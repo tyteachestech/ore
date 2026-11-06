@@ -116,7 +116,7 @@ export function remove(state: EditorState, b: Block): Transaction {
   return tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(rm.from, tr.doc.content.size)))).scrollIntoView();
 }
 
-export type Kind = "text" | "h1" | "h2" | "h3" | "bullet" | "number" | "todo" | "quote" | "callout" | "toggle";
+export type Kind = "text" | "h1" | "h2" | "h3" | "bullet" | "number" | "todo" | "quote" | "callout" | "toggle" | "th1" | "th2" | "th3";
 
 /** Turn into, in Notion's order; the same blocks as the / menu. */
 export const KINDS: { kind: Kind; label: string }[] = [
@@ -130,6 +130,9 @@ export const KINDS: { kind: Kind; label: string }[] = [
   { kind: "toggle", label: "Toggle" },
   { kind: "callout", label: "Callout" },
   { kind: "quote", label: "Quote" },
+  { kind: "th1", label: "Toggle heading 1" },
+  { kind: "th2", label: "Toggle heading 2" },
+  { kind: "th3", label: "Toggle heading 3" },
 ];
 
 /** The kind a block is now, so Turn into can mark it; of selected blocks, the kind they all are. */
@@ -144,7 +147,8 @@ function kindOfOne(doc: PMNode, b: Block): Kind | null {
   if (list) return n.attrs.checked != null ? "todo" : list.type.name === "ordered_list" ? "number" : "bullet";
   if (n.type.name === "paragraph") return "text";
   if (n.type.name === "heading") return `h${Math.min(3, Number(n.attrs.level))}` as Kind;
-  return ({ blockquote: "quote", callout: "callout", toggle: "toggle" } as Record<string, Kind>)[n.type.name] ?? null;
+  if (n.type.name === "toggle") return n.attrs.level ? (`th${n.attrs.level}` as Kind) : "toggle";
+  return ({ blockquote: "quote", callout: "callout" } as Record<string, Kind>)[n.type.name] ?? null;
 }
 
 /** The text a block leads with, and the blocks under it, which carry over into what it becomes. */
@@ -236,7 +240,8 @@ function turnOne(state: EditorState, b: Block, kind: Kind): Transaction | null {
   else if (kind === "callout") made = [s.callout!.create({ kind: "note" }, [para(), ...rest])];
   else {
     const title = lead.textBetween(0, lead.size, " ", " ").trim();
-    made = [s.toggle!.create(null, [s.toggle_summary!.create(null, title ? schema.text(title) : null), ...(rest.length ? rest : [s.paragraph!.create()])])];
+    const level = kind === "toggle" ? 0 : Number(kind[2]);
+    made = [s.toggle!.create({ level }, [s.toggle_summary!.create(null, title ? schema.text(title) : null), ...(rest.length ? rest : [s.paragraph!.create()])])];
   }
 
   if (!b.item) {

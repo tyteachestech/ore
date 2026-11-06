@@ -218,6 +218,31 @@ journey("source note: what he types is kept when he switches sources and comes b
   await shows("after a relaunch");
 });
 
+journey("note: / makes a toggle heading and @ writes a date; both are still there after a reload", async (page) => {
+  const d = new Date(Date.now() + 864e5);
+  const tomorrow = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  await openSource(page, AGENTS);
+  await page.locator(".note-editor [contenteditable=true]").first().click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/toggleheading2");
+  await page.locator(".note-menu-row.on", { hasText: "Toggle heading 2" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Why agents");
+  await page.keyboard.press("Enter"); // into the toggle's first line
+  await page.keyboard.type("Plan first, @tom");
+  await page.locator(".note-menu-row.on", { hasText: "Tomorrow" }).waitFor();
+  await page.keyboard.press("Enter");
+  const kept = async () =>
+    (await page.locator('.note-editor .toggle[data-level="2"] .toggle-summary', { hasText: "Why agents" }).isVisible()) &&
+    (await page.locator(".note-editor .toggle p", { hasText: `Plan first, ${tomorrow}` }).isVisible());
+  await until("a toggle heading with the date under it", kept);
+  await page.waitForTimeout(600); // the note saves after a pause
+  await page.reload();
+  await openSource(page, AGENTS);
+  await until("both survive a reload", kept);
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {
@@ -243,7 +268,7 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
   await grip("Effortful");
   await page.locator(".block-grip").click();
   await page.locator(".menu-item", { hasText: "Turn into" }).hover();
-  await page.getByRole("menuitemcheckbox", { name: "Heading 3" }).dispatchEvent("click");
+  await page.getByRole("menuitemcheckbox", { name: "Heading 3", exact: true }).dispatchEvent("click");
   await until("it became a heading", () => page.locator(".note-editor h3", { hasText: "Effortful" }).isVisible());
   await page.keyboard.press("ControlOrMeta+z"); // the editor's own undo: ⌘ on the Mac, Ctrl where CI runs
   await until("⌘Z takes it back", async () => (await items()).some((t) => t.startsWith("Effortful")));

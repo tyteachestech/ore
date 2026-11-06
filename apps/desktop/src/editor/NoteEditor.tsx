@@ -17,6 +17,7 @@ import { usePeek } from "../Peek";
 import { errorText, type Notify } from "../util";
 import { calloutSchema, diagramName, toggleSchema, toggleSummarySchema } from "./blocks";
 import { createEditor, markdownOf, menuTrigger } from "./editor";
+import { dateRows } from "./dates";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
 import { BlockHandle } from "./BlockHandle";
@@ -80,7 +81,7 @@ const DiagramEditor = lazy(() => import("../Diagram"));
 /** Fired after a diagram is saved, so its preview redraws; detail is `<note dir>/<name>`. */
 const SAVED = "ore:diagram-saved";
 
-type Menu = { kind: "slash" | "link" | "emoji"; query: string; from: number; to: number; x: number; y: number };
+type Menu = { kind: "slash" | "link" | "emoji" | "date"; query: string; from: number; to: number; x: number; y: number };
 type Row = { label: string; sub?: string; emoji?: string; run: () => void };
 
 const LINK_URL = /^ore:(item|skill)\/(.+)$/;
@@ -286,6 +287,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         },
       }));
     }
+    if (menu.kind === "date")
+      return dateRows(menu.query).map((d) => ({
+        label: d.label,
+        sub: d.iso, // what it saves
+        run: () => {
+          const v = clear(menu);
+          if (!v) return;
+          v.dispatch(v.state.tr.insertText(d.iso));
+          v.focus();
+        },
+      }));
     if (menu.kind === "link") {
       const hits = p.targets.filter((t) => t.title.toLowerCase().includes(q));
       hits.sort((a, b) => Number(!a.title.toLowerCase().startsWith(q)) - Number(!b.title.toLowerCase().startsWith(q)));
@@ -333,21 +345,21 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           if (v) wrapIn(calloutSchema.type(ctxOf(editor.current!)), { kind: "note" })(v.state, v.dispatch);
         },
       },
-      {
-        label: "Toggle",
-        sub: "<details>",
+      ...[0, 1, 2, 3].map((level) => ({
+        label: level ? `Toggle heading ${level}` : "Toggle",
+        sub: level ? undefined : "<details>",
         run: () => {
           const v = clear(menu);
           if (!v) return;
           const ctx = ctxOf(editor.current!);
-          const node = toggleSchema.type(ctx).create(null, [toggleSummarySchema.type(ctx).create(), v.state.schema.nodes.paragraph!.create()]);
+          const node = toggleSchema.type(ctx).create({ level }, [toggleSummarySchema.type(ctx).create(), v.state.schema.nodes.paragraph!.create()]);
           const { $from } = v.state.selection;
           const empty = $from.parent.type.name === "paragraph" && !$from.parent.content.size;
           const at = empty ? $from.before() : $from.after();
           const tr = empty ? v.state.tr.replaceWith(at, $from.after(), node) : v.state.tr.insert(at, node);
           v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 2)));
         },
-      },
+      })),
       { label: "Code", sub: "```", run: cmd(createCodeBlockCommand.key) },
       { label: "Divider", sub: "---", run: cmd(insertHrCommand.key) },
       {
@@ -453,7 +465,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <div ref={root} />
       {!PHONE && <BlockHandle view={view} host={host} />}
       {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} />}
-      {menu && (menu.kind !== "emoji" || rows.length > 0) && (
+      {menu && ((menu.kind !== "emoji" && menu.kind !== "date") || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
             rows.map((r, i) => (
@@ -589,8 +601,8 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
               }
               return false;
             }
-            // An emoji query with no match shows nothing, so its keys stay ordinary typing.
-            if (menu.kind === "emoji" && !rows.length) return false;
+            // An emoji or date query with no match shows nothing, so its keys stay ordinary typing.
+            if ((menu.kind === "emoji" || menu.kind === "date") && !rows.length) return false;
             // Keys the menu uses stop here, so the view around the editor (Esc: back) never sees them.
             const used = () => (e.stopPropagation(), true);
             if (e.key === "Escape") {
@@ -768,9 +780,10 @@ function diagramView(live: Live, name: string) {
 }
 
 /** A toggle shows its caret outside the editable text; collapsing is view-only (Markdown keeps none). */
-const toggleView = $view(toggleSchema.node, () => () => {
+const toggleView = $view(toggleSchema.node, () => (node) => {
   const dom = document.createElement("div");
   dom.className = "toggle";
+  dom.dataset.level = String(node.attrs.level); // a toggle heading's size
   const caret = document.createElement("button");
   caret.className = "toggle-caret";
   caret.contentEditable = "false";
