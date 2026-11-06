@@ -121,7 +121,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   }
   if (kind === "epub") {
     const e = await Promise.resolve().then(() => epubToDoc(bytes)).catch(damaged("EPUB"));
-    return { type: "epub", title: e.title ?? fileStem(name), author: e.author, url, body: e.body, source: { ext: "epub", data: bytes }, assets: e.assets };
+    return { type: "epub", title: e.title ?? fileStem(name), author: e.author, published: e.published, url, body: e.body, source: { ext: "epub", data: bytes }, assets: e.assets };
   }
   if (kind === "docx" || kind === "pptx") {
     const office = await import("./office.ts");
