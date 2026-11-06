@@ -12,7 +12,11 @@ export interface PdfDoc {
   body: string;
   /** The figures its pages show, saved as `assets/<name>` (D122). */
   assets?: Asset[];
+  /** Tables or formulas pdf.js reads only as lines of text, which Docling would read properly (D125). */
+  structure?: Structure[];
 }
+
+export type Structure = "tables" | "formulas";
 
 /** Figures kept per PDF, and the size of one past which it is left out. */
 const MAX_FIGURES = 80;
@@ -30,6 +34,8 @@ interface Item {
   /** Set in a bold or an italic face, by the font's name. */
   bold?: boolean;
   italic?: boolean;
+  /** Set in a math font (TeX's cmmi, Cambria Math): a formula's letters and symbols. */
+  math?: boolean;
 }
 
 interface Line {
@@ -54,9 +60,10 @@ const ITALIC_FONT = /italic|oblique|ita(?:l)?$|[-_]it(?:[A-Z]|$)|^cmti|^cmsl|^cm
 
 /** Bold and italic from the font's name ("NimbusRomNo9L-Medi", "Helvetica-BoldOblique", TeX's
  *  "CMBX10" and "CMTI10"), its subset tag ("ABCDEF+") left off. */
-function faceOf(font: string): { bold?: boolean; italic?: boolean } {
+function faceOf(font: string): { bold?: boolean; italic?: boolean; math?: boolean } {
   const name = font.replace(/^[A-Z]{6}\+/, "");
-  if (!name || MATH_FONT.test(name)) return {};
+  if (!name) return {};
+  if (MATH_FONT.test(name)) return { math: true };
   return { bold: BOLD_FONT.test(name) || undefined, italic: ITALIC_FONT.test(name) || undefined };
 }
 
@@ -277,6 +284,39 @@ function join(para: string, text: string, words: Set<string>): string {
 
 /** A face most of the text is set in (a deck all in bold) marks nothing: only a face used for some
  *  words is emphasis. */
+/** What pdf.js can only read as lines (D125). Formulas: many glyphs set in math fonts (a paper's
+ *  symbols in passing are a few dozen). Tables: three rows in a row with the same three or more
+ *  columns, a column lining up by its left or right edge, short cells and a word among them (a
+ *  page set in columns has long cells; a chart's axis has only numbers). Checked on the bake-off
+ *  papers, books, a magazine, slides and a form. */
+function structureOf(pages: Item[][]): Structure[] | undefined {
+  const out: Structure[] = [];
+  if (pages.flat().filter((i) => i.math && i.str.trim()).length >= 50) out.push("formulas");
+  const table = pages.some((items) => {
+    const rows = new Map<number, Item[]>();
+    for (const i of items) if (i.str.trim() && i.size) rows.set(Math.round(i.y), [...(rows.get(Math.round(i.y)) ?? []), i]);
+    let prev: { l: number; r: number; text: string }[] | undefined;
+    let run: string[] = [];
+    for (const y of [...rows.keys()].sort((a, b) => b - a)) {
+      const row = rows.get(y)!.sort((a, b) => a.x - b.x);
+      const cells: { l: number; r: number; text: string }[] = [];
+      for (const i of row) {
+        const c = cells.at(-1);
+        if (c && i.x - c.r <= i.size) Object.assign(c, { r: i.end, text: c.text + i.str });
+        else cells.push({ l: i.x, r: i.end, text: i.str });
+      }
+      const lined = !!prev && cells.length >= 3 && cells.length === prev.length && cells.every((c, k) => Math.abs(c.l - prev![k]!.l) < 4 || Math.abs(c.r - prev![k]!.r) < 4);
+      const short = cells.every((c) => c.text.trim().length <= 24);
+      run = lined && short ? [...run, ...cells.map((c) => c.text)] : short && cells.length >= 3 ? cells.map((c) => c.text) : [];
+      prev = cells;
+      if (run.length >= cells.length * 3 && run.some((t) => /\p{L}{2}/u.test(t))) return true;
+    }
+    return false;
+  });
+  if (table) out.push("tables");
+  return out.length ? out : undefined;
+}
+
 function plainFaces(pages: Item[][]): void {
   const all = pages.flat();
   const chars = (f: (i: Item) => boolean | undefined) => all.reduce((n, i) => n + (f(i) ? i.str.trim().length : 0), 0);
@@ -460,6 +500,7 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const assets = [...new Map(kept.flat().slice(0, MAX_FIGURES).map((a) => [a.name, a])).values()];
   const body = bodySize(items);
   plainFaces(items);
+  const structure = structureOf(items);
   const blocks: string[] = [];
   const raw = items.map((p, i) => pageLines(swapRegions(dropMargins(p, body), regions.filter((r) => r.page === i + 1), blocks)));
   const typical = lineGap(raw);
@@ -488,5 +529,5 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
     throw new ScannedPdf();
   }
   // A metadata title that is only a file or tool name ("1706", "Microsoft Word - draft.docx") loses to page 1's.
-  return { title: cleanTitle(meta.title) ?? titleFrom(lines[0] ?? [], body), author: meta.author, body: text, assets };
+  return { title: cleanTitle(meta.title) ?? titleFrom(lines[0] ?? [], body), author: meta.author, body: text, assets, structure };
 }

@@ -1,5 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import type { Region } from "./docling.ts";
+import { doclingPath } from "./docling-path.ts";
 import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
@@ -113,7 +114,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
       if (!(e instanceof (await import("./pdf.ts")).ScannedPdf)) throw e;
       return (await import("./ocr.ts")).scannedText(bytes, "pdf");
     });
-    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes }, assets: "assets" in p ? p.assets : undefined };
+    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes }, assets: "assets" in p ? p.assets : undefined, structure: "structure" in p ? p.structure : undefined };
   }
   if (IMAGE_TYPES.includes(kind)) {
     // A screenshot or photo of text: its text to read, the image above it (D96).
@@ -472,7 +473,7 @@ function swapFiles(item: Item, from: string) {
   const was = ItemMetaSchema.parse(old.data);
   for (const f of readdirSync(item.dir).filter(REPLACED)) unlinkSync(join(item.dir, f));
   for (const f of readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md")) copyFileSync(join(from, f), join(item.dir, f));
-  const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, author: was.author, published: was.published, text_sha256: was.text_sha256 };
+  const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256 };
   writeAtomic(item.docPath, stringifyFrontmatter(meta, old.body));
   rmSync(from, { recursive: true, force: true });
   return tmp;
@@ -505,7 +506,11 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const regions = read ?? layoutOf(item.dir);
   const draft = await withImages(course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
   if (!draft.body.trim()) throw new Error("Found no text to read at the original now. It may have moved; open it to check.");
-  if (draft.body === item.body) return { item, changed: false, moved: 0, removed: [] };
+  if (draft.body === item.body) {
+    // A better reader may learn something about the same text: a PDF's tables still to be read (D125).
+    if (String(draft.structure ?? "") !== String(item.meta.structure ?? "")) item.meta = await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: draft.structure }));
+    return { item, changed: false, moved: 0, removed: [] };
+  }
   const dir = stash(lib, item.meta.id);
   await withLock(paths.lock(lib), () => {
     rmSync(dir, { recursive: true, force: true });
@@ -522,7 +527,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     // A lesson read from its course page again (lessonOf) gains its page's link.
     // Read again under the lock: a background enrich may have written its questions while this one read.
     const now = readItemDir(item.dir).meta;
-    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, author: now.author ?? draft.author, published: draft.published ?? now.published };
+    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);
@@ -565,14 +570,16 @@ export async function readTables(lib: Library, ref: string): Promise<Reimported 
   }
 }
 
-/** Where a PDF's tables stand: being read now, read (its layout.json), or why the last reading failed. */
-export function tablesState(lib: Library, item: Item): { tables?: "reading" | "read"; tables_error?: string } {
+/** Where a PDF's tables stand: being read now, read (its layout.json), or why the last reading failed;
+ *  for one with tables or formulas still read as lines, whether the reader is here to read them. */
+export function tablesState(lib: Library, item: Item): { tables?: "reading" | "read"; tables_error?: string; tables_reader?: boolean } {
   if (item.meta.type !== "pdf") return {};
   const pid = Number(readOr(tablesFile(lib, item.meta.id, "reading")));
   if (pid && alive(pid)) return { tables: "reading" };
   if (existsSync(join(item.dir, "layout.json"))) return { tables: "read" };
   const error = readOr(tablesFile(lib, item.meta.id, "error"));
-  return error ? { tables_error: error } : {};
+  const reader = item.meta.structure?.length ? { tables_reader: !!doclingPath() } : {};
+  return error ? { tables_error: error, ...reader } : reader;
 }
 
 const readOr = (f: string) => {
