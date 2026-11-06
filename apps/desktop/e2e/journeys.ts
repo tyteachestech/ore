@@ -191,6 +191,36 @@ journey("highlight note: what he types is kept when he clicks away or presses Es
   await page.keyboard.press("Escape");
   await until("Esc closes the popup", async () => !(await note.isVisible()));
   await reopen("orchestrator-workers", "How is it unlike routing?");
+  await clickOn("Workflows are systems where language models");
+
+  // The highlight's save lands while he is typing (1 run in 10 lost the note, 2026-11-06): hold the
+  // save, then let it land and type in the same moment, before the reader has redrawn.
+  await page.evaluate(() => {
+    const real = window.fetch;
+    window.fetch = (async (url: RequestInfo, init?: RequestInit) => {
+      if (!String(init?.body ?? "").includes('"highlight"')) return real(url, init);
+      window.fetch = real;
+      // Read in full first, so once let go it reaches the reader in microtasks alone.
+      const j = await (await real(url, init)).json();
+      await new Promise((go) => ((window as unknown as { __land: () => void }).__land = () => go(null)));
+      return { ok: true, json: async () => j } as Response;
+    }) as typeof fetch;
+  });
+  await select(page, "Routing classifies an input");
+  await note.click();
+  await page.keyboard.type("Pick a path");
+  await page.waitForFunction(() => "__land" in window);
+  await page.evaluate(async () => {
+    (window as unknown as { __land: () => void }).__land();
+    for (let i = 0; i < 200; i++) await null; // the save's handlers run; the redraw waits for a task
+    const field = document.querySelector<HTMLTextAreaElement>('[role=dialog][aria-label=Highlight] textarea')!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, field.value + " first");
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.keyboard.type(", then answer");
+  await clickOn("Workflows are systems where language models");
+  await until("the popup closes", async () => !(await note.isVisible()));
+  await reopen("Routing classifies an input", "Pick a path first, then answer");
 
   await page.reload();
   await openSource(page, AGENTS);

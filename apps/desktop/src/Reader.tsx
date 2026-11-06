@@ -2292,7 +2292,11 @@ function ReaderView(p: Props & { reload: () => void }) {
                 className="field"
                 aria-label="Note"
                 value={popup.note}
-                onChange={(e) => setPopup({ ...popup, note: e.target.value })}
+                // From the popup as it is now: a keystroke as the highlight's save lands must not put back its draft id.
+                onChange={(e) => {
+                  const note = e.target.value;
+                  setPopup((cur) => cur && { ...cur, note });
+                }}
                 placeholder={PLACEHOLDER[intent]}
               />
               <div className="popup-tools">
