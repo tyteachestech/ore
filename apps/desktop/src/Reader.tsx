@@ -12,6 +12,7 @@ import { Collected, CollectedPanel, ICON, LABEL, MEANS } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar } from "./Find";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
+import { snapRange } from "./snap";
 import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
@@ -65,6 +66,23 @@ const rehypePlugins = [[rehypeKatex, { output: "html", throwOnError: false }]] a
 // A click on a link is handled by the reader (`followLink`). Footnotes (`footnotes` in text.ts) keep
 // their "^" in the text for the index, drawn as a small raised number.
 const caret = (children: ReactNode) => (typeof children === "string" && children.startsWith("^") ? <><span className="fn-caret">^</span>{children.slice(1)}</> : children);
+/** A footnote mark's note: the next one with its number after it (a book's chapters number theirs
+ *  from 1 again), else the first. */
+function noteFor(mark: Element): Element | undefined {
+  const id = mark.getAttribute("href")?.match(/^#(fn-.+)$/)?.[1];
+  if (!id) return undefined;
+  const all = Array.from(mark.ownerDocument.querySelectorAll(`[id="${CSS.escape(id)}"]`));
+  return all.find((n) => mark.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING) ?? all[0];
+}
+
+/** The note's text without its number, for the preview a mark shows. */
+function noteText(mark: Element): string {
+  const back = noteFor(mark);
+  const block = back?.closest("p, li");
+  if (!back || !block) return "";
+  return (block.textContent ?? "").slice((back.textContent ?? "").length).replace(/^[:\s]+/, "").trim();
+}
+
 const components: Components = {
   a: ({ href, children }) => {
     const fn = href?.match(/^#fn(ref)?-(.+)$/);
@@ -1049,7 +1067,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   /** A passage chosen with the mouse or the keyboard: inside a highlight he already made, that one opens
    *  (with the type he keyed) instead of stacking a second; otherwise it becomes a new highlight. */
-  function highlightRange(r: Range, intent?: Intent, aim?: Aim) {
+  function highlightRange(r: Range, intent?: Intent, aim?: Aim, snap = false) {
     const inside = [...ranges.current].find(
       ([, h]) => h.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, r) >= 0,
     );
@@ -1057,7 +1075,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       fresh.current = null;
       openPopup(inside[0], inside[1], annsRef.current.find((a) => a.id === inside[0])?.note ?? "", aim);
       if (intent && annsRef.current.find((a) => a.id === inside[0])?.intent !== intent) void setIntentOf(inside[0], intent);
-    } else createHighlight(r, intent, aim);
+    } else createHighlight(snap ? snapRange(r) : r, intent, aim);
   }
 
   // The quiz's "In the source" passage as a key point, in one click: inside a highlight he made, that
@@ -1643,7 +1661,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   // One click opens a link (Safari, Readwise Reader): the web in his browser, a footnote or heading
   // in this page. A drag across one selects text instead: no link opens while text is selected.
-  const followLink = (href: string) => {
+  const followLink = (href: string, from?: Element) => {
     const dec = (t: string) => {
       try {
         return decodeURIComponent(t);
@@ -1655,7 +1673,10 @@ function ReaderView(p: Props & { reload: () => void }) {
       const id = href.slice(1);
       const el = docEl.current;
       const slug = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
-      const byId = el && Array.from(el.querySelectorAll("[id]")).find((n) => n.id === id || n.id === dec(id));
+      const ids = el ? Array.from(el.querySelectorAll("[id]")).filter((n) => n.id === id || n.id === dec(id)) : [];
+      // A book's chapters number their footnotes from 1 again: a mark goes to the next note with its
+      // number, a note back to the last mark before it.
+      const byId = (from && (id.startsWith("fnref-") ? ids.findLast((n) => n.compareDocumentPosition(from) & Node.DOCUMENT_POSITION_FOLLOWING) : noteFor(from))) || ids[0];
       const heading = !byId && el ? Array.from(el.querySelectorAll("h1, h2, h3, h4, h5, h6")).find((h) => slug(h.textContent ?? "") === slug(dec(id))) : undefined;
       if (byId || heading) return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
       return p.notify(`That part of the page wasn’t saved with it.${doc?.url && doc.type !== "snippet" ? " Reimport the source from its ⋯ menu to fetch it again." : ""}`, "error");
@@ -1668,7 +1689,9 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!a || !docEl.current?.contains(a)) return;
     e.preventDefault();
     if (window.getSelection()?.isCollapsed === false) return;
-    followLink(a.getAttribute("href")!);
+    // On a touch screen a footnote's mark shows its note where it is, as Books does.
+    if (a.matches("a.fn") && matchMedia("(hover: none)").matches) return showNote(a);
+    followLink(a.getAttribute("href")!, a);
   };
 
   const onMouseUp = (e: MouseEvent) => {
@@ -1683,7 +1706,8 @@ function ReaderView(p: Props & { reload: () => void }) {
       const r = sel.getRangeAt(0);
       if (el.contains(r.startContainer) && el.contains(r.endContainer)) {
         const up = sel.focusNode === r.startContainer && sel.focusOffset === r.startOffset;
-        highlightRange(r.cloneRange(), undefined, { x: e.clientX, y: e.clientY, up });
+        // Whole words, unless he held ⌥ for part of one.
+        highlightRange(r.cloneRange(), undefined, { x: e.clientX, y: e.clientY, up }, !e.altKey);
         setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
       }
       return;
@@ -1740,13 +1764,17 @@ function ReaderView(p: Props & { reload: () => void }) {
     touchRange.current = null;
     setTouchSel(false);
     if (!r || r.collapsed) return;
-    createHighlight(r, intent);
+    createHighlight(snapRange(r), intent);
     window.getSelection()?.removeAllRanges();
   };
 
   const onMouseMove = (e: MouseEvent) => {
     pointer.current = { x: e.clientX, y: e.clientY };
-    if (popup || e.buttons || frame.current) return;
+    if (popup || e.buttons) return;
+    // A footnote's mark shows its note on hover (Wikipedia's previews); a click still goes to it.
+    const mark = (e.target as Element).closest?.("a.fn");
+    if (mark) return showNote(mark);
+    if (frame.current) return;
     const { clientX: x, clientY: y } = e;
     frame.current = requestAnimationFrame(() => {
       frame.current = 0;
@@ -1754,6 +1782,13 @@ function ReaderView(p: Props & { reload: () => void }) {
       const note = id ? annsRef.current.find((a) => a.id === id)?.note : undefined;
       setTip((cur) => (id && note ? (cur?.id === id ? cur : { id, x, y, text: note }) : null));
     });
+  };
+
+  const showNote = (mark: Element) => {
+    const text = noteText(mark);
+    if (!text) return;
+    const r = mark.getBoundingClientRect();
+    setTip((cur) => (cur?.id === `fn:${mark.id}` ? cur : { id: `fn:${mark.id}`, x: r.left - 12, y: r.bottom - 18 + 6, text }));
   };
 
   const openFind = () => {
@@ -2116,7 +2151,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         </div>
       )}
       <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll}>
-        <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={() => setTip(null)}>
+        <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's
                 og:image or site logo only repeats what the title says, and a video's picture is its player. */}
@@ -2293,7 +2328,11 @@ function ReaderView(p: Props & { reload: () => void }) {
                 className="field"
                 aria-label="Note"
                 value={popup.note}
-                onChange={(e) => setPopup({ ...popup, note: e.target.value })}
+                // From the popup as it is now: a keystroke as the highlight's save lands must not put back its draft id.
+                onChange={(e) => {
+                  const note = e.target.value;
+                  setPopup((cur) => cur && { ...cur, note });
+                }}
                 placeholder={PLACEHOLDER[intent]}
               />
               <div className="popup-tools">
@@ -2360,7 +2399,8 @@ function ReaderView(p: Props & { reload: () => void }) {
         </div>
       </div>
       {tip && (
-        <div className="tip" style={{ left: tip.x + 12, top: tip.y + 18 }}>
+        // A note's preview stays on screen at a phone's width too.
+        <div className={tip.id.startsWith("fn:") ? "tip note" : "tip"} style={{ left: tip.id.startsWith("fn:") ? Math.max(12, Math.min(tip.x + 12, innerWidth - Math.min(360, innerWidth - 24) - 12)) : tip.x + 12, top: tip.y + 18 }}>
           {tip.text}
         </div>
       )}

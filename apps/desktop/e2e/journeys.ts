@@ -95,6 +95,19 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("PDF footnote: its mark shows the note on hover, and bold stays bold", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/hazards.pdf"));
+  await page.keyboard.press("Enter");
+  const doc = page.locator(".doc");
+  await doc.getByText("habits matter as much as reasons", { exact: false }).waitFor();
+  await doc.locator("strong", { hasText: "remember" }).waitFor();
+  await doc.locator("a.fn").first().hover();
+  await page.locator(".tip.note").getByText("We are not suggesting that people are irrational").waitFor();
+  await page.mouse.move(5, 5);
+  await page.locator(".tip.note").waitFor({ state: "detached" });
+});
+
 journey("cancel an add from its toast: nothing is added, and the link stays in the box", async (page) => {
   // A page that hangs on its picture, which is fetched after the source is written.
   const page$ = `<html><head><title>Slow page</title><meta property="og:image" content="/cover.jpg"></head><body><article><h1>Slow page</h1><p>${"Spacing beats cramming. ".repeat(40)}</p></article></body></html>`;
@@ -131,6 +144,23 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await page.reload();
   await openSource(page, TESTING);
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
+});
+
+journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {
+  await openSource(page, TESTING);
+  const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await select(page, "ach successful retrieval changes the memory its");
+  await popup.waitFor();
+  await until("it snaps out to whole words", async () => (await active()) === "Each successful retrieval changes the memory itself.");
+  await page.keyboard.press("Escape"); // drops the fresh one
+  await popup.waitFor({ state: "hidden" });
+  await page.keyboard.down("Alt");
+  await select(page, "trengthens the route bac");
+  await page.keyboard.up("Alt");
+  await popup.waitFor();
+  await until("⌥ keeps exactly what he selected", async () => (await active()) === "trengthens the route bac");
+  await page.keyboard.press("Escape");
 });
 
 journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
@@ -174,6 +204,36 @@ journey("highlight note: what he types is kept when he clicks away or presses Es
   await page.keyboard.press("Escape");
   await until("Esc closes the popup", async () => !(await note.isVisible()));
   await reopen("orchestrator-workers", "How is it unlike routing?");
+  await clickOn("Workflows are systems where language models");
+
+  // The highlight's save lands while he is typing (1 run in 10 lost the note, 2026-11-06): hold the
+  // save, then let it land and type in the same moment, before the reader has redrawn.
+  await page.evaluate(() => {
+    const real = window.fetch;
+    window.fetch = (async (url: RequestInfo, init?: RequestInit) => {
+      if (!String(init?.body ?? "").includes('"highlight"')) return real(url, init);
+      window.fetch = real;
+      // Read in full first, so once let go it reaches the reader in microtasks alone.
+      const j = await (await real(url, init)).json();
+      await new Promise((go) => ((window as unknown as { __land: () => void }).__land = () => go(null)));
+      return { ok: true, json: async () => j } as Response;
+    }) as typeof fetch;
+  });
+  await select(page, "Routing classifies an input");
+  await note.click();
+  await page.keyboard.type("Pick a path");
+  await page.waitForFunction(() => "__land" in window);
+  await page.evaluate(async () => {
+    (window as unknown as { __land: () => void }).__land();
+    for (let i = 0; i < 200; i++) await null; // the save's handlers run; the redraw waits for a task
+    const field = document.querySelector<HTMLTextAreaElement>('[role=dialog][aria-label=Highlight] textarea')!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, field.value + " first");
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.keyboard.type(", then answer");
+  await clickOn("Workflows are systems where language models");
+  await until("the popup closes", async () => !(await note.isVisible()));
+  await reopen("Routing classifies an input", "Pick a path first, then answer");
 
   await page.reload();
   await openSource(page, AGENTS);
