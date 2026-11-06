@@ -12,7 +12,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { forwardRef, lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Scene } from "../Diagram";
-import { ore, type Diagram } from "../ore";
+import { ore, PHONE, type Diagram } from "../ore";
 import { usePeek } from "../Peek";
 import { errorText, type Notify } from "../util";
 import { calloutSchema, diagramName, toggleSchema, toggleSummarySchema } from "./blocks";
@@ -387,6 +387,21 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setIndex(i);
   };
 
+  /** Links a new diagram where /diagram was typed, once (on its first save or at Done). */
+  const linkDiagram = (name: string) => {
+    const d = drawing;
+    const v = view();
+    if (!d || d.at === undefined || !v) return;
+    const at = d.at;
+    d.at = undefined;
+    const img = imageSchema.type(ctxOf(editor.current!)).create({ src: `diagrams/${name}.excalidraw`, alt: "Diagram" });
+    const tr = v.state.tr.setSelection(TextSelection.create(v.state.doc, Math.min(at, v.state.doc.content.size)));
+    v.dispatch(tr.replaceSelectionWith(img));
+    // Reported now, not after the editor's pause: focus is in the drawing, so no blur saves it, and
+    // switching the panel's tab next would drop the link.
+    const now = p.pull?.current?.();
+    if (now != null) p.onChange(now);
+  };
   const closeDiagram = (scene: Scene | null, name: string) => {
     const d = drawing;
     setDrawing(null);
@@ -396,10 +411,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     v?.focus();
     if (!d || !scene) return;
     window.dispatchEvent(new CustomEvent(SAVED, { detail: `${p.dir}/${name}` }));
-    if (d.at === undefined || !v) return;
-    const img = imageSchema.type(ctxOf(editor.current!)).create({ src: `diagrams/${name}.excalidraw`, alt: "Diagram" });
-    const tr = v.state.tr.setSelection(TextSelection.create(v.state.doc, Math.min(d.at, v.state.doc.content.size)));
-    v.dispatch(tr.replaceSelectionWith(img));
+    linkDiagram(name);
   };
   /** A diagram renamed in its editor: the note's link follows, and saves with the note. */
   const renamedDiagram = (from: string, to: string) => {
@@ -450,7 +462,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {peek.view}
       {drawing && (
         <Suspense fallback={null}>
-          <DiagramEditor args={p.noteArgs} name={drawing.name} loaded={lastRead.get(`${p.dir}/${drawing.name}`)} notify={p.notify} onClose={closeDiagram} onRenamed={renamedDiagram} onLink={(href) => {
+          <DiagramEditor args={p.noteArgs} name={drawing.name} loaded={lastRead.get(`${p.dir}/${drawing.name}`)} dock={dockOf(root.current)} notify={p.notify} onClose={closeDiagram} onFirstSave={linkDiagram} onRenamed={renamedDiagram} onLink={(href) => {
             const m = href.match(LINK_URL);
             if (m) p.onOpen({ kind: m[1] as LinkTarget["kind"], id: m[2]! });
             else void openUrl(href);
@@ -615,6 +627,10 @@ function imageView(live: Live) {
     return { dom: img };
   });
 }
+
+/** The reader's side panel the note sits in, where its diagrams open beside the source (not on the phone,
+ *  where the panel is a whole screen already). */
+const dockOf = (el: HTMLElement | null) => (PHONE ? null : (el?.closest(".mynotes") as HTMLElement | null) ?? null);
 
 /** The scene each preview last read, so opening it skips reading the file again. */
 const lastRead = new Map<string, Diagram>();

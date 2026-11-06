@@ -147,6 +147,42 @@ journey("source note: what he types is kept when he switches sources and comes b
   await shows("after a relaunch");
 });
 
+journey("diagram: draws beside the source, and a new one stays linked when the panel switches tab", async (page) => {
+  await openSource(page, AGENTS);
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  // Typed into the reader instead, "/diagram" would run its keys (A archives the source).
+  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/diagram");
+  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+  await page.keyboard.press("Enter");
+  const docked = page.locator(".diagram.docked");
+  await docked.waitFor().catch(async (e) => {
+    // Say where it went instead: a toast's error, or the screen it landed on.
+    const seen = await page.evaluate(() => [...document.querySelectorAll("[role=status], [role=alert], .toast")].map((n) => n.textContent).join(" | "));
+    throw new Error(`no docked diagram (full window: ${await page.locator(".diagram").count()}, reader: ${await page.locator(".doc").count()}, says: ${seen || "nothing"}): ${(e as Error).message}`);
+  });
+  await until("the source stays in view beside it", () => page.locator(".doc").isVisible());
+  const canvas = await docked.locator(".draw").boundingBox();
+  await docked.locator(".draw").focus();
+  await page.keyboard.press("r");
+  await page.mouse.move(canvas!.x + 260, canvas!.y + 520);
+  await page.mouse.down();
+  await page.mouse.move(canvas!.x + 420, canvas!.y + 600, { steps: 5 });
+  await page.mouse.up();
+  await until("the note links it once it is saved", () => page.locator(".note-editor .note-diagram").count().then((n) => n === 1), 6000);
+  await page.getByRole("tab", { name: "Collected" }).click(); // closes the drawing without Done
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await until("the link is still in the note", async () => (await page.locator(".note-editor .note-diagram svg").count()) === 1);
+  await page.locator(".note-editor .note-diagram").click();
+  await docked.waitFor();
+  await page.keyboard.press("Shift+Meta+Enter");
+  await page.locator(".diagram:not(.docked)").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc closes it", async () => (await page.locator(".diagram").count()) === 0);
+});
+
 journey("review: rate a card, the session moves on, and Undo brings the card back", async (page) => {
   await page.getByRole("button", { name: "Start review" }).click();
   // The "What to review" sheet comes first once Home knows his skills; Enter takes them all.
