@@ -97,6 +97,9 @@ describe("block actions (⋮⋮ handle)", () => {
     expect(await act(NOTE, "Pear", (v, b) => ops.turnInto(v.state, b, "text"))).toBe("## Ideas\n\nFirst line.\n\n- Apple\n\nPear\n\n- Nested\n- Plum\n\nLast line.\n");
     expect(await act("<details><summary>Why</summary>\n\nBecause.\n\n</details>\n", "Why", (v, b) => ops.turnInto(v.state, b, "text"))).toBe("Why\n\nBecause.\n");
     expect(await act("## Head\n", "Head", (v, b) => ops.turnInto(v.state, b, "quote"))).toBe("> Head\n");
+    // A line turned into a list item beside a list joins it, as in Notion: one list, not two.
+    expect(await act(NOTE, "Last", (v, b) => ops.turnInto(v.state, b, "bullet"))).toContain("- Plum\n- Last line.\n");
+    expect(await act("Top\n\n- One\n", "Top", (v, b) => ops.turnInto(v.state, b, "bullet"))).toBe("- Top\n- One\n");
   });
 
   test("kindOf names what Turn into marks", async () => {

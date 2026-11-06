@@ -23,8 +23,9 @@ import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
 import { BlockHandle } from "./BlockHandle";
 import { TableControls } from "./TableControls";
+import { KeyboardBar } from "./KeyboardBar";
 import { SelectionBar, type Sel } from "./SelectionBar";
-import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock } from "./blockops";
+import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock, turnAtCaret, type Kind } from "./blockops";
 import { is } from "../keys";
 
 /** What a link can point at (D39): a source, or a skill (its note, D41). */
@@ -319,39 +320,48 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       clear(menu);
       editor.current?.action(callCommand(key, payload));
     };
+    const call = (key: Parameters<typeof callCommand>[0], payload?: unknown) => () => editor.current?.action(callCommand(key, payload));
+    /** Turns the caret's line, as Notion's / does, in a list item too; `there` where Turn into would take
+     *  a whole toggle, quote or callout around it. */
+    const turn = (kind: Kind, there: () => void) => () => {
+      const v = clear(menu);
+      const tr = v && turnAtCaret(v.state, kind);
+      if (tr) v!.dispatch(tr.scrollIntoView());
+      else there();
+    };
     const all: Row[] = [
-      { label: "Text", run: cmd(turnIntoTextCommand.key) },
-      { label: "Heading 1", sub: "#", run: cmd(wrapInHeadingCommand.key, 1) },
-      { label: "Heading 2", sub: "##", run: cmd(wrapInHeadingCommand.key, 2) },
-      { label: "Heading 3", sub: "###", run: cmd(wrapInHeadingCommand.key, 3) },
-      { label: "Bulleted list", sub: "-", run: cmd(wrapInBulletListCommand.key) },
-      { label: "Numbered list", sub: "1.", run: cmd(wrapInOrderedListCommand.key) },
+      { label: "Text", run: turn("text", call(turnIntoTextCommand.key)) },
+      { label: "Heading 1", sub: "#", run: turn("h1", call(wrapInHeadingCommand.key, 1)) },
+      { label: "Heading 2", sub: "##", run: turn("h2", call(wrapInHeadingCommand.key, 2)) },
+      { label: "Heading 3", sub: "###", run: turn("h3", call(wrapInHeadingCommand.key, 3)) },
+      { label: "Bulleted list", sub: "-", run: turn("bullet", call(wrapInBulletListCommand.key)) },
+      { label: "Numbered list", sub: "1.", run: turn("number", call(wrapInOrderedListCommand.key)) },
       {
         label: "To-do list",
         sub: "[ ]",
-        run: () => {
-          cmd(wrapInBulletListCommand.key)();
+        run: turn("todo", () => {
+          call(wrapInBulletListCommand.key)();
           const v = view();
           if (!v) return;
           const { $from } = v.state.selection;
           for (let d = $from.depth; d > 0; d--)
             if ($from.node(d).type.name === "list_item") return v.dispatch(v.state.tr.setNodeAttribute($from.before(d), "checked", false));
-        },
+        }),
       },
-      { label: "Quote", sub: ">", run: cmd(wrapInBlockquoteCommand.key) },
+      { label: "Quote", sub: ">", run: turn("quote", call(wrapInBlockquoteCommand.key)) },
       {
         label: "Callout",
         sub: "> [!note]",
-        run: () => {
-          const v = clear(menu);
+        run: turn("callout", () => {
+          const v = view();
           if (v) wrapIn(calloutSchema.type(ctxOf(editor.current!)), { kind: "note" })(v.state, v.dispatch);
-        },
+        }),
       },
       ...[0, 1, 2, 3].map((level) => ({
         label: level ? `Toggle heading ${level}` : "Toggle",
         sub: level ? undefined : "<details>",
-        run: () => {
-          const v = clear(menu);
+        run: turn(level ? (`th${level}` as Kind) : "toggle", () => {
+          const v = view();
           if (!v) return;
           const ctx = ctxOf(editor.current!);
           const node = toggleSchema.type(ctx).create({ level }, [toggleSummarySchema.type(ctx).create(), v.state.schema.nodes.paragraph!.create()]);
@@ -360,10 +370,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           const at = empty ? $from.before() : $from.after();
           const tr = empty ? v.state.tr.replaceWith(at, $from.after(), node) : v.state.tr.insert(at, node);
           v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 2)));
-        },
+        }),
       })),
       { label: "Table", sub: "| |", run: cmd(insertTableCommand.key, { row: 3, col: 3 }) },
-      { label: "Code", sub: "```", run: cmd(createCodeBlockCommand.key) },
+      { label: "Code", sub: "```", run: turn("code", call(createCodeBlockCommand.key)) },
       { label: "Divider", sub: "---", run: cmd(insertHrCommand.key) },
       {
         label: "Image",
@@ -468,6 +478,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <div ref={root} />
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
+      {PHONE && <KeyboardBar view={view} targets={p.targets} />}
       {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} />}
       {menu && ((menu.kind !== "emoji" && menu.kind !== "date") || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>

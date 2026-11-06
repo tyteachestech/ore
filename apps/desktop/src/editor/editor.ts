@@ -1,6 +1,7 @@
 import { defaultValueCtx, Editor, editorViewCtx, remarkStringifyOptionsCtx, rootCtx, serializerCtx } from "@milkdown/kit/core";
 import type { MilkdownPlugin } from "@milkdown/kit/ctx";
 import { history } from "@milkdown/kit/plugin/history";
+import { clipboard } from "@milkdown/kit/plugin/clipboard";
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
 import { bulletListSchema, commonmark, linkAttr, remarkPreserveEmptyLinePlugin } from "@milkdown/kit/preset/commonmark";
 import { gfm } from "@milkdown/kit/preset/gfm";
@@ -12,6 +13,7 @@ import { highlightSchema, remarkColors, stringifyColor, textColorSchema } from "
 import { blockSelPlugin } from "./blocksel";
 import { tablePlugin, tableView } from "./tables";
 import { emojiTrigger } from "./emoji";
+import { notionKeys, notionRules, pasteLink, trapTab } from "./notion";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
 export async function createEditor(root: HTMLElement, markdown: string, onChange: (md: string) => void, plugins: MilkdownPlugin[] = []): Promise<Editor> {
@@ -29,6 +31,9 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     // Before the keymaps, so selected blocks get their keys first.
     .use(blockSelPlugin)
     .use(tablePlugin)
+    .use(notionKeys)
+    // Before the presets' own rules, which would take a shortcut first and do it otherwise.
+    .use(notionRules)
     // Without it an empty paragraph saves as nothing, not as a `<br />` line.
     .use(commonmark.filter((p) => !remarkPreserveEmptyLinePlugin.includes(p)))
     .use(gfm)
@@ -37,8 +42,11 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(taskRule)
     .use(history)
     .use(listener)
+    .use(pasteLink)
+    .use(clipboard)
     .use(plugins)
-    .create();
+    .create()
+    .then((e) => (trapTab(root), e));
 }
 
 /** Notion's to-do shortcut: `[]`, `[ ]` or `[x]` then a space at the start of a line makes a
