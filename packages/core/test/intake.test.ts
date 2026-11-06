@@ -139,6 +139,7 @@ describe("import coverage: web pages", () => {
     const item = await addSource(await tempLibrary(), "https://arxiv.org/abs/1706.03762");
     expect(item.meta.url).toBe("https://arxiv.org/abs/1706.03762");
     expect(item.meta.title).toBe("Attention Is All You Need");
+    expect(item.meta.author).toBe("Ashish Vaswani et al."); // the paper's authors, not the site's
     expect(words(item.body)).toBeGreaterThan(5000);
     expect(item.body).toContain("Scaled Dot-Product Attention");
     expect(item.body).toContain("\\sqrt{d_{k}}");
@@ -476,8 +477,7 @@ describe("import coverage: video", () => {
       "https://hls.ted.com/subs/en.vtt?segment=1": { body: "WEBVTT\n\n00:00:31.000 --> 00:00:35.000\nCreativity is as important as literacy.\n", type: "text/vtt" },
     });
     const item = await addSource(await tempLibrary(), "https://www.ted.com/talks/sir_ken_robinson_do_schools_kill_creativity");
-    expect(item.meta.type).toBe("article");
-    expect(item.meta.author).toBe("Sir Ken Robinson");
+    expect(item.meta).toMatchObject({ type: "article", title: "Do schools kill creativity?", author: "Sir Ken Robinson", published: "2006-06-27" });
     expect(item.body).toBe("[00:02] Good morning. Creativity is as important as literacy.\n");
   });
 
@@ -935,5 +935,31 @@ describe("import coverage: figures and slide pictures", () => {
     const two = readFileSync(join(item.dir, images(pages[1]!)[0]!.path));
     expect(two.subarray(1, 4).toString()).toBe("PNG");
     expect(two.readUInt32BE(16) / two.readUInt32BE(20)).toBeCloseTo(2, 1); // the two square panels side by side
+  });
+});
+
+// D122 gap 9: the small holes in the grid, each now checked.
+describe("import coverage: the grid's small holes", () => {
+  test("PDF: the author from its metadata", async () => {
+    const f = join(mkdtempSync(join(tmpdir(), "ore-pdfa-")), "figures.pdf");
+    writeFileSync(f, readFileSync(join(FIX, "files", "figures.pdf")));
+    expect((await addSource(await tempLibrary(), f)).meta.author).toBe("Ada Lovelace");
+  });
+
+  test("a damaged EPUB, Word or PowerPoint file says to download it again", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ore-broken-"));
+    const cut = new Uint8Array(readFileSync(join(FIX, "files", "deck.pptx")).subarray(0, 600));
+    for (const [name, what] of [["book.epub", "EPUB"], ["notes.docx", "Word"], ["deck.pptx", "PowerPoint"]] as const) {
+      writeFileSync(join(dir, name), cut);
+      await expect(addSource(await tempLibrary(), join(dir, name))).rejects.toThrow(new RegExp(`That ${what} file is damaged or only partly downloaded\\. Download it again`));
+    }
+  });
+
+  test("a private Google Doc's sign-in page is refused with how to share it", async () => {
+    const lib = await tempLibrary();
+    serve({ "https://docs.google.com/document/d/abc_123/export?format=docx": { body: "<html><head><title>Sign in</title></head><body>Sign in to continue to Docs</body></html>", type: HTML } });
+    await expect(addSource(lib, "https://docs.google.com/document/d/abc_123/edit")).rejects.toThrow(/That Google Doc isn’t shared publicly.*Anyone with the link/);
+    serve({}); // a deck no one shared: Google answers 404
+    await expect(addSource(lib, "https://docs.google.com/presentation/d/abc_123/edit")).rejects.toThrow(/That Google Slides deck isn’t shared publicly/);
   });
 });
