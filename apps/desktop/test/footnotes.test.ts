@@ -38,7 +38,7 @@ test("footnote markers link to their notes and back, in any slice", () => {
   const out = footnotes(md);
   expect(out).toContain("anymore.”[^7](#fn-7) Because");
   expect(out).toContain("note.[^n2](#fn-n2)");
-  expect(out).toContain("[^7](#fnref-7): Vardi");
+  expect(out).toContain("[^7](#fnref-7) Vardi"); // its number, not "7:"
   expect(out).toContain("\nA second paragraph of the note.");
   expect(out).toContain("a[^1] in code stays");
   // The marker and its note in different slices still render, as links.

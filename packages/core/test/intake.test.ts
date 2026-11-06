@@ -296,7 +296,8 @@ describe("import coverage: files", () => {
     // the body, bullets and footnotes.
     const item = await addSource(await tempLibrary(), file("textbook.pdf"));
     expect(item.meta.title).toBe("Chapter 1: Learning"); // not "chap01.dvi"
-    const b = item.body;
+    expect(item.body).toContain("because **memory** is so central"); // a bold term stays bold
+    const b = item.body.replace(/\*\*/g, "");
     for (const said of ["because memory is so central", "The study of learning science tries", "practise retrieval, pulling", "The testing effect, found again", "This spacing effect is among", "called interleaving, helps"]) expect(b).toContain(said);
     for (const note of ["Memory", "Learning science", "Retrieval,", "Testing effect", "Free recall", "Cued recall", "Practice testing", "Spacing effect", "Interleaving"]) expect(b).not.toContain(note);
     expect(b).not.toContain("Chapter 1 Learning");
@@ -307,18 +308,21 @@ describe("import coverage: files", () => {
     expect(b).toContain("it does not.\n\n1 Ebbinghaus measured the curve on himself in the 1880s, with lists of nonsense syllables.\n\n2 A later replication");
   });
 
-  test("PDF: footnote marks, powers, hyphens at line and page ends, running heads written last", async () => {
+  test("PDF: footnotes, bold and italic, powers, hyphens at line and page ends, running heads written last", async () => {
     // Each line of hazards.pdf (make-hazards-pdf.py) is one hazard found reading 15 real PDFs (D121).
     const b = (await addSource(await tempLibrary(), file("hazards.pdf"))).body;
-    expect(b).toContain("the mind as rational and as a habit"); // a footnote's raised "2" is not part of the word
-    expect(b).toContain("2 We are not suggesting"); // the footnote itself keeps its number
+    expect(b).toContain("the mind as rational[^2] and as a habit"); // a footnote's raised "2" is its mark, not part of the word
+    expect(b).toContain("how we **remember** what we read"); // bold and italic from the fonts' names
+    expect(b).toContain("the other *misses*, which is why the *field keeps both* views in mind."); // one run across a line break
     expect(b).toContain("about 10¹¹ neurons and a signal crosses a synapse in 10⁻³ s, so a search costs O(n · d²) steps");
     expect(b).toContain("when they are fine-tuned again later"); // the document spells it with a hyphen elsewhere
     expect(b).toContain("the class of NP-complete problems");
     expect(b).toContain("a memory reviewed frequently is cheaper"); // the hyphen was never written into the text
     // A sentence that runs onto the next page is joined on the page it starts on, before its footnotes.
-    expect(b).toContain("1950 article “Computing Machinery and Intelligence,” which asked whether machines can think.\n\n2 We are not suggesting that people are irrational, only that habits matter.\n\n<!-- page 2 -->\n\nEach later chapter");
+    expect(b).toContain("1950 article “Computing Machinery and Intelligence,” which asked whether machines can think.\n\n[^2]: We are not suggesting that people are irrational, only that habits matter as much as reasons do when we study.\n\n<!-- page 2 -->\n\nEach later chapter");
     expect(b.match(/How Memory Works/g)).toEqual(["How Memory Works"]); // the heading, not the running head
+    expect(b).toContain("practice at once.\n\nA book starts a paragraph by indenting"); // a first line indented starts one
+    expect(b).toContain("Experimental Psychology, translated by"); // a reference's second line, indented, doesn't
   });
 
   test("notebook: Markdown cells, code in its language, text output", async () => {
