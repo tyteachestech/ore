@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { Hint } from "./Hint";
 import { still } from "./SideCursor";
 import { PixelKeep, PixelQuestion, PixelStar } from "./PixelIcon";
-import { INTENTS, type Annotation, type Intent } from "./ore";
+import { INTENTS, PHONE, type Annotation, type Intent } from "./ore";
 import { load, save } from "./util";
 
 // D118: one highlight; a key point (`card` in the files) is a highlight he marked to come back, and the AI
@@ -94,6 +94,23 @@ export function Collected({ anns, ready, rectOf, onOpen }: Props) {
   const total = anns.length;
   if (!total) return null;
   const shown = INTENTS.filter((i) => counts[i] > 0);
+
+  // The iPhone's top bar has room for one count beside Back (Tyler, 2026-11-06): every type's dot flies into it.
+  if (PHONE)
+    return (
+      <div className="collected" role="group" aria-label="Collected in this source">
+        <button
+          key={pop ? `all-${pop.n}` : "all"}
+          ref={(el) => INTENTS.forEach((i) => void (el ? chips.current.set(i, el) : chips.current.delete(i)))}
+          className={`collected-chip all${pop ? " pop" : ""}`}
+          aria-label={`${total} collected`}
+          onClick={() => onOpen(shown[0]!)}
+        >
+          {pop && <span className="plus" aria-hidden="true">+1</span>}
+          Collected {total}
+        </button>
+      </div>
+    );
 
   return (
     <div className="collected" role="group" aria-label="Collected in this source">
