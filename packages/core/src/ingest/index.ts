@@ -102,7 +102,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
       if (!(e instanceof (await import("./pdf.ts")).ScannedPdf)) throw e;
       return (await import("./ocr.ts")).scannedText(bytes, "pdf");
     });
-    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes } };
+    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes }, assets: "assets" in p ? p.assets : undefined };
   }
   if (IMAGE_TYPES.includes(kind)) {
     // A screenshot or photo of text: its text to read, the image above it (D96).
@@ -123,7 +123,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   const text = decodeText(bytes);
   if (kind === "ipynb") {
     const n = (await import("./notebook.ts")).notebookToDoc(text);
-    return { type: "article", title: n.title ?? fileStem(name), url, body: n.body, source: { ext: "ipynb", data: text } };
+    return { type: "article", title: n.title ?? fileStem(name), url, body: n.body, source: { ext: "ipynb", data: text }, assets: n.assets };
   }
   if (kind === "srt" || kind === "vtt") {
     const vtt = kind === "srt" ? srtToVtt(text) : text;
