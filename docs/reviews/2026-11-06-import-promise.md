@@ -22,4 +22,4 @@ Ranked by how much of what people learn from each one blocks, then by cost.
 
 Suggested order: 1, then 2, then 3; 4 and 5 when you hit them.
 
-**Picked (2026-11-06):** 1, 2 and 3, in order. 1 is built (D122): caption-less videos and video files are heard; a video's own-language captions are read, and its speech is heard in its language, which also closes part of 4. 2 is built for pictures: PDF figures, PowerPoint slide pictures, notebook plots and a saved page's images; a chart a PDF draws as vector lines (most charts in papers) still isn't kept, and needs the page drawn on the Mac.
+**Picked (2026-11-06):** 1, 2 and 3, in order. 1 is built (D122): caption-less videos and video files are heard; a video's own-language captions are read, and its speech is heard in its language, which also closes part of 4. 2 is built for pictures: PDF figures, PowerPoint slide pictures, notebook plots and a saved page's images; a chart a PDF draws as vector lines (most charts in papers) still isn't kept, and needs the page drawn on the Mac. 3 is built: Spotify links are heard from the show's public feed.

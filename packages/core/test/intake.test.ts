@@ -222,7 +222,7 @@ describe("import coverage: junk is refused with the next step", () => {
   test("links Ore can't read yet say why at once", async () => {
     const lib = await tempLibrary();
     await expect(addSource(lib, "https://x.com/karpathy/status/1617979122625712128")).rejects.toThrow(/X only shows posts to signed-in browsers/);
-    await expect(addSource(lib, "https://open.spotify.com/episode/4rOoJ6Egrf8K2IrywzwOMk")).rejects.toThrow(/Spotify keeps its episodes locked/);
+    await expect(addSource(lib, "https://open.spotify.com/episode/4rOoJ6Egrf8K2IrywzwOMk")).rejects.toThrow(/Couldn’t read that Spotify episode’s page.*Apple Podcasts/);
     await expect(addSource(lib, "https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ")).rejects.toThrow(/playlist.*course/);
   });
 
@@ -761,6 +761,37 @@ describe("import coverage: audio and podcasts", () => {
     const item = await addSource(await tempLibrary(), url);
     expect(item.meta.title).toBe("Episode 12: Memory");
     expect(item.meta.author).toBe("Learning Show");
+  });
+
+  // D122: a Spotify link is heard from the same episode in the show's public feed.
+  const SPOTIFY = "https://open.spotify.com/episode/3TxjF2mZy9S9I9GL5eZ8sq";
+  const spotifyPage = readFileSync(join(FIX, "audio", "spotify-episode.html"), "utf8");
+  const search = "https://itunes.apple.com/search?media=podcast&entity=podcast&limit=10&term=Huberman%20Lab";
+  const shows = JSON.stringify({ results: [{ collectionName: "Huberman Lab Clips", feedUrl: "https://feeds.test/clips" }, { collectionName: "Huberman Lab", feedUrl: "https://feeds.megaphone.fm/hubermanlab" }] });
+  const rss = (items: string) => `<?xml version="1.0"?><rss><channel><title>Huberman Lab</title>${items}</channel></rss>`;
+
+  test("a Spotify episode: the same episode's audio from the show's public feed", async () => {
+    serve({
+      [SPOTIFY]: { body: spotifyPage, type: HTML },
+      [search]: { body: shows, type: "application/json" },
+      "https://feeds.megaphone.fm/hubermanlab": { body: rss(`<item><title>Another episode</title><enclosure url="https://traffic.megaphone.fm/OTHER.mp3"/></item><item><title><![CDATA[Sleep Toolkit: Tools for Optimizing Sleep & Sleep-Wake Timing]]></title><pubDate>Mon, 08 Aug 2022 08:00:00 -0000</pubDate><enclosure url="https://traffic.megaphone.fm/HSW9.mp3?updated=1&amp;x=2" type="audio/mpeg"/></item>`), type: "application/rss+xml" },
+      "https://traffic.megaphone.fm/HSW9.mp3?updated=1&x=2": { body: new Uint8Array(4096), type: "audio/mpeg" },
+    });
+    const item = await addSource(await tempLibrary(), SPOTIFY);
+    expect(item.meta).toMatchObject({ title: "Sleep Toolkit: Tools for Optimizing Sleep & Sleep-Wake Timing", author: "Huberman Lab", published: "2022-08-08T08:00:00Z", url: SPOTIFY });
+    expect(item.body).toContain("[01:00] Thanks for listening.");
+  });
+
+  test("a Spotify episode whose title changed is found by its day; a Spotify-only show says so", async () => {
+    serve({
+      [SPOTIFY]: { body: spotifyPage, type: HTML },
+      [search]: { body: shows, type: "application/json" },
+      "https://feeds.megaphone.fm/hubermanlab": { body: rss(`<item><title>Sleep Toolkit (re-release)</title><pubDate>Mon, 08 Aug 2022 08:00:00 GMT</pubDate><enclosure url="https://traffic.megaphone.fm/HSW9.mp3"/></item>`), type: "application/rss+xml" },
+      "https://traffic.megaphone.fm/HSW9.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
+    });
+    expect((await addSource(await tempLibrary(), SPOTIFY)).meta.author).toBe("Huberman Lab");
+    serve({ [SPOTIFY]: { body: spotifyPage, type: HTML }, [search]: { body: JSON.stringify({ results: [] }), type: "application/json" } });
+    await expect(addSource(await tempLibrary(), SPOTIFY)).rejects.toThrow(/“Huberman Lab” has no public feed.*only on Spotify/);
   });
 
   test("an older macOS and silence each say what to do", async () => {

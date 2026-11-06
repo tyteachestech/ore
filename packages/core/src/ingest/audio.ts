@@ -61,7 +61,7 @@ const SPOTIFY = /^https?:\/\/open\.spotify\.com\/episode\//;
 /** An episode link's audio file and what the page says about it: Apple Podcasts through Apple's
  *  lookup, other players (Overcast, Pocket Casts, a show's own page) through the audio the page links. */
 export async function episode(url: string, fetcher: typeof fetch = fetch): Promise<Episode> {
-  if (SPOTIFY.test(url)) throw new Error("Spotify keeps its episodes locked, so Ore can’t hear this one. Find the episode on Apple Podcasts or the show’s site and add that link instead.");
+  if (SPOTIFY.test(url)) return spotify(url, fetcher);
   const apple = url.match(APPLE);
   if (apple) {
     // Apple's lookup finds episodes by their show (the path's id), not by the episode's own id.
@@ -79,4 +79,42 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   const audio = meta("og:audio") ?? meta("og:audio:url") ?? html.match(/<(?:audio|source)[^>]+src=["']([^"']+\.(?:mp3|m4a)[^"']*)["']/i)?.[1];
   if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
   return { audio: new URL(audio.replace(/&amp;/g, "&"), url).href, title: meta("og:title"), show: meta("og:site_name") };
+}
+
+/** Titles compared as words: case, punctuation and "&" vs "and" aside. */
+const words = (s: string) => decodeXml(s).toLowerCase().replace(/&/g, " and ").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const decodeXml = (s: string) =>
+  s.replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/, "$1").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))).replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+/** A Spotify episode, heard from the same episode in its show's public feed (D122): Spotify's page
+ *  names the episode and the show, Apple's podcast search finds the show's feed, and the feed's item
+ *  with that title (or that day, when the title was edited) links its audio. A show only on Spotify
+ *  has no public feed, so it says so. */
+async function spotify(url: string, fetcher: typeof fetch): Promise<Episode> {
+  const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
+  const html = res?.ok ? await res.text() : "";
+  const meta = (p: string) => html.match(new RegExp(`<meta[^>]+(?:property|name)="${p}"[^>]+content="([^"]*)"`, "i"))?.[1];
+  const title = meta("og:title") && decodeXml(meta("og:title")!);
+  const show = decodeXml(meta("og:description") ?? "").match(/^(.+?)\s+·\s+Episode$/)?.[1];
+  const published = meta("music:release_date");
+  if (!title || !show) throw new Error("Couldn’t read that Spotify episode’s page. Check the link, or find the episode on Apple Podcasts and add that link instead.");
+  const onlySpotify = `“${show}” has no public feed Ore can find, so it may be only on Spotify, which keeps its audio locked. If it has a transcript, copy it and paste it here instead.`;
+  const search = await fetcher(`https://itunes.apple.com/search?media=podcast&entity=podcast&limit=10&term=${encodeURIComponent(show)}`).catch(() => null);
+  const shows = search?.ok ? (((await search.json()) as { results?: { collectionName?: string; feedUrl?: string }[] }).results ?? []) : [];
+  const feed = shows.find((r) => r.feedUrl && words(r.collectionName ?? "") === words(show))?.feedUrl;
+  if (!feed) throw new Error(onlySpotify);
+  const xml = await (await fetcher(feed).catch(() => null))?.text().catch(() => "") ?? "";
+  const items = [...xml.matchAll(/<item\b[\s\S]*?<\/item>/g)].map((m) => ({
+    title: decodeXml(m[0].match(/<title\b[^>]*>([\s\S]*?)<\/title>/)?.[1] ?? ""),
+    audio: m[0].match(/<enclosure\b[^>]*\burl="([^"]+)"/)?.[1],
+    day: (() => {
+      const t = Date.parse(m[0].match(/<pubDate>([^<]+)<\/pubDate>/)?.[1] ?? "");
+      return Number.isNaN(t) ? undefined : new Date(t).toISOString().slice(0, 10);
+    })(),
+  }));
+  const want = words(title);
+  const sameDay = published ? items.filter((i) => i.audio && i.day === published.slice(0, 10)) : [];
+  const hit = items.find((i) => i.audio && words(i.title) === want) ?? (sameDay.length === 1 ? sameDay[0] : undefined);
+  if (!hit?.audio) throw new Error(`Couldn’t find “${title}” in ${show}’s public feed: it may be only on Spotify. Find the episode on Apple Podcasts or the show’s site and add that link instead.`);
+  return { audio: decodeXml(hit.audio), title, show, published };
 }

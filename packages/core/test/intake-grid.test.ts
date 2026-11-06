@@ -59,6 +59,7 @@ const GRID: Record<string, Row> = {
 
   // Audio
   "Podcast episode (Apple Podcasts)": { title: "an Apple Podcasts episode", author: "an Apple Podcasts episode", date: "an Apple Podcasts episode", text: "an Apple Podcasts episode", headings: na, images: na, code: na, tables: na, math: na, language: "gap: transcription in other languages isn't checked", junk: "a podcast feed asks for one episode" },
+  "Spotify episode": { title: "a Spotify episode: the same episode's audio", author: "a Spotify episode: the same episode's audio", date: "a Spotify episode: the same episode's audio", text: "a Spotify episode: the same episode's audio", headings: na, images: na, code: na, tables: na, math: na, language: "gap: transcription in other languages isn't checked", junk: "a Spotify-only show says so" },
   "Episode page (other players)": { title: "another player's episode page", author: "another player's episode page", date: "gap: the date isn't checked", text: "an audio file becomes a timed transcript", headings: na, images: na, code: na, tables: na, math: na, language: "gap: transcription in other languages isn't checked", junk: "links Ore can't read yet say why at once" },
   "Audio link or file": { title: "an audio link is titled by its own file name", author: na, date: na, text: "an audio file becomes a timed transcript", headings: na, images: na, code: na, tables: na, math: na, language: "gap: transcription in other languages isn't checked", junk: "an older macOS and silence each say what to do" },
 
