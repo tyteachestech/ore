@@ -4,6 +4,8 @@ A Mac learning app that turns what you read into things you remember. Capture an
 
 ![The reader: prequestions at the top, highlights in the text, the source note on the right](docs/images/reader.png)
 
+**The core promise:** whatever you learn from comes in whole. Articles, YouTube and other video, podcasts, every kind of PDF, EPUB books, slides, documents and screenshots all import as robustly as Ore can make them, into one format built for learning: the content's own title and outline, its images, tables, math and code, and timestamps for anything that plays. If something can't come in, Ore says why and what to do instead, and never saves half of it.
+
 It's a personal, single-user tool built by Tyler, mostly with Claude Code. It runs locally, with no accounts or API keys: your library is a folder of plain files (`~/Ore`), and AI runs through the `claude` or `codex` CLI you're already signed in to.
 
 ## The loop
@@ -100,6 +102,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`2026-10-26-motion-review.md`](docs/reviews/2026-10-26-motion-review.md) | Every animation against Emil Kowalski's standards |
 | [`2026-10-27-stress-test.md`](docs/reviews/2026-10-27-stress-test.md) | Stress test and foundation check after the iPhone build |
 | [`2026-10-28-import-coverage.md`](docs/reviews/2026-10-28-import-coverage.md) | What 53 real links and files keep and miss on import, and the plan to close the gaps |
+| [`2026-11-06-import-promise.md`](docs/reviews/2026-11-06-import-promise.md) | The core promise (D122) checked against today's import, with the gaps ranked |
 | [`2026-11-02-science-pass.md`](docs/reviews/2026-11-02-science-pass.md) | Second science audit: new features, the draft pile, 8 ranked recommendations |
 
 
