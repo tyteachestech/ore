@@ -249,6 +249,42 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
   await until("⌘Z takes it back", async () => (await items()).some((t) => t.startsWith("Effortful")));
 });
 
+journey("note block selection: Esc selects a block, ⇧↓ takes in the list, the ⋮⋮ drags both, Backspace and ⌘Z", async (page) => {
+  const tops = () => page.locator(".note-editor .ProseMirror > *").evaluateAll((els) => els.map((e) => e.tagName));
+  const picked = () => page.locator(".note-editor .block-sel").count();
+  await openSource(page, TESTING);
+  await page.locator(".note-editor p", { hasText: "learning event" }).click();
+  await until("the caret is on the line", () => page.evaluate(() => !!getSelection()?.anchorNode?.parentElement?.closest(".note-editor p")?.textContent?.includes("learning event")));
+  await page.waitForTimeout(100); // the editor takes the click's caret a moment after the browser shows it
+  await page.keyboard.press("Escape");
+  await until("Esc selects the line's block", async () => (await picked()) === 1);
+  await page.keyboard.press("Shift+ArrowDown");
+  await until("⇧↓ takes in the list after it", async () => (await picked()) === 2);
+  // Its handle drags both, above the heading.
+  const p = (await page.locator(".note-editor p", { hasText: "learning event" }).boundingBox())!;
+  await page.mouse.move(p.x + 30, p.y + 8);
+  const g = (await page.locator(".block-grip").boundingBox())!;
+  const top = (await page.locator(".note-editor h2").boundingBox())!;
+  await page.mouse.move(g.x + 10, g.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(top.x + 20, top.y + 2, { steps: 8 });
+  await page.locator(".block-drop").waitFor();
+  await page.mouse.up();
+  await until("both moved above the heading, still selected", async () => (await tops()).join() === "P,UL,H2" && (await picked()) === 2);
+  await page.waitForTimeout(600); // apart from the drag, so ⌘Z takes back only this
+  await page.keyboard.press("Backspace");
+  await until("Backspace takes both out", async () => (await tops()).join() === "H2");
+  await page.keyboard.press("ControlOrMeta+z");
+  await until("⌘Z brings them back, still selected", async () => (await tops()).join() === "P,UL,H2" && (await picked()) === 2);
+  await page.locator(".note-editor h2").click();
+  await until("the caret is on the heading", () => page.evaluate(() => !!getSelection()?.anchorNode?.parentElement?.closest(".note-editor h2")));
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await until("the second Esc lets go and leaves the note, not the source", async () => (await picked()) === 0 && !(await page.locator(".note-editor .ProseMirror").evaluate((e) => e.contains(document.activeElement))));
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+});
+
 journey("note format bar: select words, highlight them blue from the bar, and it is still there after a reload", async (page) => {
   await openSource(page, TESTING);
   await page.locator(".note-editor p", { hasText: "learning event" }).waitFor();

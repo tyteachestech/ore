@@ -9,6 +9,7 @@ import { findWrapping } from "@milkdown/kit/prose/transform";
 import { $inputRule } from "@milkdown/kit/utils";
 import { calloutSchema, remarkBlocks, toggleSchema, toggleSummarySchema } from "./blocks";
 import { highlightSchema, remarkColors, stringifyColor, textColorSchema } from "./colors";
+import { blockSelPlugin } from "./blocksel";
 import { emojiTrigger } from "./emoji";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
@@ -24,6 +25,8 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     })
     .use(remarkBlocks)
     .use(remarkColors)
+    // Before the keymaps, so selected blocks get their keys first.
+    .use(blockSelPlugin)
     // Without it an empty paragraph saves as nothing, not as a `<br />` line.
     .use(commonmark.filter((p) => !remarkPreserveEmptyLinePlugin.includes(p)))
     .use(gfm)

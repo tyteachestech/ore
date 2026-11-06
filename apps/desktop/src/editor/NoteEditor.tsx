@@ -21,7 +21,7 @@ import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
 import { BlockHandle } from "./BlockHandle";
 import { SelectionBar, type Sel } from "./SelectionBar";
-import { blockAt, duplicate, moveBy } from "./blockops";
+import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock } from "./blockops";
 import { is } from "../keys";
 
 /** What a link can point at (D39): a source, or a skill (its note, D41). */
@@ -568,10 +568,22 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
               }
               const up = is(e, "block-up");
               if (up || is(e, "block-down") || is(e, "block-duplicate")) {
-                const b = blockAt(view.state.doc, view.state.selection.from);
+                const b = selectedBlock(view.state);
                 const tr = b && (is(e, "block-duplicate") ? duplicate(view.state, b) : moveBy(view.state, b, up ? -1 : 1));
                 if (tr) view.dispatch(tr);
                 e.preventDefault();
+                e.stopPropagation();
+                return true;
+              }
+              // Esc selects the block (or the blocks the selected text runs over), as in Notion. Not
+              // while a chapter's block is open (D115): its Esc ends the block.
+              if (e.key === "Escape" && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !ghosts.getState(view.state)?.find().length) {
+                const { from, to } = view.state.selection;
+                const a = blockAt(view.state.doc, from);
+                const h = blockAt(view.state.doc, to);
+                const s = a && h && selectBlocks(view.state.doc, a.from, h.from);
+                if (!s) return false;
+                view.dispatch(view.state.tr.setSelection(s));
                 e.stopPropagation();
                 return true;
               }
@@ -641,23 +653,28 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
 }
 
 /** Shows Notion's format bar over selected text: once the mouse is up (not while he drags a
- *  selection), never for a click or while a `/`, `[[` or `:` menu is open. Esc puts it away. */
+ *  selection), never for a click or while a `/`, `[[` or `:` menu is open. Esc selects the blocks instead. */
 function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | null) => void) {
   let down = false;
-  let hidden = "";
   const at = (view: EditorView): Sel | null => {
     const s = view.state.selection;
     if (down || s.empty || !(s instanceof TextSelection) || !view.hasFocus() || !host.current) return null;
-    if (`${s.from}-${s.to}` === hidden) return null;
     if (!view.state.doc.textBetween(s.from, s.to, " ", " ").trim()) return null;
     const h = host.current.getBoundingClientRect();
     const a = view.coordsAtPos(s.from);
     const z = view.coordsAtPos(s.to);
     const width = 340;
     const x = Math.max(-8, Math.min(a.left - h.left - 16, h.width - width));
-    // Above the first line; below the last when there is no room above (the top of the note).
+    // Above the first line; below the last when there is no room above: the top of the window, or of
+    // the panel the note scrolls in (the source note's first line sits right under its tabs).
+    let top = 0;
+    for (let el = host.current.parentElement; el; el = el.parentElement)
+      if (/auto|scroll|hidden/.test(getComputedStyle(el).overflowY)) {
+        top = el.getBoundingClientRect().top;
+        break;
+      }
     const above = a.top - h.top - 42;
-    return { from: s.from, to: s.to, x, y: a.top - 42 < 8 ? z.bottom - h.top + 8 : above };
+    return { from: s.from, to: s.to, x, y: a.top - 42 < top + 8 ? z.bottom - h.top + 8 : above };
   };
   return $prose(
     () =>
@@ -675,7 +692,6 @@ function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | n
           handleDOMEvents: {
             mousedown: () => {
               down = true;
-              hidden = "";
               setSel(null);
               return false;
             },
@@ -684,15 +700,6 @@ function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | n
               if (!(e.relatedTarget as HTMLElement | null)?.closest?.(".sel-bar, .sel-pop")) setSel(null);
               return false;
             },
-          },
-          handleKeyDown: (view, e) => {
-            if (e.key !== "Escape" || view.state.selection.empty) return false;
-            const s = view.state.selection;
-            if (`${s.from}-${s.to}` === hidden) return false;
-            hidden = `${s.from}-${s.to}`;
-            setSel(null);
-            e.stopPropagation();
-            return true;
           },
         },
       }),
