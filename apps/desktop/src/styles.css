@@ -1094,7 +1094,11 @@ body.resizing iframe { pointer-events: none; }
 .block-grip:hover, .block-grip.on { background: var(--bg-hover); color: var(--muted); }
 .block-grip:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .block-drop { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
-.block-on { position: absolute; z-index: 0; border-radius: 4px; background: rgba(142, 166, 255, 0.1); pointer-events: none; }
+/* Selected blocks (Esc, ⇧↑ ⇧↓, a click on ⋮⋮): Notion's tint in the selection's accent, over an item's bullet too. */
+.note-editor .block-sel { --sel: color-mix(in srgb, var(--accent) 16%, transparent); background: var(--sel); border-radius: 4px; }
+.note-editor li.block-sel { box-shadow: -1.4em 0 0 var(--sel); }
+.note-editor .ProseMirror-hideselection *::selection { background: transparent; }
+.note-editor .ProseMirror-hideselection { caret-color: transparent; }
 .skill-page .note-editor { --note-size: 16px; }
 .note-editor .ProseMirror { min-height: 8em; outline: none; overflow-wrap: break-word; white-space: pre-wrap; }
 .note-editor .ProseMirror > p:only-child:has(> br:only-child)::before { content: var(--placeholder); color: var(--faint); pointer-events: none; float: left; height: 0; }

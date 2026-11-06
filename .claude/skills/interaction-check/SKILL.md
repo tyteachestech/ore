@@ -58,6 +58,7 @@ has to ask for something obvious, add a row here in the same PR.**
 | Text field or editor | Keeps its own ⌘Z, ⌘A, ⌘C; app shortcuts never steal them | Every Mac app |
 | Text field or editor | Spell check and autocorrect on wherever he writes words (notes, highlight notes, answers, titles, names, diagram labels); `spellCheck={false}` only on search, links and shortcut keys. The app turns WebKit spell checking on at launch (`spelling_on` in `main.rs`); autocorrect follows the Mac's Keyboard setting | TextEdit, Notes |
 | Text field or editor | Typed triggers: `[]` + space makes a to-do, `:` + a letter opens emoji, `/` blocks, `[[` links. A menu that opens under a resting pointer keeps its first row selected; only a real mouse move selects another | Notion, Raycast |
+| Note editor | Blocks as in Notion: Esc selects the line's block, ↑ ↓ move the selection, ⇧↑ ⇧↓ and ⇧-click take in more, ⌘A twice takes every block, Enter types again, a second Esc lets go; Backspace, cut, copy, ⌘D, ⌘⇧↑ ↓, the ⋮⋮ drag and its menu act on all selected blocks, and ⌘Z brings them back selected | Notion |
 | Whole app | ⌘Z and ⇧⌘Z step back and forward through more than one action, each named in a toast | Every Mac app |
 | Whole app | Every command is in the menu bar with its shortcut, generated from the keymap; Help ▸ Search finds it | Apple's apps, Things |
 | Whole app | ⌘[ ⌘] go back and forward; ⌘, opens Settings; ⌘/ lists shortcuts | Safari, Linear |
