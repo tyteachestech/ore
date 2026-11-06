@@ -2260,3 +2260,24 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-note .note-editor { --note-size: 17px; min-height: 60vh; }
 .kb-bar .sel-bar.docked { position: static; flex: 1; height: 44px; border: 0; box-shadow: none; background: none; overflow-x: auto; justify-content: space-between; animation: none; }
 .kb-bar .sel-bar.docked button { min-width: 40px; height: 40px; }
+
+/* The quick style picker (S): by the pointer, one box, rows as in the panel. Opens with a short
+   scale from the corner nearest the pointer (Tyler asked for it to feel satisfying); nothing on close. */
+.draw-quick {
+  position: absolute; z-index: 3; display: flex; flex-direction: column; gap: 8px; padding: 10px; width: max-content;
+  background: var(--bg); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  animation: draw-quick-in 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes draw-quick-in { from { opacity: 0; transform: scale(0.94); } }
+@media (prefers-reduced-motion: reduce) { .draw-quick { animation: none; } }
+.draw-quick-more { align-self: flex-start; height: 22px; padding: 0 6px; margin-left: -6px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); }
+.draw-quick-more:hover, .draw-quick-more:focus-visible { color: var(--text); background: var(--bg-hover); }
+.draw-swatch, .draw-seg { position: relative; }
+/* A key on an option's corner, in the pixel mono, so the hand learns it by looking. */
+.draw-badge {
+  position: absolute; top: 0; left: 0; padding: 1px 2px; font-family: var(--mono); font-size: 9px; line-height: 1; color: var(--paper);
+  background: rgba(20, 20, 19, 0.7); pointer-events: none;
+}
+.draw-style-chip { display: block; width: 14px; height: 14px; border: 2px solid; }
+/* Beside the source the tools bar is narrower than its labels: Map and Matrix keep their icons (and hints). */
+.diagram.docked .draw-tool.wide .draw-tool-label { display: none; }

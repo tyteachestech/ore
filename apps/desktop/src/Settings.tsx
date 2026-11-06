@@ -12,6 +12,7 @@ import { ore, opt, PHONE } from "./ore";
 import { TablesSetting } from "./Tables";
 import { setTray, trayOn } from "./quick";
 import { ShortcutEditor } from "./Shortcuts";
+import { setStyleControls, STYLE_CONTROLS, useStyleControls, type StyleControls } from "./draw/quick";
 import { CHIP_LOOKS, chipLook, setChipLook, type ChipLook } from "./Skills";
 import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
 import { bigger, DEFAULT_SIZE, PAGES, setPage, setSize, setWidth, SIZES, smaller, useReading, WIDTHS, type Page, type Width } from "./reading";
@@ -49,6 +50,7 @@ export type { Section as SettingsSection };
 export function Settings({ section: initial, onClose, notify }: { section?: Section; onClose: () => void; notify: Notify }) {
   const [section, setSection] = useState<Section>(() => initial ?? (SECTIONS.some((s) => s.id === load(LAST)) ? (load(LAST) as Section) : "general"));
   const [data, setData] = useState<Data | null>(null);
+  const styleCtl = useStyleControls();
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useFocusWhileMounted(ref);
@@ -181,6 +183,11 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
               <Group title="Skills">
                 <Row title="Skill tags" text="How a source's skills show in lists. Icon only leaves more room for titles.">
                   <Seg label="Skill tags" value={chips} options={CHIP_LOOKS} onChange={(v) => { setChipLook(v as ChipLook); setChips(v as ChipLook); }} />
+                </Row>
+              </Group>
+              <Group title="Diagrams">
+                <Row title="Style controls" text="Colours and widths in a picker by the pointer (S), or a panel at the canvas's edge whenever something is picked.">
+                  <Seg label="Style controls" value={styleCtl} options={STYLE_CONTROLS} onChange={(v) => setStyleControls(v as StyleControls)} />
                 </Row>
               </Group>
               {data && (

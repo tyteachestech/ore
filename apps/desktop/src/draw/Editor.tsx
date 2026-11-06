@@ -21,6 +21,7 @@ import {
 } from "./model";
 import { dark, Defs, Element, fontOf } from "./render";
 import { copyPng, svgMarkup } from "./export";
+import { placeQuick, useStyleControls } from "./quick";
 
 type View = { x: number; y: number; zoom: number };
 type Editing = { id: string; kind: "label" | "text"; then?: string; fresh?: boolean };
@@ -119,6 +120,13 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const [panel, setPanel] = useState<null | "commands" | "map" | "help" | "find" | "link" | "url">(null);
   const [space, setSpace] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>();
+  // The quick style picker (S): opens at the pointer, Apple Pencil's palette by the hand rather than a
+  // panel across the canvas. `more` shows the rarer rows; `held` is when S went down, to close on release.
+  const [quick, setQuick] = useState<{ x: number; y: number; more: boolean } | null>(null);
+  const quickRef = useRef<HTMLDivElement>(null);
+  const pointer = useRef<[number, number] | null>(null);
+  const held = useRef(0);
+  const controls = useStyleControls();
   const [, force] = useState(0);
   const root = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
@@ -323,6 +331,26 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
 
   // ---------- making things ----------
   const toolDone = () => !toolLock && setTool("select");
+  /** Opens the quick style picker by the pointer, or beside the selection when the pointer is off the
+   *  canvas (the keyboard got there), or at a given screen point (a button, the right-click spot). */
+  const openQuick = (at?: [number, number]) => {
+    const r = root.current?.getBoundingClientRect();
+    if (!r) return;
+    const sel = boundsOf(live.current.els.filter((e) => live.current.sel.includes(e.id)));
+    const v = live.current.view;
+    const p = at ?? pointer.current ?? (sel ? [(sel.x + sel.w - v.x) * v.zoom + svg.current!.getBoundingClientRect().left + 12, (sel.y - v.y) * v.zoom + svg.current!.getBoundingClientRect().top] as [number, number] : [r.left + r.width / 2, r.top + r.height / 2] as [number, number]);
+    setQuick({ x: p[0] - r.left, y: p[1] - r.top, more: false });
+  };
+  const closeQuick = () => setQuick(null);
+  /** The selection's box in the editor's own pixels, which the picker keeps clear of. */
+  const selBox = (): Box | null => {
+    const b = boundsOf(selected);
+    const r = root.current?.getBoundingClientRect();
+    const sv = svg.current?.getBoundingClientRect();
+    if (!b || !r || !sv) return null;
+    const z = view.zoom;
+    return { x: (b.x - view.x) * z + sv.left - r.left, y: (b.y - view.y) * z + sv.top - r.top, w: b.w * z, h: b.h * z };
+  };
   const newText = (p: Pt) => {
     const t = text(p, "", live.current.style);
     const els = [...live.current.els, { ...t, y: p[1] - (t.height / 2) }];
@@ -503,6 +531,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     { id: "grid", label: grid ? "Turn off snap to grid" : "Snap to grid", key: "d-grid", group: "View", run: () => setGrid((x) => !x) },
     { id: "snap", label: snap ? "Turn off snap to shapes" : "Snap to shapes", key: "d-snap", group: "View", run: () => setSnap((x) => !x) },
     { id: "help", label: "Keyboard shortcuts", key: "d-help", group: "View", run: () => setPanel("help") },
+    { id: "style", label: "Style…", key: "d-style", group: "Edit", run: () => (quick ? closeQuick() : openQuick()) },
     { id: "delete", label: "Delete", key: "d-delete", group: "Edit", when: nonEmpty, run: () => del() },
   ];
   const del = () => {
@@ -572,6 +601,19 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       setSpace(true);
       e.preventDefault();
       return;
+    }
+    if (quick && quickKey(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (is(k, "d-style")) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.repeat) return; // held down: one open, closed on release
+      if (quick) return closeQuick();
+      held.current = performance.now();
+      return openQuick();
     }
     if (e.key === "Escape") {
       e.preventDefault();
@@ -661,6 +703,11 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   };
   const onKeyUp = (e: ReactKeyboardEvent) => {
     if (e.key === " ") setSpace(false);
+    // Held down and let go, S closes the picker it opened (Blender's hold-to-open pie); tapped, it stays.
+    if (is(e.nativeEvent, "d-style")) {
+      if (quick && held.current && performance.now() - held.current > 300) closeQuick();
+      held.current = 0;
+    }
   };
   // Space held when focus leaves (the name field, another app) never gets its key-up here.
   const onBlur = () => setSpace(false);
@@ -761,6 +808,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   };
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    pointer.current = [e.clientX, e.clientY];
+    if (quick && e.button !== 2) closeQuick();
     if (e.button === 2) {
       const p = toScene(e.clientX, e.clientY);
       const hit = topAt(live.current.els, p, tol(), true);
@@ -889,6 +938,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   };
 
   const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    pointer.current = [e.clientX, e.clientY];
     const p = toScene(e.clientX, e.clientY);
     const cur = g.current;
     const els = live.current.els;
@@ -1178,6 +1228,130 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     apply(syncAll(reroute(next, ids)));
   };
 
+  /** What a style change can reach now: the selection's kinds, or the tool's (or every kind, so the
+   *  next thing drawn takes it, when nothing is picked). */
+  const fillOn = selected.length ? [...kinds].some((k) => k === "rectangle" || k === "ellipse" || k === "diamond") : tool === "select" || isShapeTool(tool);
+  const widthOn = !(kinds.size === 1 && kinds.has("text")) && tool !== "text";
+  const WIDTHS = [1, 2, 4];
+  const WIDTH_KEYS = ["KeyQ", "KeyW", "KeyE"];
+  /** The picker's keys: 1–5 stroke, ⇧1–5 fill, Q W E width, Esc closes. True when it used the key. */
+  const quickKey = (e: ReactKeyboardEvent): boolean => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return false;
+    if (e.key === "Escape") return closeQuick(), true;
+    const n = /^Digit([1-5])$/.exec(e.code)?.[1];
+    if (n) {
+      const i = Number(n) - 1;
+      if (e.shiftKey) return fillOn && setProp({ backgroundColor: FILLS[i]! }), true;
+      return setProp({ strokeColor: STROKES[i]! }), true;
+    }
+    const w = WIDTH_KEYS.indexOf(e.code);
+    if (w >= 0 && !e.shiftKey) return widthOn && setProp({ strokeWidth: WIDTHS[w]! }), true;
+    return false;
+  };
+  /** The style rows, shared by the panel and the picker. "main" is stroke, fill and width, the ones with
+   *  keys (shown as badges in the picker); "rest" is everything else. */
+  const styleRows = (badges: boolean, part: "main" | "rest" | "all") => {
+    const main = part !== "rest";
+    const rest = part !== "main";
+    const lbl = (l: string) => (labelOf(els, current?.id ?? "")?.[l === "size" ? "fontSize" : "fontFamily"]);
+    return (
+      <>
+        {main && (
+          <Row label="Stroke">
+            {STROKES.map((c, i) => <Swatch key={c} colour={c} badge={badges ? String(i + 1) : undefined} on={value("strokeColor") === c} onPick={() => setProp({ strokeColor: c })} />)}
+          </Row>
+        )}
+        {fillOn && (
+          <>
+            {main && (
+              <Row label="Fill">
+                {FILLS.map((c, i) => <Swatch key={c} colour={c} badge={badges ? `⇧${i + 1}` : undefined} on={value("backgroundColor") === c} onPick={() => setProp({ backgroundColor: c })} />)}
+              </Row>
+            )}
+            {rest && value("backgroundColor") !== "transparent" && (
+              <Row label="Fill style">
+                <Seg on={value("fillStyle") === "solid"} onPick={() => setProp({ fillStyle: "solid" })} label="Solid"><span className="fill-solid" /></Seg>
+                <Seg on={value("fillStyle") !== "solid"} onPick={() => setProp({ fillStyle: "hachure" })} label="Dither"><span className="fill-dither" /></Seg>
+              </Row>
+            )}
+          </>
+        )}
+        {widthOn && (
+          <>
+            {main && (
+              <Row label="Width">
+                {WIDTHS.map((w, i) => (
+                  <Seg key={w} on={value("strokeWidth") === w} badge={badges ? "QWE"[i] : undefined} onPick={() => setProp({ strokeWidth: w })} label={["Thin", "Bold", "Extra bold"][i]!}>
+                    <span className="stroke-w" style={{ height: w }} />
+                  </Seg>
+                ))}
+              </Row>
+            )}
+            {rest && (
+              <>
+                <Row label="Line">
+                  {(["solid", "dashed", "dotted"] as const).map((st) => (
+                    <Seg key={st} on={value("strokeStyle") === st} onPick={() => setProp({ strokeStyle: st })} label={st[0]!.toUpperCase() + st.slice(1)}>
+                      <span className={`stroke-s ${st}`} />
+                    </Seg>
+                  ))}
+                </Row>
+                <Row label="Corners">
+                  <Seg on={!value("roundness")} onPick={() => setProp({ roundness: null })} label="Sharp"><span className="corner sharp" /></Seg>
+                  <Seg on={!!value("roundness")} onPick={() => setProp({ roundness: { type: 3 } })} label="Round"><span className="corner round" /></Seg>
+                </Row>
+              </>
+            )}
+          </>
+        )}
+        {rest && (kinds.has("arrow") || tool === "arrow") && (
+          <>
+            <Row label="Ends">
+              {arrowHeads.map((h) => (
+                <Seg key={String(h)} on={value("endArrowhead") === h} onPick={() => setProp({ endArrowhead: h })} label={h ? `End: ${h}` : "No end"}>
+                  <Head kind={h} />
+                </Seg>
+              ))}
+            </Row>
+            <Row label="Start">
+              {arrowHeads.map((h) => (
+                <Seg key={String(h)} on={value("startArrowhead") === h} onPick={() => setProp({ startArrowhead: h })} label={h ? `Start: ${h}` : "No start"}>
+                  <Head kind={h} flip />
+                </Seg>
+              ))}
+            </Row>
+            <Row label="Route">
+              <Seg on={!value("elbowed")} onPick={() => setProp({ elbowed: false })} label="Straight"><span className="route straight" /></Seg>
+              <Seg on={!!value("elbowed")} onPick={() => setProp({ elbowed: true })} label="Elbow"><span className="route elbow" /></Seg>
+            </Row>
+          </>
+        )}
+        {rest && (kinds.has("text") || tool === "text" || selected.some((e) => labelOf(els, e.id))) && (
+          <>
+            <Row label="Size">
+              {FONT_SIZES.map((sz, i) => (
+                <Seg key={sz} on={(lbl("size") ?? value("fontSize")) === sz} onPick={() => setProp({ fontSize: sz })} label={["Small", "Medium", "Large", "Extra large"][i]!}>
+                  {["S", "M", "L", "XL"][i]}
+                </Seg>
+              ))}
+            </Row>
+            <Row label="Font">
+              <Seg on={(lbl("font") ?? value("fontFamily")) !== MONO} onPick={() => setProp({ fontFamily: SANS })} label="Sans">Aa</Seg>
+              <Seg on={(lbl("font") ?? value("fontFamily")) === MONO} onPick={() => setProp({ fontFamily: MONO })} label="Mono"><span className="mono">Aa</span></Seg>
+            </Row>
+          </>
+        )}
+        {rest && (
+          <Row label="Opacity">
+            {[100, 60, 30].map((o) => (
+              <Seg key={o} on={value("opacity") === o} onPick={() => setProp({ opacity: o })} label={`${o}%`}>{o}</Seg>
+            ))}
+          </Row>
+        )}
+      </>
+    );
+  };
+
   // ---------- render ----------
   const cur = g.current;
   const moving = cur?.kind === "move" && (cur.dx || cur.dy) ? cur : null;
@@ -1260,7 +1434,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const menu = (): MenuAction[] => {
     const pick = (ids: string[]) => cmds.filter((c) => ids.includes(c.id) && (!c.when || c.when()));
     const rows = live.current.sel.length
-      ? pick(["edit", "child", "sibling", "link", "url", "shape", "duplicate", "copy-style", "paste-style", "add-row", "add-col", "tidy", "group", "ungroup", "forward", "backward", "front", "back", "align-left", "align-hcenter", "align-right", "align-top", "align-vcenter", "align-bottom", "dist-h", "dist-v", "flip-h", "flip-v", "lock", "fit-sel", "png", "svg", "txt", "delete"])
+      ? pick(["edit", "child", "sibling", "link", "url", "shape", "duplicate", "copy-style", "paste-style", "add-row", "add-col", "tidy", "group", "ungroup", "forward", "backward", "front", "back", "align-left", "align-hcenter", "align-right", "align-top", "align-vcenter", "align-bottom", "dist-h", "dist-v", "flip-h", "flip-v", "lock", "style", "fit-sel", "png", "svg", "txt", "delete"])
       : pick(["map", "matrix", "all", "lock", "tidy", "fit", "grid", "snap", "png", "svg", "txt"]);
     const groupOf = (c: Cmd) => c.group;
     return rows.map((c, i) => ({ id: c.id, label: c.label, hint: c.key ? hintKeys(c.key) : undefined, danger: c.id === "delete", divider: i > 0 && groupOf(rows[i - 1]!) !== groupOf(c), run: c.run }));
@@ -1294,6 +1468,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={cancelGesture}
+          onPointerLeave={() => (pointer.current = null)}
           onDoubleClick={onDoubleClick}
           aria-hidden="true"
         >
@@ -1367,102 +1542,44 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
             {toolLock ? <LockSimple size={16} /> : <LockSimpleOpen size={16} />}
           </button>
         </Hint>
+        {/* Shows the stroke and fill the next change uses; opens the picker under itself. */}
+        <Hint text="Style" keys="d-style">
+          <button
+            className="draw-tool"
+            aria-label="Style"
+            aria-expanded={!!quick}
+            onClick={(e) => {
+              if (quick) return closeQuick();
+              const b = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              openQuick([b.left + b.width / 2, b.bottom]);
+            }}
+          >
+            <span className="draw-style-chip" style={{ borderColor: dark(value("strokeColor")), background: dark(value("backgroundColor")) }} />
+          </button>
+        </Hint>
         <span className="draw-sep" />
         <Hint text="Type a map: one link per line" keys="d-map">
           <button className="draw-tool wide" aria-label="Type a map" onClick={() => setPanel("map")}>
-            <TreeStructure size={16} /> Map
+            <TreeStructure size={16} /> <span className="draw-tool-label">Map</span>
           </button>
         </Hint>
         <Hint text="Compare matrix" keys="d-matrix">
           <button className="draw-tool wide" aria-label="Compare matrix" onClick={insertMatrix}>
-            <Table size={16} /> Matrix
+            <Table size={16} /> <span className="draw-tool-label">Matrix</span>
           </button>
         </Hint>
       </div>
 
-      {showStyle && (
+      {showStyle && controls === "panel" && (
         <div className="draw-style" aria-label="Style" onMouseDown={keepFocus}>
-          <Row label="Stroke">
-            {STROKES.map((c) => <Swatch key={c} colour={c} on={value("strokeColor") === c} onPick={() => setProp({ strokeColor: c })} />)}
-          </Row>
-          {(!selected.length ? isShapeTool(tool) : [...kinds].some((k) => k === "rectangle" || k === "ellipse" || k === "diamond")) && (
-            <>
-              <Row label="Fill">
-                {FILLS.map((c) => <Swatch key={c} colour={c} on={value("backgroundColor") === c} onPick={() => setProp({ backgroundColor: c })} />)}
-              </Row>
-              {value("backgroundColor") !== "transparent" && (
-                <Row label="Fill style">
-                  <Seg on={value("fillStyle") === "solid"} onPick={() => setProp({ fillStyle: "solid" })} label="Solid"><span className="fill-solid" /></Seg>
-                  <Seg on={value("fillStyle") !== "solid"} onPick={() => setProp({ fillStyle: "hachure" })} label="Dither"><span className="fill-dither" /></Seg>
-                </Row>
-              )}
-            </>
-          )}
-          {!(kinds.size === 1 && kinds.has("text")) && tool !== "text" && (
-            <>
-              <Row label="Width">
-                {[1, 2, 4].map((w) => (
-                  <Seg key={w} on={value("strokeWidth") === w} onPick={() => setProp({ strokeWidth: w })} label={["Thin", "Bold", "Extra bold"][[1, 2, 4].indexOf(w)]!}>
-                    <span className="stroke-w" style={{ height: w }} />
-                  </Seg>
-                ))}
-              </Row>
-              <Row label="Line">
-                {(["solid", "dashed", "dotted"] as const).map((s) => (
-                  <Seg key={s} on={value("strokeStyle") === s} onPick={() => setProp({ strokeStyle: s })} label={s[0]!.toUpperCase() + s.slice(1)}>
-                    <span className={`stroke-s ${s}`} />
-                  </Seg>
-                ))}
-              </Row>
-              <Row label="Corners">
-                <Seg on={!value("roundness")} onPick={() => setProp({ roundness: null })} label="Sharp"><span className="corner sharp" /></Seg>
-                <Seg on={!!value("roundness")} onPick={() => setProp({ roundness: { type: 3 } })} label="Round"><span className="corner round" /></Seg>
-              </Row>
-            </>
-          )}
-          {(kinds.has("arrow") || tool === "arrow") && (
-            <>
-              <Row label="Ends">
-                {arrowHeads.map((h) => (
-                  <Seg key={String(h)} on={value("endArrowhead") === h} onPick={() => setProp({ endArrowhead: h })} label={h ? `End: ${h}` : "No end"}>
-                    <Head kind={h} />
-                  </Seg>
-                ))}
-              </Row>
-              <Row label="Start">
-                {arrowHeads.map((h) => (
-                  <Seg key={String(h)} on={value("startArrowhead") === h} onPick={() => setProp({ startArrowhead: h })} label={h ? `Start: ${h}` : "No start"}>
-                    <Head kind={h} flip />
-                  </Seg>
-                ))}
-              </Row>
-              <Row label="Route">
-                <Seg on={!value("elbowed")} onPick={() => setProp({ elbowed: false })} label="Straight"><span className="route straight" /></Seg>
-                <Seg on={!!value("elbowed")} onPick={() => setProp({ elbowed: true })} label="Elbow"><span className="route elbow" /></Seg>
-              </Row>
-            </>
-          )}
-          {(kinds.has("text") || tool === "text" || selected.some((e) => labelOf(els, e.id))) && (
-            <>
-              <Row label="Size">
-                {FONT_SIZES.map((s, i) => (
-                  <Seg key={s} on={(labelOf(els, current?.id ?? "")?.fontSize ?? value("fontSize")) === s} onPick={() => setProp({ fontSize: s })} label={["Small", "Medium", "Large", "Extra large"][i]!}>
-                    {["S", "M", "L", "XL"][i]}
-                  </Seg>
-                ))}
-              </Row>
-              <Row label="Font">
-                <Seg on={(labelOf(els, current?.id ?? "")?.fontFamily ?? value("fontFamily")) !== MONO} onPick={() => setProp({ fontFamily: SANS })} label="Sans">Aa</Seg>
-                <Seg on={(labelOf(els, current?.id ?? "")?.fontFamily ?? value("fontFamily")) === MONO} onPick={() => setProp({ fontFamily: MONO })} label="Mono"><span className="mono">Aa</span></Seg>
-              </Row>
-            </>
-          )}
-          <Row label="Opacity">
-            {[100, 60, 30].map((o) => (
-              <Seg key={o} on={value("opacity") === o} onPick={() => setProp({ opacity: o })} label={`${o}%`}>{o}</Seg>
-            ))}
-          </Row>
+          {styleRows(false, "all")}
         </div>
+      )}
+      {quick && (
+        <QuickStyle at={quick} avoid={selBox()} box={quickRef} root={root} onMore={() => setQuick({ ...quick, more: !quick.more })}>
+          {styleRows(true, "main")}
+          {quick.more && styleRows(false, "rest")}
+        </QuickStyle>
       )}
 
       <div className="draw-zoom" role="group" aria-label="Zoom and history" onMouseDown={keepFocus}>
@@ -1653,22 +1770,52 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Swatch({ colour, on, onPick }: { colour: string; on: boolean; onPick: () => void }) {
+function Swatch({ colour, on, onPick, badge }: { colour: string; on: boolean; onPick: () => void; badge?: string }) {
   const name = colour === "transparent" ? "None" : colour;
   return (
     <Hint text={name === "None" ? "No fill" : name}>
-      <button className="draw-swatch" aria-pressed={on} aria-label={name} onClick={onPick} style={{ "--swatch": dark(colour) } as CSSProperties} data-none={colour === "transparent" || undefined} />
+      <button className="draw-swatch" aria-pressed={on} aria-label={name} aria-keyshortcuts={badge?.replace("⇧", "Shift+")} onClick={onPick} style={{ "--swatch": dark(colour) } as CSSProperties} data-none={colour === "transparent" || undefined}>
+        {badge && <span className="draw-badge" aria-hidden="true">{badge}</span>}
+      </button>
     </Hint>
   );
 }
 
-function Seg({ on, onPick, label, children }: { on: boolean; onPick: () => void; label: string; children: ReactNode }) {
+function Seg({ on, onPick, label, children, badge }: { on: boolean; onPick: () => void; label: string; children: ReactNode; badge?: string }) {
   return (
     <Hint text={label}>
-      <button className="draw-seg" aria-pressed={on} aria-label={label} onClick={onPick}>
+      <button className="draw-seg" aria-pressed={on} aria-label={label} aria-keyshortcuts={badge} onClick={onPick}>
         {children}
+        {badge && <span className="draw-badge" aria-hidden="true">{badge}</span>}
       </button>
     </Hint>
+  );
+}
+
+/** The quick style picker: a small popover by the pointer, kept inside the canvas. It never takes
+ *  focus, so its keys and the canvas's stay live while it is open. */
+function QuickStyle({ at, avoid, box, root, onMore, children }: { at: { x: number; y: number; more: boolean }; avoid: Box | null; box: React.RefObject<HTMLDivElement | null>; root: React.RefObject<HTMLDivElement | null>; onMore: () => void; children: ReactNode }) {
+  const [pos, setPos] = useState<{ left: number; top: number; origin: string } | null>(null);
+  const key = avoid ? `${Math.round(avoid.x)},${Math.round(avoid.y)},${Math.round(avoid.w)},${Math.round(avoid.h)}` : "";
+  useLayoutEffect(() => {
+    const el = box.current;
+    const r = root.current?.getBoundingClientRect();
+    if (!el || !r) return;
+    setPos(placeQuick(at, avoid, { w: el.offsetWidth, h: el.offsetHeight }, { w: r.width, h: r.height }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [at.x, at.y, at.more, key, box, root]);
+  return (
+    <div
+      ref={box}
+      className="draw-quick"
+      role="group"
+      aria-label="Style"
+      onMouseDown={keepFocus}
+      style={{ left: pos?.left ?? at.x, top: pos?.top ?? at.y, visibility: pos ? undefined : "hidden", transformOrigin: pos?.origin } as CSSProperties}
+    >
+      {children}
+      <button className="draw-quick-more" aria-expanded={at.more} onClick={onMore}>{at.more ? "Less" : "More"}</button>
+    </div>
   );
 }
 

@@ -130,6 +130,7 @@ const DEFAULTS = [
   { id: "d-done", label: "Close the diagram (Done)", group: "Diagram", combo: "Meta+Enter", scope: "diagram" },
   { id: "d-expand", label: "Full window, or back beside the source", group: "Diagram", combo: "Shift+Meta+Enter", scope: "diagram" },
   { id: "d-find", label: "Find text in the diagram", group: "Diagram", combo: "Meta+KeyF", scope: "diagram" },
+  { id: "d-style", label: "Style at the pointer (then 1–5 stroke, ⇧1–5 fill, Q W E width)", group: "Diagram", combo: "KeyS", scope: "diagram" },
 ] as const satisfies readonly Binding[];
 
 export type KeyId = (typeof DEFAULTS)[number]["id"];
