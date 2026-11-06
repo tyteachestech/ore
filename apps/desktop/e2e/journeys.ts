@@ -158,7 +158,11 @@ journey("diagram: draws beside the source, and a new one stays linked when the p
   await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
   await page.keyboard.press("Enter");
   const docked = page.locator(".diagram.docked");
-  await docked.waitFor();
+  await docked.waitFor().catch(async (e) => {
+    // Say where it went instead: a toast's error, or the screen it landed on.
+    const seen = await page.evaluate(() => [...document.querySelectorAll("[role=status], [role=alert], .toast")].map((n) => n.textContent).join(" | "));
+    throw new Error(`no docked diagram (full window: ${await page.locator(".diagram").count()}, reader: ${await page.locator(".doc").count()}, says: ${seen || "nothing"}): ${(e as Error).message}`);
+  });
   await until("the source stays in view beside it", () => page.locator(".doc").isVisible());
   const canvas = await docked.locator(".draw").boundingBox();
   await docked.locator(".draw").focus();
