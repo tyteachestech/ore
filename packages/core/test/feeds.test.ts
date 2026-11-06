@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { addHighlight } from "../src/annotations.ts";
 import { arrangeFeeds, clearPreviews, closePost, feedView, findFeed, followFeed, listFeeds, markRead, openPost, parseFeed, refreshFeeds, restoreFeed, unfollowFeed } from "../src/feeds.ts";
 import { addSource } from "../src/ingest/index.ts";
-import { findItem, listItems, updateItemMeta } from "../src/items.ts";
+import { allItems, findItem, listItems, updateItemMeta } from "../src/items.ts";
 import { setNotes } from "../src/notes.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -158,6 +158,8 @@ describe("previews: a post is saved only once he keeps something from it", () =>
     const item = await openPost(lib, url);
     expect(item.meta.preview).toBeTruthy();
     expect(listItems(lib)).toEqual([]);
+    expect(allItems(lib)).toEqual([]); // a preview is not a source until he keeps something
+    expect(allItems(lib, { preview: true }).map((i) => i.meta.id)).toEqual([item.meta.id]);
     expect(findItem(lib, item.meta.id).meta.title).toBe("injection");
     expect(feedView(lib).posts[0]).toMatchObject({ read: true, preview: item.meta.id });
     // Opening it again reads the same preview.

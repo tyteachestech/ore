@@ -224,6 +224,11 @@ export function listItems(lib: Library, opts: { archived?: boolean; preview?: bo
   return readable(itemDirs(lib), readItemDir).filter((i) => !!i.meta.preview === !!opts.preview && (opts.preview || !!i.meta.archived_at === !!opts.archived));
 }
 
+/** Live and archived sources in one read; with `preview`, the Feed's previews too. */
+export function allItems(lib: Library, opts: { preview?: boolean } = {}): Item[] {
+  return readable(itemDirs(lib), readItemDir).filter((i) => opts.preview || !i.meta.preview);
+}
+
 // Read-modify-write of item frontmatter under the library lock. Body untouched.
 export async function updateItemMeta(lib: Library, id: string, patch: (m: ItemMeta) => ItemMeta): Promise<ItemMeta> {
   return withLock(paths.lock(lib), () => {

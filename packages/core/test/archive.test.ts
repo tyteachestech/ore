@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { openIndex } from "../src/db.ts";
 import { addSnippet } from "../src/ingest/index.ts";
-import { findItem, listItems, setItemArchived, setItemPinned } from "../src/items.ts";
+import { allItems, findItem, listItems, setItemArchived, setItemPinned } from "../src/items.ts";
 import { loadSkills, removeSkill, restoreSkill } from "../src/skills.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -25,6 +25,7 @@ describe("archive a source", () => {
     await setItemArchived(lib, id, true);
     expect(listItems(lib).map((i) => i.meta.id)).not.toContain(id);
     expect(listItems(lib, { archived: true }).map((i) => i.meta.id)).toEqual([id]);
+    expect(allItems(lib).map((i) => i.meta.id)).toEqual([id]); // live and archived in one read
     expect(findItem(lib, id).body).toBe(item.body);
     expect(search(lib, "interleaving")).not.toContain(id);
     await setItemArchived(lib, id, false);
