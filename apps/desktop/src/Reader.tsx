@@ -37,7 +37,7 @@ import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, source
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
-import { errorText, load, save, type Notify } from "./util";
+import { errorText, inOrder, load, save, type Notify } from "./util";
 import { popupPlace, type Aim } from "./popup-place";
 import { Working } from "./Working";
 
@@ -1785,7 +1785,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!t || t === before) return;
     setDoc((cur) => cur && cur.id === id ? { ...cur, title: t } : cur);
     try {
-      await ore("edit", id, "--title", t);
+      await inOrder(id, () => ore("edit", id, "--title", t));
       p.onChanged();
       if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => void retitle(id, t, before, false), () => void retitle(id, before, t, false));
     } catch (e) {
@@ -1803,7 +1803,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     // On the history at once, so a quick ⌘Z takes it back; taken off again if the write fails.
     const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => void reauthor(id, a, before, false), () => void reauthor(id, before, a, false)) : () => {};
     try {
-      await ore("edit", id, "--author", a ?? "");
+      await inOrder(id, () => ore("edit", id, "--author", a ?? ""));
       p.onChanged();
     } catch (e) {
       forget();

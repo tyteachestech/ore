@@ -1093,6 +1093,15 @@ body.resizing iframe { pointer-events: none; }
 .block-grip { width: 20px; height: 24px; display: grid; place-items: center; border-radius: 4px; color: var(--faint); cursor: grab; }
 .block-grip:hover, .block-grip.on { background: var(--bg-hover); color: var(--muted); }
 .block-grip:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.table-grip-at { position: absolute; z-index: 5; }
+.table-grip { display: grid; place-items: center; border-radius: 4px; color: var(--faint); background: var(--bg); border: 1px solid var(--border); cursor: pointer; }
+.table-grip.rows { width: 14px; height: 22px; }
+.table-grip.cols { width: 22px; height: 14px; } .table-grip.cols svg { transform: rotate(90deg); }
+.table-grip:hover, .table-grip.on { background: var(--bg-hover); color: var(--muted); }
+.table-grip:focus-visible, .table-add:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.table-add { position: absolute; z-index: 5; display: grid; place-items: center; border-radius: 4px; color: var(--faint); }
+.table-add.rows { height: 14px; } .table-add.cols { width: 14px; }
+.table-add:hover { background: var(--bg-hover); color: var(--muted); }
 .block-drop { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
 /* Selected blocks (Esc, ⇧↑ ⇧↓, a click on ⋮⋮): Notion's tint in the selection's accent, over an item's bullet too. */
 .note-editor .block-sel { --sel: color-mix(in srgb, var(--accent) 16%, transparent); background: var(--sel); border-radius: 4px; }
@@ -1122,6 +1131,15 @@ body.resizing iframe { pointer-events: none; }
 .note-editor a.ore-link { border-bottom-style: dashed; }
 .note-editor blockquote { border-left: 2px solid var(--border); padding-left: 12px; margin-left: 0; color: var(--muted); }
 .note-editor code { font-family: var(--mono); font-size: 0.86em; background: var(--bg-raised); border-radius: 4px; padding: 1px 4px; }
+/* Tables (GFM): a grid in the note's text; wider than the note, it scrolls in place, faded at the edge
+   with more to see. The room right of and under it holds the + that adds a column or a row. */
+.note-table { overflow-x: auto; margin: 0 0 0.7em; padding: 0 18px 18px 0; --fade-l: 0px; --fade-r: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent); }
+.note-table.more-left { --fade-l: 32px; } .note-table.more-right { --fade-r: 32px; }
+.note-table table { border-collapse: collapse; font-size: 0.93em; }
+.note-table th, .note-table td { border: 1px solid var(--border); padding: 6px 10px; min-width: 120px; text-align: left; vertical-align: top; }
+.note-table th { color: var(--muted); font-weight: 600; background: var(--bg-raised); }
+.note-table :is(th, td) > p { margin: 0; }
+.note-table .selectedCell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .note-editor pre { background: var(--bg-raised); padding: 10px 12px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
 .note-editor pre code { background: none; padding: 0; }
 .note-editor hr { border: 0; border-top: 1px solid var(--border); margin: 1.2em 0; }
@@ -1188,6 +1206,7 @@ body.resizing iframe { pointer-events: none; }
 .col-divider { position: relative; cursor: col-resize; }
 .col-divider::after { content: ""; position: absolute; top: 0; bottom: 40px; left: 9px; width: 2px; border-radius: 1px; background: transparent; transition: background 0.12s ease-out; }
 .col-divider:hover::after, .skill-cols.dragging .col-divider::after { background: var(--accent); }
+.skill-cols.wide > :is(.col-divider, .skill-col.side) { display: none; }
 .skill-col { min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 40px; display: flex; flex-direction: column; gap: 20px; }
 .skill-col.side { container-type: inline-size; }
 .skill-card { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px 12px;; box-shadow: var(--lift); }
@@ -1200,7 +1219,7 @@ body.resizing iframe { pointer-events: none; }
 [data-tone="note"] .card-icon { color: var(--keep-solid); }
 [data-tone="read"] .card-icon { color: var(--card-solid); }
 [data-tone="question"] .card-icon { color: var(--question-solid); }
-.skill-note .card-head { justify-content: space-between; }
+.skill-note .card-head .card-title { margin-right: auto; }
 .hero-strength { margin-left: auto; flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; text-align: left; }
 .hero-strength:hover, .hero-strength[aria-expanded="true"] { background: var(--bg-hover); }
 .hero-strength:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -1316,7 +1335,8 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
   .skill-page { display: block; overflow-y: auto; }
   .skill-hero { padding: 20px 20px 16px; }
   .skill-cols { display: flex; flex-direction: column; gap: 20px; padding: 0 20px 40px; }
-  .col-divider { display: none; }
+  .col-divider, .note-widen { display: none; }
+  .skill-cols.wide > .skill-col.side { display: flex; }
   .skill-col { overflow: visible; padding-bottom: 0; }
 }
 .question { padding: 2px 0; }
