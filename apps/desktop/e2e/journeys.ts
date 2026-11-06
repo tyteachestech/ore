@@ -191,10 +191,15 @@ journey("author: add one by hand from the title's menu, it survives a reload, an
   await page.keyboard.press("Meta+z");
   await until("⌘Z removes it", async () => (await by.count()) === 0);
   // The byline shows at once; reload only once the redo's write has reached the library (slow on CI).
-  const saved = page.waitForResponse((r) => r.request().method() === "POST" && (r.request().postData() ?? "").includes("Henry Roediger"));
+  // Watched from the redo on, so the first add's write (still landing on CI) doesn't count.
+  const posts: string[] = [];
+  const watch = (r: import("playwright").Request) => r.method() === "POST" && posts.push(r.postData() ?? "");
+  page.on("request", watch);
+  const saved = page.waitForResponse((r) => r.request().method() === "POST" && (r.request().postData() ?? "").includes("Henry Roediger") && posts.includes(r.request().postData() ?? ""));
   await page.keyboard.press("Meta+Shift+z");
   await by.filter({ hasText: "Henry Roediger" }).waitFor();
   await saved;
+  page.off("request", watch);
   await page.reload();
   await openSource(page, TESTING);
   await by.click(); // the byline edits in place
