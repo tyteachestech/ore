@@ -149,10 +149,13 @@ journey("source note: what he types is kept when he switches sources and comes b
 
 journey("diagram: draws beside the source, and a new one stays linked when the panel switches tab", async (page) => {
   await openSource(page, AGENTS);
-  await page.locator(".note-editor [contenteditable=true]").first().click();
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  // Typed into the reader instead, "/diagram" would run its keys (A archives the source).
+  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
   await page.keyboard.press("Meta+ArrowDown");
   await page.keyboard.press("Enter");
   await page.keyboard.type("/diagram");
+  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
   await page.keyboard.press("Enter");
   const docked = page.locator(".diagram.docked");
   await docked.waitFor();
