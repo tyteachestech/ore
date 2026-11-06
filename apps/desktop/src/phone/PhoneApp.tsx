@@ -1,17 +1,19 @@
 // The iPhone shell (phase 0 feel test): the Mac's screens in a phone layout. A tab bar for Today
 // and Sources, as in Apple Books; a source and Review open full screen over it, with a way back.
 // Everything inside the screens is the Mac app's own code.
-import { BookOpen, CaretLeft, House } from "../icons";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { BookOpen, CaretLeft, CaretRight, House } from "../icons";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Boundary } from "../Boundary";
 import { Home } from "../Home";
-import type { SideTab } from "../Notes";
+import { NoteBody, useNotes, type SideTab } from "../Notes";
+import { PixelNote } from "../PixelIcon";
+import type { NoteEditorHandle } from "../editor/NoteEditor";
 import { lessonsOf, ore, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
-import { errorText } from "../util";
+import { errorText, type Notify } from "../util";
 
 /** iOS's edge swipes. From the left edge the screen moves with the finger; let go past a third of
  *  the way (or with a flick) and it slides off and goes back, otherwise it springs back. A screen
@@ -95,7 +97,7 @@ function Screen({ onBack, onForward, className, children }: { onBack: () => void
 type TabId = "today" | "sources";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
-type Place = { tab: TabId; skill: string | null; openId: string | null; noting?: boolean; review: { pick: string[] | null } | null };
+type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; review: { pick: string[] | null } | null };
 const PLACE = "ore-phone-place";
 function loadPlace(): Place {
   try {
@@ -106,12 +108,13 @@ function loadPlace(): Place {
 }
 
 /** Sources by To read and Done, as one list. */
-function SourceList({ title, items, onOpen }: { title: string; items: Item[] | null; onOpen: (id: string) => void }) {
+function SourceList({ title, items, onOpen, head }: { title: string; items: Item[] | null; onOpen: (id: string) => void; head?: ReactNode }) {
   const toRead = (items ?? []).filter((i) => i.status !== "done").sort((a, b) => touched(b).localeCompare(touched(a)));
   const done = (items ?? []).filter((i) => i.status === "done");
   return (
     <div className="phone-sources">
       <h1>{title}</h1>
+      {head}
       {items === null ? null : !items.length ? (
         <p className="phone-empty">Nothing here yet. Sources you add on the Mac come to the phone with its next install.</p>
       ) : (
@@ -140,6 +143,19 @@ function SourceList({ title, items, onOpen }: { title: string; items: Item[] | n
   );
 }
 
+/** A skill's note on its own screen (Tyler 2026-11-06, B): the whole page to write in, as in Apple
+ *  Notes, with the keyboard bar under it; Back or the edge swipe returns to the skill. */
+function SkillNote({ skill, notify }: { skill: string; notify: Notify }) {
+  const ref = useMemo(() => ({ skill }), [skill]);
+  const notes = useNotes(ref, notify);
+  const editor = useRef<NoteEditorHandle>(null);
+  return (
+    <div className="phone-page phone-note">
+      <NoteBody notes={notes} editorRef={editor} targets={[]} onOpen={() => {}} placeholder="What you know so far. Type / for blocks." />
+    </div>
+  );
+}
+
 const Back = ({ label, onClick }: { label: string; onClick: () => void }) => (
   <header className="phone-bar">
     <button className="phone-back" onClick={onClick}>
@@ -154,6 +170,7 @@ export function PhoneApp() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skill, setSkill] = useState<string | null>(start.skill);
+  const [skillNote, setSkillNote] = useState(!!start.skillNote);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(start.openId);
   const [noting, setNoting] = useState(!!start.noting);
@@ -174,9 +191,9 @@ export function PhoneApp() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, openId, noting, review: reviewing && { pick: reviewing.pick } } satisfies Place));
+      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, review: reviewing && { pick: reviewing.pick } } satisfies Place));
     } catch {}
-  }, [tab, skill, openId, noting, reviewing]);
+  }, [tab, skill, skillNote, openId, noting, reviewing]);
   const refresh = useCallback(async () => {
     try {
       const [all, sk] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills")]);
@@ -351,8 +368,25 @@ export function PhoneApp() {
         <Screen className="phone-full" onBack={() => setSkill(null)}>
           <Back label={tab === "today" ? "Today" : "Sources"} onClick={() => setSkill(null)} />
           <div className="phone-page">
-            <SourceList title={skillName ?? "Sources"} items={items && items.filter((i) => i.skills.includes(skill))} onOpen={open} />
+            <SourceList
+              title={skillName ?? "Sources"}
+              items={items && items.filter((i) => i.skills.includes(skill))}
+              onOpen={open}
+              head={
+                <button className="phone-note-row" onClick={() => setSkillNote(true)}>
+                  <PixelNote className="card-icon" size={16} aria-hidden="true" />
+                  <span className="phone-title">Your note</span>
+                  <CaretRight size={16} aria-hidden="true" />
+                </button>
+              }
+            />
           </div>
+        </Screen>
+      )}
+      {skill && skillNote && (
+        <Screen className="phone-full phone-reader" onBack={() => setSkillNote(false)}>
+          <Back label={skillName ?? "Back"} onClick={() => setSkillNote(false)} />
+          <SkillNote skill={skill} notify={notify} />
         </Screen>
       )}
       {over}

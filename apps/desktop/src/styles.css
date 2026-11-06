@@ -2228,8 +2228,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .feed-head:hover .feed-skill, .feed-tools:focus-within .feed-skill { opacity: 1; }
 
 /* The iPhone's bar over the keyboard while he writes a note (Notion, Bear): one row of 44 pt taps. */
-.kb-bar { position: fixed; left: 0; right: 0; bottom: var(--keyboard, 0px); z-index: 40; display: flex; justify-content: space-between; padding: 0 6px max(0px, calc(env(safe-area-inset-bottom, 0px) - var(--keyboard, 0px))); background: var(--bg-raised); border-top: 1px solid var(--border); }
-.kb-btn { flex: 1; height: 44px; display: grid; place-items: center; color: var(--muted); border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+.kb-bar { position: fixed; left: 0; right: 0; bottom: var(--keyboard, 0px); z-index: 40; display: flex; justify-content: space-between; padding: 0 0 max(0px, calc(env(safe-area-inset-bottom, 0px) - var(--keyboard, 0px))); background: var(--bg-raised); border-top: 1px solid var(--border); }
+.kb-btn { flex: 1; min-width: 0; height: 44px; display: grid; place-items: center; color: var(--muted); border-radius: 8px; -webkit-tap-highlight-color: transparent; }
 .kb-btn:active, .kb-btn.on { color: var(--text); background: var(--bg-hover); }
 .kb-btn:disabled { color: var(--faint); opacity: 0.5; }
 body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44px); }
@@ -2238,3 +2238,12 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .note-menu { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; max-width: none; max-height: 40vh; overflow-y: auto; z-index: 41; }
 .phone .note-menu-row { height: 44px; font-size: 17px; }
 .phone .mynotes-text { scroll-padding-bottom: 52px; }
+/* The skill's note on the phone: a row at the top of its page (Apple Notes' folder rows), and the note's own screen. */
+.phone .phone-note-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; margin: 0 0 20px; color: var(--text); border-bottom: 1px solid var(--border); }
+.phone .phone-note-row .phone-title { flex: 1; text-align: left; font-size: 17px; }
+.phone .phone-note-row > svg:last-child { color: var(--faint); }
+.phone .phone-note-row:active { background: var(--bg-hover); }
+.phone .phone-note { padding: 8px 20px 40px; }
+.phone .phone-note .note-editor { --note-size: 17px; min-height: 60vh; }
+.kb-bar .sel-bar.docked { position: static; flex: 1; height: 44px; border: 0; box-shadow: none; background: none; overflow-x: auto; justify-content: space-between; animation: none; }
+.kb-bar .sel-bar.docked button { min-width: 40px; height: 40px; }

@@ -469,7 +469,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <div ref={root} />
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
-      {PHONE && <KeyboardBar view={view} />}
+      {PHONE && <KeyboardBar view={view} targets={p.targets} />}
       {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} />}
       {menu && ((menu.kind !== "emoji" && menu.kind !== "date") || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
