@@ -93,7 +93,9 @@ export async function installDocling(onStep: (step: number, of: number, label: s
   onStep(1, 4, "Getting the installer");
   const res = await fetch(`https://github.com/astral-sh/uv/releases/download/${UV}/uv-${target}.tar.gz`).catch(() => undefined);
   if (!res?.ok) throw new Error("Couldn't reach GitHub to download the table and formula reader. Check the connection and try again.");
-  await Bun.write(join(home, "uv.tar.gz"), res);
+  // Read whole, then written: Bun 1.3 never finishes writing a streamed fetch body (Bun.write(path, res)),
+  // and the run ends silently mid-download.
+  await Bun.write(join(home, "uv.tar.gz"), await res.arrayBuffer());
   await run(["tar", "xzf", join(home, "uv.tar.gz"), "-C", home]);
   const uv = join(home, `uv-${target}`, "uv");
   onStep(2, 4, "Getting Python");
