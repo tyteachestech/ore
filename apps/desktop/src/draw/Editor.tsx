@@ -26,7 +26,7 @@ type View = { x: number; y: number; zoom: number };
 type Editing = { id: string; kind: "label" | "text"; then?: string; fresh?: boolean };
 type Files = Record<string, { dataURL?: string; mimeType?: string; id?: string; created?: number }>;
 type Gesture =
-  | { kind: "move"; start: Pt; before: El[]; ids: Set<string>; box: Box; others: Box[]; dx: number; dy: number }
+  | { kind: "move"; start: Pt; before: El[]; ids: Set<string>; box: Box; others: Box[]; dx: number; dy: number; pick?: string[] }
   | { kind: "marquee"; start: Pt; end: Pt; add: string[] }
   | { kind: "resize"; handle: Handle; before: El[]; starts: El[]; box: Box; others: Box[] }
   | { kind: "rotate"; before: El[]; starts: El[]; about: Pt; a0: number }
@@ -575,6 +575,9 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     }
     if (e.key === "Escape") {
       e.preventDefault();
+      // Done unmounts the editor before this event reaches the window, where the reader's Esc
+      // (back to sources) and ⌘↵ (finish) listen: stop it here, not in Diagram.tsx's document listener.
+      e.stopPropagation();
       if (multi) return finishMulti();
       if (g.current) return cancelGesture();
       if (entered) {
@@ -637,6 +640,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     for (const c of cmds) {
       if (c.key && is(k, c.key) && (!c.when || c.when())) {
         e.preventDefault();
+        e.stopPropagation();
         return c.run();
       }
     }
@@ -658,6 +662,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const onKeyUp = (e: ReactKeyboardEvent) => {
     if (e.key === " ") setSpace(false);
   };
+  // Space held when focus leaves (the name field, another app) never gets its key-up here.
+  const onBlur = () => setSpace(false);
 
   // ---------- clipboard ----------
   useEffect(() => {
@@ -878,7 +884,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     }
     const all = withLabels(live.current.els, moving);
     const box = boundsOf(live.current.els.filter((x) => all.has(x.id)))!;
-    g.current = { kind: "move", start: p, before, ids: moving, box, others: snap ? others(all) : [], dx: 0, dy: 0 };
+    // A click (no drag) on one of several selected shapes picks just that one (Figma, Excalidraw).
+    g.current = { kind: "move", start: p, before, ids: moving, box, others: snap ? others(all) : [], dx: 0, dy: 0, pick: !e.shiftKey && !e.altKey && ids.length > pick.length ? pick : undefined };
   };
 
   const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
@@ -1024,6 +1031,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       if (!cur.dx && !cur.dy) {
         if (cur.before !== els) setEls(cur.before); // an ⌥-click that never moved leaves no copy
         if (cur.before !== els) setSel(live.current.sel.length ? [...cur.ids].filter((id) => cur.before.some((x) => x.id === id)) : []);
+        else if (cur.pick) setSel(cur.pick);
         return;
       }
       const next = move(els, cur.ids, cur.dx, cur.dy);
@@ -1271,6 +1279,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       aria-roledescription="diagram editor"
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
+      onBlur={onBlur}
       onDragOver={(e) => e.dataTransfer.types.includes("Files") && e.preventDefault()}
       onDrop={onDrop}
       style={{ "--draw-ground": "var(--bg)" } as CSSProperties}
@@ -1343,7 +1352,9 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
         />
       )}
 
-      <div className="draw-tools" role="toolbar" aria-label="Tools">
+      {/* The bars never take focus on a click, so Backspace, ⌘Z and the rest keep working after a swatch or
+          a zoom button (Excalidraw); Tab still reaches them. */}
+      <div className="draw-tools" role="toolbar" aria-label="Tools" onMouseDown={keepFocus}>
         {TOOLS.map((t) => (
           <Hint key={t.tool} text={t.label} keys={t.key}>
             <button className="draw-tool" aria-pressed={tool === t.tool} aria-label={t.label} onClick={() => { setTool(t.tool); if (t.tool !== "select") setSel([]); root.current?.focus(); }}>
@@ -1370,7 +1381,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       </div>
 
       {showStyle && (
-        <div className="draw-style" aria-label="Style">
+        <div className="draw-style" aria-label="Style" onMouseDown={keepFocus}>
           <Row label="Stroke">
             {STROKES.map((c) => <Swatch key={c} colour={c} on={value("strokeColor") === c} onPick={() => setProp({ strokeColor: c })} />)}
           </Row>
@@ -1454,7 +1465,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
         </div>
       )}
 
-      <div className="draw-zoom" role="group" aria-label="Zoom and history">
+      <div className="draw-zoom" role="group" aria-label="Zoom and history" onMouseDown={keepFocus}>
         <Hint text="Undo" keys="undo"><button className="draw-tool" aria-label="Undo" onClick={undo} disabled={!hist.current.past.length}><ArrowCounterClockwise size={15} /></button></Hint>
         <Hint text="Redo" keys="redo"><button className="draw-tool" aria-label="Redo" onClick={redo} disabled={!hist.current.future.length}><ArrowClockwise size={15} /></button></Hint>
         <span className="draw-sep" />
@@ -1463,7 +1474,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
         <Hint text="Zoom in" keys="d-zoom-in"><button className="draw-tool" aria-label="Zoom in" onClick={() => zoomTo(z * 1.25)}><Plus size={15} /></button></Hint>
         <Hint text="Zoom to fit everything" keys="d-fit"><button className="draw-tool" aria-label="Zoom to fit" onClick={() => fit(boundsOf(els), 2)}><CornersOut size={15} /></button></Hint>
       </div>
-      <div className="draw-help">
+      <div className="draw-help" onMouseDown={keepFocus}>
         <Hint text="All diagram commands" keys="d-commands" side="top">
           <button className="draw-tool wide" aria-label="All diagram commands" onClick={() => setPanel("commands")}>/</button>
         </Hint>
@@ -1542,6 +1553,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
 }
 
 const isShapeTool = (t: Tool) => t === "rectangle" || t === "ellipse" || t === "diamond";
+const keepFocus = (e: React.MouseEvent) => e.preventDefault();
 const midOf = (a: Pt, b: Pt): Pt => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 const midOfPts = (pts: Pt[]) => {
   let best = pts[0]!;
