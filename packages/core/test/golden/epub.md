@@ -3,8 +3,9 @@ id: <id>
 type: epub
 title: A Small Book of Remembering
 author: Ada Learner, Ben Reviewer
+published: 2024-03-01
 captured_at: <time>
-text_sha256: fccdf41162d2f591b40289c264d30d318fd9e793e2b6cb16f5b9c9b5f8c5797c
+text_sha256: c6fc26f3e0678a23a5e20b60256c49d3b03ea09b8826dab30b9f864724ce6817
 status: inbox
 skills: []
 topics: []
@@ -13,7 +14,7 @@ topics: []
 
 # 1\. Forgetting
 
-Most of what we read is gone within a week. That is not a flaw of *weak* minds; it is how **every** memory behaves when nothing calls it back.1
+Most of what we read is gone within a week. That is not a flaw of *weak* minds; it is how **every** memory behaves when nothing calls it back.[^1]
 
 ## The curve
 
@@ -29,13 +30,13 @@ Figure 1.1 How recall fades without review.
 | 7 | 25% |
 | 30 | 21% |
 
-1\. The numbers here are illustrative, not from one study.
+[^1]: The numbers here are illustrative, not from one study.
 
 <!-- chapter 2 -->
 
 # 2\. Practice
 
-Calling a memory back, rather than rereading it, is what keeps it. The effort is the point.
+Calling a memory back, rather than rereading it, is what keeps it. The effort is the point.[^2]
 
 ## Scheduling reviews
 
@@ -52,3 +53,5 @@ def next_gap(gap, remembered):
 -   Mix topics within a session.
 
 The last line of the book.
+
+[^2]: Psychologists call this the *testing effect*.
