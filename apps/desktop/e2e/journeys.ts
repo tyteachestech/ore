@@ -308,6 +308,40 @@ journey("note: / makes a toggle heading and @ writes a date; both are still ther
   await until("both survive a reload", kept);
 });
 
+journey("note shortcuts as in Notion: # in a numbered item makes a heading; Markdown pasted into the note comes in as blocks and adds no source", async (page) => {
+  const html = () => page.locator(".note-editor .ProseMirror").innerHTML();
+  await openSource(page, AGENTS);
+  await page.locator(".note-editor [contenteditable=true]").first().click();
+  // From an empty note: ⌘A twice takes every block, Backspace clears them (other journeys write here).
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await until("the note is empty", async () => !(await page.locator(".note-editor .ProseMirror").innerText()).trim());
+  await page.keyboard.type("1. What is AI?");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("The Foundations");
+  await page.keyboard.press("Home");
+  await page.keyboard.type("# ");
+  await until("the item is a heading", async () => /<h1[^>]*>The Foundations/.test(await html()));
+  // A key sent within a frame of the last can beat the editor's own redraw; a hand never does.
+  await page.waitForTimeout(100);
+  await page.keyboard.press("End");
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Enter");
+  // A paste as the Mac gives it, without the clipboard permission a real one needs here: its target is
+  // the line the caret is on, which the paste replaces.
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", "## Pasted\n\n- one\n- two");
+    const at = getSelection()!.anchorNode!;
+    (at instanceof Element ? at : at.parentElement!).dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await until("the paste is blocks", async () => /<h2[^>]*>Pasted<\/h2>/.test(await html()) && /<li[^>]*><p>one<\/p>/.test(await html()));
+  await page.waitForTimeout(400);
+  if (await page.locator(".toast", { hasText: "Added" }).count()) throw new Error("the paste also added a source");
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+});
+
 journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
   const cells = () => page.locator(".note-editor .note-table tr").evaluateAll((rs) => rs.map((r) => [...r.children].map((c) => c.textContent ?? "")));
   await openSource(page, AGENTS);

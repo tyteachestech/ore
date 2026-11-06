@@ -116,7 +116,7 @@ export function remove(state: EditorState, b: Block): Transaction {
   return tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(rm.from, tr.doc.content.size)))).scrollIntoView();
 }
 
-export type Kind = "text" | "h1" | "h2" | "h3" | "bullet" | "number" | "todo" | "quote" | "callout" | "toggle" | "th1" | "th2" | "th3";
+export type Kind = "text" | "h1" | "h2" | "h3" | "bullet" | "number" | "todo" | "quote" | "callout" | "toggle" | "th1" | "th2" | "th3" | "code";
 
 /** Turn into, in Notion's order; the same blocks as the / menu. */
 export const KINDS: { kind: Kind; label: string }[] = [
@@ -130,6 +130,7 @@ export const KINDS: { kind: Kind; label: string }[] = [
   { kind: "toggle", label: "Toggle" },
   { kind: "callout", label: "Callout" },
   { kind: "quote", label: "Quote" },
+  { kind: "code", label: "Code" },
   { kind: "th1", label: "Toggle heading 1" },
   { kind: "th2", label: "Toggle heading 2" },
   { kind: "th3", label: "Toggle heading 3" },
@@ -148,7 +149,7 @@ function kindOfOne(doc: PMNode, b: Block): Kind | null {
   if (n.type.name === "paragraph") return "text";
   if (n.type.name === "heading") return `h${Math.min(3, Number(n.attrs.level))}` as Kind;
   if (n.type.name === "toggle") return n.attrs.level ? (`th${n.attrs.level}` as Kind) : "toggle";
-  return ({ blockquote: "quote", callout: "callout" } as Record<string, Kind>)[n.type.name] ?? null;
+  return ({ blockquote: "quote", callout: "callout", code_block: "code" } as Record<string, Kind>)[n.type.name] ?? null;
 }
 
 /** The text a block leads with, and the blocks under it, which carry over into what it becomes. */
@@ -239,6 +240,7 @@ function turnOne(state: EditorState, b: Block, kind: Kind): Transaction | null {
   if (listKind) made = [listType(kind).create(null, item())];
   else if (kind === "text") made = [para(), ...rest];
   else if (kind === "h1" || kind === "h2" || kind === "h3") made = [s.heading!.create({ level: Number(kind[1]) }, lead), ...rest];
+  else if (kind === "code") made = [s.code_block!.create(null, lead.size ? schema.text(lead.textBetween(0, lead.size, "\n", " ")) : null), ...rest];
   else if (kind === "quote") made = [s.blockquote!.create(null, [para(), ...rest])];
   else if (kind === "callout") made = [s.callout!.create({ kind: "note" }, [para(), ...rest])];
   else {
@@ -366,6 +368,25 @@ function selectSpan(doc: PMNode, from: number, to: number): BlockSelection | nul
 function blockOfSelection(s: BlockSelection): Block {
   const node = s.$from.doc.nodeAt(s.from)!;
   return { from: s.from, to: s.to, node, item: node.type.name === "list_item" };
+}
+
+/** Turn into on the caret's block, the caret kept where it was in the line (Notion's shortcuts, the /
+ *  menu, ⌘⌥ keys, the iPhone's bar). Null where the caret is inside a toggle, quote, callout or table:
+ *  Turn into would take the whole of that, so the caller turns just the line there. */
+export function turnAtCaret(state: EditorState, kind: Kind): Transaction | null {
+  const { $from } = state.selection;
+  if (!$from.parent.isTextblock) return null;
+  const top = $from.depth - 1;
+  if (top > 0) {
+    // The line leads its block: a list item's first line (wherever the list is), or a quote's, callout's
+    // or toggle's at the top of the note.
+    const t = $from.node(top).type.name;
+    if ($from.index(top) !== 0 || !(t === "list_item" || (top === 1 && ["blockquote", "callout", "toggle"].includes(t)))) return null;
+  }
+  const b = blockAt(state.doc, state.selection.from);
+  const tr = b && turnInto(state, b, kind);
+  const $c = tr?.selection.$from;
+  return tr && $c?.parent.isTextblock ? tr.setSelection(TextSelection.create(tr.doc, Math.min($c.start() + $from.parentOffset, $c.end()))) : tr;
 }
 
 /** What a block action works on: the selected blocks, or the caret's block. */

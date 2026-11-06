@@ -500,7 +500,8 @@ export function App() {
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.isContentEditable || t.closest("input, textarea, [contenteditable]") || overlayRef.current) return;
+      // A paste a text field took (the note editor replaces the very line it landed on, so its target is gone by now).
+      if (e.defaultPrevented || t.isContentEditable || t.closest("input, textarea, [contenteditable]") || overlayRef.current) return;
       const d = e.clipboardData;
       const add = (list: Entry[]) => {
         const to = dropRef.current.addTo;

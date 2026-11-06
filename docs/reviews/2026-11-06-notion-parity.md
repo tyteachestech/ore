@@ -1,0 +1,89 @@
+# Note editor: Notion parity audit (2026-11-06)
+
+Tyler found that `# ` in a numbered item didn't make a heading. A behaviour of the app we copy should never
+reach him as a bug, so this lists Notion's editing behaviours, block by block, and checks each one in our
+editor. Every row is a case in `apps/desktop/test/notion-parity.test.ts` (headless, on the real editor) or
+the e2e journey "note shortcuts as in Notion". Before = on master before this pass.
+
+## Markdown shortcuts at the start of a line
+
+| Behaviour (Notion) | Before | Now |
+| --- | --- | --- |
+| `#` `##` `###` + space make headings, also with text already after the caret | pass | pass |
+| `##` typed in a heading sets that level | fail (added levels: H1 became H3) | fixed |
+| `#` in a list item turns the item into a heading, splitting the list | fail (stayed `2. # …`) | fixed |
+| `-` `*` `+` make a bullet, `1.` a numbered list, `[]` a to-do | pass | pass |
+| `-` in a numbered item, `1.` in a bullet switch the item's kind | fail | fixed |
+| `"` + space makes a quote | fail | fixed |
+| `>` + space makes a quote (Notion: a toggle, see questions) | pass | pass |
+| ```` ``` ```` + space (or ```` ```ts ````) makes a code block; in a list item too | top level only | fixed |
+| `---` makes a divider | pass | pass |
+| In a quote, callout or toggle body the shortcuts make blocks there | pass | pass |
+| In a table cell, and mid-line, they stay text | pass | pass |
+
+## Inline
+
+| Behaviour | Before | Now |
+| --- | --- | --- |
+| `**bold**` `*italic*` `` `code` `` `~strike~` `~~strike~~` | pass | pass |
+| A typed web address becomes a link at the space after it | fail (saved as `https\://…`) | fixed |
+
+## Enter, Backspace, Tab
+
+| Behaviour | Before | Now |
+| --- | --- | --- |
+| Enter at the end of a heading starts text | pass | pass |
+| Enter on an empty item leaves the list; on an empty nested item it outdents | pass | pass |
+| Enter after a ticked to-do starts an unticked one | fail (came ticked) | fixed |
+| Enter after a numbered item starts the next number | pass | pass |
+| Enter in a quote starts text below it; Shift-Enter breaks the line inside | fail (stayed in the quote) | fixed |
+| Backspace at the start of a heading makes it text (any level) | fail (H2 became H1) | fixed |
+| Backspace at the start of a list item or to-do makes it text, leaving the list | fail (joined the item above) | fixed |
+| … of a nested item makes it text under its parent | pass | pass |
+| … of a quote, callout or toggle makes it text (a toggle keeps its body below) | fail | fixed |
+| Backspace at the start of text joins it to the block above | pass | pass |
+| Tab / Shift-Tab indent and outdent a list item | pass | pass |
+| Tab on a line that can't indent stays in the note | fail (focus left the note) | fixed |
+| Tab in a code block indents the line | fail | fixed |
+
+## Keys
+
+| Behaviour | Before | Now |
+| --- | --- | --- |
+| ⌘B ⌘I ⌘E on the selection | pass | pass |
+| ⌘⇧S strikethrough | fail | fixed |
+| ⌘⌥0 text, ⌘⌥1–3 headings | top level only | fixed (list items too) |
+| ⌘⌥4 to-do, 5 bullet, 6 numbered, 7 toggle, 8 code | fail (H4–H6, numbered, bullet) | fixed |
+| ⌘Enter ticks and unticks a to-do | fail | fixed |
+| ⌘Z right after a shortcut gives back what was typed | fail (took the line away) | fixed |
+| `/heading`, `/quote`… on a line with text turn that line, in a list item too | fail in list items | fixed |
+
+## Paste
+
+| Behaviour | Before | Now |
+| --- | --- | --- |
+| Markdown text pastes as blocks (headings, lists, bold) | fail (literal `\#`, `\-`) | fixed |
+| A paste that replaced the line it landed on also added a source to the library | fail | fixed |
+| A web address pasted over selected text links it; alone it pastes as a link | fail | fixed |
+| HTML pastes as its blocks | pass | pass |
+| Lines of plain text paste as lines | pass | pass |
+| In a code block a paste stays code | pass | pass |
+
+Copying from a note now puts Markdown on the clipboard as its text, so a copy pasted into Claude or ChatGPT
+keeps its headings and lists.
+
+## Already covered elsewhere
+
+Esc block selection, ⌘A twice, ⌘D, ⌘⇧↑↓, ⋮⋮ drag and Turn into (`blockops.test.ts`); `[[` links, `/`,
+`@` dates, `:` emoji (`editor.test.ts`, `dates.test.ts`, `emoji.test.ts`); tables (`tables.test.ts`).
+
+## For Tyler (these clash with plain Markdown or the minimal look)
+
+1. `>` then space: Notion makes a toggle, Markdown means a quote. We do a quote; `"` is a quote in both.
+2. Hints in empty blocks: Notion shows "Type '/' for commands" on the empty line the caret is on, and
+   "Heading 1", "List", "To-do" in empty blocks of those kinds. We show nothing.
+3. ⌘U underline: Markdown has no underline, so it would save as `<u>…</u>`. Left out.
+4. Tab on a plain line: Notion nests it under the block above. Markdown can only nest under a list item, so
+   Tab does nothing there.
+5. ```` ``` ````: Notion makes the code block on the third backtick. We wait for a space, so ```` ```ts ````
+   can name the language.
