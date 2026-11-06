@@ -4,22 +4,24 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { DotsSix } from "../icons";
 import { label, useKeymap } from "../keys";
 import { MoreButton, WithMenu, type MenuAction } from "../Menu";
-import { blockAt, duplicate, gaps, kindOf, KINDS, moveBy, moveTo, remove, turnInto, type Block, type Gap } from "./blockops";
+import { blockAt, BlockSelection, duplicate, gaps, kindOf, KINDS, moveBy, moveTo, remove, selectBlocks, selectedBlock, turnInto, type Block, type Gap } from "./blockops";
 
-type Box = { x: number; y: number; w: number; h: number };
+type Line = { x: number; y: number; w: number };
 type Spot = { gap: Gap; y: number; left: number; right: number };
 
 /** Notion's ⋮⋮ beside the block under the pointer: drag it to move the block (a line shows where it
  *  lands, Esc cancels), click it or right-click it for the block's menu (Turn into, Duplicate, Move,
- *  Delete). Each action is one editor step, so ⌘Z takes it back. Not on the phone: no pointer to hover. */
+ *  Delete). A click selects the block; ⇧-click takes in the blocks up to it; on a selected block, the
+ *  drag and the menu act on all of them. Each action is one editor step, so ⌘Z takes it back. Not
+ *  on the phone: no pointer to hover. */
 export function BlockHandle({ view, host }: { view: () => EditorView | undefined; host: RefObject<HTMLElement | null> }) {
   const keys = useKeymap();
   const viewNow = useRef(view);
   viewNow.current = view;
-  /** The block the handle is on, by the position it starts at, and where the handle and block sit. */
-  const [at, setAt] = useState<{ from: number; handle: { x: number; y: number }; box: Box } | null>(null);
+  /** The block the handle is on, by the position it starts at, and where the handle sits. */
+  const [at, setAt] = useState<{ from: number; handle: { x: number; y: number } } | null>(null);
   const [open, setOpen] = useState(false);
-  const [line, setLine] = useState<Box | null>(null);
+  const [line, setLine] = useState<Line | null>(null);
   const busy = useRef(false); // a drag or an open menu keeps the handle where it is
   busy.current = open || line !== null;
 
@@ -51,7 +53,12 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
     const el = host.current;
     if (e.button !== 0 || !v || !el || !at) return;
     e.preventDefault(); // the menu opens on the click, not the press
-    const b = blockAt(v.state.doc, at.from + 1);
+    if (e.shiftKey && v.state.selection instanceof BlockSelection) {
+      v.dispatch(v.state.tr.setSelection(selectBlocks(v.state.doc, v.state.selection.a, at.from) ?? v.state.selection));
+      return v.focus();
+    }
+    pickHandle(v);
+    const b = selectedBlock(v.state);
     if (!b) return;
     const start = { x: e.clientX, y: e.clientY };
     let spots: Spot[] | null = null;
@@ -64,7 +71,7 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
         spots = gaps(v.state.doc, b).map((g) => spot(v, g));
       }
       to = nearest(spots, m.clientX, m.clientY);
-      setLine(to ? { x: to.left - h.left, y: to.y - h.top - 1, w: to.right - to.left, h: 2 } : null);
+      setLine(to ? { x: to.left - h.left, y: to.y - h.top - 1, w: to.right - to.left } : null);
     };
     const end = (drop: boolean) => {
       window.removeEventListener("pointermove", onMove);
@@ -73,7 +80,7 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
       const was = dragging.current;
       dragging.current = false;
       setLine(null);
-      if (!was) return void (drop && setOpen(true));
+      if (!was) return void (drop ? setOpen(true) : v.focus());
       if (drop && to) {
         v.dispatch(moveTo(v.state, b, to.gap));
         v.focus();
@@ -94,10 +101,10 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
 
   const actions = (): MenuAction[] => {
     const v = view();
-    const b = v && at ? blockAt(v.state.doc, at.from + 1) : null;
+    const b = v && at ? selectedBlock(v.state) : null;
     if (!v || !b) return [];
     const run = (make: (b: Block) => Transaction | null) => () => {
-      const now = blockAt(v.state.doc, b.from + 1);
+      const now = selectedBlock(v.state);
       const tr = now && make(now);
       if (tr) v.dispatch(tr);
       v.focus();
@@ -113,12 +120,26 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
     ];
   };
 
+  /** The handle's block becomes the selection, unless it is one of the selected blocks already. */
+  const pickHandle = (v: EditorView) => {
+    const s = v.state.selection;
+    if (!at || (s instanceof BlockSelection && at.from >= s.from && at.from < s.to)) return;
+    const sel = selectBlocks(v.state.doc, at.from, at.from);
+    if (sel) v.dispatch(v.state.tr.setSelection(sel));
+  };
+
   if (!at) return null;
   return (
     <>
-      {(open || line) && <div className="block-on" style={{ left: at.box.x, top: at.box.y, width: at.box.w, height: at.box.h }} />}
       {line && <div className="block-drop" style={{ left: line.x, top: line.y, width: line.w }} />}
-      <div className="block-handle" style={{ left: at.handle.x, top: at.handle.y }}>
+      <div
+        className="block-handle"
+        style={{ left: at.handle.x, top: at.handle.y }}
+        onContextMenuCapture={() => {
+          const v = view();
+          if (v) pickHandle(v);
+        }}
+      >
         <WithMenu actions={actions} keepFocus>
           <MoreButton
             label="Block actions"
@@ -131,7 +152,9 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
             open={open}
             onOpenChange={(o) => {
               setOpen(o);
-              if (!o) setAt(null);
+              if (o) return;
+              setAt(null);
+              view()?.focus(); // the blocks stay selected, for the keys
             }}
             onPointerDown={onPointerDown}
           />
@@ -159,7 +182,6 @@ function place(v: EditorView, host: HTMLElement, b: Block) {
   return {
     from: b.from,
     handle: { x: edge.getBoundingClientRect().left - h.left - 22, y: (c.top + c.bottom) / 2 - h.top - 12 },
-    box: { x: r.left - h.left, y: r.top - h.top, w: r.width, h: r.height },
   };
 }
 
