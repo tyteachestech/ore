@@ -60,7 +60,7 @@ export const taskRule = $inputRule((ctx) =>
   }),
 );
 
-export type Trigger = { kind: "link" | "slash" | "emoji"; query: string; /** Characters typed for it, trigger included. */ typed: number };
+export type Trigger = { kind: "link" | "slash" | "emoji" | "date"; query: string; /** Characters typed for it, trigger included. */ typed: number };
 
 /** The menu the text before the caret opens: `[[` for links, `/` for blocks, `:` for emoji. `/` opens
  *  at a line start, after a space, or right after an inline node such as a diagram ("￼", the
@@ -70,6 +70,9 @@ export function menuTrigger(before: string): Trigger | null {
   if (link) return { kind: "link", query: link[1]!, typed: link[0].length };
   const slash = before.match(/(?:^|[\s￼])\/([a-z0-9]{0,16})$/i);
   if (slash) return { kind: "slash", query: slash[1]!, typed: slash[1]!.length + 1 };
+  // @ at the start of a word: Notion's dates (an email address has a letter before it).
+  const date = before.match(/(?:^|[\s([{])@([a-z0-9 -]{0,16})$/i);
+  if (date) return { kind: "date", query: date[1]!, typed: date[1]!.length + 1 };
   const emoji = emojiTrigger(before);
   return emoji ? { kind: "emoji", query: emoji[2]!, typed: emoji[1]!.length } : null;
 }

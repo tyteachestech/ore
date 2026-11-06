@@ -193,3 +193,26 @@ describe("selected blocks (Esc, then ⇧↑ ⇧↓)", () => {
     expect((await picked(NOTE, "Ideas", "Last", (v) => v.dispatch(v.state.tr.deleteSelection()))).md.trim()).toBe("");
   });
 });
+
+describe("toggle headings", () => {
+  const TH = "<details><summary><h2>Why it works</h2></summary>\n\nBecause.\n\n</details>\n";
+  test("save as a heading inside the toggle's summary, and load back the same", async () => {
+    expect(await act(TH, "Why", () => null)).toBe(TH);
+    const kinds: (string | null)[] = [];
+    await act(TH, "Why", (v, b) => void kinds.push(ops.kindOf(v.state.doc, b)) ?? null);
+    expect(kinds).toEqual(["th2"]);
+    // A summary that is only partly a heading stays the toggle's text.
+    const odd = "<details><summary><h2>A</h2> b</summary>\n\nC.\n\n</details>\n";
+    expect(await act(odd, "<h2>", () => null)).toBe("<details><summary>&lt;h2&gt;A&lt;/h2&gt; b</summary>\n\nC.\n\n</details>\n");
+  });
+
+  test("Turn into: a line becomes a toggle heading, and back; a toggle keeps its body", async () => {
+    expect(await act(NOTE, "First", (v, b) => ops.turnInto(v.state, b, "th1"))).toContain("<details><summary><h1>First line.</h1></summary>\n");
+    expect(await act(TH, "Why", (v, b) => ops.turnInto(v.state, b, "toggle"))).toBe("<details><summary>Why it works</summary>\n\nBecause.\n\n</details>\n");
+    expect(await act(TH, "Why", (v, b) => ops.turnInto(v.state, b, "h2"))).toBe("## Why it works\n\nBecause.\n");
+    expect(await act("<details><summary>Why</summary>\n\nBecause.\n\n</details>\n", "Why", (v, b) => ops.turnInto(v.state, b, "th3"))).toBe(
+      "<details><summary><h3>Why</h3></summary>\n\nBecause.\n\n</details>\n",
+    );
+  });
+});
+
