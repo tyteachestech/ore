@@ -4,7 +4,7 @@ import {
   createCodeBlockCommand, imageSchema, insertHrCommand, linkSchema, turnIntoTextCommand, wrapInBlockquoteCommand, wrapInBulletListCommand,
   wrapInHeadingCommand, wrapInOrderedListCommand,
 } from "@milkdown/kit/preset/commonmark";
-import { wrapIn } from "@milkdown/kit/prose/commands";
+import { toggleMark, wrapIn } from "@milkdown/kit/prose/commands";
 import { NodeSelection, Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet, type EditorView, type ViewMutationRecord } from "@milkdown/kit/prose/view";
 import { $prose, $view, callCommand } from "@milkdown/kit/utils";
@@ -20,6 +20,7 @@ import { createEditor, markdownOf, menuTrigger } from "./editor";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
 import { BlockHandle } from "./BlockHandle";
+import { SelectionBar, type Sel } from "./SelectionBar";
 import { blockAt, duplicate, moveBy } from "./blockops";
 import { is } from "../keys";
 
@@ -109,6 +110,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const editor = useRef<Editor | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [index, setIndex] = useState(0);
+  const [sel, setSel] = useState<Sel | null>(null);
   const [emoji, setEmoji] = useState<EmojiEntry[] | null>(null);
   /** The diagram open in the overlay; `at` is where a new one goes once it has a drawing. */
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
@@ -208,7 +210,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), imageView(live), toggleView, ghostPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), toggleView, ghostPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
@@ -450,6 +452,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     >
       <div ref={root} />
       {!PHONE && <BlockHandle view={view} host={host} />}
+      {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} />}
       {menu && (menu.kind !== "emoji" || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
@@ -557,6 +560,12 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             }
             if (!menu) {
               // Notion's block keys, on the caret's block: one editor step each, so ⌘Z takes it back.
+              const marks = view.state.schema.marks;
+              const fmt = is(e, "note-bold") ? marks.strong : is(e, "note-italic") ? marks.emphasis : is(e, "note-strike") ? marks.strike_through : is(e, "note-code") ? marks.inlineCode : null;
+              if (fmt) {
+                toggleMark(fmt)(view.state, view.dispatch);
+                return true;
+              }
               const up = is(e, "block-up");
               if (up || is(e, "block-down") || is(e, "block-duplicate")) {
                 const b = blockAt(view.state.doc, view.state.selection.from);
@@ -624,6 +633,65 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             if (m) live.current.p.onOpen({ kind: m[1] as LinkTarget["kind"], id: m[2]! });
             else if (/^https?:\/\//i.test(href)) void openUrl(href);
             else return false;
+            return true;
+          },
+        },
+      }),
+  );
+}
+
+/** Shows Notion's format bar over selected text: once the mouse is up (not while he drags a
+ *  selection), never for a click or while a `/`, `[[` or `:` menu is open. Esc puts it away. */
+function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | null) => void) {
+  let down = false;
+  let hidden = "";
+  const at = (view: EditorView): Sel | null => {
+    const s = view.state.selection;
+    if (down || s.empty || !(s instanceof TextSelection) || !view.hasFocus() || !host.current) return null;
+    if (`${s.from}-${s.to}` === hidden) return null;
+    if (!view.state.doc.textBetween(s.from, s.to, " ", " ").trim()) return null;
+    const h = host.current.getBoundingClientRect();
+    const a = view.coordsAtPos(s.from);
+    const z = view.coordsAtPos(s.to);
+    const width = 340;
+    const x = Math.max(-8, Math.min(a.left - h.left - 16, h.width - width));
+    // Above the first line; below the last when there is no room above (the top of the note).
+    const above = a.top - h.top - 42;
+    return { from: s.from, to: s.to, x, y: a.top - 42 < 8 ? z.bottom - h.top + 8 : above };
+  };
+  return $prose(
+    () =>
+      new Plugin({
+        view: (view) => {
+          const up = () => {
+            if (!down) return;
+            down = false;
+            setSel(at(view));
+          };
+          window.addEventListener("mouseup", up);
+          return { update: (v) => setSel(at(v)), destroy: () => window.removeEventListener("mouseup", up) };
+        },
+        props: {
+          handleDOMEvents: {
+            mousedown: () => {
+              down = true;
+              hidden = "";
+              setSel(null);
+              return false;
+            },
+            blur: (view, e) => {
+              // Focus moving into the bar's own popovers keeps it.
+              if (!(e.relatedTarget as HTMLElement | null)?.closest?.(".sel-bar, .sel-pop")) setSel(null);
+              return false;
+            },
+          },
+          handleKeyDown: (view, e) => {
+            if (e.key !== "Escape" || view.state.selection.empty) return false;
+            const s = view.state.selection;
+            if (`${s.from}-${s.to}` === hidden) return false;
+            hidden = `${s.from}-${s.to}`;
+            setSel(null);
+            e.stopPropagation();
             return true;
           },
         },
