@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sourceFile, type Item } from "../items.ts";
 
@@ -141,19 +142,20 @@ interface Info {
   upload_date?: string;
   webpage_url?: string;
   description?: string;
+  language?: string | null;
   chapters?: Chapter[] | null;
   subtitles?: Record<string, Track[]>;
   automatic_captions?: Record<string, Track[]>;
 }
 
+/** The captions to read: English first, then the video's own language (a Spanish lecture's Spanish),
+ *  as written by people before YouTube's automatic ones. */
 function pickTrack(info: Info): Track | undefined {
   const manual = info.subtitles ?? {};
   const auto = info.automatic_captions ?? {};
-  const keys = [
-    ...Object.keys(manual).filter((k) => k === "en" || /^en-[A-Z]{2}$/.test(k)).map((k) => manual[k]),
-    auto["en-orig"],
-    auto["en"],
-  ];
+  const own = info.language?.split("-")[0];
+  const of = (lang: string) => Object.keys(manual).filter((k) => k === lang || new RegExp(`^${lang}-[A-Za-z]{2,4}$`).test(k)).map((k) => manual[k]);
+  const keys = [...of("en"), auto["en-orig"], auto["en"], ...(own && own !== "en" ? [...of(own), auto[`${own}-orig`], auto[own]] : [])];
   for (const tracks of keys) {
     const vtt = tracks?.find((t) => t.ext === "vtt");
     if (vtt) return vtt;
@@ -182,19 +184,26 @@ async function captions(text: string, url: string): Promise<string> {
   return "WEBVTT\n\n" + segs.join("\n\n");
 }
 
-/** A video from yt-dlp, YouTube or any site it reads (Vimeo, TED, Loom…), with its English transcript. */
-export async function fetchYoutube(url: string): Promise<YoutubeDoc> {
+export interface VideoOptions {
+  /** Hear a video with no captions: download its sound and transcribe it on the Mac (D122). */
+  listen?: boolean;
+  onProgress?: (done: number, label?: string) => void;
+}
+
+/** A video from yt-dlp, YouTube or any site it reads (Vimeo, TED, Loom…), with its transcript: its
+ *  captions, or with `listen`, what the Mac hears in its sound. */
+export async function fetchYoutube(url: string, opts: VideoOptions = {}): Promise<YoutubeDoc> {
   const bin = ytDlp();
   if (!bin) throw new Error("Videos need yt-dlp, which isn’t installed. Run `brew install yt-dlp` in Terminal, then try again.");
-  const proc = Bun.spawn([bin, "-J", "--skip-download", "--no-warnings", "--no-playlist", url], { stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
-  if (code !== 0) throw new Error(`Couldn’t get that video: ${stderr.trim().split("\n").pop()?.replace(/^ERROR:\s*/, "")}. Check the link; if it plays in the browser, run \`brew upgrade yt-dlp\` and try again.`);
-  const info = JSON.parse(stdout) as Info;
+  const info = JSON.parse(await ytdlpRun(bin, ["-J", "--skip-download", "--no-warnings", "--no-playlist", url])) as Info;
   const track = pickTrack(info);
-  if (!track) throw new Error("This video has no English captions, so there’s no transcript to read. If you have one, paste it here instead.");
-  const res = await fetch(track.url);
-  if (!res.ok) throw new Error(`Couldn’t download the captions (HTTP ${res.status}). Try again in a minute.`);
-  const vtt = await captions(await res.text(), track.url);
+  let vtt: string;
+  if (track) {
+    const res = await fetch(track.url);
+    if (!res.ok) throw new Error(`Couldn’t download the captions (HTTP ${res.status}). Try again in a minute.`);
+    vtt = await captions(await res.text(), track.url);
+  } else if (opts.listen) vtt = await listen(bin, info.webpage_url ?? url, info.language ?? undefined, opts.onProgress);
+  else throw new Error("This video has no captions, so there’s no transcript to read. If you have one, paste it here instead.");
   const d = info.upload_date;
   return {
     title: info.title,
@@ -204,6 +213,27 @@ export async function fetchYoutube(url: string): Promise<YoutubeDoc> {
     vtt,
     body: vttToBody(vtt, info.chapters ?? []) + description(info.description),
   };
+}
+
+async function ytdlpRun(bin: string, args: string[]): Promise<string> {
+  const proc = Bun.spawn([bin, ...args], { stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  if (code !== 0) throw new Error(`Couldn’t get that video: ${stderr.trim().split("\n").pop()?.replace(/^ERROR:\s*/, "")}. Check the link; if it plays in the browser, run \`brew upgrade yt-dlp\` and try again.`);
+  return stdout;
+}
+
+/** A video's sound, downloaded by yt-dlp (an m4a or mp4 the Mac can open) and transcribed. */
+async function listen(bin: string, url: string, language: string | undefined, onProgress?: VideoOptions["onProgress"]): Promise<string> {
+  const dir = mkdtempSync(join(tmpdir(), "ore-video-"));
+  try {
+    onProgress?.(0, "No captions, so listening to the video…");
+    await ytdlpRun(bin, ["-f", "ba[ext=m4a]/b[ext=mp4]/ba/b", "--no-playlist", "--no-warnings", "--max-filesize", "2G", "-o", join(dir, "sound.%(ext)s"), url]);
+    const file = readdirSync(dir).find((f) => f.startsWith("sound.") && !f.endsWith(".part"));
+    if (!file) throw new Error("Couldn’t download the video’s sound. Try again in a minute; if it has a transcript, paste it here instead.");
+    return await (await import("./audio.ts")).transcribeFile(join(dir, file), onProgress, language);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /** What the reader's player needs (D48, D49): the video ID and the transcript's word times, or

@@ -1,10 +1,10 @@
 // What a paste or a typed entry in the add box becomes: links and file paths are fetched or read
 // by `ore add`; anything else is kept as text (`ore add --stdin`).
 
-export const FILE_TYPES = ["pdf", "md", "markdown", "txt", "text", "html", "htm", "epub", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac"];
+export const FILE_TYPES = ["pdf", "md", "markdown", "txt", "text", "html", "htm", "epub", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
 
 /** What kind of source a dropped file becomes, from its extension; null when Ore can't read it. */
-export type FileKind = "pdf" | "book" | "note" | "page" | "image" | "audio";
+export type FileKind = "pdf" | "book" | "note" | "page" | "image" | "audio" | "video";
 export function fileKind(path: string): FileKind | null {
   const ext = path.split(".").pop()?.toLowerCase();
   if (ext === "pdf") return "pdf";
@@ -12,6 +12,7 @@ export function fileKind(path: string): FileKind | null {
   if (ext === "md" || ext === "markdown" || ext === "txt" || ext === "text" || ext === "docx" || ext === "ipynb" || ext === "srt" || ext === "vtt") return "note";
   if (ext && ["png", "jpg", "jpeg", "heic", "tiff", "webp", "gif"].includes(ext)) return "image"; // its text, read on the Mac (D96)
   if (ext && ["mp3", "m4a", "wav", "aac", "aiff", "flac"].includes(ext)) return "audio"; // transcribed on the Mac (D96)
+  if (ext && ["mp4", "mov", "m4v"].includes(ext)) return "video"; // heard from its sound on the Mac (D122)
   return ext === "html" || ext === "htm" || ext === "pptx" ? "page" : null;
 }
 
@@ -93,7 +94,7 @@ const REFUSED = [/^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/\w+\/status
 
 /** What a copied entry is, for the add box's row: "video", "PDF", "course" and so on. */
 export function copiedWhat(e: Entry): string {
-  if (e.kind === "file") return ({ pdf: "PDF", book: "book", note: "file", page: "page", image: "image", audio: "audio" } as const)[fileKind(e.path)!];
+  if (e.kind === "file") return ({ pdf: "PDF", book: "book", note: "file", page: "page", image: "image", audio: "audio", video: "video" } as const)[fileKind(e.path)!];
   if (e.kind !== "link") return "link";
   if (isCourseLink(e.url)) return "course";
   if (/^https?:\/\/(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\//i.test(e.url)) return "video";

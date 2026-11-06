@@ -21,3 +21,5 @@ Ranked by how much of what people learn from each one blocks, then by cost.
 9. **Small grid holes.** A PDF's author, arXiv authors, TED's title and date, a damaged EPUB, a private Google Doc's sign-in page. One cleanup batch; each closes a `gap:` cell.
 
 Suggested order: 1, then 2, then 3; 4 and 5 when you hit them.
+
+**Picked (2026-11-06):** 1, 2 and 3, in order. 1 is built (D122): caption-less videos and video files are heard; a video's own-language captions are read, and its speech is heard in its language, which also closes part of 4.

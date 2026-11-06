@@ -1,6 +1,8 @@
 // Speech to text for audio files and podcast episodes (D96 phase 3), on the Mac, with Apple's
-// on-device SpeechAnalyzer (macOS 26). Usage: transcribe <audio file>. Prints WebVTT; on stderr,
-// `progress <0..1>` lines while it works. Exits 3 on an older macOS. Compiled on first use by `audio.ts`.
+// on-device SpeechAnalyzer (macOS 26). Usage: transcribe <audio or video file> [language]. Prints
+// WebVTT; on stderr, `progress <0..1>` and `status <line>` lines while it works. Exits 3 on an older
+// macOS, 4 when there is no speech model for the language. A video (or audio AVAudioFile can't open)
+// is first exported to an m4a of its sound. Compiled on first use by `audio.ts`.
 import AVFoundation
 import CoreMedia
 import Foundation
@@ -17,13 +19,29 @@ func stamp(_ t: Double) -> String {
   return String(format: "%02d:%02d:%02d.%03d", ms / 3_600_000, ms / 60000 % 60, ms / 1000 % 60, ms % 1000)
 }
 
-guard CommandLine.arguments.count == 2 else { fail("usage: transcribe <audio file>") }
+/** The file itself when AVAudioFile reads it, else its sound exported to a temporary m4a. */
+@available(macOS 26.0, *)
+func soundOf(_ url: URL) async throws -> (URL, Bool) {
+  if (try? AVAudioFile(forReading: url)) != nil { return (url, false) }
+  let asset = AVURLAsset(url: url)
+  guard try await !asset.loadTracks(withMediaType: .audio).isEmpty else { fail("that file has no sound") }
+  guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else { fail("can’t read the sound in that file") }
+  let out = FileManager.default.temporaryDirectory.appendingPathComponent("ore-sound-\(UUID().uuidString).m4a")
+  err("status Reading the video’s sound…")
+  try await export.export(to: out, as: .m4a)
+  return (out, true)
+}
+
+let args = CommandLine.arguments
+guard args.count == 2 || args.count == 3 else { fail("usage: transcribe <audio or video file> [language]") }
 guard #available(macOS 26.0, *) else { fail("Transcription needs macOS 26 or later.", 3) }
-let url = URL(fileURLWithPath: CommandLine.arguments[1])
+let wanted = args.count == 3 ? Locale(identifier: args[2]) : Locale.current
 do {
-  guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
-    fail("No speech model for \(Locale.current.identifier).")
+  guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: wanted) else {
+    fail("No speech model for \(wanted.identifier).", 4)
   }
+  let (url, temporary) = try await soundOf(URL(fileURLWithPath: args[1]))
+  defer { if temporary { try? FileManager.default.removeItem(at: url) } }
   let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [.audioTimeRange])
   if let install = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
     err("status Downloading the speech model (once)…")
