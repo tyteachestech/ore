@@ -68,9 +68,11 @@ const PLAYLIST = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/playlist\?/;
 const PODCAST = /^https?:\/\/(?:podcasts\.apple\.com\/.+[?&]i=|open\.spotify\.com\/episode\/|overcast\.fm\/|pca\.st\/)/;
 const X_POST = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/\w+\/status\//;
 /** File types Ore reads, by extension. */
-export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac"];
+export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
 /** Audio transcribed on the Mac (D96); as `audio.ts` AUDIO_TYPES, which loads only when used. */
 const AUDIO_TYPES = ["mp3", "m4a", "wav", "aac", "aiff", "flac"];
+/** Video files, heard from their sound on the Mac; as `audio.ts` VIDEO_TYPES. */
+const VIDEO_TYPES = ["mp4", "mov", "m4v"];
 /** Images read with text recognition (D96). */
 const IMAGE_TYPES = ["png", "jpg", "jpeg", "heic", "tiff", "webp", "gif"];
 /** A page larger than this is not an article: a video, a dump, a disk image. */
@@ -174,7 +176,7 @@ function kindOf(name: string, ctype = ""): string | null {
 
 async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   if (opts.type === "youtube" || (!opts.type && isYoutubeUrl(url))) {
-    const y = await fetchYoutube(url);
+    const y = await fetchYoutube(url, { listen: true, onProgress: opts.onProgress });
     return { type: "youtube", title: y.title, url: y.url, author: y.author, published: y.published, body: y.body, source: { ext: "vtt", data: y.vtt } };
   }
   const refused = refuseLink(url);
@@ -189,7 +191,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   }
   if (VIDEO_SITE.test(url)) {
     // Played on its own site (the reader's player is YouTube's); the transcript reads like an article.
-    const y = await fetchYoutube(url);
+    const y = await fetchYoutube(url, { listen: true, onProgress: opts.onProgress });
     return { type: "article", title: y.title, url, author: y.author, published: y.published, body: y.body, source: { ext: "vtt", data: y.vtt } };
   }
   const rw = (await import("./links.ts")).rewrite(url);
@@ -288,6 +290,13 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
   if (stat.isDirectory()) throw new Error("That’s a folder. Open it and add the files inside instead.");
   // Finder's own files (.DS_Store, AppleDouble ._ copies) ride along when a folder's files are dropped.
   if (/^(\.DS_Store|\._.*|Icon\r)$/.test(basename(path))) throw new Error(`“${basename(path)}” is a file Finder keeps for itself, not something to read. Add the file you meant instead.`);
+  const ext = extname(path).slice(1).toLowerCase();
+  if (VIDEO_TYPES.includes(ext) && !opts.type) {
+    // A lecture recording or a downloaded course video: heard from its sound where it lies, never
+    // read into memory, so no size limit (D122). Only its transcript is kept.
+    const vtt = await (await import("./audio.ts")).transcribeFile(path, opts.onProgress);
+    return { type: "article", title: fileStem(path), body: vttToBody(vtt), source: { ext: "vtt", data: vtt } };
+  }
   if (stat.size > MAX_BYTES) throw new Error(tooBig());
   const bytes = new Uint8Array(readFileSync(path));
   // A file with no extension ("README", "notes") is read as text when it is text.

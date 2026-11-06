@@ -8,32 +8,44 @@ import { run, swiftHelper } from "./swift.ts";
 
 /** Audio file types the Mac transcribes. */
 export const AUDIO_TYPES = ["mp3", "m4a", "wav", "aac", "aiff", "flac"];
+/** Video files the Mac transcribes from their sound (lecture recordings, Zoom, downloaded courses). */
+export const VIDEO_TYPES = ["mp4", "mov", "m4v"];
+
+type Progress = (done: number, label?: string) => void;
 
 /** The audio as WebVTT. `onProgress` gets 0..1 as it goes, and a line to show while the speech model
  *  downloads the first time. */
-export async function transcribe(data: Uint8Array, ext: string, onProgress?: (done: number, label?: string) => void): Promise<string> {
+export async function transcribe(data: Uint8Array, ext: string, onProgress?: Progress): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "ore-audio-"));
   try {
     const file = join(dir, `audio.${ext}`);
     writeFileSync(file, data);
-    const bin = process.env.ORE_TRANSCRIBE ?? (process.platform === "darwin" ? await swiftHelper("transcribe") : null);
-    if (!bin) throw new Error("Transcribing audio works on a Mac only. If it has a transcript, copy it and paste it here instead.");
-    const vtt = await run(bin, [file], (line) => {
-      const p = line.match(/^progress ([\d.]+)/);
-      if (p) onProgress?.(Number(p[1]));
-      else if (line.startsWith("status ")) onProgress?.(0, line.slice(7));
-    }).catch((e: Error & { code?: number }) => {
-      throw new Error(
-        e.code === 3
-          ? "Transcribing audio needs macOS 26 or later. If it has a transcript, copy it and paste it here instead."
-          : `Couldn’t transcribe the audio (${e.message.split("\n").pop()}). If it has a transcript, copy it and paste it here instead.`,
-      );
-    });
-    if (!/-->/.test(vtt)) throw new Error("Heard no speech in that audio. If it has a transcript, copy it and paste it here instead.");
-    return vtt;
+    return await transcribeFile(file, onProgress);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** A sound or video file on disk as WebVTT, without reading it into memory (a lecture video can be
+ *  gigabytes). `language` is the speech's language when known (a video's, "es"); else the Mac's. */
+export async function transcribeFile(file: string, onProgress?: Progress, language?: string): Promise<string> {
+  const bin = process.env.ORE_TRANSCRIBE ?? (process.platform === "darwin" ? await swiftHelper("transcribe") : null);
+  if (!bin) throw new Error("Transcribing audio works on a Mac only. If it has a transcript, copy it and paste it here instead.");
+  const vtt = await run(bin, language ? [file, language] : [file], (line) => {
+    const p = line.match(/^progress ([\d.]+)/);
+    if (p) onProgress?.(Number(p[1]));
+    else if (line.startsWith("status ")) onProgress?.(0, line.slice(7));
+  }).catch((e: Error & { code?: number }) => {
+    throw new Error(
+      e.code === 3
+        ? "Transcribing audio needs macOS 26 or later. If it has a transcript, copy it and paste it here instead."
+        : e.code === 4
+          ? `Your Mac can’t transcribe speech in this language (${language}) yet. If it has a transcript, copy it and paste it here instead.`
+          : `Couldn’t transcribe the audio (${e.message.split("\n").pop()}). If it has a transcript, copy it and paste it here instead.`,
+    );
+  });
+  if (!/-->/.test(vtt)) throw new Error("Heard no speech in that audio. If it has a transcript, copy it and paste it here instead.");
+  return vtt;
 }
 
 export interface Episode {

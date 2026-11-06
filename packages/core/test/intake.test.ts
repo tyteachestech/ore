@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
@@ -7,7 +7,7 @@ import { addSource, addTab, addText } from "../src/ingest/index.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
-import { transcribe } from "../src/ingest/audio.ts";
+import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { inlineMath } from "../src/ingest/web.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
@@ -769,5 +769,91 @@ describe("import coverage: audio and podcasts", () => {
     process.env.ORE_TRANSCRIBE = stand("printf 'WEBVTT\\n\\n'");
     await expect(transcribe(new Uint8Array(10), "mp3")).rejects.toThrow(/Heard no speech/);
     process.env.ORE_TRANSCRIBE = stand(`cat '${vttFile}'`);
+  });
+});
+
+// D122: a video with no captions, or a video file, is heard from its sound on the Mac. Stand-ins:
+// yt-dlp prints the saved info (or "downloads" a sound file), the transcriber prints VTT and the
+// arguments it was given, so the test sees the file and the language it was asked for.
+describe("import coverage: videos heard from their sound", () => {
+  const VTT = "WEBVTT\n\n00:00:00.000 --> 00:00:30.000\nTesting yourself beats rereading.\n\n00:01:00.000 --> 00:01:05.000\nTeachers can quiz every week.\n\n";
+  const realPath = process.env.PATH;
+  const was = process.env.ORE_TRANSCRIBE;
+  let dir = "";
+  const script = (name: string, body: string) => {
+    const f = join(dir, name);
+    writeFileSync(f, `#!/bin/sh\n${body}\n`);
+    chmodSync(f, 0o755);
+    return f;
+  };
+  const vttFile = () => {
+    const f = join(dir, "out.vtt");
+    writeFileSync(f, VTT);
+    return f;
+  };
+  // yt-dlp: `-J` prints the info; a download writes `sound.m4a` where `-o` says (and notes it did).
+  const ytdlp = (info: string) =>
+    script("yt-dlp", `case " $* " in *" -J "*) cat '${info}';; *) while [ "$1" != "-o" ]; do shift; done; out=$(echo "$2" | sed 's/%(ext)s/m4a/'); echo sound > "$out"; touch '${dir}/downloaded';; esac`);
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "ore-listen-"));
+    process.env.PATH = `${dir}:${realPath}`;
+    process.env.ORE_TRANSCRIBE = script("transcribe", `echo "$@" > '${dir}/args'; echo "progress 1" >&2; cat '${vttFile()}'`);
+  });
+  afterAll(() => {
+    process.env.PATH = realPath;
+    if (was === undefined) delete process.env.ORE_TRANSCRIBE;
+    else process.env.ORE_TRANSCRIBE = was;
+  });
+
+  test("a YouTube video with no captions is heard: chapters, title and description kept", async () => {
+    ytdlp(join(FIX, "video", "no-captions.info.json"));
+    const seen: string[] = [];
+    const item = await addSource(await tempLibrary(), "https://www.youtube.com/watch?v=Nc4pT10nSaA", { onProgress: (_d, label) => label && seen.push(label) });
+    expect(item.meta).toMatchObject({ type: "youtube", title: "Lecture 3: Retrieval practice", author: "Cognitive Science Lab", published: "2024-02-12" });
+    expect(item.body).toBe("### Why testing works\n\n[00:00] Testing yourself beats rereading.\n\n### In the classroom\n\n[01:00] Teachers can quiz every week.\n\n## From the description\n\nSlides: https://example.edu/lecture3.pdf\n");
+    expect(readFileSync(join(item.dir, "source.vtt"), "utf8")).toBe(VTT);
+    expect(readFileSync(join(dir, "args"), "utf8")).toMatch(/sound\.m4a en\n$/);
+    expect(seen[0]).toMatch(/No captions, so listening/);
+  });
+
+  test("a video in another language reads its own captions before listening", async () => {
+    const info = join(dir, "es.json");
+    writeFileSync(info, JSON.stringify({ title: "La memoria", language: "es", subtitles: { es: [{ ext: "vtt", url: "https://captions.test/es.vtt" }] } }));
+    ytdlp(info);
+    serve({ "https://captions.test/es.vtt": { body: "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nHola a todos.\n", type: "text/vtt" } });
+    const item = await addSource(await tempLibrary(), "https://www.youtube.com/watch?v=es0000000aa");
+    expect(item.body).toBe("[00:00] Hola a todos.\n");
+  });
+
+  test("a video a page only embeds is never downloaded to be heard", async () => {
+    const info = join(dir, "bare.json");
+    writeFileSync(info, JSON.stringify({ title: "Embedded", webpage_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }));
+    ytdlp(info);
+    rmSync(join(dir, "downloaded"), { force: true });
+    const text = "Spacing works because forgetting makes the next retrieval harder. ".repeat(30);
+    serve({ "https://example.com/spacing": { body: `<html><head><title>Spacing</title></head><body><article><h1>Spacing</h1><p>${text}</p><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe><p>${text}</p></article></body></html>`, type: HTML } });
+    const item = await addSource(await tempLibrary(), "https://example.com/spacing");
+    expect(item.body).toContain("Spacing works because");
+    expect(item.meta.video).toBeUndefined();
+    expect(existsSync(join(dir, "downloaded"))).toBe(false);
+  });
+
+  test("a video file over 200 MB is heard where it lies, titled by its name", async () => {
+    const f = join(mkdtempSync(join(tmpdir(), "ore-mov-")), "Week 3 lecture.mov");
+    writeFileSync(f, "");
+    truncateSync(f, 300 * 1024 * 1024); // sparse: big on paper, nothing to read
+    const item = await addSource(await tempLibrary(), f);
+    expect(item.meta).toMatchObject({ type: "article", title: "Week 3 lecture" });
+    expect(item.body).toBe("[00:00] Testing yourself beats rereading.\n\n[01:00] Teachers can quiz every week.\n");
+    expect(readFileSync(join(dir, "args"), "utf8").trim()).toBe(f);
+    expect(existsSync(join(item.dir, "source.mov"))).toBe(false);
+  });
+
+  test("speech in a language the Mac has no model for says so", async () => {
+    process.env.ORE_TRANSCRIBE = script("transcribe-none", "echo 'No speech model for xx.' >&2; exit 4");
+    const f = join(mkdtempSync(join(tmpdir(), "ore-mp4-")), "talk.mp4");
+    writeFileSync(f, "x");
+    await expect(transcribeFile(f, undefined, "xx")).rejects.toThrow(/can’t transcribe speech in this language \(xx\).*paste it here/);
+    process.env.ORE_TRANSCRIBE = script("transcribe", `echo "$@" > '${dir}/args'; cat '${vttFile()}'`);
   });
 });
