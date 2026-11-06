@@ -67,6 +67,10 @@ const DEFAULTS = [
   { id: "question", label: "Question", group: "Highlight", combo: "Digit3" },
   { id: "note", label: "Write note", group: "Highlight", combo: "Tab" },
   { id: "remove", label: "Remove highlight", group: "Highlight", combo: "Backspace" },
+  // The note editor's blocks (Notion's keys): the caret's block, or the one the ⋮⋮ handle is on.
+  { id: "block-up", label: "Move block up", group: "Notes", combo: "Shift+Meta+ArrowUp" },
+  { id: "block-down", label: "Move block down", group: "Notes", combo: "Shift+Meta+ArrowDown" },
+  { id: "block-duplicate", label: "Duplicate block", group: "Notes", combo: "Meta+KeyD" },
   { id: "cut-text", label: "Remove the selected text (from a heading: its section)", group: "Highlight", combo: "Shift+Backspace" },
   // The diagram editor (D103) owns the keyboard while it is open, so its keys only clash with each other.
   // Tools take Excalidraw's letters and numbers, so his muscle memory carries over.

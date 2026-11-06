@@ -49,6 +49,8 @@ export const Copy = icon("M8 6h12v2H8zM4 2h12v2H4zm2 6h2v12H6zM2 4h2v12H2zm6 16h
 export const CornersOut = icon("M11 5h2v2h2v2h2V7h-2V5h-2V3h-2v2zM9 7V5h2v2H9zm0 0v2H7V7h2zm-5 6h16v-2H4v2zm9 6h-2v-2H9v-2H7v2h2v2h2v2h2v-2zm2-2h-2v2h2v-2zm0 0h2v-2h-2v2z");
 export const CursorClick = icon("M17 9h2v3h-2zm-4-2h2v4h-2zM9 3h2v8H9zM5 3h2v10H5zm14 6h2v2h-2zm-4-2h2v2h-2zm-4 0h2v2h-2zM7 1h2v2H7zM3 11h2v2H3zm-2 2h2v2H1zm0 2h2v2H1zm2 2h2v2H3zm2 2h2v2H5zm2 2h12v2H7zm12-2h2v2h-2zm2-8h2v8h-2zM5 13h2v2H5zm2 2h2v2H7z");
 export const Diamond = icon("M11 2h2v2h-2zM9 4h2v2H9zm4 0h2v2h-2zM7 6h2v2H7zm8 0h2v2h-2zM5 8h2v2H5zm12 0h2v2h-2zM3 10h2v4H3zm16 0h2v4h-2zM5 14h2v2H5zm12 0h2v2h-2zM7 16h2v2H7zm8 0h2v2h-2zM9 18h2v2H9zm4 0h2v2h-2zM11 20h2v2h-2z");
+/** The block handle's six dots (Notion's ⋮⋮), drawn on the 24 grid in 1.5 steps so each dot is whole pixels at 16 px. */
+export const DotsSix = icon("M7.5 4.5h3v3h-3zm6 0h3v3h-3zM7.5 10.5h3v3h-3zm6 0h3v3h-3zM7.5 16.5h3v3h-3zm6 0h3v3h-3z"); // 2 px dots at 16 px
 export const DotsThree = icon("M1 9h6v6H1V9zm2 2v2h2v-2H3zm6-2h6v6H9V9zm2 2v2h2v-2h-2zm6-2h6v6h-6V9zm2 2v2h2v-2h-2z");
 export const Eraser = icon("M15 18h6v2H7v-2h6v-2h2v2Zm-8 0H5v-2h2v2Zm-2-2H3v-2h2v2Zm12 0h-2v-2h2v2ZM7 14H5v-2h2v2Zm8 0h-2v-2h2v2Zm4 0h-2v-2h2v2ZM9 12H7v-2h2v2Zm4 0h-2v-2h2v2Zm8 0h-2v-2h2v2Zm-10-2H9V8h2v2Zm8 0h-2V8h2v2Zm-6-2h-2V6h2v2Zm4 0h-2V6h2v2Zm-2-2h-2V4h2v2Z");
 export const Expand = icon("M3 3h7v2H5v5H3zM14 3h7v7h-2V5h-5zM3 14h2v5h5v2H3zM19 14h2v7h-7v-2h5z");

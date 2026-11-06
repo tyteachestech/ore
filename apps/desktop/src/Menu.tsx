@@ -40,7 +40,7 @@ const Later = ({ children }: { children: () => ReactNode }) => <>{children()}</>
 
 /** An object's actions, the same list on right-click and on its ⋯ button, as in Linear and Finder
  *  (AGENTS.md interaction checklist). Radix menus: arrows, type-ahead, Enter, Esc. */
-export function WithMenu({ actions, children }: { actions: Actions; children: ReactNode }) {
+export function WithMenu({ actions, children, keepFocus }: { actions: Actions; children: ReactNode; /** Focus stays where the action put it (the note's text), not back on the trigger. */ keepFocus?: boolean }) {
   // macOS opens the menu on mouse down, under the pointer, so the same click's mouse up lands on the
   // first item and Radix would pick it. A release right after opening is that click, not a choice;
   // pressing, moving to an item and releasing still picks it, as in a native menu.
@@ -56,7 +56,7 @@ export function WithMenu({ actions, children }: { actions: Actions; children: Re
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="popover menu-list" collisionPadding={8}>
+        <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => keepFocus && e.preventDefault()}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <ContextMenu.Separator className="menu-sep" />}
@@ -103,18 +103,33 @@ export function WithMenu({ actions, children }: { actions: Actions; children: Re
 }
 
 /** The ⋯ button that opens the same actions as right-click; shown on row hover. */
-export function MoreButton({ label, actions, className = "more" }: { label: string; actions: Actions; className?: string }) {
+export function MoreButton({ label, actions, className = "more", icon, hint = "More actions", open, onOpenChange, onPointerDown, align = "end", keepFocus }: {
+  label: string;
+  actions: Actions;
+  className?: string;
+  /** Another button face (the note's ⋮⋮ block handle) with its hover text. */
+  icon?: ReactNode;
+  hint?: ReactNode;
+  /** Opened by its owner: a handle that drags on press opens on a click that didn't (Notion). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Runs first; preventDefault() there keeps the press from opening the menu. */
+  onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
+  align?: "start" | "end";
+  /** Focus stays where the action put it (the note's text), not back on the button. */
+  keepFocus?: boolean;
+}) {
   return (
-    <DropdownMenu.Root modal={false}>
-      <Hint text="More actions">
+    <DropdownMenu.Root modal={false} open={open} onOpenChange={onOpenChange}>
+      <Hint text={hint}>
         <DropdownMenu.Trigger asChild>
-          <button className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-            <DotsThree size={16} aria-hidden="true" />
+          <button className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => (onPointerDown?.(e), e.stopPropagation())}>
+            {icon ?? <DotsThree size={16} aria-hidden="true" />}
           </button>
         </DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="popover menu-list" align="end" sideOffset={4} collisionPadding={8} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => keepFocus && e.preventDefault()} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <DropdownMenu.Separator className="menu-sep" />}
