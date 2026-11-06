@@ -1,5 +1,5 @@
 # Makes files/tables.pdf: a page of a paper with a table and a numbered display formula between
-# paragraphs, the parts pdf.js reads as plain lines and Docling reads as structure (D123). Its Docling
+# paragraphs, the parts pdf.js reads as plain lines and Docling reads as structure (D124). Its Docling
 # layout, saved as files/tables.docling.json, comes from:
 #   docling convert files/tables.pdf --to json --enrich-formula --table-mode accurate --image-export-mode placeholder
 # Run: python3 make-tables-pdf.py (needs reportlab).

@@ -80,7 +80,7 @@ export const itemCommands: Record<string, Command> = {
       if (f.for) await matchQuestion(lib, item.meta.id, str(f.for)!);
       const kept = !!item.kept;
       const enrich = f["no-enrich"] || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
-      // A PDF's tables and formulas are read after it is added, once the optional reader is installed (D123).
+      // A PDF's tables and formulas are read after it is added, once the optional reader is installed (D124).
       if (!kept && item.meta.type === "pdf" && doclingPath()) startTables(lib, item.meta.id);
       const path = relative(lib.root, item.docPath);
       return {
@@ -434,7 +434,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   tables: {
-    usage: "<item> | --install | --remove | --status   read a PDF's tables and display formulas with Docling and put them in its text in place of their lines; highlights stay (D123). Docling is an optional download of about 2 GB: --install gets it, --remove deletes it, --status says whether it is here. Undo with `ore reimport <item> --undo`",
+    usage: "<item> | --install | --remove | --status   read a PDF's tables and display formulas with Docling and put them in its text in place of their lines; highlights stay (D124). Docling is an optional download of about 2 GB: --install gets it, --remove deletes it, --status says whether it is here. Undo with `ore reimport <item> --undo`",
     options: { install: { type: "boolean" }, remove: { type: "boolean" }, status: { type: "boolean" } },
     async run([ref], f) {
       if (f.status) {

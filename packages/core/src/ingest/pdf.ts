@@ -140,7 +140,7 @@ function pageLines(items: Item[]): Line[] {
 
 /** The usual distance from one line to the next, across the whole document: a short page can't tell. */
 function lineGap(pages: Line[][]): number {
-  // A table or formula Docling read (D123) is one line standing for many, so its gaps don't count.
+  // A table or formula Docling read (D124) is one line standing for many, so its gaps don't count.
   const gaps = pages.flatMap((lines) => lines.slice(1).map((l, i) => (isBlock(l.text) || isBlock(lines[i]!.text) ? 0 : lines[i]!.y - l.y))).filter((g) => g > 0).sort((a, b) => a - b);
   return gaps[Math.floor(gaps.length / 2)] ?? 12;
 }
@@ -165,7 +165,7 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
     const drop = new Set<Line>();
     const [head, next] = byY;
     const t = (l: Line) => plain(l.text);
-    // A table or formula Docling read (D123) is never a running head, though many pages start with one.
+    // A table or formula Docling read (D124) is never a running head, though many pages start with one.
     if (head && next && !isBlock(head.text) && t(head).length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(t(head)) || folio.test(t(head)) || heads.get(key(head))! > 1)) drop.add(head);
     const rest = byY.filter((l) => !drop.has(l));
     const foot = rest.at(-1);
@@ -200,7 +200,7 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
     if (skip > i) return;
     const gap = i === 0 ? 0 : lines[i - 1]!.y - l.y;
     const line = plain(l.text);
-    // A table or formula Docling read stands alone (D123).
+    // A table or formula Docling read stands alone (D124).
     if (isBlock(line)) {
       push();
       out.push({ text: line, note: false });
@@ -370,7 +370,7 @@ export class ScannedPdf extends Error {
   }
 }
 
-/** A table or formula Docling found (D123), held in the text as BLOCK…BLOCK_ until the page is put together. */
+/** A table or formula Docling found (D124), held in the text as BLOCK…BLOCK_ until the page is put together. */
 const BLOCK = "\uE020", BLOCK_ = "\uE021";
 const isBlock = (t: string) => new RegExp(`^${BLOCK}\\d+${BLOCK_}$`).test(t);
 
