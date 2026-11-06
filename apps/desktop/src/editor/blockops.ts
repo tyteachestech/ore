@@ -263,7 +263,7 @@ function turnOne(state: EditorState, b: Block, kind: Kind): Transaction | null {
 }
 
 /** Each block a Block covers: its items, for all of a list; each of them, for selected blocks. */
-export function units(doc: PMNode, b: Block): Block[] {
+function units(doc: PMNode, b: Block): Block[] {
   const $p = doc.resolve(b.from);
   const out: Block[] = [];
   for (let i = $p.index(), pos = b.from; pos < b.to; i++) {
@@ -352,7 +352,7 @@ export function selectBlocks(doc: PMNode, a: number, h: number): BlockSelection 
 }
 
 /** The blocks side by side from `from` to `to`, selected; null unless those are block edges in one parent. */
-export function selectSpan(doc: PMNode, from: number, to: number): BlockSelection | null {
+function selectSpan(doc: PMNode, from: number, to: number): BlockSelection | null {
   if (from >= to) return null;
   const $f = doc.resolve(from);
   const $t = doc.resolve(to);
@@ -360,7 +360,7 @@ export function selectSpan(doc: PMNode, from: number, to: number): BlockSelectio
   return selectBlocks(doc, from, to - $t.nodeBefore.nodeSize);
 }
 
-export function blockOfSelection(s: BlockSelection): Block {
+function blockOfSelection(s: BlockSelection): Block {
   const node = s.$from.doc.nodeAt(s.from)!;
   return { from: s.from, to: s.to, node, item: node.type.name === "list_item" };
 }
