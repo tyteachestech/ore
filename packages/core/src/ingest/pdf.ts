@@ -26,6 +26,9 @@ interface Item {
   /** Glyph height in points; 0 for rotated text (a margin stamp, an axis label), which is never a heading or title. */
   size: number;
   eol: boolean;
+  /** Set in a bold or an italic face, by the font's name. */
+  bold?: boolean;
+  italic?: boolean;
 }
 
 interface Line {
@@ -37,10 +40,40 @@ interface Line {
   size: number;
 }
 
-function toItem(it: TextItem): Item {
+function toItem(it: TextItem, font: (name: string) => string): Item {
   const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = it.transform;
   const size = b || c ? 0 : Math.round(Math.hypot(c, d) * 10) / 10;
-  return { str: it.str, x, y, end: x + (it.width ?? 0) * (a < 0 ? -1 : 1), size, eol: it.hasEOL };
+  return { str: it.str, x, y, end: x + (it.width ?? 0) * (a < 0 ? -1 : 1), size, eol: it.hasEOL, ...faceOf(font(it.fontName)) };
+}
+
+/** Math fonts set every variable in italic: that is notation, not emphasis. */
+const MATH_FONT = /^(?:cmmi|cmsy|cmex|cmbsy|msam|msbm|eufm|rsfs|stmary|wasy)|math|symbol/i;
+const BOLD_FONT = /bold|black|heavy|semibold|demi|[-_](?:bd|blk|medi)|^cm(?:ss)?bx|^sfbx/i;
+const ITALIC_FONT = /italic|oblique|ita(?:l)?$|[-_]it(?:[A-Z]|$)|^cmti|^cmsl|^cmssi|^sfti|^sfsl/i;
+
+/** Bold and italic from the font's name ("NimbusRomNo9L-Medi", "Helvetica-BoldOblique", TeX's
+ *  "CMBX10" and "CMTI10"), its subset tag ("ABCDEF+") left off. */
+function faceOf(font: string): { bold?: boolean; italic?: boolean } {
+  const name = font.replace(/^[A-Z]{6}\+/, "");
+  if (!name || MATH_FONT.test(name)) return {};
+  return { bold: BOLD_FONT.test(name) || undefined, italic: ITALIC_FONT.test(name) || undefined };
+}
+
+// Marks kept in the text while lines are joined, written as Markdown once a paragraph is whole:
+// bold and italic runs, and a footnote's mark (its label between REF and END).
+const B = "\uE000", B_ = "\uE001", I = "\uE002", I_ = "\uE003", REF = "\uE010", END = "\uE011";
+/** The text with its marks left out, for every check on what a line says. */
+const plain = (s: string) => s.replace(/\uE010[^\uE011]*\uE011/g, "").replace(/[\uE000-\uE003]/g, "");
+
+/** A paragraph's runs as Markdown: one run across a line break or a hyphen stays one. */
+function emphasis(s: string): string {
+  return s
+    .replace(new RegExp(`${I_}${B_}(\\s*)${B}${I}`, "g"), "$1")
+    .replace(new RegExp(`${B_}(\\s*)${B}`, "g"), "$1")
+    .replace(new RegExp(`${I_}(\\s*)${I}`, "g"), "$1")
+    .replace(new RegExp(`${B}(\\s*)${B_}|${I}(\\s*)${I_}`, "g"), "$1$2")
+    .replace(/[\uE000\uE001]/g, "**")
+    .replace(/[\uE002\uE003]/g, "*");
 }
 
 /** Text set smaller than the body entirely beside the body's column: a textbook's margin notes
@@ -57,16 +90,24 @@ function dropMargins(items: Item[], body: number): Item[] {
 const SUPER: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "−": "⁻", "-": "⁻", "+": "⁺" };
 
 /** Small digits raised above the line: a power after a number or a lone letter ("10¹¹", "d²"),
- *  else a footnote's mark after a word ("rational²"), which is dropped. A footnote's own number,
- *  first on its line, stays. */
-function raised(cur: Line, it: Item, after: boolean): string | null {
+ *  else a footnote's mark after a word ("rational²"), kept apart as REF…END until its note is
+ *  found. A footnote's own number, first on its line, stays. */
+function raised(cur: Line, it: Item, after: boolean): { text: string; power: boolean } | null {
   const t = it.str.trim();
-  if (!t || !(/^[−+-]?\d[\d.]*$|^[−+-]$/.test(t) || (after && /^[.\d]+$/.test(t))) || !cur.text.trim() || !it.size || it.size >= cur.size * 0.85 || it.y <= cur.y + 1) return null;
+  const text = plain(cur.text);
+  if (!t || !(/^[−+-]?\d[\d.]*$|^[−+-]$/.test(t) || (after && /^[.\d]+$/.test(t))) || !text.trim() || !it.size || it.size >= cur.size * 0.85 || it.y <= cur.y + 1) return null;
   // A mark sits right after a word or its punctuation; a raised number after a space (a fraction's
   // top, "¹⁄₂") is left as it is.
-  if (/\s$/.test(cur.text) && !after) return null;
-  const power = after || /[−+-]/.test(t) || /\d$/.test(cur.text) || /(?:^|[^\p{L}])\p{L}$/u.test(cur.text);
-  return power ? [...t].map((c) => SUPER[c] ?? c).join("") : "";
+  if (/\s$/.test(text) && !after) return null;
+  const power = after || /[−+-]/.test(t) || /\d$/.test(text) || /(?:^|[^\p{L}])\p{L}$/u.test(text);
+  return power ? { text: [...t].map((c) => SUPER[c] ?? c).join(""), power } : { text: /^\d{1,3}$/.test(t) ? REF + t + END : "", power };
+}
+
+/** An item's text with its bold or italic run marked, spaces kept outside the marks. */
+function styled(it: Item): string {
+  if (!(it.bold || it.italic) || !/[\p{L}\d]/u.test(it.str)) return it.str;
+  const [, lead, core, tail] = it.str.match(/^(\s*)(.*?)(\s*)$/s)!;
+  return lead + (it.bold ? B : "") + (it.italic ? I : "") + core + (it.italic ? I_ : "") + (it.bold ? B_ : "") + tail;
 }
 
 function pageLines(items: Item[]): Line[] {
@@ -79,21 +120,21 @@ function pageLines(items: Item[]): Line[] {
     if (it.str.trim()) {
       cur ??= { text: "", y: it.y, x: it.x, size: 0 };
       const sup = raised(cur, it, up);
-      up = !!sup;
+      up = !!sup?.power;
       if (sup !== null) {
-        cur.text += sup;
+        cur.text += sup.text;
         continue;
       }
       cur.size = Math.max(cur.size, it.size);
     }
-    if (cur) cur.text += it.str;
+    if (cur) cur.text += styled(it);
     if (it.eol && cur) {
       lines.push(cur);
       cur = null;
     }
   }
   if (cur) lines.push(cur);
-  return lines.map((l) => ({ ...l, text: l.text.replace(/\s+/g, " ").trim() })).filter((l) => l.text);
+  return lines.map((l) => ({ ...l, text: l.text.replace(/\s+/g, " ").trim() })).filter((l) => plain(l.text).trim());
 }
 
 /** The usual distance from one line to the next, across the whole document: a short page can't tell. */
@@ -106,7 +147,7 @@ function lineGap(pages: Line[][]): number {
  *  number): the first or last line of a page, set apart from the text, that is a page number, starts
  *  or ends with one, or comes back on other pages. */
 function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
-  const key = (l?: Line) => l?.text.replace(/\d+/g, "#").toLowerCase() ?? "";
+  const key = (l?: Line) => (l ? plain(l.text) : "").replace(/\d+/g, "#").toLowerCase();
   const count = (keys: string[]) => keys.reduce((m, k) => m.set(k, (m.get(k) ?? 0) + 1), new Map<string, number>());
   const top = (p: Line[]) => p.reduce<Line | undefined>((a, l) => (!a || l.y > a.y ? l : a), undefined);
   const bottom = (p: Line[]) => p.reduce<Line | undefined>((a, l) => (!a || l.y < a.y ? l : a), undefined);
@@ -121,11 +162,12 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
     const byY = [...lines].sort((a, b) => b.y - a.y);
     const drop = new Set<Line>();
     const [head, next] = byY;
-    if (head && next && head.text.length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(head.text) || folio.test(head.text) || heads.get(key(head))! > 1)) drop.add(head);
+    const t = (l: Line) => plain(l.text);
+    if (head && next && t(head).length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(t(head)) || folio.test(t(head)) || heads.get(key(head))! > 1)) drop.add(head);
     const rest = byY.filter((l) => !drop.has(l));
     const foot = rest.at(-1);
     const prev = rest.at(-2);
-    if (foot && prev && foot.text.length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(foot.text) || feet.get(key(foot))! > 1)) drop.add(foot);
+    if (foot && prev && t(foot).length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
     return lines.filter((l) => !drop.has(l));
   });
 }
@@ -139,76 +181,118 @@ const FOOTNOTE = /^(?:\d{1,3}|[*†‡§])\s+\S/;
 // Join lines into paragraphs: a vertical gap clearly larger than the document's
 // typical line spacing (or a jump upwards, i.e. a new column) starts a paragraph.
 function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<string>()): { text: string; note: boolean }[] {
-  const out: string[] = [];
-  /** Paragraphs that are footnotes: a sentence running onto the next page joins the one above them. */
-  const notes = new Set<string>();
+  const out: { text: string; note: boolean }[] = [];
   let para = "";
+  /** The open paragraph is a footnote: a sentence running onto the next page joins the one above them. */
+  let inNote = false;
+  const push = () => {
+    if (para) out.push({ text: para, note: inNote });
+    para = "";
+    inNote = false;
+  };
   let skip = 0;
   /** Where the open list item's text starts, while one is open. */
   let item: number | null = null;
   lines.forEach((l, i) => {
     if (skip > i) return;
     const gap = i === 0 ? 0 : lines[i - 1]!.y - l.y;
+    const line = plain(l.text);
     // Lines set clearly larger than the body text, then body text, are a heading (the outline's);
     // a heading that wraps is joined. Large text not followed by body text is a figure's labels.
     // A numbered heading ("1.1.1 Acting humanly") may be set only a little larger, often in bold.
-    if (body && (l.size >= body * 1.15 || (l.size >= body * 1.05 && NUMBERED.test(l.text)))) {
+    if (body && (l.size >= body * 1.15 || (l.size >= body * 1.05 && NUMBERED.test(line)))) {
       let j = i + 1;
       while (j < lines.length && lines[j]!.size === l.size) j++;
-      const text = lines.slice(i, j).map((x) => x.text).join(" ");
+      const text = lines.slice(i, j).map((x) => plain(x.text)).join(" ");
       const next = lines[j];
       if (text.length <= 150 && /\p{L}{3}/u.test(text) && !/[.,;:<>]$/.test(text) && (!next || Math.abs(next.size - body) <= body * 0.1)) {
-        if (para) out.push(para);
-        out.push(`${l.size >= body * 1.6 ? "##" : "###"} ${text}`);
-        para = "";
+        push();
+        out.push({ text: `${l.size >= body * 1.6 ? "##" : "###"} ${text}`, note: false });
         item = null;
         skip = j;
         return;
       }
     }
-    const bullet = BULLET.test(l.text) && l.text.replace(BULLET, "").length > 0;
-    const note = body && l.size <= body * 0.85 && FOOTNOTE.test(l.text);
+    const bullet = BULLET.test(line) && line.replace(BULLET, "").length > 0;
+    const note = !!body && l.size <= body * 0.85 && FOOTNOTE.test(line);
     // A list item goes on while its lines start past its bullet; a line back at the margin ends it.
     const ended = item !== null && l.x < item - 2;
-    if (i > 0 && (gap > typical * 1.4 || gap < 0 || bullet || note || ended)) {
-      if (para) out.push(para);
-      para = "";
+    // A book's paragraph starts with its first line indented: the lines around it start further left,
+    // together, and the line before it ends a sentence. A list of references indents an entry's
+    // second line instead ("hanging"), so the second line after it must start back at the margin too.
+    const [before, after, later] = [lines[i - 1], lines[i + 1], lines[i + 2]];
+    const back = (o?: Line) => !!o && !!before && Math.abs(o.x - before.x) <= 2;
+    const indent = !!body && item === null && !!before && gap > 0 && l.x - before.x > body * 1.2 && l.x - before.x < body * 4 && /[.!?:”"’)]$/.test(plain(before.text)) && back(after) && (!later || back(later) || later.y > after!.y || after!.y - later.y > typical * 1.4);
+    if (i > 0 && (gap > typical * 1.4 || gap < 0 || bullet || note || ended || indent)) {
+      push();
       if (!bullet) item = ended || gap > typical * 1.4 || gap < 0 ? null : item;
     }
-    const text = bullet ? "- " + l.text.replace(BULLET, "") : l.text;
+    const text = bullet ? "- " + l.text.replace(/^([\uE000-\uE003]*)[•◦▪‣·●○■□–]\s*/, "$1") : l.text;
     if (bullet) item = l.x + 4;
+    if (!para) inNote = note;
     para = para ? join(para, text, words) : text;
-    if (note) notes.add(para);
   });
-  if (para) out.push(para);
-  return out.map((p) => ({ text: p, note: notes.has(p) }));
+  push();
+  return out;
 }
 
 /** Words seen inside lines across the document (not first or last on a line, where a break may cut
  *  them): what a word split at a line's end should be joined back into. */
 function wordsOf(pages: Line[][]): Set<string> {
   const words = new Set<string>();
-  for (const l of pages.flat()) for (const w of l.text.toLowerCase().match(/[\p{L}\d]+(?:-[\p{L}\d]+)*/gu)?.slice(1, -1) ?? []) words.add(w);
+  for (const l of pages.flat()) for (const w of plain(l.text).toLowerCase().match(/[\p{L}\d]+(?:-[\p{L}\d]+)*/gu)?.slice(1, -1) ?? []) words.add(w);
   return words;
 }
 
 /** Joins a line to the paragraph before it. A word broken at the end with a hyphen ("intel-"
  *  "lectual") loses it, unless the document spells the word with one elsewhere ("fine-tuned"), or
  *  the hyphen follows a capital ("NP-complete"). A word broken with no hyphen in the text at all
- *  (some apps never write it) is joined when the whole word is used elsewhere and the piece is not. */
+ *  (some apps never write it) is joined when the whole word is used elsewhere and the piece is not.
+ *  A bold or italic run's marks may sit around the break. */
 function join(para: string, text: string, words: Set<string>): string {
-  const left = para.match(/([\p{L}\d]+)-$/u)?.[1];
-  const right = text.match(/^[\p{L}\d]+/u)?.[0] ?? "";
+  const p = plain(para);
+  const left = p.match(/([\p{L}\d]+)-$/u)?.[1];
+  const right = plain(text).match(/^[\p{L}\d]+/u)?.[0] ?? "";
   if (left !== undefined && right) {
     if (/[a-z]$/.test(left) && /^[a-z]/.test(right)) {
       const both = `${left}-${right}`.toLowerCase();
-      return words.has(both) && !words.has((left + right).toLowerCase()) ? para + text : para.slice(0, -1) + text;
+      return words.has(both) && !words.has((left + right).toLowerCase()) ? para + text : para.replace(/-([\uE000-\uE003]*)$/, "$1") + text;
     }
     return para + text;
   }
-  const piece = para.match(/(?:^|[^\p{L}])(\p{Ll}{2,})$/u)?.[1];
+  const piece = p.match(/(?:^|[^\p{L}])(\p{Ll}{2,})$/u)?.[1];
   if (piece && /^\p{Ll}{2,}/u.test(right) && words.has(piece + right) && !words.has(piece)) return para + text;
   return para + " " + text;
+}
+
+/** A face most of the text is set in (a deck all in bold) marks nothing: only a face used for some
+ *  words is emphasis. */
+function plainFaces(pages: Item[][]): void {
+  const all = pages.flat();
+  const chars = (f: (i: Item) => boolean | undefined) => all.reduce((n, i) => n + (f(i) ? i.str.trim().length : 0), 0);
+  const total = chars(() => true);
+  const bold = chars((i) => i.bold) > total * 0.4;
+  const italic = chars((i) => i.italic) > total * 0.4;
+  if (bold || italic) for (const i of all) {
+    if (bold) i.bold = undefined;
+    if (italic) i.italic = undefined;
+  }
+}
+
+/** Footnotes as Markdown's: a mark in the text ("rational²") becomes `[^2]` when its page, or the
+ *  next one (a paragraph joined across the break), has that note, and the note becomes `[^2]: …`.
+ *  A mark with no note found is dropped, and a note no mark points to stays as it was printed. */
+function footnotes(paras: { text: string; note: boolean }[][]): (text: string, page: number) => string {
+  const label = (p: { text: string; note: boolean }) => (p.note ? plain(p.text).match(/^(\d{1,3})\s/)?.[1] : undefined);
+  const defs = paras.map((page) => new Set(page.map(label).filter(Boolean)));
+  const refs = paras.map((page) => new Set(page.filter((p) => !p.note).flatMap((p) => [...p.text.matchAll(/\uE010(\d+)\uE011/g)].map((m) => m[1]!))));
+  return (text, page) => {
+    const n = text.match(/^[\uE000-\uE003]*(\d{1,3})[\uE000-\uE003]*\s+/);
+    if (n && defs[page]!.has(n[1]!) && (refs[page]!.has(n[1]!) || refs[page - 1]?.has(n[1]!)) && plain(text).startsWith(n[1]!)) {
+      if (paras[page]!.some((p) => p.note && p.text === text)) text = `[^${n[1]}]: ` + text.slice(n[0].length);
+    }
+    return emphasis(text.replace(/\uE010(\d+)\uE011/g, (_, l: string) => (defs[page]!.has(l) || defs[page + 1]?.has(l) ? `[^${l}]` : "")));
+  };
 }
 
 /** The size most of the text is set in, by characters. */
@@ -229,11 +313,11 @@ function titleFrom(first: Line[], body: number): string | undefined {
   const top = Math.max(0, ...first.map((l) => l.size));
   if (top < body * 1.15) return undefined;
   const at = first.findIndex((l) => l.size === top);
-  const lines = [first[at]!.text];
-  for (let i = at + 1; i < first.length && first[i]!.size === top; i++) lines.push(first[i]!.text);
+  const lines = [plain(first[at]!.text)];
+  for (let i = at + 1; i < first.length && first[i]!.size === top; i++) lines.push(plain(first[i]!.text));
   let t = lines.join(" ").trim();
   const name = LABEL.test(t) ? first.slice(at + lines.length).find((l) => l.size >= body * 1.6) : undefined;
-  if (name) t = `${unshout(t)}: ${unshout(name.text)}`;
+  if (name) t = `${unshout(t)}: ${unshout(plain(name.text))}`;
   return t.length >= 4 && t.length <= 200 ? t : undefined;
 }
 
@@ -251,7 +335,7 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it
  *  can't open with the next step. */
 function openPdf(data: Uint8Array) {
-  const task = getDocument({ data: data.slice(), useSystemFonts: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
+  const task = getDocument({ data: data.slice(), useSystemFonts: true, fontExtraProperties: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
   const promise = task.promise.catch((e: Error) => {
     if (e.name === "PasswordException") throw new Error("That PDF is locked with a password. Open it in Preview, enter the password, choose File › Export as PDF, and add the copy.");
     throw new Error("That file isn’t a readable PDF: it may be damaged or only partly downloaded. Download it again, or open it in Preview and choose File › Export as PDF.");
@@ -286,9 +370,17 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
   for (let n = 1; n <= doc.numPages; n++) {
     const page = await doc.getPage(n);
     const tc = await page.getTextContent();
-    items.push(tc.items.filter((i): i is TextItem => "str" in i).map(toItem));
-    // A figure that won't decode never costs the text.
+    // A figure that won't decode never costs the text. Reading the figures loads the page's fonts,
+    // whose names say which text is bold or italic.
     const figs = (await pageFigures(page).catch(() => [])).map((f) => png(f.width, f.height, f.rgba)).filter((d) => d.length <= MAX_FIGURE).map((d) => ({ name: assetName(d, "png"), data: d }));
+    const font = (id: string) => {
+      try {
+        return String((page.commonObjs.has(id) && (page.commonObjs.get(id) as { name?: string })?.name) || "");
+      } catch {
+        return "";
+      }
+    };
+    items.push(tc.items.filter((i): i is TextItem => "str" in i).map((i) => toItem(i, font)));
     for (const name of new Set(figs.map((f) => f.name))) seen.set(name, (seen.get(name) ?? 0) + 1);
     figures.push(figs);
   }
@@ -297,6 +389,7 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
   const kept = figures.map((f) => f.filter((a) => (seen.get(a.name) ?? 0) < 3));
   const assets = [...new Map(kept.flat().slice(0, MAX_FIGURES).map((a) => [a.name, a])).values()];
   const body = bodySize(items);
+  plainFaces(items);
   const raw = items.map((p) => pageLines(dropMargins(p, body)));
   const typical = lineGap(raw);
   const lines = dropRunning(raw, body, typical);
@@ -310,13 +403,15 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
     const last = page[at]?.text;
     const first = next?.[0];
     if (!last || !first || first.note || /^(?:#|- )/.test(last) || /^(?:#|- )/.test(first.text)) return;
-    if (/-$/.test(last) || (!/[.!?:;”"’)\]]$/.test(last) && /^\p{Ll}/u.test(first.text))) {
+    const end = plain(last);
+    if (/-$/.test(end) || (!/[.!?:;”"’)\]]$/.test(end) && /^\p{Ll}/u.test(plain(first.text)))) {
       page[at] = { text: join(last, first.text, words), note: false };
       next.shift();
     }
   });
   const shown = new Set(assets.map((a) => a.name));
-  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => x.text), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);
+  const notes = footnotes(paras);
+  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => notes(x.text, i)), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);
   const text = pages.join("\n\n") + "\n";
   if (text.replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").trim().length < 20) {
     throw new ScannedPdf();

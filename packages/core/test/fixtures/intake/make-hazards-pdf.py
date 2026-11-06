@@ -10,13 +10,13 @@ c.setTitle("")
 L, TOP, GAP, BODY = 72, 700, 14, 11
 
 
-def line(y, parts):
-    """parts: (text, size, rise) runs drawn one after another on one baseline."""
-    x = L
-    for text, size, rise in parts:
-        c.setFont("Times-Roman", size)
+def line(y, parts, x=L):
+    """parts: (text, size, rise[, font]) runs drawn one after another on one baseline."""
+    for text, size, rise, *font in parts:
+        f = font[0] if font else "Times-Roman"
+        c.setFont(f, size)
         c.drawString(x, y + rise, text)
-        x += c.stringWidth(text, "Times-Roman", size)
+        x += c.stringWidth(text, f, size)
 
 
 def body(y, text):
@@ -31,7 +31,9 @@ def page(n, lines, notes=()):
         if l is None:
             y -= GAP
             continue
-        if isinstance(l, str):
+        if isinstance(l, tuple):
+            line(y, [(l[1], BODY, 0)], L + l[0])
+        elif isinstance(l, str):
             body(y, l)
         else:
             line(y, l)
@@ -52,8 +54,9 @@ page(
     1,
     [
         [("Psychologists study the mind as rational", BODY, 0), ("2", 7, 4), (" and as a habit of the body, and", BODY, 0)],
-        "both views explain part of how we remember what we read. Each view",
-        "predicts something the other misses, which is why the field keeps both.",
+        [("both views explain part of how we ", BODY, 0), ("remember", BODY, 0, "Times-Bold"), (" what we read. Each view", BODY, 0)],
+        [("predicts something the other ", BODY, 0), ("misses", BODY, 0, "Times-Italic"), (", which is why the ", BODY, 0), ("field keeps", BODY, 0, "Times-Italic")],
+        [("both", BODY, 0, "Times-Italic"), (" views in mind.", BODY, 0)],
         None,
         [("The brain holds about 10", BODY, 0), ("11", 7, 4), (" neurons and a signal crosses a synapse in 10", BODY, 0), ("−3", 7, 4), (" s,", BODY, 0)],
         [("so a search costs O(n · d", BODY, 0), ("2", 7, 4), (") steps for n items of length d.", BODY, 0)],
@@ -73,7 +76,10 @@ page(
         None,
         "The idea goes back to Alan Turing’s 1950 article “Com-",
     ],
-    notes=[[("2", 6, 3), (" We are not suggesting that people are irrational, only that habits matter.", 8, 0)]],
+    notes=[
+        [("2", 6, 3), (" We are not suggesting that people are irrational, only that habits matter", 8, 0)],
+        [("as much as reasons do when we study.", 8, 0)],
+    ],
 )
 page(
     2,
@@ -81,7 +87,16 @@ page(
         "puting Machinery and Intelligence,” which asked whether machines can think.",
         None,
         "Each later chapter returns to this question from another side, and",
-        "each one ends with exercises that ask you to recall what it said.",
+        "each one ends with exercises that ask you to recall what it said, so the",
+        "reading turns into practice at once.",
+        (18, "A book starts a paragraph by indenting its first line instead of leaving"),
+        "a gap, and the lines after it go back to the margin as this one does.",
+        None,
+        "[1] H. Ebbinghaus. Memory: A Contribution to Experimental Psychology,",
+        (18, "translated by H. Ruger and C. Bussenius, 1913."),
+        "[2] H. Roediger and J. Karpicke. Test-enhanced learning, 2006.",
+        "[3] N. Kornell and R. Bjork. Learning concepts and categories: is spacing",
+        (18, "the enemy of induction? 2008."),
     ],
 )
 c.save()

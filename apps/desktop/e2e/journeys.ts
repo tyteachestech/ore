@@ -95,6 +95,19 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("PDF footnote: its mark shows the note on hover, and bold stays bold", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/hazards.pdf"));
+  await page.keyboard.press("Enter");
+  const doc = page.locator(".doc");
+  await doc.getByText("habits matter as much as reasons", { exact: false }).waitFor();
+  await doc.locator("strong", { hasText: "remember" }).waitFor();
+  await doc.locator("a.fn").first().hover();
+  await page.locator(".tip.note").getByText("We are not suggesting that people are irrational").waitFor();
+  await page.mouse.move(5, 5);
+  await page.locator(".tip.note").waitFor({ state: "detached" });
+});
+
 journey("cancel an add from its toast: nothing is added, and the link stays in the box", async (page) => {
   // A page that hangs on its picture, which is fetched after the source is written.
   const page$ = `<html><head><title>Slow page</title><meta property="og:image" content="/cover.jpg"></head><body><article><h1>Slow page</h1><p>${"Spacing beats cramming. ".repeat(40)}</p></article></body></html>`;
