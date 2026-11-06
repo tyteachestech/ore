@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { madeThisRun } from "../cancel.ts";
 import { run, swiftHelper } from "./swift.ts";
 
 // Audio and podcast episodes (D96 phase 3): transcribed on the Mac with Apple's on-device speech
@@ -17,6 +18,7 @@ type Progress = (done: number, label?: string) => void;
  *  downloads the first time. */
 export async function transcribe(data: Uint8Array, ext: string, onProgress?: Progress): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "ore-audio-"));
+  madeThisRun(dir);
   try {
     const file = join(dir, `audio.${ext}`);
     writeFileSync(file, data);
