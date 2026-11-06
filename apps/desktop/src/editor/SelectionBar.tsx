@@ -17,7 +17,7 @@ const NAMES: Record<Color, string> = { gray: "Gray", red: "Red", orange: "Orange
 
 /** Notion's bar over selected text: Turn into, bold, italic, strikethrough, code, a web link, a
  *  link to a source or skill note ([[ ]], D39), and colour. Each is one editor step (⌘Z). */
-export function SelectionBar({ view, sel, targets, onDone }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void }) {
+export function SelectionBar({ view, sel, targets, onDone, docked }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void; /** In the iPhone's keyboard bar, not over the text: iOS puts its Copy bar there. */ docked?: boolean }) {
   const v = view();
   if (!v) return null;
   const { schema, doc } = v.state;
@@ -41,7 +41,7 @@ export function SelectionBar({ view, sel, targets, onDone }: { view: () => Edito
   );
 
   return (
-    <div className="sel-bar" style={{ left: sel.x, top: sel.y }} onMouseDown={keep} role="toolbar" aria-label="Format">
+    <div className={`sel-bar${docked ? " docked" : ""}`} style={docked ? undefined : { left: sel.x, top: sel.y }} onMouseDown={keep} role="toolbar" aria-label="Format">
       <MoreButton
         label="Turn into"
         hint="Turn into"
