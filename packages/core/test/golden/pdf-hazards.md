@@ -4,7 +4,7 @@ type: pdf
 title: How Memory Works
 author: anonymous
 captured_at: <time>
-text_sha256: a8fbeb2b2ec18bc376ea611d0e4300a570a97669f64aca0901d857567802cf19
+text_sha256: c3ce0588d400c471e4d4b55218c0b03ad20c5b4530fbab23b989f933e7ea260e
 status: inbox
 skills: []
 topics: []
@@ -13,7 +13,7 @@ topics: []
 
 ## How Memory Works
 
-Psychologists study the mind as rational and as a habit of the body, and both views explain part of how we remember what we read. Each view predicts something the other misses, which is why the field keeps both.
+Psychologists study the mind as rational[^2] and as a habit of the body, and both views explain part of how we **remember** what we read. Each view predicts something the other *misses*, which is why the *field keeps both* views in mind.
 
 The brain holds about 10¹¹ neurons and a signal crosses a synapse in 10⁻³ s, so a search costs O(n · d²) steps for n items of length d. Numbers like these are rough, but they show the scale of the problem.
 
@@ -25,8 +25,12 @@ We review frequently because a memory reviewed frequently is cheaper to recall, 
 
 The idea goes back to Alan Turing’s 1950 article “Computing Machinery and Intelligence,” which asked whether machines can think.
 
-2 We are not suggesting that people are irrational, only that habits matter.
+[^2]: We are not suggesting that people are irrational, only that habits matter as much as reasons do when we study.
 
 <!-- page 2 -->
 
-Each later chapter returns to this question from another side, and each one ends with exercises that ask you to recall what it said.
+Each later chapter returns to this question from another side, and each one ends with exercises that ask you to recall what it said, so the reading turns into practice at once.
+
+A book starts a paragraph by indenting its first line instead of leaving a gap, and the lines after it go back to the margin as this one does.
+
+[1] H. Ebbinghaus. Memory: A Contribution to Experimental Psychology, translated by H. Ruger and C. Bussenius, 1913. [2] H. Roediger and J. Karpicke. Test-enhanced learning, 2006. [3] N. Kornell and R. Bjork. Learning concepts and categories: is spacing the enemy of induction? 2008.
