@@ -9,11 +9,11 @@ import { InputRule } from "@milkdown/kit/prose/inputrules";
 import { findWrapping } from "@milkdown/kit/prose/transform";
 import { $inputRule } from "@milkdown/kit/utils";
 import { calloutSchema, remarkBlocks, toggleSchema, toggleSummarySchema } from "./blocks";
-import { highlightSchema, remarkColors, stringifyColor, textColorSchema } from "./colors";
+import { highlightSchema, remarkColors, stringifyColor, textColorSchema, underlineSchema } from "./colors";
 import { blockSelPlugin } from "./blocksel";
 import { tablePlugin, tableView } from "./tables";
 import { emojiTrigger } from "./emoji";
-import { notionKeys, notionRules, pasteLink, trapTab } from "./notion";
+import { emptyHints, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
 export async function createEditor(root: HTMLElement, markdown: string, onChange: (md: string) => void, plugins: MilkdownPlugin[] = []): Promise<Editor> {
@@ -38,10 +38,11 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(commonmark.filter((p) => !remarkPreserveEmptyLinePlugin.includes(p)))
     .use(gfm)
     .use(tableView)
-    .use([toggleSummarySchema, toggleSchema, calloutSchema, highlightSchema, textColorSchema].flat())
+    .use([toggleSummarySchema, toggleSchema, calloutSchema, highlightSchema, textColorSchema, underlineSchema].flat())
     .use(taskRule)
     .use(history)
     .use(listener)
+    .use(emptyHints)
     .use(pasteLink)
     .use(clipboard)
     .use(plugins)

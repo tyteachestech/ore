@@ -15,7 +15,7 @@ the e2e journey "note shortcuts as in Notion". Before = on master before this pa
 | `-` `*` `+` make a bullet, `1.` a numbered list, `[]` a to-do | pass | pass |
 | `-` in a numbered item, `1.` in a bullet switch the item's kind | fail | fixed |
 | `"` + space makes a quote | fail | fixed |
-| `>` + space makes a quote (Notion: a toggle, see questions) | pass | pass |
+| `>` + space makes a toggle (Tyler: Notion's way), its line the title; in a list item and inside a quote too | quote | fixed |
 | ```` ``` ```` + space (or ```` ```ts ````) makes a code block; in a list item too | top level only | fixed |
 | `---` makes a divider | pass | pass |
 | In a quote, callout or toggle body the shortcuts make blocks there | pass | pass |
@@ -44,6 +44,7 @@ the e2e journey "note shortcuts as in Notion". Before = on master before this pa
 | Backspace at the start of text joins it to the block above | pass | pass |
 | Tab / Shift-Tab indent and outdent a list item | pass | pass |
 | Tab on a line that can't indent stays in the note | fail (focus left the note) | fixed |
+| Tab on a line under a list nests it in the last item; under a toggle, in its body; Shift-Tab takes it out (Tyler) | missing | added |
 | Tab in a code block indents the line | fail | fixed |
 
 ## Keys
@@ -51,7 +52,8 @@ the e2e journey "note shortcuts as in Notion". Before = on master before this pa
 | Behaviour | Before | Now |
 | --- | --- | --- |
 | ⌘B ⌘I ⌘E on the selection | pass | pass |
-| ⌘⇧S strikethrough | fail | fixed |
+| Strikethrough: ⌘⇧X, since ⌘⇧S toggles the sidebar in Ore | pass | pass |
+| ⌘U underline, also on the format bar, saved as `<u>…</u>` (Tyler) | missing | added |
 | ⌘⌥0 text, ⌘⌥1–3 headings | top level only | fixed (list items too) |
 | ⌘⌥4 to-do, 5 bullet, 6 numbered, 7 toggle, 8 code | fail (H4–H6, numbered, bullet) | fixed |
 | ⌘Enter ticks and unticks a to-do | fail | fixed |
@@ -77,7 +79,16 @@ keeps its headings and lists.
 Esc block selection, ⌘A twice, ⌘D, ⌘⇧↑↓, ⋮⋮ drag and Turn into (`blockops.test.ts`); `[[` links, `/`,
 `@` dates, `:` emoji (`editor.test.ts`, `dates.test.ts`, `emoji.test.ts`); tables (`tables.test.ts`).
 
-## For Tyler (these clash with plain Markdown or the minimal look)
+## Tyler's answers (2026-11-06)
+
+1. `>` makes a toggle, Notion's way; `"` makes a quote. Built.
+2. Hints in empty blocks: yes, on the caret's block while the note has focus. Built.
+3. Underline: wanted. ⌘U and a U on the format bar, saved as `<u>…</u>` like the colours' HTML. Built.
+4. Tab nests: built where Markdown can hold it (under a list item or in a toggle). Under a heading or a line of
+   text it does nothing, since Markdown has no child blocks there.
+5. Code fences wait for a space, so ```` ```ts ```` names the language. Kept.
+
+## The questions he was asked
 
 1. `>` then space: Notion makes a toggle, Markdown means a quote. We do a quote; `"` is a quote in both.
 2. Hints in empty blocks: Notion shows "Type '/' for commands" on the empty line the caret is on, and

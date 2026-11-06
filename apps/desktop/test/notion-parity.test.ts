@@ -49,12 +49,13 @@ function type(v: View, text: string) {
 }
 
 /** Runs the steps on `md`; the saved Markdown, and each key's handled flag (false: the browser's own). */
-async function run(md: string, steps: Step[]) {
+async function run(md: string, steps: Step[], probe?: (state: import("@milkdown/kit/prose/state").EditorState) => string | null) {
   const root = document.createElement("div");
   document.body.appendChild(root);
   const marks = [...md.matchAll(/[‸‹›]/g)];
   const editor = await ed.createEditor(root as unknown as HTMLElement, md.replace(/[‸‹›]/g, "⁂"), () => {});
   const handled: boolean[] = [];
+  let hint: string | null = null;
   editor.action((ctx) => {
     const v: View = ctx.get(core.editorViewCtx);
     // The markers, found in the document and taken out.
@@ -86,11 +87,12 @@ async function run(md: string, steps: Step[]) {
         else v.pasteText(s.paste, e as never);
       }
     }
+    if (probe) hint = probe(v.state);
   });
   const out = ed.markdownOf(editor);
   editor.destroy();
   root.remove();
-  return { md: out.trim(), handled };
+  return { md: out.trim(), handled, hint };
 }
 const md = async (start: string, ...steps: Step[]) => (await run(start, steps)).md;
 
@@ -122,11 +124,16 @@ describe("markdown shortcuts at the start of a block", () => {
     expect(await md("‸", "[] a")).toBe("- [ ] a");
   });
 
-  test('" makes a quote (Notion), > too (Markdown), also in a list item', async () => {
-    expect(await md("‸", '" Said'))
-      .toBe("> Said");
-    expect(await md("‸", "> Said")).toBe("> Said");
+  test('" makes a quote, also in a list item', async () => {
+    expect(await md("‸", '" Said')).toBe("> Said");
     expect(await md("- a\n- ‸b", '" ')).toBe("- a\n\n> b");
+  });
+
+  test("> makes a toggle (Notion), its line the title; in a list item, and inside a quote", async () => {
+    expect(await md("‸", "> Why")).toMatch(/^<details><summary>Why<\/summary>/);
+    expect(await md("‸Why it works", "> ")).toMatch(/^<details><summary>Why it works<\/summary>/);
+    expect(await md("- a\n- ‸b", "> ")).toMatch(/^- a\n\n<details><summary>b<\/summary>/);
+    expect(await md("> a\n>\n> ‸b", "> ")).toMatch(/^> a\n>\n> <details><summary>b<\/summary>/);
   });
 
   test("``` makes a code block, with its language; in a list item too", async () => {
@@ -237,17 +244,40 @@ describe("Tab", () => {
     expect(await run("# ‸Text", [{ tab: "Shift-Tab" }])).toMatchObject({ md: "# Text", handled: [true] });
   });
 
+  test("on text under a list it nests the line in the last item; Shift-Tab takes it back out", async () => {
+    expect(await md("- a\n- b\n\n‸More", "{Tab}")).toBe("- a\n- b\n\n  More");
+    expect(await md("- a\n- b\n\n  ‸More", "{Shift-Tab}")).toBe("- a\n- b\n\nMore");
+    // Under a nested list the item turns loose: blank lines, or Markdown would read the line as part of b.
+    expect(await md("- a\n  - b\n\n‸More", "{Tab}")).toBe("- a\n\n  - b\n\n  More");
+  });
+
+  test("on text under a toggle it nests the line in the toggle; Shift-Tab takes it back out", async () => {
+    const T = "<details><summary>T</summary>\n\nbody\n\n</details>";
+    expect(await md(`${T}\n\n‸More`, "{Tab}")).toBe("<details><summary>T</summary>\n\nbody\n\nMore\n\n</details>");
+    expect(await md("<details><summary>T</summary>\n\nbody\n\n‸More\n\n</details>", "{Shift-Tab}")).toBe(`${T}\n\nMore`);
+  });
+
   test("in a code block it indents the line", async () => {
     expect(await md("```\n‸x\n```", "{Tab}")).toBe("```\n  x\n```");
   });
 });
 
 describe("keyboard shortcuts", () => {
-  test("⌘B ⌘I ⌘E ⌘⇧S format the selection", async () => {
+  test("⌘B ⌘I ⌘E format the selection (⌘U and ⌘⇧X are the app's keys, below)", async () => {
     expect(await md("‹bold›", "{Mod-b}")).toBe("**bold**");
     expect(await md("‹it›", "{Mod-i}")).toMatch(/^[*_]it[*_]$/);
     expect(await md("‹c›", "{Mod-e}")).toBe("`c`");
-    expect(await md("‹s›", "{Mod-Shift-s}")).toMatch(/^~~?s~~?$/);
+  });
+
+  test("underline and strikethrough have Notion's ⌘U and, as ⌘⇧S toggles the sidebar here, ⌘⇧X", async () => {
+    const { BINDINGS } = await import("../src/keys");
+    const combo = (id: string) => BINDINGS.find((b) => b.id === id)?.combo;
+    expect(combo("note-underline")).toBe("Meta+KeyU");
+    expect(combo("note-strike")).toBe("Shift+Meta+KeyX");
+  });
+
+  test("underline saves as <u>, which Markdown readers show", async () => {
+    expect(await md("Some <u>key</u> words‸", "!")).toBe("Some <u>key</u> words!");
   });
 
   test("⌘⌥0–8 turn the block into text, headings, to-do, bullet, numbered, toggle and code (Notion's keys)", async () => {
@@ -294,5 +324,23 @@ describe("paste", () => {
 
   test("in a code block a paste stays code", async () => {
     expect(await md("```\n‸\n```", { paste: "# not a heading\n- x" })).toBe("```\n# not a heading\n- x\n```");
+  });
+});
+
+describe("empty blocks", () => {
+  const notion = () => import("../src/editor/notion");
+
+  test("say what / does, or the kind of block", async () => {
+    const n = await notion();
+    const h = async (start: string, ...steps: Step[]) => (await run(start, steps, n.hintFor)).hint;
+    expect(await h("Text\n\n‸", "{Enter}")).toBe("Type / for blocks");
+    expect(await h("# T‸", "{Enter}", "# ")).toBe("Heading 1");
+    expect(await h("- a‸", "{Enter}")).toBe("List");
+    expect(await h("- [ ] a‸", "{Enter}")).toBe("To-do");
+    expect(await h("Text\n\n‸", '" ')).toBe("Quote");
+    expect(await h("Text\n\n‸", "> ")).toBe("Toggle");
+    expect(await h("Text with words‸")).toBeNull();
+    // An empty note has its own placeholder.
+    expect(await h("‸")).toBeNull();
   });
 });
