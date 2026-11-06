@@ -1,0 +1,368 @@
+import { GraduationCap } from "./icons";
+import { Command } from "cmdk";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { SkillIcon } from "./IconPicker";
+import { courseThumb, lessonsOf, nextLesson, ore, opt, type Item, type SearchHit, type Skill } from "./ore";
+import { Thumb } from "./Thumb";
+import { errorText, useFocusWhileMounted } from "./util";
+
+export type Action = { id: string; label: string; hint?: string; keywords?: string[]; run: () => void };
+
+type Props = {
+  actions: Action[];
+  recent: Source[];
+  /** Every source: titles are matched here (a course by its own title too), and a hit found in a source's text is titled from it. */
+  items: Item[];
+  skills: Skill[];
+  skill: string | null;
+  onSkill: (id: string | null) => void;
+  onOpen: (item: string) => void;
+  /** A skill made from the palette (New skill, New collection). */
+  onCreated: (s: Skill) => void;
+  onClose: () => void;
+};
+
+type Source = Pick<Item, "id" | "title" | "type" | "thumbnail">;
+/** A source row: its picture (D77), as in every list of sources, then its title. */
+const sourceLabel = (i: Source) => (
+  <>
+    <Thumb item={i} />
+    <span className="palette-title">{i.title}</span>
+  </>
+);
+
+/** `score` ranks a row against the query in place of cmdk's fuzzy match on `value`. */
+type Row = { value: string; score?: number; label: ReactNode; extra?: ReactNode; keywords?: string[]; run: () => void };
+type Group = { heading: string; score: number; rows: Row[] };
+type Hit = { item?: string; skill?: string; title: string; snippet?: string };
+/** A naming step, Raycast-style: the input names the thing, ↵ makes it, Esc goes back. */
+type Page = { kind: "skill"; collection: string } | { kind: "collection" };
+
+const TITLES = 8;
+
+/** ⌘K: recent sources, actions, skills, sources and courses by title, then sources whose text matches
+ *  (`ore search`, SQLite FTS5) in their own group below. */
+export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen, onCreated, onClose }: Props) {
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState<Page | null>(null);
+  const [hits, setHits] = useState<Hit[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  /** ⌘ held: the first nine rows show ⌘1–⌘9 and that key runs the row (Raycast). Set only by a ⌘ press
+   *  after the palette opened, so the ⌘ still held from ⌘K does not flash the numbers. */
+  const [numbers, setNumbers] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useFocusWhileMounted(inputRef);
+
+  useEffect(() => {
+    const query = q.trim();
+    if (page || query.length < 2) return setHits([]);
+    let live = true;
+    const t = setTimeout(() => {
+      ore<SearchHit[]>("search", query, "--limit", "20").then(
+        (rows) => {
+          if (!live) return;
+          const seen = new Set<string>();
+          const out: Hit[] = [];
+          for (const r of rows) {
+            if (r.kind === "skill-notes") {
+              if (!seen.has(`skill ${r.ref}`)) out.push({ skill: r.ref, title: skills.find((s) => s.id === r.ref)?.name ?? r.title, snippet: r.snippet });
+              seen.add(`skill ${r.ref}`);
+              continue;
+            }
+            const item = r.item ?? (r.kind === "item" ? r.ref : undefined);
+            if (!item || seen.has(item)) continue;
+            seen.add(item);
+            out.push({ item, title: items.find((i) => i.id === item)?.title ?? r.title, snippet: r.snippet });
+          }
+          setHits(out);
+        },
+        () => live && setHits([]),
+      );
+    }, 150);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [q, page]);
+
+  const open = (p: Page | null) => {
+    setPage(p);
+    setQ("");
+    setError(null);
+  };
+
+  const create = async (name: string) => {
+    if (!page || !name || busy) return;
+    setBusy(true);
+    try {
+      const made = await ore<Skill>("skills", "add", name, opt("collection", page.kind === "skill" ? page.collection : ""));
+      onClose();
+      onCreated(made);
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(false);
+    }
+  };
+
+  // The palette ranks rows itself: search hits arrive after the query changes, and cmdk's own
+  // sort (which reorders DOM nodes on each keystroke) misses groups that mount later.
+  const query = q.trim();
+  const group = (heading: string, rows: Row[], fixed?: number, max = Infinity): Group => {
+    const scored = rows
+      .map((row) => ({ row, s: fixed ?? row.score ?? (query ? Math.max(titleScore(row.value, query), ...(row.keywords ?? []).map((k) => titleScore(k, query) * 0.9)) : 1) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, max);
+    return { heading, score: scored[0]?.s ?? 0, rows: scored.map((x) => x.row) };
+  };
+
+  const current = skills.find((s) => s.id === skill);
+  const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
+  let groups: Group[];
+  if (page) {
+    const exists = page.kind === "collection" && collections.find((c) => c.toLowerCase() === query.toLowerCase());
+    groups = query
+      ? [
+          {
+            heading: "",
+            score: 1,
+            rows: [
+              page.kind === "collection"
+                ? { value: "create", label: exists ? <>Add a skill to “{exists}”</> : <>Create collection “{query}”</>, run: () => open({ kind: "skill", collection: exists || query }) }
+                : { value: "create", label: <>Create skill “{query}”{page.collection && <span className="sub">in {page.collection}</span>}</>, run: () => void create(query) },
+            ],
+          },
+        ]
+      : [];
+  } else {
+    const titled = new Set<string>();
+    // A course (D79) is one row, matched by its own title, that opens the lesson to read next, as its
+    // row in the source list does; its lessons match by their own titles like any source.
+    const courses = query ? [...new Map(items.flatMap((i) => (i.course ? [[i.course.id, i.course] as const] : []))).values()] : [];
+    const byTitle = group(
+      "Sources",
+      query
+        ? [
+            ...courses.map((c): Row => {
+              const lessons = lessonsOf(items, c.id);
+              const thumb = courseThumb(lessons);
+              return {
+                value: `course ${c.id}`,
+                score: titleScore(c.title, query),
+                label: (
+                  <>
+                    {thumb ? (
+                      <Thumb item={thumb} />
+                    ) : (
+                      <span className="thumb none" aria-hidden="true">
+                        <GraduationCap size={12} />
+                      </span>
+                    )}
+                    <span className="palette-title">{c.title}</span>
+                  </>
+                ),
+                extra: <span className="sub course-of">course</span>,
+                run: () => onOpen((nextLesson(lessons) ?? lessons[0]!).id),
+              };
+            }),
+            // A lesson names its course, as on Home: "Skills" alone doesn't say which course it is from.
+            ...items.map((i) => ({ value: `source ${i.id}`, score: titleScore(i.title, query), label: sourceLabel(i), extra: i.course && <span className="sub course-of">{i.course.title}</span>, run: () => onOpen(i.id) })),
+          ]
+        : [],
+      undefined,
+      TITLES,
+    );
+    for (const r of byTitle.rows) if (r.value.startsWith("source ")) titled.add(r.value.slice(7));
+    groups = [
+      group("Recent", query ? [] : recent.map((r) => ({ value: `source ${r.id}`, label: sourceLabel(r), run: () => onOpen(r.id) })), 2),
+      byTitle,
+      group(
+        "Actions",
+        [
+          ...actions.map((a) => ({ value: a.label, label: a.label, keywords: a.keywords, extra: a.hint && <kbd>{a.hint}</kbd>, run: a.run })),
+          { value: "New skill…", label: "New skill…", keywords: ["add skill", "create skill"], run: () => open({ kind: "skill", collection: current?.collection ?? "" }) },
+          { value: "New collection…", label: "New collection…", keywords: ["section", "group", "folder", "create collection"], run: () => open({ kind: "collection" }) },
+        ],
+      ),
+      // Skill pages (D46): stats, skill note, questions and sources.
+      group("Skills", [
+        ...(skill ? [{ value: "All sources", label: "All sources", run: () => onSkill(null) }] : []),
+        ...skills.map((s) => ({
+          value: `Go to skill: ${s.name}`,
+          label: (
+            <>
+              <SkillIcon icon={s.icon} color={s.color} dot className="palette-icon" />
+              {s.name}
+            </>
+          ),
+          extra: skill === s.id && <span className="sub">current</span>,
+          run: () => onSkill(s.id),
+        })),
+      ]),
+      // Matches in the text (body, highlights, cards, notes) come last, under their own heading,
+      // so a title match is never pushed down by a word deep in a long source.
+      group(
+        "In the text",
+        hits
+          .filter((h) => !h.item || !titled.has(h.item))
+          .map((h) => ({
+            value: h.skill ? `skill notes ${h.skill}` : `text ${h.item}`,
+            label: (
+              <>
+                {h.item && <Thumb item={items.find((i) => i.id === h.item) ?? { type: "article" }} />}
+                <span className="palette-hit">
+                  <span className="title">{h.skill ? `${h.title} · skill note` : h.title}</span>
+                  {h.snippet && <span className="sub">{snippet(h.snippet, query)}</span>}
+                </span>
+              </>
+            ),
+            run: h.skill ? () => onSkill(h.skill!) : () => onOpen(h.item!),
+          })),
+        0.01,
+      ),
+    ];
+  }
+  groups = groups.filter((g) => g.rows.length).sort((a, b) => b.score - a.score);
+
+  // Keep the highlight on the top row when late search results change what that is.
+  const first = groups[0]?.rows[0]?.value ?? "";
+  const [selected, setSelected] = useState(first);
+  useEffect(() => setSelected(first), [first]);
+
+  const run = (f: () => void) => {
+    onClose();
+    f();
+  };
+  // A naming step keeps the palette open; every other row closes it first.
+  const pick = (r: Row) => (r.value === "create" || /^New (skill|collection)…$/.test(r.value) ? r.run() : run(r.run));
+  const quick = groups.flatMap((g) => g.rows).slice(0, 9);
+
+  useEffect(() => {
+    const up = (e: KeyboardEvent) => e.key === "Meta" && setNumbers(false);
+    const off = () => setNumbers(false);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", off);
+    return () => {
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", off);
+    };
+  }, []);
+
+  const placeholder = !page ? "Search sources or run a command…" : page.kind === "collection" ? "Name the collection…" : page.collection ? `Name the first skill in ${page.collection}…` : "Name the skill…";
+
+  return (
+    <div className="overlay" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <Command
+        className="panel"
+        label="Command palette"
+        shouldFilter={false}
+        value={selected}
+        onValueChange={setSelected}
+        onKeyDown={(e) => {
+          if (e.key === "Meta") setNumbers(true);
+          // ⌘1–⌘9 run a row here, before the app's ⌘1/⌘2 (To read, Done) see them.
+          const n = e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && /^Digit[1-9]$/.test(e.code) ? quick[Number(e.code.slice(5)) - 1] : undefined;
+          if (n) {
+            e.preventDefault();
+            e.stopPropagation();
+            setNumbers(false);
+            pick(n);
+          } else if (e.key === "Tab") e.preventDefault(); // one input; arrows move through the list
+          else if (e.key === "Escape" || (e.key === "Backspace" && page && !q)) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (page) open(null);
+            else onClose();
+          }
+        }}
+      >
+        <Command.Input
+          ref={inputRef}
+          className="panel-input"
+          value={q}
+          onValueChange={(v) => {
+            setQ(v);
+            setError(null);
+          }}
+          readOnly={busy}
+          placeholder={placeholder}
+          spellCheck={false}
+          autoComplete="off"
+        />
+        <Command.List>
+          {!page && <Command.Empty>No matches</Command.Empty>}
+          {groups.map((g) => (
+            <Command.Group key={g.heading} heading={g.heading || undefined}>
+              {g.rows.map((r) => {
+                const i = numbers ? quick.indexOf(r) : -1;
+                return (
+                  <Command.Item key={r.value} value={r.value} onSelect={() => pick(r)}>
+                    {r.label}
+                    {i >= 0 ? <kbd>⌘{i + 1}</kbd> : r.extra}
+                  </Command.Item>
+                );
+              })}
+            </Command.Group>
+          ))}
+        </Command.List>
+        <div className="panel-foot">
+          {error && <span className="err">{error}</span>}
+          <span className="right">
+            {page ? (
+              <>
+                <span>
+                  <kbd>↵</kbd> {page.kind === "collection" ? "Next" : "Create"}
+                </span>
+                <span>
+                  <kbd>Esc</kbd> Back
+                </span>
+              </>
+            ) : (
+              <>
+                {groups.some((g) => g.rows.length > 0) && (
+                  <span>
+                    <kbd>↵</kbd> {/^(source |course |text |skill notes |Go to skill|All sources)/.test(selected) ? "Open" : "Run"}
+                  </span>
+                )}
+                <span>
+                  <kbd>Esc</kbd> Close
+                </span>
+              </>
+            )}
+          </span>
+        </div>
+      </Command>
+    </div>
+  );
+}
+
+/** How well a title matches: every query word must appear in it, and a word that starts a title
+ *  word counts more than one inside it (Linear, Raindrop). Letters scattered across a long title
+ *  never match, which cmdk's fuzzy score allows. */
+export function titleScore(title: string, query: string): number {
+  const t = title.toLowerCase();
+  // A word keeps a trailing # or + (C#, C++, F#), or "c#" would match every title with a c-word.
+  const terms = query.toLowerCase().match(/[\p{L}\p{N}_]+[#+]*/gu) ?? [];
+  if (!terms.length) return 0;
+  let score = 0;
+  for (const term of terms) {
+    let i = t.indexOf(term);
+    if (i < 0) return 0;
+    let start = false;
+    for (; i >= 0 && !start; i = t.indexOf(term, i + 1)) start = i === 0 || !/[\p{L}\p{N}]/u.test(t.charAt(i - 1));
+    score += start ? 1 : 0.5;
+  }
+  return score / terms.length + (t.startsWith(terms[0]!) ? 0.5 : 0);
+}
+
+/** One line of a search snippet: FTS5 brackets the matched words; a bracket around anything
+ *  else is the source's own Markdown and stays as written. */
+export function snippet(text: string, query: string): ReactNode {
+  const terms = query.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [];
+  const line = text.replace(/\s+/g, " ").replace(/^[#>*\-\s]+/, "");
+  const parts = line.split(/\[([^[\]]+)\]/);
+  return parts.map((p, i) =>
+    i % 2 === 0 ? p : terms.some((t) => p.toLowerCase().startsWith(t)) ? <mark key={i}>{p}</mark> : `[${p}]`,
+  );
+}

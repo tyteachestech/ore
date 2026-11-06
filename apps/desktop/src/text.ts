@@ -1,0 +1,219 @@
+// Mapping between the rendered reader text and the Markdown source, for highlights.
+// Both sides are reduced to a "skeleton": the characters that render as text, minus whitespace
+// and the punctuation Markdown uses for emphasis, code, links and tables. A selection is matched
+// in the source skeleton to recover the exact source text (so `ore highlight` gets an exact
+// match), and a stored annotation's `exact` is matched in the rendered skeleton to paint it.
+
+const IGNORED = new Set([..." \t\n\r\f\v   *_`[]|~"]);
+
+export type Skeleton = { chars: string; map: number[] };
+
+/** Skeleton of Markdown source; `map[i]` is the source offset of skeleton char i. */
+export function sourceSkeleton(md: string): Skeleton {
+  const mask = new Uint8Array(md.length);
+  const hide = (re: RegExp, from = 0) => {
+    for (const m of md.matchAll(re)) mask.fill(1, m.index + from, m.index + m[0].length);
+  };
+  hide(/<!--[\s\S]*?-->/g);
+  hide(/\$\$[\s\S]*?\$\$/g); // math: rendered by KaTeX, outside the text index
+  hide(/!\[[^\]\n]*\]\([^)\n]*\)/g); // images
+  hide(/\]\([^)\n]*\)/g, 1); // link destinations
+  hide(/<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>\n]*)?\/?>/g); // inline HTML tags (never rendered)
+  hide(/^[ \t]*(?:```|~~~).*$/gm); // code fences and their info strings
+  hide(/^[ \t]*(?:#{1,6}[ \t]+|(?:>[ \t]?)+|(?:[-+*]|\d{1,9}[.)])[ \t]+)+/gm); // block markers
+  hide(/^[ \t]*(?:[-*_][ \t]*){3,}$/gm); // thematic breaks
+  hide(/^[ \t|:-]*-{3,}[ \t|:-]*$/gm); // table separator rows
+  hide(/\\(?=[\\`*_{}[\]()#+\-.!|>~])/g); // backslash escapes
+  const parts: string[] = [];
+  const map: number[] = [];
+  for (let i = 0; i < md.length; i++) {
+    const c = md[i]!;
+    if (mask[i] || IGNORED.has(c)) continue;
+    parts.push(c);
+    map.push(i);
+  }
+  return { chars: parts.join(""), map };
+}
+
+/** Skeleton of plain rendered text. */
+export function plainSkeleton(text: string): string {
+  let out = "";
+  for (const c of text) if (!IGNORED.has(c)) out += c;
+  return out;
+}
+
+/** Skeleton of the rendered DOM text, with each char's text node and offset. */
+export type TextIndex = { chars: string; nodes: Text[]; node: Int32Array; off: Int32Array; first: Map<Text, number> };
+
+export function indexText(root: HTMLElement): TextIndex {
+  const nodes: Text[] = [];
+  const parts: string[] = [];
+  const nodeOf: number[] = [];
+  const offOf: number[] = [];
+  const first = new Map<Text, number>();
+  // Rendered math is drawn glyphs, not the TeX in the body: left out, as the skeleton leaves out `$$…$$`. So is
+  // a video card's bar and player (D92), which sit in the text but are not part of it.
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.parentElement?.closest(".katex, [data-noindex]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
+  for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+    const k = nodes.push(n) - 1;
+    first.set(n, parts.length);
+    const s = n.data;
+    for (let i = 0; i < s.length; i++) {
+      if (IGNORED.has(s[i]!)) continue;
+      parts.push(s[i]!);
+      nodeOf.push(k);
+      offOf.push(i);
+    }
+  }
+  return { chars: parts.join(""), nodes, node: Int32Array.from(nodeOf), off: Int32Array.from(offOf), first };
+}
+
+function occurrences(hay: string, needle: string): number[] {
+  const out: number[] = [];
+  for (let p = hay.indexOf(needle); p >= 0; p = hay.indexOf(needle, p + 1)) out.push(p);
+  return out;
+}
+
+/** Where `needle` sits in `hay`: matched with its surrounding context first (repeated words are
+ *  common in a book), then alone; several hits go to the one nearest `hint`. */
+function find(hay: string, pre: string, needle: string, suf: string, hint: number): number | null {
+  const nearest = (hits: number[]) => hits.reduce((a, b) => (Math.abs(b - hint) < Math.abs(a - hint) ? b : a));
+  for (const k of [24, 8]) {
+    const p = pre.slice(-k);
+    const s = suf.slice(0, k);
+    if (!p && !s) break;
+    const hits = occurrences(hay, p + needle + s);
+    if (hits.length) return nearest(hits) + p.length;
+  }
+  const hits = occurrences(hay, needle);
+  return hits.length ? nearest(hits) : null;
+}
+
+/** Skeleton offset of a DOM point inside the indexed root. */
+export function skeletonOffset(idx: TextIndex, node: Node, offset: number): number {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const base = idx.first.get(node as Text);
+    if (base === undefined) return 0;
+    return base + plainSkeleton((node as Text).data.slice(0, offset)).length;
+  }
+  const child = node.childNodes[offset] ?? node;
+  const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT);
+  const t = walker.nextNode() as Text | null;
+  return t ? (idx.first.get(t) ?? 0) : 0;
+}
+
+/** The exact source text and offset for a rendered selection, or null when it cannot be mapped. */
+export function sourceQuote(src: Skeleton, body: string, idx: TextIndex, sel: Range): { exact: string; start: number } | null {
+  const needle = plainSkeleton(sel.toString());
+  if (!needle) return null;
+  const at = skeletonOffset(idx, sel.startContainer, sel.startOffset);
+  const pre = idx.chars.slice(Math.max(0, at - 24), at);
+  const suf = idx.chars.slice(at + needle.length, at + needle.length + 24);
+  const hint = (at / Math.max(1, idx.chars.length)) * src.chars.length;
+  const h = find(src.chars, pre, needle, suf, hint);
+  if (h === null) return null;
+  const start = src.map[h]!;
+  const end = src.map[h + needle.length - 1]! + 1;
+  return { exact: body.slice(start, end), start };
+}
+
+type Quote = { exact: string; prefix: string; suffix: string; start: number };
+
+/** A DOM range for a stored annotation, located by its quote (context first, then position). */
+export function rangeFor(idx: TextIndex, q: Quote, bodyLength: number): Range | null {
+  const needle = sourceSkeleton(q.exact).chars;
+  if (!needle) return null;
+  const hint = (q.start / Math.max(1, bodyLength)) * idx.chars.length;
+  const h = find(idx.chars, sourceSkeleton(q.prefix).chars, needle, sourceSkeleton(q.suffix).chars, hint);
+  if (h === null) return null;
+  const last = h + needle.length - 1;
+  const range = document.createRange();
+  range.setStart(idx.nodes[idx.node[h]!]!, idx.off[h]!);
+  range.setEnd(idx.nodes[idx.node[last]!]!, idx.off[last]! + 1);
+  return range;
+}
+
+/** The rendered text node holding the first character at or after source offset `at` (e.g. just
+ *  past a `<!-- chapter N -->` marker, which never renders), or null when it cannot be mapped. */
+export function renderedNodeAt(src: Skeleton, idx: TextIndex, at: number): Text | null {
+  let lo = 0;
+  let hi = src.map.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (src.map[mid]! < at) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo >= src.chars.length) return null;
+  const hint = (lo / Math.max(1, src.chars.length)) * idx.chars.length;
+  const pre = src.chars.slice(Math.max(0, lo - 24), lo);
+  for (const k of [32, 12]) {
+    const h = find(idx.chars, pre, src.chars.slice(lo, lo + k), "", hint);
+    if (h !== null) return idx.nodes[idx.node[h]!]!;
+  }
+  return null;
+}
+
+/** Which stored range is under the point, if any. */
+export function hitTest(ranges: Map<string, Range>, x: number, y: number): string | null {
+  const caret = document.caretRangeFromPoint(x, y);
+  if (!caret) return null;
+  for (const [id, r] of ranges) {
+    try {
+      if (r.comparePoint(caret.startContainer, caret.startOffset) !== 0) continue;
+    } catch {
+      continue;
+    }
+    for (const b of r.getClientRects()) {
+      if (x >= b.left - 1 && x <= b.right + 1 && y >= b.top - 1 && y <= b.bottom + 1) return id;
+    }
+  }
+  return null;
+}
+
+/** Splits a long Markdown body at blank lines (outside code fences) so a book renders in slices. */
+export function chunks(md: string, size = 12000): string[] {
+  const out: string[] = [];
+  let cur: string[] = [];
+  let len = 0;
+  let fence = false;
+  for (const line of md.split("\n")) {
+    if (/^[ \t]*(?:```|~~~)/.test(line)) fence = !fence;
+    cur.push(line);
+    len += line.length + 1;
+    if (!fence && len >= size && line.trim() === "") {
+      out.push(cur.join("\n"));
+      cur = [];
+      len = 0;
+    }
+  }
+  if (cur.length) out.push(cur.join("\n"));
+  return out;
+}
+
+/** Footnotes (`[^7]` and `[^7]: …`) as links that keep their text, so they work in any slice of a
+ *  long body: GFM footnotes only resolve within one parse, and the body renders in slices (`chunks`),
+ *  so a marker would show as "[^7]" and its note would vanish. A marker links to `#fn-7`, its note's
+ *  label to `#fnref-7`; both keep "^7", so the text index still matches the source. */
+export function footnotes(md: string): string {
+  if (!md.includes("[^")) return md;
+  let fence = false;
+  let inNote = false;
+  return md
+    .split("\n")
+    .map((line) => {
+      if (/^[ \t]*(?:```|~~~)/.test(line)) fence = !fence;
+      if (fence) return line;
+      const def = line.match(/^ {0,3}\[\^([^\]\s]+)\]:/);
+      if (def) {
+        inNote = true;
+        return `[^${def[1]}](#fnref-${encodeURIComponent(def[1]!)})${line.slice(def[0].length - 1)}`.replace(/\[\^([^\]\s]+)\](?![(:])/g, (_, l) => `[^${l}](#fn-${encodeURIComponent(l)})`);
+      }
+      // A note's later paragraphs are indented under it: outdented, so they read as text, not code.
+      if (inNote && /^(?: {4}|\t)/.test(line)) line = line.replace(/^(?: {4}|\t)/, "");
+      else if (line.trim()) inNote = false;
+      return line.replace(/\[\^([^\]\s]+)\](?![(:])/g, (_, l) => `[^${l}](#fn-${encodeURIComponent(l)})`);
+    })
+    .join("\n");
+}

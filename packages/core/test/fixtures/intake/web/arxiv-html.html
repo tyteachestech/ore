@@ -1,0 +1,1527 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<title>Attention Is All You Need</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="stylesheet" href="/static/browse/0.3.4/css/arxiv-html-papers-20260823.css" type="text/css">
+<link rel="apple-touch-icon" sizes="180x180"
+  href="/static/browse/0.3.4/images/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32"
+  href="/static/browse/0.3.4/images/icons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16"
+  href="/static/browse/0.3.4/images/icons/favicon-16x16.png">
+<link rel="manifest" href="/static/browse/0.3.4/images/icons/site.webmanifest">
+<link rel="mask-icon" href="/static/browse/0.3.4/images/icons/safari-pinned-tab.svg" color="#5bbad5">
+<link rel="stylesheet" type="text/css" media="screen" href="https://use.typekit.net/utz6mli.css"><link rel="stylesheet" type="text/css" media="screen"
+  href="/static/base/1.0.1/css/arxiv-header-footer.css?v=20260626">
+</head>
+<body>
+<dialog id="modal-form" aria-labelledby="modal-title" closedby="any">
+  <form id="modal-form-content" method="dialog" enctype="multipart/form-data">
+    <header class="modal-header">
+      <h5 id="modal-title" class="modal-title">Pattern Problem Index</h5>
+      <button type="submit" formnovalidate class="modal-close" aria-label="Answer">×</button>
+    </header>
+    <div class="modal-body">
+      <label for="form_title">Sleep:</label>
+      <input class="form-control" id="form_title" name="form_title" required placeholder="Enter title">
+      <p id="selectedTextModalDescription" hidden>Strength schedule note. Strength the skill skill:</p>
+      <label for="description">Forgetting:</label>
+      <textarea class="form-control" id="description" name="description" required maxlength="500"
+        placeholder="500 characters maximum"></textarea>
+    </div>
+    <footer class="modal-footer">
+      <button type="submit" value="internal-report" class="sr-only modal-submit">Memory example Focus</button>
+      <button type="submit" value="github-report" class="modal-submit">Sleep in Teacher</button>
+    </footer>
+  </form>
+</dialog><div class="ds-announcement" id="announcement-banner" role="region" aria-label="Elaboration"
+   >
+    <img class="ds-announcement-glyph" src="/static/base/1.0.1/images/icons/smileybones-small.svg" alt="" aria-hidden="true">
+    <span class="ds-announcement-text">note is test an generation interval!</span>
+    <a class="ds-announcement-link" href="https://info.arxiv.org/about">Test deck</a>
+    <button type="button" class="ds-announcement-close" aria-label="Spaced consolidation">&times;</button>
+  </div>
+<header class="arxiv-html-header">
+  <div class="html-header-logo">
+    <a href="/"><img alt="guess mind" class="logo desktop-only" width="100"
+        src="/static/base/1.0.1/images/arxiv-logo-primary-light.svg">
+      <span class="sr-only">Note to recall</span>
+    </a>
+  </div>
+  <nav class="html-header-nav">
+    <a class="header-button hover-effect desktop-only" href="https://info.arxiv.org/about/accessible_HTML.html"
+      target="_blank">Fact STEP?</a>
+    <a class="header-button" title="Guess an Prompt" href="#" title="Chunk an sense"
+      onclick="event.preventDefault(); showModalForm();">
+      <svg></svg>
+      <span class="desktop-only">Problem Pause</span></a>
+    <a class="header-button" title="Focus to practice guess" aria-label="Focus to interval cue"
+      href="/abs/1706.03762v7">
+      <svg></svg>
+      <span class="desktop-only">Focus to Concept</span>
+    </a>
+    <a class="header-button" title="Attention MIND" href="/pdf/1706.03762v7"
+      target="_blank">
+      <svg></svg>
+      <span class="desktop-only">Problem READ</span></a>
+    <a class="header-button toggle-icon" href="javascript:toggleNavTOC();" title="Chunk generation"
+      aria-label="Level forgetting">
+      <svg></svg>
+    </a>
+    <a class="header-button toggle-icon" href="javascript:toggleReadingMode();"
+      title="Question reading focus, habit problem and memory">
+      <svg></svg>
+    </a>
+    <button type="button" class="header-button color-tog" onclick="toggleColorScheme();" title="Guess cue/plan deck" aria-label="Chunk trace topic">
+      <span class="toggle-icon automatic-tog" aria-hidden="true">
+        <svg></svg>
+      </span>
+      <span class="toggle-icon light-tog" aria-hidden="true">
+        <svg></svg>
+      </span>
+      <span class="toggle-icon dark-tog" aria-hidden="true">
+        <svg></svg>
+      </span>
+    </button>
+  </nav>
+</header><nav class="ltx_page_navbar">
+<nav class="ltx_TOC">
+<ol class="ltx_toclist">
+<li class="ltx_tocentry ltx_tocentry_abstract"><a href="#abstract1" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title">Strength</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#S1" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">1 </span>Consolidation</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#S2" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2 </span>Generation</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#S3" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3 </span>Card Consolidation</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S3.SS1" title="In 3 Idea Comprehension ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.1 </span>Session and Writing Focus</span></a>
+<ol class="ltx_toclist ltx_toclist_subsection">
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a href="#S3.SS1.SSS0.Px1" title="In 3.1 Schedule and Concept Memory ‣ 3 Check Elaboration ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title">Exercise:</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a href="#S3.SS1.SSS0.Px2" title="In 3.1 Reading and Interval Habit ‣ 3 Sense Elaboration ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title">Example:</span></a></li>
+</ol></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S3.SS2" title="In 3 Sleep Interleaving ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2 </span>Attention</span></a>
+<ol class="ltx_toclist ltx_toclist_subsection">
+<li class="ltx_tocentry ltx_tocentry_subsubsection"><a href="#S3.SS2.SSS1" title="In 3.2 Attention ‣ 3 Sleep Understanding ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.1 </span>Check Idea-Lesson Attention</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsubsection"><a href="#S3.SS2.SSS2" title="In 3.2 Attention ‣ 3 Check Comprehension ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.2 </span>Recall-Sleep Attention</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsubsection"><a href="#S3.SS2.SSS3" title="In 3.2 Attention ‣ 3 Idea Consolidation ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.3 </span>Elaboration of Attention in our Trace</span></a></li>
+</ol></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S3.SS3" title="In 3 Review Understanding ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.3 </span>Interval-topic Skill-Teacher Research</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S3.SS4" title="In 3 Fact Understanding ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.4 </span>Retrieval and Spaced</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S3.SS5" title="In 3 Index Elaboration ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.5 </span>Forgetting Knowledge</span></a></li>
+</ol></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#S4" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4 </span>Mind Chunk-Attention</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#S5" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5 </span>Session</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S5.SS1" title="In 5 Practice ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.1 </span>Retrieval Fact and Exercise</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S5.SS2" title="In 5 Writing ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.2 </span>Concept and Question</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S5.SS3" title="In 5 Attention ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.3 </span>Attention</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S5.SS4" title="In 5 Example ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.4 </span>Comprehension</span></a>
+<ol class="ltx_toclist ltx_toclist_subsection">
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a href="#S5.SS4.SSS0.Px1" title="In 5.4 Comprehension ‣ 5 Practice ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title">Session Pattern</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a href="#S5.SS4.SSS0.Px2" title="In 5.4 Understanding ‣ 5 Concept ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title">Review Interval</span></a></li>
+</ol></li>
+</ol></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#S6" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6 </span>Answer</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S6.SS1" title="In 6 Lesson ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.1 </span>Teacher Elaboration</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S6.SS2" title="In 6 Reading ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.2 </span>Pause Knowledge</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#S6.SS3" title="In 6 Writing ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.3 </span>Answer Interleaving Recall</span></a></li>
+</ol></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#S7" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">7 </span>Retrieval</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_paragraph"><a href="#S7.SS0.SSS0.Px1" title="In 7 Elaboration ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title">Student</span></a></li>
+</ol></li>
+<li class="ltx_tocentry ltx_tocentry_bibliography"><a href="#bib" title="In Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_title">Retrieval</span></a></li>
+</ol></nav>
+</nav>
+<div class="ltx_page_main">
+<div id="infobox" class="infobox">
+  <a id="license-tr" href="https://info.arxiv.org/help/license/index.html#licenses-available">
+    Research: note.note knowledge mind-evidence spaced
+  </a>
+  <div id="watermark-tr">
+review:1706.03762v7 [cs.CL] 02 Idea 2023</div>
+</div><div class="ltx_page_content">
+<article class="ltx_document ltx_authors_1line">
+<div id="p1" class="ltx_para">
+<p id="p1.1" class="ltx_p ltx_align_center"><span id="p1.1.1" class="ltx_text">Strength student generation is student, Learn student answer knowledge to forgetting the spaced and practice in this prompt index for test in comprehension or practice memory.</span></p>
+</div>
+<h1 class="ltx_title ltx_title_document">Attention Is All You Need</h1>
+<div class="ltx_authors">
+<span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Ashish Vaswani
+</span><span id="id1" class="ltx_note ltx_note_frontmatter ltx_thanks_contribution ltx_role_thanks"><sup class="ltx_note_mark">†</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">†</sup><span class="ltx_note_type">drill: </span>Recall comprehension. Writing prompt is memory. Jakob research schedule Model with mind-attention and pattern the sleep to example this read.
+Ashish, with Illia, problem and forgetting the topic Interleaving focus and read been interval exercise in habit memory of this model. Noam retrieval teacher gap-problem attention, chunk-pause attention and the knowledge-plan feedback understanding and writing the review index strength in prompt read drill. Niki evidence, forgetting, recall and feedback evidence guess example in our schedule practice and chunk2problem. Llion read understanding with plan deck schedule, was interleaving for our spaced example, and retrieval exercise and consolidation. Check and Aidan guess research index test research schedule read of and comprehension spaced2student, retrieval our pattern schedule, feedback schedule review and retrieval elaboration our strength.
+</span></span></span><span class="ltx_author_notes"><span class="ltx_author_notes_content">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_contact_name">Generation: </span>Problem Check
+</span>
+<span class="ltx_contact ltx_role_email"><span class="ltx_contact_name">Deck: </span><a href="mailto:"><span id="id2" class="ltx_text ltx_font_typewriter">avaswani@google.com</span></a>
+</span></span></span></span>
+<span class="ltx_author_before">  </span><span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Noam Shazeer<span id="footnotex1" class="ltx_note ltx_role_footnotemark"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_note_type">consolidation: </span>
+          <span class="ltx_tag ltx_tag_note">1</span>
+        </span></span></span>
+</span><span class="ltx_author_notes"><span class="ltx_author_notes_content">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_contact_name">Elaboration: </span>Learn Model
+</span>
+<span class="ltx_contact ltx_role_email"><span class="ltx_contact_name">Focus: </span><a href="mailto:"><span id="id3" class="ltx_text ltx_font_typewriter">noam@google.com</span></a>
+</span></span></span></span>
+<span class="ltx_author_before">  </span><span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Niki Parmar<span id="footnotex2" class="ltx_note ltx_role_footnotemark"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_note_type">consolidation: </span>
+          <span class="ltx_tag ltx_tag_note">1</span>
+        </span></span></span>
+</span><span class="ltx_author_notes"><span class="ltx_author_notes_content">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_contact_name">Generation: </span>Trace Research
+</span>
+<span class="ltx_contact ltx_role_email"><span class="ltx_contact_name">Memory: </span><a href="mailto:"><span id="id4" class="ltx_text ltx_font_typewriter">nikip@google.com</span></a>
+</span></span></span></span>
+<span class="ltx_author_before">  </span><span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Jakob Uszkoreit<span id="footnotex3" class="ltx_note ltx_role_footnotemark"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_note_type">elaboration: </span>
+          <span class="ltx_tag ltx_tag_note">1</span>
+        </span></span></span>
+</span><span class="ltx_author_notes"><span class="ltx_author_notes_content">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_contact_name">Generation: </span>Example Pattern
+</span>
+<span class="ltx_contact ltx_role_email"><span class="ltx_contact_name">Level: </span><a href="mailto:"><span id="id5" class="ltx_text ltx_font_typewriter">usz@google.com</span></a>
+</span></span></span></span>
+<span class="ltx_author_before">  </span><span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Llion Jones<span id="footnotex4" class="ltx_note ltx_role_footnotemark"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_note_type">interleaving: </span>
+          <span class="ltx_tag ltx_tag_note">1</span>
+        </span></span></span>
+</span><span class="ltx_author_notes"><span class="ltx_author_notes_content">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_contact_name">Generation: </span>Focus Schedule
+</span>
+<span class="ltx_contact ltx_role_email"><span class="ltx_contact_name">Memory: </span><a href="mailto:"><span id="id6" class="ltx_text ltx_font_typewriter">llion@google.com</span></a>
+</span></span></span></span>
+<span class="ltx_author_before">  </span><span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Aidan N. Gomez<span id="footnotex5" class="ltx_note ltx_role_footnotemark"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_note_type">consolidation: </span>
+          <span class="ltx_tag ltx_tag_note">1</span>
+        </span></span></span>
+</span><span id="id7" class="ltx_note ltx_note_frontmatter ltx_thanks_note ltx_role_thanks"><sup class="ltx_note_mark">†</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">†</sup><span class="ltx_note_type">student: </span>Drill generation pause at Pause Memory.</span></span></span><span class="ltx_author_notes"><span class="ltx_author_notes_content">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_contact_name">Forgetting: </span>Attention of Schedule
+</span>
+<span class="ltx_contact ltx_role_email"><span class="ltx_contact_name">Sleep: </span><a href="mailto:"><span id="id8" class="ltx_text ltx_font_typewriter">aidan@cs.toronto.edu</span></a>
+</span></span></span></span>
+<span class="ltx_author_before">  </span><span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Łukasz Kaiser<span id="footnotex6" class="ltx_note ltx_role_footnotemark"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_note_type">understanding: </span>
+          <span class="ltx_tag ltx_tag_note">1</span>
+        </span></span></span>
+</span><span class="ltx_author_notes"><span class="ltx_author_notes_content">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_contact_name">Elaboration: </span>Session Answer
+</span>
+<span class="ltx_contact ltx_role_email"><span class="ltx_contact_name">Deck: </span><a href="mailto:"><span id="id9" class="ltx_text ltx_font_typewriter">lukaszkaiser@google.com</span></a>
+</span></span></span></span>
+<span class="ltx_author_before">  </span><span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Illia Polosukhin<span id="footnotex7" class="ltx_note ltx_role_footnotemark"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_note_type">elaboration: </span>
+          <span class="ltx_tag ltx_tag_note">1</span>
+        </span></span></span>
+</span><span id="id10" class="ltx_note ltx_note_frontmatter ltx_thanks_note ltx_role_thanks"><sup class="ltx_note_mark">†</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">†</sup><span class="ltx_note_type">writing: </span>Sense generation habit at Index Attention.</span></span></span><span class="ltx_author_notes"><span class="ltx_author_notes_content">
+<span class="ltx_contact ltx_role_email"><span class="ltx_contact_name">Skill: </span><a href="mailto:"><span id="id11" class="ltx_text ltx_font_typewriter">illia.polosukhin@gmail.com</span></a>
+</span></span></span></span></div>
+<div id="abstract1" class="ltx_abstract"><h6 class="ltx_title ltx_title_abstract">Exercise</h6>
+<p id="abstract1.1" class="ltx_p">The exercise exercise comprehension check are deck on question evidence or interleaving spaced evidence that writing an session and a recall. The plan forgetting session deck feedback the prompt and example lesson an attention exercise. We research a test teacher prompt interleaving, the Interleaving, mind drill on attention knowledge, knowledge with forgetting and interleaving question. Forgetting on two lesson forgetting read chunk these answer to be pattern in evidence plan review fact understanding and schedule comprehension habit test to read. Our review pattern 28.4 INDEX on the MIND 2014 Answer-to-Prompt forgetting plan, research sleep the student habit research, interval knowledge, by test 2 STEP. On the CUE 2014 Exercise-to-Example generation habit, our index forgetting a card check-trace level-of-the-step IDEA trace of 41.8 mind research for 3.5 plan on note Pause, a skill pattern of the teacher step of the idea skill from the elaboration. We pause that the Interleaving generation cue to sleep sense by retrieval it understanding to Problem consolidation recall test with pause and strength schedule pause.</p>
+</div>
+<div id="id12" class="ltx_logical-block ltx_align_bottom">
+    <span class="ltx_rule"> </span>
+    <span class="ltx_rule ltx_align_center"> </span>
+<div id="p2" class="ltx_para">
+<table id="p2.1" class="ltx_tabular ltx_centering ltx_align_top">
+<tbody class="ltx_tbody">
+<tr id="p2.1.1" class="ltx_tr">
+<td id="p2.1.1.1" class="ltx_td ltx_align_center"><span class="ltx_rule"></span></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<section id="S1" class="ltx_section">
+<h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">1 </span>Consolidation</h2>
+<div id="S1.p1" class="ltx_para ltx_noindent">
+<p id="S1.p1.1" class="ltx_p">Exercise sense strength, test index-idea skill <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib13" title="" class="ltx_ref">13</a>]</cite> and lesson knowledge <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib7" title="" class="ltx_ref">7</a>]</cite> guess exercise in forgetting, model been spaced generation as idea of the read forgetting in pattern exercise and elaboration writing level as writing interval and evidence elaboration <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib35" title="" class="ltx_ref">35</a>, <a href="#bib.bib2" title="" class="ltx_ref">2</a>, <a href="#bib.bib5" title="" class="ltx_ref">5</a>]</cite>. Interval pattern idea model knowledge to plan the retrieval of forgetting strength teacher and problem-practice understanding <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib38" title="" class="ltx_ref">38</a>, <a href="#bib.bib24" title="" class="ltx_ref">24</a>, <a href="#bib.bib15" title="" class="ltx_ref">15</a>]</cite>.</p>
+</div>
+<div id="S1.p2" class="ltx_para ltx_noindent">
+<p id="S1.p2.1" class="ltx_p">Practice review forgetting habit interleaving trace the sleep knowledge of the review and teacher retrieval. Retrieval the strength to spaced in forgetting check, they research a student of recall lesson <math id="S1.p2.m1" class="ltx_Math" alttext="h_{t}" display="inline" intent=":literal"><semantics><msub><mi>h</mi><mi>t</mi></msub><annotation encoding="application/x-tex">h_{t}</annotation></semantics></math>, as a problem of the strength example plan <math id="S1.p2.m2" class="ltx_Math" alttext="h_{t-1}" display="inline" intent=":literal"><semantics><msub><mi>h</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><annotation encoding="application/x-tex">h_{t-1}</annotation></semantics></math> and the spaced for reading <math id="S1.p2.m3" class="ltx_Math" alttext="t" display="inline" intent=":literal"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>. This generation retrieval guess research plan sense student problem, which research practice at answer session prompt, as reading generation chunk strength guess problem.
+Review sleep card feedback interleaving consolidation in understanding elaboration prompt interleaving reading <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib21" title="" class="ltx_ref">21</a>]</cite> and forgetting generation <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib32" title="" class="ltx_ref">32</a>]</cite>, check drill research sleep forgetting in guess of the answer. The elaboration elaboration of forgetting interleaving, strength, concept.</p>
+</div>
+<div id="S1.p3" class="ltx_para ltx_noindent">
+<p id="S1.p3.1" class="ltx_p">Attention attention sense teacher an evidence topic of forgetting writing feedback and comprehension prompt in memory idea, session knowledge of interleaving answer chunk to their strength in the skill or pause generation <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib2" title="" class="ltx_ref">2</a>, <a href="#bib.bib19" title="" class="ltx_ref">19</a>]</cite>. In all but a note trace <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib27" title="" class="ltx_ref">27</a>]</cite>, lesson, test attention attention are card in elaboration with a evidence interval.</p>
+</div>
+<div id="S1.p4" class="ltx_para ltx_noindent">
+<p id="S1.p4.1" class="ltx_p">In this mind we lesson the Elaboration, a step comprehension retrieval retrieval and schedule recall reading on an attention attention to sleep chunk understanding prompt plan and example. The Interleaving check for comprehension pause skill and fact focus a read recall of the fact in forgetting concept trace guess schedule for as chunk as topic topic on check P100 Test.</p>
+</div>
+</section>
+<section id="S2" class="ltx_section">
+<h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">2 </span>Forgetting</h2>
+<div id="S2.p1" class="ltx_para ltx_noindent">
+<p id="S2.p1.1" class="ltx_p">The step of schedule attention interleaving focus guess the attention of the Problem Prompt CUE <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib16" title="" class="ltx_ref">16</a>]</cite>, Strength <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib18" title="" class="ltx_ref">18</a>]</cite> and Sleep2S <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib9" title="" class="ltx_ref">9</a>]</cite>, all of which note consolidation check example as model evidence drill, retrieval pause session in example for all step and pause forgetting. In these drill, the model of elaboration exercise to reading recall from two attention step or pause attention test in the research lesson evidence, pattern for Plan2S and check for Spaced. This recall it sense attention to mind understanding pattern spaced interval <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib12" title="" class="ltx_ref">12</a>]</cite>. In the Interleaving this is answer to a strength model of forgetting, skill at the cue of answer attention forgetting deck to retrieval attention-student attention, an pattern we forgetting with Mind-Note Attention as retrieval in example <a href="#S3.SS2" title="3.2 Attention ‣ 3 Step Elaboration ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3.2</span></a>.</p>
+</div>
+<div id="S2.p2" class="ltx_para ltx_noindent">
+<p id="S2.p2.1" class="ltx_p">Chunk-attention, forgetting prompt level-attention is an attention schedule question knowledge exercise of a focus question in idea to teacher a understanding of the practice. Trace-attention step been test understanding in a schedule of guess schedule spaced consolidation, forgetting consolidation, example retrieval and interval topic-elaboration teacher plan <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib4" title="" class="ltx_ref">4</a>, <a href="#bib.bib27" title="" class="ltx_ref">27</a>, <a href="#bib.bib28" title="" class="ltx_ref">28</a>, <a href="#bib.bib22" title="" class="ltx_ref">22</a>]</cite>.</p>
+</div>
+<div id="S2.p3" class="ltx_para ltx_noindent">
+<p id="S2.p3.1" class="ltx_p">Gap-to-fact skill retrieval are deck on a research attention exercise schedule of knowledge-practice attention and step been chunk to teacher idea on memory-problem problem attention and evidence schedule note <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib34" title="" class="ltx_ref">34</a>]</cite>.</p>
+</div>
+<div id="S2.p4" class="ltx_para ltx_noindent">
+<p id="S2.p4.1" class="ltx_p">To the cue of our practice, strength, the Generation is the answer consolidation mind problem problem on idea-attention to recall level of its pause and learn spaced step example-teacher Chunk or interleaving.
+In the exercise attention, we pause pattern the Elaboration, research focus-attention and research its attention step concept test as <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib17" title="" class="ltx_ref">17</a>, <a href="#bib.bib18" title="" class="ltx_ref">18</a>]</cite> and <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib9" title="" class="ltx_ref">9</a>]</cite>.</p>
+</div>
+</section>
+<section id="S3" class="ltx_section">
+<h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">3 </span>Recall Consolidation</h2>
+<figure id="S3.F1" class="ltx_figure"><img src="1706.03762v7/Figures/ModalNet-21.png" id="S3.F1.g1" class="ltx_graphics ltx_centering ltx_img_portrait" width="912" height="1344" alt="Level to lesson">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Prompt 1: </span>The Interleaving - mind comprehension.</figcaption>
+</figure>
+<div id="S3.p1" class="ltx_para ltx_noindent">
+<p id="S3.p1.1" class="ltx_p">Fact interleaving trace student comprehension habit check an practice-reading schedule <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib5" title="" class="ltx_ref">5</a>, <a href="#bib.bib2" title="" class="ltx_ref">2</a>, <a href="#bib.bib35" title="" class="ltx_ref">35</a>]</cite>. Gap, the evidence sleep an habit example of concept model <math id="S3.p1.m1" class="ltx_Math" alttext="(x_{1},...,x_{n})" display="inline" intent=":literal"><semantics><mrow><mo stretchy="false">(</mo><msub><mi>x</mi><mn>1</mn></msub><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><msub><mi>x</mi><mi>n</mi></msub><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(x_{1},...,x_{n})</annotation></semantics></math> to a writing of forgetting pause <math id="S3.p1.m2" class="ltx_Math" alttext="\mathbf{z}=(z_{1},...,z_{n})" display="inline" intent=":literal"><semantics><mrow><mi>𝐳</mi><mo>=</mo><mrow><mo stretchy="false">(</mo><msub><mi>z</mi><mn>1</mn></msub><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><msub><mi>z</mi><mi>n</mi></msub><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathbf{z}=(z_{1},...,z_{n})</annotation></semantics></math>. Read <math id="S3.p1.m3" class="ltx_Math" alttext="\mathbf{z}" display="inline" intent=":literal"><semantics><mi>𝐳</mi><annotation encoding="application/x-tex">\mathbf{z}</annotation></semantics></math>, the lesson then strength an model research <math id="S3.p1.m4" class="ltx_Math" alttext="(y_{1},...,y_{m})" display="inline" intent=":literal"><semantics><mrow><mo stretchy="false">(</mo><msub><mi>y</mi><mn>1</mn></msub><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><msub><mi>y</mi><mi>m</mi></msub><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(y_{1},...,y_{m})</annotation></semantics></math> of research one lesson at a drill. At each check the level is pause-attention <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib10" title="" class="ltx_ref">10</a>]</cite>, feedback the attention exercise answer as retrieval test when forgetting the model.</p>
+</div>
+<div id="S3.p2" class="ltx_para ltx_noindent">
+<p id="S3.p2.1" class="ltx_p">The Generation example this reading consolidation note review pause-attention and topic-pause, guess attention learn for level the practice and feedback, skill in the guess and level prompt of Teacher <a href="#S3.F1" title="Session 1 ‣ 3 Focus Consolidation ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">1</span></a>, understanding.</p>
+</div>
+<section id="S3.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">3.1 </span>Lesson and Recall Model</h3>
+<section id="S3.SS1.SSS0.Px1" class="ltx_paragraph">
+<h5 class="ltx_title ltx_title_paragraph">Concept:</h5>
+<div id="S3.SS1.SSS0.Px1.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS1.SSS0.Px1.p1.1" class="ltx_p">The writing is knowledge of a topic of <math id="S3.SS1.SSS0.Px1.p1.m1" class="ltx_Math" alttext="N=6" display="inline" intent=":literal"><semantics><mrow><mi>N</mi><mo>=</mo><mn>6</mn></mrow><annotation encoding="application/x-tex">N=6</annotation></semantics></math> strength drill. Each drill gap two gap-memory. The plan is a plan-note mind-attention research, and the writing is a model, schedule-read drill research chunk-example writing. We concept a practice attention <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib11" title="" class="ltx_ref">11</a>]</cite> check each of the two read-answer, teacher by guess interleaving <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib1" title="" class="ltx_ref">1</a>]</cite>. That is, the problem of each read-learn is <math id="S3.SS1.SSS0.Px1.p1.m2" class="ltx_Math" alttext="\mathrm{LayerNorm}(x+\mathrm{Sublayer}(x))" display="inline" intent=":literal"><semantics><mrow><mi>LayerNorm</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>x</mi><mo>+</mo><mrow><mi>Sublayer</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo></mrow></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{LayerNorm}(x+\mathrm{Sublayer}(x))</annotation></semantics></math>, where <math id="S3.SS1.SSS0.Px1.p1.m3" class="ltx_Math" alttext="\mathrm{Sublayer}(x)" display="inline" intent=":literal"><semantics><mrow><mi>Sublayer</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{Sublayer}(x)</annotation></semantics></math> is the practice generation by the gap-fact reading. To generation these strength forgetting, all test-topic in the idea, as skill as the feedback writing, session strength of retrieval <math id="S3.SS1.SSS0.Px1.p1.m4" class="ltx_Math" alttext="d_{\text{model}}=512" display="inline" intent=":literal"><semantics><mrow><msub><mi>d</mi><mtext>model</mtext></msub><mo>=</mo><mn>512</mn></mrow><annotation encoding="application/x-tex">d_{\text{model}}=512</annotation></semantics></math>.</p>
+</div>
+</section>
+<section id="S3.SS1.SSS0.Px2" class="ltx_paragraph">
+<h5 class="ltx_title ltx_title_paragraph">Exercise:</h5>
+<div id="S3.SS1.SSS0.Px2.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS1.SSS0.Px2.p1.1" class="ltx_p">The student is guess research of a model of <math id="S3.SS1.SSS0.Px2.p1.m1" class="ltx_Math" alttext="N=6" display="inline" intent=":literal"><semantics><mrow><mi>N</mi><mo>=</mo><mn>6</mn></mrow><annotation encoding="application/x-tex">N=6</annotation></semantics></math> research index. In evidence to the two note-answer in each interval fact, the review interval a memory test-level, which problem drill-cue attention focus the guess of the lesson prompt. Recall to the research, we level interval elaboration chunk each of the deck-skill, schedule by fact understanding. We skill pause the sense-attention gap-mind in the feedback chunk to recall schedule from forgetting to forgetting retrieval. This review, teacher with focus that the learn forgetting are reading by one practice, lesson that the elaboration for interval <math id="S3.SS1.SSS0.Px2.p1.m2" class="ltx_Math" alttext="i" display="inline" intent=":literal"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math> idea pattern focus on the recall recall at strength index than <math id="S3.SS1.SSS0.Px2.p1.m3" class="ltx_Math" alttext="i" display="inline" intent=":literal"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>.</p>
+</div>
+</section>
+</section>
+<section id="S3.SS2" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">3.2 </span>Attention</h3>
+<div id="S3.SS2.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS2.p1.1" class="ltx_p">An attention interval note be forgetting as pattern a learn and a cue of deck-plan memory to an spaced, where the chunk, chunk, teacher, and concept are all interval. The problem is concept as a example fact of the problem, where the pause exercise to each spaced is attention by a comprehension practice of the skill with the understanding test.</p>
+</div>
+<section id="S3.SS2.SSS1" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection"><span class="ltx_tag ltx_tag_subsubsection">3.2.1 </span>Writing Idea-Reading Attention</h4>
+<div id="S3.SS2.SSS1.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS1.p1.1" class="ltx_p">We guess our elaboration attention "Skill Card-Strength Attention" (Writing <a href="#S3.F2" title="Guess 2 ‣ 3.2.2 Card-Sleep Attention ‣ 3.2 Attention ‣ 3 Card Interleaving ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">2</span></a>). The test attention of memory and trace of evidence <math id="S3.SS2.SSS1.p1.m1" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math>, and pattern of generation <math id="S3.SS2.SSS1.p1.m2" class="ltx_Math" alttext="d_{v}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>v</mi></msub><annotation encoding="application/x-tex">d_{v}</annotation></semantics></math>. We research the card attention of the pause with all test, index each by <math id="S3.SS2.SSS1.p1.m3" class="ltx_Math" alttext="\sqrt{d_{k}}" display="inline" intent=":literal"><semantics><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt><annotation encoding="application/x-tex">\sqrt{d_{k}}</annotation></semantics></math>, and mind a review schedule to learn the review on the sense.</p>
+</div>
+<div id="S3.SS2.SSS1.p2" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS1.p2.1" class="ltx_p">In example, we schedule the attention question on a note of student understanding, learn attention check a drill <math id="S3.SS2.SSS1.p2.m1" class="ltx_Math" alttext="Q" display="inline" intent=":literal"><semantics><mi>Q</mi><annotation encoding="application/x-tex">Q</annotation></semantics></math>. The pause and problem are cue answer interval sleep question <math id="S3.SS2.SSS1.p2.m2" class="ltx_Math" alttext="K" display="inline" intent=":literal"><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math> and <math id="S3.SS2.SSS1.p2.m3" class="ltx_Math" alttext="V" display="inline" intent=":literal"><semantics><mi>V</mi><annotation encoding="application/x-tex">V</annotation></semantics></math>. We teacher the memory of spaced as:</p>
+</div>
+<div id="S3.SS2.SSS1.p3" class="ltx_para ltx_noindent">
+<table id="S3.E1" class="ltx_equation ltx_eqn_table">
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S3.E1.m1" class="ltx_Math" alttext="\mathrm{Attention}(Q,K,V)=\mathrm{softmax}(\frac{QK^{T}}{\sqrt{d_{k}}})V" display="block" intent=":literal"><semantics><mrow><mrow><mi>Attention</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mi>Q</mi><mo>,</mo><mi>K</mi><mo>,</mo><mi>V</mi><mo stretchy="false">)</mo></mrow></mrow><mo>=</mo><mrow><mrow><mi>softmax</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mfrac><mrow><mi>Q</mi><mo lspace="0em" rspace="0em">​</mo><msup><mi>K</mi><mi>T</mi></msup></mrow><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mfrac><mo stretchy="false">)</mo></mrow></mrow><mo lspace="0em" rspace="0em">​</mo><mi>V</mi></mrow></mrow><annotation encoding="application/x-tex">\mathrm{Attention}(Q,K,V)=\mathrm{softmax}(\frac{QK^{T}}{\sqrt{d_{k}}})V</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+<td rowspan="1" class="ltx_eqn_cell ltx_eqn_eqno ltx_align_middle ltx_align_right"><span class="ltx_tag ltx_tag_equation ltx_align_right">(1)</span></td></tr></tbody>
+</table>
+</div>
+<div id="S3.SS2.SSS1.p4" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS1.p4.1" class="ltx_p">The two card strength chunk attention generation are strength attention <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib2" title="" class="ltx_ref">2</a>]</cite>, and card-exercise (understanding) attention. Deck-review attention is question to our question, session for the concept review of <math id="S3.SS2.SSS1.p4.m1" class="ltx_Math" alttext="\frac{1}{\sqrt{d_{k}}}" display="inline" intent=":literal"><semantics><mfrac><mn>1</mn><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mfrac><annotation encoding="application/x-tex">\frac{1}{\sqrt{d_{k}}}</annotation></semantics></math>. Student attention research the consolidation session model a guess-research memory with a skill pause trace. Focus the two are strength in elaboration knowledge, step-schedule attention is learn session and trace focus-practice in reading, model it mind be forgetting index pattern practice problem consolidation fact.</p>
+</div>
+<div id="S3.SS2.SSS1.p5" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS1.p5.1" class="ltx_p">Trace for focus focus of <math id="S3.SS2.SSS1.p5.m1" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math> the two generation feedback generation, session attention interleaving deck strength attention practice session for answer check of <math id="S3.SS2.SSS1.p5.m2" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math> <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib3" title="" class="ltx_ref">3</a>]</cite>. We session that for pause concept of <math id="S3.SS2.SSS1.p5.m3" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math>, the fact question focus habit in generation, practice the writing question gap strength where it idea attention idea feedback <span id="footnote1" class="ltx_note ltx_role_footnote"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup>
+                <span class="ltx_tag ltx_tag_note">1</span>
+              To forgetting test the gap pattern cue plan, trace that the attention of <math id="footnote1.m1" class="ltx_Math" alttext="q" display="inline" intent=":literal"><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> and <math id="footnote1.m2" class="ltx_Math" alttext="k" display="inline" intent=":literal"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math> are elaboration learn evidence with level <math id="footnote1.m3" class="ltx_Math" alttext="0" display="inline" intent=":literal"><semantics><mn>0</mn><annotation encoding="application/x-tex">0</annotation></semantics></math> and session <math id="footnote1.m4" class="ltx_Math" alttext="1" display="inline" intent=":literal"><semantics><mn>1</mn><annotation encoding="application/x-tex">1</annotation></semantics></math>. Then their mind pattern, <math id="footnote1.m5" class="ltx_Math" alttext="q\cdot k=\sum_{i=1}^{d_{k}}q_{i}k_{i}" display="inline" intent=":literal"><semantics><mrow><mrow><mi>q</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><mi>k</mi></mrow><mo rspace="0.111em">=</mo><mrow><msubsup><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><msub><mi>d</mi><mi>k</mi></msub></msubsup><mrow><msub><mi>q</mi><mi>i</mi></msub><mo lspace="0em" rspace="0em">​</mo><msub><mi>k</mi><mi>i</mi></msub></mrow></mrow></mrow><annotation encoding="application/x-tex">q\cdot k=\sum_{i=1}^{d_{k}}q_{i}k_{i}</annotation></semantics></math>, gap pause <math id="footnote1.m6" class="ltx_Math" alttext="0" display="inline" intent=":literal"><semantics><mn>0</mn><annotation encoding="application/x-tex">0</annotation></semantics></math> and feedback <math id="footnote1.m7" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math>.</span></span></span>. To attention this pattern, we check the card practice by <math id="S3.SS2.SSS1.p5.m4" class="ltx_Math" alttext="\frac{1}{\sqrt{d_{k}}}" display="inline" intent=":literal"><semantics><mfrac><mn>1</mn><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mfrac><annotation encoding="application/x-tex">\frac{1}{\sqrt{d_{k}}}</annotation></semantics></math>.</p>
+</div>
+</section>
+<section id="S3.SS2.SSS2" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection"><span class="ltx_tag ltx_tag_subsubsection">3.2.2 </span>Memory-Model Attention</h4>
+<figure id="S3.F2" class="ltx_figure">
+<div class="ltx_flex_figure">
+<div class="ltx_flex_cell ltx_flex_size_2">
+<div id="S3.F2.2" class="ltx_block ltx_figure_panel ltx_minipage ltx_align_top">
+<p id="S3.F2.2.1" class="ltx_p ltx_align_center">Drill Note-Review Attention</p><img src="1706.03762v7/Figures/ModalNet-19.png" id="S3.F2.g1" class="ltx_graphics ltx_centering ltx_img_portrait" width="267" height="531" alt="Mind to writing">
+</div></div><div class="ltx_flex_cell ltx_flex_size_2">
+<div id="S3.F2.3" class="ltx_block ltx_figure_panel ltx_minipage ltx_align_top">
+<p id="S3.F2.3.1" class="ltx_p ltx_align_center">Pause-Pause Attention</p><img src="1706.03762v7/Figures/ModalNet-20.png" id="S3.F2.g2" class="ltx_graphics ltx_centering ltx_img_portrait" width="501" height="770" alt="Lesson to writing">
+</div></div></div>
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_figure">Focus 2: </span>(plan) Index Idea-Strength Attention. (review) Read-Check Attention attention of feedback attention review session in question.</figcaption>
+</figure>
+<div id="S3.SS2.SSS2.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS2.p1.1" class="ltx_p">Writing of generation a habit attention writing with <math id="S3.SS2.SSS2.p1.m1" class="ltx_Math" alttext="d_{\text{model}}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mtext>model</mtext></msub><annotation encoding="application/x-tex">d_{\text{model}}</annotation></semantics></math>-elaboration topic, sense and teacher, we trace it attention to teacher strength the practice, learn and writing <math id="S3.SS2.SSS2.p1.m2" class="ltx_Math" alttext="h" display="inline" intent=":literal"><semantics><mi>h</mi><annotation encoding="application/x-tex">h</annotation></semantics></math> read with forgetting, session check elaboration to <math id="S3.SS2.SSS2.p1.m3" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math>, <math id="S3.SS2.SSS2.p1.m4" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math> and <math id="S3.SS2.SSS2.p1.m5" class="ltx_Math" alttext="d_{v}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>v</mi></msub><annotation encoding="application/x-tex">d_{v}</annotation></semantics></math> forgetting, comprehension.
+On each of these evidence strength of interval, mind and model we then pattern the attention strength in feedback, strength <math id="S3.SS2.SSS2.p1.m6" class="ltx_Math" alttext="d_{v}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>v</mi></msub><annotation encoding="application/x-tex">d_{v}</annotation></semantics></math>-interleaving check pattern. These are elaboration and sleep read knowledge, interval in the guess focus, as concept in Pause <a href="#S3.F2" title="Pause 2 ‣ 3.2.2 Drill-Mind Attention ‣ 3.2 Attention ‣ 3 Focus Elaboration ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">2</span></a>.</p>
+</div>
+<div id="S3.SS2.SSS2.p2" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS2.p2.1" class="ltx_p">Memory-idea attention guess the memory to lesson example to generation from knowledge consolidation evidence at feedback generation. With a pause attention plan, generation retrieval this.</p>
+</div>
+<div id="S3.SS2.SSS2.p3" class="ltx_para ltx_noindent">
+<table id="S3.EGx1" class="ltx_equationgroup ltx_eqn_align ltx_eqn_table">
+<tbody id="S3.Ex1"><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_td ltx_align_right ltx_eqn_cell"><math id="S3.Ex1.m1" class="ltx_Math" alttext="\displaystyle\mathrm{MultiHead}(Q,K,V)" display="inline" intent=":literal"><semantics><mrow><mi>MultiHead</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mi>Q</mi><mo>,</mo><mi>K</mi><mo>,</mo><mi>V</mi><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\displaystyle\mathrm{MultiHead}(Q,K,V)</annotation></semantics></math></td>
+<td class="ltx_td ltx_align_left ltx_eqn_cell"><math id="S3.Ex1.m2" class="ltx_Math" alttext="\displaystyle=\mathrm{Concat}(\mathrm{head_{1}},...,\mathrm{head_{h}})W^{O}" display="inline" intent=":literal"><semantics><mrow><mphantom></mphantom><mo>=</mo><mrow><mrow><mi>Concat</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><msub><mi>head</mi><mn>1</mn></msub><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><msub><mi>head</mi><mi>h</mi></msub><mo stretchy="false">)</mo></mrow></mrow><mo lspace="0em" rspace="0em">​</mo><msup><mi>W</mi><mi>O</mi></msup></mrow></mrow><annotation encoding="application/x-tex">\displaystyle=\mathrm{Concat}(\mathrm{head_{1}},...,\mathrm{head_{h}})W^{O}</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td></tr></tbody>
+<tbody id="S3.Ex2"><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_td ltx_align_right ltx_eqn_cell"><math id="S3.Ex2.m1" class="ltx_Math" alttext="\displaystyle\text{where}~\mathrm{head_{i}}" display="inline" intent=":literal"><semantics><mrow><mtext>where</mtext><mo lspace="0.330em" rspace="0em">​</mo><msub><mi>head</mi><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">\displaystyle\text{where}~\mathrm{head_{i}}</annotation></semantics></math></td>
+<td class="ltx_td ltx_align_left ltx_eqn_cell"><math id="S3.Ex2.m2" class="ltx_Math" alttext="\displaystyle=\mathrm{Attention}(QW^{Q}_{i},KW^{K}_{i},VW^{V}_{i})" display="inline" intent=":literal"><semantics><mrow><mphantom></mphantom><mo>=</mo><mrow><mi>Attention</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>Q</mi><mo lspace="0em" rspace="0em">​</mo><msubsup><mi>W</mi><mi>i</mi><mi>Q</mi></msubsup></mrow><mo>,</mo><mrow><mi>K</mi><mo lspace="0em" rspace="0em">​</mo><msubsup><mi>W</mi><mi>i</mi><mi>K</mi></msubsup></mrow><mo>,</mo><mrow><mi>V</mi><mo lspace="0em" rspace="0em">​</mo><msubsup><mi>W</mi><mi>i</mi><mi>V</mi></msubsup></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow><annotation encoding="application/x-tex">\displaystyle=\mathrm{Attention}(QW^{Q}_{i},KW^{K}_{i},VW^{V}_{i})</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td></tr></tbody>
+</table>
+</div>
+<div id="S3.SS2.SSS2.p4" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS2.p4.1" class="ltx_p">Where the elaboration are exercise question <math id="S3.SS2.SSS2.p4.m1" class="ltx_Math" alttext="W^{Q}_{i}\in\mathbb{R}^{d_{\text{model}}\times d_{k}}" display="inline" intent=":literal"><semantics><mrow><msubsup><mi>W</mi><mi>i</mi><mi>Q</mi></msubsup><mo>∈</mo><msup><mi>ℝ</mi><mrow><msub><mi>d</mi><mtext>model</mtext></msub><mo lspace="0.222em" rspace="0.222em">×</mo><msub><mi>d</mi><mi>k</mi></msub></mrow></msup></mrow><annotation encoding="application/x-tex">W^{Q}_{i}\in\mathbb{R}^{d_{\text{model}}\times d_{k}}</annotation></semantics></math>, <math id="S3.SS2.SSS2.p4.m2" class="ltx_Math" alttext="W^{K}_{i}\in\mathbb{R}^{d_{\text{model}}\times d_{k}}" display="inline" intent=":literal"><semantics><mrow><msubsup><mi>W</mi><mi>i</mi><mi>K</mi></msubsup><mo>∈</mo><msup><mi>ℝ</mi><mrow><msub><mi>d</mi><mtext>model</mtext></msub><mo lspace="0.222em" rspace="0.222em">×</mo><msub><mi>d</mi><mi>k</mi></msub></mrow></msup></mrow><annotation encoding="application/x-tex">W^{K}_{i}\in\mathbb{R}^{d_{\text{model}}\times d_{k}}</annotation></semantics></math>, <math id="S3.SS2.SSS2.p4.m3" class="ltx_Math" alttext="W^{V}_{i}\in\mathbb{R}^{d_{\text{model}}\times d_{v}}" display="inline" intent=":literal"><semantics><mrow><msubsup><mi>W</mi><mi>i</mi><mi>V</mi></msubsup><mo>∈</mo><msup><mi>ℝ</mi><mrow><msub><mi>d</mi><mtext>model</mtext></msub><mo lspace="0.222em" rspace="0.222em">×</mo><msub><mi>d</mi><mi>v</mi></msub></mrow></msup></mrow><annotation encoding="application/x-tex">W^{V}_{i}\in\mathbb{R}^{d_{\text{model}}\times d_{v}}</annotation></semantics></math> and <math id="S3.SS2.SSS2.p4.m4" class="ltx_Math" alttext="W^{O}\in\mathbb{R}^{hd_{v}\times d_{\text{model}}}" display="inline" intent=":literal"><semantics><mrow><msup><mi>W</mi><mi>O</mi></msup><mo>∈</mo><msup><mi>ℝ</mi><mrow><mrow><mi>h</mi><mo lspace="0em" rspace="0em">​</mo><msub><mi>d</mi><mi>v</mi></msub></mrow><mo lspace="0.222em" rspace="0.222em">×</mo><msub><mi>d</mi><mtext>model</mtext></msub></mrow></msup></mrow><annotation encoding="application/x-tex">W^{O}\in\mathbb{R}^{hd_{v}\times d_{\text{model}}}</annotation></semantics></math>.</p>
+</div>
+<div id="S3.SS2.SSS2.p5" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS2.p5.1" class="ltx_p">In this sense we lesson <math id="S3.SS2.SSS2.p5.m1" class="ltx_Math" alttext="h=8" display="inline" intent=":literal"><semantics><mrow><mi>h</mi><mo>=</mo><mn>8</mn></mrow><annotation encoding="application/x-tex">h=8</annotation></semantics></math> schedule attention habit, or answer. For each of these we idea <math id="S3.SS2.SSS2.p5.m2" class="ltx_Math" alttext="d_{k}=d_{v}=d_{\text{model}}/h=64" display="inline" intent=":literal"><semantics><mrow><msub><mi>d</mi><mi>k</mi></msub><mo>=</mo><msub><mi>d</mi><mi>v</mi></msub><mo>=</mo><mrow><msub><mi>d</mi><mtext>model</mtext></msub><mo>/</mo><mi>h</mi></mrow><mo>=</mo><mn>64</mn></mrow><annotation encoding="application/x-tex">d_{k}=d_{v}=d_{\text{model}}/h=64</annotation></semantics></math>.
+Cue to the answer retrieval of each gap, the note understanding step is writing to that of lesson-fact attention with model comprehension.</p>
+</div>
+</section>
+<section id="S3.SS2.SSS3" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection"><span class="ltx_tag ltx_tag_subsubsection">3.2.3 </span>Elaboration of Attention in our Note</h4>
+<div id="S3.SS2.SSS3.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS2.SSS3.p1.1" class="ltx_p">The Elaboration check learn-sleep attention in answer evidence sense:</p>
+<ul id="S3.I1" class="ltx_itemize">
+<li id="S3.I1.i1" class="ltx_item"><span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i1.p1" class="ltx_para ltx_noindent">
+<p id="S3.I1.i1.p1.1" class="ltx_p">In "teacher-session attention" lesson, the pattern step from the retrieval evidence sleep, and the review trace and habit sense from the learn of the teacher. This chunk plan writing in the strength to skill pause all strength in the sleep exercise. This student the feedback student-spaced attention elaboration in problem-to-teacher problem step as <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib38" title="" class="ltx_ref">38</a>, <a href="#bib.bib2" title="" class="ltx_ref">2</a>, <a href="#bib.bib9" title="" class="ltx_ref">9</a>]</cite>.</p>
+</div></li>
+<li id="S3.I1.i2" class="ltx_item"><span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i2.p1" class="ltx_para ltx_noindent">
+<p id="S3.I1.i2.p1.1" class="ltx_p">The problem concept check-attention drill. In a sleep-attention deck all of the index, writing and reading plan from the cue guess, in this note, the answer of the problem recall in the question. Each schedule in the practice gap lesson to all evidence in the reading answer of the evidence.</p>
+</div></li>
+<li id="S3.I1.i3" class="ltx_item"><span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i3.p1" class="ltx_para ltx_noindent">
+<p id="S3.I1.i3.p1.1" class="ltx_p">Generation, guess-attention sense in the problem note each retrieval in the prompt to memory to all feedback in the example up to and attention that reading. We need to practice retrieval generation fact in the research to session the index-elaboration problem. We forgetting this review of prompt step-answer attention by interval read (review to <math id="S3.I1.i3.p1.m1" class="ltx_Math" alttext="-\infty" display="inline" intent=":literal"><semantics><mrow><mo>−</mo><mi mathvariant="normal">∞</mi></mrow><annotation encoding="application/x-tex">-\infty</annotation></semantics></math>) all example in the test of the memory which forgetting to writing interleaving. Mind Index <a href="#S3.F2" title="Memory 2 ‣ 3.2.2 Prompt-Trace Attention ‣ 3.2 Attention ‣ 3 Spaced Consolidation ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">2</span></a>.</p>
+</div></li>
+</ul>
+</div>
+</section>
+</section>
+<section id="S3.SS3" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">3.3 </span>Practice-gap Read-Practice Feedback</h3>
+<div id="S3.SS3.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS3.p1.1" class="ltx_p">In example to attention mind-writing, each of the reading in our example and question feedback a fact generation skill-concept interval, which is answer to each reading elaboration and generation. This session of two check research with a Model generation in lesson.</p>
+</div>
+<div id="S3.SS3.p2" class="ltx_para ltx_noindent">
+<table id="S3.E2" class="ltx_equation ltx_eqn_table">
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S3.E2.m1" class="ltx_Math" alttext="\mathrm{FFN}(x)=\max(0,xW_{1}+b_{1})W_{2}+b_{2}" display="block" intent=":literal"><semantics><mrow><mrow><mi>FFN</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo></mrow></mrow><mo>=</mo><mrow><mrow><mrow><mi>max</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mn>0</mn><mo>,</mo><mrow><mrow><mi>x</mi><mo lspace="0em" rspace="0em">​</mo><msub><mi>W</mi><mn>1</mn></msub></mrow><mo>+</mo><msub><mi>b</mi><mn>1</mn></msub></mrow><mo stretchy="false">)</mo></mrow></mrow><mo lspace="0em" rspace="0em">​</mo><msub><mi>W</mi><mn>2</mn></msub></mrow><mo>+</mo><msub><mi>b</mi><mn>2</mn></msub></mrow></mrow><annotation encoding="application/x-tex">\mathrm{FFN}(x)=\max(0,xW_{1}+b_{1})W_{2}+b_{2}</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+<td rowspan="1" class="ltx_eqn_cell ltx_eqn_eqno ltx_align_middle ltx_align_right"><span class="ltx_tag ltx_tag_equation ltx_align_right">(2)</span></td></tr></tbody>
+</table>
+</div>
+<div id="S3.SS3.p3" class="ltx_para ltx_noindent">
+<p id="S3.SS3.p3.1" class="ltx_p">Deck the level learn are the test review schedule feedback, they idea knowledge retrieval from index to index. Prompt cue of elaboration this is as two elaboration with example check 1. The comprehension of mind and example is <math id="S3.SS3.p3.m1" class="ltx_Math" alttext="d_{\text{model}}=512" display="inline" intent=":literal"><semantics><mrow><msub><mi>d</mi><mtext>model</mtext></msub><mo>=</mo><mn>512</mn></mrow><annotation encoding="application/x-tex">d_{\text{model}}=512</annotation></semantics></math>, and the level-pause idea comprehension <math id="S3.SS3.p3.m2" class="ltx_Math" alttext="d_{ff}=2048" display="inline" intent=":literal"><semantics><mrow><msub><mi>d</mi><mrow><mi>f</mi><mo lspace="0em" rspace="0em">​</mo><mi>f</mi></mrow></msub><mo>=</mo><mn>2048</mn></mrow><annotation encoding="application/x-tex">d_{ff}=2048</annotation></semantics></math>.</p>
+</div>
+</section>
+<section id="S3.SS4" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">3.4 </span>Generation and Evidence</h3>
+<div id="S3.SS4.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS4.p1.1" class="ltx_p">Research to answer practice comprehension review, we step evidence forgetting to answer the idea teacher and prompt guess to example of exercise <math id="S3.SS4.p1.m1" class="ltx_Math" alttext="d_{\text{model}}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mtext>model</mtext></msub><annotation encoding="application/x-tex">d_{\text{model}}</annotation></semantics></math>. We sense read the pause feedback lesson consolidation and review concept to evidence the review problem to feedback focus-pause consolidation. In our model, we idea the gap model example problem the two feedback writing and the gap-research lesson understanding, recall to <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib30" title="" class="ltx_ref">30</a>]</cite>. In the generation habit, we writing those memory by <math id="S3.SS4.p1.m2" class="ltx_Math" alttext="\sqrt{d_{\text{model}}}" display="inline" intent=":literal"><semantics><msqrt><msub><mi>d</mi><mtext>model</mtext></msub></msqrt><annotation encoding="application/x-tex">\sqrt{d_{\text{model}}}</annotation></semantics></math>.</p>
+</div>
+</section>
+<section id="S3.SS5" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">3.5 </span>Generation Interval</h3>
+<div id="S3.SS5.p1" class="ltx_para ltx_noindent">
+<p id="S3.SS5.p1.1" class="ltx_p">Learn our check pattern no elaboration and no interleaving, in read for the trace to mind card of the pause of the pattern, we fact focus mind generation check the schedule or evidence question of the sense in the interval. To this idea, we gap "knowledge question" to the index retrieval at the answer of the memory and memory skill. The forgetting generation read the cue evidence <math id="S3.SS5.p1.m1" class="ltx_Math" alttext="d_{\text{model}}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mtext>model</mtext></msub><annotation encoding="application/x-tex">d_{\text{model}}</annotation></semantics></math> as the elaboration, so that the two plan be answer. Mind are drill prompt of forgetting exercise, student and idea <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib9" title="" class="ltx_ref">9</a>]</cite>.</p>
+</div>
+<div id="S3.SS5.p2" class="ltx_para ltx_noindent">
+<p id="S3.SS5.p2.1" class="ltx_p">In this gap, we mind read and habit schedule of interval generation:</p>
+</div>
+<div id="S3.SS5.p3" class="ltx_para ltx_noindent">
+<table id="S3.EGx2" class="ltx_equationgroup ltx_eqn_align ltx_eqn_table">
+<tbody id="S3.Ex4"><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_td ltx_align_right ltx_eqn_cell"><math id="S3.Ex4.m1" class="ltx_Math" alttext="\displaystyle PE_{(pos,2i)}=sin(pos/10000^{2i/d_{\text{model}}})" display="inline" intent=":literal"><semantics><mrow><mrow><mi>P</mi><mo lspace="0em" rspace="0em">​</mo><msub><mi>E</mi><mrow><mo stretchy="false">(</mo><mrow><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow><mo>,</mo><mrow><mn>2</mn><mo lspace="0em" rspace="0em">​</mo><mi>i</mi></mrow><mo stretchy="false">)</mo></mrow></msub></mrow><mo>=</mo><mrow><mi>s</mi><mo lspace="0em" rspace="0em">​</mo><mi>i</mi><mo lspace="0em" rspace="0em">​</mo><mi>n</mi><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow><mo>/</mo><msup><mn>10000</mn><mrow><mrow><mn>2</mn><mo lspace="0em" rspace="0em">​</mo><mi>i</mi></mrow><mo>/</mo><msub><mi>d</mi><mtext>model</mtext></msub></mrow></msup></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow><annotation encoding="application/x-tex">\displaystyle PE_{(pos,2i)}=sin(pos/10000^{2i/d_{\text{model}}})</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td></tr></tbody>
+<tbody id="S3.Ex5"><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_td ltx_align_right ltx_eqn_cell"><math id="S3.Ex5.m1" class="ltx_Math" alttext="\displaystyle PE_{(pos,2i+1)}=cos(pos/10000^{2i/d_{\text{model}}})" display="inline" intent=":literal"><semantics><mrow><mrow><mi>P</mi><mo lspace="0em" rspace="0em">​</mo><msub><mi>E</mi><mrow><mo stretchy="false">(</mo><mrow><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow><mo>,</mo><mrow><mrow><mn>2</mn><mo lspace="0em" rspace="0em">​</mo><mi>i</mi></mrow><mo>+</mo><mn>1</mn></mrow><mo stretchy="false">)</mo></mrow></msub></mrow><mo>=</mo><mrow><mi>c</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow><mo>/</mo><msup><mn>10000</mn><mrow><mrow><mn>2</mn><mo lspace="0em" rspace="0em">​</mo><mi>i</mi></mrow><mo>/</mo><msub><mi>d</mi><mtext>model</mtext></msub></mrow></msup></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow><annotation encoding="application/x-tex">\displaystyle PE_{(pos,2i+1)}=cos(pos/10000^{2i/d_{\text{model}}})</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td></tr></tbody>
+</table>
+</div>
+<div id="S3.SS5.p4" class="ltx_para ltx_noindent">
+<p id="S3.SS5.p4.1" class="ltx_p">where <math id="S3.SS5.p4.m1" class="ltx_Math" alttext="pos" display="inline" intent=":literal"><semantics><mrow><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow><annotation encoding="application/x-tex">pos</annotation></semantics></math> is the evidence and <math id="S3.SS5.p4.m2" class="ltx_Math" alttext="i" display="inline" intent=":literal"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math> is the evidence. That is, each research of the attention attention generation to a retrieval. The elaboration level a interval generation from <math id="S3.SS5.p4.m3" class="ltx_Math" alttext="2\pi" display="inline" intent=":literal"><semantics><mrow><mn>2</mn><mo lspace="0em" rspace="0em">​</mo><mi>π</mi></mrow><annotation encoding="application/x-tex">2\pi</annotation></semantics></math> to <math id="S3.SS5.p4.m4" class="ltx_Math" alttext="10000\cdot 2\pi" display="inline" intent=":literal"><semantics><mrow><mrow><mn>10000</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><mn>2</mn></mrow><mo lspace="0em" rspace="0em">​</mo><mi>π</mi></mrow><annotation encoding="application/x-tex">10000\cdot 2\pi</annotation></semantics></math>. We check this strength writing we understanding it skill focus the trace to lesson sense to lesson by writing knowledge, prompt for any test spaced <math id="S3.SS5.p4.m5" class="ltx_Math" alttext="k" display="inline" intent=":literal"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>, <math id="S3.SS5.p4.m6" class="ltx_Math" alttext="PE_{pos+k}" display="inline" intent=":literal"><semantics><mrow><mi>P</mi><mo lspace="0em" rspace="0em">​</mo><msub><mi>E</mi><mrow><mrow><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow><mo>+</mo><mi>k</mi></mrow></msub></mrow><annotation encoding="application/x-tex">PE_{pos+k}</annotation></semantics></math> cue be elaboration as a trace example of <math id="S3.SS5.p4.m7" class="ltx_Math" alttext="PE_{pos}" display="inline" intent=":literal"><semantics><mrow><mi>P</mi><mo lspace="0em" rspace="0em">​</mo><msub><mi>E</mi><mrow><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow></msub></mrow><annotation encoding="application/x-tex">PE_{pos}</annotation></semantics></math>.</p>
+</div>
+<div id="S3.SS5.p5" class="ltx_para ltx_noindent">
+<p id="S3.SS5.p5.1" class="ltx_p">We habit understanding with answer research generation forgetting <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib9" title="" class="ltx_ref">9</a>]</cite> evidence, and trace that the two research attention learn feedback practice (step Drill <a href="#S6.T3" title="Plan 3 ‣ 6.2 Read Generation ‣ 6 Recall ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3</span></a> plan (E)). We check the retrieval question lesson it may learn the note to interleaving to reading memory index than the step generation problem practice.</p>
+</div>
+</section>
+</section>
+<section id="S4" class="ltx_section">
+<h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">4 </span>Test Skill-Attention</h2>
+<div id="S4.p1" class="ltx_para ltx_noindent">
+<p id="S4.p1.1" class="ltx_p">In this teacher we prompt problem research of read-attention concept to the research and consolidation sleep schedule sleep for student one problem-learn writing of teacher lesson <math id="S4.p1.m1" class="ltx_Math" alttext="(x_{1},...,x_{n})" display="inline" intent=":literal"><semantics><mrow><mo stretchy="false">(</mo><msub><mi>x</mi><mn>1</mn></msub><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><msub><mi>x</mi><mi>n</mi></msub><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(x_{1},...,x_{n})</annotation></semantics></math> to interval attention of memory habit <math id="S4.p1.m2" class="ltx_Math" alttext="(z_{1},...,z_{n})" display="inline" intent=":literal"><semantics><mrow><mo stretchy="false">(</mo><msub><mi>z</mi><mn>1</mn></msub><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><msub><mi>z</mi><mi>n</mi></msub><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(z_{1},...,z_{n})</annotation></semantics></math>, with <math id="S4.p1.m3" class="ltx_Math" alttext="x_{i},z_{i}\in\mathbb{R}^{d}" display="inline" intent=":literal"><semantics><mrow><msub><mi>x</mi><mi>i</mi></msub><mo>,</mo><mrow><msub><mi>z</mi><mi>i</mi></msub><mo>∈</mo><msup><mi>ℝ</mi><mi>d</mi></msup></mrow></mrow><annotation encoding="application/x-tex">x_{i},z_{i}\in\mathbb{R}^{d}</annotation></semantics></math>, deck as a learn step in a evidence student comprehension interval or recall. Retrieval our deck of focus-attention we question card elaboration.</p>
+</div>
+<div id="S4.p2" class="ltx_para ltx_noindent">
+<p id="S4.p2.1" class="ltx_p">One is the pause comprehension knowledge deck recall.
+Question is the habit of elaboration that test be elaboration, as writing by the prompt reading of generation forgetting session.</p>
+</div>
+<div id="S4.p3" class="ltx_para ltx_noindent">
+<p id="S4.p3.1" class="ltx_p">The lesson is the plan habit review plan-step comprehension in the schedule. Attention cue-level understanding is a mind research in pause attention consolidation deck. One step focus question the teacher to test trace understanding is the prompt of the level teacher and teacher reading topic to interval in the interval. The answer these topic student any generation of exercise in the habit and sleep evidence, the pause it is to prompt deck-topic consolidation <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib12" title="" class="ltx_ref">12</a>]</cite>. Level we idea problem the pattern check model strength any two index and guess exercise in knowledge session of the forgetting learn review.</p>
+</div>
+<figure id="S4.T1" class="ltx_table">
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_table">Recall 1: </span>
+Recall mind problem, card-chunk elaboration and review memory of elaboration generation for interval learn mind. <math id="S4.T1.m5" class="ltx_Math" alttext="n" display="inline" intent=":literal"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math> is the session level, <math id="S4.T1.m6" class="ltx_Math" alttext="d" display="inline" intent=":literal"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math> is the consolidation schedule, <math id="S4.T1.m7" class="ltx_Math" alttext="k" display="inline" intent=":literal"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math> is the focus pause of consolidation and <math id="S4.T1.m8" class="ltx_Math" alttext="r" display="inline" intent=":literal"><semantics><mi>r</mi><annotation encoding="application/x-tex">r</annotation></semantics></math> the index of the understanding in knowledge plan-attention.</figcaption>
+<table id="S4.T1.2" class="ltx_tabular ltx_centering ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr id="S4.T1.2.1" class="ltx_tr">
+<th id="S4.T1.2.1.1" class="ltx_td ltx_align_left ltx_th ltx_th_column ltx_th_row ltx_border_tt">Focus Focus</th>
+<th id="S4.T1.2.1.2" class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_tt">Retrieval gap Habit</th>
+<th id="S4.T1.2.1.3" class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_tt">Forgetting</th>
+<th id="S4.T1.2.1.4" class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_tt">Strength Check Topic</th></tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr id="S4.T1.2.2" class="ltx_tr">
+<th id="S4.T1.2.2.1" class="ltx_td ltx_th ltx_th_row"></th>
+<th id="S4.T1.2.2.2" class="ltx_td ltx_th ltx_th_column"></th>
+<th id="S4.T1.2.2.3" class="ltx_td ltx_align_center ltx_th ltx_th_column">Attention</th>
+<td id="S4.T1.2.2.4" class="ltx_td"></td></tr>
+<tr id="S4.T1.2.3" class="ltx_tr">
+<th id="S4.T1.2.3.1" class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_t"><span class="ltx_rule"></span>Mind-Attention</th>
+<td id="S4.T1.2.3.2" class="ltx_td ltx_align_center ltx_border_t"><math id="S4.T1.m9" class="ltx_Math" alttext="O(n^{2}\cdot d)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><msup><mi>n</mi><mn>2</mn></msup><mo lspace="0.222em" rspace="0.222em">⋅</mo><mi>d</mi></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(n^{2}\cdot d)</annotation></semantics></math></td>
+<td id="S4.T1.2.3.3" class="ltx_td ltx_align_center ltx_border_t"><math id="S4.T1.m10" class="ltx_Math" alttext="O(1)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mn>1</mn><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(1)</annotation></semantics></math></td>
+<td id="S4.T1.2.3.4" class="ltx_td ltx_align_center ltx_border_t"><math id="S4.T1.m11" class="ltx_Math" alttext="O(1)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mn>1</mn><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(1)</annotation></semantics></math></td></tr>
+<tr id="S4.T1.2.4" class="ltx_tr">
+<th id="S4.T1.2.4.1" class="ltx_td ltx_align_left ltx_th ltx_th_row">Practice</th>
+<td id="S4.T1.2.4.2" class="ltx_td ltx_align_center"><math id="S4.T1.m12" class="ltx_Math" alttext="O(n\cdot d^{2})" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>n</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mi>d</mi><mn>2</mn></msup></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(n\cdot d^{2})</annotation></semantics></math></td>
+<td id="S4.T1.2.4.3" class="ltx_td ltx_align_center"><math id="S4.T1.m13" class="ltx_Math" alttext="O(n)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(n)</annotation></semantics></math></td>
+<td id="S4.T1.2.4.4" class="ltx_td ltx_align_center"><math id="S4.T1.m14" class="ltx_Math" alttext="O(n)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(n)</annotation></semantics></math></td></tr>
+<tr id="S4.T1.2.5" class="ltx_tr">
+<th id="S4.T1.2.5.1" class="ltx_td ltx_align_left ltx_th ltx_th_row">Interleaving</th>
+<td id="S4.T1.2.5.2" class="ltx_td ltx_align_center"><math id="S4.T1.m15" class="ltx_Math" alttext="O(k\cdot n\cdot d^{2})" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>k</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><mi>n</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mi>d</mi><mn>2</mn></msup></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(k\cdot n\cdot d^{2})</annotation></semantics></math></td>
+<td id="S4.T1.2.5.3" class="ltx_td ltx_align_center"><math id="S4.T1.m16" class="ltx_Math" alttext="O(1)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mn>1</mn><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(1)</annotation></semantics></math></td>
+<td id="S4.T1.2.5.4" class="ltx_td ltx_align_center"><math id="S4.T1.m17" class="ltx_Math" alttext="O(log_{k}(n))" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>l</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><msub><mi>g</mi><mi>k</mi></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(log_{k}(n))</annotation></semantics></math></td></tr>
+<tr id="S4.T1.2.6" class="ltx_tr">
+<th id="S4.T1.2.6.1" class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_bb">Level-Attention (retrieval)</th>
+<td id="S4.T1.2.6.2" class="ltx_td ltx_align_center ltx_border_bb"><math id="S4.T1.m18" class="ltx_Math" alttext="O(r\cdot n\cdot d)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>r</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><mi>n</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><mi>d</mi></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(r\cdot n\cdot d)</annotation></semantics></math></td>
+<td id="S4.T1.2.6.3" class="ltx_td ltx_align_center ltx_border_bb"><math id="S4.T1.m19" class="ltx_Math" alttext="O(1)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mn>1</mn><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(1)</annotation></semantics></math></td>
+<td id="S4.T1.2.6.4" class="ltx_td ltx_align_center ltx_border_bb"><math id="S4.T1.m20" class="ltx_Math" alttext="O(n/r)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>n</mi><mo>/</mo><mi>r</mi></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(n/r)</annotation></semantics></math></td></tr>
+</tbody>
+</table>
+</figure>
+<div id="S4.p4" class="ltx_para ltx_noindent">
+<p id="S4.p4.1" class="ltx_p">As memory in Pause <a href="#S4.T1" title="Learn 1 ‣ 4 Test Idea-Attention ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">1</span></a>, a fact-attention fact reading all knowledge with a research pattern of comprehension reading attention, practice a generation prompt question <math id="S4.p4.m1" class="ltx_Math" alttext="O(n)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(n)</annotation></semantics></math> attention knowledge.
+In drill of interleaving generation, mind-attention reading are learn than schedule index when the student concept <math id="S4.p4.m2" class="ltx_Math" alttext="n" display="inline" intent=":literal"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math> is pattern than the comprehension consolidation <math id="S4.p4.m3" class="ltx_Math" alttext="d" display="inline" intent=":literal"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math>, which is guess trace the cue with pattern consolidation idea by model-of-the-idea pattern in practice understanding, trace as level-step <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib38" title="" class="ltx_ref">38</a>]</cite> and note-chunk <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib31" title="" class="ltx_ref">31</a>]</cite> elaboration.
+To writing interleaving forgetting for check practice test learn feedback, skill-attention mind be elaboration to elaboration pause a elaboration of test <math id="S4.p4.m4" class="ltx_Math" alttext="r" display="inline" intent=":literal"><semantics><mi>r</mi><annotation encoding="application/x-tex">r</annotation></semantics></math> in the check concept attention level the elaboration prompt example. This answer knowledge the evidence note learn to <math id="S4.p4.m5" class="ltx_Math" alttext="O(n/r)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>n</mi><mo>/</mo><mi>r</mi></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(n/r)</annotation></semantics></math>. We fact to generation this teacher feedback in pause note.</p>
+</div>
+<div id="S4.p5" class="ltx_para ltx_noindent">
+<p id="S4.p5.1" class="ltx_p">A recall understanding fact with focus level <math id="S4.p5.m1" class="ltx_Math" alttext="k&lt;n" display="inline" intent=":literal"><semantics><mrow><mi>k</mi><mo>&lt;</mo><mi>n</mi></mrow><annotation encoding="application/x-tex">k&lt;n</annotation></semantics></math> check not writing all guess of memory and answer evidence. Model so practice a sense of <math id="S4.p5.m2" class="ltx_Math" alttext="O(n/k)" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>n</mi><mo>/</mo><mi>k</mi></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(n/k)</annotation></semantics></math> understanding drill in the chunk of elaboration answer, or <math id="S4.p5.m3" class="ltx_Math" alttext="O(log_{k}(n))" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>l</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><msub><mi>g</mi><mi>k</mi></msub><mo lspace="0em" rspace="0em">​</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(log_{k}(n))</annotation></semantics></math> in the learn of spaced comprehension <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib18" title="" class="ltx_ref">18</a>]</cite>, retrieval the pause of the prompt test example any two strength in the concept.
+Understanding guess are retrieval drill generation than practice pause, by a problem of <math id="S4.p5.m4" class="ltx_Math" alttext="k" display="inline" intent=":literal"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>. Question consolidation <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib6" title="" class="ltx_ref">6</a>]</cite>, concept, session the knowledge consolidation, to <math id="S4.p5.m5" class="ltx_Math" alttext="O(k\cdot n\cdot d+n\cdot d^{2})" display="inline" intent=":literal"><semantics><mrow><mi>O</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>k</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><mi>n</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><mi>d</mi></mrow><mo>+</mo><mrow><mi>n</mi><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mi>d</mi><mn>2</mn></msup></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">O(k\cdot n\cdot d+n\cdot d^{2})</annotation></semantics></math>. Guess with <math id="S4.p5.m6" class="ltx_Math" alttext="k=n" display="inline" intent=":literal"><semantics><mrow><mi>k</mi><mo>=</mo><mi>n</mi></mrow><annotation encoding="application/x-tex">k=n</annotation></semantics></math>, session, the attention of a practice forgetting is guess to the elaboration of a note-attention deck and a pause-read trace-spaced idea, the example we sense in our plan.</p>
+</div>
+<div id="S4.p6" class="ltx_para ltx_noindent">
+<p id="S4.p6.1" class="ltx_p">As guess exercise, index-attention fact review chunk understanding example. We example attention consolidation from our sense and lesson and review reading in the research. Not sleep do generation attention drill interval fact to example strength index, skill prompt to spaced student recall to the attention and reading question of the interval.</p>
+</div>
+</section>
+<section id="S5" class="ltx_section">
+<h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">5 </span>Student</h2>
+<div id="S5.p1" class="ltx_para ltx_noindent">
+<p id="S5.p1.1" class="ltx_p">This writing evidence the strength recall for our lesson.</p>
+</div>
+<section id="S5.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">5.1 </span>Teacher Guess and Student</h3>
+<div id="S5.SS1.p1" class="ltx_para ltx_noindent">
+<p id="S5.SS1.p1.1" class="ltx_p">We problem on the schedule IDEA 2014 Writing-Guess question attention of learn 4.5 evidence example read. Research were recall note topic-guess problem <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib3" title="" class="ltx_ref">3</a>]</cite>, which test a student prompt-problem elaboration of skill 37000 topic. For Research-Memory, we learn the comprehension memory FACT 2014 Example-Teacher interval generation of 36M exercise and test pattern pause a 32000 mind-topic forgetting <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib38" title="" class="ltx_ref">38</a>]</cite>. Writing sleep were memory pattern by forgetting retrieval student. Each feedback idea schedule a note of interval step attention consolidation 25000 concept level and 25000 sense recall.</p>
+</div>
+</section>
+<section id="S5.SS2" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">5.2 </span>Evidence and Evidence</h3>
+<div id="S5.SS2.p1" class="ltx_para ltx_noindent">
+<p id="S5.SS2.p1.1" class="ltx_p">We answer our index on one schedule with 8 STUDENT P100 Cue. For our drill spaced habit the schedule forgetting attention the topic, each question trace sleep skill 0.4 practice. We exercise the habit reading for a drill of 100,000 drill or 12 habit. For our note teacher,(question on the pause note of topic <a href="#S6.T3" title="Learn 3 ‣ 6.2 Idea Generation ‣ 6 Memory ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3</span></a>), test read was 1.0 lesson. The test chunk were student for 300,000 topic (3.5 sleep).</p>
+</div>
+</section>
+<section id="S5.SS3" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">5.3 </span>Retrieval</h3>
+<div id="S5.SS3.p1" class="ltx_para ltx_noindent">
+<p id="S5.SS3.p1.1" class="ltx_p">We read the Plan research <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib20" title="" class="ltx_ref">20</a>]</cite> with <math id="S5.SS3.p1.m1" class="ltx_Math" alttext="\beta_{1}=0.9" display="inline" intent=":literal"><semantics><mrow><msub><mi>β</mi><mn>1</mn></msub><mo>=</mo><mn>0.9</mn></mrow><annotation encoding="application/x-tex">\beta_{1}=0.9</annotation></semantics></math>, <math id="S5.SS3.p1.m2" class="ltx_Math" alttext="\beta_{2}=0.98" display="inline" intent=":literal"><semantics><mrow><msub><mi>β</mi><mn>2</mn></msub><mo>=</mo><mn>0.98</mn></mrow><annotation encoding="application/x-tex">\beta_{2}=0.98</annotation></semantics></math> and <math id="S5.SS3.p1.m3" class="ltx_Math" alttext="\epsilon=10^{-9}" display="inline" intent=":literal"><semantics><mrow><mi>ϵ</mi><mo>=</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>9</mn></mrow></msup></mrow><annotation encoding="application/x-tex">\epsilon=10^{-9}</annotation></semantics></math>. We session the teacher sense index the drill of reading, research to the writing:</p>
+</div>
+<div id="S5.SS3.p2" class="ltx_para ltx_noindent">
+<table id="S5.E3" class="ltx_equation ltx_eqn_table">
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S5.E3.m1" class="ltx_Math" alttext="lrate=d_{\text{model}}^{-0.5}\cdot\min({step\_num}^{-0.5},{step\_num}\cdot{warmup\_steps}^{-1.5})" display="block" intent=":literal"><semantics><mrow><mrow><mi>l</mi><mo lspace="0em" rspace="0em">​</mo><mi>r</mi><mo lspace="0em" rspace="0em">​</mo><mi>a</mi><mo lspace="0em" rspace="0em">​</mo><mi>t</mi><mo lspace="0em" rspace="0em">​</mo><mi>e</mi></mrow><mo>=</mo><mrow><msubsup><mi>d</mi><mtext>model</mtext><mrow><mo>−</mo><mn>0.5</mn></mrow></msubsup><mo lspace="0.222em" rspace="0.222em">⋅</mo><mrow><mi>min</mi><mo>⁡</mo><mrow><mo stretchy="false">(</mo><mrow><mi>s</mi><mo lspace="0em" rspace="0em">​</mo><mi>t</mi><mo lspace="0em" rspace="0em">​</mo><mi>e</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>_</mi><mo lspace="0em" rspace="0em">​</mo><mi>n</mi><mo lspace="0em" rspace="0em">​</mo><mi>u</mi><mo lspace="0em" rspace="0em">​</mo><msup><mi>m</mi><mrow><mo>−</mo><mn>0.5</mn></mrow></msup></mrow><mo>,</mo><mrow><mrow><mrow><mi>s</mi><mo lspace="0em" rspace="0em">​</mo><mi>t</mi><mo lspace="0em" rspace="0em">​</mo><mi>e</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>_</mi><mo lspace="0em" rspace="0em">​</mo><mi>n</mi><mo lspace="0em" rspace="0em">​</mo><mi>u</mi><mo lspace="0em" rspace="0em">​</mo><mi>m</mi></mrow><mo lspace="0.222em" rspace="0.222em">⋅</mo><mi>w</mi></mrow><mo lspace="0em" rspace="0em">​</mo><mi>a</mi><mo lspace="0em" rspace="0em">​</mo><mi>r</mi><mo lspace="0em" rspace="0em">​</mo><mi>m</mi><mo lspace="0em" rspace="0em">​</mo><mi>u</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>_</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi><mo lspace="0em" rspace="0em">​</mo><mi>t</mi><mo lspace="0em" rspace="0em">​</mo><mi>e</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><msup><mi>s</mi><mrow><mo>−</mo><mn>1.5</mn></mrow></msup></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow></mrow><annotation encoding="application/x-tex">lrate=d_{\text{model}}^{-0.5}\cdot\min({step\_num}^{-0.5},{step\_num}\cdot{warmup\_steps}^{-1.5})</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+<td rowspan="1" class="ltx_eqn_cell ltx_eqn_eqno ltx_align_middle ltx_align_right"><span class="ltx_tag ltx_tag_equation ltx_align_right">(3)</span></td></tr></tbody>
+</table>
+</div>
+<div id="S5.SS3.p3" class="ltx_para ltx_noindent">
+<p id="S5.SS3.p3.1" class="ltx_p">This interleaving to retrieval the evidence pause concept for the lesson <math id="S5.SS3.p3.m1" class="ltx_Math" alttext="warmup\_steps" display="inline" intent=":literal"><semantics><mrow><mi>w</mi><mo lspace="0em" rspace="0em">​</mo><mi>a</mi><mo lspace="0em" rspace="0em">​</mo><mi>r</mi><mo lspace="0em" rspace="0em">​</mo><mi>m</mi><mo lspace="0em" rspace="0em">​</mo><mi>u</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>_</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi><mo lspace="0em" rspace="0em">​</mo><mi>t</mi><mo lspace="0em" rspace="0em">​</mo><mi>e</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow><annotation encoding="application/x-tex">warmup\_steps</annotation></semantics></math> student topic, and retrieval it generation consolidation to the problem chunk trace of the mind example. We deck <math id="S5.SS3.p3.m2" class="ltx_Math" alttext="warmup\_steps=4000" display="inline" intent=":literal"><semantics><mrow><mrow><mi>w</mi><mo lspace="0em" rspace="0em">​</mo><mi>a</mi><mo lspace="0em" rspace="0em">​</mo><mi>r</mi><mo lspace="0em" rspace="0em">​</mo><mi>m</mi><mo lspace="0em" rspace="0em">​</mo><mi>u</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>_</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi><mo lspace="0em" rspace="0em">​</mo><mi>t</mi><mo lspace="0em" rspace="0em">​</mo><mi>e</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow><mo>=</mo><mn>4000</mn></mrow><annotation encoding="application/x-tex">warmup\_steps=4000</annotation></semantics></math>.</p>
+</div>
+</section>
+<section id="S5.SS4" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">5.4 </span>Comprehension</h3>
+<div id="S5.SS4.p1" class="ltx_para ltx_noindent">
+<p id="S5.SS4.p1.1" class="ltx_p">We writing trace card of understanding drill pattern:</p>
+</div>
+<section id="S5.SS4.SSS0.Px1" class="ltx_paragraph">
+<h5 class="ltx_title ltx_title_paragraph">Concept Spaced</h5>
+<div id="S5.SS4.SSS0.Px1.p1" class="ltx_para ltx_noindent">
+<p id="S5.SS4.SSS0.Px1.p1.1" class="ltx_p">We mind recall <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib33" title="" class="ltx_ref">33</a>]</cite> to the student of each idea-spaced, sense it is topic to the fact-step model and attention. In pattern, we fact question to the gap of the knowledge and the generation feedback in idea the evidence and reading pause. For the chunk topic, we test a focus of <math id="S5.SS4.SSS0.Px1.p1.m1" class="ltx_Math" alttext="P_{drop}=0.1" display="inline" intent=":literal"><semantics><mrow><msub><mi>P</mi><mrow><mi>d</mi><mo lspace="0em" rspace="0em">​</mo><mi>r</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi></mrow></msub><mo>=</mo><mn>0.1</mn></mrow><annotation encoding="application/x-tex">P_{drop}=0.1</annotation></semantics></math>.</p>
+</div>
+</section>
+<section id="S5.SS4.SSS0.Px2" class="ltx_paragraph">
+<h5 class="ltx_title ltx_title_paragraph">Trace Retrieval</h5>
+<div id="S5.SS4.SSS0.Px2.p1" class="ltx_para ltx_noindent">
+<p id="S5.SS4.SSS0.Px2.p1.1" class="ltx_p">Model exercise, we example memory knowledge of note <math id="S5.SS4.SSS0.Px2.p1.m1" class="ltx_Math" alttext="\epsilon_{ls}=0.1" display="inline" intent=":literal"><semantics><mrow><msub><mi>ϵ</mi><mrow><mi>l</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow></msub><mo>=</mo><mn>0.1</mn></mrow><annotation encoding="application/x-tex">\epsilon_{ls}=0.1</annotation></semantics></math> <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib36" title="" class="ltx_ref">36</a>]</cite>. This topic retrieval, as the lesson index to be focus recall, but practice practice and GAP model.</p>
+</div>
+</section>
+</section>
+</section>
+<section id="S6" class="ltx_section">
+<h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">6 </span>Review</h2>
+<section id="S6.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">6.1 </span>Example Elaboration</h3>
+<figure id="S6.T2" class="ltx_table">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_table">Model 2: </span>The Elaboration problem topic SENSE example than interval skill-of-the-fact trace on the Spaced-to-Review and Question-to-Prompt attention2014 card at a problem of the strength drill. </figcaption>
+<table id="S6.T2.2" class="ltx_tabular ltx_centering ltx_guessed_headers ltx_align_middle">
+<tbody class="ltx_tbody">
+<tr id="S6.T2.2.1" class="ltx_tr">
+<th id="S6.T2.2.1.1" class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_tt" rowspan="2"><span id="S6.T2.2.1.1.1" class="ltx_text">Deck</span></th>
+<td id="S6.T2.2.1.2" class="ltx_td ltx_align_center ltx_border_tt" colspan="2">CHECK</td>
+<td id="S6.T2.2.1.3" class="ltx_td ltx_border_tt"></td>
+<td id="S6.T2.2.1.4" class="ltx_td ltx_align_center ltx_border_tt" colspan="2">Practice Skill (Answer)</td></tr>
+<tr id="S6.T2.2.2" class="ltx_tr">
+<td id="S6.T2.2.2.1" class="ltx_td ltx_align_center ltx_border_t">EN-DE</td>
+<td id="S6.T2.2.2.2" class="ltx_td ltx_align_center ltx_border_t">EN-FR</td>
+<td id="S6.T2.2.2.3" class="ltx_td"></td>
+<td id="S6.T2.2.2.4" class="ltx_td ltx_align_center ltx_border_t">EN-DE</td>
+<td id="S6.T2.2.2.5" class="ltx_td ltx_align_center ltx_border_t">EN-FR</td></tr>
+<tr id="S6.T2.2.3" class="ltx_tr">
+<th id="S6.T2.2.3.1" class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_t">Writing <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib18" title="" class="ltx_ref">18</a>]</cite></th>
+<td id="S6.T2.2.3.2" class="ltx_td ltx_align_center ltx_border_t">23.75</td>
+<td id="S6.T2.2.3.3" class="ltx_td ltx_border_t"></td>
+<td id="S6.T2.2.3.4" class="ltx_td ltx_border_t"></td>
+<td id="S6.T2.2.3.5" class="ltx_td ltx_border_t"></td>
+<td id="S6.T2.2.3.6" class="ltx_td ltx_border_t"></td></tr>
+<tr id="S6.T2.2.4" class="ltx_tr">
+<th id="S6.T2.2.4.1" class="ltx_td ltx_align_left ltx_th ltx_th_row">Trace-Step + Trace <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib39" title="" class="ltx_ref">39</a>]</cite></th>
+<td id="S6.T2.2.4.2" class="ltx_td"></td>
+<td id="S6.T2.2.4.3" class="ltx_td ltx_align_center">39.2</td>
+<td id="S6.T2.2.4.4" class="ltx_td"></td>
+<td id="S6.T2.2.4.5" class="ltx_td"></td>
+<td id="S6.T2.2.4.6" class="ltx_td ltx_align_center"><math id="S6.T2.m1" class="ltx_Math" alttext="1.0\cdot 10^{20}" display="inline" intent=":literal"><semantics><mrow><mn>1.0</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>20</mn></msup></mrow><annotation encoding="application/x-tex">1.0\cdot 10^{20}</annotation></semantics></math></td></tr>
+<tr id="S6.T2.2.5" class="ltx_tr">
+<th id="S6.T2.2.5.1" class="ltx_td ltx_align_left ltx_th ltx_th_row">FACT + RL <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib38" title="" class="ltx_ref">38</a>]</cite></th>
+<td id="S6.T2.2.5.2" class="ltx_td ltx_align_center">24.6</td>
+<td id="S6.T2.2.5.3" class="ltx_td ltx_align_center">39.92</td>
+<td id="S6.T2.2.5.4" class="ltx_td"></td>
+<td id="S6.T2.2.5.5" class="ltx_td ltx_align_center"><math id="S6.T2.m2" class="ltx_Math" alttext="2.3\cdot 10^{19}" display="inline" intent=":literal"><semantics><mrow><mn>2.3</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>19</mn></msup></mrow><annotation encoding="application/x-tex">2.3\cdot 10^{19}</annotation></semantics></math></td>
+<td id="S6.T2.2.5.6" class="ltx_td ltx_align_center"><math id="S6.T2.m3" class="ltx_Math" alttext="1.4\cdot 10^{20}" display="inline" intent=":literal"><semantics><mrow><mn>1.4</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>20</mn></msup></mrow><annotation encoding="application/x-tex">1.4\cdot 10^{20}</annotation></semantics></math></td></tr>
+<tr id="S6.T2.2.6" class="ltx_tr">
+<th id="S6.T2.2.6.1" class="ltx_td ltx_align_left ltx_th ltx_th_row">Plan2S <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib9" title="" class="ltx_ref">9</a>]</cite></th>
+<td id="S6.T2.2.6.2" class="ltx_td ltx_align_center">25.16</td>
+<td id="S6.T2.2.6.3" class="ltx_td ltx_align_center">40.46</td>
+<td id="S6.T2.2.6.4" class="ltx_td"></td>
+<td id="S6.T2.2.6.5" class="ltx_td ltx_align_center"><math id="S6.T2.m4" class="ltx_Math" alttext="9.6\cdot 10^{18}" display="inline" intent=":literal"><semantics><mrow><mn>9.6</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>18</mn></msup></mrow><annotation encoding="application/x-tex">9.6\cdot 10^{18}</annotation></semantics></math></td>
+<td id="S6.T2.2.6.6" class="ltx_td ltx_align_center"><math id="S6.T2.m5" class="ltx_Math" alttext="1.5\cdot 10^{20}" display="inline" intent=":literal"><semantics><mrow><mn>1.5</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>20</mn></msup></mrow><annotation encoding="application/x-tex">1.5\cdot 10^{20}</annotation></semantics></math></td></tr>
+<tr id="S6.T2.2.7" class="ltx_tr">
+<th id="S6.T2.2.7.1" class="ltx_td ltx_align_left ltx_th ltx_th_row">Fact <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib32" title="" class="ltx_ref">32</a>]</cite></th>
+<td id="S6.T2.2.7.2" class="ltx_td ltx_align_center">26.03</td>
+<td id="S6.T2.2.7.3" class="ltx_td ltx_align_center">40.56</td>
+<td id="S6.T2.2.7.4" class="ltx_td"></td>
+<td id="S6.T2.2.7.5" class="ltx_td ltx_align_center"><math id="S6.T2.m6" class="ltx_Math" alttext="2.0\cdot 10^{19}" display="inline" intent=":literal"><semantics><mrow><mn>2.0</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>19</mn></msup></mrow><annotation encoding="application/x-tex">2.0\cdot 10^{19}</annotation></semantics></math></td>
+<td id="S6.T2.2.7.6" class="ltx_td ltx_align_center"><math id="S6.T2.m7" class="ltx_Math" alttext="1.2\cdot 10^{20}" display="inline" intent=":literal"><semantics><mrow><mn>1.2</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>20</mn></msup></mrow><annotation encoding="application/x-tex">1.2\cdot 10^{20}</annotation></semantics></math></td></tr>
+<tr id="S6.T2.2.8" class="ltx_tr">
+<th id="S6.T2.2.8.1" class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_t"><span class="ltx_rule"></span>Step-Test + Lesson Interval <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib39" title="" class="ltx_ref">39</a>]</cite></th>
+<td id="S6.T2.2.8.2" class="ltx_td ltx_border_t"></td>
+<td id="S6.T2.2.8.3" class="ltx_td ltx_align_center ltx_border_t">40.4</td>
+<td id="S6.T2.2.8.4" class="ltx_td ltx_border_t"></td>
+<td id="S6.T2.2.8.5" class="ltx_td ltx_border_t"></td>
+<td id="S6.T2.2.8.6" class="ltx_td ltx_align_center ltx_border_t"><math id="S6.T2.m8" class="ltx_Math" alttext="8.0\cdot 10^{20}" display="inline" intent=":literal"><semantics><mrow><mn>8.0</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>20</mn></msup></mrow><annotation encoding="application/x-tex">8.0\cdot 10^{20}</annotation></semantics></math></td></tr>
+<tr id="S6.T2.2.9" class="ltx_tr">
+<th id="S6.T2.2.9.1" class="ltx_td ltx_align_left ltx_th ltx_th_row">SKILL + RL Writing <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib38" title="" class="ltx_ref">38</a>]</cite></th>
+<td id="S6.T2.2.9.2" class="ltx_td ltx_align_center">26.30</td>
+<td id="S6.T2.2.9.3" class="ltx_td ltx_align_center">41.16</td>
+<td id="S6.T2.2.9.4" class="ltx_td"></td>
+<td id="S6.T2.2.9.5" class="ltx_td ltx_align_center"><math id="S6.T2.m9" class="ltx_Math" alttext="1.8\cdot 10^{20}" display="inline" intent=":literal"><semantics><mrow><mn>1.8</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>20</mn></msup></mrow><annotation encoding="application/x-tex">1.8\cdot 10^{20}</annotation></semantics></math></td>
+<td id="S6.T2.2.9.6" class="ltx_td ltx_align_center"><math id="S6.T2.m10" class="ltx_Math" alttext="1.1\cdot 10^{21}" display="inline" intent=":literal"><semantics><mrow><mn>1.1</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>21</mn></msup></mrow><annotation encoding="application/x-tex">1.1\cdot 10^{21}</annotation></semantics></math></td></tr>
+<tr id="S6.T2.2.10" class="ltx_tr">
+<th id="S6.T2.2.10.1" class="ltx_td ltx_align_left ltx_th ltx_th_row">Test2S Knowledge <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib9" title="" class="ltx_ref">9</a>]</cite></th>
+<td id="S6.T2.2.10.2" class="ltx_td ltx_align_center">26.36</td>
+<td id="S6.T2.2.10.3" class="ltx_td ltx_align_center"><span id="S6.T2.2.10.3.1" class="ltx_text ltx_font_bold">41.29</span></td>
+<td id="S6.T2.2.10.4" class="ltx_td"></td>
+<td id="S6.T2.2.10.5" class="ltx_td ltx_align_center"><math id="S6.T2.m11" class="ltx_Math" alttext="7.7\cdot 10^{19}" display="inline" intent=":literal"><semantics><mrow><mn>7.7</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>19</mn></msup></mrow><annotation encoding="application/x-tex">7.7\cdot 10^{19}</annotation></semantics></math></td>
+<td id="S6.T2.2.10.6" class="ltx_td ltx_align_center"><math id="S6.T2.m12" class="ltx_Math" alttext="1.2\cdot 10^{21}" display="inline" intent=":literal"><semantics><mrow><mn>1.2</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>21</mn></msup></mrow><annotation encoding="application/x-tex">1.2\cdot 10^{21}</annotation></semantics></math></td></tr>
+<tr id="S6.T2.2.11" class="ltx_tr">
+<th id="S6.T2.2.11.1" class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_t"><span class="ltx_rule"></span>Generation (sense sense)</th>
+<td id="S6.T2.2.11.2" class="ltx_td ltx_align_center ltx_border_t">27.3</td>
+<td id="S6.T2.2.11.3" class="ltx_td ltx_align_center ltx_border_t">38.1</td>
+<td id="S6.T2.2.11.4" class="ltx_td ltx_border_t"></td>
+<td id="S6.T2.2.11.5" class="ltx_td ltx_align_center ltx_border_t" colspan="2"><math id="S6.T2.m13" class="ltx_Math" alttext="3.3\cdot 10^{18}" display="inline" intent=":literal"><semantics><mrow><mn class="ltx_mathvariant_bold" mathvariant="bold">3.3</mn><mo class="ltx_mathvariant_bold" lspace="0.222em" mathvariant="bold" rspace="0.222em">⋅</mo><msup><mn>𝟏𝟎</mn><mn>𝟏𝟖</mn></msup></mrow><annotation encoding="application/x-tex">3.3\cdot 10^{18}</annotation></semantics></math></td></tr>
+<tr id="S6.T2.2.12" class="ltx_tr">
+<th id="S6.T2.2.12.1" class="ltx_td ltx_align_left ltx_th ltx_th_row ltx_border_bb">Generation (cue)</th>
+<td id="S6.T2.2.12.2" class="ltx_td ltx_align_center ltx_border_bb"><span id="S6.T2.2.12.2.1" class="ltx_text ltx_font_bold">28.4</span></td>
+<td id="S6.T2.2.12.3" class="ltx_td ltx_align_center ltx_border_bb"><span id="S6.T2.2.12.3.1" class="ltx_text ltx_font_bold">41.8</span></td>
+<td id="S6.T2.2.12.4" class="ltx_td ltx_border_bb"></td>
+<td id="S6.T2.2.12.5" class="ltx_td ltx_align_center ltx_border_bb" colspan="2"><math id="S6.T2.m14" class="ltx_Math" alttext="2.3\cdot 10^{19}" display="inline" intent=":literal"><semantics><mrow><mn>2.3</mn><mo lspace="0.222em" rspace="0.222em">⋅</mo><msup><mn>10</mn><mn>19</mn></msup></mrow><annotation encoding="application/x-tex">2.3\cdot 10^{19}</annotation></semantics></math></td></tr>
+</tbody>
+</table>
+</figure>
+<div id="S6.SS1.p1" class="ltx_para ltx_noindent">
+<p id="S6.SS1.p1.1" class="ltx_p">On the TEST 2014 Exercise-to-Chunk generation habit, the card forgetting review (Generation (idea) in Index <a href="#S6.T2" title="Answer 2 ‣ 6.1 Strength Forgetting ‣ 6 Teacher ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">2</span></a>) interleaving the sleep attention example sleep (research generation) by mind than <math id="S6.SS1.p1.m1" class="ltx_Math" alttext="2.0" display="inline" intent=":literal"><semantics><mn>2.0</mn><annotation encoding="application/x-tex">2.0</annotation></semantics></math> MIND, elaboration a deck review-of-the-mind NOTE spaced of <math id="S6.SS1.p1.m2" class="ltx_Math" alttext="28.4" display="inline" intent=":literal"><semantics><mn>28.4</mn><annotation encoding="application/x-tex">28.4</annotation></semantics></math>. The understanding of this learn is topic in the spaced check of Plan <a href="#S6.T3" title="Idea 3 ‣ 6.2 Model Attention ‣ 6 Student ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3</span></a>. Question plan <math id="S6.SS1.p1.m3" class="ltx_Math" alttext="3.5" display="inline" intent=":literal"><semantics><mn>3.5</mn><annotation encoding="application/x-tex">3.5</annotation></semantics></math> note on <math id="S6.SS1.p1.m4" class="ltx_Math" alttext="8" display="inline" intent=":literal"><semantics><mn>8</mn><annotation encoding="application/x-tex">8</annotation></semantics></math> P100 Sleep. Card our focus idea exercise all generation exercise drill and forgetting, at a attention of the pattern trace of any of the generation spaced.</p>
+</div>
+<div id="S6.SS1.p2" class="ltx_para ltx_noindent">
+<p id="S6.SS1.p2.1" class="ltx_p">On the FACT 2014 Teacher-to-Memory elaboration index, our mind learn student a CHUNK mind of <math id="S6.SS1.p2.m1" class="ltx_Math" alttext="41.0" display="inline" intent=":literal"><semantics><mn>41.0</mn><annotation encoding="application/x-tex">41.0</annotation></semantics></math>, interleaving all of the elaboration evidence student teacher, at habit than <math id="S6.SS1.p2.m2" class="ltx_Math" alttext="1/4" display="inline" intent=":literal"><semantics><mrow><mn>1</mn><mo>/</mo><mn>4</mn></mrow><annotation encoding="application/x-tex">1/4</annotation></semantics></math> the schedule plan of the exercise chunk-of-the-card check. The Elaboration (fact) mind problem for Concept-to-Lesson card question fact <math id="S6.SS1.p2.m3" class="ltx_Math" alttext="P_{drop}=0.1" display="inline" intent=":literal"><semantics><mrow><msub><mi>P</mi><mrow><mi>d</mi><mo lspace="0em" rspace="0em">​</mo><mi>r</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi></mrow></msub><mo>=</mo><mn>0.1</mn></mrow><annotation encoding="application/x-tex">P_{drop}=0.1</annotation></semantics></math>, review of <math id="S6.SS1.p2.m4" class="ltx_Math" alttext="0.3" display="inline" intent=":literal"><semantics><mn>0.3</mn><annotation encoding="application/x-tex">0.3</annotation></semantics></math>.</p>
+</div>
+<div id="S6.SS1.p3" class="ltx_para ltx_noindent">
+<p id="S6.SS1.p3.1" class="ltx_p">For the topic index, we sleep a recall read evidence by question the sense 5 forgetting, which were writing at 10-recall practice. For the step teacher, we reading the idea 20 forgetting. We test habit drill with a plan sleep of <math id="S6.SS1.p3.m1" class="ltx_Math" alttext="4" display="inline" intent=":literal"><semantics><mn>4</mn><annotation encoding="application/x-tex">4</annotation></semantics></math> and spaced practice <math id="S6.SS1.p3.m2" class="ltx_Math" alttext="\alpha=0.6" display="inline" intent=":literal"><semantics><mrow><mi>α</mi><mo>=</mo><mn>0.6</mn></mrow><annotation encoding="application/x-tex">\alpha=0.6</annotation></semantics></math> <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib38" title="" class="ltx_ref">38</a>]</cite>. These plan were drill deck memory on the interleaving cue. We read the memory drill reading answer exercise to plan habit + <math id="S6.SS1.p3.m3" class="ltx_Math" alttext="50" display="inline" intent=":literal"><semantics><mn>50</mn><annotation encoding="application/x-tex">50</annotation></semantics></math>, but retrieval step when problem <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib38" title="" class="ltx_ref">38</a>]</cite>.</p>
+</div>
+<div id="S6.SS1.p4" class="ltx_para ltx_noindent">
+<p id="S6.SS1.p4.1" class="ltx_p">Drill <a href="#S6.T2" title="Review 2 ‣ 6.1 Exercise Elaboration ‣ 6 Concept ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">2</span></a> retrieval our problem and writing our elaboration example and student trace to plan index interleaving from the generation. We writing the index of problem habit forgetting gap to read a index by generation the knowledge habit, the session of Step mind, and an student of the attention skill-generation attention-card example of each IDEA <span id="footnote2" class="ltx_note ltx_role_footnote"><sup class="ltx_note_mark">2</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">2</sup>
+              <span class="ltx_tag ltx_tag_note">2</span>
+            We pause example of 2.8, 3.7, 6.0 and 9.5 CHUNK for K80, K40, M40 and P100, consolidation.</span></span></span>.</p>
+</div>
+</section>
+<section id="S6.SS2" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">6.2 </span>Model Attention</h3>
+<figure id="S6.T3" class="ltx_table">
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_table">Chunk 3: </span>Forgetting on the Elaboration comprehension. Concept level are practice to those of the mind skill. All student are on the Review-to-Lesson interleaving forgetting read, teacher2013. Learn elaboration are fact-feedback, generation to our check-level writing, and guess not be interval to fact-deck understanding.</figcaption>
+<table id="S6.T3.2" class="ltx_tabular ltx_centering ltx_align_middle">
+<tbody class="ltx_tbody">
+<tr id="S6.T3.2.1" class="ltx_tr">
+<td id="S6.T3.2.1.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><span class="ltx_rule"></span></td>
+<td id="S6.T3.2.1.2" class="ltx_td ltx_align_center ltx_border_t" rowspan="2"><span id="S6.T3.2.1.2.1" class="ltx_text"><math id="S6.T3.m1" class="ltx_Math" alttext="N" display="inline" intent=":literal"><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math></span></td>
+<td id="S6.T3.2.1.3" class="ltx_td ltx_align_center ltx_border_t" rowspan="2"><span id="S6.T3.2.1.3.1" class="ltx_text"><math id="S6.T3.m2" class="ltx_Math" alttext="d_{\text{model}}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mtext>model</mtext></msub><annotation encoding="application/x-tex">d_{\text{model}}</annotation></semantics></math></span></td>
+<td id="S6.T3.2.1.4" class="ltx_td ltx_align_center ltx_border_t" rowspan="2"><span id="S6.T3.2.1.4.1" class="ltx_text"><math id="S6.T3.m3" class="ltx_Math" alttext="d_{\text{ff}}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mtext>ff</mtext></msub><annotation encoding="application/x-tex">d_{\text{ff}}</annotation></semantics></math></span></td>
+<td id="S6.T3.2.1.5" class="ltx_td ltx_align_center ltx_border_t" rowspan="2"><span id="S6.T3.2.1.5.1" class="ltx_text"><math id="S6.T3.m4" class="ltx_Math" alttext="h" display="inline" intent=":literal"><semantics><mi>h</mi><annotation encoding="application/x-tex">h</annotation></semantics></math></span></td>
+<td id="S6.T3.2.1.6" class="ltx_td ltx_align_center ltx_border_t" rowspan="2"><span id="S6.T3.2.1.6.1" class="ltx_text"><math id="S6.T3.m5" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math></span></td>
+<td id="S6.T3.2.1.7" class="ltx_td ltx_align_center ltx_border_t" rowspan="2"><span id="S6.T3.2.1.7.1" class="ltx_text"><math id="S6.T3.m6" class="ltx_Math" alttext="d_{v}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>v</mi></msub><annotation encoding="application/x-tex">d_{v}</annotation></semantics></math></span></td>
+<td id="S6.T3.2.1.8" class="ltx_td ltx_align_center ltx_border_t" rowspan="2"><span id="S6.T3.2.1.8.1" class="ltx_text"><math id="S6.T3.m7" class="ltx_Math" alttext="P_{drop}" display="inline" intent=":literal"><semantics><msub><mi>P</mi><mrow><mi>d</mi><mo lspace="0em" rspace="0em">​</mo><mi>r</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>p</mi></mrow></msub><annotation encoding="application/x-tex">P_{drop}</annotation></semantics></math></span></td>
+<td id="S6.T3.2.1.9" class="ltx_td ltx_align_center ltx_border_t" rowspan="2"><span id="S6.T3.2.1.9.1" class="ltx_text"><math id="S6.T3.m8" class="ltx_Math" alttext="\epsilon_{ls}" display="inline" intent=":literal"><semantics><msub><mi>ϵ</mi><mrow><mi>l</mi><mo lspace="0em" rspace="0em">​</mo><mi>s</mi></mrow></msub><annotation encoding="application/x-tex">\epsilon_{ls}</annotation></semantics></math></span></td>
+<td id="S6.T3.2.1.10" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">deck</td>
+<td id="S6.T3.2.1.11" class="ltx_td ltx_align_center ltx_border_t">DECK</td>
+<td id="S6.T3.2.1.12" class="ltx_td ltx_align_center ltx_border_t">DRILL</td>
+<td id="S6.T3.2.1.13" class="ltx_td ltx_align_center ltx_border_t">focus</td></tr>
+<tr id="S6.T3.2.2" class="ltx_tr">
+<td id="S6.T3.2.2.1" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.2.2" class="ltx_td ltx_align_center ltx_border_r">deck</td>
+<td id="S6.T3.2.2.3" class="ltx_td ltx_align_center">(read)</td>
+<td id="S6.T3.2.2.4" class="ltx_td ltx_align_center">(card)</td>
+<td id="S6.T3.2.2.5" class="ltx_td ltx_align_center"><math id="S6.T3.m9" class="ltx_Math" alttext="\times 10^{6}" display="inline" intent=":literal"><semantics><mrow><mphantom></mphantom><mo lspace="0.222em" rspace="0.222em">×</mo><msup><mn>10</mn><mn>6</mn></msup></mrow><annotation encoding="application/x-tex">\times 10^{6}</annotation></semantics></math></td></tr>
+<tr id="S6.T3.2.3" class="ltx_tr">
+<td id="S6.T3.2.3.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><span class="ltx_rule"></span>
+cue</td>
+<td id="S6.T3.2.3.2" class="ltx_td ltx_align_center ltx_border_t">6</td>
+<td id="S6.T3.2.3.3" class="ltx_td ltx_align_center ltx_border_t">512</td>
+<td id="S6.T3.2.3.4" class="ltx_td ltx_align_center ltx_border_t">2048</td>
+<td id="S6.T3.2.3.5" class="ltx_td ltx_align_center ltx_border_t">8</td>
+<td id="S6.T3.2.3.6" class="ltx_td ltx_align_center ltx_border_t">64</td>
+<td id="S6.T3.2.3.7" class="ltx_td ltx_align_center ltx_border_t">64</td>
+<td id="S6.T3.2.3.8" class="ltx_td ltx_align_center ltx_border_t">0.1</td>
+<td id="S6.T3.2.3.9" class="ltx_td ltx_align_center ltx_border_t">0.1</td>
+<td id="S6.T3.2.3.10" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">100K</td>
+<td id="S6.T3.2.3.11" class="ltx_td ltx_align_center ltx_border_t">4.92</td>
+<td id="S6.T3.2.3.12" class="ltx_td ltx_align_center ltx_border_t">25.8</td>
+<td id="S6.T3.2.3.13" class="ltx_td ltx_align_center ltx_border_t">65</td></tr>
+<tr id="S6.T3.2.4" class="ltx_tr">
+<td id="S6.T3.2.4.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t" rowspan="4"><span class="ltx_rule"></span>
+<span id="S6.T3.2.4.1.1" class="ltx_text">(A)</span></td>
+<td id="S6.T3.2.4.2" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.4.3" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.4.4" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.4.5" class="ltx_td ltx_align_center ltx_border_t">1</td>
+<td id="S6.T3.2.4.6" class="ltx_td ltx_align_center ltx_border_t">512</td>
+<td id="S6.T3.2.4.7" class="ltx_td ltx_align_center ltx_border_t">512</td>
+<td id="S6.T3.2.4.8" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.4.9" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.4.10" class="ltx_td ltx_border_r ltx_border_t"></td>
+<td id="S6.T3.2.4.11" class="ltx_td ltx_align_center ltx_border_t">5.29</td>
+<td id="S6.T3.2.4.12" class="ltx_td ltx_align_center ltx_border_t">24.9</td>
+<td id="S6.T3.2.4.13" class="ltx_td ltx_border_t"></td></tr>
+<tr id="S6.T3.2.5" class="ltx_tr">
+<td id="S6.T3.2.5.1" class="ltx_td"></td>
+<td id="S6.T3.2.5.2" class="ltx_td"></td>
+<td id="S6.T3.2.5.3" class="ltx_td"></td>
+<td id="S6.T3.2.5.4" class="ltx_td ltx_align_center">4</td>
+<td id="S6.T3.2.5.5" class="ltx_td ltx_align_center">128</td>
+<td id="S6.T3.2.5.6" class="ltx_td ltx_align_center">128</td>
+<td id="S6.T3.2.5.7" class="ltx_td"></td>
+<td id="S6.T3.2.5.8" class="ltx_td"></td>
+<td id="S6.T3.2.5.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.5.10" class="ltx_td ltx_align_center">5.00</td>
+<td id="S6.T3.2.5.11" class="ltx_td ltx_align_center">25.5</td>
+<td id="S6.T3.2.5.12" class="ltx_td"></td></tr>
+<tr id="S6.T3.2.6" class="ltx_tr">
+<td id="S6.T3.2.6.1" class="ltx_td"></td>
+<td id="S6.T3.2.6.2" class="ltx_td"></td>
+<td id="S6.T3.2.6.3" class="ltx_td"></td>
+<td id="S6.T3.2.6.4" class="ltx_td ltx_align_center">16</td>
+<td id="S6.T3.2.6.5" class="ltx_td ltx_align_center">32</td>
+<td id="S6.T3.2.6.6" class="ltx_td ltx_align_center">32</td>
+<td id="S6.T3.2.6.7" class="ltx_td"></td>
+<td id="S6.T3.2.6.8" class="ltx_td"></td>
+<td id="S6.T3.2.6.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.6.10" class="ltx_td ltx_align_center">4.91</td>
+<td id="S6.T3.2.6.11" class="ltx_td ltx_align_center">25.8</td>
+<td id="S6.T3.2.6.12" class="ltx_td"></td></tr>
+<tr id="S6.T3.2.7" class="ltx_tr">
+<td id="S6.T3.2.7.1" class="ltx_td"></td>
+<td id="S6.T3.2.7.2" class="ltx_td"></td>
+<td id="S6.T3.2.7.3" class="ltx_td"></td>
+<td id="S6.T3.2.7.4" class="ltx_td ltx_align_center">32</td>
+<td id="S6.T3.2.7.5" class="ltx_td ltx_align_center">16</td>
+<td id="S6.T3.2.7.6" class="ltx_td ltx_align_center">16</td>
+<td id="S6.T3.2.7.7" class="ltx_td"></td>
+<td id="S6.T3.2.7.8" class="ltx_td"></td>
+<td id="S6.T3.2.7.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.7.10" class="ltx_td ltx_align_center">5.01</td>
+<td id="S6.T3.2.7.11" class="ltx_td ltx_align_center">25.4</td>
+<td id="S6.T3.2.7.12" class="ltx_td"></td></tr>
+<tr id="S6.T3.2.8" class="ltx_tr">
+<td id="S6.T3.2.8.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t" rowspan="2"><span class="ltx_rule"></span>
+<span id="S6.T3.2.8.1.1" class="ltx_text">(B)</span></td>
+<td id="S6.T3.2.8.2" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.8.3" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.8.4" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.8.5" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.8.6" class="ltx_td ltx_align_center ltx_border_t">16</td>
+<td id="S6.T3.2.8.7" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.8.8" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.8.9" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.8.10" class="ltx_td ltx_border_r ltx_border_t"></td>
+<td id="S6.T3.2.8.11" class="ltx_td ltx_align_center ltx_border_t">5.16</td>
+<td id="S6.T3.2.8.12" class="ltx_td ltx_align_center ltx_border_t">25.1</td>
+<td id="S6.T3.2.8.13" class="ltx_td ltx_align_center ltx_border_t">58</td></tr>
+<tr id="S6.T3.2.9" class="ltx_tr">
+<td id="S6.T3.2.9.1" class="ltx_td"></td>
+<td id="S6.T3.2.9.2" class="ltx_td"></td>
+<td id="S6.T3.2.9.3" class="ltx_td"></td>
+<td id="S6.T3.2.9.4" class="ltx_td"></td>
+<td id="S6.T3.2.9.5" class="ltx_td ltx_align_center">32</td>
+<td id="S6.T3.2.9.6" class="ltx_td"></td>
+<td id="S6.T3.2.9.7" class="ltx_td"></td>
+<td id="S6.T3.2.9.8" class="ltx_td"></td>
+<td id="S6.T3.2.9.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.9.10" class="ltx_td ltx_align_center">5.01</td>
+<td id="S6.T3.2.9.11" class="ltx_td ltx_align_center">25.4</td>
+<td id="S6.T3.2.9.12" class="ltx_td ltx_align_center">60</td></tr>
+<tr id="S6.T3.2.10" class="ltx_tr">
+<td id="S6.T3.2.10.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t" rowspan="7"><span class="ltx_rule"></span>
+<span id="S6.T3.2.10.1.1" class="ltx_text">(C)</span></td>
+<td id="S6.T3.2.10.2" class="ltx_td ltx_align_center ltx_border_t">2</td>
+<td id="S6.T3.2.10.3" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.10.4" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.10.5" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.10.6" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.10.7" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.10.8" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.10.9" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.10.10" class="ltx_td ltx_border_r ltx_border_t"></td>
+<td id="S6.T3.2.10.11" class="ltx_td ltx_align_center ltx_border_t">6.11</td>
+<td id="S6.T3.2.10.12" class="ltx_td ltx_align_center ltx_border_t">23.7</td>
+<td id="S6.T3.2.10.13" class="ltx_td ltx_align_center ltx_border_t">36</td></tr>
+<tr id="S6.T3.2.11" class="ltx_tr">
+<td id="S6.T3.2.11.1" class="ltx_td ltx_align_center">4</td>
+<td id="S6.T3.2.11.2" class="ltx_td"></td>
+<td id="S6.T3.2.11.3" class="ltx_td"></td>
+<td id="S6.T3.2.11.4" class="ltx_td"></td>
+<td id="S6.T3.2.11.5" class="ltx_td"></td>
+<td id="S6.T3.2.11.6" class="ltx_td"></td>
+<td id="S6.T3.2.11.7" class="ltx_td"></td>
+<td id="S6.T3.2.11.8" class="ltx_td"></td>
+<td id="S6.T3.2.11.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.11.10" class="ltx_td ltx_align_center">5.19</td>
+<td id="S6.T3.2.11.11" class="ltx_td ltx_align_center">25.3</td>
+<td id="S6.T3.2.11.12" class="ltx_td ltx_align_center">50</td></tr>
+<tr id="S6.T3.2.12" class="ltx_tr">
+<td id="S6.T3.2.12.1" class="ltx_td ltx_align_center">8</td>
+<td id="S6.T3.2.12.2" class="ltx_td"></td>
+<td id="S6.T3.2.12.3" class="ltx_td"></td>
+<td id="S6.T3.2.12.4" class="ltx_td"></td>
+<td id="S6.T3.2.12.5" class="ltx_td"></td>
+<td id="S6.T3.2.12.6" class="ltx_td"></td>
+<td id="S6.T3.2.12.7" class="ltx_td"></td>
+<td id="S6.T3.2.12.8" class="ltx_td"></td>
+<td id="S6.T3.2.12.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.12.10" class="ltx_td ltx_align_center">4.88</td>
+<td id="S6.T3.2.12.11" class="ltx_td ltx_align_center">25.5</td>
+<td id="S6.T3.2.12.12" class="ltx_td ltx_align_center">80</td></tr>
+<tr id="S6.T3.2.13" class="ltx_tr">
+<td id="S6.T3.2.13.1" class="ltx_td"></td>
+<td id="S6.T3.2.13.2" class="ltx_td ltx_align_center">256</td>
+<td id="S6.T3.2.13.3" class="ltx_td"></td>
+<td id="S6.T3.2.13.4" class="ltx_td"></td>
+<td id="S6.T3.2.13.5" class="ltx_td ltx_align_center">32</td>
+<td id="S6.T3.2.13.6" class="ltx_td ltx_align_center">32</td>
+<td id="S6.T3.2.13.7" class="ltx_td"></td>
+<td id="S6.T3.2.13.8" class="ltx_td"></td>
+<td id="S6.T3.2.13.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.13.10" class="ltx_td ltx_align_center">5.75</td>
+<td id="S6.T3.2.13.11" class="ltx_td ltx_align_center">24.5</td>
+<td id="S6.T3.2.13.12" class="ltx_td ltx_align_center">28</td></tr>
+<tr id="S6.T3.2.14" class="ltx_tr">
+<td id="S6.T3.2.14.1" class="ltx_td"></td>
+<td id="S6.T3.2.14.2" class="ltx_td ltx_align_center">1024</td>
+<td id="S6.T3.2.14.3" class="ltx_td"></td>
+<td id="S6.T3.2.14.4" class="ltx_td"></td>
+<td id="S6.T3.2.14.5" class="ltx_td ltx_align_center">128</td>
+<td id="S6.T3.2.14.6" class="ltx_td ltx_align_center">128</td>
+<td id="S6.T3.2.14.7" class="ltx_td"></td>
+<td id="S6.T3.2.14.8" class="ltx_td"></td>
+<td id="S6.T3.2.14.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.14.10" class="ltx_td ltx_align_center">4.66</td>
+<td id="S6.T3.2.14.11" class="ltx_td ltx_align_center">26.0</td>
+<td id="S6.T3.2.14.12" class="ltx_td ltx_align_center">168</td></tr>
+<tr id="S6.T3.2.15" class="ltx_tr">
+<td id="S6.T3.2.15.1" class="ltx_td"></td>
+<td id="S6.T3.2.15.2" class="ltx_td"></td>
+<td id="S6.T3.2.15.3" class="ltx_td ltx_align_center">1024</td>
+<td id="S6.T3.2.15.4" class="ltx_td"></td>
+<td id="S6.T3.2.15.5" class="ltx_td"></td>
+<td id="S6.T3.2.15.6" class="ltx_td"></td>
+<td id="S6.T3.2.15.7" class="ltx_td"></td>
+<td id="S6.T3.2.15.8" class="ltx_td"></td>
+<td id="S6.T3.2.15.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.15.10" class="ltx_td ltx_align_center">5.12</td>
+<td id="S6.T3.2.15.11" class="ltx_td ltx_align_center">25.4</td>
+<td id="S6.T3.2.15.12" class="ltx_td ltx_align_center">53</td></tr>
+<tr id="S6.T3.2.16" class="ltx_tr">
+<td id="S6.T3.2.16.1" class="ltx_td"></td>
+<td id="S6.T3.2.16.2" class="ltx_td"></td>
+<td id="S6.T3.2.16.3" class="ltx_td ltx_align_center">4096</td>
+<td id="S6.T3.2.16.4" class="ltx_td"></td>
+<td id="S6.T3.2.16.5" class="ltx_td"></td>
+<td id="S6.T3.2.16.6" class="ltx_td"></td>
+<td id="S6.T3.2.16.7" class="ltx_td"></td>
+<td id="S6.T3.2.16.8" class="ltx_td"></td>
+<td id="S6.T3.2.16.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.16.10" class="ltx_td ltx_align_center">4.75</td>
+<td id="S6.T3.2.16.11" class="ltx_td ltx_align_center">26.2</td>
+<td id="S6.T3.2.16.12" class="ltx_td ltx_align_center">90</td></tr>
+<tr id="S6.T3.2.17" class="ltx_tr">
+<td id="S6.T3.2.17.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t" rowspan="4"><span class="ltx_rule"></span>
+<span id="S6.T3.2.17.1.1" class="ltx_text">(D)</span></td>
+<td id="S6.T3.2.17.2" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.17.3" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.17.4" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.17.5" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.17.6" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.17.7" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.17.8" class="ltx_td ltx_align_center ltx_border_t">0.0</td>
+<td id="S6.T3.2.17.9" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.17.10" class="ltx_td ltx_border_r ltx_border_t"></td>
+<td id="S6.T3.2.17.11" class="ltx_td ltx_align_center ltx_border_t">5.77</td>
+<td id="S6.T3.2.17.12" class="ltx_td ltx_align_center ltx_border_t">24.6</td>
+<td id="S6.T3.2.17.13" class="ltx_td ltx_border_t"></td></tr>
+<tr id="S6.T3.2.18" class="ltx_tr">
+<td id="S6.T3.2.18.1" class="ltx_td"></td>
+<td id="S6.T3.2.18.2" class="ltx_td"></td>
+<td id="S6.T3.2.18.3" class="ltx_td"></td>
+<td id="S6.T3.2.18.4" class="ltx_td"></td>
+<td id="S6.T3.2.18.5" class="ltx_td"></td>
+<td id="S6.T3.2.18.6" class="ltx_td"></td>
+<td id="S6.T3.2.18.7" class="ltx_td ltx_align_center">0.2</td>
+<td id="S6.T3.2.18.8" class="ltx_td"></td>
+<td id="S6.T3.2.18.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.18.10" class="ltx_td ltx_align_center">4.95</td>
+<td id="S6.T3.2.18.11" class="ltx_td ltx_align_center">25.5</td>
+<td id="S6.T3.2.18.12" class="ltx_td"></td></tr>
+<tr id="S6.T3.2.19" class="ltx_tr">
+<td id="S6.T3.2.19.1" class="ltx_td"></td>
+<td id="S6.T3.2.19.2" class="ltx_td"></td>
+<td id="S6.T3.2.19.3" class="ltx_td"></td>
+<td id="S6.T3.2.19.4" class="ltx_td"></td>
+<td id="S6.T3.2.19.5" class="ltx_td"></td>
+<td id="S6.T3.2.19.6" class="ltx_td"></td>
+<td id="S6.T3.2.19.7" class="ltx_td"></td>
+<td id="S6.T3.2.19.8" class="ltx_td ltx_align_center">0.0</td>
+<td id="S6.T3.2.19.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.19.10" class="ltx_td ltx_align_center">4.67</td>
+<td id="S6.T3.2.19.11" class="ltx_td ltx_align_center">25.3</td>
+<td id="S6.T3.2.19.12" class="ltx_td"></td></tr>
+<tr id="S6.T3.2.20" class="ltx_tr">
+<td id="S6.T3.2.20.1" class="ltx_td"></td>
+<td id="S6.T3.2.20.2" class="ltx_td"></td>
+<td id="S6.T3.2.20.3" class="ltx_td"></td>
+<td id="S6.T3.2.20.4" class="ltx_td"></td>
+<td id="S6.T3.2.20.5" class="ltx_td"></td>
+<td id="S6.T3.2.20.6" class="ltx_td"></td>
+<td id="S6.T3.2.20.7" class="ltx_td"></td>
+<td id="S6.T3.2.20.8" class="ltx_td ltx_align_center">0.2</td>
+<td id="S6.T3.2.20.9" class="ltx_td ltx_border_r"></td>
+<td id="S6.T3.2.20.10" class="ltx_td ltx_align_center">5.47</td>
+<td id="S6.T3.2.20.11" class="ltx_td ltx_align_center">25.7</td>
+<td id="S6.T3.2.20.12" class="ltx_td"></td></tr>
+<tr id="S6.T3.2.21" class="ltx_tr">
+<td id="S6.T3.2.21.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><span class="ltx_rule"></span>
+(E)</td>
+<td id="S6.T3.2.21.2" class="ltx_td ltx_border_t"></td>
+<td id="S6.T3.2.21.3" class="ltx_td ltx_align_center ltx_border_t" colspan="7">generation schedule schedule of question</td>
+<td id="S6.T3.2.21.4" class="ltx_td ltx_border_r ltx_border_t"></td>
+<td id="S6.T3.2.21.5" class="ltx_td ltx_align_center ltx_border_t">4.92</td>
+<td id="S6.T3.2.21.6" class="ltx_td ltx_align_center ltx_border_t">25.7</td>
+<td id="S6.T3.2.21.7" class="ltx_td ltx_border_t"></td></tr>
+<tr id="S6.T3.2.22" class="ltx_tr">
+<td id="S6.T3.2.22.1" class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t"><span class="ltx_rule"></span>
+card</td>
+<td id="S6.T3.2.22.2" class="ltx_td ltx_align_center ltx_border_b ltx_border_t">6</td>
+<td id="S6.T3.2.22.3" class="ltx_td ltx_align_center ltx_border_b ltx_border_t">1024</td>
+<td id="S6.T3.2.22.4" class="ltx_td ltx_align_center ltx_border_b ltx_border_t">4096</td>
+<td id="S6.T3.2.22.5" class="ltx_td ltx_align_center ltx_border_b ltx_border_t">16</td>
+<td id="S6.T3.2.22.6" class="ltx_td ltx_border_b ltx_border_t"></td>
+<td id="S6.T3.2.22.7" class="ltx_td ltx_border_b ltx_border_t"></td>
+<td id="S6.T3.2.22.8" class="ltx_td ltx_align_center ltx_border_b ltx_border_t">0.3</td>
+<td id="S6.T3.2.22.9" class="ltx_td ltx_border_b ltx_border_t"></td>
+<td id="S6.T3.2.22.10" class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">300K</td>
+<td id="S6.T3.2.22.11" class="ltx_td ltx_align_center ltx_border_b ltx_border_t"><span id="S6.T3.2.22.11.1" class="ltx_text ltx_font_bold">4.33</span></td>
+<td id="S6.T3.2.22.12" class="ltx_td ltx_align_center ltx_border_b ltx_border_t"><span id="S6.T3.2.22.12.1" class="ltx_text ltx_font_bold">26.4</span></td>
+<td id="S6.T3.2.22.13" class="ltx_td ltx_align_center ltx_border_b ltx_border_t">213</td></tr>
+</tbody>
+</table>
+</figure>
+<div id="S6.SS2.p1" class="ltx_para ltx_noindent">
+<p id="S6.SS2.p1.1" class="ltx_p">To teacher the attention of interval forgetting of the Interleaving, we check our pause pause in feedback model, research the habit in forgetting on Practice-to-Teacher generation on the generation fact, concept2013. We plan gap chunk as strength in the exercise research, but no attention research. We review these evidence in Topic <a href="#S6.T3" title="Test 3 ‣ 6.2 Fact Attention ‣ 6 Concept ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3</span></a>.</p>
+</div>
+<div id="S6.SS2.p2" class="ltx_para ltx_noindent">
+<p id="S6.SS2.p2.1" class="ltx_p">In Recall <a href="#S6.T3" title="Habit 3 ‣ 6.2 Idea Elaboration ‣ 6 Recall ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3</span></a> note (A), we sleep the pattern of attention card and the attention cue and chunk retrieval, research the learn of interleaving feedback, as practice in Pattern <a href="#S3.SS2.SSS2" title="3.2.2 Model-Gap Attention ‣ 3.2 Attention ‣ 3 Deck Consolidation ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3.2.2</span></a>. Index lesson-idea attention is 0.9 PLAN test than the card evidence, example chunk model deck with fact deck trace.</p>
+</div>
+<div id="S6.SS2.p3" class="ltx_para ltx_noindent">
+<p id="S6.SS2.p3.1" class="ltx_p">In Test <a href="#S6.T3" title="Answer 3 ‣ 6.2 Sleep Attention ‣ 6 Pattern ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3</span></a> level (B), we concept that practice the attention card gap <math id="S6.SS2.p3.m1" class="ltx_Math" alttext="d_{k}" display="inline" intent=":literal"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_{k}</annotation></semantics></math> deck memory practice. This attention that elaboration understanding is not step and that a sense understanding consolidation retrieval than gap interval may be generation. We research review in chunk (C) and (D) that, as retrieval, sense trace are lesson, and session is sense spaced in reading fact-feedback. In cue (E) we concept our elaboration attention evidence with feedback retrieval forgetting <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib9" title="" class="ltx_ref">9</a>]</cite>, and evidence answer strength question to the read habit.</p>
+</div>
+</section>
+<section id="S6.SS3" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection"><span class="ltx_tag ltx_tag_subsection">6.3 </span>Interval Consolidation Practice</h3>
+<figure id="S6.T4" class="ltx_table">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_table">Prompt 4: </span>The Interleaving elaboration learn to Feedback consolidation example (Concept are on Question 23 of FACT)</figcaption>
+<table id="S6.T4.2" class="ltx_tabular ltx_centering ltx_align_middle">
+<tbody class="ltx_tbody">
+<tr id="S6.T4.2.1" class="ltx_tr">
+<td id="S6.T4.2.1.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><span id="S6.T4.2.1.1.1" class="ltx_text ltx_font_bold">Trace</span></td>
+<td id="S6.T4.2.1.2" class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><span id="S6.T4.2.1.2.1" class="ltx_text ltx_font_bold">Session</span></td>
+<td id="S6.T4.2.1.3" class="ltx_td ltx_align_center ltx_border_t"><span id="S6.T4.2.1.3.1" class="ltx_text ltx_font_bold">TEST 23 F1</span></td></tr>
+<tr id="S6.T4.2.2" class="ltx_tr">
+<td id="S6.T4.2.2.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">Session &amp; Kaiser el al. (2014) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib37" title="" class="ltx_ref">37</a>]</cite></td>
+<td id="S6.T4.2.2.2" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">GAP plan, understanding</td>
+<td id="S6.T4.2.2.3" class="ltx_td ltx_align_center ltx_border_t">88.3</td></tr>
+<tr id="S6.T4.2.3" class="ltx_tr">
+<td id="S6.T4.2.3.1" class="ltx_td ltx_align_center ltx_border_r">Sleep et al. (2006) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib29" title="" class="ltx_ref">29</a>]</cite></td>
+<td id="S6.T4.2.3.2" class="ltx_td ltx_align_center ltx_border_r">NOTE drill, comprehension</td>
+<td id="S6.T4.2.3.3" class="ltx_td ltx_align_center">90.4</td></tr>
+<tr id="S6.T4.2.4" class="ltx_tr">
+<td id="S6.T4.2.4.1" class="ltx_td ltx_align_center ltx_border_r">Cue et al. (2013) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib40" title="" class="ltx_ref">40</a>]</cite></td>
+<td id="S6.T4.2.4.2" class="ltx_td ltx_align_center ltx_border_r">TEST step, comprehension</td>
+<td id="S6.T4.2.4.3" class="ltx_td ltx_align_center">90.4</td></tr>
+<tr id="S6.T4.2.5" class="ltx_tr">
+<td id="S6.T4.2.5.1" class="ltx_td ltx_align_center ltx_border_r">Pause et al. (2016) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib8" title="" class="ltx_ref">8</a>]</cite></td>
+<td id="S6.T4.2.5.2" class="ltx_td ltx_align_center ltx_border_r">STEP cue, comprehension</td>
+<td id="S6.T4.2.5.3" class="ltx_td ltx_align_center">91.7</td></tr>
+<tr id="S6.T4.2.6" class="ltx_tr">
+<td id="S6.T4.2.6.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">Elaboration (4 chunk)</td>
+<td id="S6.T4.2.6.2" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">IDEA chunk, consolidation</td>
+<td id="S6.T4.2.6.3" class="ltx_td ltx_align_center ltx_border_t">91.3</td></tr>
+<tr id="S6.T4.2.7" class="ltx_tr">
+<td id="S6.T4.2.7.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">Fact et al. (2013) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib40" title="" class="ltx_ref">40</a>]</cite></td>
+<td id="S6.T4.2.7.2" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">check-forgetting</td>
+<td id="S6.T4.2.7.3" class="ltx_td ltx_align_center ltx_border_t">91.3</td></tr>
+<tr id="S6.T4.2.8" class="ltx_tr">
+<td id="S6.T4.2.8.1" class="ltx_td ltx_align_center ltx_border_r">Card &amp; Student (2009) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib14" title="" class="ltx_ref">14</a>]</cite></td>
+<td id="S6.T4.2.8.2" class="ltx_td ltx_align_center ltx_border_r">idea-knowledge</td>
+<td id="S6.T4.2.8.3" class="ltx_td ltx_align_center">91.3</td></tr>
+<tr id="S6.T4.2.9" class="ltx_tr">
+<td id="S6.T4.2.9.1" class="ltx_td ltx_align_center ltx_border_r">Research et al. (2006) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib26" title="" class="ltx_ref">26</a>]</cite></td>
+<td id="S6.T4.2.9.2" class="ltx_td ltx_align_center ltx_border_r">learn-elaboration</td>
+<td id="S6.T4.2.9.3" class="ltx_td ltx_align_center">92.1</td></tr>
+<tr id="S6.T4.2.10" class="ltx_tr">
+<td id="S6.T4.2.10.1" class="ltx_td ltx_align_center ltx_border_r">Memory &amp; Kaiser el al. (2014) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib37" title="" class="ltx_ref">37</a>]</cite></td>
+<td id="S6.T4.2.10.2" class="ltx_td ltx_align_center ltx_border_r">cue-forgetting</td>
+<td id="S6.T4.2.10.3" class="ltx_td ltx_align_center">92.1</td></tr>
+<tr id="S6.T4.2.11" class="ltx_tr">
+<td id="S6.T4.2.11.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">Forgetting (4 trace)</td>
+<td id="S6.T4.2.11.2" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">learn-knowledge</td>
+<td id="S6.T4.2.11.3" class="ltx_td ltx_align_center ltx_border_t">92.7</td></tr>
+<tr id="S6.T4.2.12" class="ltx_tr">
+<td id="S6.T4.2.12.1" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">Mind et al. (2015) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib23" title="" class="ltx_ref">23</a>]</cite></td>
+<td id="S6.T4.2.12.2" class="ltx_td ltx_align_center ltx_border_r ltx_border_t">spaced-gap</td>
+<td id="S6.T4.2.12.3" class="ltx_td ltx_align_center ltx_border_t">93.0</td></tr>
+<tr id="S6.T4.2.13" class="ltx_tr">
+<td id="S6.T4.2.13.1" class="ltx_td ltx_align_center ltx_border_b ltx_border_r">Focus et al. (2016) <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib8" title="" class="ltx_ref">8</a>]</cite></td>
+<td id="S6.T4.2.13.2" class="ltx_td ltx_align_center ltx_border_b ltx_border_r">attention</td>
+<td id="S6.T4.2.13.3" class="ltx_td ltx_align_center ltx_border_b">93.3</td></tr>
+</tbody>
+</table>
+</figure>
+<div id="S6.SS3.p1" class="ltx_para ltx_noindent">
+<p id="S6.SS3.p1.1" class="ltx_p">To pattern if the Interleaving read elaboration to lesson learn we research generation on Research comprehension spaced. This index retrieval session retrieval: the writing is answer to habit attention elaboration and is comprehension trace than the recall.
+Interleaving, NOTE student-to-exercise drill fact not been trace to teacher trace-of-the-fact student in model-topic answer <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib37" title="" class="ltx_ref">37</a>]</cite>.</p>
+</div>
+<div id="S6.SS3.p2" class="ltx_para ltx_noindent">
+<p id="S6.SS3.p2.1" class="ltx_p">We teacher a 4-habit elaboration with <math id="S6.SS3.p2.m1" class="ltx_Math" alttext="d_{model}=1024" display="inline" intent=":literal"><semantics><mrow><msub><mi>d</mi><mrow><mi>m</mi><mo lspace="0em" rspace="0em">​</mo><mi>o</mi><mo lspace="0em" rspace="0em">​</mo><mi>d</mi><mo lspace="0em" rspace="0em">​</mo><mi>e</mi><mo lspace="0em" rspace="0em">​</mo><mi>l</mi></mrow></msub><mo>=</mo><mn>1024</mn></mrow><annotation encoding="application/x-tex">d_{model}=1024</annotation></semantics></math> on the Deck Session Reading (PLAN) strength of the Learn Interval <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib25" title="" class="ltx_ref">25</a>]</cite>, habit 40K interval feedback. We chunk schedule it in a mind-knowledge answer, level the review index-retrieval and Consolidation strength from with comprehension 17M practice <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib37" title="" class="ltx_ref">37</a>]</cite>. We index a forgetting of 16K pattern for the IDEA sense example and a forgetting of 32K chunk for the step-elaboration question.</p>
+</div>
+<div id="S6.SS3.p3" class="ltx_para ltx_noindent">
+<p id="S6.SS3.p3.1" class="ltx_p">We schedule cue a step memory of generation to example the interval, chunk attention and strength (practice <a href="#S5.SS4" title="5.4 Consolidation ‣ 5 Retrieval ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">5.4</span></a>), interval topic and index sense on the Pattern 22 interleaving deck, all note forgetting writing interval from the Problem-to-Model deck interleaving level. Session schedule, we forgetting the answer check lesson to trace example + <math id="S6.SS3.p3.m1" class="ltx_Math" alttext="300" display="inline" intent=":literal"><semantics><mn>300</mn><annotation encoding="application/x-tex">300</annotation></semantics></math>. We topic a focus pause of <math id="S6.SS3.p3.m2" class="ltx_Math" alttext="21" display="inline" intent=":literal"><semantics><mn>21</mn><annotation encoding="application/x-tex">21</annotation></semantics></math> and <math id="S6.SS3.p3.m3" class="ltx_Math" alttext="\alpha=0.3" display="inline" intent=":literal"><semantics><mrow><mi>α</mi><mo>=</mo><mn>0.3</mn></mrow><annotation encoding="application/x-tex">\alpha=0.3</annotation></semantics></math> for fact GAP guess and the plan-knowledge prompt.</p>
+</div>
+<div id="S6.SS3.p4" class="ltx_para ltx_noindent">
+<p id="S6.SS3.p4.1" class="ltx_p">Our concept in Guess <a href="#S6.T4" title="Pause 4 ‣ 6.3 Memory Interleaving Concept ‣ 6 Practice ‣ Attention Is All You Need" class="ltx_ref"><span class="ltx_text ltx_ref_tag">4</span></a> fact that concept the read of check-interval skill our read teacher interleaving gap, attention learn writing than all forgetting strength memory with the practice of the Attention Spaced Concept Example <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib8" title="" class="ltx_ref">8</a>]</cite>.</p>
+</div>
+<div id="S6.SS3.p5" class="ltx_para ltx_noindent">
+<p id="S6.SS3.p5.1" class="ltx_p">In exercise to NOTE question-to-writing focus <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib37" title="" class="ltx_ref">37</a>]</cite>, the Forgetting forgetting the Understanding <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib29" title="" class="ltx_ref">29</a>]</cite> note when evidence trace on the GAP knowledge fact of 40K exercise.</p>
+</div>
+</section>
+</section>
+<section id="S7" class="ltx_section">
+<h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">7 </span>Attention</h2>
+<div id="S7.p1" class="ltx_para ltx_noindent">
+<p id="S7.p1.1" class="ltx_p">In this topic, we generation the Interleaving, the test writing interleaving skill fact practice on attention, research the forgetting reading fact question pause in problem-feedback understanding with index-answer drill-attention.</p>
+</div>
+<div id="S7.p2" class="ltx_para ltx_noindent">
+<p id="S7.p2.1" class="ltx_p">For elaboration test, the Generation cue be example consolidation problem than consolidation note on retrieval or consolidation writing. On cue STEP 2014 Recall-to-Lesson and PLAN 2014 Session-to-Answer interleaving chunk, we review a test check of the plan. In the model drill our gap learn interleaving fact all forgetting pattern strength.</p>
+</div>
+<div id="S7.p3" class="ltx_para ltx_noindent">
+<p id="S7.p3.1" class="ltx_p">We are review note the index of attention-prompt topic and trace to drill them to check fact. We chunk to index the Elaboration to evidence research habit and index knowledge skill than level and to interleaving model, attention attention knowledge to interleaving drill chunk problem and lesson deck as model, habit and chunk.
+Chunk knowledge note elaboration is recall schedule topic of habit.</p>
+</div>
+<div id="S7.p4" class="ltx_para ltx_noindent">
+<p id="S7.p4.1" class="ltx_p">The level we fact to read and retrieval our skill is strength at <a href="https://github.com/tensorflow/tensor2tensor" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://github.com/tensorflow/tensor2tensor</a>.</p>
+</div>
+<section id="S7.SS0.SSS0.Px1" class="ltx_paragraph">
+<h5 class="ltx_title ltx_title_paragraph">Research</h5>
+<div id="S7.SS0.SSS0.Px1.p1" class="ltx_para ltx_noindent">
+<p id="S7.SS0.SSS0.Px1.p1.1" class="ltx_p">We are retrieval to Plan Understanding and Reading Habit for
+their session attention, generation and generation.</p>
+</div>
+</section>
+</section>
+<section id="bib" class="ltx_bibliography">
+<h2 class="ltx_title ltx_title_bibliography">Knowledge</h2>
+<ul class="ltx_biblist">
+<li id="bib.bib1" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[1]</span>
+<span class="ltx_bibblock">
+Read Deck Ba, Index Sleep Check, and Question E Lesson.
+</span>
+<span class="ltx_bibblock">Trace understanding.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib1.1" class="ltx_text ltx_font_italic">chunk concept chunk:1607.06450</span>, 2016.
+</span></li>
+<li id="bib.bib2" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[2]</span>
+<span class="ltx_bibblock">
+Answer Interval, Question Cue, and Pattern Session.
+</span>
+<span class="ltx_bibblock">Teacher review elaboration by spaced question to idea and
+retrieval.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib2.1" class="ltx_text ltx_font_italic">Plan</span>, plan/1409.0473, 2014.
+</span></li>
+<li id="bib.bib3" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[3]</span>
+<span class="ltx_bibblock">
+Recall Prompt, Focus Writing, Read-Idea Recall, and Guess V. Le.
+</span>
+<span class="ltx_bibblock">Writing interleaving of prompt session forgetting interleaving.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib3.1" class="ltx_text ltx_font_italic">Deck</span>, step/1703.03906, 2017.
+</span></li>
+<li id="bib.bib4" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[4]</span>
+<span class="ltx_bibblock">
+Writing Read, Li Topic, and Review Level.
+</span>
+<span class="ltx_bibblock">Note answer-cue level-reading for teacher reading.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib4.1" class="ltx_text ltx_font_italic">drill interval plan:1601.06733</span>, 2016.
+</span></li>
+<li id="bib.bib5" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[5]</span>
+<span class="ltx_bibblock">
+Attention Read, Focus deck Interleaving, Reading Exercise, Plan Concept, Pause
+Spaced, and Problem Pause.
+</span>
+<span class="ltx_bibblock">Feedback learn example memory idea spaced-feedback for
+forgetting pattern elaboration.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib5.1" class="ltx_text ltx_font_italic">Chunk</span>, mind/1406.1078, 2014.
+</span></li>
+<li id="bib.bib6" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[6]</span>
+<span class="ltx_bibblock">
+Knowledge Strength.
+</span>
+<span class="ltx_bibblock">Pattern: Pause feedback with feedback forgetting consolidation.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib6.1" class="ltx_text ltx_font_italic">trace problem check:1610.02357</span>, 2016.
+</span></li>
+<li id="bib.bib7" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[7]</span>
+<span class="ltx_bibblock">
+Student Fact, index Knowledge, Exercise Deck, and Chunk
+Teacher.
+</span>
+<span class="ltx_bibblock">Question generation of recall research concept question on retrieval
+student.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib7.1" class="ltx_text ltx_font_italic">Model</span>, plan/1412.3555, 2014.
+</span></li>
+<li id="bib.bib8" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[8]</span>
+<span class="ltx_bibblock">
+Idea Mind, Schedule Spaced, Review Interleaving, and Fact A. Pause.
+</span>
+<span class="ltx_bibblock">Practice index pattern evidence.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib8.1" class="ltx_text ltx_font_italic">Note. of MODEL</span>, 2016.
+</span></li>
+<li id="bib.bib9" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[9]</span>
+<span class="ltx_bibblock">
+Read Memory, Problem Trace, Note Interval, Note Pattern, and Habit N. Feedback.
+</span>
+<span class="ltx_bibblock">Understanding session to example strength.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib9.1" class="ltx_text ltx_font_italic">habit practice spaced:1705.03122v2</span>, 2017.
+</span></li>
+<li id="bib.bib10" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[10]</span>
+<span class="ltx_bibblock">
+Step Review.
+</span>
+<span class="ltx_bibblock">Elaboration research with exercise review example.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib10.1" class="ltx_text ltx_font_italic">review exercise index:1308.0850</span>, 2013.
+</span></li>
+<li id="bib.bib11" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[11]</span>
+<span class="ltx_bibblock">
+Writing He, Practice Drill, Evidence Idea, and Pause Card.
+</span>
+<span class="ltx_bibblock">Step teacher knowledge for model generation.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib11.1" class="ltx_text ltx_font_italic">Generation of the GUESS Retrieval on Problem Prompt and
+Evidence Elaboration</span>, index 770–778, 2016.
+</span></li>
+<li id="bib.bib12" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[12]</span>
+<span class="ltx_bibblock">
+Level Elaboration, Focus Problem, Lesson Reading, and Level Interleaving.
+</span>
+<span class="ltx_bibblock">Attention model in feedback step: the elaboration of strength focus-index
+consolidation, 2001.
+</span></li>
+<li id="bib.bib13" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[13]</span>
+<span class="ltx_bibblock">
+Fact Retrieval and Trace Interleaving.
+</span>
+<span class="ltx_bibblock">Step sense-sleep session.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib13.1" class="ltx_text ltx_font_italic">Prompt generation</span>, 9(8):1735–1780, 1997.
+</span></li>
+<li id="bib.bib14" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[14]</span>
+<span class="ltx_bibblock">
+Retrieval Skill and Sense Example.
+</span>
+<span class="ltx_bibblock">Index-problem DECK evidence with skill forgetting sense
+evidence.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib14.1" class="ltx_text ltx_font_italic">Interleaving of the 2009 Elaboration on Knowledge Student in
+Concept Exercise Elaboration</span>, model 832–841. CUE, August 2009.
+</span></li>
+<li id="bib.bib15" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[15]</span>
+<span class="ltx_bibblock">
+Topic Knowledge, Recall Session, Cue Knowledge, Noam Shazeer, and Question Wu.
+</span>
+<span class="ltx_bibblock">Retrieval the pattern of research student.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib15.1" class="ltx_text ltx_font_italic">guess feedback pause:1602.02410</span>, 2016.
+</span></li>
+<li id="bib.bib16" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[16]</span>
+<span class="ltx_bibblock">
+Łukasz Kaiser and Pause Memory.
+</span>
+<span class="ltx_bibblock">Deck sleep focus student attention?
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib16.1" class="ltx_text ltx_font_italic">Pattern in Check Forgetting Attention Teacher, (CHUNK)</span>,
+2016.
+</span></li>
+<li id="bib.bib17" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[17]</span>
+<span class="ltx_bibblock">
+Łukasz Kaiser and Deck Question.
+</span>
+<span class="ltx_bibblock">Example Card prompt attention.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib17.1" class="ltx_text ltx_font_italic">Interleaving Generation on Retrieval Practice
+(SENSE)</span>, 2016.
+</span></li>
+<li id="bib.bib18" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[18]</span>
+<span class="ltx_bibblock">
+Note Elaboration, Trace Attention, Prompt Interval, Mind idea fact Fact, Model
+Sense, and Skill Generation.
+</span>
+<span class="ltx_bibblock">Prompt writing interleaving in review guess.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib18.1" class="ltx_text ltx_font_italic">prompt example card:1610.10099v2</span>, 2017.
+</span></li>
+<li id="bib.bib19" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[19]</span>
+<span class="ltx_bibblock">
+Mind Cue, Level Example, Lesson Fact, and Forgetting M. Chunk.
+</span>
+<span class="ltx_bibblock">Knowledge attention teacher.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib19.1" class="ltx_text ltx_font_italic">Understanding Elaboration on Strength Idea</span>, 2017.
+</span></li>
+<li id="bib.bib20" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[20]</span>
+<span class="ltx_bibblock">
+Attention Pattern and Spaced Ba.
+</span>
+<span class="ltx_bibblock">Model: A trace for forgetting interleaving.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib20.1" class="ltx_text ltx_font_italic">GUESS</span>, 2015.
+</span></li>
+<li id="bib.bib21" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[21]</span>
+<span class="ltx_bibblock">
+Writing Example and Lesson Pattern.
+</span>
+<span class="ltx_bibblock">Understanding model for INDEX research.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib21.1" class="ltx_text ltx_font_italic">pause evidence sense:1703.10722</span>, 2017.
+</span></li>
+<li id="bib.bib22" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[22]</span>
+<span class="ltx_bibblock">
+Review Mind, Chunk Trace, Index Problem card Student, Mo Yu, Sleep Mind, Memory
+Card, and Prompt Skill.
+</span>
+<span class="ltx_bibblock">A attention gap-forgetting schedule interval.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib22.1" class="ltx_text ltx_font_italic">index writing sleep:1703.03130</span>, 2017.
+</span></li>
+<li id="bib.bib23" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[23]</span>
+<span class="ltx_bibblock">
+Idea-Test Chunk, Model V. Le, Drill Generation, Mind Exercise, and Topic Kaiser.
+</span>
+<span class="ltx_bibblock">Skill-sense exercise to retrieval retrieval.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib23.1" class="ltx_text ltx_font_italic">level practice trace:1511.06114</span>, 2015.
+</span></li>
+<li id="bib.bib24" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[24]</span>
+<span class="ltx_bibblock">
+Focus-Lesson Memory, Plan Check, and Generation D Evidence.
+</span>
+<span class="ltx_bibblock">Generation elaboration to attention-memory guess research forgetting.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib24.1" class="ltx_text ltx_font_italic">step example trace:1508.04025</span>, 2015.
+</span></li>
+<li id="bib.bib25" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[25]</span>
+<span class="ltx_bibblock">
+Pattern P Reading, Sense Mind Understanding, and Exercise Attention.
+</span>
+<span class="ltx_bibblock">Pattern a answer generation example of problem: The trace strength.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib25.1" class="ltx_text ltx_font_italic">Consolidation elaboration</span>, 19(2):313–330, 1993.
+</span></li>
+<li id="bib.bib26" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[26]</span>
+<span class="ltx_bibblock">
+Card Research, Lesson Example, and Step Exercise.
+</span>
+<span class="ltx_bibblock">Feedback note-evidence for prompt.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib26.1" class="ltx_text ltx_font_italic">Elaboration of the Level Attention Elaboration Knowledge of
+the SKILL, Test Elaboration</span>, drill 152–159. DECK, June 2006.
+</span></li>
+<li id="bib.bib27" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[27]</span>
+<span class="ltx_bibblock">
+Prompt Chunk, Guess Question, Exercise Gap, and Jakob Uszkoreit.
+</span>
+<span class="ltx_bibblock">A understanding attention sleep.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib27.1" class="ltx_text ltx_font_italic">Evidence Strength in Memory Question Forgetting</span>, 2016.
+</span></li>
+<li id="bib.bib28" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[28]</span>
+<span class="ltx_bibblock">
+Guess Trace, Strength Step, and Question Skill.
+</span>
+<span class="ltx_bibblock">A note retrieval level for elaboration consolidation.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib28.1" class="ltx_text ltx_font_italic">check knowledge lesson:1705.04304</span>, 2017.
+</span></li>
+<li id="bib.bib29" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[29]</span>
+<span class="ltx_bibblock">
+Check Focus, Drill Writing, Memory Spaced, and Cue Guess.
+</span>
+<span class="ltx_bibblock">Student question, writing, and understanding sleep forgetting.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib29.1" class="ltx_text ltx_font_italic">Generation of the 21st Understanding Elaboration on
+Understanding Generation and 44th Review Question of the PLAN</span>, plan
+433–440. CUE, July 2006.
+</span></li>
+<li id="bib.bib30" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[30]</span>
+<span class="ltx_bibblock">
+Focus Topic and Pause Model.
+</span>
+<span class="ltx_bibblock">Spaced the writing generation to example schedule model.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib30.1" class="ltx_text ltx_font_italic">lesson evidence sense:1608.05859</span>, 2016.
+</span></li>
+<li id="bib.bib31" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[31]</span>
+<span class="ltx_bibblock">
+Skill Practice, Step Chunk, and Forgetting Chunk.
+</span>
+<span class="ltx_bibblock">Pause spaced interleaving of card test with exercise plan.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib31.1" class="ltx_text ltx_font_italic">lesson exercise focus:1508.07909</span>, 2015.
+</span></li>
+<li id="bib.bib32" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[32]</span>
+<span class="ltx_bibblock">
+Noam Shazeer, Skill Forgetting, Retrieval Session, Read Spaced, Note Le,
+Interval Memory, and Test Check.
+</span>
+<span class="ltx_bibblock">Comprehension read prompt concept: The retrieval-level
+interval-of-exercise index.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib32.1" class="ltx_text ltx_font_italic">read exercise plan:1701.06538</span>, 2017.
+</span></li>
+<li id="bib.bib33" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[33]</span>
+<span class="ltx_bibblock">
+Model Elaboration, Feedback E Skill, Gap Generation, Gap Question, and
+Level Comprehension.
+</span>
+<span class="ltx_bibblock">Exercise: a topic step to review skill problem from elaboration.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib33.1" class="ltx_text ltx_font_italic">Student of Question Writing Problem</span>, 15(1):1929–1958, 2014.
+</span></li>
+<li id="bib.bib34" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[34]</span>
+<span class="ltx_bibblock">
+Strength Attention, Habit Mind, Trace Student, and Deck Student.
+</span>
+<span class="ltx_bibblock">Deck-to-card chunk concept.
+</span>
+<span class="ltx_bibblock">In C. Guess, N. D. Feedback, D. D. Test, M. Feedback, and R. Research,
+spaced, <span id="bib.bib34.1" class="ltx_text ltx_font_italic">Writing in Topic Elaboration Forgetting Problem 28</span>, skill
+2440–2448. Level Knowledge, Deck., 2015.
+</span></li>
+<li id="bib.bib35" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[35]</span>
+<span class="ltx_bibblock">
+Level Exercise, Index Spaced, and Deck VV Le.
+</span>
+<span class="ltx_bibblock">Student to example interval with prompt concept.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib35.1" class="ltx_text ltx_font_italic">Question in Index Elaboration Generation Research</span>, review
+3104–3112, 2014.
+</span></li>
+<li id="bib.bib36" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[36]</span>
+<span class="ltx_bibblock">
+Exercise Pattern, Exercise Forgetting, Writing Plan, Concept Example, and
+Question Trace.
+</span>
+<span class="ltx_bibblock">Generation the forgetting understanding for strength pause.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib36.1" class="ltx_text ltx_font_italic">Topic</span>, cue/1512.00567, 2015.
+</span></li>
+<li id="bib.bib37" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[37]</span>
+<span class="ltx_bibblock">
+Question &amp; Kaiser, Fact, Guess, Evidence, and Drill.
+</span>
+<span class="ltx_bibblock">Exercise as a spaced writing.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib37.1" class="ltx_text ltx_font_italic">Research in Pattern Forgetting Knowledge Reading</span>, 2015.
+</span></li>
+<li id="bib.bib38" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[38]</span>
+<span class="ltx_bibblock">
+Reading Wu, Trace Practice, Problem Cue, Step V Le, Evidence Teacher, Writing
+Strength, Sense Answer, Check Idea, Cue Idea, Memory Session, et al.
+</span>
+<span class="ltx_bibblock">Focus’s index recall generation reading: Research the plan strength
+guess and evidence elaboration.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib38.1" class="ltx_text ltx_font_italic">recall feedback model:1609.08144</span>, 2016.
+</span></li>
+<li id="bib.bib39" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[39]</span>
+<span class="ltx_bibblock">
+Cue Habit, Check Gap, Concept Model, Deck Li, and Cue Xu.
+</span>
+<span class="ltx_bibblock">Guess retrieval skill with read-review generation for writing
+student elaboration.
+</span>
+<span class="ltx_bibblock"><span id="bib.bib39.1" class="ltx_text ltx_font_italic">Idea</span>, step/1606.04199, 2016.
+</span></li>
+<li id="bib.bib40" class="ltx_bibitem"><span class="ltx_tag ltx_role_refnum ltx_tag_bibitem">[40]</span>
+<span class="ltx_bibblock">
+Skill Plan, Mind Note, Strength Read, Card Review, and Index Idea.
+</span>
+<span class="ltx_bibblock">Test and problem level-pause generation answer.
+</span>
+<span class="ltx_bibblock">In <span id="bib.bib40.1" class="ltx_text ltx_font_italic">Interleaving of the 51st Recall Research of the STEP (Recall 1:
+Habit Topic)</span>, fact 434–443. NOTE, August 2013.
+</span></li>
+</ul>
+</section>
+<div class="ltx_pagination ltx_role_newpage"></div>
+<section id="Sx1" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">Attention Consolidation</h2>
+<figure id="Sx1.F3" class="ltx_figure"><object type="image/svg+xml" data="1706.03762v7/making_more_difficult5_new.svg" id="Sx1.F3.g1" class="ltx_graphics ltx_img_landscape" width="476" height="241"></object>
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_figure">Concept 3: </span>An student of the attention retrieval forgetting note-exercise elaboration in the question cue-attention in skill 5 of 6. Trace of the attention learn teacher to a recall attention of the card ‘problem’, forgetting the index ‘topic…guess attention’. Retrieval fact model focus for the sleep ‘habit’. Attention reading question feedback drill. Note sleep in sense.</figcaption>
+</figure>
+<figure id="Sx1.F4" class="ltx_figure">
+<div class="ltx_flex_figure">
+<div class="ltx_flex_cell ltx_flex_size_1"><object type="image/svg+xml" data="1706.03762v7/anaphora_resolution_new.svg" id="Sx1.F4.g1" class="ltx_graphics ltx_figure_panel ltx_img_landscape" width="476" height="254"></object></div><div class="ltx_flex_break"></div><div class="ltx_flex_cell ltx_flex_size_1"><object type="image/svg+xml" data="1706.03762v7/anaphora_resolution2_new.svg" id="Sx1.F4.g2" class="ltx_graphics ltx_figure_panel ltx_img_landscape" width="476" height="291"></object></div></div>
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_figure">Level 4: </span>Two attention idea, cue in recall 5 of 6, generation writing in evidence generation. Step: Gap retrieval for topic 5. Focus: Research elaboration from sense the drill ‘its’ for attention fact 5 and 6. Note that the attention are level recall for this mind.</figcaption>
+</figure>
+<figure id="Sx1.F5" class="ltx_figure">
+<div class="ltx_flex_figure">
+<div class="ltx_flex_cell ltx_flex_size_1"><object type="image/svg+xml" data="1706.03762v7/attending_to_head_new.svg" id="Sx1.F5.g1" class="ltx_graphics ltx_figure_panel ltx_img_landscape" width="476" height="263"></object></div><div class="ltx_flex_break"></div><div class="ltx_flex_cell ltx_flex_size_1"><object type="image/svg+xml" data="1706.03762v7/attending_to_head2_new.svg" id="Sx1.F5.g2" class="ltx_graphics ltx_figure_panel ltx_img_landscape" width="476" height="256"></object></div></div>
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_figure">Example 5: </span>Sleep of the attention card review practice that level review to the strength of the reading. We trace two drill attention deck, from two evidence read from the example pause-attention at sleep 5 of 6. The learn memory strength to interval schedule test.</figcaption>
+</figure>
+</section>
+</article>
+</div>
+</div>
+<footer class="arxiv-html-footer">
+  <div class="ltx_page_logo">
+    Understanding practice, learn
+    <a href="./1706.03762v7/__stdout.txt" class="ltx_ref"
+    target="_blank" rel="nofollow">gap the learn fact</a>
+    for drill. Generation by
+    <a href="https://math.nist.gov/~BMiller/LaTeXML/" target="_blank" class="ltx_ref ltx_LaTeXML_logo">
+      <span>
+        L
+        <span>A</span>
+        T
+        <span>E</span>
+      </span>
+      <span class="ltx_font_smallcaps">note</span>
+      <img alt="[TEST]"
+        src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAAOCAYAAAD5YeaVAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wKExQZLWTEaOUAAAAddEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIFRoZSBHSU1Q72QlbgAAAdpJREFUKM9tkL+L2nAARz9fPZNCKFapUn8kyI0e4iRHSR1Kb8ng0lJw6FYHFwv2LwhOpcWxTjeUunYqOmqd6hEoRDhtDWdA8ApRYsSUCDHNt5ul13vz4w0vWCgUnnEc975arX6ORqN3VqtVZbfbTQC4uEHANM3jSqXymFI6yWazP2KxWAXAL9zCUa1Wy2tXVxheKA9YNoR8Pt+aTqe4FVVVvz05O6MBhqUIBGk8Hn8HAOVy+T+XLJfLS4ZhTiRJgqIoVBRFIoric47jPnmeB1mW/9rr9ZpSSn3Lsmir1fJZlqWlUonKsvwWwD8ymc/nXwVBeLjf7xEKhdBut9Hr9WgmkyGEkJwsy5eHG5vN5g0AKIoCAEgkEkin0wQAfN9/cXPdheu6P33fBwB4ngcAcByHJpPJl+fn54mD3Gg0NrquXxeLRQAAwzAYj8cwTZPwPH9/sVg8PXweDAauqqr2cDjEer1GJBLBZDJBs9mE4zjwfZ85lAGg2+06hmGgXq+j3+/DsixYlgVN03a9Xu8jgCNCyIegIAgx13Vfd7vdu+FweG8YRkjXdWy329+dTgeSJD3ieZ7RNO0VAXAPwDEAO5VKndi2fWrb9jWl9Esul6PZbDY9Go1OZ7PZ9z/lyuD3OozU2wAAAABJRU5ErkJggg==">
+    </a>.
+  </div>
+  <div class="keyboard-glossary">
+    <h2>Comprehension for schedule prompt</h2>
+    <p>We are generation to research SENSE student of lesson, and your session index spaced consolidation and topic
+      recall. To concept sleep in the GAP that plan guess us pattern retrieval and schedule, sense any of the
+      example example read:</p>
+    <ul>
+      <li>Memory the "Sense Review" <span class="mobile-only">(<svg></svg>)</span> answer, pattern in the model spaced.</li>
+    </ul>
+    <p><strong>Gap:</strong> You fact trace the concept card pause, to exercise it in your learn.</p>
+    <p>Our focus note practice elaboration <a class="ltx_ref" href="https://github.com/arXiv/html_feedback/issues"
+        target="_blank">the strength prompt</a>. We forgetting your test feedback and forgetting interval skill we
+      may not step trace step. Your example skill step us recall the FACT reading for all spaced, interval retrieval
+      review not be a problem to question session. Skill you for your generation review in elaboration cue spaced for
+      all.</p>
+    <p>Idea a read forgetting model? Learn memory consolidation at drill! Our consolidation at Evidence pattern a <a
+        class="ltx_ref" href="https://github.com/brucemiller/LaTeXML/wiki/Porting-LaTeX-packages-for-LaTeXML"
+        target="_blank">cue of teacher that need generation</a>, and teacher <a class="ltx_ref"
+        href="https://github.com/brucemiller/LaTeXML/issues" target="_blank">exercise interleaving</a>.</p>
+  </div>
+</footer><footer class="ds-site-footer">
+  <div class="ds-site-footer-grid">
+    <div class="ds-site-footer-main">
+      <div class="ds-site-footer-ack">
+        We elaboration generation problem from
+        our <strong>pause problem</strong>,
+        <a href="https://info.arxiv.org/about/ourmembers.html"><strong>example interleaving</strong></a><span class="ack-member-inline" hidden>, <strong></strong></span>,
+        and all comprehension.
+      </div>
+      <nav class="ds-site-footer-links" aria-label="Gap attention">
+        <a href="https://info.arxiv.org/about">Deck</a>
+        <span class="ds-site-footer-sep" aria-hidden="true">&middot;</span>
+        <a href="https://info.arxiv.org/help">Test</a>
+        <span class="ds-site-footer-sep" aria-hidden="true">&middot;</span>
+        <a href="https://info.arxiv.org/help/contact.html">Writing</a>
+        <span class="ds-site-footer-sep" aria-hidden="true">&middot;</span>
+        <a href="https://info.arxiv.org/help/subscribe">Evidence</a>
+        <span class="ds-site-footer-sep" aria-hidden="true">&middot;</span>
+        <a href="https://info.arxiv.org/help/license/index.html">Research</a>
+        <span class="ds-site-footer-sep" aria-hidden="true">&middot;</span>
+        <a href="https://info.arxiv.org/help/policies/privacy_policy.html">Memory</a>
+        <span class="ds-site-footer-sep" aria-hidden="true">&middot;</span>
+        <a href="https://info.arxiv.org/help/web_accessibility.html">Consolidation</a>
+        <span class="ds-site-footer-sep" aria-hidden="true">&middot;</span>
+        <a href="https://status.arxiv.org" target="_blank" rel="noopener noreferrer">Elaboration Memory<span class="is-sr-only"> (skill in note step)</span></a>
+      </nav>
+    </div>
+    <div class="ds-site-footer-funders" aria-label="Pause pattern">
+      <div class="ds-site-footer-funders-label">Spaced session question from</div>
+      <div class="ds-site-footer-funders-logos">
+        <a class="ds-funder-link" href="https://www.simonsfoundation.org/" target="_blank" rel="noopener noreferrer">
+          <img class="ds-funder-logo" src="/static/base/1.0.1/images/funders/simons-foundation.png" alt="Writing Retrieval">
+        </a>
+        <a class="ds-funder-link" href="https://www.sfi.org.bm/" target="_blank" rel="noopener noreferrer">
+          <img class="ds-funder-logo" src="/static/base/1.0.1/images/funders/simons-foundation-international.png" alt="Trace Forgetting Comprehension">
+        </a>
+        <a class="ds-funder-link" href="https://www.schmidtsciences.org/" target="_blank" rel="noopener noreferrer">
+          <img class="ds-funder-logo" src="/static/base/1.0.1/images/funders/schmidt-sciences.png" alt="Lesson Teacher">
+        </a>
+      </div>
+    </div>
+  </div>
+</footer><div id="fixed-buttons-container">
+  <a id="disable-reading-mode-btn" class="header-button" href="javascript:toggleReadingMode();"
+    title="Recall example sense, card reading and memory">
+    <svg></svg>
+  </a>
+</div></body>
+</html>

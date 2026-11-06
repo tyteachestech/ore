@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Ore",
+  "version": "0.1.0",
+  "identifier": "com.tylerpoelking.ore.phone",
+  "build": {
+    "beforeBuildCommand": "cd ../desktop && ORE_PHONE=1 bunx vite build",
+    "frontendDist": "../../desktop/dist-phone"
+  },
+  "app": {
+    "windows": [{ "label": "main", "title": "Ore", "theme": "Dark", "backgroundColor": "#121212" }],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; font-src 'self'; worker-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "public.app-category.education",
+    "iOS": { "developmentTeam": "229SB9CKNF" },
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.png"]
+  }
+}

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2a30"/>
+      <stop offset="1" stop-color="#131316"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9db4ff"/>
+      <stop offset="1" stop-color="#6d7cf2"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <!-- an open ring (the "O") with a highlighted passage stroke through it -->
+  <circle cx="512" cy="512" r="232" fill="none" stroke="url(#mark)" stroke-width="64" stroke-linecap="round"
+          stroke-dasharray="1240 218" transform="rotate(-18 512 512)"/>
+  <rect x="352" y="472" width="320" height="80" rx="40" fill="#f2cf5b" fill-opacity="0.92"/>
+</svg>

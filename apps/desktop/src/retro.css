@@ -1,0 +1,168 @@
+/* The Terminal look (D101, Tyler 2026-10-29, option A; refs claude.dev, Oxide, Geist Pixel): a warm neutral
+   black, Geist for the interface, small uppercase Geist Mono labels, square corners, cards drawn as hairline
+   frames, flat white buttons, Geist Pixel for big numbers, segmented rings and dithered bars, 8-bit gems
+   (Gem.tsx). Reading stays in the system font. Loaded after styles.css, so equal selectors here win. */
+@font-face { font-family: "Geist"; src: url("./fonts/Geist-Regular.woff2") format("woff2"); font-weight: 400; font-display: block; }
+@font-face { font-family: "Geist"; src: url("./fonts/Geist-Medium.woff2") format("woff2"); font-weight: 500; font-display: block; }
+@font-face { font-family: "Geist"; src: url("./fonts/Geist-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: block; }
+@font-face { font-family: "Geist"; src: url("./fonts/Geist-Bold.woff2") format("woff2"); font-weight: 700 900; font-display: block; }
+@font-face { font-family: "Geist Mono"; src: url("./fonts/GeistMono-Regular.woff2") format("woff2"); font-weight: 400; font-display: block; }
+@font-face { font-family: "Geist Mono"; src: url("./fonts/GeistMono-Medium.woff2") format("woff2"); font-weight: 500 900; font-display: block; }
+@font-face { font-family: "Geist Pixel"; src: url("./fonts/GeistPixel-Square.woff2") format("woff2"); font-display: block; }
+
+:root {
+  --bg: #141413;
+  --bg-side: #141413;
+  --bg-card: #141413;
+  --bg-raised: #1c1c1b;
+  --border: #2b2b29;
+  --text: #f2f1ec;
+  --text-read: #d9d8d2;
+  --muted: #a3a29c;
+  --faint: #8c8b85; /* 4.9:1 on --bg, 4.6:1 on --bg-raised */
+  --lift: none;
+  --paper: #f2f1ec; /* the flat white of buttons and an inverted selection */
+  --ink: #141413;
+  --font-read: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --font: "Geist", var(--font-read);
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --round: var(--font);
+  --pixel: "Geist Pixel", var(--mono);
+  --radius: 0px;
+}
+.doc, .note-editor, .review-passage { font-family: var(--font-read); }
+.sidebar { border-right: 1px solid var(--border); }
+/* The open row's 8-bit menu arrow in the left gutter (SideCursor.tsx); quieter inside a source, as the row is. */
+.sidebar:not(.peek) { position: relative; }
+.side-cursor { position: absolute; top: 0; left: 1px; fill: var(--paper); pointer-events: none; z-index: 1; }
+.sidebar.within .side-cursor { fill: var(--muted); }
+.sidebar.sorting .side-cursor { visibility: hidden; }
+/* The reader's outline (D113): headings passed fill in, the current one is white with the arrow beside it. */
+.outline-lines span { border-radius: 0; transition: none; }
+.outline-lines span.past { background: var(--faint); }
+.outline-lines span.on { background: var(--paper); }
+.outline-cursor { position: absolute; top: 0; left: -6px; fill: var(--paper); pointer-events: none; }
+.outline:hover .outline-cursor, .outline:focus-within .outline-cursor { visibility: hidden !important; }
+
+/* One level of boxes at most (Tyler, 2026-10-30): page sections are a label over a hairline rule, never framed;
+   what sits inside a section is never boxed either. Home's cards stay hairline frames: nothing inside them is. */
+.skill-card { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 0; }
+.skill-note { padding: 0; }
+.skill-col { gap: 36px; }
+.skill-card .card-head { box-sizing: content-box; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.warm-up { background: transparent; padding: 0; gap: 14px; margin-bottom: 14px; }
+.warm-up b { font-size: 17px; font-weight: 600; }
+
+/* Home is an open page (Style rules: one level of boxes): sections are a label over a rule, skills are rows. */
+.home-today, .home-cont, .home-skill { border-radius: 0; box-shadow: none; background: transparent; border: 0; }
+.home-today { padding: 20px 0; }
+.home-cont { margin-top: 0; padding: 0; }
+.home-h, .home-cont .home-h { margin: 32px 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.home-cont .home-h { margin-top: 0; }
+.home-read { margin: 0 -8px; padding: 0 8px; }
+.home-skills { display: flex; flex-direction: column; gap: 0; }
+.home-skill { flex-direction: row; align-items: center; height: var(--row); margin: 0 -8px; padding: 0 8px; }
+.home-skill-top { flex: 1; }
+
+/* Labels: section and card titles, sidebar groups, metadata. */
+.card-title h2, .home-h, .home-cont .home-h, .side-label { font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.card-title .card-icon { margin-right: 2px; }
+.skill-page .row .kind, .row .count, .side-item .count, .home-read .chip, .gem-ring-lv { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Big numbers in pixel type. */
+.home-solid, .hero-strength .home-solid, .home-goal h1, .review-kept b, .review-cut b { font-family: var(--pixel); font-weight: 400; }
+.home-goal h1 span { font-family: var(--font); }
+
+/* Square corners everywhere a row, chip or control sits. */
+.row, .home-read, .side-item, .chip, .icon-button, .icon-btn, .skill-badge, .pick-row, .gem-ring-lv, [cmdk-item],
+.panel, .popover, .popover.menu, .toast, .popup, .quiz, .mynotes-text, .review-passage, .quiz-answer, .quiz-leave, .quiz-verdict, .quiz-stepper, .field { border-radius: 0; }
+.chip { background: transparent; box-shadow: inset 0 0 0 1px var(--border); font-size: 11px; }
+
+/* Primary buttons: flat paper white, mono caps (claude.dev's "Try Claude Code"). */
+.pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 0; font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+.pill-btn:active:not(:disabled) { box-shadow: none; }
+
+/* Bars are dithered tracks with a solid fill; rings are cut into segments. */
+.home-meter, .thumb-bar { border-radius: 0; background: repeating-conic-gradient(#3a3a37 0 25%, transparent 0 50%) 0 0 / 2px 2px; }
+.home-meter { height: 8px; }
+.home-meter > span, .thumb-bar > span { border-radius: 0; }
+.home-meter.small > span, .thumb-bar > span { background: var(--paper); }
+.gem-ring > svg:first-child, .ring svg { -webkit-mask: repeating-conic-gradient(#000 0 9deg, transparent 9deg 12deg); mask: repeating-conic-gradient(#000 0 9deg, transparent 9deg 12deg); }
+.gem-ring-fill, .ring-fill { stroke-linecap: butt; }
+.gem-ring-lv { font-weight: 400; }
+
+/* Selection in lists: neutral grey with a white bar on the left edge. */
+.row.on, .row.sel { box-shadow: inset 2px 0 0 var(--paper); }
+.list:focus-visible .row.on { box-shadow: inset 2px 0 0 var(--paper), inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
+
+/* Review: what he picked is inverted, paper white with ink text (Playdate), on a hard 3px lip. */
+.review-rate button, .quiz-sure button { border-radius: 0; font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.review-rate button.suggested, .review-rate button.suggested:hover:not(:disabled),
+.quiz-sure button[aria-checked="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); box-shadow: 0 3px 0 #6b6a66; filter: none; }
+.pick-box { border-radius: 0; }
+.pick-row[aria-checked="true"] .pick-box { background: var(--paper); color: var(--ink); box-shadow: 0 2px 0 #6b6a66; }
+.side-tabs button { border-radius: 0; }
+
+/* The skill badge: a matte tile in the skill's colour with 8-bit stepped corners, no outline (Tyler, 2026-10-29). */
+.skill-badge, .skill-badge.tinted {
+  box-shadow: none; background: color-mix(in srgb, var(--skill, var(--muted)) 26%, var(--bg));
+  clip-path: polygon(0 6px, 3px 6px, 3px 3px, 6px 3px, 6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px));
+}
+/* The clip hides an outline, so keyboard focus brightens the tile instead. */
+.skill-badge:focus-visible { outline: none; background: color-mix(in srgb, var(--skill, var(--muted)) 55%, var(--bg)); }
+
+/* Settings follows the skill page (Tyler, 2026-10-31): each group is a mono label over a hairline rule and its rows
+   sit on the page between hairlines, no rounded card around them; controls are square like every other control. */
+.settings-group { margin-bottom: 36px; }
+.settings-group h2 { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.settings-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.settings-row { padding: 14px 0; }
+.settings-tab, .seg, .seg-item, .settings-btn { border-radius: 0; }
+.seg { background: transparent; border-color: var(--border); }
+.seg-item[data-state="on"] { box-shadow: none; }
+.settings-sheet { border-radius: 0; border: 1px solid var(--border); }
+/* The shortcut list in Settings: groups are mono labels over a rule, the list sits on the page; the search stays a field. */
+.keys-editor.in-page .keys-head { border-radius: 0; }
+.keys-editor.in-page .keys-body { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
+.keys-editor.in-page .keys-body h3 { margin-top: 20px; padding: 0 0 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.keys-editor.in-page .keys-body h3:first-child { margin-top: 0; }
+.keys-editor.in-page .key-row { margin: 0 -8px; border-radius: 0; }
+
+/* Toasts stack (D113, RareUI's Toast): one column at the foot of the window, every toast as wide as the
+   widest. Older ones show only their top edge until the pointer fans them out in three hard frames. */
+.toasts { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30; display: grid; max-width: 70vw; }
+.toasts .toast { position: relative; left: auto; bottom: auto; transform: none; grid-area: 1 / 1; width: auto; max-width: none; align-self: end; }
+.toasts.fan .toast { transition: transform 84ms steps(3, end); }
+.toasts:not(.fan) .toast:not(:last-child) { background: var(--bg); }
+.toasts:not(.fan) .toast:not(:last-child) > * { visibility: hidden; }
+.toast-msg { min-width: 0; }
+.toasts .toast-msg, .toasts .toast-text { flex: 1; }
+.toasts:not(.fan) .toast:not(:last-child) { overflow: hidden; }
+.toast-mark.ok { fill: var(--c-green); }
+.toast-mark.bad { fill: var(--error); }
+.sprite { flex: none; display: block; }
+.toast .pixel-spin { margin-right: -4px; }
+.pixel-spin { flex: none; display: inline-grid; grid-template-columns: 4px 4px; grid-template-rows: 4px 4px; width: 8px; height: 8px; }
+.pixel-spin i { background: var(--border); animation: pixel-spin 480ms steps(1) infinite; }
+.pixel-spin i:nth-child(2) { animation-delay: -360ms; }
+.pixel-spin i:nth-child(4) { animation-delay: -240ms; }
+.pixel-spin i:nth-child(3) { animation-delay: -120ms; }
+@keyframes pixel-spin { 0% { background: currentColor; } 25% { background: var(--border); } }
+@media (prefers-reduced-motion: reduce) {
+  .toasts.fan .toast { transition: none; }
+  .pixel-spin i { animation: none; background: var(--muted); }
+}
+
+/* Big pixel numbers roll digit by digit in four hard frames when they change (D113, Roll.tsx). */
+.roll-slot { display: inline-grid; overflow: hidden; vertical-align: bottom; }
+.roll-slot > span { grid-area: 1 / 1; animation: 112ms steps(4, end) both; }
+.roll.up .roll-was { animation-name: roll-out-up; }
+.roll.up .roll-now { animation-name: roll-in-up; }
+.roll.down .roll-was { animation-name: roll-out-down; }
+.roll.down .roll-now { animation-name: roll-in-down; }
+@keyframes roll-out-up { to { transform: translateY(-100%); } }
+@keyframes roll-in-up { from { transform: translateY(100%); } }
+@keyframes roll-out-down { to { transform: translateY(100%); } }
+@keyframes roll-in-down { from { transform: translateY(-100%); } }

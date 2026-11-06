@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.index/
+.DS_Store
+*.log
+
+# Impeccable engine binary (downloaded on first run)
+.claude/skills/impeccable/scripts/bin/
+
+# Excalidraw fonts, copied from node_modules at dev/build time
+apps/desktop/public/excalidraw-assets/
+
+# Impeccable runtime state (live server port, pid, token; critique snapshots)
+.impeccable/
+apps/desktop/.impeccable/
+apps/desktop/dist-phone/
+apps/phone/src-tauri/target/
+apps/phone/src-tauri/gen/schemas/

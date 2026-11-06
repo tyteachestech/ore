@@ -1,0 +1,11 @@
+1
+00:00:01,000 --> 00:00:04,000
+Welcome to the lecture on memory.
+
+2
+00:00:04,500 --> 00:00:08,000
+Today we cover spacing and retrieval.
+
+3
+00:00:41,000 --> 00:00:45,000
+Now the forgetting curve.

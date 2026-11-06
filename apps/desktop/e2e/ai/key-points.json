@@ -1,0 +1,41 @@
+{
+ "prequestions": [
+  {
+   "q": "Why does rereading feel effective even when it isn't?",
+   "points": [
+    {
+     "text": "Rereading creates fluency, which feels like knowing",
+     "evidence": [
+      {
+       "exact": "Rereading, by contrast, creates fluency: the text feels familiar, and familiarity is easily mistaken for knowing.",
+       "prefix": "",
+       "suffix": "",
+       "start": 980,
+       "end": 1093
+      }
+     ]
+    },
+    {
+     "text": "Retrieval pulls information out of memory",
+     "evidence": [
+      {
+       "exact": "Retrieval practice is the act of pulling information out of memory rather than putting it back in.",
+       "prefix": "",
+       "suffix": "",
+       "start": 84,
+       "end": 182
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "q": "When does the testing effect show up, and when doesn't it?",
+   "points": []
+  },
+  {
+   "q": "What makes a retrieval attempt more useful?",
+   "points": []
+  }
+ ]
+}

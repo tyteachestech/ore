@@ -1,0 +1,4 @@
+/target/
+/gen/schemas
+# the global "Icon?" ignore (macOS folder icons) would otherwise match this folder
+!/icons/

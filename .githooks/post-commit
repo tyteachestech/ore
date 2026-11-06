@@ -1,0 +1,19 @@
+#!/bin/sh
+# Rebuild and reinstall /Applications/Ore.app when a commit touches the desktop app.
+# Runs in the background so the commit returns at once. Log: ~/Library/Caches/ore/app-install.log
+git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^apps/desktop/' || exit 0
+root=$(git rev-parse --show-toplevel)
+cache="$HOME/Library/Caches/ore"
+mkdir -p "$cache"
+(
+  cd "$root" || exit 1
+  # One build at a time; the running build loops until it has installed the latest HEAD.
+  mkdir "$cache/app-install.lock" 2>/dev/null || exit 0
+  trap 'rmdir "$cache/app-install.lock"' EXIT
+  built=
+  while [ "$(git rev-parse HEAD)" != "$built" ]; do
+    built=$(git rev-parse HEAD)
+    echo "$(date): installing $(git rev-parse --short HEAD)"
+    if bun run app:install; then echo "$(date): installed"; else echo "$(date): FAILED"; fi
+  done
+) >>"$cache/app-install.log" 2>&1 &

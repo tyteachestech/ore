@@ -1,0 +1,21 @@
+{
+  "name": "ore",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "workspaces": [
+    "packages/*",
+    "apps/desktop"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit",
+    "app:install": "bun run --cwd apps/desktop app:install",
+    "intake:live": "bun packages/core/scripts/intake-live.ts",
+    "e2e": "bun apps/desktop/e2e/journeys.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2",
+    "playwright": "1.63.0"
+  }
+}

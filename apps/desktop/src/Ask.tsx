@@ -1,0 +1,134 @@
+import { ArrowUp, Sparkle } from "./icons";
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Grow } from "./Grow";
+import { ore, opt, type CardFull } from "./ore";
+import { errorText } from "./util";
+
+type Proposal = { question: string; answer: string };
+type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null };
+type Reply = { reply: string; proposal: Proposal | null; session: string };
+
+const STARTERS = ["Why is this the answer?", "Give me an example", "Make this card clearer"];
+
+/** Ask about this (D61): a chat about the card he just answered, like ChatGPT's thread under a
+ *  message. It runs on his own plan through `ore ask` (claude -p or codex); a proposed card is
+ *  applied only when he clicks Use this card. Never shown before the answer, never rates. */
+export function Ask({ card, answer, onApply, onClose }: { card: CardFull; answer: string; onApply: (p: Proposal) => Promise<void>; onClose: () => void }) {
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [applied, setApplied] = useState<Proposal | null>(null);
+  const session = useRef<string | undefined>(undefined);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const end = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    field.current?.focus();
+  }, []);
+  useEffect(() => {
+    // Braces: newer engines return a promise from a smooth scrollIntoView, which an effect must not return.
+    end.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [turns, busy]);
+
+  const send = async (text: string) => {
+    const message = text.trim();
+    if (!message || busy) return;
+    setTurns((t) => [...t, { role: "me", text: message }]);
+    setInput("");
+    setError(null);
+    setBusy(true);
+    try {
+      const r = await ore<Reply>(
+        "ask",
+        card.id,
+        opt("message", message),
+        ...(session.current ? [opt("session", session.current)] : [opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : [])]),
+      );
+      session.current = r.session;
+      setTurns((t) => [...t, { role: "ai", text: r.reply, proposal: r.proposal }]);
+    } catch (e) {
+      setError(errorText(e, "answer that"));
+    } finally {
+      setBusy(false);
+      field.current?.focus();
+    }
+  };
+
+  return (
+    <section className="ask" aria-label="Ask about this">
+      {turns.length === 0 && (
+        <div className="ask-starters">
+          {STARTERS.map((s) => (
+            <button key={s} onClick={() => void send(s)}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="ask-turns" aria-live="polite">
+        {turns.map((t, i) =>
+          t.role === "me" ? (
+            <p key={i} className="ask-me">
+              {t.text}
+            </p>
+          ) : (
+            <div key={i} className="ask-ai">
+              <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
+              <div className="ask-text">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.text}</ReactMarkdown>
+                {t.proposal && (
+                  <div className="ask-card">
+                    <div className="quiz-kicker">Suggested card</div>
+                    <p className="ask-card-q">{t.proposal.question}</p>
+                    <p className="ask-card-a">{t.proposal.answer}</p>
+                    <button className="ask-use" disabled={applied === t.proposal} onClick={() => void onApply(t.proposal!).then(() => setApplied(t.proposal!), () => {})}>
+                      {applied === t.proposal ? "Card updated" : "Use this card"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ),
+        )}
+        {busy && (
+          <div className="ask-ai">
+            <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
+            <span className="ask-dots" aria-label="Thinking">
+              <i />
+              <i />
+              <i />
+            </span>
+          </div>
+        )}
+        {error && <p className="err">{error}</p>}
+        <div ref={end} />
+      </div>
+      <div className="ask-input">
+        <Grow
+          ref={field}
+          rows={1}
+          className="field"
+          aria-label="Ask about this card"
+          placeholder={turns.length ? "Ask a follow-up…" : "Ask about this card…"}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void send(input);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              onClose();
+            }
+          }}
+        />
+        <button className="ask-send" aria-label="Send" disabled={!input.trim() || busy} onClick={() => void send(input)}>
+          <ArrowUp size={14} weight="bold" aria-hidden="true" />
+        </button>
+      </div>
+    </section>
+  );
+}
