@@ -12,6 +12,7 @@ import { Collected, CollectedPanel, ICON, LABEL, MEANS } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar } from "./Find";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
+import { snapRange } from "./snap";
 import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
@@ -1049,7 +1050,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   /** A passage chosen with the mouse or the keyboard: inside a highlight he already made, that one opens
    *  (with the type he keyed) instead of stacking a second; otherwise it becomes a new highlight. */
-  function highlightRange(r: Range, intent?: Intent, aim?: Aim) {
+  function highlightRange(r: Range, intent?: Intent, aim?: Aim, snap = false) {
     const inside = [...ranges.current].find(
       ([, h]) => h.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, r) >= 0,
     );
@@ -1057,7 +1058,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       fresh.current = null;
       openPopup(inside[0], inside[1], annsRef.current.find((a) => a.id === inside[0])?.note ?? "", aim);
       if (intent && annsRef.current.find((a) => a.id === inside[0])?.intent !== intent) void setIntentOf(inside[0], intent);
-    } else createHighlight(r, intent, aim);
+    } else createHighlight(snap ? snapRange(r) : r, intent, aim);
   }
 
   // The quiz's "In the source" passage as a key point, in one click: inside a highlight he made, that
@@ -1683,7 +1684,8 @@ function ReaderView(p: Props & { reload: () => void }) {
       const r = sel.getRangeAt(0);
       if (el.contains(r.startContainer) && el.contains(r.endContainer)) {
         const up = sel.focusNode === r.startContainer && sel.focusOffset === r.startOffset;
-        highlightRange(r.cloneRange(), undefined, { x: e.clientX, y: e.clientY, up });
+        // Whole words, unless he held ⌥ for part of one.
+        highlightRange(r.cloneRange(), undefined, { x: e.clientX, y: e.clientY, up }, !e.altKey);
         setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
       }
       return;
@@ -1740,7 +1742,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     touchRange.current = null;
     setTouchSel(false);
     if (!r || r.collapsed) return;
-    createHighlight(r, intent);
+    createHighlight(snapRange(r), intent);
     window.getSelection()?.removeAllRanges();
   };
 

@@ -148,6 +148,7 @@ export const FIXED: { label: string; group: string; keys: string }[] = [
   { label: "Move the reading focus, widen it", group: "Reader", keys: "↑ ↓  ⇧↑ ⇧↓" },
   { label: "Clear the reading focus", group: "Reader", keys: "Esc" },
   { label: "Next / previous match in find", group: "Reader", keys: "↵ ⇧↵  ⌘G ⇧⌘G" },
+  { label: "Highlight part of a word (no snapping to whole words)", group: "Reader", keys: "⌥ while selecting or dragging" },
   { label: "Save note", group: "Highlight", keys: "↵" },
   { label: "Close", group: "Highlight", keys: "Esc" },
   { label: "How sure: Guess, Think so, Sure", group: "Review", keys: "1 2 3" },

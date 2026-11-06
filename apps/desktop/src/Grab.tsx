@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Intent } from "./ore";
+import { snapEdge, type Side } from "./snap";
 
 // The open highlight's two edges, to drag (Kindle, Apple Books on iPhone): a stem the height of the line
-// with a knob, above the start and below the end, in the highlight's colour. An edge snaps to whole words;
+// with a knob, above the start and below the end, in the highlight's colour. An edge snaps to whole words (snap.ts), ⌥ for part of one;
 // Esc while dragging puts it back. Outside <article className="doc">, like the margin marks: highlights are
 // painted over that DOM and its text index must stay untouched.
 
-type Side = "start" | "end";
 type Spot = { left: number; top: number; height: number };
 
 /** The text node and offset under the pointer, inside `root` and its indexed text. */
@@ -16,20 +16,6 @@ function pointAt(root: HTMLElement, x: number, y: number): { node: Text; offset:
   if (!c || !node || node.nodeType !== Node.TEXT_NODE || !root.contains(node)) return null;
   if (node.parentElement?.closest(".katex, [data-noindex]")) return null;
   return { node: node as Text, offset: c.startOffset };
-}
-
-/** The edge of the word at `offset`: a start goes back to where the word begins, an end on to where it
- *  ends (its punctuation with it), and neither takes the space beside it. */
-export function snap(text: string, offset: number, side: Side): number {
-  let o = offset;
-  if (side === "start") {
-    while (o > 0 && /\S/.test(text[o - 1]!)) o--;
-    while (o < text.length && /\s/.test(text[o]!)) o++;
-  } else {
-    while (o < text.length && /\S/.test(text[o]!)) o++;
-    while (o > 0 && /\s/.test(text[o - 1]!)) o--;
-  }
-  return o;
 }
 
 function spotsOf(range: Range, box: DOMRect): Record<Side, Spot> | null {
@@ -100,11 +86,11 @@ export function Grab(p: {
     // The knob sits off the line: aim at the line it stands for.
     const at = pointAt(p.root, e.clientX, e.clientY + (d.side === "start" ? 6 : -6));
     if (!at) return;
-    const o = snap(at.node.data, at.offset, d.side);
+    const [n, o] = e.altKey ? [at.node, at.offset] : snapEdge(at.node, at.offset, d.side);
     const r = d.now.cloneRange();
     // Past the other edge, the range collapses: the highlight stops at its last word instead.
-    if (d.side === "start") r.setStart(at.node, o);
-    else r.setEnd(at.node, o);
+    if (d.side === "start") r.setStart(n, o);
+    else r.setEnd(n, o);
     if (r.collapsed || !r.toString().trim()) return;
     if (r.compareBoundaryPoints(Range.START_TO_START, d.now) === 0 && r.compareBoundaryPoints(Range.END_TO_END, d.now) === 0) return;
     d.now = r;

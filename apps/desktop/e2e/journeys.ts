@@ -133,6 +133,23 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {
+  await openSource(page, TESTING);
+  const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await select(page, "ach successful retrieval changes the memory its");
+  await popup.waitFor();
+  await until("it snaps out to whole words", async () => (await active()) === "Each successful retrieval changes the memory itself.");
+  await page.keyboard.press("Escape"); // drops the fresh one
+  await popup.waitFor({ state: "hidden" });
+  await page.keyboard.down("Alt");
+  await select(page, "trengthens the route bac");
+  await page.keyboard.up("Alt");
+  await popup.waitFor();
+  await until("⌥ keeps exactly what he selected", async () => (await active()) === "trengthens the route bac");
+  await page.keyboard.press("Escape");
+});
+
 journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
   await openSource(page, AGENTS);
   const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
