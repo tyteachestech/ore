@@ -1,4 +1,4 @@
-import { Rss, BookOpenText, FilePdf, FileText, FileX, Globe, GraduationCap, Headphones, Image as ImageIcon, LinkSimple, NotePencil, Paperclip, Plus, TextAlignLeft, Stack, YoutubeLogo, type Icon } from "./icons";
+import { Rss, BookOpenText, FilePdf, FileText, FileX, Globe, GraduationCap, Headphones, Image as ImageIcon, LinkSimple, NotePencil, Paperclip, PlayCircle, Plus, TextAlignLeft, Stack, YoutubeLogo, type Icon } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { feedProof, type FoundFeed } from "./Feed";
@@ -275,8 +275,8 @@ function Copied({ entry, onAdd }: { entry: Entry; onAdd: () => void }) {
   );
 }
 
-const TILES = { pdf: FilePdf, book: BookOpenText, note: NotePencil, page: Globe, image: ImageIcon, audio: Headphones } satisfies Record<FileKind, Icon>;
-const NAMES: Record<FileKind, string> = { pdf: "PDF", book: "book", note: "note", page: "web page", image: "image", audio: "audio" };
+const TILES = { pdf: FilePdf, book: BookOpenText, note: NotePencil, page: Globe, image: ImageIcon, audio: Headphones, video: PlayCircle } satisfies Record<FileKind, Icon>;
+const NAMES: Record<FileKind, string> = { pdf: "PDF", book: "book", note: "note", page: "web page", image: "image", audio: "audio", video: "video" };
 
 export type Dropping = { kinds: (FileKind | null)[]; skill: Skill | null };
 
