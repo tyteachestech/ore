@@ -20,6 +20,11 @@ export function startRemix(lib: Library, cardIds: string[]): "started" | "skippe
   return startBackground(lib, ["remix", ...cardIds], "remix");
 }
 
+// A PDF's tables and formulas (D125): `ore tables <id>` detached, since Docling takes seconds to minutes.
+export function startTables(lib: Library, itemId: string): "started" | "skipped" {
+  return startBackground(lib, ["tables", itemId], `tables-${itemId}`);
+}
+
 // The day's catch-up (D8, D10): `ore catch-up` detached, at most once in 20 hours. Started from Home,
 // a review session and the reminder agent, so it runs whether or not the app is open.
 export function startCatchUp(lib: Library): "started" | "skipped" {

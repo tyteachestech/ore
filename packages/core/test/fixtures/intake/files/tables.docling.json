@@ -1,0 +1,302 @@
+{
+ "schema_name": "DoclingDocument",
+ "version": "1.11.0",
+ "texts": [
+  {
+   "label": "formula",
+   "prov": [
+    {
+     "page_no": 1,
+     "bbox": {
+      "l": 222.174,
+      "t": 491.3,
+      "r": 391.026,
+      "b": 467.1253147877013,
+      "coord_origin": "BOTTOMLEFT"
+     },
+     "charspan": [
+      0,
+      37
+     ]
+    }
+   ],
+   "text": "R ( t ) = e ^ { - t / S } , \\quad S _ { n + 1 } = S _ { n } \\cdot ( 1 + a )"
+  }
+ ],
+ "tables": [
+  {
+   "label": "table",
+   "prov": [
+    {
+     "page_no": 1,
+     "bbox": {
+      "l": 139.8758544921875,
+      "t": 648.8443603515625,
+      "r": 471.87518310546875,
+      "b": 570.6477508544922,
+      "coord_origin": "BOTTOMLEFT"
+     },
+     "charspan": [
+      0,
+      0
+     ]
+    }
+   ],
+   "data": {
+    "num_rows": 4,
+    "num_cols": 4,
+    "table_cells": [
+     {
+      "bbox": {
+       "l": 147.0,
+       "t": 150.56399999999996,
+       "r": 189.174,
+       "b": 160.36253587115664,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 0,
+      "start_col_offset_idx": 0,
+      "column_header": true,
+      "text": "Schedule"
+     },
+     {
+      "bbox": {
+       "l": 257.0,
+       "t": 150.56399999999996,
+       "r": 299.76800000000003,
+       "b": 160.36253587115664,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 0,
+      "start_col_offset_idx": 1,
+      "column_header": true,
+      "text": "Learners"
+     },
+     {
+      "bbox": {
+       "l": 337.0,
+       "t": 150.56399999999996,
+       "r": 364.192,
+       "b": 160.36253587115664,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 0,
+      "start_col_offset_idx": 2,
+      "column_header": true,
+      "text": "Day 1"
+     },
+     {
+      "bbox": {
+       "l": 407.0,
+       "t": 150.56399999999996,
+       "r": 439.692,
+       "b": 160.36253587115664,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 0,
+      "start_col_offset_idx": 3,
+      "column_header": true,
+      "text": "Day 30"
+     },
+     {
+      "bbox": {
+       "l": 147.0,
+       "t": 169.9179999999999,
+       "r": 178.768,
+       "b": 179.51360761346996,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 1,
+      "start_col_offset_idx": 0,
+      "column_header": false,
+      "text": "Spaced"
+     },
+     {
+      "bbox": {
+       "l": 257.0,
+       "t": 169.9179999999999,
+       "r": 273.5,
+       "b": 179.51360761346996,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 1,
+      "start_col_offset_idx": 1,
+      "column_header": false,
+      "text": "412"
+     },
+     {
+      "bbox": {
+       "l": 337.0,
+       "t": 169.9179999999999,
+       "r": 357.163,
+       "b": 179.51360761346996,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 1,
+      "start_col_offset_idx": 2,
+      "column_header": false,
+      "text": "91%"
+     },
+     {
+      "bbox": {
+       "l": 407.0,
+       "t": 169.9179999999999,
+       "r": 427.163,
+       "b": 179.51360761346996,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 1,
+      "start_col_offset_idx": 3,
+      "column_header": false,
+      "text": "74%"
+     },
+     {
+      "bbox": {
+       "l": 147.0,
+       "t": 189.11799999999994,
+       "r": 180.60500000000002,
+       "b": 198.7136076134699,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 2,
+      "start_col_offset_idx": 0,
+      "column_header": false,
+      "text": "Massed"
+     },
+     {
+      "bbox": {
+       "l": 257.0,
+       "t": 189.11799999999994,
+       "r": 273.5,
+       "b": 198.7136076134699,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 2,
+      "start_col_offset_idx": 1,
+      "column_header": false,
+      "text": "398"
+     },
+     {
+      "bbox": {
+       "l": 337.0,
+       "t": 189.11799999999994,
+       "r": 357.163,
+       "b": 198.7136076134699,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 2,
+      "start_col_offset_idx": 2,
+      "column_header": false,
+      "text": "93%"
+     },
+     {
+      "bbox": {
+       "l": 407.0,
+       "t": 189.11799999999994,
+       "r": 427.163,
+       "b": 198.7136076134699,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 2,
+      "start_col_offset_idx": 3,
+      "column_header": false,
+      "text": "41%"
+     },
+     {
+      "bbox": {
+       "l": 147.0,
+       "t": 208.31799999999998,
+       "r": 180.61599999999999,
+       "b": 217.91360761346994,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 3,
+      "start_col_offset_idx": 0,
+      "column_header": false,
+      "text": "Control"
+     },
+     {
+      "bbox": {
+       "l": 257.0,
+       "t": 208.31799999999998,
+       "r": 273.5,
+       "b": 217.91360761346994,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 3,
+      "start_col_offset_idx": 1,
+      "column_header": false,
+      "text": "120"
+     },
+     {
+      "bbox": {
+       "l": 337.0,
+       "t": 208.31799999999998,
+       "r": 357.163,
+       "b": 217.91360761346994,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 3,
+      "start_col_offset_idx": 2,
+      "column_header": false,
+      "text": "88%"
+     },
+     {
+      "bbox": {
+       "l": 407.0,
+       "t": 208.31799999999998,
+       "r": 427.163,
+       "b": 217.91360761346994,
+       "coord_origin": "TOPLEFT"
+      },
+      "row_span": 1,
+      "col_span": 1,
+      "start_row_offset_idx": 3,
+      "start_col_offset_idx": 3,
+      "column_header": false,
+      "text": "37%"
+     }
+    ]
+   }
+  }
+ ],
+ "pages": {
+  "1": {
+   "size": {
+    "width": 612.0,
+    "height": 792.0
+   },
+   "page_no": 1
+  }
+ }
+}

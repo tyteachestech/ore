@@ -3,6 +3,7 @@ import type { TextItem } from "pdfjs-dist/types/src/display/api";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
 import { cleanTitle } from "./check.ts";
+import type { Box, Region } from "./docling.ts";
 import { pageFigures, png } from "./pdf-figures.ts";
 
 export interface PdfDoc {
@@ -139,7 +140,8 @@ function pageLines(items: Item[]): Line[] {
 
 /** The usual distance from one line to the next, across the whole document: a short page can't tell. */
 function lineGap(pages: Line[][]): number {
-  const gaps = pages.flatMap((lines) => lines.slice(1).map((l, i) => lines[i]!.y - l.y)).filter((g) => g > 0).sort((a, b) => a - b);
+  // A table or formula Docling read (D125) is one line standing for many, so its gaps don't count.
+  const gaps = pages.flatMap((lines) => lines.slice(1).map((l, i) => (isBlock(l.text) || isBlock(lines[i]!.text) ? 0 : lines[i]!.y - l.y))).filter((g) => g > 0).sort((a, b) => a - b);
   return gaps[Math.floor(gaps.length / 2)] ?? 12;
 }
 
@@ -163,11 +165,12 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
     const drop = new Set<Line>();
     const [head, next] = byY;
     const t = (l: Line) => plain(l.text);
-    if (head && next && t(head).length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(t(head)) || folio.test(t(head)) || heads.get(key(head))! > 1)) drop.add(head);
+    // A table or formula Docling read (D125) is never a running head, though many pages start with one.
+    if (head && next && !isBlock(head.text) && t(head).length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(t(head)) || folio.test(t(head)) || heads.get(key(head))! > 1)) drop.add(head);
     const rest = byY.filter((l) => !drop.has(l));
     const foot = rest.at(-1);
     const prev = rest.at(-2);
-    if (foot && prev && t(foot).length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
+    if (foot && prev && !isBlock(foot.text) && t(foot).length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
     return lines.filter((l) => !drop.has(l));
   });
 }
@@ -197,6 +200,13 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
     if (skip > i) return;
     const gap = i === 0 ? 0 : lines[i - 1]!.y - l.y;
     const line = plain(l.text);
+    // A table or formula Docling read stands alone (D125).
+    if (isBlock(line)) {
+      push();
+      out.push({ text: line, note: false });
+      item = null;
+      return;
+    }
     // Lines set clearly larger than the body text, then body text, are a heading (the outline's);
     // a heading that wraps is joined. Large text not followed by body text is a figure's labels.
     // A numbered heading ("1.1.1 Acting humanly") may be set only a little larger, often in bold.
@@ -360,7 +370,67 @@ export class ScannedPdf extends Error {
   }
 }
 
-export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
+/** A table or formula Docling found (D125), held in the text as BLOCK…BLOCK_ until the page is put together. */
+const BLOCK = "\uE020", BLOCK_ = "\uE021";
+const isBlock = (t: string) => new RegExp(`^${BLOCK}\\d+${BLOCK_}$`).test(t);
+
+const inside = (i: Item, b: Box) => {
+  const x = (i.x + i.end) / 2;
+  const y = i.y + (i.size || 8) / 3;
+  return x >= b.l - 2 && x <= b.r + 2 && y >= b.b - 2 && y <= b.t + 2;
+};
+
+/** A page's items with each region's text taken out and one BLOCK item put where it started, and
+ *  the Markdown each block stands for: a table built cell by cell from pdf.js's own reading of the
+ *  text in each cell's box (its powers and bold kept), Docling's where pdf.js finds none; a formula as
+ *  Docling's LaTeX. */
+function swapRegions(items: Item[], regions: Region[], blocks: string[]): Item[] {
+  let out = items;
+  // A formula Docling found inside a table is one of its cells, read with the table.
+  const within = (a: Box, b: Box) => (a.l + a.r) / 2 >= b.l && (a.l + a.r) / 2 <= b.r && (a.t + a.b) / 2 >= b.b && (a.t + a.b) / 2 <= b.t;
+  const tables = regions.filter((r) => r.kind === "table");
+  for (const r of regions) {
+    if (r.kind === "formula" && tables.some((t) => within(r.box, t.box))) continue;
+    const ins = (i: Item) => !!i.str.trim() && !isBlock(i.str) && inside(i, r.box);
+    const at = out.findIndex(ins);
+    if (at < 0) continue;
+    const md = r.kind === "formula" ? `$$\n${r.latex}\n$$` : table(r, out.filter(ins));
+    if (!md) continue;
+    const mark: Item = { str: BLOCK + blocks.length + BLOCK_, x: r.box.l, y: r.box.t, end: r.box.r, size: 0, eol: true };
+    blocks.push(md);
+    const kept = out.filter((i, n) => n < at || !ins(i));
+    if (at > 0) kept[at - 1] = { ...kept[at - 1]!, eol: true };
+    out = [...kept.slice(0, at), mark, ...kept.slice(at)];
+  }
+  return out;
+}
+
+function table(r: Extract<Region, { kind: "table" }>, items: Item[]): string {
+  const grid = Array.from({ length: r.rows }, () => Array.from({ length: r.cols }, () => ""));
+  for (const c of r.cells) {
+    if (c.row >= r.rows || c.col >= r.cols) continue;
+    // A cell's text may wrap: a step down to the next line ends one, a raised power doesn't.
+    const its = items.filter((i) => inside(i, c.box));
+    const own = pageLines(its.map((i, n) => ({ ...i, eol: i.eol || (!!its[n + 1] && its[n + 1]!.y < i.y - (i.size || 8) * 0.6) })))
+      .map((l) => l.text)
+      .join(" ");
+    const text = emphasis(own.replace(/\uE010[^\uE011]*\uE011/g, "")).trim() || c.text;
+    grid[c.row]![c.col] = text.replace(/\|/g, "\\|").replace(/\s+/g, " ");
+  }
+  // The header is the run of rows from the top whose every cell is a header; Docling also marks a
+  // label row lower down (a table's "FLOPs" line), which stays in the body.
+  let head = 0;
+  while (head + 1 < r.rows && r.cells.some((c) => c.row === head + 1) && r.cells.every((c) => c.row !== head + 1 || c.header)) head++;
+  // Markdown has one header row: a header set over two rows reads as one, its parts joined.
+  const top = grid.slice(0, head + 1).reduce((a, row) => a.map((t, i) => [t, row[i]].filter(Boolean).join(" ")), grid[0]!.map(() => ""));
+  // A header row is bold already: its own bold marks would only repeat that.
+  const rows = [top.map((t) => t.replace(/^\*\*(.*)\*\*$/, "$1")), ...grid.slice(head + 1)].filter((row) => row.some(Boolean));
+  if (rows.length < 2) return "";
+  const line = (row: string[]) => `| ${row.join(" | ")} |`;
+  return [line(rows[0]!), line(rows[0]!.map(() => "---")), ...rows.slice(1).map(line)].join("\n");
+}
+
+export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promise<PdfDoc> {
   const task = openPdf(data);
   const doc = await task.promise;
   const meta = await pdfMeta(doc);
@@ -390,7 +460,8 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
   const assets = [...new Map(kept.flat().slice(0, MAX_FIGURES).map((a) => [a.name, a])).values()];
   const body = bodySize(items);
   plainFaces(items);
-  const raw = items.map((p) => pageLines(dropMargins(p, body)));
+  const blocks: string[] = [];
+  const raw = items.map((p, i) => pageLines(swapRegions(dropMargins(p, body), regions.filter((r) => r.page === i + 1), blocks)));
   const typical = lineGap(raw);
   const lines = dropRunning(raw, body, typical);
   const words = wordsOf(lines);
@@ -402,7 +473,7 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
     const at = page.findLastIndex((p) => !p.note);
     const last = page[at]?.text;
     const first = next?.[0];
-    if (!last || !first || first.note || /^(?:#|- )/.test(last) || /^(?:#|- )/.test(first.text)) return;
+    if (!last || !first || first.note || /^(?:#|- )/.test(last) || /^(?:#|- )/.test(first.text) || isBlock(last) || isBlock(first.text)) return;
     const end = plain(last);
     if (/-$/.test(end) || (!/[.!?:;”"’)\]]$/.test(end) && /^\p{Ll}/u.test(plain(first.text)))) {
       page[at] = { text: join(last, first.text, words), note: false };
@@ -411,7 +482,7 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
   });
   const shown = new Set(assets.map((a) => a.name));
   const notes = footnotes(paras);
-  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => notes(x.text, i)), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);
+  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);
   const text = pages.join("\n\n") + "\n";
   if (text.replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").trim().length < 20) {
     throw new ScannedPdf();
