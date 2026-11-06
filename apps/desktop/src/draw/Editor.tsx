@@ -1264,8 +1264,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
         {fillOn && (
           <>
             {main && (
-              <Row label={badges ? "Fill ⇧" : "Fill"}>
-                {FILLS.map((c, i) => <Swatch key={c} colour={c} badge={badges ? String(i + 1) : undefined} on={value("backgroundColor") === c} onPick={() => setProp({ backgroundColor: c })} />)}
+              <Row label="Fill">
+                {FILLS.map((c, i) => <Swatch key={c} colour={c} badge={badges ? `⇧${i + 1}` : undefined} on={value("backgroundColor") === c} onPick={() => setProp({ backgroundColor: c })} />)}
               </Row>
             )}
             {rest && value("backgroundColor") !== "transparent" && (
@@ -1774,7 +1774,7 @@ function Swatch({ colour, on, onPick, badge }: { colour: string; on: boolean; on
   const name = colour === "transparent" ? "None" : colour;
   return (
     <Hint text={name === "None" ? "No fill" : name}>
-      <button className="draw-swatch" aria-pressed={on} aria-label={name} aria-keyshortcuts={badge} onClick={onPick} style={{ "--swatch": dark(colour) } as CSSProperties} data-none={colour === "transparent" || undefined}>
+      <button className="draw-swatch" aria-pressed={on} aria-label={name} aria-keyshortcuts={badge?.replace("⇧", "Shift+")} onClick={onPick} style={{ "--swatch": dark(colour) } as CSSProperties} data-none={colour === "transparent" || undefined}>
         {badge && <span className="draw-badge" aria-hidden="true">{badge}</span>}
       </button>
     </Hint>
