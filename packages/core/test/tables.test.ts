@@ -3,7 +3,8 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
-import { regionsFrom, tidyLatex } from "../src/ingest/docling.ts";
+import { regionsFrom, tidyLatex, type Region } from "../src/ingest/docling.ts";
+import { pdfToDoc } from "../src/ingest/pdf.ts";
 import { addSource, addText, readTables, tablesState, reimportSource, undoReimport } from "../src/ingest/index.ts";
 import { findItem } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -78,6 +79,18 @@ describe("PDF tables and formulas (D123)", () => {
     expect(findItem(lib, item.meta.id).body).toBe(item.body);
     const text = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
     await expect(readTables(lib, text.meta.id)).rejects.toThrow("Only a PDF source");
+  });
+
+  test("a formula Docling finds inside a table is one of its cells, and a label row lower down stays in the body", async () => {
+    const regions = regionsFrom(JSON.parse(readFileSync(LAYOUT, "utf8")));
+    const t = regions.find((r) => r.kind === "table")!;
+    if (t.kind !== "table") throw new Error("no table");
+    // Docling marks a row near the bottom as a header too (ResNet's "FLOPs" row).
+    const marked: Region = { ...t, cells: t.cells.map((c) => (c.row === 3 ? { ...c, header: true } : c)) };
+    const inner: Region = { kind: "formula", page: 1, box: t.cells[5]!.box, latex: "412" };
+    const body = (await pdfToDoc(new Uint8Array(readFileSync(join(FIX, "tables.pdf"))), [marked, inner, ...regions.filter((r) => r.kind === "formula")])).body;
+    expect(body).toContain(TABLE);
+    expect(body).not.toContain("$$\n412");
   });
 
   test("Docling's boxes are turned to bottom-left points, and its LaTeX made safe for KaTeX", () => {
