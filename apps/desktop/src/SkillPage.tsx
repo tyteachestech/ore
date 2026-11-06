@@ -1,4 +1,4 @@
-import { CaretRight, Info as InfoIcon, Plus, Target, X } from "./icons";
+import { CaretRight, Collapse, Expand, Info as InfoIcon, Plus, Target, X } from "./icons";
 import { PixelBook, PixelNote, PixelQuestion } from "./PixelIcon";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
@@ -97,6 +97,8 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
   const stats = useStats(skill.id);
   const pageRef = useRef<HTMLDivElement>(null);
   const [find, setFind] = useState({ open: false, query: "", focus: 0 });
+  // The note across the whole page for a wide table, until he clicks again; not kept (Tyler, option C).
+  const [wide, setWide] = useState(false);
   return (
     <div className="skill-page" data-color={skill.color} ref={pageRef}>
       {find.open && (
@@ -118,11 +120,16 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
         {stats && stats.strength.solid + stats.strength.growing + stats.strength.new > 0 && <Strength s={stats} color={skill.color} />}
       </header>
 
-      <div className={`skill-cols${split.dragging ? " dragging" : ""}`} style={{ gridTemplateColumns: `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` }}>
+      <div className={`skill-cols${split.dragging ? " dragging" : ""}${wide ? " wide" : ""}`} style={{ gridTemplateColumns: wide ? "minmax(0, 1fr)" : `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` }}>
         <div className="skill-col">
           <section className="skill-card skill-note" data-tone="note">
             <div className="card-head">
               <span className="card-title"><PixelNote className="card-icon" size={12} aria-hidden="true" /><h2>Your note</h2></span>
+              <Hint text={wide ? "Back beside sources and questions" : "Widen the note, for wide tables"}>
+                <button className="icon-btn note-widen" aria-label={wide ? "Narrow your note" : "Widen your note"} aria-pressed={wide} onClick={() => setWide((w) => !w)}>
+                  {wide ? <Collapse size={14} aria-hidden="true" /> : <Expand size={14} aria-hidden="true" />}
+                </button>
+              </Hint>
               <Hint text="Add a block">
                 <button className="icon-btn" aria-label="Add a block to your note" onClick={() => editor.current?.addBlock()}>
                   <Plus size={14} weight="bold" aria-hidden="true" />

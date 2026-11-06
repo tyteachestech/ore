@@ -4,6 +4,7 @@ import {
   createCodeBlockCommand, imageSchema, insertHrCommand, linkSchema, turnIntoTextCommand, wrapInBlockquoteCommand, wrapInBulletListCommand,
   wrapInHeadingCommand, wrapInOrderedListCommand,
 } from "@milkdown/kit/preset/commonmark";
+import { insertTableCommand } from "@milkdown/kit/preset/gfm";
 import { toggleMark, wrapIn } from "@milkdown/kit/prose/commands";
 import { NodeSelection, Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet, type EditorView, type ViewMutationRecord } from "@milkdown/kit/prose/view";
@@ -21,6 +22,7 @@ import { dateRows } from "./dates";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
 import { BlockHandle } from "./BlockHandle";
+import { TableControls } from "./TableControls";
 import { SelectionBar, type Sel } from "./SelectionBar";
 import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock } from "./blockops";
 import { is } from "../keys";
@@ -360,6 +362,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 2)));
         },
       })),
+      { label: "Table", sub: "| |", run: cmd(insertTableCommand.key, { row: 3, col: 3 }) },
       { label: "Code", sub: "```", run: cmd(createCodeBlockCommand.key) },
       { label: "Divider", sub: "---", run: cmd(insertHrCommand.key) },
       {
@@ -464,6 +467,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     >
       <div ref={root} />
       {!PHONE && <BlockHandle view={view} host={host} />}
+      {!PHONE && <TableControls view={view} host={host} />}
       {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} />}
       {menu && ((menu.kind !== "emoji" && menu.kind !== "date") || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>

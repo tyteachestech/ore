@@ -243,6 +243,44 @@ journey("note: / makes a toggle heading and @ writes a date; both are still ther
   await until("both survive a reload", kept);
 });
 
+journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
+  const cells = () => page.locator(".note-editor .note-table tr").evaluateAll((rs) => rs.map((r) => [...r.children].map((c) => c.textContent ?? "")));
+  await openSource(page, AGENTS);
+  await page.locator(".note-editor [contenteditable=true]").first().click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/table");
+  await page.locator(".note-menu-row.on", { hasText: "Table" }).waitFor();
+  await page.keyboard.press("Enter");
+  await until("a 3 by 3 table", async () => (await cells()).length === 3 && (await cells())[0]!.length === 3);
+  // Header, then the two rows, cell by cell; Tab in the last cell makes a fourth row.
+  for (const t of ["Tool", "Use", "Cost", "Search", "Find", "Low", "Code", "Run", "High"]) {
+    await page.keyboard.type(t);
+    await page.keyboard.press("Tab");
+  }
+  await page.keyboard.type("Memory");
+  await until("Tab in the last cell added a row", async () => JSON.stringify(await cells()) === JSON.stringify([["Tool", "Use", "Cost"], ["Search", "Find", "Low"], ["Code", "Run", "High"], ["Memory", "", ""]]));
+  await page.locator(".note-editor .note-table th", { hasText: "Use" }).hover();
+  await page.locator(".table-grip.cols").click();
+  await page.getByRole("menuitem", { name: "Delete column" }).click();
+  await until("the column is gone", async () => (await cells())[0]!.join() === "Tool,Cost");
+  await page.locator(".note-editor .note-table td", { hasText: "Memory" }).hover();
+  await page.locator(".table-add.rows").click();
+  await until("+ added a row", async () => (await cells()).length === 5);
+  await page.waitForTimeout(600); // the note saves after a pause
+  await page.reload();
+  await openSource(page, AGENTS);
+  await until("the table survives a reload", async () => (await cells()).length === 5 && (await cells())[3]!.join() === "Memory,");
+  // The skill page's widen button gives the note the whole page, and back.
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const side = page.locator(".skill-col.side");
+  await side.waitFor();
+  await page.getByRole("button", { name: "Widen your note" }).click();
+  await until("the side column hides", async () => !(await side.isVisible()));
+  await page.getByRole("button", { name: "Narrow your note" }).click();
+  await until("and comes back", () => side.isVisible());
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {

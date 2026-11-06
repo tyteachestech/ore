@@ -10,6 +10,7 @@ import { $inputRule } from "@milkdown/kit/utils";
 import { calloutSchema, remarkBlocks, toggleSchema, toggleSummarySchema } from "./blocks";
 import { highlightSchema, remarkColors, stringifyColor, textColorSchema } from "./colors";
 import { blockSelPlugin } from "./blocksel";
+import { tablePlugin, tableView } from "./tables";
 import { emojiTrigger } from "./emoji";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
@@ -27,9 +28,11 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(remarkColors)
     // Before the keymaps, so selected blocks get their keys first.
     .use(blockSelPlugin)
+    .use(tablePlugin)
     // Without it an empty paragraph saves as nothing, not as a `<br />` line.
     .use(commonmark.filter((p) => !remarkPreserveEmptyLinePlugin.includes(p)))
     .use(gfm)
+    .use(tableView)
     .use([toggleSummarySchema, toggleSchema, calloutSchema, highlightSchema, textColorSchema].flat())
     .use(taskRule)
     .use(history)
