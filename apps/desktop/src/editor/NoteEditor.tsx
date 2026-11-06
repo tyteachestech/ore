@@ -348,7 +348,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             if ($from.node(d).type.name === "list_item") return v.dispatch(v.state.tr.setNodeAttribute($from.before(d), "checked", false));
         }),
       },
-      { label: "Quote", sub: ">", run: turn("quote", call(wrapInBlockquoteCommand.key)) },
+      { label: "Quote", sub: '"', run: turn("quote", call(wrapInBlockquoteCommand.key)) },
       {
         label: "Callout",
         sub: "> [!note]",
@@ -359,7 +359,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       },
       ...[0, 1, 2, 3].map((level) => ({
         label: level ? `Toggle heading ${level}` : "Toggle",
-        sub: level ? undefined : "<details>",
+        sub: level ? undefined : ">",
         run: turn(level ? (`th${level}` as Kind) : "toggle", () => {
           const v = view();
           if (!v) return;
@@ -588,7 +588,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             if (!menu) {
               // Notion's block keys, on the caret's block: one editor step each, so ⌘Z takes it back.
               const marks = view.state.schema.marks;
-              const fmt = is(e, "note-bold") ? marks.strong : is(e, "note-italic") ? marks.emphasis : is(e, "note-strike") ? marks.strike_through : is(e, "note-code") ? marks.inlineCode : null;
+              const fmt = is(e, "note-bold") ? marks.strong : is(e, "note-italic") ? marks.emphasis : is(e, "note-underline") ? marks.ore_underline : is(e, "note-strike") ? marks.strike_through : is(e, "note-code") ? marks.inlineCode : null;
               if (fmt) {
                 toggleMark(fmt)(view.state, view.dispatch);
                 return true;

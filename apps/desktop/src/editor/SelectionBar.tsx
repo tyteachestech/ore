@@ -15,7 +15,7 @@ export type Sel = { from: number; to: number; x: number; y: number };
 
 const NAMES: Record<Color, string> = { gray: "Gray", red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", teal: "Teal", blue: "Blue", purple: "Purple", pink: "Pink" };
 
-/** Notion's bar over selected text: Turn into, bold, italic, strikethrough, code, a web link, a
+/** Notion's bar over selected text: Turn into, bold, italic, underline, strikethrough, code, a web link, a
  *  link to a source or skill note ([[ ]], D39), and colour. Each is one editor step (⌘Z). */
 export function SelectionBar({ view, sel, targets, onDone, docked }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void; /** In the iPhone's keyboard bar, not over the text: iOS puts its Copy bar there. */ docked?: boolean }) {
   const v = view();
@@ -66,6 +66,7 @@ export function SelectionBar({ view, sel, targets, onDone, docked }: { view: () 
       <span className="sel-sep" />
       <Hint text="Bold" keys="note-bold">{mark("Bold", schema.marks.strong, <b>B</b>)}</Hint>
       <Hint text="Italic" keys="note-italic">{mark("Italic", schema.marks.emphasis, <i>I</i>)}</Hint>
+      <Hint text="Underline" keys="note-underline">{mark("Underline", schema.marks.ore_underline, <u>U</u>)}</Hint>
       <Hint text="Strikethrough" keys="note-strike">{mark("Strikethrough", schema.marks.strike_through, <s>S</s>)}</Hint>
       <Hint text="Code" keys="note-code">{mark("Code", schema.marks.inlineCode, <span className="mono">{"</>"}</span>)}</Hint>
       <span className="sel-sep" />

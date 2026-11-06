@@ -637,8 +637,8 @@ img.thumb { filter: brightness(0.86); }
 /* Highlighted text is always full contrast: the intent layers sit above the video's spoken/unspoken dimming
    (priority 1, Reader.tsx), so they set their own colour. */
 ::highlight(hl-keep) { background-color: var(--keep); color: var(--text); }
-/* D118: a key point is a highlight too (same tint); its star in the margin says it comes back. */
-::highlight(hl-card) { background-color: var(--keep); color: var(--text); }
+/* D124: a key point is blue so it never reads as a plain highlight; its star in the margin says it comes back. */
+::highlight(hl-card) { background-color: var(--card); color: var(--text); }
 ::highlight(hl-question) { background-color: var(--question); color: var(--text); }
 ::highlight(hl-active), ::highlight(hl-lookup) { text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 4px; }
 
@@ -703,7 +703,7 @@ img.thumb { filter: brightness(0.86); }
 .intent { flex: 1; height: 26px; border-radius: 6px; color: var(--muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .intent:hover { background: var(--bg-hover); }
 /* Each type keeps its colour on the icon; the chosen one fills with the same tint it paints in the text. */
-.intent.keep { --hue: var(--keep-solid); --tint: var(--keep); } .intent.card { --hue: var(--keep-solid); --tint: var(--keep); }
+.intent.keep { --hue: var(--keep-solid); --tint: var(--keep); } .intent.card { --hue: var(--card-solid); --tint: var(--card); }
 .intent.question { --hue: var(--question-solid); --tint: var(--question); }
 .intent svg { color: var(--hue, currentColor); flex: none; }
 .intent.on { color: var(--text); background: var(--tint); }
@@ -849,7 +849,7 @@ body.resizing iframe { pointer-events: none; }
 .ex-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; color: var(--text-read); background: var(--bg-hover); box-shadow: var(--lift); white-space: nowrap; }
 .ex-btn:hover:not(:disabled) { background: var(--bg-active); color: var(--text); }
 .ex-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.ex-btn svg.card { color: var(--keep-solid); }
+.ex-btn svg.card { color: var(--card-solid); }
 .ex-btn svg.question { color: var(--question-solid); }
 .ex-btn.ghost { background: none; box-shadow: none; color: var(--muted); }
 .ex-btn.ghost:hover { background: var(--bg-hover); }
@@ -896,6 +896,8 @@ body.resizing iframe { pointer-events: none; }
 
 /* The chapter's prompts in the source note (D115): placeholders on empty lines, never saved. */
 .note-editor .ghost:has(> br:only-child)::before { content: attr(data-ghost); color: var(--faint); pointer-events: none; float: left; height: 0; }
+/* Notion's hint on the empty block the caret is on: what / does, or the block's kind. Never saved. */
+.note-editor .ProseMirror-focused .empty-hint:not(.ghost):has(> br:only-child)::before { content: attr(data-hint); color: var(--faint); pointer-events: none; float: left; height: 0; }
 /* Feedback on a chapter recall, under the note (D34.3: after his attempt). */
 .chapter-fb { margin: 18px 0 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; line-height: 1.55; color: var(--text-read); }
 .chapter-fb .quiz-kicker { margin: 0 0 6px; display: flex; align-items: center; }
@@ -1022,7 +1024,7 @@ body.resizing iframe { pointer-events: none; }
 .cp-toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .cp-caret { transition: transform 120ms ease-out; }
 .cp-toggle[aria-expanded="true"] .cp-caret { transform: rotate(90deg); }
-.cp-head.card svg:not(.cp-caret) { color: var(--keep-solid); }
+.cp-head.card svg:not(.cp-caret) { color: var(--card-solid); }
 .cp-head.question svg:not(.cp-caret) { color: var(--question-solid); }
 .cp-head.keep svg:not(.cp-caret) { color: var(--keep-solid); }
 .cp-count { margin-left: 6px; font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
@@ -1485,7 +1487,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .quiz-stepper button { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--text); background: var(--bg-hover); }
 .quiz-stepper button:hover, .quiz-stepper button:focus-visible { background: var(--bg-active); }
 .quiz-stepper .quiz-key { color: var(--muted); background: none; }
-.quiz-stepper .quiz-key.on { color: var(--keep-solid); }
+.quiz-stepper .quiz-key.on { color: var(--card-solid); }
 .quiz-note { margin: 0 0 8px; text-align: center; color: var(--faint); font-size: 12px; }
 .quiz-done { display: flex; flex-direction: column; align-items: center; text-align: center; margin-top: 18px; }
 .quiz-done-badge { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--c-green); color: #0f2a19; box-shadow: 0 0 0 10px color-mix(in srgb, var(--c-green) 16%, transparent); }
@@ -1847,7 +1849,7 @@ button.home-plan:hover { color: var(--text); }
 }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly) { --hue: var(--muted); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).keep { --hue: var(--keep-solid); --tint: var(--keep); }
-:is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).card { --hue: var(--keep-solid); --tint: var(--keep); }
+:is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).card { --hue: var(--card-solid); --tint: var(--card); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).question { --hue: var(--question-solid); --tint: var(--question); }
 .collected-chip {
   position: relative; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px;
@@ -2029,7 +2031,7 @@ button.home-plan:hover { color: var(--text); }
   display: grid; place-items: center; border-radius: 4px; color: var(--hue); opacity: 0.75; transition: opacity 0.12s ease-out;
 }
 .mark-icon:hover { opacity: 1; background: var(--bg-hover); }
-.mark-icon.keep { --hue: var(--keep-solid); } .mark-icon.card { --hue: var(--keep-solid); }
+.mark-icon.keep { --hue: var(--keep-solid); } .mark-icon.card { --hue: var(--card-solid); }
 .mark-icon.question { --hue: var(--question-solid); }
 .mark-icon.evidence { --hue: var(--c-orange); opacity: 0.8; }
 
@@ -2088,7 +2090,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .touch-highlight button { display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 12px; color: var(--text); font: 500 15px var(--font); white-space: nowrap; }
 .touch-highlight button:active { background: var(--bg-active); }
 .touch-highlight .keep svg { color: var(--keep-solid); }
-.touch-highlight .card svg { color: var(--keep-solid); }
+.touch-highlight .card svg { color: var(--card-solid); }
 .touch-highlight .question svg { color: var(--question-solid); }
 /* Today on the phone (Tyler's pick of A/B, 2026-10-31): sections are a label over a rule, never framed, and skills
    are list rows, as in Books and Settings, so a screen shows the day's work and every skill. */
@@ -2137,7 +2139,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .grab-edge::after { content: ""; position: absolute; left: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--hue); }
 .grab-edge.start::after { top: -9px; }
 .grab-edge.end::after { bottom: -9px; }
-.grab-edge.keep { --hue: var(--keep-solid); } .grab-edge.card { --hue: var(--keep-solid); } .grab-edge.question { --hue: var(--question-solid); }
+.grab-edge.keep { --hue: var(--keep-solid); } .grab-edge.card { --hue: var(--card-solid); } .grab-edge.question { --hue: var(--question-solid); }
 .grab-edge:active, body:has(.grab-edge:active) { cursor: grabbing; }
 .phone .marks { display: none; }
 .phone .grab-edge::before { inset: -16px -16px; }
