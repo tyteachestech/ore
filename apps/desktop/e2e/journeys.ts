@@ -133,6 +133,53 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
+  await openSource(page, AGENTS);
+  const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
+  /** Clicks the middle of a phrase in the reader: a highlight there opens its popup. */
+  const clickOn = async (phrase: string) => {
+    const at = await page.evaluate((phrase) => {
+      const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+        const i = n.data.indexOf(phrase);
+        if (i < 0) continue;
+        n.parentElement!.scrollIntoView({ block: "center" });
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + phrase.length);
+        const b = r.getClientRects()[0]!;
+        return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      }
+      return null;
+    }, phrase);
+    if (!at) throw new Error(`“${phrase}” is not in the reader`);
+    await page.mouse.click(at.x, at.y);
+  };
+  const reopen = async (phrase: string, typed: string) => {
+    await clickOn(phrase);
+    await until(`the note reads “${typed}”`, async () => (await note.isVisible()) && (await note.inputValue()) === typed);
+  };
+
+  await select(page, "Prompt chaining decomposes a task");
+  await note.click();
+  await page.keyboard.type("Each step feeds the next");
+  await clickOn("Workflows are systems where language models"); // click away, as he does
+  await until("the popup closes", async () => !(await note.isVisible()));
+  await reopen("decomposes a task", "Each step feeds the next");
+  await clickOn("Workflows are systems where language models");
+
+  await select(page, "The orchestrator-workers pattern");
+  await note.click();
+  await page.keyboard.type("How is it unlike routing?");
+  await page.keyboard.press("Escape");
+  await until("Esc closes the popup", async () => !(await note.isVisible()));
+  await reopen("orchestrator-workers", "How is it unlike routing?");
+
+  await page.reload();
+  await openSource(page, AGENTS);
+  await reopen("decomposes a task", "Each step feeds the next");
+});
+
 journey("author: add one by hand from the title's menu, it survives a reload, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   await page.locator(".doc-head h1").click({ button: "right" });
