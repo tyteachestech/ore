@@ -5,7 +5,7 @@ import { WithMenu } from "./Menu";
 import { BINDINGS, clash, comboOf, defaultOf, FIXED, invalid, isCustom, label, rebind, resetKeys, restore, saved, useKeymap, type Combo, type KeyId } from "./keys";
 import { useFocusWhileMounted, type Notify } from "./util";
 
-const GROUPS = ["General", "Sources", "Feed", "Review", "Reader", "Quiz", "Video and listening", "Highlight", "Diagram"];
+const GROUPS = ["General", "Sources", "Feed", "Review", "Reader", "Quiz", "Video and listening", "Highlight", "Notes", "Diagram"];
 
 /** ⌘/: every shortcut, in a sheet over the app. Settings › Keyboard shortcuts is the same editor. */
 export function Shortcuts({ onClose, notify }: { onClose: () => void; notify: Notify }) {
