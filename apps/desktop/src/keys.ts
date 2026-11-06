@@ -73,6 +73,7 @@ const DEFAULTS = [
   { id: "block-duplicate", label: "Duplicate block", group: "Notes", combo: "Meta+KeyD" },
   { id: "note-bold", label: "Bold", group: "Notes", combo: "Meta+KeyB" },
   { id: "note-italic", label: "Italic", group: "Notes", combo: "Meta+KeyI" },
+  { id: "note-underline", label: "Underline", group: "Notes", combo: "Meta+KeyU" },
   { id: "note-strike", label: "Strikethrough", group: "Notes", combo: "Shift+Meta+KeyX" },
   { id: "note-code", label: "Inline code", group: "Notes", combo: "Meta+KeyE" },
   { id: "cut-text", label: "Remove the selected text (from a heading: its section)", group: "Highlight", combo: "Shift+Backspace" },
