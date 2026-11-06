@@ -1,6 +1,8 @@
 // Stand-in for the Tauri `ore` command when the UI runs in a plain browser (screenshots, Playwright).
-// POST /ore {args, stdin} -> runs the real ore CLI against $ORE_LIBRARY, returns its JSON (or 500 with the error line).
+// POST /ore {args, stdin, job} -> runs the real ore CLI against $ORE_LIBRARY, returns its JSON (or 500 with the error line).
+// POST /cancel {job} stops that run with SIGTERM, as the app's ore_cancel does.
 const CLI = `${import.meta.dir}/../../../../packages/cli/src/ore.ts`;
+const jobs = new Map<string, ReturnType<typeof Bun.spawn>>();
 Bun.serve({
   port: Number(process.env.PORT ?? 1421),
   async fetch(req) {
@@ -13,7 +15,12 @@ Bun.serve({
       const lib = process.env.ORE_LIBRARY ?? "";
       return lib && path.startsWith(lib + "/") && !path.includes("..") ? new Response(Bun.file(path), { headers: h }) : new Response(null, { status: 404 });
     }
-    const { args, stdin } = await req.json();
+    if (url.pathname === "/cancel") {
+      const { job } = await req.json();
+      jobs.get(job)?.kill("SIGTERM");
+      return new Response("null", { headers: h });
+    }
+    const { args, stdin, job } = await req.json();
     // `recall --text` only stores what he wrote; `recall --feedback` is the AI call.
     const ai = ["enrich", "ask", "grade", "key-points", "check", "research", "explain"].includes(args[0]) || (args[0] === "recall" && args.includes("--feedback"));
     if (ai) {
@@ -23,7 +30,9 @@ Bun.serve({
       return new Response(JSON.stringify(null), { headers: h });
     }
     const p = Bun.spawn(["bun", CLI, ...args, "--json"], { stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
+    if (job) jobs.set(job, p);
     const [out, err, code] = [await new Response(p.stdout).text(), await new Response(p.stderr).text(), await p.exited];
+    if (job) jobs.delete(job);
     if (code !== 0) return new Response(JSON.stringify(err.trim().split("\n").pop() || "ore failed"), { status: 500, headers: h });
     return new Response(out.trim() || "null", { headers: h });
   },

@@ -95,6 +95,27 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("cancel an add from its toast: nothing is added, and the link stays in the box", async (page) => {
+  // A page that hangs on its picture, which is fetched after the source is written.
+  const page$ = `<html><head><title>Slow page</title><meta property="og:image" content="/cover.jpg"></head><body><article><h1>Slow page</h1><p>${"Spacing beats cramming. ".repeat(40)}</p></article></body></html>`;
+  const slow = Bun.serve({ port: 0, fetch: (req) => (new URL(req.url).pathname === "/cover.jpg" ? new Promise<Response>(() => {}) : new Response(page$, { headers: { "content-type": "text/html" } })) });
+  try {
+    const link = `http://localhost:${slow.port}/slow`;
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByLabel("Link, file path or text").fill(link);
+    await page.keyboard.press("Enter");
+    await page.locator(".toast").getByRole("button", { name: "Cancel" }).click();
+    await page.locator(".toast").waitFor({ state: "detached" });
+    await until("the box keeps the link, ready again", async () => (await page.getByLabel("Link, file path or text").inputValue()) === link && !(await page.getByLabel("Link, file path or text").getAttribute("readonly").then((r) => r !== null)));
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await Bun.sleep(300);
+    if (await page.locator(".row").filter({ hasText: "Slow page" }).count()) throw new Error("the cancelled source was added");
+  } finally {
+    slow.stop(true);
+  }
+});
+
 journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   const keeps = page.locator(".collected-chip.keep");
