@@ -2189,7 +2189,10 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* The collected count sits in the top bar, beside Back, not over the text. */
 .phone .collected { top: -42px; bottom: auto; left: 84px; transform: none; animation: none; box-shadow: none; padding: 2px; }
 /* Note in the top bar is an iOS text button, like Edit in Notes. */
-.phone .reader-tools .note-toggle { border-color: transparent; background: none; color: var(--accent); font-size: 17px; }
+.phone .reader-tools .note-toggle { border-color: transparent; background: none; color: var(--accent); font-size: 17px; padding: 0 6px; }
+/* The counts stop short of Note, Finish and ⋯ (about 190 px), so they never cover Note at 390 pt. */
+.phone .collected { max-width: calc(100% - 84px - 190px); overflow: hidden; }
+.phone .collected .collected-chip { padding: 0 5px; gap: 3px; flex: none; }
 .phone .mynotes-text { padding-top: 12px; }
 .add-box .chips-button { max-width: 260px; overflow: hidden; }
 .add-skills { display: inline-flex; min-width: 0; }
@@ -2223,3 +2226,15 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .unsaved { display: flex; align-items: center; height: 24px; padding: 0 4px; font-size: 12px; color: var(--faint); cursor: default; }
 .feed-head .feed-skill { opacity: 0; }
 .feed-head:hover .feed-skill, .feed-tools:focus-within .feed-skill { opacity: 1; }
+
+/* The iPhone's bar over the keyboard while he writes a note (Notion, Bear): one row of 44 pt taps. */
+.kb-bar { position: fixed; left: 0; right: 0; bottom: var(--keyboard, 0px); z-index: 40; display: flex; justify-content: space-between; padding: 0 6px max(0px, calc(env(safe-area-inset-bottom, 0px) - var(--keyboard, 0px))); background: var(--bg-raised); border-top: 1px solid var(--border); }
+.kb-btn { flex: 1; height: 44px; display: grid; place-items: center; color: var(--muted); border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+.kb-btn:active, .kb-btn.on { color: var(--text); background: var(--bg-hover); }
+.kb-btn:disabled { color: var(--faint); opacity: 0.5; }
+body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44px); }
+/* On the phone the / [[ @ and emoji menus are a sheet docked above the keyboard bar (Notion's iOS app), never under a finger or off screen. */
+/* Fixed inside the note page, which slides in by a transform and ends at the bar: its bottom is the bar's top. */
+.phone .note-menu { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; max-width: none; max-height: 40vh; overflow-y: auto; z-index: 41; }
+.phone .note-menu-row { height: 44px; font-size: 17px; }
+.phone .mynotes-text { scroll-padding-bottom: 52px; }

@@ -174,6 +174,7 @@ export function turnInto(state: EditorState, b: Block, kind: Kind): Transaction 
   const us = units(state.doc, b);
   if (us.length === 1) {
     const tr = turnOne(state, us[0]!, kind);
+    if (tr) joinLists(tr, tr.mapping.map(b.from, -1), tr.mapping.map(b.to, 1));
     if (!tr || !(state.selection instanceof BlockSelection)) return tr;
     const at = blockAt(tr.doc, tr.selection.from)!.from;
     return tr.setSelection(selectBlocks(tr.doc, at, at)!);
@@ -191,9 +192,14 @@ export function turnInto(state: EditorState, b: Block, kind: Kind): Transaction 
     landed.push({ pos: s.selection.from, at: tr.mapping.maps.length });
   }
   if (!landed.length) return null;
-  // Only the lists it made, and the ones they touch, join.
-  const from = tr.mapping.map(b.from, -1);
-  const to = tr.mapping.map(b.to, 1);
+  joinLists(tr, tr.mapping.map(b.from, -1), tr.mapping.map(b.to, 1));
+  const where = (l: { pos: number; at: number }) => blockAt(tr.doc, tr.mapping.slice(l.at).map(l.pos))!.from;
+  const sel = selectBlocks(tr.doc, where(landed.at(-1)!), where(landed[0]!));
+  return sel ? tr.setSelection(sel) : tr;
+}
+
+/** Lists side by side between `from` and `to` (the ones Turn into made, and those they touch) join into one. */
+function joinLists(tr: Transaction, from: number, to: number) {
   const $f = tr.doc.resolve(from);
   const joins: number[] = [];
   let prev: PMNode | null = null;
@@ -203,9 +209,6 @@ export function turnInto(state: EditorState, b: Block, kind: Kind): Transaction 
     prev = c;
   });
   for (const pos of joins.reverse()) tr.join(pos);
-  const where = (l: { pos: number; at: number }) => blockAt(tr.doc, tr.mapping.slice(l.at).map(l.pos))!.from;
-  const sel = selectBlocks(tr.doc, where(landed.at(-1)!), where(landed[0]!));
-  return sel ? tr.setSelection(sel) : tr;
 }
 
 function turnOne(state: EditorState, b: Block, kind: Kind): Transaction | null {

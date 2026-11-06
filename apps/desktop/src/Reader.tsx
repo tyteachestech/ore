@@ -2055,11 +2055,14 @@ function ReaderView(p: Props & { reload: () => void }) {
               <span className="unsaved">Not saved</span>
             </Hint>
           )}
-          <Hint text={hideSource ? "Show the source" : "Hide the source while you write"} keys="hide-source">
-            <button className={`width-toggle${hideSource ? " on" : ""}`} aria-label={hideSource ? "Show the source" : "Hide the source"} aria-pressed={hideSource} onClick={toggleHide}>
-              {hideSource ? <EyeSlash size={16} /> : <Eye size={16} />}
-            </button>
-          </Hint>
+          {/* Not on the phone: its note is a page of its own, the source already out of sight. */}
+          {!PHONE && (
+            <Hint text={hideSource ? "Show the source" : "Hide the source while you write"} keys="hide-source">
+              <button className={`width-toggle${hideSource ? " on" : ""}`} aria-label={hideSource ? "Show the source" : "Hide the source"} aria-pressed={hideSource} onClick={toggleHide}>
+                {hideSource ? <EyeSlash size={16} /> : <Eye size={16} />}
+              </button>
+            </Hint>
+          )}
           {doc && doc.status !== "done" && !doc.preview && (
             <Hint text="Quiz yourself, then finish" keys="finish-source">
               <button className="note-toggle" onClick={() => p.setFinishing(true)}>
