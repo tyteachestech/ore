@@ -2,10 +2,10 @@ import { paragraphSchema } from "@milkdown/kit/preset/commonmark";
 import { $nodeSchema, $remark } from "@milkdown/kit/utils";
 
 // Blocks Markdown can store, beyond CommonMark and GFM (D38): toggles as
-// `<details><summary>…</summary>` … `</details>`, callouts as `> [!note]` quotes.
-// Other raw HTML stays a literal, never rendered.
+// `<details><summary>…</summary>` … `</details>` (a toggle heading's summary is `<h2>…</h2>`, as
+// GitHub shows it), callouts as `> [!note]` quotes. Other raw HTML stays a literal, never rendered.
 
-type MdNode = { type: string; value?: string; children?: MdNode[]; summary?: string; kind?: string };
+type MdNode = { type: string; value?: string; children?: MdNode[]; summary?: string; kind?: string; level?: number };
 
 const decode = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 const encode = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -19,6 +19,7 @@ function htmlOf(n: MdNode | undefined): string | null {
 }
 
 const OPEN = /^<details>\s*<summary>([\s\S]*?)<\/summary>$/;
+const HEADING = /^<h([1-3])>([^<]*)<\/h\1>$/;
 const MARKER = /^\[!(\w+)\][ \t]*(?:\n|$)/;
 
 /** A quote whose first line is exactly `[!kind]` becomes a callout; anything else stays a quote. */
@@ -47,7 +48,9 @@ function group(children: MdNode[]): MdNode[] {
         else if (h === "</details>" && --depth === 0) break;
       }
       if (j < children.length) {
-        out.push({ type: "details", summary: decode(open[1]!.trim()), children: group(children.slice(i + 1, j)) });
+        const h = open[1]!.trim().match(HEADING);
+        const summary = decode(h ? h[2]!.trim() : open[1]!.trim());
+        out.push({ type: "details", summary, level: h ? Number(h[1]) : 0, children: group(children.slice(i + 1, j)) });
         i = j;
         continue;
       }
@@ -80,16 +83,18 @@ export const toggleSummarySchema = $nodeSchema("toggle_summary", () => ({
   toMarkdown: { match: (node) => node.type.name === "toggle_summary", runner: () => {} },
 }));
 
+/** A toggle; `level` 1–3 makes it a toggle heading (Notion's). */
 export const toggleSchema = $nodeSchema("toggle", (ctx) => ({
   content: "toggle_summary block+",
   group: "block",
   defining: true,
-  parseDOM: [{ tag: "div.toggle" }],
-  toDOM: () => ["div", { class: "toggle" }, 0],
+  attrs: { level: { default: 0, validate: "number" } },
+  parseDOM: [{ tag: "div.toggle", getAttrs: (dom) => ({ level: Number((dom as HTMLElement).dataset.level ?? 0) }) }],
+  toDOM: (node) => ["div", { class: "toggle", "data-level": node.attrs.level }, 0],
   parseMarkdown: {
     match: (n) => n.type === "details",
     runner: (state, n, type) => {
-      state.openNode(type).openNode(toggleSummarySchema.type(ctx));
+      state.openNode(type, { level: (n as MdNode).level ?? 0 }).openNode(toggleSummarySchema.type(ctx));
       if ((n as MdNode).summary) state.addText((n as MdNode).summary!);
       state.closeNode();
       if (n.children?.length) state.next(n.children);
@@ -100,7 +105,9 @@ export const toggleSchema = $nodeSchema("toggle", (ctx) => ({
   toMarkdown: {
     match: (node) => node.type.name === "toggle",
     runner: (state, node) => {
-      state.addNode("html", undefined, `<details><summary>${encode(node.firstChild?.textContent.trim() ?? "")}</summary>`);
+      const title = encode(node.firstChild?.textContent.trim() ?? "");
+      const l = node.attrs.level;
+      state.addNode("html", undefined, `<details><summary>${l ? `<h${l}>${title}</h${l}>` : title}</summary>`);
       node.forEach((child, _, i) => i > 0 && void state.next(child));
       state.addNode("html", undefined, "</details>");
     },

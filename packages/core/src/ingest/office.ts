@@ -69,8 +69,14 @@ export function pptxToDoc(data: Uint8Array): OfficeDoc {
   const order = [...read("ppt/presentation.xml").matchAll(/<p:sldId\b[^>]*r:id="([^"]+)"/g)].map((m) => rels.get(m[1]!)).filter(Boolean) as string[];
   const slides: string[] = [];
   let first: string | undefined;
-  for (const target of order) {
-    const path = posix.join("ppt", target.replace(/^\/?ppt\//, ""));
+  const paths = order.map((target) => posix.join("ppt", target.replace(/^\/?ppt\//, "")));
+  // Each slide's pictures, in the order they sit on it. One on three or more slides is a logo or a
+  // footer graphic, not what the slide teaches, so it is left out.
+  const pictures = paths.map((path) => slidePictures(read(path), read(posix.join(posix.dirname(path), "_rels", posix.basename(path) + ".rels")), posix.dirname(path)));
+  const uses = new Map<string, number>();
+  for (const media of pictures.map((ps) => new Set(ps.map((p) => p.media)))) for (const m of media) uses.set(m, (uses.get(m) ?? 0) + 1);
+  const assets = new Map<string, Asset>();
+  for (const [i, path] of paths.entries()) {
     const xml = read(path);
     const shapes = [...xml.matchAll(/<p:sp>([\s\S]*?)<\/p:sp>/g)].map((s) => s[1]!);
     const isTitle = (s: string) => /<p:ph\b[^>]*type="(?:title|ctrTitle)"/.test(s);
@@ -85,10 +91,33 @@ export function pptxToDoc(data: Uint8Array): OfficeDoc {
     first ??= title || undefined;
     const parts = [`<!-- slide ${n} -->`, `## ${title || `Slide ${n}`}`];
     if (text.length) parts.push(text.map((p) => `${"  ".repeat(p.level)}- ${p.text}`).join("\n"));
+    for (const pic of pictures[i]!) {
+      const ext = IMAGE_EXT[posix.extname(pic.media).slice(1).toLowerCase()];
+      const data = files[pic.media];
+      if (!ext || !data || (paths.length >= 3 && uses.get(pic.media)! >= 3)) continue;
+      const name = assetName(data, ext);
+      assets.set(name, { name, data });
+      parts.push(`![${pic.alt}](assets/${name})`);
+    }
     if (notes.length) parts.push(`> **Speaker notes:** ${notes.join(" ")}`);
     slides.push(parts.join("\n\n"));
   }
   if (!slides.length) throw new Error("This PowerPoint file has no slides to read.");
   const meta = coreProps(files);
-  return { ...meta, title: meta.title ?? first, body: slides.join("\n\n") + "\n" };
+  return { ...meta, title: meta.title ?? first, body: slides.join("\n\n") + "\n", assets: [...assets.values()] };
+}
+
+/** Picture types a browser shows; a Windows metafile (emf, wmf) or a TIFF isn't one, so it is skipped. */
+const IMAGE_EXT: Record<string, string> = { png: "png", jpg: "jpg", jpeg: "jpg", gif: "gif", svg: "svg", webp: "webp" };
+
+/** A slide's pictures (`<p:pic>`) in order: the media file each embeds, and its alt text unless that
+ *  is only a file name ("image.png", which PowerPoint writes by default). */
+function slidePictures(xml: string, rels: string, dir: string): { media: string; alt: string }[] {
+  const targets = new Map([...rels.matchAll(/<Relationship\b[^>]*>/g)].map((r) => [r[0].match(/Id="([^"]+)"/)?.[1], r[0].match(/Target="([^"]+)"/)?.[1]]));
+  return [...xml.matchAll(/<p:pic>([\s\S]*?)<\/p:pic>/g)].flatMap((m) => {
+    const target = targets.get(m[1]!.match(/<a:blip\b[^>]*r:embed="([^"]+)"/)?.[1]);
+    if (!target || /^https?:/.test(target)) return [];
+    const descr = xmlText(m[1]!.match(/<p:cNvPr\b[^>]*descr="([^"]*)"/)?.[1] ?? "").replace(/[\[\]\n]/g, " ").trim();
+    return [{ media: posix.normalize(posix.join(dir, target)), alt: /^[\w -]+\.(png|jpe?g|gif|svg|emf|wmf|tiff?)$/i.test(descr) ? "" : descr }];
+  });
 }

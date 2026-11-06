@@ -22,9 +22,17 @@ const KIND = { video: PlayCircle, docs: BookOpenText, paper: Scroll, book: Book,
 const kindIcon = (type: string) => KIND[type as keyof typeof KIND] ?? Article;
 /** The AI's `code` marks as code; the rest as plain text. */
 const inline = (t: string) => t.split(/`([^`]+)`/).map((x, i) => (i % 2 ? <code key={i}>{x}</code> : x));
+/** The site a URL points at, or the URL as written when it can't be read (it comes from the AI). */
+const host = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
 const sub = (s: Source) => [s.site, s.type === "article" ? null : s.type, s.minutes ? `${Math.round(s.minutes)} min` : null].filter(Boolean).join(" · ");
 
-export type ExplainProps = {
+type ExplainProps = {
   word: string;
   /** The source and where the term sits in it, for the AI's paragraph. */
   item: string;
@@ -309,7 +317,7 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
             createPortal(
               <div className="popover ex-peek" style={peekAt} aria-hidden="true">
                 <div className="peek-title">{peek.title}</div>
-                <div className="ex-sub">{[sub(peek), new URL(peek.url).hostname.replace(/^www\./, "")].join(" · ")}</div>
+                <div className="ex-sub">{[sub(peek), host(peek.url)].join(" · ")}</div>
                 <p className="ex-why">{peek.why}</p>
               </div>,
               document.body,

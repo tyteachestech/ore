@@ -4,7 +4,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Item, type ItemType, type NewItem } from "../items.ts";
+import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Item, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
@@ -68,9 +68,11 @@ const PLAYLIST = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/playlist\?/;
 const PODCAST = /^https?:\/\/(?:podcasts\.apple\.com\/.+[?&]i=|open\.spotify\.com\/episode\/|overcast\.fm\/|pca\.st\/)/;
 const X_POST = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/\w+\/status\//;
 /** File types Ore reads, by extension. */
-export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac"];
+export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
 /** Audio transcribed on the Mac (D96); as `audio.ts` AUDIO_TYPES, which loads only when used. */
 const AUDIO_TYPES = ["mp3", "m4a", "wav", "aac", "aiff", "flac"];
+/** Video files, heard from their sound on the Mac; as `audio.ts` VIDEO_TYPES. */
+const VIDEO_TYPES = ["mp4", "mov", "m4v"];
 /** Images read with text recognition (D96). */
 const IMAGE_TYPES = ["png", "jpg", "jpeg", "heic", "tiff", "webp", "gif"];
 /** A page larger than this is not an article: a video, a dump, a disk image. */
@@ -84,6 +86,14 @@ function refuseLink(url: string): string | null {
   if (X_POST.test(url)) return `X only shows posts to signed-in browsers. Open the post in Safari or Chrome and ${FROM_TAB}, or copy it and paste it here instead.`;
   return null;
 }
+
+/** A zipped file (EPUB, Word, PowerPoint) that won't unzip or is missing its parts is damaged or
+ *  only partly downloaded: say so, never "invalid zip data". Other errors pass through. */
+const damaged = (what: string, app?: string) => (e: Error): never => {
+  if (/invalid zip|zip data|unexpected EOF|is missing|no rootfile|Can't find end of central directory|Could not find file/i.test(e.message))
+    throw new Error(`That ${what} file is damaged or only partly downloaded. Download it again${app ? `, or open it in ${app} and save a fresh copy` : ""}.`);
+  throw e;
+};
 
 /** A source draft from a file's bytes, whatever it came from (a link or a file), by its kind. */
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
@@ -100,7 +110,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
       if (!(e instanceof (await import("./pdf.ts")).ScannedPdf)) throw e;
       return (await import("./ocr.ts")).scannedText(bytes, "pdf");
     });
-    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes } };
+    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes }, assets: "assets" in p ? p.assets : undefined };
   }
   if (IMAGE_TYPES.includes(kind)) {
     // A screenshot or photo of text: its text to read, the image above it (D96).
@@ -110,18 +120,18 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "article", title: o.title ?? fileStem(name), url, body: `![](assets/${image.name})\n\n${o.body}`, source: { ext, data: bytes }, assets: [image] };
   }
   if (kind === "epub") {
-    const e = await epubToDoc(bytes);
+    const e = await Promise.resolve().then(() => epubToDoc(bytes)).catch(damaged("EPUB"));
     return { type: "epub", title: e.title ?? fileStem(name), author: e.author, url, body: e.body, source: { ext: "epub", data: bytes }, assets: e.assets };
   }
   if (kind === "docx" || kind === "pptx") {
     const office = await import("./office.ts");
-    const o = kind === "docx" ? await office.docxToDoc(bytes) : office.pptxToDoc(bytes);
+    const o = await Promise.resolve().then(() => (kind === "docx" ? office.docxToDoc(bytes) : office.pptxToDoc(bytes))).catch(damaged(kind === "docx" ? "Word" : "PowerPoint", kind === "docx" ? "Word or Pages" : "PowerPoint or Keynote"));
     return { type: "article", title: o.title ?? fileStem(name), author: o.author, url, body: o.body, source: { ext: kind, data: bytes }, assets: o.assets };
   }
   const text = decodeText(bytes);
   if (kind === "ipynb") {
     const n = (await import("./notebook.ts")).notebookToDoc(text);
-    return { type: "article", title: n.title ?? fileStem(name), url, body: n.body, source: { ext: "ipynb", data: text } };
+    return { type: "article", title: n.title ?? fileStem(name), url, body: n.body, source: { ext: "ipynb", data: text }, assets: n.assets };
   }
   if (kind === "srt" || kind === "vtt") {
     const vtt = kind === "srt" ? srtToVtt(text) : text;
@@ -174,7 +184,7 @@ function kindOf(name: string, ctype = ""): string | null {
 
 async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   if (opts.type === "youtube" || (!opts.type && isYoutubeUrl(url))) {
-    const y = await fetchYoutube(url);
+    const y = await fetchYoutube(url, { listen: true, onProgress: opts.onProgress });
     return { type: "youtube", title: y.title, url: y.url, author: y.author, published: y.published, body: y.body, source: { ext: "vtt", data: y.vtt } };
   }
   const refused = refuseLink(url);
@@ -189,7 +199,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   }
   if (VIDEO_SITE.test(url)) {
     // Played on its own site (the reader's player is YouTube's); the transcript reads like an article.
-    const y = await fetchYoutube(url);
+    const y = await fetchYoutube(url, { listen: true, onProgress: opts.onProgress });
     return { type: "article", title: y.title, url, author: y.author, published: y.published, body: y.body, source: { ext: "vtt", data: y.vtt } };
   }
   const rw = (await import("./links.ts")).rewrite(url);
@@ -197,8 +207,17 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   // Every failure says what to do next: a page that won't open or parse can still be pasted as text.
   const host = new URL(url).host;
   // An arXiv paper with no HTML version (older ones) is read from its PDF.
-  const res = await get(rw?.url ?? url, host).catch((e) => (rw?.url.startsWith("https://arxiv.org/html/") ? get(rw.url.replace("/html/", "/pdf/"), host) : Promise.reject(e)));
+  // A Google Doc or deck that isn't shared answers its export link with a sign-in page or an error.
+  const google = rw?.url.startsWith("https://docs.google.com/") ? `That Google ${rw.url.includes("/presentation/") ? "Slides deck" : "Doc"} isn’t shared publicly, so Ore can’t download it. In Google, choose Share › Anyone with the link, then add it again; or open it in your browser and ${FROM_TAB}.` : null;
+  const res = await get(rw?.url ?? url, host).catch((e) => {
+    if (google) throw new Error(google);
+    return rw?.url.startsWith("https://arxiv.org/html/") ? get(rw.url.replace("/html/", "/pdf/"), host) : Promise.reject(e);
+  });
   const ctype = res.headers.get("content-type") ?? "";
+  if (google && (/html/.test(ctype) || /accounts\.google\.com/.test(res.url))) {
+    await res.body?.cancel();
+    throw new Error(google);
+  }
   const urlName = decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
   // Video is never read as a page: the whole file would download and parse as HTML. Audio is transcribed.
   if ((/^(audio|video)\//.test(ctype) || /\.(ogg|opus|mp4|mov|m4v|webm)$/i.test(urlName)) && !kindOf(urlName, ctype)) {
@@ -288,6 +307,13 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
   if (stat.isDirectory()) throw new Error("That’s a folder. Open it and add the files inside instead.");
   // Finder's own files (.DS_Store, AppleDouble ._ copies) ride along when a folder's files are dropped.
   if (/^(\.DS_Store|\._.*|Icon\r)$/.test(basename(path))) throw new Error(`“${basename(path)}” is a file Finder keeps for itself, not something to read. Add the file you meant instead.`);
+  const ext = extname(path).slice(1).toLowerCase();
+  if (VIDEO_TYPES.includes(ext) && !opts.type) {
+    // A lecture recording or a downloaded course video: heard from its sound where it lies, never
+    // read into memory, so no size limit (D122). Only its transcript is kept.
+    const vtt = await (await import("./audio.ts")).transcribeFile(path, opts.onProgress);
+    return { type: "article", title: fileStem(path), body: vttToBody(vtt), source: { ext: "vtt", data: vtt } };
+  }
   if (stat.size > MAX_BYTES) throw new Error(tooBig());
   const bytes = new Uint8Array(readFileSync(path));
   // A file with no extension ("README", "notes") is read as text when it is text.
@@ -305,14 +331,14 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   const isUrl = /^https?:\/\//i.test(input);
   if (isUrl && !URL.canParse(input)) throw new Error("That link looks cut off. Copy it again from the address bar.");
   if (!isUrl && /^[a-z][\w+.-]*:/i.test(input) && !existsSync(input)) throw new Error("Ore opens web links (http or https) and files. Open that one in your browser, then add the page from there.");
-  const had = isUrl ? everyItem(lib).find((i) => i.meta.url === input && !i.meta.course) : undefined;
+  const had = isUrl ? allItems(lib, { preview: true }).find((i) => i.meta.url === input && !i.meta.course) : undefined;
   if (had && opts.preview) return had;
   if (had) return keep(lib, had, opts);
   const draft = isUrl ? await fromUrl(input, opts) : await fromFile(resolve(input), opts, input);
   if (!draft.body.trim()) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
   const ready = await withImages(draft);
   // The same file added again (dropped twice, or a copy) is the source already here.
-  const same = !isUrl && everyItem(lib).find((i) => i.meta.text_sha256 === sha256(ready.body) && !i.meta.course);
+  const same = !isUrl && allItems(lib, { preview: true }).find((i) => i.meta.text_sha256 === sha256(ready.body) && !i.meta.course);
   const item = same ? await keep(lib, same, opts) : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview });
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same) await makeThumbnail(item);
@@ -321,8 +347,6 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
 
 /** Kept sources: what adding one again did, so the app can say it ("Added to AI", "back from Archived"). */
 export type Kept = { kept: true; filed: string[]; restored: boolean; fromFeed: boolean };
-
-const everyItem = (lib: Library) => listItems(lib).concat(listItems(lib, { archived: true }), listItems(lib, { preview: true }));
 
 /** A source already in the library, added again: filed under the new skills too, and back from the
  *  archive if it was there, since adding it again means he wants it. */

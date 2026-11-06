@@ -217,6 +217,11 @@ describe("a log line that isn't a record", () => {
     expect(readReviews(lib)).toEqual([]);
     writeFileSync(join(lib.root, "sessions", "2026-10.jsonl"), 'null\n{"x":1}\n');
     expect(readSessions(lib)).toEqual([]);
+    // A receipt in two device logs (a conflicted copy) counts once, the first copy read; the rest sort by time.
+    const a = '{"type":"end","id":"S1","ts":"2026-10-02T00:00:00.000Z","caught_up":true}';
+    writeFileSync(join(lib.root, "sessions", "2026-10.mac.jsonl"), `${a}\n{"type":"start","id":"S1","ts":"2026-10-01T00:00:00.000Z"}\n`);
+    writeFileSync(join(lib.root, "sessions", "2026-10.phone.jsonl"), `${a.replace("true", "false")}\n`);
+    expect(readSessions(lib).map((s) => `${s.type} ${s.id} ${s.caught_up ?? ""}`)).toEqual(["start S1 ", "end S1 true"]);
     const item = await createItem(lib, { type: "markdown", title: "S", body: "Some text here.\n" });
     const kept = addHighlight(item, { exact: "text", intent: "keep" });
     appendFileSync(join(item.dir, "annotations.jsonl"), 'null\n{"id":"X","rev":1}\n');

@@ -5,7 +5,7 @@ import { Ask } from "./Ask";
 import { Gem } from "./Gem";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
-import { is, label, useKeymap, type KeyId } from "./keys";
+import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { ore, opt, PHONE, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today } from "./ore";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -32,11 +32,6 @@ const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : [
 
 /** Quick quiz answers typed but not checked, by card: putting the window away keeps them (D76). */
 const drafts = new Map<string, string>();
-
-const inField = (t: EventTarget | null) => {
-  const el = t as HTMLElement | null;
-  return !!el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA");
-};
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
@@ -496,13 +491,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       } else if (is(e, "finish") && card.kind === "prompt") {
         e.preventDefault();
         void check();
-      } else if (!inField(e.target) && !e.metaKey && !e.ctrlKey && !e.altKey && /^Digit[1-3]$/.test(e.code)) {
+      } else if (!inTextField(e) && !e.metaKey && !e.ctrlKey && !e.altKey && /^Digit[1-3]$/.test(e.code)) {
         e.preventDefault();
         pickSure(Number(e.code.slice(5)));
       }
       return;
     }
-    if (inField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (inTextField(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.repeat || Date.now() - shownAnswerAt.current < 300) return;
     if (/^Digit[1-4]$/.test(e.code)) {
       e.preventDefault();

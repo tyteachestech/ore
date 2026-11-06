@@ -9,7 +9,7 @@ const READ_LINE = 96;
 type Heading = { el: HTMLElement; level: number; title: string };
 
 /** H1 to H3 of the rendered source, shallow levels only when a book has too many to show. */
-export function outlineHeadings(doc: HTMLElement): Heading[] {
+function outlineHeadings(doc: HTMLElement): Heading[] {
   const all = [...doc.querySelectorAll<HTMLElement>("h1, h2, h3")].map((el) => ({ el, level: Number(el.tagName[1]), title: el.textContent?.trim() ?? "" }));
   let levels = [...new Set(all.map((h) => h.level))].sort();
   let shown = all.filter((h) => h.title);

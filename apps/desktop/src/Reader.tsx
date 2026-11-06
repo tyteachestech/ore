@@ -38,7 +38,7 @@ import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, source
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
-import { errorText, load, save, type Notify } from "./util";
+import { errorText, inOrder, load, save, type Notify } from "./util";
 import { popupPlace, type Aim } from "./popup-place";
 import { Working } from "./Working";
 
@@ -55,7 +55,7 @@ const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece o
 const PLACEHOLDER: Record<Intent, string> = {
   keep: "Connects to…",
   card: "This works because…",
-  question: "My question… my guess:",
+  question: "My question / my guess…",
 };
 
 // Raw HTML never renders (skipHtml): documents come from the web and this webview can run `ore`.
@@ -239,6 +239,9 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [anns, setAnns] = useState<Annotation[]>([]);
   const [ready, setReady] = useState(false);
   const [popup, setPopup] = useState<Popup | null>(null);
+  // The popup as it is now, for its note to be written when he leaves the source with it open.
+  const popupNow = useRef(popup);
+  popupNow.current = popup;
   /** An edge of the open highlight being dragged: the popup hides meanwhile. */
   const [dragging, setDragging] = useState(false);
   /** Bumped when a highlight's range changes in place (an edge dragged), so the paint below reruns. */
@@ -730,6 +733,7 @@ function ReaderView(p: Props & { reload: () => void }) {
    *  prompts, the source hidden (D34.4) until he ends it with ⌘↵ (recorded, then feedback) or Esc
    *  (what he typed stays, nothing is recorded). */
   const openChapter = (c: ChapterEnd) => {
+    keepNote();
     setPopup(null);
     setChapterFb(null);
     if (hideBefore.current === null) hideBefore.current = hideSource;
@@ -809,7 +813,19 @@ function ReaderView(p: Props & { reload: () => void }) {
     return wait ? (await wait).id : id;
   };
 
-  function closePopup() {
+  /** Writes what he typed in the popup's note, however it closes: a click away, Esc, another
+   *  highlight, leaving the source. Only Remove (and a selection dropped untouched) throws it away. */
+  function keepNote(pop = popupNow.current) {
+    const ann = pop && annsRef.current.find((a) => a.id === pop.id);
+    if (!pop || !ann) return;
+    const note = pop.note.trim();
+    if (note !== (ann.note ?? "")) void setNoteOf(pop.id, note);
+  }
+
+  useEffect(() => () => keepNote(), [p.id]);
+
+  function closePopup(keep = true) {
+    if (keep) keepNote();
     setPopup(null);
     scrollRef.current?.focus({ preventScroll: true });
   }
@@ -850,6 +866,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   const aimRef = useRef<Aim>({});
 
   function openPopup(id: string, range: Range, note: string, aim: Aim = {}) {
+    if (popup && popup.id !== id) keepNote();
     aimRef.current = aim;
     const at = popupAt(range, aim);
     if (!at) return;
@@ -1198,15 +1215,6 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   }
 
-  async function saveNote() {
-    if (!popup) return;
-    const { id } = popup;
-    const note = popup.note.trim();
-    closePopup();
-    if (note === (annsRef.current.find((a) => a.id === id)?.note ?? "")) return;
-    await setNoteOf(id, note);
-  }
-
   async function setNoteOf(id: string, note: string, undoable = true) {
     const was = annsRef.current.find((a) => a.id === id)?.note ?? "";
     setAnns((l) => l.map((a) => (a.id === id ? { ...a, note } : a)));
@@ -1224,7 +1232,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   async function remove(undoable = true) {
     if (!popup) return;
     const id = popup.id;
-    closePopup();
+    closePopup(false);
     let rid: string;
     try {
       rid = await realId(id);
@@ -1255,7 +1263,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     const id = popup.id;
     const ann = annsRef.current.find((a) => a.id === id);
     const untouched = fresh.current === id && ann?.intent === "keep" && !ann.note && !popup.note.trim();
-    closePopup();
+    closePopup(false);
     const d = doc;
     try {
       const rid = await realId(id);
@@ -1400,6 +1408,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       // Not while typing: ⌘↵ out of habit in a note must never open the quiz (2026-10-31).
       if (is(e, "finish-source") && !inField && !inNote && !doc?.preview) {
         e.preventDefault();
+        keepNote();
         setPopup(null);
         p.setFinishing(true);
         return;
@@ -1562,7 +1571,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             void setIntent(typed);
           } else if (plain && !e.shiftKey && e.key === "Enter" && !e.isComposing) {
             e.preventDefault();
-            void saveNote();
+            closePopup();
           } else if (plain && e.key === "Escape") {
             e.preventDefault();
             closePopup();
@@ -1624,7 +1633,10 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   const onMouseDown = (e: MouseEvent) => {
     setFocus(null); // the mouse takes over from the keyboard focus
-    if (popup && !popupRef.current?.contains(e.target as Node)) setPopup(null);
+    if (popup && !popupRef.current?.contains(e.target as Node)) {
+      keepNote();
+      setPopup(null);
+    }
     // The skill picker in Learn this opens in a portal: a click there is still inside the popover.
     if (lookup && !lookupRef.current?.contains(e.target as Node) && !(e.target as Element).closest?.("[data-radix-popper-content-wrapper]")) closeLookUp();
     setTip(null);
@@ -1775,7 +1787,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!t || t === before) return;
     setDoc((cur) => cur && cur.id === id ? { ...cur, title: t } : cur);
     try {
-      await ore("edit", id, "--title", t);
+      await inOrder(id, () => ore("edit", id, "--title", t));
       p.onChanged();
       if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => void retitle(id, t, before, false), () => void retitle(id, before, t, false));
     } catch (e) {
@@ -1793,7 +1805,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     // On the history at once, so a quick ⌘Z takes it back; taken off again if the write fails.
     const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => void reauthor(id, a, before, false), () => void reauthor(id, before, a, false)) : () => {};
     try {
-      await ore("edit", id, "--author", a ?? "");
+      await inOrder(id, () => ore("edit", id, "--author", a ?? ""));
       p.onChanged();
     } catch (e) {
       forget();

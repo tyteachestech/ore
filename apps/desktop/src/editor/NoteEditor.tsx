@@ -4,7 +4,8 @@ import {
   createCodeBlockCommand, imageSchema, insertHrCommand, linkSchema, turnIntoTextCommand, wrapInBlockquoteCommand, wrapInBulletListCommand,
   wrapInHeadingCommand, wrapInOrderedListCommand,
 } from "@milkdown/kit/preset/commonmark";
-import { wrapIn } from "@milkdown/kit/prose/commands";
+import { insertTableCommand } from "@milkdown/kit/preset/gfm";
+import { toggleMark, wrapIn } from "@milkdown/kit/prose/commands";
 import { NodeSelection, Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet, type EditorView, type ViewMutationRecord } from "@milkdown/kit/prose/view";
 import { $prose, $view, callCommand } from "@milkdown/kit/utils";
@@ -17,10 +18,13 @@ import { usePeek } from "../Peek";
 import { errorText, type Notify } from "../util";
 import { calloutSchema, diagramName, toggleSchema, toggleSummarySchema } from "./blocks";
 import { createEditor, markdownOf, menuTrigger } from "./editor";
+import { dateRows } from "./dates";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
 import { BlockHandle } from "./BlockHandle";
-import { blockAt, duplicate, moveBy } from "./blockops";
+import { TableControls } from "./TableControls";
+import { SelectionBar, type Sel } from "./SelectionBar";
+import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock } from "./blockops";
 import { is } from "../keys";
 
 /** What a link can point at (D39): a source, or a skill (its note, D41). */
@@ -79,7 +83,7 @@ const DiagramEditor = lazy(() => import("../Diagram"));
 /** Fired after a diagram is saved, so its preview redraws; detail is `<note dir>/<name>`. */
 const SAVED = "ore:diagram-saved";
 
-type Menu = { kind: "slash" | "link" | "emoji"; query: string; from: number; to: number; x: number; y: number };
+type Menu = { kind: "slash" | "link" | "emoji" | "date"; query: string; from: number; to: number; x: number; y: number };
 type Row = { label: string; sub?: string; emoji?: string; run: () => void };
 
 const LINK_URL = /^ore:(item|skill)\/(.+)$/;
@@ -109,6 +113,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const editor = useRef<Editor | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [index, setIndex] = useState(0);
+  const [sel, setSel] = useState<Sel | null>(null);
   const [emoji, setEmoji] = useState<EmojiEntry[] | null>(null);
   /** The diagram open in the overlay; `at` is where a new one goes once it has a drawing. */
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
@@ -208,7 +213,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), imageView(live), toggleView, ghostPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), toggleView, ghostPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
@@ -284,6 +289,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         },
       }));
     }
+    if (menu.kind === "date")
+      return dateRows(menu.query).map((d) => ({
+        label: d.label,
+        sub: d.iso, // what it saves
+        run: () => {
+          const v = clear(menu);
+          if (!v) return;
+          v.dispatch(v.state.tr.insertText(d.iso));
+          v.focus();
+        },
+      }));
     if (menu.kind === "link") {
       const hits = p.targets.filter((t) => t.title.toLowerCase().includes(q));
       hits.sort((a, b) => Number(!a.title.toLowerCase().startsWith(q)) - Number(!b.title.toLowerCase().startsWith(q)));
@@ -331,21 +347,22 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           if (v) wrapIn(calloutSchema.type(ctxOf(editor.current!)), { kind: "note" })(v.state, v.dispatch);
         },
       },
-      {
-        label: "Toggle",
-        sub: "<details>",
+      ...[0, 1, 2, 3].map((level) => ({
+        label: level ? `Toggle heading ${level}` : "Toggle",
+        sub: level ? undefined : "<details>",
         run: () => {
           const v = clear(menu);
           if (!v) return;
           const ctx = ctxOf(editor.current!);
-          const node = toggleSchema.type(ctx).create(null, [toggleSummarySchema.type(ctx).create(), v.state.schema.nodes.paragraph!.create()]);
+          const node = toggleSchema.type(ctx).create({ level }, [toggleSummarySchema.type(ctx).create(), v.state.schema.nodes.paragraph!.create()]);
           const { $from } = v.state.selection;
           const empty = $from.parent.type.name === "paragraph" && !$from.parent.content.size;
           const at = empty ? $from.before() : $from.after();
           const tr = empty ? v.state.tr.replaceWith(at, $from.after(), node) : v.state.tr.insert(at, node);
           v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 2)));
         },
-      },
+      })),
+      { label: "Table", sub: "| |", run: cmd(insertTableCommand.key, { row: 3, col: 3 }) },
       { label: "Code", sub: "```", run: cmd(createCodeBlockCommand.key) },
       { label: "Divider", sub: "---", run: cmd(insertHrCommand.key) },
       {
@@ -450,7 +467,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     >
       <div ref={root} />
       {!PHONE && <BlockHandle view={view} host={host} />}
-      {menu && (menu.kind !== "emoji" || rows.length > 0) && (
+      {!PHONE && <TableControls view={view} host={host} />}
+      {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} />}
+      {menu && ((menu.kind !== "emoji" && menu.kind !== "date") || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
             rows.map((r, i) => (
@@ -557,19 +576,37 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             }
             if (!menu) {
               // Notion's block keys, on the caret's block: one editor step each, so ⌘Z takes it back.
+              const marks = view.state.schema.marks;
+              const fmt = is(e, "note-bold") ? marks.strong : is(e, "note-italic") ? marks.emphasis : is(e, "note-strike") ? marks.strike_through : is(e, "note-code") ? marks.inlineCode : null;
+              if (fmt) {
+                toggleMark(fmt)(view.state, view.dispatch);
+                return true;
+              }
               const up = is(e, "block-up");
               if (up || is(e, "block-down") || is(e, "block-duplicate")) {
-                const b = blockAt(view.state.doc, view.state.selection.from);
+                const b = selectedBlock(view.state);
                 const tr = b && (is(e, "block-duplicate") ? duplicate(view.state, b) : moveBy(view.state, b, up ? -1 : 1));
                 if (tr) view.dispatch(tr);
                 e.preventDefault();
                 e.stopPropagation();
                 return true;
               }
+              // Esc selects the block (or the blocks the selected text runs over), as in Notion. Not
+              // while a chapter's block is open (D115): its Esc ends the block.
+              if (e.key === "Escape" && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !ghosts.getState(view.state)?.find().length) {
+                const { from, to } = view.state.selection;
+                const a = blockAt(view.state.doc, from);
+                const h = blockAt(view.state.doc, to);
+                const s = a && h && selectBlocks(view.state.doc, a.from, h.from);
+                if (!s) return false;
+                view.dispatch(view.state.tr.setSelection(s));
+                e.stopPropagation();
+                return true;
+              }
               return false;
             }
-            // An emoji query with no match shows nothing, so its keys stay ordinary typing.
-            if (menu.kind === "emoji" && !rows.length) return false;
+            // An emoji or date query with no match shows nothing, so its keys stay ordinary typing.
+            if ((menu.kind === "emoji" || menu.kind === "date") && !rows.length) return false;
             // Keys the menu uses stop here, so the view around the editor (Esc: back) never sees them.
             const used = () => (e.stopPropagation(), true);
             if (e.key === "Escape") {
@@ -625,6 +662,60 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             else if (/^https?:\/\//i.test(href)) void openUrl(href);
             else return false;
             return true;
+          },
+        },
+      }),
+  );
+}
+
+/** Shows Notion's format bar over selected text: once the mouse is up (not while he drags a
+ *  selection), never for a click or while a `/`, `[[` or `:` menu is open. Esc selects the blocks instead. */
+function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | null) => void) {
+  let down = false;
+  const at = (view: EditorView): Sel | null => {
+    const s = view.state.selection;
+    if (down || s.empty || !(s instanceof TextSelection) || !view.hasFocus() || !host.current) return null;
+    if (!view.state.doc.textBetween(s.from, s.to, " ", " ").trim()) return null;
+    const h = host.current.getBoundingClientRect();
+    const a = view.coordsAtPos(s.from);
+    const z = view.coordsAtPos(s.to);
+    const width = 340;
+    const x = Math.max(-8, Math.min(a.left - h.left - 16, h.width - width));
+    // Above the first line; below the last when there is no room above: the top of the window, or of
+    // the panel the note scrolls in (the source note's first line sits right under its tabs).
+    let top = 0;
+    for (let el = host.current.parentElement; el; el = el.parentElement)
+      if (/auto|scroll|hidden/.test(getComputedStyle(el).overflowY)) {
+        top = el.getBoundingClientRect().top;
+        break;
+      }
+    const above = a.top - h.top - 42;
+    return { from: s.from, to: s.to, x, y: a.top - 42 < top + 8 ? z.bottom - h.top + 8 : above };
+  };
+  return $prose(
+    () =>
+      new Plugin({
+        view: (view) => {
+          const up = () => {
+            if (!down) return;
+            down = false;
+            setSel(at(view));
+          };
+          window.addEventListener("mouseup", up);
+          return { update: (v) => setSel(at(v)), destroy: () => window.removeEventListener("mouseup", up) };
+        },
+        props: {
+          handleDOMEvents: {
+            mousedown: () => {
+              down = true;
+              setSel(null);
+              return false;
+            },
+            blur: (view, e) => {
+              // Focus moving into the bar's own popovers keeps it.
+              if (!(e.relatedTarget as HTMLElement | null)?.closest?.(".sel-bar, .sel-pop")) setSel(null);
+              return false;
+            },
           },
         },
       }),
@@ -693,9 +784,10 @@ function diagramView(live: Live, name: string) {
 }
 
 /** A toggle shows its caret outside the editable text; collapsing is view-only (Markdown keeps none). */
-const toggleView = $view(toggleSchema.node, () => () => {
+const toggleView = $view(toggleSchema.node, () => (node) => {
   const dom = document.createElement("div");
   dom.className = "toggle";
+  dom.dataset.level = String(node.attrs.level); // a toggle heading's size
   const caret = document.createElement("button");
   caret.className = "toggle-caret";
   caret.contentEditable = "false";

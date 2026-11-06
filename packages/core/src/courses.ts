@@ -1,4 +1,4 @@
-import { listItems, setItemArchived, updateItemMeta, type Item } from "./items.ts";
+import { allItems, listItems, setItemArchived, updateItemMeta, type Item } from "./items.ts";
 import type { Library } from "./library.ts";
 import { setItemSkills } from "./skills.ts";
 
@@ -7,7 +7,7 @@ import { setItemSkills } from "./skills.ts";
 
 /** A course's lessons in course order; with `archived`, archived lessons too. */
 export function courseLessons(lib: Library, id: string, opts: { archived?: boolean } = {}): Item[] {
-  const all = opts.archived ? [...listItems(lib), ...listItems(lib, { archived: true })] : listItems(lib);
+  const all = opts.archived ? allItems(lib) : listItems(lib);
   const lessons = all.filter((i) => i.meta.course?.id === id).sort((a, b) => a.meta.course!.part - b.meta.course!.part);
   if (!lessons.length) throw new Error(`no course matches "${id}"`);
   return lessons;

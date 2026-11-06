@@ -26,13 +26,14 @@ window.__TAURI_INTERNALS__ = {
     if (cmd === "ore" || cmd === "ore_detached") {
       const port = window.__ORE_BRIDGE || 1421;
       // As the real app reports a missing `ore`: say what is down and how to start it, not "Failed to fetch".
-      const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null }) }).catch(() => {
+      const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null }) }).catch(() => {
         throw `The mock bridge isn’t answering on port ${port}. Start it: PORT=${port} bun scripts/mock/bridge.ts`;
       });
       const j = await r.json();
       if (!r.ok) throw j;
       return j;
     }
+    if (cmd === "ore_cancel") return void (await fetch("http://localhost:" + (window.__ORE_BRIDGE || 1421) + "/cancel", { method: "POST", body: JSON.stringify({ job: args.job }) }).catch(() => {}));
     // `window.__ORE_PLAYER_PORT` (an earlier init script) points the player at fake-player.ts.
     if (cmd === "player_port") return window.__ORE_PLAYER_PORT ?? null;
     // Look Up: the macOS dictionary's one-line entry, as Dictionary Services returns it; set

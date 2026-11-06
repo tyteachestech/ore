@@ -4,7 +4,7 @@ import { z } from "zod";
 import { listCards, writeCardMeta } from "./cards.ts";
 import { parseYaml, stringifyFrontmatter, loadYaml } from "./frontmatter.ts";
 import { writeAtomic } from "./fsutil.ts";
-import { findItem, ItemMetaSchema, listItems, updateItemMeta, type ItemMeta } from "./items.ts";
+import { allItems, findItem, ItemMetaSchema, updateItemMeta, type ItemMeta } from "./items.ts";
 import { nowIso, slugify } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
@@ -310,7 +310,7 @@ export async function removeSkill(lib: Library, id: string, opts: { archive?: bo
     list.items.splice(i, 1);
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     const removed: RemovedSkill = { skill, at: i, items: [], cards: [], topics: [] };
-    for (const item of [...listItems(lib), ...listItems(lib, { archived: true })]) {
+    for (const item of allItems(lib)) {
       if (!item.meta.skills.includes(id)) continue;
       const skills = item.meta.skills.filter((s) => s !== id);
       const archive = !!opts.archive && !skills.length && !item.meta.archived_at;
@@ -342,7 +342,7 @@ export async function restoreSkill(lib: Library, input: RemovedSkill): Promise<S
     list.items.splice(Math.min(r.at, list.items.length), 0, doc.createNode(r.skill) as YAMLLib.YAMLMap);
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     const back = new Map(r.items.map((x) => [x.id, x.archived]));
-    for (const item of [...listItems(lib), ...listItems(lib, { archived: true })]) {
+    for (const item of allItems(lib)) {
       if (!back.has(item.meta.id) || item.meta.skills.includes(id)) continue;
       const { archived_at, ...rest } = item.meta;
       const meta = ItemMetaSchema.parse({ ...rest, skills: [...item.meta.skills, id], ...(back.get(item.meta.id) ? {} : archived_at ? { archived_at } : {}) });

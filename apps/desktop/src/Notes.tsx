@@ -9,10 +9,10 @@ import { ore, opt, type Backlink, type Notes } from "./ore";
 import { errorText, load, save, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
-export type NoteRef = { item: string } | { skill: string };
+type NoteRef = { item: string } | { skill: string };
 const args = (ref: NoteRef) => ("item" in ref ? [ref.item] : [opt("skill", ref.skill)]);
 
-export type MyNotes = {
+type MyNotes = {
   /** notes.md as edited here; null until loaded (or when loading failed). */
   text: string | null;
   /** The note's folder (for images); null until loaded. */
@@ -242,7 +242,7 @@ const NOTE_WIDTH = 380;
 
 /** A right-hand panel's width, dragged on its left-edge divider between `min` and 60% of the
  *  window, remembered under `key`; double-click resets it (D44). */
-export function useSideWidth(key: string, initial: number, min = 280) {
+function useSideWidth(key: string, initial: number, min = 280) {
   const clamp = useCallback((w: number) => Math.round(Math.max(min, Math.min(w, window.innerWidth * 0.6))), [min]);
   const [width, setWidth] = useState(() => {
     const w = Number(load(key));

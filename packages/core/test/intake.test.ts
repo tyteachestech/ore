@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
@@ -7,7 +7,7 @@ import { addSource, addTab, addText } from "../src/ingest/index.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
-import { transcribe } from "../src/ingest/audio.ts";
+import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { inlineMath } from "../src/ingest/web.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
@@ -139,6 +139,7 @@ describe("import coverage: web pages", () => {
     const item = await addSource(await tempLibrary(), "https://arxiv.org/abs/1706.03762");
     expect(item.meta.url).toBe("https://arxiv.org/abs/1706.03762");
     expect(item.meta.title).toBe("Attention Is All You Need");
+    expect(item.meta.author).toBe("Ashish Vaswani et al."); // the paper's authors, not the site's
     expect(words(item.body)).toBeGreaterThan(5000);
     expect(item.body).toContain("Scaled Dot-Product Attention");
     expect(item.body).toContain("\\sqrt{d_{k}}");
@@ -222,7 +223,7 @@ describe("import coverage: junk is refused with the next step", () => {
   test("links Ore can't read yet say why at once", async () => {
     const lib = await tempLibrary();
     await expect(addSource(lib, "https://x.com/karpathy/status/1617979122625712128")).rejects.toThrow(/X only shows posts to signed-in browsers/);
-    await expect(addSource(lib, "https://open.spotify.com/episode/4rOoJ6Egrf8K2IrywzwOMk")).rejects.toThrow(/Spotify keeps its episodes locked/);
+    await expect(addSource(lib, "https://open.spotify.com/episode/4rOoJ6Egrf8K2IrywzwOMk")).rejects.toThrow(/Couldn’t read that Spotify episode’s page.*Apple Podcasts/);
     await expect(addSource(lib, "https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ")).rejects.toThrow(/playlist.*course/);
   });
 
@@ -476,8 +477,7 @@ describe("import coverage: video", () => {
       "https://hls.ted.com/subs/en.vtt?segment=1": { body: "WEBVTT\n\n00:00:31.000 --> 00:00:35.000\nCreativity is as important as literacy.\n", type: "text/vtt" },
     });
     const item = await addSource(await tempLibrary(), "https://www.ted.com/talks/sir_ken_robinson_do_schools_kill_creativity");
-    expect(item.meta.type).toBe("article");
-    expect(item.meta.author).toBe("Sir Ken Robinson");
+    expect(item.meta).toMatchObject({ type: "article", title: "Do schools kill creativity?", author: "Sir Ken Robinson", published: "2006-06-27" });
     expect(item.body).toBe("[00:02] Good morning. Creativity is as important as literacy.\n");
   });
 
@@ -763,11 +763,203 @@ describe("import coverage: audio and podcasts", () => {
     expect(item.meta.author).toBe("Learning Show");
   });
 
+  // D122: a Spotify link is heard from the same episode in the show's public feed.
+  const SPOTIFY = "https://open.spotify.com/episode/3TxjF2mZy9S9I9GL5eZ8sq";
+  const spotifyPage = readFileSync(join(FIX, "audio", "spotify-episode.html"), "utf8");
+  const search = "https://itunes.apple.com/search?media=podcast&entity=podcast&limit=10&term=Huberman%20Lab";
+  const shows = JSON.stringify({ results: [{ collectionName: "Huberman Lab Clips", feedUrl: "https://feeds.test/clips" }, { collectionName: "Huberman Lab", feedUrl: "https://feeds.megaphone.fm/hubermanlab" }] });
+  const rss = (items: string) => `<?xml version="1.0"?><rss><channel><title>Huberman Lab</title>${items}</channel></rss>`;
+
+  test("a Spotify episode: the same episode's audio from the show's public feed", async () => {
+    serve({
+      [SPOTIFY]: { body: spotifyPage, type: HTML },
+      [search]: { body: shows, type: "application/json" },
+      "https://feeds.megaphone.fm/hubermanlab": { body: rss(`<item><title>Another episode</title><enclosure url="https://traffic.megaphone.fm/OTHER.mp3"/></item><item><title><![CDATA[Sleep Toolkit: Tools for Optimizing Sleep & Sleep-Wake Timing]]></title><pubDate>Mon, 08 Aug 2022 08:00:00 -0000</pubDate><enclosure url="https://traffic.megaphone.fm/HSW9.mp3?updated=1&amp;x=2" type="audio/mpeg"/></item>`), type: "application/rss+xml" },
+      "https://traffic.megaphone.fm/HSW9.mp3?updated=1&x=2": { body: new Uint8Array(4096), type: "audio/mpeg" },
+    });
+    const item = await addSource(await tempLibrary(), SPOTIFY);
+    expect(item.meta).toMatchObject({ title: "Sleep Toolkit: Tools for Optimizing Sleep & Sleep-Wake Timing", author: "Huberman Lab", published: "2022-08-08T08:00:00Z", url: SPOTIFY });
+    expect(item.body).toContain("[01:00] Thanks for listening.");
+  });
+
+  test("a Spotify episode whose title changed is found by its day; a Spotify-only show says so", async () => {
+    serve({
+      [SPOTIFY]: { body: spotifyPage, type: HTML },
+      [search]: { body: shows, type: "application/json" },
+      "https://feeds.megaphone.fm/hubermanlab": { body: rss(`<item><title>Sleep Toolkit (re-release)</title><pubDate>Mon, 08 Aug 2022 08:00:00 GMT</pubDate><enclosure url="https://traffic.megaphone.fm/HSW9.mp3"/></item>`), type: "application/rss+xml" },
+      "https://traffic.megaphone.fm/HSW9.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
+    });
+    expect((await addSource(await tempLibrary(), SPOTIFY)).meta.author).toBe("Huberman Lab");
+    serve({ [SPOTIFY]: { body: spotifyPage, type: HTML }, [search]: { body: JSON.stringify({ results: [] }), type: "application/json" } });
+    await expect(addSource(await tempLibrary(), SPOTIFY)).rejects.toThrow(/“Huberman Lab” has no public feed.*only on Spotify/);
+  });
+
   test("an older macOS and silence each say what to do", async () => {
     process.env.ORE_TRANSCRIBE = stand("echo 'Transcription needs macOS 26 or later.' >&2; exit 3");
     await expect(transcribe(new Uint8Array(10), "mp3")).rejects.toThrow(/needs macOS 26 or later.*paste it here/);
     process.env.ORE_TRANSCRIBE = stand("printf 'WEBVTT\\n\\n'");
     await expect(transcribe(new Uint8Array(10), "mp3")).rejects.toThrow(/Heard no speech/);
     process.env.ORE_TRANSCRIBE = stand(`cat '${vttFile}'`);
+  });
+});
+
+// D122: a video with no captions, or a video file, is heard from its sound on the Mac. Stand-ins:
+// yt-dlp prints the saved info (or "downloads" a sound file), the transcriber prints VTT and the
+// arguments it was given, so the test sees the file and the language it was asked for.
+describe("import coverage: videos heard from their sound", () => {
+  const VTT = "WEBVTT\n\n00:00:00.000 --> 00:00:30.000\nTesting yourself beats rereading.\n\n00:01:00.000 --> 00:01:05.000\nTeachers can quiz every week.\n\n";
+  const realPath = process.env.PATH;
+  const was = process.env.ORE_TRANSCRIBE;
+  let dir = "";
+  const script = (name: string, body: string) => {
+    const f = join(dir, name);
+    writeFileSync(f, `#!/bin/sh\n${body}\n`);
+    chmodSync(f, 0o755);
+    return f;
+  };
+  const vttFile = () => {
+    const f = join(dir, "out.vtt");
+    writeFileSync(f, VTT);
+    return f;
+  };
+  // yt-dlp: `-J` prints the info; a download writes `sound.m4a` where `-o` says (and notes it did).
+  const ytdlp = (info: string) =>
+    script("yt-dlp", `case " $* " in *" -J "*) cat '${info}';; *) while [ "$1" != "-o" ]; do shift; done; out=$(echo "$2" | sed 's/%(ext)s/m4a/'); echo sound > "$out"; touch '${dir}/downloaded';; esac`);
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "ore-listen-"));
+    process.env.PATH = `${dir}:${realPath}`;
+    process.env.ORE_TRANSCRIBE = script("transcribe", `echo "$@" > '${dir}/args'; echo "progress 1" >&2; cat '${vttFile()}'`);
+  });
+  afterAll(() => {
+    process.env.PATH = realPath;
+    if (was === undefined) delete process.env.ORE_TRANSCRIBE;
+    else process.env.ORE_TRANSCRIBE = was;
+  });
+
+  test("a YouTube video with no captions is heard: chapters, title and description kept", async () => {
+    ytdlp(join(FIX, "video", "no-captions.info.json"));
+    const seen: string[] = [];
+    const item = await addSource(await tempLibrary(), "https://www.youtube.com/watch?v=Nc4pT10nSaA", { onProgress: (_d, label) => label && seen.push(label) });
+    expect(item.meta).toMatchObject({ type: "youtube", title: "Lecture 3: Retrieval practice", author: "Cognitive Science Lab", published: "2024-02-12" });
+    expect(item.body).toBe("### Why testing works\n\n[00:00] Testing yourself beats rereading.\n\n### In the classroom\n\n[01:00] Teachers can quiz every week.\n\n## From the description\n\nSlides: https://example.edu/lecture3.pdf\n");
+    expect(readFileSync(join(item.dir, "source.vtt"), "utf8")).toBe(VTT);
+    expect(readFileSync(join(dir, "args"), "utf8")).toMatch(/sound\.m4a en\n$/);
+    expect(seen[0]).toMatch(/No captions, so listening/);
+  });
+
+  test("a video in another language reads its own captions before listening", async () => {
+    const info = join(dir, "es.json");
+    writeFileSync(info, JSON.stringify({ title: "La memoria", language: "es", subtitles: { es: [{ ext: "vtt", url: "https://captions.test/es.vtt" }] } }));
+    ytdlp(info);
+    serve({ "https://captions.test/es.vtt": { body: "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nHola a todos.\n", type: "text/vtt" } });
+    const item = await addSource(await tempLibrary(), "https://www.youtube.com/watch?v=es0000000aa");
+    expect(item.body).toBe("[00:00] Hola a todos.\n");
+  });
+
+  test("a video a page only embeds is never downloaded to be heard", async () => {
+    const info = join(dir, "bare.json");
+    writeFileSync(info, JSON.stringify({ title: "Embedded", webpage_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }));
+    ytdlp(info);
+    rmSync(join(dir, "downloaded"), { force: true });
+    const text = "Spacing works because forgetting makes the next retrieval harder. ".repeat(30);
+    serve({ "https://example.com/spacing": { body: `<html><head><title>Spacing</title></head><body><article><h1>Spacing</h1><p>${text}</p><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe><p>${text}</p></article></body></html>`, type: HTML } });
+    const item = await addSource(await tempLibrary(), "https://example.com/spacing");
+    expect(item.body).toContain("Spacing works because");
+    expect(item.meta.video).toBeUndefined();
+    expect(existsSync(join(dir, "downloaded"))).toBe(false);
+  });
+
+  test("a video file over 200 MB is heard where it lies, titled by its name", async () => {
+    const f = join(mkdtempSync(join(tmpdir(), "ore-mov-")), "Week 3 lecture.mov");
+    writeFileSync(f, "");
+    truncateSync(f, 300 * 1024 * 1024); // sparse: big on paper, nothing to read
+    const item = await addSource(await tempLibrary(), f);
+    expect(item.meta).toMatchObject({ type: "article", title: "Week 3 lecture" });
+    expect(item.body).toBe("[00:00] Testing yourself beats rereading.\n\n[01:00] Teachers can quiz every week.\n");
+    expect(readFileSync(join(dir, "args"), "utf8").trim()).toBe(f);
+    expect(existsSync(join(item.dir, "source.mov"))).toBe(false);
+  });
+
+  test("speech in a language the Mac has no model for says so", async () => {
+    process.env.ORE_TRANSCRIBE = script("transcribe-none", "echo 'No speech model for xx.' >&2; exit 4");
+    const f = join(mkdtempSync(join(tmpdir(), "ore-mp4-")), "talk.mp4");
+    writeFileSync(f, "x");
+    await expect(transcribeFile(f, undefined, "xx")).rejects.toThrow(/can’t transcribe speech in this language \(xx\).*paste it here/);
+    process.env.ORE_TRANSCRIBE = script("transcribe", `echo "$@" > '${dir}/args'; cat '${vttFile()}'`);
+  });
+});
+
+// D122: figures and slide pictures come in with the text they illustrate.
+describe("import coverage: figures and slide pictures", () => {
+  const file = (name: string) => {
+    const f = join(mkdtempSync(join(tmpdir(), "ore-fig-")), name);
+    writeFileSync(f, readFileSync(join(FIX, "files", name)));
+    return f;
+  };
+  const images = (body: string) => [...body.matchAll(/!\[([^\]]*)\]\((assets\/[0-9a-f]{16}\.\w+)\)/g)].map((m) => ({ alt: m[1], path: m[2]! }));
+
+  test("PowerPoint: each slide's pictures after its text, a logo on every slide left out", async () => {
+    const item = await addSource(await tempLibrary(), file("deck-pictures.pptx"));
+    const slides = item.body.split(/<!-- slide \d+ -->/).slice(1);
+    expect(slides.map((s) => images(s).length)).toEqual([1, 1, 0]);
+    expect(slides[0]).toMatch(/## The forgetting curve\n\n!\[\]\(assets\//); // "image.png" is no alt text
+    for (const i of images(item.body)) expect(existsSync(join(item.dir, i.path))).toBe(true);
+  });
+
+  test("notebook: a plot is saved as an image, its <Figure …> text dropped", async () => {
+    const item = await addSource(await tempLibrary(), file("plot.ipynb"));
+    const [plot] = images(item.body);
+    expect(plot).toBeDefined();
+    expect(readFileSync(join(item.dir, plot!.path)).subarray(1, 4).toString()).toBe("PNG");
+    expect(item.body).not.toContain("<Figure size");
+    expect(item.body.indexOf("plt.plot")).toBeLessThan(item.body.indexOf(plot!.path));
+  });
+
+  test("a saved web page's own images come in from its _files folder", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ore-saved-"));
+    mkdirSync(join(dir, "Spacing_files"));
+    writeFileSync(join(dir, "Spacing_files", "curve.png"), readFileSync(join(FIX, "files", "screenshot.png")));
+    const text = "Spacing works because forgetting makes the next retrieval harder. ".repeat(30);
+    writeFileSync(join(dir, "Spacing.html"), `<html><head><title>Spacing</title></head><body><article><h1>Spacing</h1><p>${text}</p><img src="Spacing_files/curve.png" alt="curve"><p>${text}</p></article></body></html>`);
+    const item = await addSource(await tempLibrary(), join(dir, "Spacing.html"));
+    const [curve] = images(item.body);
+    expect(curve?.alt).toBe("curve");
+    expect(readFileSync(join(item.dir, curve!.path))).toEqual(readFileSync(join(FIX, "files", "screenshot.png")));
+  });
+
+  test("PDF: figures after their page's text; touching panels are one, logos and icons left out", async () => {
+    const item = await addSource(await tempLibrary(), file("figures.pdf"));
+    const pages = item.body.split(/<!-- page \d+ -->/).slice(1);
+    expect(pages.map((p) => images(p).length)).toEqual([1, 1, 0]);
+    expect(pages[0]).toMatch(/Figure 1: Recall falls fast without review\.\n\n!\[\]\(assets\/[0-9a-f]{16}\.png\)/);
+    const two = readFileSync(join(item.dir, images(pages[1]!)[0]!.path));
+    expect(two.subarray(1, 4).toString()).toBe("PNG");
+    expect(two.readUInt32BE(16) / two.readUInt32BE(20)).toBeCloseTo(2, 1); // the two square panels side by side
+  });
+});
+
+// D122 gap 9: the small holes in the grid, each now checked.
+describe("import coverage: the grid's small holes", () => {
+  test("PDF: the author from its metadata", async () => {
+    const f = join(mkdtempSync(join(tmpdir(), "ore-pdfa-")), "figures.pdf");
+    writeFileSync(f, readFileSync(join(FIX, "files", "figures.pdf")));
+    expect((await addSource(await tempLibrary(), f)).meta.author).toBe("Ada Lovelace");
+  });
+
+  test("a damaged EPUB, Word or PowerPoint file says to download it again", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ore-broken-"));
+    const cut = new Uint8Array(readFileSync(join(FIX, "files", "deck.pptx")).subarray(0, 600));
+    for (const [name, what] of [["book.epub", "EPUB"], ["notes.docx", "Word"], ["deck.pptx", "PowerPoint"]] as const) {
+      writeFileSync(join(dir, name), cut);
+      await expect(addSource(await tempLibrary(), join(dir, name))).rejects.toThrow(new RegExp(`That ${what} file is damaged or only partly downloaded\\. Download it again`));
+    }
+  });
+
+  test("a private Google Doc's sign-in page is refused with how to share it", async () => {
+    const lib = await tempLibrary();
+    serve({ "https://docs.google.com/document/d/abc_123/export?format=docx": { body: "<html><head><title>Sign in</title></head><body>Sign in to continue to Docs</body></html>", type: HTML } });
+    await expect(addSource(lib, "https://docs.google.com/document/d/abc_123/edit")).rejects.toThrow(/That Google Doc isn’t shared publicly.*Anyone with the link/);
+    serve({}); // a deck no one shared: Google answers 404
+    await expect(addSource(lib, "https://docs.google.com/presentation/d/abc_123/edit")).rejects.toThrow(/That Google Slides deck isn’t shared publicly/);
   });
 });

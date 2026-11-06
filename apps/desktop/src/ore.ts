@@ -9,15 +9,21 @@ export const PHONE = import.meta.env.VITE_PHONE === "1";
 export const ore = <T,>(...args: string[]): Promise<T> => oreWith<T>(null, ...args);
 
 /** `ore` with `stdin` piped in (`ore diagram <item> <name> --set`). */
-export async function oreWith<T>(stdin: string | null, ...args: string[]): Promise<T> {
+export const oreWith = <T,>(stdin: string | null, ...args: string[]): Promise<T> => oreJob<T>(null, stdin, ...args);
+
+/** `ore` run under the name `job`, which `cancelOre(job)` stops (Cancel on an add). */
+export async function oreJob<T>(job: string | null, stdin: string | null, ...args: string[]): Promise<T> {
   // On iPhone the same commands run inside the app (src/phone/core.ts).
   if (PHONE) return (await import("./phone/core")).run<T>(args, stdin);
   try {
-    return await invoke<T>("ore", { args, stdin });
+    return await invoke<T>("ore", { args, stdin, job });
   } catch (e) {
     throw new Error(typeof e === "string" ? e : String(e));
   }
 }
+
+/** Stops the run named `job`: `ore` takes out what it wrote so far, and its call fails. */
+export const cancelOre = (job: string): Promise<void> => invoke<void>("ore_cancel", { job }).catch(() => {});
 
 /** `--name=value` in one argument: node's parseArgs rejects a separate value that starts with "-"
  *  (a Markdown list), so free text always goes in this form. */

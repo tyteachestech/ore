@@ -1,12 +1,21 @@
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
+import type { Asset } from "../items.ts";
+import { assetName } from "./assets.ts";
 import { cleanTitle } from "./check.ts";
+import { pageFigures, png } from "./pdf-figures.ts";
 
 export interface PdfDoc {
   title?: string;
   author?: string;
   body: string;
+  /** The figures its pages show, saved as `assets/<name>` (D122). */
+  assets?: Asset[];
 }
+
+/** Figures kept per PDF, and the size of one past which it is left out. */
+const MAX_FIGURES = 80;
+const MAX_FIGURE = 5 * 1024 * 1024;
 
 interface Item {
   str: string;
@@ -242,7 +251,7 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it
  *  can't open with the next step. */
 function openPdf(data: Uint8Array) {
-  const task = getDocument({ data: data.slice(), useSystemFonts: true, verbosity: 0 });
+  const task = getDocument({ data: data.slice(), useSystemFonts: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
   const promise = task.promise.catch((e: Error) => {
     if (e.name === "PasswordException") throw new Error("That PDF is locked with a password. Open it in Preview, enter the password, choose File › Export as PDF, and add the copy.");
     throw new Error("That file isn’t a readable PDF: it may be damaged or only partly downloaded. Download it again, or open it in Preview and choose File › Export as PDF.");
@@ -272,12 +281,21 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
   const doc = await task.promise;
   const meta = await pdfMeta(doc);
   const items: Item[][] = [];
+  const figures: Asset[][] = [];
+  const seen = new Map<string, number>();
   for (let n = 1; n <= doc.numPages; n++) {
     const page = await doc.getPage(n);
     const tc = await page.getTextContent();
     items.push(tc.items.filter((i): i is TextItem => "str" in i).map(toItem));
+    // A figure that won't decode never costs the text.
+    const figs = (await pageFigures(page).catch(() => [])).map((f) => png(f.width, f.height, f.rgba)).filter((d) => d.length <= MAX_FIGURE).map((d) => ({ name: assetName(d, "png"), data: d }));
+    for (const name of new Set(figs.map((f) => f.name))) seen.set(name, (seen.get(name) ?? 0) + 1);
+    figures.push(figs);
   }
   await task.destroy();
+  // On three or more pages it is a logo or a header band, not a figure.
+  const kept = figures.map((f) => f.filter((a) => (seen.get(a.name) ?? 0) < 3));
+  const assets = [...new Map(kept.flat().slice(0, MAX_FIGURES).map((a) => [a.name, a])).values()];
   const body = bodySize(items);
   const raw = items.map((p) => pageLines(dropMargins(p, body)));
   const typical = lineGap(raw);
@@ -297,11 +315,12 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
       next.shift();
     }
   });
-  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${p.map((x) => x.text).join("\n\n")}`);
+  const shown = new Set(assets.map((a) => a.name));
+  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => x.text), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);
   const text = pages.join("\n\n") + "\n";
-  if (text.replace(/<!-- page \d+ -->/g, "").trim().length < 20) {
+  if (text.replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").trim().length < 20) {
     throw new ScannedPdf();
   }
   // A metadata title that is only a file or tool name ("1706", "Microsoft Word - draft.docx") loses to page 1's.
-  return { title: cleanTitle(meta.title) ?? titleFrom(lines[0] ?? [], body), author: meta.author, body: text };
+  return { title: cleanTitle(meta.title) ?? titleFrom(lines[0] ?? [], body), author: meta.author, body: text, assets };
 }

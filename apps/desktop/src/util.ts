@@ -51,3 +51,15 @@ export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>): void {
     };
   }, [ref]);
 }
+
+const writing = new Map<string, Promise<unknown>>();
+/** Runs `write` after the writes already started for `key` (a source's id), so quick edits and their
+ *  ⌘Z and ⇧⌘Z land in the order he made them, each in its own `ore` process. A failed write doesn't
+ *  stop the next one. */
+export function inOrder<T>(key: string, write: () => Promise<T>): Promise<T> {
+  const next = (writing.get(key) ?? Promise.resolve()).then(write, write);
+  const done = next.catch(() => {});
+  writing.set(key, done);
+  void done.then(() => writing.get(key) === done && writing.delete(key));
+  return next;
+}

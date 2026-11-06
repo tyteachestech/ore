@@ -5,10 +5,10 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from "react";
-import { is, isNotes, label, useKeymap, type KeyId } from "./keys";
+import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { courseThumb, lessonsOf, loadSkills, nextLesson, ore, oreWith, opt, type Item, type Question, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, oreJob, opt, PHONE, type Item, type Question, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Reader } from "./Reader";
@@ -316,8 +316,14 @@ export function App() {
    *  drop of a list that landed with no skill goes to its row with the skill picker open. Returns the first error (shown as a toast unless the caller shows it)
    *  and the entries that failed, so the add box can keep only those and a retry never adds the rest twice. */
   const addSources = useCallback(
-    async (list: Entry[], to: string[], toastError = true, pickAfter = false, forQuestion?: string): Promise<{ failure: string | null; failed: Entry[]; first: string | null }> => {
+    async (list: Entry[], to: string[], toastError = true, pickAfter = false, forQuestion?: string): Promise<{ failure: string | null; failed: Entry[]; first: string | null; cancelled: boolean }> => {
       let last: Item | null = null;
+      // Cancel on the toast stops the entry being added (`ore` takes out what it wrote) and skips the
+      // rest; the entries already in stay, as Finder keeps the files a cancelled copy finished.
+      const job = `add-${Date.now()}-${Math.random()}`;
+      let cancelled = false;
+      const stopped: Entry[] = [];
+      const cancel = PHONE ? undefined : () => ((cancelled = true), void cancelOre(job));
       let first: string | null = null;
       /** Where he was when the add began: an add that finishes after he moved on never takes him away. */
       const from = viewRef.current;
@@ -350,21 +356,25 @@ export function App() {
             : `“${title}” is already ${to.length ? `in ${names(to)}` : "here"}${where}`;
       };
       for (const [i, e] of list.entries()) {
+        if (cancelled) {
+          stopped.push(e);
+          continue;
+        }
         const { args, stdin } = addArgs(e);
         const course = args.includes("--course");
         // A list fills its bar entry by entry; a course by lesson, as `ore add --course` reports each one;
         // audio as it is transcribed (D96).
-        progress(course ? "Reading the course…" : list.length > 1 ? `Adding ${i + 1} of ${list.length}…` : "Adding…", list.length > 1 && !course ? i / list.length : undefined);
+        progress(course ? "Reading the course…" : list.length > 1 ? `Adding ${i + 1} of ${list.length}…` : "Adding…", list.length > 1 && !course ? i / list.length : undefined, cancel);
         const stop = await listen<{ done: number; of: number; label: string }>("ore-progress", ({ payload: p }) =>
-          progress(course ? `Adding “${p.label}” · lesson ${p.done + 1} of ${p.of}` : `${p.label}…`, p.done / p.of),
+          cancelled || progress(course ? `Adding “${p.label}” · lesson ${p.done + 1} of ${p.of}` : `${p.label}…`, p.done / p.of, cancel),
         ).catch(() => () => {});
         try {
-          const r = await oreWith<Item | CourseAdd>(stdin, ...args, ...to.map((k) => opt("skill", k)), ...(forQuestion ? [opt("for", forQuestion)] : [])).finally(stop);
+          const r = await oreJob<Item | CourseAdd>(job, stdin, ...args, ...to.map((k) => opt("skill", k)), ...(forQuestion ? [opt("for", forQuestion)] : [])).finally(stop);
           if ("course" in r && "lessons" in r) {
             // A course (D79): every lesson it could add, in order; a lesson that failed says why, and adding
             // the link again adds only the lessons still missing.
-            const first = r.lessons[0];
-            if (first) last = { id: first.id, title: first.title } as Item;
+            const lesson = r.lessons[0];
+            if (lesson) last = { id: lesson.id, title: lesson.title } as Item;
             fresh.push(...r.lessons.map((l) => l.id));
             // Lessons added before D92 as bare videos get their page's text when the link is added again.
             const filled = r.filled?.length ? `added the page text to ${r.filled.length} lesson${r.filled.length > 1 ? "s" : ""}` : "";
@@ -390,6 +400,10 @@ export function App() {
             else fresh.push(r.id);
           }
         } catch (err) {
+          if (cancelled) {
+            stopped.push(e);
+            continue;
+          }
           failure ??= list.length > 1 ? `${entryName(e)}: ${errorText(err)}` : errorText(err);
           failed.push(e);
         }
@@ -422,7 +436,7 @@ export function App() {
       const archive = (on: boolean) => {
         void Promise.all(fresh.map((id) => ore("archive", id, ...(on ? [] : ["--undo"])))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
       };
-      const message = added && list.length === 1 ? added : last ? (list.length > 1 ? manyAdded(list.length, here) : `Added “${last.title}”`) : "";
+      const message = added && list.length === 1 ? added : last ? (list.length > 1 ? manyAdded(list.length - stopped.length, here) : `Added “${last.title}”`) : "";
       if (failure) {
         if (toastError) notify(failure, "error");
         else clearToast();
@@ -433,7 +447,7 @@ export function App() {
         const again = fresh.length || redo.length ? () => (fresh.length && archive(false), redo.length && run(redo)) : undefined;
         notify(message, "info", undo, again, opens ? undefined : show);
       }
-      return { failure, failed, first };
+      return { failure, failed: [...failed, ...stopped], first, cancelled };
     },
     [notify, progress, refresh, skills, openSource],
   );
@@ -799,8 +813,7 @@ export function App() {
         setHelp(!help);
       } else if (is(e, "nav-back") || is(e, "nav-forward")) {
         // ⌘[ and ⌘] also indent lists in the note editor, so a text field keeps them.
-        const t = e.target as HTMLElement;
-        if (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA") return;
+        if (inTextField(e)) return;
         close();
         if (is(e, "nav-back")) history.back();
         else history.forward();
@@ -965,8 +978,7 @@ export function App() {
     if (openId || overlay || onHome || !current) return;
     const onKey = (e: KeyboardEvent) => {
       // O is a plain letter: in a field (the skill note, a new question) it is typing.
-      const t = e.target as HTMLElement;
-      if ((is(e, "original") || is(e, "archive")) && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if ((is(e, "original") || is(e, "archive")) && inTextField(e)) return;
       if (is(e, "copy") && !window.getSelection()?.toString() && (many.length > 1 || keyed)) {
         // ⌘C on the picked rows, or the selected one, copies them as linked titles; a course as its page.
         e.preventDefault();

@@ -1,4 +1,4 @@
-import { Rss, BookOpenText, FilePdf, FileText, FileX, Globe, GraduationCap, Headphones, Image as ImageIcon, LinkSimple, NotePencil, Paperclip, Plus, TextAlignLeft, Stack, YoutubeLogo, type Icon } from "./icons";
+import { Rss, BookOpenText, FilePdf, FileText, FileX, Globe, GraduationCap, Headphones, Image as ImageIcon, LinkSimple, NotePencil, Paperclip, PlayCircle, Plus, TextAlignLeft, Stack, YoutubeLogo, type Icon } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { feedProof, type FoundFeed } from "./Feed";
@@ -10,22 +10,6 @@ import { copiedWhat, entries, entryName, entryText, fileKind, isCourseLink, word
 import { SkillChip, SkillPicker } from "./Skills";
 import { useFocusWhileMounted, type Notify } from "./util";
 import { Working } from "./Working";
-
-/** Where a new source goes: the open skill, or All sources (no skill). */
-export function Destination({ skill }: { skill: Skill | null }) {
-  return (
-    <span className="add-dest">
-      {skill ? (
-        <span className={`mark${skill.icon && skill.color ? " tile" : ""}`} data-color={skill.color} aria-hidden="true">
-          <SkillIcon icon={skill.icon} color={skill.color} dot />
-        </span>
-      ) : (
-        <Stack size={14} aria-hidden="true" />
-      )}
-      {skill ? skill.name : "All sources"}
-    </span>
-  );
-}
 
 /** A course link says what ↵ will add (D79): the course and how many lessons, read from the link. */
 function useCourse(url: string | null): { title: string; lessons: unknown[] } | "reading" | "unreadable" | null {
@@ -103,7 +87,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   /** Links already in the library, never offered from the clipboard. */
   have: string[];
   onCreate: (name: string) => Promise<Skill | undefined>;
-  onAdd: (list: Entry[], skills: string[], toastError: boolean) => Promise<{ failure: string | null; failed: Entry[] }>;
+  onAdd: (list: Entry[], skills: string[], toastError: boolean) => Promise<{ failure: string | null; failed: Entry[]; cancelled: boolean }>;
   /** Follows the feed behind a link (Feed); why it failed, or null. */
   onFollow: (url: string, skills: string[]) => Promise<string | null>;
   onPickFiles: () => void;
@@ -147,9 +131,11 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
     if (!what.length || busy) return;
     setBusy(true);
     setError(null);
-    const { failure, failed } = await onAdd(what, picked, false);
+    const { failure, failed, cancelled } = await onAdd(what, picked, false);
     if (!open.current) return failure ? notify(failure, "error") : undefined;
     setBusy(false);
+    // Cancelled from the toast: the box stays with what didn't go in, to fix or add again.
+    if (cancelled && !failure) return failed.length ? (setValue(failed.map(entryText).join("\n")), ref.current?.focus()) : onClose();
     if (!failure) return onClose();
     // Keep only what didn't go in: the rest is already added, and a retry mustn't add it twice.
     if (failed.length < what.length || what !== list) setValue(failed.map(entryText).join("\n"));
@@ -275,8 +261,8 @@ function Copied({ entry, onAdd }: { entry: Entry; onAdd: () => void }) {
   );
 }
 
-const TILES = { pdf: FilePdf, book: BookOpenText, note: NotePencil, page: Globe, image: ImageIcon, audio: Headphones } satisfies Record<FileKind, Icon>;
-const NAMES: Record<FileKind, string> = { pdf: "PDF", book: "book", note: "note", page: "web page", image: "image", audio: "audio" };
+const TILES = { pdf: FilePdf, book: BookOpenText, note: NotePencil, page: Globe, image: ImageIcon, audio: Headphones, video: PlayCircle } satisfies Record<FileKind, Icon>;
+const NAMES: Record<FileKind, string> = { pdf: "PDF", book: "book", note: "note", page: "web page", image: "image", audio: "audio", video: "video" };
 
 export type Dropping = { kinds: (FileKind | null)[]; skill: Skill | null };
 

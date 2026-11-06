@@ -95,6 +95,27 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("cancel an add from its toast: nothing is added, and the link stays in the box", async (page) => {
+  // A page that hangs on its picture, which is fetched after the source is written.
+  const page$ = `<html><head><title>Slow page</title><meta property="og:image" content="/cover.jpg"></head><body><article><h1>Slow page</h1><p>${"Spacing beats cramming. ".repeat(40)}</p></article></body></html>`;
+  const slow = Bun.serve({ port: 0, fetch: (req) => (new URL(req.url).pathname === "/cover.jpg" ? new Promise<Response>(() => {}) : new Response(page$, { headers: { "content-type": "text/html" } })) });
+  try {
+    const link = `http://localhost:${slow.port}/slow`;
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByLabel("Link, file path or text").fill(link);
+    await page.keyboard.press("Enter");
+    await page.locator(".toast").getByRole("button", { name: "Cancel" }).click();
+    await page.locator(".toast").waitFor({ state: "detached" });
+    await until("the box keeps the link, ready again", async () => (await page.getByLabel("Link, file path or text").inputValue()) === link && !(await page.getByLabel("Link, file path or text").getAttribute("readonly").then((r) => r !== null)));
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await Bun.sleep(300);
+    if (await page.locator(".row").filter({ hasText: "Slow page" }).count()) throw new Error("the cancelled source was added");
+  } finally {
+    slow.stop(true);
+  }
+});
+
 journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   const keeps = page.locator(".collected-chip.keep");
@@ -129,6 +150,53 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await page.keyboard.press("Escape");
 });
 
+journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
+  await openSource(page, AGENTS);
+  const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
+  /** Clicks the middle of a phrase in the reader: a highlight there opens its popup. */
+  const clickOn = async (phrase: string) => {
+    const at = await page.evaluate((phrase) => {
+      const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+        const i = n.data.indexOf(phrase);
+        if (i < 0) continue;
+        n.parentElement!.scrollIntoView({ block: "center" });
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + phrase.length);
+        const b = r.getClientRects()[0]!;
+        return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      }
+      return null;
+    }, phrase);
+    if (!at) throw new Error(`“${phrase}” is not in the reader`);
+    await page.mouse.click(at.x, at.y);
+  };
+  const reopen = async (phrase: string, typed: string) => {
+    await clickOn(phrase);
+    await until(`the note reads “${typed}”`, async () => (await note.isVisible()) && (await note.inputValue()) === typed);
+  };
+
+  await select(page, "Prompt chaining decomposes a task");
+  await note.click();
+  await page.keyboard.type("Each step feeds the next");
+  await clickOn("Workflows are systems where language models"); // click away, as he does
+  await until("the popup closes", async () => !(await note.isVisible()));
+  await reopen("decomposes a task", "Each step feeds the next");
+  await clickOn("Workflows are systems where language models");
+
+  await select(page, "The orchestrator-workers pattern");
+  await note.click();
+  await page.keyboard.type("How is it unlike routing?");
+  await page.keyboard.press("Escape");
+  await until("Esc closes the popup", async () => !(await note.isVisible()));
+  await reopen("orchestrator-workers", "How is it unlike routing?");
+
+  await page.reload();
+  await openSource(page, AGENTS);
+  await reopen("decomposes a task", "Each step feeds the next");
+});
+
 journey("author: add one by hand from the title's menu, it survives a reload, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   await page.locator(".doc-head h1").click({ button: "right" });
@@ -140,10 +208,15 @@ journey("author: add one by hand from the title's menu, it survives a reload, an
   await page.keyboard.press("Meta+z");
   await until("⌘Z removes it", async () => (await by.count()) === 0);
   // The byline shows at once; reload only once the redo's write has reached the library (slow on CI).
-  const saved = page.waitForResponse((r) => r.request().method() === "POST" && (r.request().postData() ?? "").includes("Henry Roediger"));
+  // Watched from the redo on, so the first add's write (still landing on CI) doesn't count.
+  const posts: string[] = [];
+  const watch = (r: import("playwright").Request) => r.method() === "POST" && posts.push(r.postData() ?? "");
+  page.on("request", watch);
+  const saved = page.waitForResponse((r) => r.request().method() === "POST" && (r.request().postData() ?? "").includes("Henry Roediger") && posts.includes(r.request().postData() ?? ""));
   await page.keyboard.press("Meta+Shift+z");
   await by.filter({ hasText: "Henry Roediger" }).waitFor();
   await saved;
+  page.off("request", watch);
   await page.reload();
   await openSource(page, TESTING);
   await by.click(); // the byline edits in place
@@ -165,6 +238,69 @@ journey("source note: what he types is kept when he switches sources and comes b
   await page.reload();
   await openSource(page, AGENTS);
   await shows("after a relaunch");
+});
+
+journey("note: / makes a toggle heading and @ writes a date; both are still there after a reload", async (page) => {
+  const d = new Date(Date.now() + 864e5);
+  const tomorrow = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  await openSource(page, AGENTS);
+  await page.locator(".note-editor [contenteditable=true]").first().click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/toggleheading2");
+  await page.locator(".note-menu-row.on", { hasText: "Toggle heading 2" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Why agents");
+  await page.keyboard.press("Enter"); // into the toggle's first line
+  await page.keyboard.type("Plan first, @tom");
+  await page.locator(".note-menu-row.on", { hasText: "Tomorrow" }).waitFor();
+  await page.keyboard.press("Enter");
+  const kept = async () =>
+    (await page.locator('.note-editor .toggle[data-level="2"] .toggle-summary', { hasText: "Why agents" }).isVisible()) &&
+    (await page.locator(".note-editor .toggle p", { hasText: `Plan first, ${tomorrow}` }).isVisible());
+  await until("a toggle heading with the date under it", kept);
+  await page.waitForTimeout(600); // the note saves after a pause
+  await page.reload();
+  await openSource(page, AGENTS);
+  await until("both survive a reload", kept);
+});
+
+journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
+  const cells = () => page.locator(".note-editor .note-table tr").evaluateAll((rs) => rs.map((r) => [...r.children].map((c) => c.textContent ?? "")));
+  await openSource(page, AGENTS);
+  await page.locator(".note-editor [contenteditable=true]").first().click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/table");
+  await page.locator(".note-menu-row.on", { hasText: "Table" }).waitFor();
+  await page.keyboard.press("Enter");
+  await until("a 3 by 3 table", async () => (await cells()).length === 3 && (await cells())[0]!.length === 3);
+  // Header, then the two rows, cell by cell; Tab in the last cell makes a fourth row.
+  for (const t of ["Tool", "Use", "Cost", "Search", "Find", "Low", "Code", "Run", "High"]) {
+    await page.keyboard.type(t);
+    await page.keyboard.press("Tab");
+  }
+  await page.keyboard.type("Memory");
+  await until("Tab in the last cell added a row", async () => JSON.stringify(await cells()) === JSON.stringify([["Tool", "Use", "Cost"], ["Search", "Find", "Low"], ["Code", "Run", "High"], ["Memory", "", ""]]));
+  await page.locator(".note-editor .note-table th", { hasText: "Use" }).hover();
+  await page.locator(".table-grip.cols").click();
+  await page.getByRole("menuitem", { name: "Delete column" }).click();
+  await until("the column is gone", async () => (await cells())[0]!.join() === "Tool,Cost");
+  await page.locator(".note-editor .note-table td", { hasText: "Memory" }).hover();
+  await page.locator(".table-add.rows").click();
+  await until("+ added a row", async () => (await cells()).length === 5);
+  await page.waitForTimeout(600); // the note saves after a pause
+  await page.reload();
+  await openSource(page, AGENTS);
+  await until("the table survives a reload", async () => (await cells()).length === 5 && (await cells())[3]!.join() === "Memory,");
+  // The skill page's widen button gives the note the whole page, and back.
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const side = page.locator(".skill-col.side");
+  await side.waitFor();
+  await page.getByRole("button", { name: "Widen your note" }).click();
+  await until("the side column hides", async () => !(await side.isVisible()));
+  await page.getByRole("button", { name: "Narrow your note" }).click();
+  await until("and comes back", () => side.isVisible());
 });
 
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
@@ -192,10 +328,78 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
   await grip("Effortful");
   await page.locator(".block-grip").click();
   await page.locator(".menu-item", { hasText: "Turn into" }).hover();
-  await page.getByRole("menuitemcheckbox", { name: "Heading 3" }).dispatchEvent("click");
+  await page.getByRole("menuitemcheckbox", { name: "Heading 3", exact: true }).dispatchEvent("click");
   await until("it became a heading", () => page.locator(".note-editor h3", { hasText: "Effortful" }).isVisible());
   await page.keyboard.press("ControlOrMeta+z"); // the editor's own undo: ⌘ on the Mac, Ctrl where CI runs
   await until("⌘Z takes it back", async () => (await items()).some((t) => t.startsWith("Effortful")));
+});
+
+journey("note block selection: Esc selects a block, ⇧↓ takes in the list, the ⋮⋮ drags both, Backspace and ⌘Z", async (page) => {
+  const tops = () => page.locator(".note-editor .ProseMirror > *").evaluateAll((els) => els.map((e) => e.tagName));
+  const picked = () => page.locator(".note-editor .block-sel").count();
+  await openSource(page, TESTING);
+  await page.locator(".note-editor p", { hasText: "learning event" }).click();
+  await until("the caret is on the line", () => page.evaluate(() => !!getSelection()?.anchorNode?.parentElement?.closest(".note-editor p")?.textContent?.includes("learning event")));
+  await page.waitForTimeout(100); // the editor takes the click's caret a moment after the browser shows it
+  await page.keyboard.press("Escape");
+  await until("Esc selects the line's block", async () => (await picked()) === 1);
+  await page.keyboard.press("Shift+ArrowDown");
+  await until("⇧↓ takes in the list after it", async () => (await picked()) === 2);
+  // Its handle drags both, above the heading.
+  const p = (await page.locator(".note-editor p", { hasText: "learning event" }).boundingBox())!;
+  await page.mouse.move(p.x + 30, p.y + 8);
+  const g = (await page.locator(".block-grip").boundingBox())!;
+  const top = (await page.locator(".note-editor h2").boundingBox())!;
+  await page.mouse.move(g.x + 10, g.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(top.x + 20, top.y + 2, { steps: 8 });
+  await page.locator(".block-drop").waitFor();
+  await page.mouse.up();
+  await until("both moved above the heading, still selected", async () => (await tops()).join() === "P,UL,H2" && (await picked()) === 2);
+  await page.waitForTimeout(600); // apart from the drag, so ⌘Z takes back only this
+  await page.keyboard.press("Backspace");
+  await until("Backspace takes both out", async () => (await tops()).join() === "H2");
+  await page.keyboard.press("ControlOrMeta+z");
+  await until("⌘Z brings them back, still selected", async () => (await tops()).join() === "P,UL,H2" && (await picked()) === 2);
+  await page.locator(".note-editor h2").click();
+  await until("the caret is on the heading", () => page.evaluate(() => !!getSelection()?.anchorNode?.parentElement?.closest(".note-editor h2")));
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await until("the second Esc lets go and leaves the note, not the source", async () => (await picked()) === 0 && !(await page.locator(".note-editor .ProseMirror").evaluate((e) => e.contains(document.activeElement))));
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+});
+
+journey("note format bar: select words, highlight them blue from the bar, and it is still there after a reload", async (page) => {
+  await openSource(page, TESTING);
+  await page.locator(".note-editor p", { hasText: "learning event" }).waitFor();
+  const box = await page.evaluate(() => {
+    const el = [...document.querySelectorAll(".note-editor p")].find((e) => e.textContent!.includes("learning event"))!;
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode() as Text | null; n; n = w.nextNode() as Text | null) {
+      const i = n.data.indexOf("learning event");
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + 14);
+      const q = r.getBoundingClientRect();
+      return { x1: q.left + 1, x2: q.right - 1, y: q.top + q.height / 2 };
+    }
+    return null;
+  });
+  await page.mouse.move(box!.x1, box!.y);
+  await page.mouse.down();
+  await page.mouse.move(box!.x2, box!.y, { steps: 5 });
+  await page.mouse.up();
+  await page.locator(".sel-bar").waitFor();
+  await page.locator(".sel-bar button[aria-label=Colour]").click();
+  await page.getByRole("button", { name: "Highlight: Blue" }).click();
+  const marked = () => page.locator('.note-editor mark[data-color="blue"]', { hasText: "learning event" }).isVisible();
+  await until("the words are highlighted", marked);
+  await page.waitForTimeout(600); // the note saves after a pause
+  await page.reload();
+  await openSource(page, TESTING);
+  await until("the highlight survives a reload", marked);
 });
 
 journey("diagram: draws beside the source, and a new one stays linked when the panel switches tab", async (page) => {

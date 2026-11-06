@@ -12,7 +12,9 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::os::unix::process::CommandExt;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -131,17 +133,29 @@ mod tests {
 
 /// Runs `ore <args> --json`. A long step's `{"progress":…}` lines on stderr (`ore add --course`) go to
 /// the window as `ore-progress` events while it runs; the rest of stderr is kept for the error line.
-fn run(args: Vec<String>, stdin: Option<String>, app: Option<AppHandle>) -> Result<Value, String> {
+/// Runs that can be cancelled (an add), by the job name the window gave: the process group of each.
+fn jobs() -> &'static Mutex<HashMap<String, u32>> {
+    static JOBS: OnceLock<Mutex<HashMap<String, u32>>> = OnceLock::new();
+    JOBS.get_or_init(Default::default)
+}
+
+fn run(args: Vec<String>, stdin: Option<String>, app: Option<AppHandle>, job: Option<String>) -> Result<Value, String> {
     let (bin, path) = resolve()?;
-    let mut child = Command::new(&bin)
-        .args(&args)
+    let mut cmd = Command::new(&bin);
+    cmd.args(&args)
         .arg("--json")
         .env("PATH", path)
         .stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() })
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("could not run {}: {e}", bin.display()))?;
+        .stderr(Stdio::piped());
+    // Its own process group, so Cancel stops the tools it runs too (yt-dlp, the transcriber).
+    if job.is_some() {
+        cmd.process_group(0);
+    }
+    let mut child = cmd.spawn().map_err(|e| format!("could not run {}: {e}", bin.display()))?;
+    if let Some(j) = &job {
+        jobs().lock().unwrap().insert(j.clone(), child.id());
+    }
     // `ore diagram <item> <name> --set` reads the scene from stdin; dropping the pipe closes it.
     if let (Some(text), Some(mut pipe)) = (stdin, child.stdin.take()) {
         pipe.write_all(text.as_bytes()).map_err(|e| format!("could not write to ore: {e}"))?;
@@ -159,7 +173,11 @@ fn run(args: Vec<String>, stdin: Option<String>, app: Option<AppHandle>) -> Resu
             rest
         })
     });
-    let out = child.wait_with_output().map_err(|e| format!("could not run {}: {e}", bin.display()))?;
+    let out = child.wait_with_output().map_err(|e| format!("could not run {}: {e}", bin.display()));
+    if let Some(j) = &job {
+        jobs().lock().unwrap().remove(j);
+    }
+    let out = out?;
     let err = stderr.and_then(|t| t.join().ok()).unwrap_or_default();
     if !out.status.success() {
         return Err(one_line_error(err.as_bytes(), out.status.code(), args.first().map_or("", String::as_str)));
@@ -195,9 +213,19 @@ fn spawn(args: Vec<String>) -> Result<(), String> {
 }
 
 /// Runs `ore <args> --json` off the main thread, with `stdin` piped in when given; returns parsed stdout or the CLI's error line.
+/// `job` names a run `ore_cancel` can stop.
 #[tauri::command]
-async fn ore(app: AppHandle, args: Vec<String>, stdin: Option<String>) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || run(args, stdin, Some(app))).await.map_err(|e| e.to_string())?
+async fn ore(app: AppHandle, args: Vec<String>, stdin: Option<String>, job: Option<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || run(args, stdin, Some(app), job)).await.map_err(|e| e.to_string())?
+}
+
+/// Stops the run named `job` (Cancel on an add): SIGTERM to its process group; `ore` takes out what it
+/// wrote before it exits. Nothing running under that name is not an error: it just finished.
+#[tauri::command]
+fn ore_cancel(job: String) {
+    if let Some(pid) = jobs().lock().unwrap().get(&job) {
+        let _ = Command::new("kill").args(["-s", "TERM", "--", &format!("-{pid}")]).status();
+    }
 }
 
 /// Fire-and-forget `ore <args>`; returns once the process has started.
@@ -307,7 +335,7 @@ fn refresh_reminder() {
 }
 
 fn remind() {
-    let Ok(note) = run(vec!["remind".into()], None, None) else { return };
+    let Ok(note) = run(vec!["remind".into()], None, None, None) else { return };
     if note["notify"] != Value::Bool(true) {
         return;
     }
@@ -702,7 +730,7 @@ fn main() {
                 .with_state_flags(StateFlags::all() & !StateFlags::VISIBLE)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![ore, ore_detached, player_port, define, clipboard_count, clipboard_text, clipboard_files, set_reminder, login_item, quiz_hide, quiz_open_source, set_quiz_shortcut, set_tray, set_app_menu])
+        .invoke_handler(tauri::generate_handler![ore, ore_cancel, ore_detached, player_port, define, clipboard_count, clipboard_text, clipboard_files, set_reminder, login_item, quiz_hide, quiz_open_source, set_quiz_shortcut, set_tray, set_app_menu])
         .on_menu_event(|app, e| {
             let id = e.id().as_ref();
             if !id.starts_with("ore:") {
