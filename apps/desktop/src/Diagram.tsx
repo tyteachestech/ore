@@ -5,8 +5,12 @@ import { createPortal } from "react-dom";
 import Editor from "./draw/Editor";
 import { svgMarkup } from "./draw/export";
 import { fromScene, toScene, type El } from "./draw/model";
+import { Hint } from "./Hint";
+import { Collapse, Expand } from "./icons";
 import { ore, oreWith, type Diagram } from "./ore";
-import { errorText, type Notify } from "./util";
+import { errorText, load, save as remember, type Notify } from "./util";
+
+const FULL = "ore.diagram.full";
 
 export type Scene = NonNullable<Diagram["scene"]>;
 type Files = Record<string, { dataURL?: string }>;
@@ -16,15 +20,20 @@ export function preview(scene: Scene): string {
   return svgMarkup(fromScene(scene as never), (scene.files ?? {}) as Files);
 }
 
-/** The full editor over the window. Autosaves through `ore diagram --set` (D30) 1 s after a change;
+/** The editor, over the window or, given `dock` (the reader's side panel), over the panel's sheet so the
+ *  source stays readable beside it; ⤢ (⇧⌘↵) swaps the two, remembered. Autosaves through `ore diagram --set` (D30) 1 s after a change;
  *  Esc or Done saves and closes, and `onClose` gets the scene on disk (null when nothing was ever saved). */
-export default function DiagramEditor({ args, name, loaded, notify, onClose, onRenamed, onLink }: {
+export default function DiagramEditor({ args, name, loaded, dock, notify, onClose, onFirstSave, onRenamed, onLink }: {
   args: string[];
   name: string;
   /** The file as the note's preview last read it; saves reading it again on open. */
   loaded?: Diagram;
+  /** The side panel to draw in, beside the source. */
+  dock?: HTMLElement | null;
   notify: Notify;
   onClose: (scene: Scene | null, name: string) => void;
+  /** The first write of a new diagram, so the note links it even if the panel closes before Done. */
+  onFirstSave?: (name: string) => void;
   onRenamed?: (from: string, to: string) => void;
   onLink?: (href: string) => void;
 }) {
@@ -38,9 +47,35 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onR
   const timer = useRef(0);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   // The parent's callbacks change identity with its state; read them here so the effects below run once.
-  const props = useRef({ notify, onClose, onRenamed });
+  const props = useRef({ notify, onClose, onFirstSave, onRenamed });
   const key = args.join(" ");
-  props.current = { notify, onClose, onRenamed };
+  props.current = { notify, onClose, onFirstSave, onRenamed };
+  const [full, setFull] = useState(() => !dock || load(FULL) === "1");
+  const box = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const docked = !!dock && !full;
+  const toggle = useCallback(() => {
+    setFull((f) => (remember(FULL, f ? "0" : "1"), !f));
+    requestAnimationFrame(() => box.current?.querySelector<HTMLElement>(".draw")?.focus());
+  }, []);
+
+  // Docked, it sits over the panel's sheet and follows it as the panel is resized; the panel widens
+  // to fit the tools while it does. One portal for both places, so the drawing and its undo survive the swap.
+  useEffect(() => {
+    if (!docked || !dock) return;
+    const sheet = (dock.querySelector(".mynotes-text") as HTMLElement | null) ?? dock;
+    const measure = () => setRect(sheet.getBoundingClientRect());
+    dock.classList.add("drawing");
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(sheet);
+    window.addEventListener("resize", measure);
+    return () => {
+      dock.classList.remove("drawing");
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [docked, dock]);
 
   useEffect(() => {
     let live = true;
@@ -72,6 +107,7 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onR
       const json = JSON.stringify(scene);
       if (json === written.current) return onDisk.current;
       await oreWith<Diagram>(json, "diagram", ...args, nameRef.current, "--set");
+      if (!onDisk.current) props.current.onFirstSave?.(nameRef.current);
       written.current = json;
       setFailed(null);
       onDisk.current = scene as Scene;
@@ -127,7 +163,11 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onR
     const prev = document.activeElement;
     // The editor handles its own keys; stopping them at document keeps the app's window-level keys
     // (palette, finish, Esc back to sources) out while it is open.
-    const contain = (e: KeyboardEvent) => e.stopPropagation();
+    // Docked, keys outside it (reading the source) are the reader's.
+    const contain = (e: KeyboardEvent) => {
+      if (box.current?.classList.contains("docked") && !box.current.contains(e.target as Node)) return;
+      e.stopPropagation();
+    };
     document.addEventListener("keydown", contain);
     return () => {
       document.removeEventListener("keydown", contain);
@@ -136,7 +176,13 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onR
   }, []);
 
   return createPortal(
-    <div className="diagram" role="dialog" aria-label="Diagram">
+    <div
+      ref={box}
+      className={`diagram${docked ? " docked" : ""}`}
+      role="dialog"
+      aria-label="Diagram"
+      style={docked && rect ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : undefined}
+    >
       <div className="diagram-head">
         {/* Rename in place (Linear's title): Enter saves, Esc or clicking away keeps the old name. */}
         <input
@@ -164,6 +210,13 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onR
             <button onClick={() => void save().catch(() => {})}>Retry</button>
           </span>
         )}
+        {dock && (
+          <Hint text={full ? "Back beside the source" : "Full window"} keys="d-expand">
+            <button className="diagram-expand" aria-label={full ? "Back beside the source" : "Full window"} onClick={toggle}>
+              {full ? <Collapse size={16} aria-hidden="true" /> : <Expand size={16} aria-hidden="true" />}
+            </button>
+          </Hint>
+        )}
         <button className="diagram-done" onClick={() => void close()}>
           Done <kbd>Esc</kbd>
         </button>
@@ -181,6 +234,7 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onR
               timer.current = window.setTimeout(() => void save().catch((e) => props.current.notify(`Diagram not saved: ${errorText(e)}`, "error")), 1000);
             }}
             onDone={() => void close()}
+            expand={dock ? { full, toggle } : undefined}
             onLink={(href) => (/^ore:/.test(href) ? void close().then((closed) => closed && onLink?.(href)) : onLink?.(href))}
           />
         )}

@@ -119,6 +119,7 @@ const DEFAULTS = [
   { id: "d-grid", label: "Snap to grid", group: "Diagram", combo: "Meta+Quote", scope: "diagram" },
   { id: "d-snap", label: "Snap to other shapes", group: "Diagram", combo: "Alt+KeyS", scope: "diagram" },
   { id: "d-done", label: "Close the diagram (Done)", group: "Diagram", combo: "Meta+Enter", scope: "diagram" },
+  { id: "d-expand", label: "Full window, or back beside the source", group: "Diagram", combo: "Shift+Meta+Enter", scope: "diagram" },
   { id: "d-find", label: "Find text in the diagram", group: "Diagram", combo: "Meta+KeyF", scope: "diagram" },
 ] as const satisfies readonly Binding[];
 

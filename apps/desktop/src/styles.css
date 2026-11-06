@@ -1460,6 +1460,16 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 }
 .diagram-done:hover, .diagram-done:focus-visible { background: var(--bg-hover); }
 .diagram-canvas { position: relative; flex: 1; min-height: 0; }
+/* Beside the source (Source note tab): over the panel's sheet, which it replaces until Done; the panel widens to fit the tools. */
+.diagram.docked { padding-top: 0; z-index: 3; border: 1px solid var(--border); border-top-left-radius: 0; border-radius: 0 10px 10px 10px; overflow: hidden; }
+.diagram.docked .diagram-name { width: 160px; }
+.mynotes.drawing { min-width: min(560px, 60vw); }
+.diagram-expand {
+  margin-left: auto; display: grid; place-items: center; width: 26px; height: 26px; color: var(--muted);
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+}
+.diagram-expand:hover, .diagram-expand:focus-visible { color: var(--text); background: var(--bg-hover); }
+.diagram-expand ~ .diagram-done { margin-left: 0; }
 
 /* The canvas (D103, draw/Editor.tsx). Floating bars are square hairline frames on the page colour (Terminal look),
    labels in mono caps; the grid, when on, is a field of single dots. */
