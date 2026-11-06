@@ -20,7 +20,7 @@ export function startRemix(lib: Library, cardIds: string[]): "started" | "skippe
   return startBackground(lib, ["remix", ...cardIds], "remix");
 }
 
-// A PDF's tables and formulas (D124): `ore tables <id>` detached, since Docling takes seconds to minutes.
+// A PDF's tables and formulas (D125): `ore tables <id>` detached, since Docling takes seconds to minutes.
 export function startTables(lib: Library, itemId: string): "started" | "skipped" {
   return startBackground(lib, ["tables", itemId], `tables-${itemId}`);
 }

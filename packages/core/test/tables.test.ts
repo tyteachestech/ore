@@ -9,7 +9,7 @@ import { addSource, addText, readTables, tablesState, reimportSource, undoReimpo
 import { findItem } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
-// D124: pdf.js reads a PDF's prose; Docling, an optional Mac download, reads its tables and display
+// D125: pdf.js reads a PDF's prose; Docling, an optional Mac download, reads its tables and display
 // formulas, and those regions replace pdf.js's lines by their place on the page. tables.pdf comes from
 // fixtures/intake/make-tables-pdf.py and tables.docling.json is Docling's real reading of it.
 
@@ -33,7 +33,7 @@ afterEach(() => {
 const TABLE = "| Schedule | Learners | Day 1 | Day 30 |\n| --- | --- | --- | --- |\n| Spaced | 412 | 91% | 74% |\n| Massed | 398 | 93% | 41% |\n| Control | 120 | 88% | 37% |";
 const PROSE = ["Learners who spread their reviews out remembered more a month later", "Table 1: Recall after one day and after thirty days.", "at a rate set by its stability S:", "Each successful review raises S, so the next gap can be longer than the last one."];
 
-describe("PDF tables and formulas (D124)", () => {
+describe("PDF tables and formulas (D125)", () => {
   test("PDF: tables and display formulas read by Docling replace their lines, the prose stays as it was", async () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, join(FIX, "tables.pdf"));

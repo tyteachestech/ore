@@ -23,7 +23,7 @@ export interface Cell {
   text: string;
 }
 
-/** A part of a page that Docling reads as structure (D124): a table or a display formula. pdf.js still
+/** A part of a page that Docling reads as structure (D125): a table or a display formula. pdf.js still
  *  reads the text everywhere else, so highlights on the prose never move. */
 export type Region = { page: number; box: Box } & ({ kind: "table"; rows: number; cols: number; cells: Cell[] } | { kind: "formula"; latex: string });
 

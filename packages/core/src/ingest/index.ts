@@ -35,7 +35,7 @@ export interface AddOptions {
   onProgress?: (done: number, label?: string) => void;
   /** A Feed post opened to read, not kept until he highlights or writes in it. */
   preview?: boolean;
-  /** A PDF's tables and formulas as Docling read them (D124), swapped into pdf.js's text. */
+  /** A PDF's tables and formulas as Docling read them (D125), swapped into pdf.js's text. */
   regions?: Region[];
 }
 
@@ -456,7 +456,7 @@ export interface Reimported {
 }
 
 // Files a reimport replaces; the previous ones wait in `.ore/reimport/<id>/` for Undo.
-// layout.json (D124) belongs to the version it was read into, so Undo takes its tables back out too.
+// layout.json (D125) belongs to the version it was read into, so Undo takes its tables back out too.
 const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.");
 const stash = (lib: Library, id: string) => join(lib.root, ".ore", "reimport", id);
 
@@ -532,7 +532,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone };
 }
 
-/** The tables and formulas Docling read in a source's PDF (D124), kept beside it as `layout.json` so a
+/** The tables and formulas Docling read in a source's PDF (D125), kept beside it as `layout.json` so a
  *  reimport keeps them without reading the PDF with Docling again. */
 function layoutOf(dir: string): Region[] | undefined {
   try {
@@ -544,7 +544,7 @@ function layoutOf(dir: string): Region[] | undefined {
 
 const tablesFile = (lib: Library, id: string, ext: "reading" | "error") => join(paths.logs(lib), `tables-${id}.${ext}`);
 
-/** Reads a PDF source's tables and formulas with Docling (D124) and puts them in its text in place of
+/** Reads a PDF source's tables and formulas with Docling (D125) and puts them in its text in place of
  *  pdf.js's lines, through a reimport from the kept PDF: the prose is unchanged, so every highlight
  *  stays where it is. While it runs, and after it fails, `tablesState` says so. */
 export async function readTables(lib: Library, ref: string): Promise<Reimported & { regions: number }> {
