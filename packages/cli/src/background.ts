@@ -1,6 +1,6 @@
 import { mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
-import { catchUpDue, markCatchUp, paths, type Library } from "@ore/core";
+import { catchUpDue, markCatchUp, markTablesReading, paths, type Library } from "@ore/core";
 
 // Run `ore enrich <id>` detached so `ore add` returns immediately.
 // Output goes to .ore/logs/enrich-<id>.log.
@@ -21,8 +21,9 @@ export function startRemix(lib: Library, cardIds: string[]): "started" | "skippe
 }
 
 // A PDF's tables and formulas (D125): `ore tables <id>` detached, since Docling takes seconds to minutes.
+// Marked as being read before `ore add` returns, so the reader opened next shows it waiting.
 export function startTables(lib: Library, itemId: string): "started" | "skipped" {
-  return startBackground(lib, ["tables", itemId], `tables-${itemId}`);
+  return startBackground(lib, ["tables", itemId], `tables-${itemId}`, (pid) => markTablesReading(lib, itemId, pid));
 }
 
 // The day's catch-up (D8, D10): `ore catch-up` detached, at most once in 20 hours. Started from Home,
@@ -33,7 +34,7 @@ export function startCatchUp(lib: Library): "started" | "skipped" {
   return startBackground(lib, ["catch-up"], "catch-up");
 }
 
-function startBackground(lib: Library, args: string[], logName: string): "started" | "skipped" {
+function startBackground(lib: Library, args: string[], logName: string, started?: (pid: number) => void): "started" | "skipped" {
   if (process.env.ORE_NO_ENRICH) return "skipped";
   mkdirSync(paths.logs(lib), { recursive: true });
   const log = openSync(join(paths.logs(lib), `${logName}.log`), "a");
@@ -43,6 +44,7 @@ function startBackground(lib: Library, args: string[], logName: string): "starte
     stdio: ["ignore", log, log],
     detached: true,
   });
+  started?.(proc.pid);
   proc.unref();
   return "started";
 }

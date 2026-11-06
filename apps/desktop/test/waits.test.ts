@@ -26,10 +26,12 @@ const WAITS: Record<string, string> = {
   "Feed.tsx feed --refresh": "Checking your feeds…",
   "Add.tsx feed find": "background: only offers Follow once a feed is found",
   "Settings.tsx models": "background: the saved model shows until the list arrives",
+  // Docling reads a PDF's tables and formulas (D125); its download (oreJob) shows "Downloading the table and formula reader".
+  "Tables.tsx tables": "Reading the ",
 };
 
 // AI calls (the mock bridge's list) and the ones that go out to the network.
-const SLOW = new Set(["enrich", "catch-up", "ask", "grade", "key-points", "check", "research", "explain", "scope", "add", "models"]);
+const SLOW = new Set(["enrich", "catch-up", "ask", "grade", "key-points", "check", "research", "explain", "scope", "add", "models", "tables"]);
 const SLOW_FEED = new Set(["follow", "open", "find", "--refresh"]);
 
 const src = join(import.meta.dir, "../src");

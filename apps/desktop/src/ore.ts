@@ -78,6 +78,12 @@ export type Item = {
   pinned_at?: string;
   /** Last opened in the reader (D110). */
   opened_at?: string;
+  /** A PDF's tables or formulas that read as plain text until the optional reader reads them (D125). */
+  structure?: ("tables" | "formulas")[];
+  /** `ore show`: being read now, or read; why the last reading failed; whether the reader is installed. */
+  tables?: "reading" | "read";
+  tables_error?: string;
+  tables_reader?: boolean;
   skills: string[];
   suggested_skill?: { name: string; hook?: string };
   prequestions?: Prequestion[];

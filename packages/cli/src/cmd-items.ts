@@ -81,7 +81,7 @@ export const itemCommands: Record<string, Command> = {
       const kept = !!item.kept;
       const enrich = f["no-enrich"] || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
       // A PDF's tables and formulas are read after it is added, once the optional reader is installed (D125).
-      if (!kept && item.meta.type === "pdf" && doclingPath()) startTables(lib, item.meta.id);
+      if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
       const path = relative(lib.root, item.docPath);
       return {
         data: { id: item.meta.id, title: item.meta.title, type: item.meta.type, path, enrich, ...(kept ? { kept, filed: item.filed, restored: item.restored, status: item.meta.status, skills: item.meta.skills } : {}) },
@@ -434,9 +434,14 @@ export const itemCommands: Record<string, Command> = {
   },
 
   tables: {
-    usage: "<item> | --install | --remove | --status   read a PDF's tables and display formulas with Docling and put them in its text in place of their lines; highlights stay (D125). Docling is an optional download of about 2 GB: --install gets it, --remove deletes it, --status says whether it is here. Undo with `ore reimport <item> --undo`",
+    usage: "<item> [--status] | --install | --remove | --status   read a PDF's tables and display formulas with Docling and put them in its text in place of their lines; highlights stay (D125). Docling is an optional download of about 2 GB: --install gets it, --remove deletes it, --status says whether it is here. Undo with `ore reimport <item> --undo`",
     options: { install: { type: "boolean" }, remove: { type: "boolean" }, status: { type: "boolean" } },
     async run([ref], f) {
+      if (f.status && ref) {
+        // One PDF's tables: being read, read, or why the last reading failed (the reader waits on this).
+        const lib = openLibrary();
+        return { data: tablesState(lib, findItem(lib, ref)), text: "" };
+      }
       if (f.status) {
         const installed = !!doclingPath();
         return { data: { installed, path: installed ? doclingHome() : undefined }, text: installed ? `The table and formula reader is installed (${doclingHome()})` : "The table and formula reader isn't installed. Get it with `ore tables --install`." };

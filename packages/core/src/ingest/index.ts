@@ -555,11 +555,12 @@ const tablesFile = (lib: Library, id: string, ext: "reading" | "error") => join(
 export async function readTables(lib: Library, ref: string): Promise<Reimported & { regions: number }> {
   const item = findItem(lib, ref);
   if (item.meta.type !== "pdf" || !existsSync(join(item.dir, "source.pdf"))) throw new Error("Only a PDF source has tables and formulas to read.");
-  mkdirSync(paths.logs(lib), { recursive: true });
-  writeFileSync(tablesFile(lib, item.meta.id, "reading"), String(process.pid));
+  markTablesReading(lib, item.meta.id, process.pid);
   try {
     const regions = await (await import("./docling.ts")).runDocling(join(item.dir, "source.pdf"));
     const r = await reimportSource(lib, item.meta.id, { local: true, regions });
+    // Nothing to swap in is still a reading: the PDF stops offering it.
+    if (!r.changed) writeAtomic(join(item.dir, "layout.json"), JSON.stringify(regions));
     rmSync(tablesFile(lib, item.meta.id, "error"), { force: true });
     return { ...r, regions: regions.length };
   } catch (e) {
@@ -568,6 +569,12 @@ export async function readTables(lib: Library, ref: string): Promise<Reimported 
   } finally {
     rmSync(tablesFile(lib, item.meta.id, "reading"), { force: true });
   }
+}
+
+/** Marks a PDF's tables as being read by the run `pid`, until it ends. */
+export function markTablesReading(lib: Library, id: string, pid: number): void {
+  mkdirSync(paths.logs(lib), { recursive: true });
+  writeFileSync(tablesFile(lib, id, "reading"), String(pid));
 }
 
 /** Where a PDF's tables stand: being read now, read (its layout.json), or why the last reading failed;
