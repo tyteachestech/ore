@@ -71,7 +71,7 @@ export const FONT_SIZES = [16, 20, 28, 36];
 export const SANS = 2;
 export const MONO = 3;
 export const GRID = 20;
-export const PAD = 5; // Excalidraw's padding around a shape's label
+const PAD = 5; // Excalidraw's padding around a shape's label
 export const GAP = 6; // between a bound arrow's tip and the shape
 const NODE: [number, number] = [160, 64];
 const SPACE = 110; // between a node and the next one made from the keyboard
@@ -107,7 +107,7 @@ export const isNode = (e: El) => isShape(e) || (e.type === "text" && !e.containe
 
 // ---------- Text measuring ----------
 
-export type Measure = (line: string, fontSize: number, family: number) => number;
+type Measure = (line: string, fontSize: number, family: number) => number;
 let measureLine: Measure = (line, size) => line.length * size * 0.55;
 /** The editor installs a canvas measurer; tests keep the estimate. */
 export const setMeasure = (m: Measure) => void (measureLine = m);
@@ -209,7 +209,7 @@ export function union(boxes: Box[]): Box | null {
 export const boundsOf = (els: readonly El[]) => union(els.map(bounds));
 export const inside = (b: Box, [x, y]: Pt) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 export const contains = (outer: Box, b: Box) => b.x >= outer.x && b.y >= outer.y && b.x + b.w <= outer.x + outer.w && b.y + b.h <= outer.y + outer.h;
-export const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 function segDist([px, py]: Pt, [ax, ay]: Pt, [bx, by]: Pt): number {
   const dx = bx - ax;
@@ -219,7 +219,7 @@ function segDist([px, py]: Pt, [ax, ay]: Pt, [bx, by]: Pt): number {
   return Math.hypot(px - ax - t * dx, py - ay - t * dy);
 }
 
-export function polyDist(p: Pt, pts: Pt[]): number {
+function polyDist(p: Pt, pts: Pt[]): number {
   if (pts.length === 1) return Math.hypot(p[0] - pts[0]![0], p[1] - pts[0]![1]);
   let d = Infinity;
   for (let i = 1; i < pts.length; i++) d = Math.min(d, segDist(p, pts[i - 1]!, pts[i]!));
@@ -249,7 +249,7 @@ function inPolygon([x, y]: Pt, poly: Pt[]): boolean {
 
 /** Whether a scene point touches an element. Closed shapes count their inside, filled or not, so a
  *  hollow box picks with one click anywhere in it (tldraw, Freeform); `tol` is in scene units. */
-export function hits(e: El, p: Pt, tol: number): boolean {
+function hits(e: El, p: Pt, tol: number): boolean {
   if (isShape(e)) {
     const poly = outline(e);
     return inPolygon(p, poly) || polyDist(p, [...poly, poly[0]!]) <= tol;
@@ -291,7 +291,7 @@ const toward = (p: Pt, q: Pt, d: number): Pt => {
 };
 
 /** The middle of a polyline by length, where its label sits. */
-export function midpoint(pts: Pt[]): Pt {
+function midpoint(pts: Pt[]): Pt {
   if (pts.length < 2) return pts[0] ?? [0, 0];
   const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i]![0], p[1] - pts[i]![1]));
   let half = lens.reduce((a, b) => a + b, 0) / 2;
@@ -361,7 +361,7 @@ const DEFAULTS: Record<string, unknown> = {
 const round = (v: number) => Math.round(v * 100) / 100;
 
 /** An element as written to the file: defaults left out, coordinates to 0.01, about 150 bytes per box. */
-export function compact(e: El): El {
+function compact(e: El): El {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(e)) {
     if (v === undefined) continue;
@@ -499,7 +499,7 @@ export function reroute(els: Els, moved: Set<string>): El[] {
 // ---------- Selection, groups ----------
 
 /** The outermost group an element belongs to, unless the editor has entered that group. */
-export const outerGroup = (e: El, entered: string | null) => {
+const outerGroup = (e: El, entered: string | null) => {
   const gs = e.groupIds;
   if (!gs.length) return null;
   const i = entered ? gs.indexOf(entered) : -1;
@@ -544,7 +544,7 @@ export function withLabels(els: Els, ids: Iterable<string>): Set<string> {
 
 // ---------- Edits ----------
 
-export function translate(e: El, dx: number, dy: number): El {
+function translate(e: El, dx: number, dy: number): El {
   return { ...e, x: e.x + dx, y: e.y + dy };
 }
 
@@ -986,7 +986,7 @@ export function nearestIn(els: Els, from: El, dir: Dir): El | null {
 
 // ---------- Typed maps ----------
 
-export type Edge = { from: string; to: string; label: string };
+type Edge = { from: string; to: string; label: string };
 
 /** Parses lines of `A -> B`, `A -causes-> B`, chains (`A -> B -> C`) and indented outlines (a line
  *  indented under another is its child), the text form of a concept map. A name in `(…)` is an
@@ -1157,7 +1157,7 @@ export function tidy(els: Els, ids: Set<string> = new Set()): El[] {
 
 // ---------- Matrix ----------
 
-export type Cell = { matrix: string; row: number; col: number };
+type Cell = { matrix: string; row: number; col: number };
 export const cellOf = (e: El): Cell | null => {
   const c = e.customData?.oreCell as Cell | undefined;
   return c && typeof c.matrix === "string" ? c : null;

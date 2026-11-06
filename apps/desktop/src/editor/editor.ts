@@ -40,7 +40,7 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
 
 /** Notion's to-do shortcut: `[]`, `[ ]` or `[x]` then a space at the start of a line makes a
  *  checkbox item, also outside a list (GFM's own rule only works inside one). Saves as `- [ ]`. */
-export const taskRule = $inputRule((ctx) =>
+const taskRule = $inputRule((ctx) =>
   new InputRule(/^\[([ xX]?)\]\s$/, (state, match, start, end) => {
     const checked = match[1]!.toLowerCase() === "x";
     const $start = state.doc.resolve(start);

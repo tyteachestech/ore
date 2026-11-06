@@ -14,7 +14,7 @@ import { errorText, load, save, type Notify } from "./util";
 import { Working } from "./Working";
 
 export type FeedPost = { feed: string; url: string; title: string; author?: string; published?: string; image?: string; read: boolean; feed_title: string; preview?: string };
-export type FeedInfo = { url: string; title: string; site?: string; skills: string[]; followed_at: string; checked_at?: string; error?: string };
+type FeedInfo = { url: string; title: string; site?: string; skills: string[]; followed_at: string; checked_at?: string; error?: string };
 type FeedData = { feeds: FeedInfo[]; posts: FeedPost[] };
 
 type View = "recent" | "byfeed";

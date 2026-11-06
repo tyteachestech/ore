@@ -105,5 +105,3 @@ export function useReading(): State {
     () => state,
   );
 }
-
-export const useWidth = () => useReading().width;

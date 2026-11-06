@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from "react";
-import { is, isNotes, label, useKeymap, type KeyId } from "./keys";
+import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
 import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, oreJob, opt, PHONE, type Item, type Question, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
@@ -373,8 +373,8 @@ export function App() {
           if ("course" in r && "lessons" in r) {
             // A course (D79): every lesson it could add, in order; a lesson that failed says why, and adding
             // the link again adds only the lessons still missing.
-            const first = r.lessons[0];
-            if (first) last = { id: first.id, title: first.title } as Item;
+            const lesson = r.lessons[0];
+            if (lesson) last = { id: lesson.id, title: lesson.title } as Item;
             fresh.push(...r.lessons.map((l) => l.id));
             // Lessons added before D92 as bare videos get their page's text when the link is added again.
             const filled = r.filled?.length ? `added the page text to ${r.filled.length} lesson${r.filled.length > 1 ? "s" : ""}` : "";
@@ -813,8 +813,7 @@ export function App() {
         setHelp(!help);
       } else if (is(e, "nav-back") || is(e, "nav-forward")) {
         // ⌘[ and ⌘] also indent lists in the note editor, so a text field keeps them.
-        const t = e.target as HTMLElement;
-        if (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA") return;
+        if (inTextField(e)) return;
         close();
         if (is(e, "nav-back")) history.back();
         else history.forward();
@@ -979,8 +978,7 @@ export function App() {
     if (openId || overlay || onHome || !current) return;
     const onKey = (e: KeyboardEvent) => {
       // O is a plain letter: in a field (the skill note, a new question) it is typing.
-      const t = e.target as HTMLElement;
-      if ((is(e, "original") || is(e, "archive")) && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if ((is(e, "original") || is(e, "archive")) && inTextField(e)) return;
       if (is(e, "copy") && !window.getSelection()?.toString() && (many.length > 1 || keyed)) {
         // ⌘C on the picked rows, or the selected one, copies them as linked titles; a course as its page.
         e.preventDefault();
