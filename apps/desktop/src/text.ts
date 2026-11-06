@@ -24,6 +24,7 @@ export function sourceSkeleton(md: string): Skeleton {
   hide(/^[ \t]*(?:[-*_][ \t]*){3,}$/gm); // thematic breaks
   hide(/^[ \t|:-]*-{3,}[ \t|:-]*$/gm); // table separator rows
   hide(/\\(?=[\\`*_{}[\]()#+\-.!|>~])/g); // backslash escapes
+  hide(/(?<=^ {0,3}\[\^[^\]\s]+\]):/gm); // a footnote's "[^7]:" shows as its number alone (`footnotes`)
   const parts: string[] = [];
   const map: number[] = [];
   for (let i = 0; i < md.length; i++) {
@@ -208,7 +209,7 @@ export function footnotes(md: string): string {
       const def = line.match(/^ {0,3}\[\^([^\]\s]+)\]:/);
       if (def) {
         inNote = true;
-        return `[^${def[1]}](#fnref-${encodeURIComponent(def[1]!)})${line.slice(def[0].length - 1)}`.replace(/\[\^([^\]\s]+)\](?![(:])/g, (_, l) => `[^${l}](#fn-${encodeURIComponent(l)})`);
+        return `[^${def[1]}](#fnref-${encodeURIComponent(def[1]!)})${line.slice(def[0].length)}`.replace(/\[\^([^\]\s]+)\](?![(:])/g, (_, l) => `[^${l}](#fn-${encodeURIComponent(l)})`);
       }
       // A note's later paragraphs are indented under it: outdented, so they read as text, not code.
       if (inNote && /^(?: {4}|\t)/.test(line)) line = line.replace(/^(?: {4}|\t)/, "");

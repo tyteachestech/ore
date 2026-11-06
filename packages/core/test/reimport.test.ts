@@ -92,12 +92,12 @@ describe("reimport", () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, join(import.meta.dir, "fixtures/intake/files/textbook.pdf"));
     // The text an older reader made of it: a margin note glued into the line beside it.
-    const old = readFileSync(item.docPath, "utf8").replace("The testing effect, found", "TheTesting effect testing effect, found");
+    const old = readFileSync(item.docPath, "utf8").replace("The **testing effect**, found", "TheTesting effect testing effect, found");
     writeFileSync(item.docPath, old);
     const h = addHighlight(findItem(lib, item.meta.id), { exact: "found again and again since the 1900s", intent: "keep" });
     const r = await reimportSource(lib, item.meta.id);
     expect(r.changed).toBe(true);
-    expect(r.item.body).toContain("The testing effect, found");
+    expect(r.item.body).toContain("The **testing effect**, found");
     expect(r.item.meta.title).toBe(item.meta.title);
     expect(readAnnotations(r.item).find((a) => a.id === h.id)?.status).not.toBe("deleted");
     expect((await undoReimport(lib, item.meta.id)).body).toContain("TheTesting effect");
