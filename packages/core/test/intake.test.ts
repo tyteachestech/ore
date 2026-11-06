@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
@@ -855,5 +855,54 @@ describe("import coverage: videos heard from their sound", () => {
     writeFileSync(f, "x");
     await expect(transcribeFile(f, undefined, "xx")).rejects.toThrow(/can’t transcribe speech in this language \(xx\).*paste it here/);
     process.env.ORE_TRANSCRIBE = script("transcribe", `echo "$@" > '${dir}/args'; cat '${vttFile()}'`);
+  });
+});
+
+// D122: figures and slide pictures come in with the text they illustrate.
+describe("import coverage: figures and slide pictures", () => {
+  const file = (name: string) => {
+    const f = join(mkdtempSync(join(tmpdir(), "ore-fig-")), name);
+    writeFileSync(f, readFileSync(join(FIX, "files", name)));
+    return f;
+  };
+  const images = (body: string) => [...body.matchAll(/!\[([^\]]*)\]\((assets\/[0-9a-f]{16}\.\w+)\)/g)].map((m) => ({ alt: m[1], path: m[2]! }));
+
+  test("PowerPoint: each slide's pictures after its text, a logo on every slide left out", async () => {
+    const item = await addSource(await tempLibrary(), file("deck-pictures.pptx"));
+    const slides = item.body.split(/<!-- slide \d+ -->/).slice(1);
+    expect(slides.map((s) => images(s).length)).toEqual([1, 1, 0]);
+    expect(slides[0]).toMatch(/## The forgetting curve\n\n!\[\]\(assets\//); // "image.png" is no alt text
+    for (const i of images(item.body)) expect(existsSync(join(item.dir, i.path))).toBe(true);
+  });
+
+  test("notebook: a plot is saved as an image, its <Figure …> text dropped", async () => {
+    const item = await addSource(await tempLibrary(), file("plot.ipynb"));
+    const [plot] = images(item.body);
+    expect(plot).toBeDefined();
+    expect(readFileSync(join(item.dir, plot!.path)).subarray(1, 4).toString()).toBe("PNG");
+    expect(item.body).not.toContain("<Figure size");
+    expect(item.body.indexOf("plt.plot")).toBeLessThan(item.body.indexOf(plot!.path));
+  });
+
+  test("a saved web page's own images come in from its _files folder", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ore-saved-"));
+    mkdirSync(join(dir, "Spacing_files"));
+    writeFileSync(join(dir, "Spacing_files", "curve.png"), readFileSync(join(FIX, "files", "screenshot.png")));
+    const text = "Spacing works because forgetting makes the next retrieval harder. ".repeat(30);
+    writeFileSync(join(dir, "Spacing.html"), `<html><head><title>Spacing</title></head><body><article><h1>Spacing</h1><p>${text}</p><img src="Spacing_files/curve.png" alt="curve"><p>${text}</p></article></body></html>`);
+    const item = await addSource(await tempLibrary(), join(dir, "Spacing.html"));
+    const [curve] = images(item.body);
+    expect(curve?.alt).toBe("curve");
+    expect(readFileSync(join(item.dir, curve!.path))).toEqual(readFileSync(join(FIX, "files", "screenshot.png")));
+  });
+
+  test("PDF: figures after their page's text; touching panels are one, logos and icons left out", async () => {
+    const item = await addSource(await tempLibrary(), file("figures.pdf"));
+    const pages = item.body.split(/<!-- page \d+ -->/).slice(1);
+    expect(pages.map((p) => images(p).length)).toEqual([1, 1, 0]);
+    expect(pages[0]).toMatch(/Figure 1: Recall falls fast without review\.\n\n!\[\]\(assets\/[0-9a-f]{16}\.png\)/);
+    const two = readFileSync(join(item.dir, images(pages[1]!)[0]!.path));
+    expect(two.subarray(1, 4).toString()).toBe("PNG");
+    expect(two.readUInt32BE(16) / two.readUInt32BE(20)).toBeCloseTo(2, 1); // the two square panels side by side
   });
 });
