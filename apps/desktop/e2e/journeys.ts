@@ -139,8 +139,11 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await page.keyboard.press("Enter"); // keeps it (Esc would drop a fresh one)
   await page.keyboard.press("Meta+z");
   await until("⌘Z removes it", async () => Number(await keeps.innerText()) === before);
+  // The count shows at once; reload only once the redo's write has reached the library (slow on CI).
+  const saved = page.waitForResponse((r) => r.request().method() === "POST" && /"annotate".*"--status","open"/.test(r.request().postData() ?? ""));
   await page.keyboard.press("Meta+Shift+z");
   await until("⇧⌘Z puts it back", async () => Number(await keeps.innerText()) === before + 1);
+  await saved;
   await page.reload();
   await openSource(page, TESTING);
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
