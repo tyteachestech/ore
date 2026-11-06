@@ -1,5 +1,6 @@
 export * from "./annotations.ts";
 export * from "./anchoring.ts";
+export * from "./cancel.ts";
 export * from "./frontmatter.ts";
 export * from "./fsutil.ts";
 export * from "./ids.ts";

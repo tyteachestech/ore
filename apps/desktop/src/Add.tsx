@@ -103,7 +103,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   /** Links already in the library, never offered from the clipboard. */
   have: string[];
   onCreate: (name: string) => Promise<Skill | undefined>;
-  onAdd: (list: Entry[], skills: string[], toastError: boolean) => Promise<{ failure: string | null; failed: Entry[] }>;
+  onAdd: (list: Entry[], skills: string[], toastError: boolean) => Promise<{ failure: string | null; failed: Entry[]; cancelled: boolean }>;
   /** Follows the feed behind a link (Feed); why it failed, or null. */
   onFollow: (url: string, skills: string[]) => Promise<string | null>;
   onPickFiles: () => void;
@@ -147,9 +147,11 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
     if (!what.length || busy) return;
     setBusy(true);
     setError(null);
-    const { failure, failed } = await onAdd(what, picked, false);
+    const { failure, failed, cancelled } = await onAdd(what, picked, false);
     if (!open.current) return failure ? notify(failure, "error") : undefined;
     setBusy(false);
+    // Cancelled from the toast: the box stays with what didn't go in, to fix or add again.
+    if (cancelled && !failure) return failed.length ? (setValue(failed.map(entryText).join("\n")), ref.current?.focus()) : onClose();
     if (!failure) return onClose();
     // Keep only what didn't go in: the rest is already added, and a retry mustn't add it twice.
     if (failed.length < what.length || what !== list) setValue(failed.map(entryText).join("\n"));

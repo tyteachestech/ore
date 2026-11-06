@@ -6,6 +6,7 @@ import { sha256, subdirs, writeAtomic } from "./fsutil.ts";
 import { nowIso, slugify, ulid } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
+import { madeThisRun } from "./cancel.ts";
 
 export const ItemType = z.enum(["article", "pdf", "youtube", "markdown", "snippet", "epub"]);
 export type ItemType = z.infer<typeof ItemType>;
@@ -163,6 +164,7 @@ export async function createItem(lib: Library, input: NewItem): Promise<Item> {
     preview: input.preview ? nowIso(now) : undefined,
   };
   const docPath = join(dir, "doc.md");
+  madeThisRun(dir);
   await withLock(paths.lock(lib), () => {
     if (input.source) writeAtomic(join(dir, `source.${input.source.ext}`), input.source.data);
     if (input.transcript) writeAtomic(join(dir, "transcript.vtt"), input.transcript);

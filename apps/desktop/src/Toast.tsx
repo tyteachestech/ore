@@ -7,7 +7,7 @@ import type { Notify } from "./util";
 
 /** `done`: how much of a long step is finished (0 to 1), drawn as a bar along the toast's foot.
  *  `settled`: a long step's toast that turned into its result, which shows a check or a cross where the
- *  spinner was. `step`: the step its Undo or Redo acts on. */
+ *  spinner was. `step`: the step its Undo or Redo acts on. `cancel`: stops a long step (an add). */
 type Toast = {
   id: number;
   message: string;
@@ -16,6 +16,7 @@ type Toast = {
   step?: Step;
   show?: () => void;
   done?: number;
+  cancel?: () => void;
   settled?: "ok" | "bad";
 };
 type Shown = Omit<Toast, "id" | "settled">;
@@ -85,7 +86,7 @@ export function useToast() {
     },
     [show, commit],
   );
-  const progress = useCallback((message: string, done?: number) => show({ message, kind: "progress", done }), [show]);
+  const progress = useCallback((message: string, done?: number, cancel?: () => void) => show({ message, kind: "progress", done, cancel }), [show]);
   const clear = useCallback(() => commit(list.current.filter((t) => t.kind !== "progress")), [commit]);
   /** The toasts stay while the pointer or focus is on them, then give him a few seconds more. */
   const hold = () => {
@@ -163,6 +164,17 @@ export function useToast() {
             <span className="toast-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(t.done * 100)}>
               <span style={{ transform: `scaleX(${t.done})` }} />
             </span>
+          )}
+          {t.kind === "progress" && t.cancel && (
+            <button
+              className="toast-undo"
+              onClick={() => {
+                t.cancel?.();
+                drop(t.id);
+              }}
+            >
+              Cancel
+            </button>
           )}
           {t.show && (
             <button

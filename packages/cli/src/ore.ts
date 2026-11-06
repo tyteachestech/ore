@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { parseArgs, type ParseArgsConfig } from "node:util";
-import { openLibrary, snapshot } from "@ore/core";
+import { cancelRun, openLibrary, snapshot } from "@ore/core";
 import { commands } from "./commands.ts";
 import { errorLine } from "./util.ts";
 
@@ -45,6 +45,12 @@ async function main(argv: string[]): Promise<number> {
   else if (out.text) console.log(out.text);
   return out.exitCode ?? 0;
 }
+
+// The app's Cancel on an add ends this run with SIGTERM: take out what it wrote so far, then stop.
+process.on("SIGTERM", () => {
+  cancelRun();
+  process.exit(143);
+});
 
 main(process.argv.slice(2)).then(
   (code) => process.exit(code),
