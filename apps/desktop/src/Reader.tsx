@@ -54,7 +54,7 @@ const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece o
 const PLACEHOLDER: Record<Intent, string> = {
   keep: "Connects to…",
   card: "This works because…",
-  question: "My question… my guess:",
+  question: "My question / my guess…",
 };
 
 // Raw HTML never renders (skipHtml): documents come from the web and this webview can run `ore`.
