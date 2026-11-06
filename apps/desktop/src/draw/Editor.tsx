@@ -89,7 +89,7 @@ function handlesOf(sel: El[], zoom: number): { box: Box; angle: number; at: { h:
   };
 }
 
-export default function Editor({ initial, files: initialFiles, name, notify, onChange, onDone, onLink }: {
+export default function Editor({ initial, files: initialFiles, name, notify, onChange, onDone, onLink, expand }: {
   onLink: (href: string) => void;
   initial: El[];
   files: Files;
@@ -97,6 +97,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   notify: Notify;
   onChange: (els: El[], files: Files) => void;
   onDone: () => void;
+  /** Beside the source in the side panel: `toggle` goes full window and back (⇧⌘↵). */
+  expand?: { full: boolean; toggle: () => void };
 }) {
   const keys = useKeymap();
   const [els, setElsState] = useState<El[]>(() => syncAll(initial));
@@ -488,6 +490,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     { id: "lock", label: "Lock or unlock", key: "d-lock-el", group: "Arrange", run: lockToggle },
     { id: "all", label: "Select all", key: "d-all", group: "Select", run: () => setSel(live.current.els.filter((e) => !isLabel(e) && !e.locked).map((e) => e.id)) },
     { id: "done", label: "Done", key: "d-done", group: "View", run: () => onDone() },
+    { id: "expand", label: expand?.full ? "Back beside the source" : "Full window", key: "d-expand", group: "View", when: () => !!expand, run: () => expand?.toggle() },
     { id: "find", label: "Find text", key: "d-find", group: "Select", run: () => setPanel("find") },
     { id: "png", label: "Copy as PNG", key: "d-png", group: "Export", run: exportPng },
     { id: "svg", label: "Copy as SVG", group: "Export", run: exportSvg },
