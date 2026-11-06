@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<style>html, body, iframe { margin: 0; width: 100%; height: 100%; border: 0; background: #000; overflow: hidden; }</style>
+</head>
+<body>
+<iframe id="yt" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<script>
+// The YouTube embed refuses a page with no http(s) origin (error 153), which the app's
+// tauri://localhost is not. The app frames this page from http://127.0.0.1:<port> instead;
+// it frames YouTube and relays the embed's postMessage protocol both ways, nothing else.
+const q = new URLSearchParams(location.search);
+const v = q.get("v") || "";
+q.delete("v");
+q.set("origin", location.origin);
+const yt = document.getElementById("yt");
+if (/^[\w-]{11}$/.test(v)) yt.src = "https://www.youtube.com/embed/" + v + "?" + q;
+addEventListener("message", (e) => {
+  if (e.source === yt.contentWindow) parent.postMessage(e.data, "*");
+  else if (e.source === parent) yt.contentWindow.postMessage(e.data, "https://www.youtube.com");
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+import { readFileSync } from "node:fs";
+import type * as YAMLLib from "yaml";
+import { z } from "zod";
+import { listCards, writeCardMeta } from "./cards.ts";
+import { parseYaml, stringifyFrontmatter, loadYaml } from "./frontmatter.ts";
+import { writeAtomic } from "./fsutil.ts";
+import { findItem, ItemMetaSchema, listItems, updateItemMeta, type ItemMeta } from "./items.ts";
+import { nowIso, slugify } from "./ids.ts";
+import { paths, type Library } from "./library.ts";
+import { withLock } from "./lock.ts";
+import { listTopics, readTopic, writeTopic } from "./topics.ts";
+
+export const Priority = z.enum(["P1", "P2", "P3"]);
+export type Priority = z.infer<typeof Priority>;
+
+// Named colors, so the app can render each one for its own theme.
+export const SkillColor = z.enum(["gray", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink"]);
+export type SkillColor = z.infer<typeof SkillColor>;
+
+export const SkillSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  priority: Priority,
+  hook: z.string().optional(),
+  goal: z.string().optional(), // D101: what he could show he can do, tried from memory on the skill page
+  icon: z.string().optional(), // an emoji, "mc:<name>" (a MingCute icon) or "ph:<name>" (Phosphor, older) (D36)
+  color: SkillColor.optional(),
+  collection: z.string().optional(), // sidebar group, e.g. "Ty Teaches Tech"
+});
+export type Skill = z.infer<typeof SkillSchema>;
+
+// Daily review (D60): a goal in minutes of active review, weekends optional, and how many
+// new drafts enter review a day. All optional; defaults below.
+export const ReviewSettingsSchema = z.object({
+  goal_minutes: z.number().int().min(1).max(240).optional(),
+  weekdays_only: z.boolean().optional(),
+  new_per_day: z.number().int().min(0).max(200).optional(),
+  remix: z.boolean().optional(), // D66: cards he knows come back as variants
+  plan: z.string().trim().max(80).optional(), // D67: the cue in "After <plan>, I review."; "" for none
+  reminder: z.string().regex(/^(([01]\d|2[0-3]):[0-5]\d)?$/, "reminder must be HH:MM, or empty for off").optional(), // D67: local time; "" off
+});
+export type ReviewSettings = Required<z.infer<typeof ReviewSettingsSchema>>;
+export const REVIEW_DEFAULTS: ReviewSettings = { goal_minutes: 10, weekdays_only: false, new_per_day: 10, remix: true, plan: "", reminder: "" };
+
+export const SkillsFileSchema = z.object({
+  ai: z.enum(["claude", "codex"]).optional(),
+  models: z.object({ claude: z.string().optional(), codex: z.string().optional() }).optional(), // the model per vendor; ORE_AI_MODEL overrides
+  review: ReviewSettingsSchema.optional(),
+  skills: z.array(SkillSchema),
+});
+export type SkillsFile = z.infer<typeof SkillsFileSchema>;
+
+// D25. Tyler owns these; hooks are one-line reminders of why the skill matters.
+export const DEFAULT_SKILLS: Skill[] = [
+  { id: "ai", name: "AI", priority: "P1", hook: "Build and explain AI systems in my work" },
+  { id: "learning", name: "Learning", priority: "P1", hook: "How people learn and remember" },
+  { id: "teaching", name: "Teaching", priority: "P1", hook: "Explaining ideas so they land" },
+  { id: "storytelling-writing", name: "Storytelling & Writing", priority: "P2", hook: "Clear, compelling writing and narrative" },
+  { id: "creator-business", name: "Creator Business", priority: "P2", hook: "Running a creator business" },
+  { id: "creativity", name: "Creativity", priority: "P2", hook: "Generating and shaping ideas" },
+  { id: "habits", name: "Habits", priority: "P3", hook: "Building and breaking habits" },
+  { id: "focus-attention", name: "Focus & Attention", priority: "P3", hook: "Directing attention, deep work" },
+  { id: "self-regulation-motivation", name: "Self-Regulation & Motivation", priority: "P3", hook: "Managing energy, emotion and drive" },
+];
+
+export const HOOK_MAX = 140; // one line under the skill's name
+
+export const RETENTION: Record<Priority, number> = { P1: 0.92, P2: 0.88, P3: 0.8 };
+export const PRIORITY_WEIGHT: Record<Priority, number> = { P1: 3, P2: 2, P3: 1 };
+const DEFAULT_PRIORITY: Priority = "P2";
+
+export function defaultSkillsYaml(): string {
+  return (
+    "# Skills (D25). Priority maps to desired retention (P1 0.92, P2 0.88, P3 0.80)\n" +
+    "# and breaks ties in the review queue. It never changes FSRS math.\n" +
+    "# ai: claude | codex   (AI vendor for enrichment and grading; ORE_AI overrides)\n" +
+    loadYaml().stringify({ ai: "claude", skills: DEFAULT_SKILLS }, { lineWidth: 0 })
+  );
+}
+
+export function loadSkills(lib: Library): SkillsFile {
+  const text = readFileSync(paths.skills(lib), "utf8");
+  let data: unknown;
+  try {
+    data = parseYaml(text);
+  } catch {
+    // Every screen reads skills.yaml, so a typo in it must say where (Bun's parser gives no line).
+    const why = loadYaml().parseDocument(text).errors[0]?.message.split("\n")[0]?.replace(/:$/, "") ?? "it isn’t valid YAML";
+    throw new Error(`skills.yaml in your library has a typo: ${why}. Fix it in a text editor.`);
+  }
+  return SkillsFileSchema.parse(data);
+}
+
+// A card's priority is the highest priority among its skills.
+export function cardPriority(skillIds: string[], skills: Skill[]): Priority {
+  const ps = skillIds.flatMap((id) => skills.filter((s) => s.id === id).map((s) => s.priority));
+  return ps.length ? ps.sort()[0]! : DEFAULT_PRIORITY;
+}
+
+export const desiredRetention = (skillIds: string[], skills: Skill[]): number =>
+  RETENTION[cardPriority(skillIds, skills)];
+
+/** A new skill's id: its name's slug, numbered when another skill holds it ("C#" after "C++"). A name with
+ *  no Latin letters or digits keeps its own letters ("日本語", "русский") instead of "untitled": the id names
+ *  the skills/<id>/ folder and `ore:skill/<id>` links, and both take any letter. */
+const newSkillId = (skills: Skill[], name: string): string => {
+  const ascii = slugify(name);
+  const own = name.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{N}\p{M}]+/gu, "-").replace(/^-+|-+$/g, "");
+  const base = ascii === "untitled" && own ? [...own].slice(0, 60).join("").replace(/-+$/, "") : ascii;
+  let id = base;
+  for (let n = 2; skills.some((s) => s.id === id); n++) id = `${base}-${n}`;
+  return id;
+};
+
+export const matchSkill = (skills: Skill[], name: string): Skill | undefined =>
+  skills.find((s) => s.id === name.trim() || s.name.toLowerCase() === name.trim().replace(/\s+/g, " ").toLowerCase());
+
+// One emoji (flags and keycaps included), "mc:<file_name>" or "ph:<kebab-name>". Checked on write only, so a
+// hand-edited skills.yaml never stops loading; the app just doesn't draw an icon it can't read.
+export function isSkillIcon(icon: string): boolean {
+  if (/^mc:[A-Za-z0-9]+(_[A-Za-z0-9]+)*$/.test(icon) || /^ph:[a-z0-9]+(-[a-z0-9]+)*$/.test(icon)) return true;
+  const graphemes = [...new Intl.Segmenter().segment(icon)];
+  return graphemes.length === 1 && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(icon);
+}
+
+export const reviewSettings = (lib: Library): ReviewSettings => ({ ...REVIEW_DEFAULTS, ...loadSkills(lib).review });
+
+// Change the daily review settings in skills.yaml (D60), keeping comments.
+export async function setReviewSettings(lib: Library, patch: Partial<ReviewSettings>): Promise<ReviewSettings> {
+  const valid = ReviewSettingsSchema.parse(patch);
+  return withLock(paths.lock(lib), () => {
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    for (const [k, v] of Object.entries(valid)) if (v !== undefined) doc.setIn(["review", k], v);
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    return { ...REVIEW_DEFAULTS, ...SkillsFileSchema.parse(doc.toJSON()).review };
+  });
+}
+
+// The AI vendor for enrichment and grading (`ai:` in skills.yaml), keeping comments.
+export async function setAiVendor(lib: Library, vendor: "claude" | "codex"): Promise<"claude" | "codex"> {
+  const ai = SkillsFileSchema.shape.ai.unwrap().parse(vendor);
+  return withLock(paths.lock(lib), () => {
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    doc.set("ai", ai);
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    return ai;
+  });
+}
+
+// Rename a skill, or set its icon, color, collection, hook (his "why I'm learning this", D63) or goal (D101) in
+// skills.yaml; an empty string clears the field (never the name). The ID stays, so links survive (D39).
+// Edits the YAML document in place so Tyler's comments and ordering survive.
+export async function setSkillLook(lib: Library, id: string, look: Partial<Record<"name" | "icon" | "color" | "collection" | "hook" | "goal", string>>): Promise<Skill> {
+  return withLock(paths.lock(lib), () => {
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
+    const node = list.items.find((m) => m.get("id") === id);
+    if (!node) throw new Error(`unknown skill "${id}"`);
+    const name = look.name?.trim().replace(/\s+/g, " ");
+    if (name !== undefined) {
+      if (!name) throw new Error("a skill needs a name");
+      const other = loadSkills(lib).skills.find((s) => s.id !== id && s.name.toLowerCase() === name.toLowerCase());
+      if (other) throw new Error(`skill "${other.name}" already exists`);
+      node.set("name", name);
+    }
+    for (const key of ["icon", "color", "collection", "hook", "goal"] as const) {
+      const v = key === "hook" || key === "goal" ? look[key]?.trim().replace(/\s+/g, " ") : look[key]?.trim();
+      if (v === undefined) continue;
+      if (key === "color" && v && !SkillColor.options.includes(v as SkillColor))
+        throw new Error(`color must be one of ${SkillColor.options.join("|")}`);
+      if (key === "icon" && v && !isSkillIcon(v)) throw new Error('icon must be one emoji or "mc:<name>"');
+      if ((key === "hook" || key === "goal") && v.length > HOOK_MAX) throw new Error(`${key} must be at most ${HOOK_MAX} characters`);
+      if (v) node.set(key, v);
+      else node.delete(key);
+    }
+    const skill = SkillSchema.parse(node.toJSON());
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    return skill;
+  });
+}
+
+// The sidebar's layout: collections in order, each with its skills in order ("" holds the skills in
+// no collection). Every skill appears exactly once.
+export const SkillLayoutSchema = z.array(z.object({ collection: z.string(), skills: z.array(z.string()) }));
+export type SkillLayout = z.infer<typeof SkillLayoutSchema>;
+
+// Lay out the sidebar in one write: sorts skills.yaml into the given order (each collection's skills
+// contiguous, since a collection's place is where its first skill appears) and sets or clears each
+// skill's collection. Moving a skill, reordering, renaming or removing a collection, and undoing any
+// of them are all this call. Comments on each skill's entry move with it.
+export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<Skill[]> {
+  return withLock(paths.lock(lib), () => {
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
+    const byId = new Map(list.items.map((m) => [String(m.get("id")), m]));
+    const seen = new Set<string>();
+    const names = new Set<string>();
+    const order: YAMLLib.YAMLMap[] = [];
+    for (const g of layout) {
+      const c = g.collection.trim().replace(/\s+/g, " ");
+      if (c && names.has(c.toLowerCase())) throw new Error(`collection "${c}" is listed twice`);
+      names.add(c.toLowerCase());
+      for (const id of g.skills) {
+        const node = byId.get(id);
+        if (!node) throw new Error(`unknown skill "${id}"`);
+        if (seen.has(id)) throw new Error(`skill "${id}" is listed twice`);
+        seen.add(id);
+        if (c) node.set("collection", c);
+        else node.delete("collection");
+        order.push(node);
+      }
+    }
+    const missing = [...byId.keys()].filter((id) => !seen.has(id));
+    if (missing.length) throw new Error(`layout leaves out ${missing.map((id) => `"${id}"`).join(", ")}`);
+    list.items = order;
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    return order.map((m) => SkillSchema.parse(m.toJSON()));
+  });
+}
+
+// Create a skill Tyler named (D25), at the default priority, optionally in a sidebar collection.
+export async function addSkill(lib: Library, name: string, collection = ""): Promise<Skill> {
+  return withLock(paths.lock(lib), () => {
+    const n = name.trim().replace(/\s+/g, " ");
+    if (!n) throw new Error("a skill needs a name");
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    const skills = SkillsFileSchema.parse(doc.toJSON()).skills;
+    const existing = skills.find((s) => s.name.toLowerCase() === n.toLowerCase());
+    if (existing) throw new Error(`skill "${existing.name}" already exists`);
+    const id = newSkillId(skills, n);
+    const c = collection.trim();
+    const skill: Skill = { id, name: n, priority: DEFAULT_PRIORITY, ...(c ? { collection: c } : {}) };
+    (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    return skill;
+  });
+}
+
+// Accept an item's suggested skill: create it in skills.yaml at the default priority unless it
+// already exists, then file the item, its cards and its topics under it. Tyler creates skills; AI only suggests (D25).
+export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{ skill: Skill; created: boolean; item: ItemMeta }> {
+  return withLock(paths.lock(lib), () => {
+    const item = findItem(lib, ref);
+    const s = item.meta.suggested_skill;
+    if (!s) throw new Error(`${item.meta.id} has no suggested skill`);
+    const skills = loadSkills(lib).skills;
+    let skill = matchSkill(skills, s.name);
+    const created = !skill;
+    if (!skill) {
+      skill = { id: newSkillId(skills, s.name), name: s.name, priority: DEFAULT_PRIORITY, ...(s.hook ? { hook: s.hook } : {}) };
+      const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+      (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
+      writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    }
+    const id = skill.id;
+    const meta = ItemMetaSchema.parse({ ...item.meta, skills: [...new Set([...item.meta.skills, id])], suggested_skill: undefined });
+    writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
+    for (const c of listCards(lib).filter((c) => c.meta.item === meta.id && !c.meta.skills.includes(id)))
+      writeCardMeta(c, { ...c.meta, skills: [...c.meta.skills, id] });
+    for (const t of meta.topics.map((slug) => readTopic(lib, slug)))
+      if (t && !t.meta.skills.includes(id)) writeTopic({ ...t, meta: { ...t.meta, skills: [...t.meta.skills, id] } });
+    return { skill, created, item: meta };
+  });
+}
+
+// File a source under exactly `ids`. Its cards follow (a skill taken off the source comes off its
+// cards, a new one goes on) and its topics gain the new ones; topics are shared, so none are dropped.
+export async function setItemSkills(lib: Library, ref: string, ids: string[]): Promise<ItemMeta> {
+  return withLock(paths.lock(lib), () => {
+    const known = new Set(loadSkills(lib).skills.map((s) => s.id));
+    const unknown = ids.find((id) => !known.has(id));
+    if (unknown) throw new Error(`unknown skill "${unknown}"`);
+    const item = findItem(lib, ref);
+    const next = [...new Set(ids)];
+    const added = next.filter((id) => !item.meta.skills.includes(id));
+    const removed = item.meta.skills.filter((id) => !next.includes(id));
+    const meta = ItemMetaSchema.parse({ ...item.meta, skills: next });
+    writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
+    for (const c of listCards(lib).filter((c) => c.meta.item === meta.id)) {
+      const skills = [...new Set([...c.meta.skills.filter((s) => !removed.includes(s)), ...added])];
+      if (skills.join() !== c.meta.skills.join()) writeCardMeta(c, { ...c.meta, skills });
+    }
+    for (const t of meta.topics.map((slug) => readTopic(lib, slug)))
+      if (t && added.some((id) => !t.meta.skills.includes(id))) writeTopic({ ...t, meta: { ...t.meta, skills: [...new Set([...t.meta.skills, ...added])] } });
+    return meta;
+  });
+}
+
+// Delete a skill: drop it from skills.yaml and untag its sources, cards and topics. Nothing else
+// goes: cards keep reviewing and the skill note stays on disk. `archive` also archives the sources
+// filed only under this skill.
+/** What deleting a skill changed, so `restoreSkill` can put it all back (Undo): the skill and its place
+ *  in skills.yaml, the sources, cards and topics it was taken off, and which sources it archived. */
+export const RemovedSkillSchema = z.object({
+  skill: SkillSchema,
+  at: z.number().int().min(0),
+  items: z.array(z.object({ id: z.string(), archived: z.boolean() })),
+  cards: z.array(z.string()),
+  topics: z.array(z.string()),
+});
+export type RemovedSkill = z.infer<typeof RemovedSkillSchema>;
+
+export async function removeSkill(lib: Library, id: string, opts: { archive?: boolean } = {}): Promise<{ skill: Skill; untagged: number; archived: number; removed: RemovedSkill }> {
+  return withLock(paths.lock(lib), () => {
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
+    const i = list.items.findIndex((m) => m.get("id") === id);
+    if (i < 0) throw new Error(`unknown skill "${id}"`);
+    const skill = SkillSchema.parse(list.items[i]!.toJSON());
+    list.items.splice(i, 1);
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    const removed: RemovedSkill = { skill, at: i, items: [], cards: [], topics: [] };
+    for (const item of [...listItems(lib), ...listItems(lib, { archived: true })]) {
+      if (!item.meta.skills.includes(id)) continue;
+      const skills = item.meta.skills.filter((s) => s !== id);
+      const archive = !!opts.archive && !skills.length && !item.meta.archived_at;
+      const meta = ItemMetaSchema.parse({ ...item.meta, skills, ...(archive ? { archived_at: nowIso() } : {}) });
+      writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
+      removed.items.push({ id: item.meta.id, archived: archive });
+    }
+    for (const c of listCards(lib).filter((c) => c.meta.skills.includes(id))) {
+      writeCardMeta(c, { ...c.meta, skills: c.meta.skills.filter((s) => s !== id) });
+      removed.cards.push(c.meta.id);
+    }
+    for (const t of listTopics(lib).filter((t) => t.meta.skills.includes(id))) {
+      writeTopic({ ...t, meta: { ...t.meta, skills: t.meta.skills.filter((s) => s !== id) } });
+      removed.topics.push(t.slug);
+    }
+    return { skill, untagged: removed.items.length, archived: removed.items.filter((x) => x.archived).length, removed };
+  });
+}
+
+/** Undoes `removeSkill`: the skill goes back where it was, filed again under everything it was taken
+ *  off, and the sources it archived come back. Anything deleted since is skipped. */
+export async function restoreSkill(lib: Library, input: RemovedSkill): Promise<Skill> {
+  const r = RemovedSkillSchema.parse(input);
+  const id = r.skill.id;
+  return withLock(paths.lock(lib), () => {
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
+    if (list.items.some((m) => m.get("id") === id)) throw new Error(`a skill "${id}" already exists`);
+    list.items.splice(Math.min(r.at, list.items.length), 0, doc.createNode(r.skill) as YAMLLib.YAMLMap);
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    const back = new Map(r.items.map((x) => [x.id, x.archived]));
+    for (const item of [...listItems(lib), ...listItems(lib, { archived: true })]) {
+      if (!back.has(item.meta.id) || item.meta.skills.includes(id)) continue;
+      const { archived_at, ...rest } = item.meta;
+      const meta = ItemMetaSchema.parse({ ...rest, skills: [...item.meta.skills, id], ...(back.get(item.meta.id) ? {} : archived_at ? { archived_at } : {}) });
+      writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
+    }
+    const cards = new Set(r.cards);
+    for (const c of listCards(lib).filter((c) => cards.has(c.meta.id) && !c.meta.skills.includes(id))) writeCardMeta(c, { ...c.meta, skills: [...c.meta.skills, id] });
+    for (const slug of r.topics) {
+      const t = readTopic(lib, slug);
+      if (t && !t.meta.skills.includes(id)) writeTopic({ ...t, meta: { ...t.meta, skills: [...t.meta.skills, id] } });
+    }
+    return r.skill;
+  });
+}
+
+export async function dismissSuggestedSkill(lib: Library, ref: string): Promise<ItemMeta> {
+  return updateItemMeta(lib, ref, (m) => ({ ...m, suggested_skill: undefined }));
+}

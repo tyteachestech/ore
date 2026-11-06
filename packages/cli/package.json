@@ -1,0 +1,8 @@
+{
+  "name": "ore",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "ore": "./src/ore.ts" },
+  "dependencies": { "@ore/core": "workspace:*" }
+}

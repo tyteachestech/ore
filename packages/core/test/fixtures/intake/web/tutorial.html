@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+            <title>Git and GitHub Tutorial – Version Control for Beginners</title>
+        <meta name="HandheldFriendly" content="True">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;1,400&family=Roboto+Mono:wght@400;700&display=swap">
+    <link id="prism-theme-light" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="https://cdn.freecodecamp.org/news-assets/prism/1.29.0/themes/prism.min.css">
+<noscript>
+  <link rel="stylesheet" href="https://cdn.freecodecamp.org/news-assets/prism/1.29.0/themes/prism.min.css">
+</noscript>
+<link id="prism-theme-dark" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="https://cdn.freecodecamp.org/news-assets/prism/1.29.0/themes/prism-dark.min.css">
+<noscript>
+  <link rel="stylesheet" href="https://cdn.freecodecamp.org/news-assets/prism/1.29.0/themes/prism-dark.min.css">
+</noscript>
+<link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="https://cdn.freecodecamp.org/news-assets/prism/1.29.0/plugins/unescaped-markup/prism-unescaped-markup.min.css">
+<noscript>
+  <link rel="stylesheet" href="https://cdn.freecodecamp.org/news-assets/prism/1.29.0/plugins/unescaped-markup/prism-unescaped-markup.min.css">
+</noscript>
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/fontawesome.min.css">
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/solid.min.css">
+        <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="/news/assets/css/global-f141287a91.css">
+        <link rel="stylesheet" type="text/css" href="/news/assets/css/variables-54e5c7c52a.css">
+        <link rel="stylesheet" type="text/css" href="/news/assets/css/print-118c07de60.css">
+        <link rel="stylesheet" type="text/css" href="/news/assets/css/screen-0e9ca6e993.css">
+        <link rel="stylesheet" type="text/css" href="/news/assets/css/search-bar-beba8d2b76.css">
+        <link rel="icon" href="https://cdn.freecodecamp.org/universal/favicons/favicon.ico" type="image/png">
+            <link rel="canonical" href="https://www.freecodecamp.org/news/git-and-github-for-beginners/">
+        <meta name="referrer" content="no-referrer-when-downgrade">
+    <meta name="description" content="Git and GitHub are two technologies that every developer should learn, irrespective of their field.  If you&#39;re a beginner developer, you might think that these two terms mean the same thing – but they&#39;re different.  This tutorial will help you unders...">
+    <meta property="og:site_name" content="freeCodeCamp.org">
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Git and GitHub Tutorial – Version Control for Beginners">
+        <meta property="og:description" content="Git and GitHub are two technologies that every developer should learn, irrespective of their field.  If you&#39;re a beginner developer, you might think that these two terms mean the same thing – but they&#39;re different.  This tutorial will help you unders...">
+    <meta property="og:url" content="https://www.freecodecamp.org/news/git-and-github-for-beginners/">
+    <meta property="og:image" content="https://www.freecodecamp.org/news/content/images/2021/11/g1117.png">
+    <meta property="article:published_time" content="2021-11-05T18:25:06.000Z">
+    <meta property="article:modified_time" content="2021-11-05T18:25:06.000Z">
+        <meta property="article:tag" content="beginners guide">
+        <meta property="article:tag" content="Git">
+        <meta property="article:tag" content="GitHub">
+        <meta property="article:tag" content="version control">
+    <meta property="article:publisher" content="https://www.facebook.com/freecodecamp">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Git and GitHub Tutorial – Version Control for Beginners">
+        <meta name="twitter:description" content="Git and GitHub are two technologies that every developer should learn, irrespective of their field.  If you&#39;re a beginner developer, you might think that these two terms mean the same thing – but they&#39;re different.  This tutorial will help you unders...">
+    <meta name="twitter:url" content="https://www.freecodecamp.org/news/git-and-github-for-beginners/">
+    <meta name="twitter:image" content="https://www.freecodecamp.org/news/content/images/2021/11/g1117.png">
+    <meta name="twitter:label1" content="Written by">
+    <meta name="twitter:data1" content="Ihechikara Abba">
+    <meta name="twitter:label2" content="Filed under">
+    <meta name="twitter:data2" content="beginners guide, Git, GitHub, version control">
+    <meta name="twitter:site" content="@freecodecamp">
+        <meta name="twitter:creator" content="@Ihechikara2">
+    <meta property="og:image:width" content="600">
+    <meta property="og:image:height" content="400">
+        <meta name="generator" content="Eleventy">
+        <link rel="alternate" type="application/rss+xml" title="freeCodeCamp.org" href="https://www.freecodecamp.org/news/rss/">
+  <meta name="x-fcc-source" content="Hashnode">
+    <script type="application/ld+json">{
+	"@context": "https://schema.org",
+	"@type": "Article",
+	"publisher": {
+		"@type": "Organization",
+		"name": "freeCodeCamp.org",
+		"url": "https://www.freecodecamp.org/news/",
+		"logo": {
+			"@type": "ImageObject",
+			"url": "https://cdn.freecodecamp.org/platform/universal/fcc_primary.svg",
+			"width": 2100,
+			"height": 240
+		}
+	},
+	"image": {
+		"@type": "ImageObject",
+		"url": "https://www.freecodecamp.org/news/content/images/2021/11/g1117.png",
+		"width": 600,
+		"height": 400
+	},
+	"url": "https://www.freecodecamp.org/news/git-and-github-for-beginners/",
+	"mainEntityOfPage": {
+		"@type": "WebPage",
+		"@id": "https://www.freecodecamp.org/news/"
+	},
+	"datePublished": "2021-11-05T18:25:06.000Z",
+	"dateModified": "2021-11-05T18:25:06.000Z",
+	"keywords": "beginners guide, Git, GitHub, version control",
+	"description": "Git and GitHub are two technologies that every developer should learn, irrespective of their field. \nIf you&#x27;re a beginner developer, you might think that these two terms mean the same thing – but they&#x27;re different. \nThis tutorial will help you unders...",
+	"headline": "Git and GitHub Tutorial – Version Control for Beginners",
+	"author": {
+		"@type": "Person",
+		"name": "Ihechikara Abba",
+		"url": "https://www.freecodecamp.org/news/author/Ihechikara/",
+		"sameAs": [
+			"https://ihechikara.com/",
+			"https://x.com/Ihechikara2"
+		],
+		"image": {
+			"@type": "ImageObject",
+			"url": "https://cdn.hashnode.com/res/hashnode/image/upload/v1709153015297/mkI7rPRBU.jpg",
+			"width": 1269,
+			"height": 1082
+		}
+	}
+}</script></head>
+        <body class="home-template">
+        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5D6RKKP" height="0" width="0"></iframe></noscript>
+        <div class="site-wrapper">
+            <nav class="site-nav nav-padding universal-nav">
+    <div class="site-nav-left">
+        <div id="nav-left-search-container" class="fcc-search-container"></div>
+    </div>
+    <div class="site-nav-middle">
+        <a class="site-nav-logo" href="https://www.freecodecamp.org/news/"><img src="https://cdn.freecodecamp.org/platform/universal/fcc_primary.svg" alt="freeCodeCamp.org"></a>
+    </div>
+    <div class="site-nav-right">
+        <button id="toggle-lang-button" class="lang-button-nav" title="Change Language" aria-label="Change Language" aria-controls="lang-dropdown" aria-expanded="false">
+             <svg></svg>
+        </button>
+            <ul id="lang-dropdown" class="nav-list" aria-labelledby="toggle-lang-button">
+                    <li>
+                        <a class="nav-link nav-lang-list-option" href="https://www.freecodecamp.org/news/" hreflang="en" lang="en" aria-current="true">English</a>
+                    </li>
+                    <li>
+                        <a class="nav-link nav-lang-list-option" href="https://www.freecodecamp.org/espanol/news/" hreflang="es" lang="es">Español</a>
+                    </li>
+                    <li>
+                        <a class="nav-link nav-lang-list-option" href="https://www.freecodecamp.org/chinese/news/" hreflang="zh" lang="zh">中文（简体字）</a>
+                    </li>
+                    <li>
+                        <a class="nav-link nav-lang-list-option" href="https://www.freecodecamp.org/italian/news/" hreflang="it" lang="it">Italiano</a>
+                    </li>
+                    <li>
+                        <a class="nav-link nav-lang-list-option" href="https://www.freecodecamp.org/portuguese/news/" hreflang="pt-BR" lang="pt-BR">Português</a>
+                    </li>
+                    <li>
+                        <a class="nav-link nav-lang-list-option" href="https://www.freecodecamp.org/ukrainian/news/" hreflang="uk" lang="uk">Українська</a>
+                    </li>
+                    <li>
+                        <a class="nav-link nav-lang-list-option" href="https://www.freecodecamp.org/japanese/news/" hreflang="ja" lang="ja">日本語</a>
+                    </li>
+                    <li>
+                        <a class="nav-link nav-lang-list-option" href="https://www.freecodecamp.org/korean/news/" hreflang="ko" lang="ko">한국어</a>
+                    </li>
+            </ul>
+        <button aria-expanded="false" class="menu-button-nav" id="toggle-menu-button" aria-label="Menu" aria-controls="menu-dropdown">
+            <span class="menu-btn-text">Menu</span>
+            <i class="fa-solid fa-bars menu-btn-icon" aria-hidden="true"></i>
+        </button>
+        <ul id="menu-dropdown" class="nav-list" aria-labelledby="toggle-menu-button">
+            <li>
+                <div id="nav-right-search-container" class="fcc-search-container"></div>
+            </li>
+            <li><a class="nav-link nav-link-flex" id="nav-forum" rel="noopener noreferrer" href="https://forum.freecodecamp.org/" target="_blank">Forum</a></li>
+            <li><a class="nav-link nav-link-flex" id="nav-learn" rel="noopener noreferrer" href="https://www.freecodecamp.org/learn" target="_blank">Curriculum</a></li>
+        <li><button class="nav-link nav-link-flex" id="toggle-dark-mode" aria-pressed="false">
+        <span>Night Mode</span><i class="fa-regular fa-square-check" aria-hidden="true"></i></button></li>
+        </ul>
+        <a class="donate-button-nav" id="nav-donate" rel="noopener noreferrer" href="https://www.freecodecamp.org/donate/" target="_blank">Donate</a>
+    </div>
+</nav>
+            <a class="banner" id="banner" rel="noopener noreferrer" target="_blank">
+    <p id="banner-text"></p>
+</a>
+            <div id="error-message"></div>
+    <main id="site-main" class="post-template site-main outer">
+        <div class="inner ad-layout">
+            <article class="post-full post">
+                <header class="post-full-header">
+                    <section class="post-full-meta">
+                        <time class="post-full-meta-date" datetime="2021-11-05T18:25:06.000Z">
+                            November 5, 2021
+                        </time>
+                            <span class="date-divider">/</span>
+                            <a dir="ltr" href="/news/tag/beginners-guide/">
+                                #beginners guide
+                            </a>
+                    </section>
+                    <h1 class="post-full-title">Git and GitHub Tutorial – Version Control for Beginners</h1>
+                </header>
+                    <div class="post-full-author-header">
+    <section class="author-card">
+    <img sizes="60px" src="https://cdn.hashnode.com/res/hashnode/image/upload/v1709153015297/mkI7rPRBU.jpg" class="author-profile-image" alt="Ihechikara Abba" width="1269" height="1082" onerror="this.style.display='none'">
+        <section class="author-card-content author-card-content-no-bio">
+            <span class="author-card-name">
+                <a href="/news/author/Ihechikara/">
+                        Ihechikara Abba
+                </a>
+            </span>
+        </section>
+    </section>
+                    </div>
+                <figure class="post-full-image">
+    <picture>
+      <source media="(max-width: 700px)" sizes="1px">
+      <source media="(min-width: 701px)" sizes="(max-width: 800px) 400px, (max-width: 1170px) 700px, 1400px">
+      <img onerror="this.style.display='none'" src="https://www.freecodecamp.org/news/content/images/size/w2000/2021/11/g1117.png" alt="Git and GitHub Tutorial – Version Control for Beginners" ,="" width="600" height="400">
+    </picture>
+                </figure>
+                <section class="post-full-content">
+                    <div class="post-and-sidebar">
+                        <section class="post-content ">
+<p>Git and GitHub are two technologies that every developer should learn, irrespective of their field. </p>
+<p>If you're a beginner developer, you might think that these two terms mean the same thing – but they're different. </p>
+<p>This tutorial will help you understand what Git and version control are, the basic Git commands you need to know, how you can use its features to boost your work efficiency, and how to extend these features using GitHub.</p>
+<p>This guide is beginner friendly, as the examples will be very easy to understand. It will also be a generalized tutorial so anyone can follow along no matter what your favorite programming language is. </p>
+<p>For our project, we'll make a to-do list written in a text (txt) file. You will see how we can use the features of Git to work on and create a final version of the list.</p>
+<h3 id="heading-prerequisites">Prerequisites</h3>
+<p>In order to complete this tutorial, you'll need the following:</p>
+<ul>
+<li>A command line interface.</li>
+<li>A text editor of your choice (I will be using VS Code).</li>
+<li>A GitHub account.</li>
+</ul>
+<h2 id="heading-what-is-git">What is Git?</h2>
+<p>Git is a version control system which lets you track changes you make to your files over time. With Git, you can revert to various states of your files (like a time traveling machine). You can also make a copy of your file, make changes to that copy, and then merge these changes to the original copy.</p>
+<p>For example, you could be working on a website's landing page and discover that you do not like the navigation bar. But at the same time, you might not want to start altering its components because it might get worse. </p>
+<p>With Git, you can create an identical copy of that file and play around with the navigation bar. Then, when you are satisfied with your changes, you can merge the copy to the original file.</p>
+<p>You are not limited to using Git just for source code files – you can also use it to keep track of text files or even images. This means that Git is not just for developers – anyone can find it helpful.</p>
+<h3 id="heading-how-to-install-git">How to install Git</h3>
+<p>In order to use Git, you have to install it on your computer. To do this, you can download the latest version on the <a target="_blank" href="https://git-scm.com/downloads">official website</a>. You can download for your operating system from the options given. </p>
+<p>You can also install Git using the command line, but since the commands vary with each operating system, we'll focus on the more general approach.</p>
+<h3 id="heading-how-to-configure-git">How to configure Git</h3>
+<p>I will assume that at this point you have installed Git. To verify this, you can run this command on the command line: <code>git --version</code>. This shows you the current version installed on you PC. </p>
+<p>The next thing you'll need to do is to set your username and email address. Git will use this information to identify who made specific changes to files. </p>
+<p>To set your username, type and execute these commands: <code>git config --global user.name "YOUR_USERNAME"</code> and <code>git config --global user.email "YOUR_EMAIL"</code>. Just make sure to replace <code>"YOUR_USERNAME"</code> and <code>"YOUR_EMAIL"</code> with the values you choose.</p>
+<h2 id="heading-how-to-create-and-initialize-a-project-in-git">How to Create and Initialize a Project in Git</h2>
+<p>We are finally done with installing and setting up Git. It is now time to create our project. </p>
+<p>I have created a folder on my desktop called <code>Git and GitHub tutorial</code>. Using the command line, navigate to your new project's location. For me, I would run the following commands:</p>
+<p><code>cd desktop</code></p>
+<p><code>cd Git and GitHub tutorial</code></p>
+<p>If you are new to the command line and are still learning how to use it to navigate around your PC, then I would suggest using Microsoft's Visual Studio Code. It is a code editor which has an inbuilt terminal for executing commands. You can download it <a target="_blank" href="https://code.visualstudio.com/download">here</a>. </p>
+<p>After installing VS Code, open your project in the editor and open a new terminal for your project. This automatically points the terminal/command line to your project's path.</p>
+<p>Now to initialize your project, simply run <code>git init</code>. This will tell Git to get ready to start watching your files for every change that occurs. It looks like this:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/Screenshot--95-.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git init</em></p>
+<p>The first line has information about my PC and the path to where the folder exists. The second line is the command <code>git init</code>, and the third line is the response sent back telling me that my repository (repo) has been initialized. It is considered empty because we have not told Git what files to track. </p>
+<p>A repository is just another way to define a project being watched/tracked by Git.</p>
+<h3 id="heading-git-project-files">Git project files</h3>
+<p>I have created only one file called <code>todo.txt</code>. This is what the file looks like:</p>
+<pre><code class="lang-txt">MY TO-DO LIST
+1. Write an article.
+2. Code.
+3. Study books.
+4. Attend classes on time.
+5. Visit aunt.
+6. Apply for remote jobs.
+</code></pre>
+<p>Before we proceed with learning other Git commands, let's talk about GitHub.</p>
+<h2 id="heading-what-is-github">What is GitHub?</h2>
+<p>GitHub is an online hosting service for Git repositories. Imagine working on a project at home and while you are away, maybe at a friend's place, you suddenly remember the solution to a code error that has kept you restless for days. </p>
+<p>You cannot make these changes because your PC is not with you. But if you have your project hosted on GitHub, you can access and download that project with a command on whatever computer you have access to. Then you can make your changes and push the latest version back to GitHub.</p>
+<p>In summary, GitHub lets you store your repo on their platform. Another awesome feature that comes with GitHub is the ability to collaborate with other developers from any location.</p>
+<p>Now that we have created and initialized our project locally, let's push it to GitHub. </p>
+<p>If you are a beginner, you will come across some new terms like push, commit, add, and so on – but do not be overwhelmed by them. With some practice you will be able to remember these terms and what they do.</p>
+<h2 id="heading-how-to-push-a-repository-to-github">How to push a repository to GitHub</h2>
+<p>I will divide this section into steps to help you understand the process more clearly.</p>
+<h3 id="heading-step-1-create-a-github-account">Step 1 – Create a GitHub account</h3>
+<p>To be able to use GitHub, you will have to create an account first. You can do that on their <a target="_blank" href="https://github.com/">website</a>.</p>
+<h3 id="heading-step-2-create-a-repository">Step 2 – Create a repository</h3>
+<p>You can click on the <code>+</code> symbol on the top right corner of the page then choose "New repository". Give your repo a name then scroll down and click on "Create repository".</p>
+<h3 id="heading-step-3-add-and-commit-files">Step 3 – Add and commit file(s)</h3>
+<p>Before we "add" and "commit" our files, you need to understand the stages of a file being tracked by Git. </p>
+<h4 id="heading-committed-state">Committed state</h4>
+<p>A file is in the <strong>committed</strong> state when all the changes made to the file have been saved in the local repo. Files in the committed stage are files ready to be pushed to the remote repo (on GitHub).</p>
+<h4 id="heading-modified-state">Modified state</h4>
+<p>A file in the <strong>modified</strong> state has some changes made to it but it's not yet saved. This means that the state of the file has been altered from its previous state in the committed state. </p>
+<h4 id="heading-staged-state">Staged state</h4>
+<p>A file in the <strong>staged</strong> state means it is ready to be committed. In this state, all necessary changes have been made so the next step is to move the file to the commit state. </p>
+<p>You can understand this better by imagining Git as a camera. The camera will only take a snapshot when the file reaches the commit state. After this state, the camera starts comparing changes being made to the same file with the last snapshot (this is the modified state). And when the required changes have been made, the file is staged and moved to the commit state for a new snapshot.</p>
+<p>This might be a lot of information to take in at the moment, but do not be discouraged – it gets easier with practice.</p>
+<h3 id="heading-how-to-add-files-in-git">How to add files in Git</h3>
+<p>When we first initialized our project, the file was not being tracked by Git. To do that, we use this command <code>git add .</code> The period or dot that comes after <code>add</code> means all the files that exist in the repository. If you want to add a specific file, maybe one named <code>about.txt</code>, you use <code>git add about.txt</code>. </p>
+<p>Now our file is in the staged state. You will not get a response after this command, but to know what state your file is in, you can run the <code>git status</code> command. </p>
+<h3 id="heading-how-to-commit-files-in-git">How to commit files in Git</h3>
+<p>The next state for a file after the staged state is the committed state. To commit our file, we use the <code>git commit -m "first commit"</code> command. </p>
+<p>The first part of the command <code>git commit</code> tells Git that all the files staged are ready to be committed so it is time to take a snapshot. The second part <code>-m "first commit"</code> is the commit message. <code>-m</code> is shorthand for message while the text inside the parenthesis is the commit message. </p>
+<p>After executing this command, you should get a response similar to this:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/Screenshot--97-.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git commit</em></p>
+<p>Now our file is in the committed state.</p>
+<h3 id="heading-step-4-push-the-repository-to-github">Step 4 – Push the repository to GitHub</h3>
+<p>After you create the repo, you should be redirected to a page that tells you how to create a repo locally or push an existing one. </p>
+<p>In our case, the project already exists locally so we will use commands in the "…or push an existing repository from the command line" section. These are the commands:</p>
+<pre><code>git remote add origin https:<span class="hljs-comment">//github.com/ihechikara/git-and-github-tutorial.git</span>
+git branch -M main
+git push -u origin main
+</code></pre><p>The first command <code>git remote add origin [https://github.com/ihechikara/git-and-github-tutorial.git](https://github.com/ihechikara/git-and-github-tutorial.git)</code> creates a connection between your local repo and the remote repo on Github. </p>
+<p>The URL for your remote project should be entirely different from the one above. So to follow along, make sure you are following the steps and working with your own remote repo. You won't usually get a response after executing this command but make sure you have an internet connection.</p>
+<p>The second command <code>git branch -M main</code> changes your main branch's name to "main". The default branch might be created as "master", but "main" is the standard name for this repo now. There is usually no response here.</p>
+<p>The last command <code>git push -u origin main</code> pushes your repo from your local device to GitHub. You should get a response similar to this:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/Screenshot--102-.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git push</em></p>
+<p>To help you deepen your understanding of file stages, I will make changes to the file and then push the new version to GitHub.</p>
+<p>Recall that our file is now in the committed state. Let's make changes to the file and take note of the states.</p>
+<p>I am going to add a new task to the to-do list:</p>
+<pre><code>MY TO-DO LIST
+<span class="hljs-number">1.</span> Write an article.
+<span class="hljs-number">2.</span> Code.
+<span class="hljs-number">3.</span> Study books.
+<span class="hljs-number">4.</span> Attend classes on time.
+<span class="hljs-number">5.</span> Visit aunt.
+<span class="hljs-number">6.</span> Apply <span class="hljs-keyword">for</span> remote jobs. 
+<span class="hljs-number">7.</span> Practice code
+</code></pre><p>After adding the new task, run the <code>git status</code> command. This is what you should see:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/Screenshot--98-.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git status</em></p>
+<p>After making changes to the file, it moved to the modified state – but it's not yet staged for commit, so you can't push it to GitHub yet. Git has not taken a final snapshot of this current state as it's only comparing the changes we have made now with the last snapshot.</p>
+<p>Now we are going to add (stage) this file and then commit and push it. This is the same as in the last section.</p>
+<p>We first add the file by using <code>git add .</code> which adds all the files in the folder (one file in our case). Then we commit the file by running <code>git commit -m "added new task"</code> followed by <code>git push -u origin main</code>. </p>
+<p>Those are the three steps to pushing your modified files to GitHub. You add, commit, and then push. I hope you now understand file stages and the commands associated with them.</p>
+<h2 id="heading-how-to-use-branches-in-git">How to Use Branches in Git</h2>
+<p>With branches, you can create a copy of a file you would like to work on without messing up the original copy. You can either merge these changes to the original copy or just let the branch remain independent. </p>
+<p>Before we go into using branches, I want to show you a visual representation of our repo which looks like this:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/g638.png" alt="Image" width="600" height="400" loading="lazy">
+<em>main banch</em></p>
+<p>The image above shows our main branch with the last two commits (the first commit and the added new task commit). </p>
+<p>At this point, I want to add more tasks to the list but I am not yet sure whether I want them on my main list. So I will create a new branch called <code>test</code> to see what my list would look like with more tasks included.</p>
+<p>To create a new branch, run this command: <code>git checkout -b test</code>. I will break it down. </p>
+<p><code>checkout</code> tells Git it is supposed to switch to a new branch. <code>-b</code> tells Git to create a new branch. <code>test</code> is the name of the branch to be created and switched to. Here is the response you should get:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/Screenshot--99-.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git checkout -b</em></p>
+<p>Now that we have a new branch created, this is what our repo will look like:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/g664.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git branch</em></p>
+<p>We created the new branch from the state of our last commit. Let's now add more tasks to this new branch.</p>
+<pre><code>MY TO-DO LIST
+<span class="hljs-number">1.</span> Write an article.
+<span class="hljs-number">2.</span> Code.
+<span class="hljs-number">3.</span> Study books.
+<span class="hljs-number">4.</span> Attend classes on time.
+<span class="hljs-number">5.</span> Visit aunt.
+<span class="hljs-number">6.</span> Apply <span class="hljs-keyword">for</span> remote jobs. 
+<span class="hljs-number">7.</span> Practice code
+<span class="hljs-number">8.</span> Complete internship task.
+<span class="hljs-number">9.</span> Practice chess openings.
+<span class="hljs-number">10.</span> Solve chess puzzles.
+<span class="hljs-number">11.</span> Check exam schedule.
+</code></pre><p>I have added four new tasks. To merge the new state to the main branch, you have to first stage and commit this branch. I will not go into details about how to do this as we did it twice in the last section. </p>
+<p>You should try doing it yourself so you understand how it works. As a hint, add the file and then commit with a message (refer to the previous section for details showing you how to do that).</p>
+<p>After committing your test branch, switch back to the main branch by running this command: <code>git checkout main</code>.</p>
+<p>Did you notice that we did not add <code>-b</code> ? This is because we are not creating a new branch but rather switching to an existing one. You can check all the branches that exist in your repo by running the <code>git branch</code> command.</p>
+<p>Now we can merge the changes we made in the test branch into the main branch by running <code>git merge test</code>. At this point, you will see all the changes made in the test branch reflected on the main branch. You should also receive a response similar to this:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/Screenshot--100-.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git merge</em></p>
+<p>Here is a visual representation of our repo:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/g816.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git merge</em></p>
+<p>If you go on to push your repo to GitHub, you'll see that the test branch will not be pushed. It will only remain in your local repo. If you would like to push your test branch, switch to the branch using <code>git checkout test</code> and then run <code>git push -u origin test</code>.</p>
+<h2 id="heading-how-to-pull-a-repository-in-git">How to Pull a Repository in Git</h2>
+<p>To pull in Git means to clone a remote repository's current state into your computer/repository. This comes in handy when you want to work on your repo from a different computer or when you are contributing to an open source project online. </p>
+<p>To test this, don't worry about switching to a new computer. Just run <code>cd ..</code> to leave the current directory and go back one step. In my own case, I have navigated back to my desktop. </p>
+<p>Go to GitHub, and on your repository's main page you should see a green button that says "Code". When you click on the button, you should see some options in a dropdown menu. Go on and copy the HTTPS URL. </p>
+<p>After that, run <code>git clone YOUR_HTTPS_URL</code>. This command pulls the remote repository into your local computer in a folder called git-and-git-tutorial. That is:</p>
+<p><img src="https://www.freecodecamp.org/news/content/images/2021/11/Screenshot--101-.png" alt="Image" width="600" height="400" loading="lazy">
+<em>git clone</em></p>
+<h2 id="heading-conclusion">Conclusion</h2>
+<p>This article covered the basic commands that'll help get you started using Git. We also started learning how to use GitHub. </p>
+<p>If you have followed up to this point then congratulations, you are good to go. You can now use Git in your projects no matter what programming language you are using. </p>
+<p>You should know that these are not all the commands that exist in Git – so feel free to do more research to learn more commands and their uses. <a target="_blank" href="https://www.freecodecamp.org/news/what-is-git-learn-git-version-control/">This article</a> and <a target="_blank" href="https://www.freecodecamp.org/news/git-cheat-sheet/">this cheat sheet</a> are great places to start. <a target="_blank" href="https://gist.github.com/brandon1024/14b5f9fcfd982658d01811ee3045ff1e">This</a> is a great place to see a detailed list of more Git commands.</p>
+<p>Find me on Twitter <a target="_blank" href="https://twitter.com/Ihechikara2">@ihechikara2</a>. Happy coding!</p>
+                        </section>
+                            <div class="sidebar">
+                                    <div class="sidebar-segment">
+    <section class="partner-courses partner-courses-rail" aria-labelledby="partner-courses-label-rail-1">
+        <p class="partner-courses-label" id="partner-courses-label-rail-1">Recommended courses from our partners<span class="sr-only"> (sidebar, 1 of 2)</span></p>
+        <div class="partner-courses-card">
+    <div class="partner-courses-disclosure">
+        <a class="partner-courses-logo-link" href="https://www.classcentral.com/?ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <svg></svg>
+            <span class="sr-only">(opens in a new tab)</span>
+        </a>
+        <span class="partner-courses-disclosure-label">ADVERTISEMENT</span>
+    </div>
+    <ul class="partner-courses-list" role="list">
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/udemy-git-for-beginners-course-131185?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://d3f1iyfxxz8i1e.cloudfront.net/courses/course_image/a4c161ccea46.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Udemy</span>
+        <span class="partner-courses-title">Git for Beginners</span>
+            <span class="partner-courses-instructor">Thomas Claudius Huber</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.3<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(1,441)</span><span class="sr-only"> from 1,441 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">2h 22m</span>
+                    <span class="sr-only">2 hours 22 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/udemy-valaxy-git-159353?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://cdn.classcentral.com/courses/6a8f60eb12357_cc_img_1dab4uhqdkr4cwYnKwp.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Udemy</span>
+        <span class="partner-courses-title">Git and GitHub for DevOps Engineers</span>
+            <span class="partner-courses-instructor">AR Shankar</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.6<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(2,041)</span><span class="sr-only"> from 2,041 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">6h 15m</span>
+                    <span class="sr-only">6 hours 15 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/udemy-learn-git-tutorial-bitbucket-121808?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://d3f1iyfxxz8i1e.cloudfront.net/courses/course_image/616e902f3e97.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Udemy</span>
+        <span class="partner-courses-title">Learn GIT In depth with BitBucket- Practical work flows</span>
+            <span class="partner-courses-instructor">QA Click Academy and Rahul Shetty Academy</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.6<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(2,856)</span><span class="sr-only"> from 2,856 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">6h 18m</span>
+                    <span class="sr-only">6 hours 18 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/udemy-git-branching-and-merging-97660?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://d3f1iyfxxz8i1e.cloudfront.net/courses/course_image/1e6d7d683d29.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Udemy</span>
+        <span class="partner-courses-title">GIT: Branching and Merging</span>
+            <span class="partner-courses-instructor">Brian Gorman</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.4<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(1,224)</span><span class="sr-only"> from 1,224 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">4h 45m</span>
+                    <span class="sr-only">4 hours 45 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+    </ul>
+        <a class="partner-courses-more" href="https://www.classcentral.com/subject/git?ref=fcc" rel="sponsored noopener noreferrer" target="_blank"><span>More Git courses on Class Central <span aria-hidden="true">&rarr;</span></span><span class="sr-only">(opens in a new tab)</span></a>
+        </div>
+    </section>
+                                    </div>
+                                    <div class="sidebar-segment">
+    <section class="partner-courses partner-courses-rail" aria-labelledby="partner-courses-label-rail-2">
+        <p class="partner-courses-label" id="partner-courses-label-rail-2">Recommended courses from our partners<span class="sr-only"> (sidebar, 2 of 2)</span></p>
+        <div class="partner-courses-card">
+    <div class="partner-courses-disclosure">
+        <a class="partner-courses-logo-link" href="https://www.classcentral.com/?ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <svg></svg>
+            <span class="sr-only">(opens in a new tab)</span>
+        </a>
+        <span class="partner-courses-disclosure-label">ADVERTISEMENT</span>
+    </div>
+    <ul class="partner-courses-list" role="list">
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/coursera-packt-master-version-control-branching-merging-collaboration-psnjz-476154?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://cdn.classcentral.com/courses/6a92a5c73bbf2_cc_img_i7ao9dlr36ef9eEfVcc.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Coursera</span>
+        <span class="partner-courses-title">Master Version Control – Branching, Merging, Collaboration</span>
+            <span class="partner-courses-instructor">Packt - Course Instructors</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">6w</span>
+                    <span class="sr-only">6 weeks, 2 hours a week</span>
+                </span>
+                <span class="partner-courses-stat">Intermediate</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/skillshare-git-github-crash-course-83712?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://d3f1iyfxxz8i1e.cloudfront.net/courses/course_image/2059212459cd.jpeg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Skillshare</span>
+        <span class="partner-courses-title">Git &amp; GitHub Crash Course</span>
+            <span class="partner-courses-instructor">Kalob Taulien</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(64)</span><span class="sr-only"> from 64 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">36m</span>
+                    <span class="sr-only">36 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/coursera-getting-started-with-git-and-github-61345?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://cdn.classcentral.com/courses/6aa516ca9a1fd_cc_img_pc77spi5a4k3cG4vnYX.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Coursera</span>
+        <span class="partner-courses-title">Getting Started with Git and GitHub</span>
+            <span class="partner-courses-instructor">Upkar Lidder and Rav Ahuja</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.6<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(1,970)</span><span class="sr-only"> from 1,970 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">4w</span>
+                    <span class="sr-only">4 weeks, 3 hours a week</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/github-ibm-git-and-github-basics-105173?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://cdn.classcentral.com/courses/6a929e7a4c8d3_cc_img_us4g0opgdi7lfPq3aWM.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On edX</span>
+        <span class="partner-courses-title">Git and GitHub Basics</span>
+            <span class="partner-courses-instructor">Upkar Lidder and Rav Ahuja</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.2<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(37)</span><span class="sr-only"> from 37 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">3w</span>
+                    <span class="sr-only">3 weeks, 6-8 hours a week</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+    </ul>
+        <a class="partner-courses-more" href="https://www.classcentral.com/subject/git?ref=fcc" rel="sponsored noopener noreferrer" target="_blank"><span>More Git courses on Class Central <span aria-hidden="true">&rarr;</span></span><span class="sr-only">(opens in a new tab)</span></a>
+        </div>
+    </section>
+                                    </div>
+                            </div>
+                    </div>
+                    <hr>
+                        <div class="post-full-author-header">
+    <section class="author-card">
+    <img sizes="60px" src="https://cdn.hashnode.com/res/hashnode/image/upload/v1709153015297/mkI7rPRBU.jpg" class="author-profile-image" alt="Ihechikara Abba" width="1269" height="1082" onerror="this.style.display='none'" loading="lazy">
+        <section class="author-card-content ">
+            <span class="author-card-name">
+                <a href="/news/author/Ihechikara/">
+                        Ihechikara Abba
+                </a>
+            </span>
+                    <p>ihechikara.com
+</p>
+        </section>
+    </section>
+                        </div>
+                        <hr>
+<p class="social-row">
+    If you read this far, thank the author to show them you care. <button id="tweet-btn" class="cta-button">Say Thanks</button>
+</p>
+<div class="learn-cta-row">
+    <p>
+        Learn to code for free. freeCodeCamp's open source curriculum has helped more than 40,000 people get jobs as developers. <a href="https://www.freecodecamp.org/learn" class="cta-button" id="learn-to-code-cta" rel="noopener noreferrer" target="_blank">Get started</a>
+    </p>
+</div>
+                </section>
+    <section class="partner-courses partner-courses-banner" aria-labelledby="partner-courses-label-banner">
+        <p class="partner-courses-label" id="partner-courses-label-banner">Recommended courses from our partners</p>
+        <div class="partner-courses-card">
+    <div class="partner-courses-disclosure">
+        <a class="partner-courses-logo-link" href="https://www.classcentral.com/?ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <svg></svg>
+            <span class="sr-only">(opens in a new tab)</span>
+        </a>
+        <span class="partner-courses-disclosure-label">ADVERTISEMENT</span>
+    </div>
+    <ul class="partner-courses-list" role="list">
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/udemy-git-for-beginners-course-131185?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://d3f1iyfxxz8i1e.cloudfront.net/courses/course_image/a4c161ccea46.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Udemy</span>
+        <span class="partner-courses-title">Git for Beginners</span>
+            <span class="partner-courses-instructor">Thomas Claudius Huber</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.3<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(1,441)</span><span class="sr-only"> from 1,441 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">2h 22m</span>
+                    <span class="sr-only">2 hours 22 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/udemy-valaxy-git-159353?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://cdn.classcentral.com/courses/6a8f60eb12357_cc_img_1dab4uhqdkr4cwYnKwp.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Udemy</span>
+        <span class="partner-courses-title">Git and GitHub for DevOps Engineers</span>
+            <span class="partner-courses-instructor">AR Shankar</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.6<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(2,041)</span><span class="sr-only"> from 2,041 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">6h 15m</span>
+                    <span class="sr-only">6 hours 15 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/udemy-learn-git-tutorial-bitbucket-121808?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://d3f1iyfxxz8i1e.cloudfront.net/courses/course_image/616e902f3e97.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Udemy</span>
+        <span class="partner-courses-title">Learn GIT In depth with BitBucket- Practical work flows</span>
+            <span class="partner-courses-instructor">QA Click Academy and Rahul Shetty Academy</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.6<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(2,856)</span><span class="sr-only"> from 2,856 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">6h 18m</span>
+                    <span class="sr-only">6 hours 18 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+            <li>
+    <a class="partner-courses-course" href="https://www.classcentral.com/course/udemy-git-branching-and-merging-97660?go=1&amp;ref=fcc" rel="sponsored noopener noreferrer" target="_blank">
+            <span class="partner-courses-thumbnail">
+                <img src="https://d3f1iyfxxz8i1e.cloudfront.net/courses/course_image/1e6d7d683d29.jpg" alt="" loading="lazy" decoding="async">
+            </span>
+        <span class="partner-courses-provider">On Udemy</span>
+        <span class="partner-courses-title">GIT: Branching and Merging</span>
+            <span class="partner-courses-instructor">Brian Gorman</span>
+        <span class="partner-courses-stats">
+                <span class="partner-courses-stat partner-courses-rating">
+                    <svg></svg>
+                    4.4<span class="sr-only"> out of 5 stars</span> <span class="partner-courses-rating-count" aria-hidden="true">(1,224)</span><span class="sr-only"> from 1,224 ratings</span>
+                </span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    <span aria-hidden="true">4h 45m</span>
+                    <span class="sr-only">4 hours 45 minutes</span>
+                </span>
+                <span class="partner-courses-stat">Beginner</span>
+                <span class="partner-courses-stat">
+                    <svg></svg>
+                    Certificate
+                </span>
+        </span>
+        <span class="partner-courses-cta">
+            View course
+            <svg></svg>
+        </span>
+        <span class="sr-only">(opens in a new tab)</span>
+    </a>
+</li>
+    </ul>
+        <a class="partner-courses-more" href="https://www.classcentral.com/subject/git?ref=fcc" rel="sponsored noopener noreferrer" target="_blank"><span>More Git courses on Class Central <span aria-hidden="true">&rarr;</span></span><span class="sr-only">(opens in a new tab)</span></a>
+        </div>
+    </section>
+            </article>
+        </div>
+    </main>
+<footer class="site-footer">
+    <div class="footer-top">
+        <div class="footer-desc-col">
+            <p>freeCodeCamp is a donor-supported tax-exempt 501(c)(3) charity organization (United States Federal Tax Identification Number: 82-0779546)</p>
+            <p>Our mission: to help people learn to code for free. We accomplish this by creating thousands of videos, articles, and interactive coding lessons - all freely available to the public.</p>
+            <p>Donations to freeCodeCamp go toward our education initiatives, and help pay for servers, services, and staff.</p>
+            <p class="footer-donation">
+                You can <a href="https://www.freecodecamp.org/donate/" class="inline" rel="noopener noreferrer" target="_blank">make a tax-deductible donation here</a>.
+            </p>
+        </div>
+        <div class="trending-guides">
+            <h2 id="trending-guides" class="col-header">Trending Books and Handbooks</h2>
+            <ul class="trending-guides-articles" aria-labelledby="trending-guides">
+                <li>
+                    <a href="https://www.freecodecamp.org/news/build-consume-and-document-a-rest-api/" rel="noopener noreferrer" target="_blank">REST APIs
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/how-to-write-clean-code/" rel="noopener noreferrer" target="_blank">Clean Code
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/learn-typescript-with-react-handbook/" rel="noopener noreferrer" target="_blank">TypeScript
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/learn-javascript-for-beginners/" rel="noopener noreferrer" target="_blank">JavaScript
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/how-to-build-an-ai-chatbot-with-redis-python-and-gpt/" rel="noopener noreferrer" target="_blank">AI Chatbots
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/command-line-for-beginners/" rel="noopener noreferrer" target="_blank">Command Line
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/building-consuming-and-documenting-a-graphql-api/" rel="noopener noreferrer" target="_blank">GraphQL APIs
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/complete-guide-to-css-transform-functions-and-properties/" rel="noopener noreferrer" target="_blank">CSS Transforms
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/how-to-build-scalable-access-control-for-your-web-app/" rel="noopener noreferrer" target="_blank">Access Control
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/rest-api-design-best-practices-build-a-rest-api/" rel="noopener noreferrer" target="_blank">REST API Design
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/the-php-handbook/" rel="noopener noreferrer" target="_blank">PHP
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/the-java-handbook/" rel="noopener noreferrer" target="_blank">Java
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/learn-linux-for-beginners-book-basic-to-advanced/" rel="noopener noreferrer" target="_blank">Linux
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/react-for-beginners-handbook/" rel="noopener noreferrer" target="_blank">React
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/learn-continuous-integration-delivery-and-deployment/" rel="noopener noreferrer" target="_blank">CI/CD
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/the-docker-handbook/" rel="noopener noreferrer" target="_blank">Docker
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/learn-golang-handbook/" rel="noopener noreferrer" target="_blank">Golang
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/the-python-handbook/" rel="noopener noreferrer" target="_blank">Python
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/get-started-with-nodejs/" rel="noopener noreferrer" target="_blank">Node.js
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/build-crud-operations-with-dotnet-core-handbook/" rel="noopener noreferrer" target="_blank">Todo APIs
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/how-to-use-classes-in-javascript-handbook/" rel="noopener noreferrer" target="_blank">JavaScript Classes
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/front-end-javascript-development-react-angular-vue-compared/" rel="noopener noreferrer" target="_blank">Front-End Libraries
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/the-express-handbook/" rel="noopener noreferrer" target="_blank">Express and Node.js
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/python-code-examples-sample-script-coding-tutorial-for-beginners/" rel="noopener noreferrer" target="_blank">Python Code Examples
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/clustering-in-python-a-machine-learning-handbook/" rel="noopener noreferrer" target="_blank">Clustering in Python
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/an-introduction-to-software-architecture-patterns/" rel="noopener noreferrer" target="_blank">Software Architecture
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/what-is-programming-tutorial-for-beginners/" rel="noopener noreferrer" target="_blank">Programming Fundamentals
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/learn-to-code-book/" rel="noopener noreferrer" target="_blank">Coding Career Preparation
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/become-a-full-stack-developer-and-get-a-job/" rel="noopener noreferrer" target="_blank">Full-Stack Developer Guide
+                    </a>
+                </li>
+                <li>
+                    <a href="https://www.freecodecamp.org/news/learn-python-for-javascript-developers-handbook/" rel="noopener noreferrer" target="_blank">Python for JavaScript Devs
+                    </a>
+                </li>
+            </ul>
+            <div class="spacer"></div>
+            <div>
+                <h2 id="mobile-app" class="col-header">
+                    Mobile App
+                </h2>
+                <div class="min-h-[1px] px-[15px] md:w-2/3 md:ml-[16.6%]">
+                    <ul aria-labelledby="mobile-app" class="mobile-app-container">
+                        <li>
+                            <a href="https://apps.apple.com/us/app/freecodecamp/id6446908151?itsct=apps_box_link&itscg=30200" rel="noopener noreferrer" target="_blank">
+                                <img src="https://cdn.freecodecamp.org/platform/universal/apple-store-badge.svg" lang="en" alt="Download on the App Store">
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://play.google.com/store/apps/details?id=org.freecodecamp" rel="noopener noreferrer" target="_blank">
+                                <img src="https://cdn.freecodecamp.org/platform/universal/google-play-badge.svg" lang="en" alt="Get it on Google Play">
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <h2 class="col-header">Our Charity</h2>
+        <div class="our-nonprofit">
+            <a href="https://hashnode.com/" rel="noopener noreferrer" target="_blank">
+                Publication powered by Hashnode
+            </a>
+            <a href="https://www.freecodecamp.org/news/about/" rel="noopener noreferrer" target="_blank">
+                About
+            </a>
+            <a href="https://www.linkedin.com/school/free-code-camp/people/" rel="noopener noreferrer" target="_blank">
+                Alumni Network
+            </a>
+            <a href="https://github.com/freeCodeCamp/" rel="noopener noreferrer" target="_blank">
+                Open Source
+            </a>
+            <a href="https://www.freecodecamp.org/news/shop/" rel="noopener noreferrer" target="_blank">
+                Shop
+            </a>
+            <a href="https://www.freecodecamp.org/news/support/" rel="noopener noreferrer" target="_blank">
+                Support
+            </a>
+            <a href="https://www.freecodecamp.org/news/sponsors/" rel="noopener noreferrer" target="_blank">
+                Sponsors
+            </a>
+            <a href="https://www.freecodecamp.org/news/academic-honesty-policy/" rel="noopener noreferrer" target="_blank">
+                Academic Honesty
+            </a>
+            <a href="https://www.freecodecamp.org/news/code-of-conduct/" rel="noopener noreferrer" target="_blank">
+                Code of Conduct
+            </a>
+            <a href="https://www.freecodecamp.org/news/privacy-policy/" rel="noopener noreferrer" target="_blank">
+                Privacy Policy
+            </a>
+            <a href="https://www.freecodecamp.org/news/terms-of-service/" rel="noopener noreferrer" target="_blank">
+                Terms of Service
+            </a>
+            <a href="https://www.freecodecamp.org/news/copyright-policy/" rel="noopener noreferrer" target="_blank">
+                Copyright Policy
+            </a>
+        </div>
+    </div>
+</footer>
+        </div>
+    </body>
+</html>
