@@ -515,8 +515,8 @@ journey("diagram: draws beside the source, and a new one stays linked when the p
   await until("Esc closes it", async () => (await page.locator(".diagram").count()) === 0);
 });
 
-journey("diagram: keys stay on the canvas after the style panel, Space never sticks, and Esc closes only the drawing", async (page) => {
-  await openSource(page, AGENTS);
+journey("diagram: S styles at the pointer, keys stay on the canvas, Space never sticks, and Esc closes only the drawing", async (page) => {
+  await openSource(page, TESTING); // no other journey draws here, so the diagram starts empty
   const note = page.locator(".note-editor [contenteditable=true]").first();
   await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
   await page.keyboard.press("Meta+ArrowDown");
@@ -537,8 +537,26 @@ journey("diagram: keys stay on the canvas after the style panel, Space never sti
   await page.keyboard.press("Enter");
   const boxes = () => page.locator(".diagram .draw-canvas > g rect").count();
   await until("the box is drawn", async () => (await boxes()) === 1);
-  // Picking a colour in the style panel must not take the keys away from the drawing (Excalidraw).
-  await page.locator(".draw-style .draw-swatch").nth(1).click();
+  // S opens the style picker by the pointer; its keys restyle the selection and Esc closes only it.
+  const rect = page.locator(".diagram .draw-canvas > g rect").first();
+  await page.mouse.move(c.x + 640, c.y + 420);
+  await page.keyboard.press("s");
+  const quick = page.locator(".draw-quick");
+  await quick.waitFor();
+  const qb = (await quick.boundingBox())!;
+  if (Math.hypot(qb.x - (c.x + 640), qb.y + qb.height - (c.y + 420)) > 60) throw new Error(`the picker opened at ${qb.x},${qb.y}, not by the pointer`);
+  await page.keyboard.press("2");
+  await page.keyboard.press("Shift+4");
+  await page.keyboard.press("e");
+  await until("1–5, ⇧1–5 and Q W E restyle the box", async () => (await rect.getAttribute("stroke")) !== "#f2f1ec" && (await rect.getAttribute("fill")) !== "none" && (await rect.getAttribute("stroke-width")) === "4");
+  await page.keyboard.press("Escape");
+  await until("Esc closes the picker, the box stays picked", async () => (await quick.count()) === 0 && (await page.locator(".sr-only[aria-live]").textContent()) === "Selected: Memory");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes back the last change", async () => (await rect.getAttribute("stroke-width")) === "2");
+  // Picking a colour by click must not take the keys away from the drawing (Excalidraw).
+  await page.keyboard.press("s");
+  await quick.locator(".draw-swatch").nth(1).click();
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Backspace");
   await until("Backspace after a swatch click still deletes the box", async () => (await boxes()) === 0);
   await page.keyboard.press("Meta+z");
