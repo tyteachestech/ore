@@ -71,6 +71,10 @@ const DEFAULTS = [
   { id: "block-up", label: "Move block up", group: "Notes", combo: "Shift+Meta+ArrowUp" },
   { id: "block-down", label: "Move block down", group: "Notes", combo: "Shift+Meta+ArrowDown" },
   { id: "block-duplicate", label: "Duplicate block", group: "Notes", combo: "Meta+KeyD" },
+  { id: "note-bold", label: "Bold", group: "Notes", combo: "Meta+KeyB" },
+  { id: "note-italic", label: "Italic", group: "Notes", combo: "Meta+KeyI" },
+  { id: "note-strike", label: "Strikethrough", group: "Notes", combo: "Shift+Meta+KeyX" },
+  { id: "note-code", label: "Inline code", group: "Notes", combo: "Meta+KeyE" },
   { id: "cut-text", label: "Remove the selected text (from a heading: its section)", group: "Highlight", combo: "Shift+Backspace" },
   // The diagram editor (D103) owns the keyboard while it is open, so its keys only clash with each other.
   // Tools take Excalidraw's letters and numbers, so his muscle memory carries over.

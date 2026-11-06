@@ -181,6 +181,38 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
   await until("⌘Z takes it back", async () => (await items()).some((t) => t.startsWith("Effortful")));
 });
 
+journey("note format bar: select words, highlight them blue from the bar, and it is still there after a reload", async (page) => {
+  await openSource(page, TESTING);
+  await page.locator(".note-editor p", { hasText: "learning event" }).waitFor();
+  const box = await page.evaluate(() => {
+    const el = [...document.querySelectorAll(".note-editor p")].find((e) => e.textContent!.includes("learning event"))!;
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode() as Text | null; n; n = w.nextNode() as Text | null) {
+      const i = n.data.indexOf("learning event");
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + 14);
+      const q = r.getBoundingClientRect();
+      return { x1: q.left + 1, x2: q.right - 1, y: q.top + q.height / 2 };
+    }
+    return null;
+  });
+  await page.mouse.move(box!.x1, box!.y);
+  await page.mouse.down();
+  await page.mouse.move(box!.x2, box!.y, { steps: 5 });
+  await page.mouse.up();
+  await page.locator(".sel-bar").waitFor();
+  await page.locator(".sel-bar button[aria-label=Colour]").click();
+  await page.getByRole("button", { name: "Highlight: Blue" }).click();
+  const marked = () => page.locator('.note-editor mark[data-color="blue"]', { hasText: "learning event" }).isVisible();
+  await until("the words are highlighted", marked);
+  await page.waitForTimeout(600); // the note saves after a pause
+  await page.reload();
+  await openSource(page, TESTING);
+  await until("the highlight survives a reload", marked);
+});
+
 journey("diagram: draws beside the source, and a new one stays linked when the panel switches tab", async (page) => {
   await openSource(page, AGENTS);
   const note = page.locator(".note-editor [contenteditable=true]").first();

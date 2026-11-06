@@ -8,6 +8,7 @@ import { InputRule } from "@milkdown/kit/prose/inputrules";
 import { findWrapping } from "@milkdown/kit/prose/transform";
 import { $inputRule } from "@milkdown/kit/utils";
 import { calloutSchema, remarkBlocks, toggleSchema, toggleSummarySchema } from "./blocks";
+import { highlightSchema, remarkColors, stringifyColor, textColorSchema } from "./colors";
 import { emojiTrigger } from "./emoji";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
@@ -17,15 +18,16 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
       ctx.set(rootCtx, root);
       ctx.set(defaultValueCtx, markdown);
       // The style of his existing notes and of the CLI's appends.
-      ctx.update(remarkStringifyOptionsCtx, (o) => ({ ...o, bullet: "-" as const, rule: "-" as const }));
+      ctx.update(remarkStringifyOptionsCtx, (o) => ({ ...o, bullet: "-" as const, rule: "-" as const, handlers: { ...o.handlers, oreColor: stringifyColor as never } }));
       ctx.set(linkAttr.key, (mark) => (String(mark.attrs.href).startsWith("ore:") ? { class: "ore-link" } : {}));
       ctx.get(listenerCtx).updated((c) => onChange(c.get(serializerCtx)(c.get(editorViewCtx).state.doc)));
     })
     .use(remarkBlocks)
+    .use(remarkColors)
     // Without it an empty paragraph saves as nothing, not as a `<br />` line.
     .use(commonmark.filter((p) => !remarkPreserveEmptyLinePlugin.includes(p)))
     .use(gfm)
-    .use([toggleSummarySchema, toggleSchema, calloutSchema].flat())
+    .use([toggleSummarySchema, toggleSchema, calloutSchema, highlightSchema, textColorSchema].flat())
     .use(taskRule)
     .use(history)
     .use(listener)
