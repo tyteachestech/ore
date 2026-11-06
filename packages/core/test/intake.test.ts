@@ -603,6 +603,23 @@ describe("import coverage: what the reader shows", () => {
   });
 });
 
+describe("import coverage: EPUB", () => {
+  test("EPUB: the book's date, and its footnotes and endnotes as Markdown footnotes under the chapter that cites them", async () => {
+    const item = await addSource(await tempLibrary(), file("book.epub"));
+    expect(item.meta).toMatchObject({ type: "epub", title: "A Small Book of Remembering", author: "Ada Learner, Ben Reviewer", published: "2024-03-01" });
+    const [, one, two] = item.body.split(/<!-- chapter \d+ -->/);
+    // A note in the chapter itself.
+    expect(one).toContain("when nothing calls it back.[^1]");
+    expect(one).toContain("\n[^1]: The numbers here are illustrative, not from one study.\n");
+    // A note in the book's endnotes file, its back link dropped; that file is not a chapter of its own.
+    expect(two).toContain("The effort is the point.[^2]");
+    expect(two).toContain("\n[^2]: Psychologists call this the *testing effect*.\n");
+    expect(item.body).not.toContain("Endnotes");
+    expect(item.body).not.toContain("↩");
+    expect(item.body.match(/<!-- chapter/g)).toHaveLength(2);
+  });
+});
+
 // Phase 3 of D96: the page open in his browser, as he sees it signed in.
 describe("import coverage: from the browser tab", () => {
   const shell = web("wall-notion.html");

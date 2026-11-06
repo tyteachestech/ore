@@ -1,4 +1,4 @@
-// Makes files/book.epub: a two-chapter EPUB 3 with the parts a real book has (cover, contents page,
+// Makes files/book.epub: a two-chapter EPUB 3 with the parts a real book has (cover, contents page, endnotes file,
 // metadata, headings, emphasis, a footnote, a table, code, a figure). The text is written for Ore and
 // is AGPL like the rest of the repo. Run: bun make-book-epub.ts
 import { strToU8, zipSync } from "fflate";
@@ -36,11 +36,12 @@ const files: Record<string, Uint8Array> = {
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="c1" href="text/ch1.xhtml" media-type="application/xhtml+xml"/>
     <item id="c2" href="text/ch2.xhtml" media-type="application/xhtml+xml"/>
+    <item id="notes" href="text/notes.xhtml" media-type="application/xhtml+xml"/>
     <item id="css" href="style.css" media-type="text/css"/>
     <item id="img-cover" href="img/cover.png" media-type="image/png"/>
     <item id="img-curve" href="img/curve.png" media-type="image/png"/>
   </manifest>
-  <spine><itemref idref="cover"/><itemref idref="nav"/><itemref idref="c1"/><itemref idref="c2"/></spine>
+  <spine><itemref idref="cover"/><itemref idref="nav"/><itemref idref="c1"/><itemref idref="c2"/><itemref idref="notes"/></spine>
 </package>`),
   "OEBPS/style.css": strToU8("p { text-indent: 1em; }"),
   "OEBPS/cover.xhtml": strToU8(page("Cover", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><image xlink:href="img/cover.png" width="1" height="1"/></svg>`)),
@@ -59,7 +60,7 @@ const files: Record<string, Uint8Array> = {
 </section>`)),
   "OEBPS/text/ch2.xhtml": strToU8(page("Practice", `<section epub:type="chapter">
 <h1>2. Practice</h1>
-<p>Calling a memory back, rather than rereading it, is what keeps it. The effort is the point.</p>
+<p>Calling a memory back, rather than rereading it, is what keeps it. The effort is the point.<sup><a epub:type="noteref" role="doc-noteref" href="notes.xhtml#en1" id="r2">2</a></sup></p>
 <h2>Scheduling reviews</h2>
 <p>A review scheduler only needs the last gap and how the answer went:</p>
 <pre><code>def next_gap(gap, remembered):
@@ -67,6 +68,11 @@ const files: Record<string, Uint8Array> = {
 <blockquote><p>Test yourself before you feel ready.</p></blockquote>
 <ul><li>Spread sessions out.</li><li>Mix topics within a session.</li></ul>
 <p>The last line of the book.</p>
+</section>`)),
+  // Endnotes in a file of their own, as Standard Ebooks and many publishers make them.
+  "OEBPS/text/notes.xhtml": strToU8(page("Endnotes", `<section epub:type="endnotes" role="doc-endnotes">
+<h2>Endnotes</h2>
+<ol><li id="en1" epub:type="endnote" role="doc-endnote"><p>Psychologists call this the <em>testing effect</em>. <a href="ch2.xhtml#r2" epub:type="backlink" role="doc-backlink">↩</a></p></li></ol>
 </section>`)),
   "OEBPS/img/cover.png": PNG,
   "OEBPS/img/curve.png": PNG,
