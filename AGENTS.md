@@ -1,6 +1,6 @@
 # Ore — agent working agreement
 
-Ore is a Mac-first, AI-first, local-files personal learning app: capture anything → read → highlight → AI-drafted prompts and cards → FSRS review → skill-level stats. Owner: Tyler. Single user.
+Ore is a Mac-first, AI-first, local-files personal learning app: capture anything (its core promise, below) → read → highlight → AI-drafted prompts and cards → FSRS review → skill-level stats. Owner: Tyler. Single user.
 
 ## Read first
 - `docs/DECISIONS.md` — settled decisions. Do not reopen them; propose changes explicitly.
@@ -9,6 +9,9 @@ Ore is a Mac-first, AI-first, local-files personal learning app: capture anythin
 
 ## Purpose rule (Tyler, 2026-10-25)
 Everything on screen MUST have an explicit purpose: a thing Tyler needs to see or do to learn. Build minimal by default. Never add an element to make the app look like an app (stat pills, counts, taglines, decorative cards). Before adding one, name its purpose in one line; if you can't, leave it out. When you touch a screen, remove what fails this test and list what you removed in the PR.
+
+## Core promise: everything you learn from comes in whole (Tyler, 2026-11-06, D122)
+Ore's core promise is that whatever someone learns from imports as fully and robustly as possible, into one format built for learning. That covers at least the top 80% of what people learn from: web articles, YouTube and other video, podcasts and audio, every kind of PDF (papers, textbooks, slides, scans, with their tables and formulas), EPUB books, documents, slides, notebooks and screenshots. Every type lands as the same `doc.md`: its own title, author and date; its headings as the outline; its images, tables, math and code intact; timestamps for anything that plays; the original kept so a better reader can reimport it. That one shape is what lets every source be read, highlighted, noted, quizzed and reviewed the same way. Import is the base the whole loop stands on: a source that comes in broken can't be learned from, so a broken import is a core bug, not polish. What can't come in is refused with the next step (D96), never saved half-read. Open gaps: `"gap:"` in `packages/core/test/intake-grid.test.ts`, ranked in `docs/reviews/2026-11-06-import-promise.md`.
 
 ## Rules
 - Smallest complete solution. Add features only when the behavior requires them. No speculative abstractions.
