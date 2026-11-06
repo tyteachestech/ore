@@ -5,7 +5,7 @@ import { plainSkeleton, type TextIndex } from "./text";
 // and a DOM point maps back to a time. Built from the same TextIndex the highlights use.
 
 /** Matched words only, in order: skeleton offsets of each word's first and last char, and its start time. */
-export type WordMap = { pos: Int32Array; end: Int32Array; time: Float64Array };
+type WordMap = { pos: Int32Array; end: Int32Array; time: Float64Array };
 
 const inStamp = (idx: TextIndex, at: number) => !!idx.nodes[idx.node[at]!]!.parentElement?.closest(".ts");
 

@@ -11,22 +11,6 @@ import { SkillChip, SkillPicker } from "./Skills";
 import { useFocusWhileMounted, type Notify } from "./util";
 import { Working } from "./Working";
 
-/** Where a new source goes: the open skill, or All sources (no skill). */
-export function Destination({ skill }: { skill: Skill | null }) {
-  return (
-    <span className="add-dest">
-      {skill ? (
-        <span className={`mark${skill.icon && skill.color ? " tile" : ""}`} data-color={skill.color} aria-hidden="true">
-          <SkillIcon icon={skill.icon} color={skill.color} dot />
-        </span>
-      ) : (
-        <Stack size={14} aria-hidden="true" />
-      )}
-      {skill ? skill.name : "All sources"}
-    </span>
-  );
-}
-
 /** A course link says what ↵ will add (D79): the course and how many lessons, read from the link. */
 function useCourse(url: string | null): { title: string; lessons: unknown[] } | "reading" | "unreadable" | null {
   const [plan, setPlan] = useState<{ url: string; got: { title: string; lessons: unknown[] } | "unreadable" } | null>(null);

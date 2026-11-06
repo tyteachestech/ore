@@ -69,22 +69,6 @@ export const PixelStar = sprite([
   ".#........#.",
 ]);
 
-/** Card: a flashcard with stepped corners and a diamond on its face, another behind it. */
-export const PixelCard = sprite([
-  "............",
-  ".##########.",
-  "#++++++++++#",
-  "#++++##++++#",
-  "#+++#oo#+++#",
-  "#++#oooo#++#",
-  "#+++#oo#+++#",
-  "#++++##++++#",
-  "#++++++++++#",
-  ".##########.",
-  "..########..",
-  "............",
-]);
-
 /** Your note: a spiral notepad with written lines. */
 export const PixelNote = sprite([
   "..#.#.#.#...",

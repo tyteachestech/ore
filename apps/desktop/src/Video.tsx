@@ -19,7 +19,7 @@ const PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const clampRate = (r: number) => Math.min(MAX_RATE, Math.max(MIN_RATE, Math.round(r * 20) / 20));
 const savedRate = () => clampRate(Number(load(RATE_KEY)) || 1);
 
-export type Player = {
+type Player = {
   frame: RefObject<HTMLIFrameElement | null>;
   src: string;
   ready: boolean;

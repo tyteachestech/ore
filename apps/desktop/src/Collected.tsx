@@ -1,6 +1,7 @@
 import { CaretRight, Plus } from "./icons";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
+import { still } from "./SideCursor";
 import { PixelKeep, PixelQuestion, PixelStar } from "./PixelIcon";
 import { INTENTS, type Annotation, type Intent } from "./ore";
 import { load, save } from "./util";
@@ -29,7 +30,6 @@ type Props = {
   onOpen: (intent: Intent) => void;
 };
 
-const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** D64: what he has collected in this source, at the bottom center of the reader. Each new
  *  highlight flies into its type's chip, which pops; a click opens the Collected tab. */

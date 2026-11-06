@@ -12,7 +12,7 @@ import { errorText, useFocusWhileMounted, type Notify } from "./util";
 // has the next enrich draft a card from his answer (offer, never require).
 
 /** His question in one line: a typed question is its own text; a highlight's question is his note. */
-export const questionText = (q: Question) => q.note?.trim() || q.exact.replace(/\s+/g, " ").trim();
+const questionText = (q: Question) => q.note?.trim() || q.exact.replace(/\s+/g, " ").trim();
 
 /** A question he typed (not one highlighted in a source): its hidden source is titled from its first
  *  line, cut to 77 characters and "…" past 80, as `addSnippet` titles it. */
