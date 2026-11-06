@@ -896,6 +896,8 @@ body.resizing iframe { pointer-events: none; }
 
 /* The chapter's prompts in the source note (D115): placeholders on empty lines, never saved. */
 .note-editor .ghost:has(> br:only-child)::before { content: attr(data-ghost); color: var(--faint); pointer-events: none; float: left; height: 0; }
+/* Notion's hint on the empty block the caret is on: what / does, or the block's kind. Never saved. */
+.note-editor .ProseMirror-focused .empty-hint:not(.ghost):has(> br:only-child)::before { content: attr(data-hint); color: var(--faint); pointer-events: none; float: left; height: 0; }
 /* Feedback on a chapter recall, under the note (D34.3: after his attempt). */
 .chapter-fb { margin: 18px 0 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; line-height: 1.55; color: var(--text-read); }
 .chapter-fb .quiz-kicker { margin: 0 0 6px; display: flex; align-items: center; }
