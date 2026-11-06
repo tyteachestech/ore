@@ -6,7 +6,7 @@ import { addHighlight, readAnnotations } from "../src/annotations.ts";
 import { regionsFrom, tidyLatex, type Region } from "../src/ingest/docling.ts";
 import { pdfToDoc } from "../src/ingest/pdf.ts";
 import { addSource, addText, readTables, tablesState, reimportSource, undoReimport } from "../src/ingest/index.ts";
-import { findItem } from "../src/items.ts";
+import { findItem, updateItemMeta } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // D125: pdf.js reads a PDF's prose; Docling, an optional Mac download, reads its tables and display
@@ -37,8 +37,11 @@ describe("PDF tables and formulas (D125)", () => {
   test("PDF: tables and display formulas read by Docling replace their lines, the prose stays as it was", async () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, join(FIX, "tables.pdf"));
-    // Without Docling the table's cells run into the text as lines.
+    // Without Docling the table's cells run into the text as lines, and the source says it has a table.
     expect(item.body).not.toContain("| Schedule |");
+    expect(item.meta.structure).toEqual(["tables"]);
+    process.env.ORE_DOCLING = "/nope/docling";
+    expect(tablesState(lib, item)).toEqual({ tables_reader: false });
     for (const s of PROSE) expect(item.body).toContain(s);
     const kept = addHighlight(item, { exact: "Each successful review raises S", intent: "card" });
 
@@ -67,6 +70,17 @@ describe("PDF tables and formulas (D125)", () => {
     expect(existsSync(join(back.dir, "layout.json"))).toBe(false);
   });
 
+  test("a PDF of prose has nothing to offer; one added before tables were spotted learns it on reimport", async () => {
+    const lib = await tempLibrary();
+    const prose = await addSource(lib, join(FIX, "paper.pdf"));
+    expect(prose.meta.structure).toBeUndefined();
+    expect(tablesState(lib, prose)).toEqual({});
+    const item = await addSource(lib, join(FIX, "tables.pdf"));
+    await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: undefined }));
+    expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+    expect(findItem(lib, item.meta.id).meta.structure).toEqual(["tables"]);
+  });
+
   test("reading tables says what to do when Docling is missing or fails, and leaves the source as it was", async () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, join(FIX, "tables.pdf"));
@@ -75,7 +89,7 @@ describe("PDF tables and formulas (D125)", () => {
     process.env.ORE_DOCLING = fakeDocling(true);
     await expect(readTables(lib, item.meta.id)).rejects.toThrow("couldn't read this PDF: RuntimeError: out of memory");
     // The reader shows why at once, not a wait on a run that already died.
-    expect(tablesState(lib, item)).toEqual({ tables_error: "The table and formula reader couldn't read this PDF: RuntimeError: out of memory" });
+    expect(tablesState(lib, item)).toEqual({ tables_error: "The table and formula reader couldn't read this PDF: RuntimeError: out of memory", tables_reader: true });
     expect(findItem(lib, item.meta.id).body).toBe(item.body);
     const text = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
     await expect(readTables(lib, text.meta.id)).rejects.toThrow("Only a PDF source");
