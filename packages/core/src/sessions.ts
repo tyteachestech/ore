@@ -39,7 +39,8 @@ export function readSessions(lib: Library): SessionReceipt[] {
     .filter((f) => f.endsWith(".jsonl"))
     .flatMap((f) => readJsonl<SessionReceipt>(join(dir, f)))
     .filter((s) => typeof s.ts === "string" && typeof s.id === "string");
-  return all.filter((s, i) => all.findIndex((t) => t.type === s.type && t.id === s.id) === i).sort((a, b) => a.ts.localeCompare(b.ts));
+  const seen = new Set<string>();
+  return all.filter((s) => (seen.has(`${s.type} ${s.id}`) ? false : (seen.add(`${s.type} ${s.id}`), true))).sort((a, b) => a.ts.localeCompare(b.ts));
 }
 
 // The open session id lives in .ore/session; reviews attach to it.

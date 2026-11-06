@@ -6,7 +6,7 @@ import { loadYaml, parseYaml } from "./frontmatter.ts";
 import { appendJsonl, deviceLog, readLog, writeAtomic } from "./fsutil.ts";
 import { nowIso } from "./ids.ts";
 import { addSource } from "./ingest/index.ts";
-import { findItem, keepPreview, listItems, type Item } from "./items.ts";
+import { allItems, findItem, keepPreview, listItems, type Item } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 import { readNotes } from "./notes.ts";
@@ -293,7 +293,8 @@ export async function setFeed(lib: Library, ref: string, patch: { title?: string
 /** Fetches every feed (or the named ones) and caches their posts; a feed that fails keeps its last
  *  posts and says why. Also clears previews left behind. */
 export async function refreshFeeds(lib: Library, only?: string[]): Promise<{ checked: number; failed: { feed: string; error: string }[] }> {
-  const feeds = listFeeds(lib).filter((f) => !only?.length || only.includes(f.url));
+  const all = listFeeds(lib);
+  const feeds = all.filter((f) => !only?.length || only.includes(f.url));
   const results = await Promise.all(
     feeds.map(async (f) => {
       try {
@@ -310,7 +311,7 @@ export async function refreshFeeds(lib: Library, only?: string[]): Promise<{ che
     const prev = cache.feeds[r.f.url];
     cache.feeds[r.f.url] = "error" in r ? { checked_at: now, error: r.error, posts: prev?.posts ?? [] } : { checked_at: now, posts: r.posts };
   }
-  for (const url of Object.keys(cache.feeds)) if (!listFeeds(lib).some((f) => f.url === url)) delete cache.feeds[url];
+  for (const url of Object.keys(cache.feeds)) if (!all.some((f) => f.url === url)) delete cache.feeds[url];
   writeAtomic(cachePath(lib), JSON.stringify(cache));
   await clearPreviews(lib);
   return { checked: feeds.length, failed: results.flatMap((r) => ("error" in r ? [{ feed: r.f.url, error: r.error! }] : [])) };
@@ -341,7 +342,7 @@ export function feedView(lib: Library, now = new Date()): FeedView {
   const feeds = listFeeds(lib);
   const cache = readCache(lib);
   const read = readSet(lib);
-  const kept = new Set(listItems(lib).concat(listItems(lib, { archived: true })).map((i) => i.meta.url).filter(Boolean));
+  const kept = new Set(allItems(lib).map((i) => i.meta.url).filter(Boolean));
   const previews = new Map(listItems(lib, { preview: true }).map((i) => [i.meta.url, i.meta.id]));
   const since = now.getTime() - FEED_DAYS * 86400_000;
   const seen = new Set<string>();

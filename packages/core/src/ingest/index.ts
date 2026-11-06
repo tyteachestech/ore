@@ -4,7 +4,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Item, type ItemType, type NewItem } from "../items.ts";
+import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Item, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
@@ -331,14 +331,14 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   const isUrl = /^https?:\/\//i.test(input);
   if (isUrl && !URL.canParse(input)) throw new Error("That link looks cut off. Copy it again from the address bar.");
   if (!isUrl && /^[a-z][\w+.-]*:/i.test(input) && !existsSync(input)) throw new Error("Ore opens web links (http or https) and files. Open that one in your browser, then add the page from there.");
-  const had = isUrl ? everyItem(lib).find((i) => i.meta.url === input && !i.meta.course) : undefined;
+  const had = isUrl ? allItems(lib, { preview: true }).find((i) => i.meta.url === input && !i.meta.course) : undefined;
   if (had && opts.preview) return had;
   if (had) return keep(lib, had, opts);
   const draft = isUrl ? await fromUrl(input, opts) : await fromFile(resolve(input), opts, input);
   if (!draft.body.trim()) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
   const ready = await withImages(draft);
   // The same file added again (dropped twice, or a copy) is the source already here.
-  const same = !isUrl && everyItem(lib).find((i) => i.meta.text_sha256 === sha256(ready.body) && !i.meta.course);
+  const same = !isUrl && allItems(lib, { preview: true }).find((i) => i.meta.text_sha256 === sha256(ready.body) && !i.meta.course);
   const item = same ? await keep(lib, same, opts) : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview });
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same) await makeThumbnail(item);
@@ -347,8 +347,6 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
 
 /** Kept sources: what adding one again did, so the app can say it ("Added to AI", "back from Archived"). */
 export type Kept = { kept: true; filed: string[]; restored: boolean; fromFeed: boolean };
-
-const everyItem = (lib: Library) => listItems(lib).concat(listItems(lib, { archived: true }), listItems(lib, { preview: true }));
 
 /** A source already in the library, added again: filed under the new skills too, and back from the
  *  archive if it was there, since adding it again means he wants it. */
