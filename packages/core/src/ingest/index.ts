@@ -87,6 +87,14 @@ function refuseLink(url: string): string | null {
   return null;
 }
 
+/** A zipped file (EPUB, Word, PowerPoint) that won't unzip or is missing its parts is damaged or
+ *  only partly downloaded: say so, never "invalid zip data". Other errors pass through. */
+const damaged = (what: string, app?: string) => (e: Error): never => {
+  if (/invalid zip|zip data|unexpected EOF|is missing|no rootfile|Can't find end of central directory|Could not find file/i.test(e.message))
+    throw new Error(`That ${what} file is damaged or only partly downloaded. Download it again${app ? `, or open it in ${app} and save a fresh copy` : ""}.`);
+  throw e;
+};
+
 /** A source draft from a file's bytes, whatever it came from (a link or a file), by its kind. */
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
   if (AUDIO_TYPES.includes(kind)) {
@@ -112,12 +120,12 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "article", title: o.title ?? fileStem(name), url, body: `![](assets/${image.name})\n\n${o.body}`, source: { ext, data: bytes }, assets: [image] };
   }
   if (kind === "epub") {
-    const e = await epubToDoc(bytes);
+    const e = await Promise.resolve().then(() => epubToDoc(bytes)).catch(damaged("EPUB"));
     return { type: "epub", title: e.title ?? fileStem(name), author: e.author, url, body: e.body, source: { ext: "epub", data: bytes }, assets: e.assets };
   }
   if (kind === "docx" || kind === "pptx") {
     const office = await import("./office.ts");
-    const o = kind === "docx" ? await office.docxToDoc(bytes) : office.pptxToDoc(bytes);
+    const o = await Promise.resolve().then(() => (kind === "docx" ? office.docxToDoc(bytes) : office.pptxToDoc(bytes))).catch(damaged(kind === "docx" ? "Word" : "PowerPoint", kind === "docx" ? "Word or Pages" : "PowerPoint or Keynote"));
     return { type: "article", title: o.title ?? fileStem(name), author: o.author, url, body: o.body, source: { ext: kind, data: bytes }, assets: o.assets };
   }
   const text = decodeText(bytes);
@@ -199,8 +207,17 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   // Every failure says what to do next: a page that won't open or parse can still be pasted as text.
   const host = new URL(url).host;
   // An arXiv paper with no HTML version (older ones) is read from its PDF.
-  const res = await get(rw?.url ?? url, host).catch((e) => (rw?.url.startsWith("https://arxiv.org/html/") ? get(rw.url.replace("/html/", "/pdf/"), host) : Promise.reject(e)));
+  // A Google Doc or deck that isn't shared answers its export link with a sign-in page or an error.
+  const google = rw?.url.startsWith("https://docs.google.com/") ? `That Google ${rw.url.includes("/presentation/") ? "Slides deck" : "Doc"} isn’t shared publicly, so Ore can’t download it. In Google, choose Share › Anyone with the link, then add it again; or open it in your browser and ${FROM_TAB}.` : null;
+  const res = await get(rw?.url ?? url, host).catch((e) => {
+    if (google) throw new Error(google);
+    return rw?.url.startsWith("https://arxiv.org/html/") ? get(rw.url.replace("/html/", "/pdf/"), host) : Promise.reject(e);
+  });
   const ctype = res.headers.get("content-type") ?? "";
+  if (google && (/html/.test(ctype) || /accounts\.google\.com/.test(res.url))) {
+    await res.body?.cancel();
+    throw new Error(google);
+  }
   const urlName = decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
   // Video is never read as a page: the whole file would download and parse as HTML. Audio is transcribed.
   if ((/^(audio|video)\//.test(ctype) || /\.(ogg|opus|mp4|mov|m4v|webm)$/i.test(urlName)) && !kindOf(urlName, ctype)) {
