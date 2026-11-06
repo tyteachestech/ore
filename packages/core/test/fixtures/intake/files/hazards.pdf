@@ -2,7 +2,7 @@
 %“Œ‹ž ReportLab Generated PDF document (opensource)
 1 0 obj
 <<
-/F1 2 0 R /F2 3 0 R /F3 4 0 R /F4 5 0 R
+/F1 2 0 R /F2 3 0 R /F3 4 0 R /F4 5 0 R /F5 6 0 R
 >>
 endobj
 2 0 obj
@@ -22,22 +22,17 @@ endobj
 endobj
 5 0 obj
 <<
-/BaseFont /Symbol /Name /F4 /Subtype /Type1 /Type /Font
+/BaseFont /Times-Italic /Encoding /WinAnsiEncoding /Name /F4 /Subtype /Type1 /Type /Font
 >>
 endobj
 6 0 obj
 <<
-/Contents 11 0 R /MediaBox [ 0 0 612 792 ] /Parent 10 0 R /Resources <<
-/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
->> /Rotate 0 /Trans <<
-
->> 
-  /Type /Page
+/BaseFont /Symbol /Name /F5 /Subtype /Type1 /Type /Font
 >>
 endobj
 7 0 obj
 <<
-/Contents 12 0 R /MediaBox [ 0 0 612 792 ] /Parent 10 0 R /Resources <<
+/Contents 12 0 R /MediaBox [ 0 0 612 792 ] /Parent 11 0 R /Resources <<
 /Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
 >> /Rotate 0 /Trans <<
 
@@ -47,23 +42,33 @@ endobj
 endobj
 8 0 obj
 <<
-/PageMode /UseNone /Pages 10 0 R /Type /Catalog
+/Contents 13 0 R /MediaBox [ 0 0 612 792 ] /Parent 11 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
 >>
 endobj
 9 0 obj
 <<
-/Author (anonymous) /CreationDate (D:20261106192203+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20261106192203+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
-  /Subject (unspecified) /Title () /Trapped /False
+/PageMode /UseNone /Pages 11 0 R /Type /Catalog
 >>
 endobj
 10 0 obj
 <<
-/Count 2 /Kids [ 6 0 R 7 0 R ] /Type /Pages
+/Author (anonymous) /CreationDate (D:20261106213342+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20261106213342+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title () /Trapped /False
 >>
 endobj
 11 0 obj
 <<
-/Length 2922
+/Count 2 /Kids [ 7 0 R 8 0 R ] /Type /Pages
+>>
+endobj
+12 0 obj
+<<
+/Length 3452
 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
@@ -76,60 +81,76 @@ BT 1 0 0 1 248.924 704 Tm (2) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
 BT 1 0 0 1 252.424 700 Tm ( and as a habit of the body, and) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 686 Tm (both views explain part of how we remember what we read. Each view) Tj T* ET
+BT 1 0 0 1 72 686 Tm (both views explain part of how we ) Tj T* ET
+BT /F2 11 Tf 13.2 TL ET
+BT 1 0 0 1 226.891 686 Tm (remember) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 672 Tm (predicts something the other misses, which is why the field keeps both.) Tj T* ET
+BT 1 0 0 1 275.753 686 Tm ( what we read. Each view) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 644 Tm (The brain holds about 10) Tj T* ET
+BT 1 0 0 1 72 672 Tm (predicts something the other ) Tj T* ET
+BT /F4 11 Tf 13.2 TL ET
+BT 1 0 0 1 199.71 672 Tm (misses) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 228.431 672 Tm (, which is why the ) Tj T* ET
+BT /F4 11 Tf 13.2 TL ET
+BT 1 0 0 1 311.536 672 Tm (field keeps) Tj T* ET
+BT /F4 11 Tf 13.2 TL ET
+BT 1 0 0 1 72 658 Tm (both) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 91.558 658 Tm ( views in mind.) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 72 630 Tm (The brain holds about 10) Tj T* ET
 BT /F3 7 Tf 8.4 TL ET
-BT 1 0 0 1 181.989 648 Tm (11) Tj T* ET
+BT 1 0 0 1 181.989 634 Tm (11) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 188.989 644 Tm ( neurons and a signal crosses a synapse in 10) Tj T* ET
+BT 1 0 0 1 188.989 630 Tm ( neurons and a signal crosses a synapse in 10) Tj T* ET
 BT /F3 7 Tf 8.4 TL ET
-BT 1 0 0 1 386.648 648 Tm /F4 7 Tf 8.4 TL (-) Tj /F3 7 Tf 8.4 TL (3) Tj T* ET
+BT 1 0 0 1 386.648 634 Tm /F5 7 Tf 8.4 TL (-) Tj /F3 7 Tf 8.4 TL (3) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 393.991 644 Tm ( s,) Tj T* ET
+BT 1 0 0 1 393.991 630 Tm ( s,) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 630 Tm (so a search costs O\(n \267 d) Tj T* ET
+BT 1 0 0 1 72 616 Tm (so a search costs O\(n \267 d) Tj T* ET
 BT /F3 7 Tf 8.4 TL ET
-BT 1 0 0 1 178.612 634 Tm (2) Tj T* ET
+BT 1 0 0 1 178.612 620 Tm (2) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 182.112 630 Tm (\) steps for n items of length d.) Tj T* ET
+BT 1 0 0 1 182.112 616 Tm (\) steps for n items of length d.) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 616 Tm (Numbers like these are rough, but they show the scale of the problem.) Tj T* ET
+BT 1 0 0 1 72 602 Tm (Numbers like these are rough, but they show the scale of the problem.) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 588 Tm (Models that are fine-tuned on a few examples forget less when they are fine-) Tj T* ET
+BT 1 0 0 1 72 574 Tm (Models that are fine-tuned on a few examples forget less when they are fine-) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 574 Tm (tuned again later, a result that holds for people learning a skill as well.) Tj T* ET
+BT 1 0 0 1 72 560 Tm (tuned again later, a result that holds for people learning a skill as well.) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 560 Tm (Practice that is spread out leaves a stronger trace than practice crammed.) Tj T* ET
+BT 1 0 0 1 72 546 Tm (Practice that is spread out leaves a stronger trace than practice crammed.) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 532 Tm (Some puzzles belong to the class of NP-) Tj T* ET
+BT 1 0 0 1 72 518 Tm (Some puzzles belong to the class of NP-) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 518 Tm (complete problems, and no shortcut is known for them. Memory search is) Tj T* ET
+BT 1 0 0 1 72 504 Tm (complete problems, and no shortcut is known for them. Memory search is) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 504 Tm (easier: a good cue narrows it at once, which is why cues matter so much.) Tj T* ET
+BT 1 0 0 1 72 490 Tm (easier: a good cue narrows it at once, which is why cues matter so much.) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 476 Tm (We review frequently because a memory reviewed fre) Tj T* ET
+BT 1 0 0 1 72 462 Tm (We review frequently because a memory reviewed fre) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 462 Tm (quently is cheaper to recall, as the spacing studies show. The gain is) Tj T* ET
+BT 1 0 0 1 72 448 Tm (quently is cheaper to recall, as the spacing studies show. The gain is) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 448 Tm (largest when the gap between reviews grows a little each time it works.) Tj T* ET
+BT 1 0 0 1 72 434 Tm (largest when the gap between reviews grows a little each time it works.) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 420 Tm (The idea goes back to Alan Turing\222s 1950 article \223Com-) Tj T* ET
+BT 1 0 0 1 72 406 Tm (The idea goes back to Alan Turing\222s 1950 article \223Com-) Tj T* ET
 BT /F3 6 Tf 7.2 TL ET
 BT 1 0 0 1 72 123 Tm (2) Tj T* ET
 BT /F3 8 Tf 9.6 TL ET
-BT 1 0 0 1 75 120 Tm ( We are not suggesting that people are irrational, only that habits matter.) Tj T* ET
+BT 1 0 0 1 75 120 Tm ( We are not suggesting that people are irrational, only that habits matter) Tj T* ET
+BT /F3 8 Tf 9.6 TL ET
+BT 1 0 0 1 72 109 Tm (as much as reasons do when we study.) Tj T* ET
 BT /F3 8 Tf 9.6 TL ET
 BT 1 0 0 1 271.784 762 Tm (How Memory Works) Tj T* ET
 BT 1 0 0 1 304 40 Tm (1) Tj T* ET
  
 endstream
 endobj
-12 0 obj
+13 0 obj
 <<
-/Length 532
+/Length 1451
 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
@@ -138,7 +159,23 @@ BT 1 0 0 1 72 700 Tm (puting Machinery and Intelligence,\224 which asked whether
 BT /F3 11 Tf 13.2 TL ET
 BT 1 0 0 1 72 672 Tm (Each later chapter returns to this question from another side, and) Tj T* ET
 BT /F3 11 Tf 13.2 TL ET
-BT 1 0 0 1 72 658 Tm (each one ends with exercises that ask you to recall what it said.) Tj T* ET
+BT 1 0 0 1 72 658 Tm (each one ends with exercises that ask you to recall what it said, so the) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 72 644 Tm (reading turns into practice at once.) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 90 630 Tm (A book starts a paragraph by indenting its first line instead of leaving) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 72 616 Tm (a gap, and the lines after it go back to the margin as this one does.) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 72 588 Tm ([1] H. Ebbinghaus. Memory: A Contribution to Experimental Psychology,) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 90 574 Tm (translated by H. Ruger and C. Bussenius, 1913.) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 72 560 Tm ([2] H. Roediger and J. Karpicke. Test-enhanced learning, 2006.) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 72 546 Tm ([3] N. Kornell and R. Bjork. Learning concepts and categories: is spacing) Tj T* ET
+BT /F3 11 Tf 13.2 TL ET
+BT 1 0 0 1 90 532 Tm (the enemy of induction? 2008.) Tj T* ET
 BT /F3 8 Tf 9.6 TL ET
 BT 1 0 0 1 271.784 762 Tm (How Memory Works) Tj T* ET
 BT 1 0 0 1 304 40 Tm (2) Tj T* ET
@@ -146,30 +183,31 @@ BT 1 0 0 1 304 40 Tm (2) Tj T* ET
 endstream
 endobj
 xref
-0 13
+0 14
 0000000000 65535 f 
 0000000061 00000 n 
-0000000122 00000 n 
-0000000229 00000 n 
-0000000337 00000 n 
-0000000446 00000 n 
-0000000523 00000 n 
-0000000718 00000 n 
-0000000913 00000 n 
-0000000982 00000 n 
-0000001235 00000 n 
-0000001301 00000 n 
-0000004275 00000 n 
+0000000132 00000 n 
+0000000239 00000 n 
+0000000347 00000 n 
+0000000456 00000 n 
+0000000566 00000 n 
+0000000643 00000 n 
+0000000838 00000 n 
+0000001033 00000 n 
+0000001102 00000 n 
+0000001356 00000 n 
+0000001422 00000 n 
+0000004926 00000 n 
 trailer
 <<
 /ID 
-[<82c69e4edadd7fb003cafb872f305922><82c69e4edadd7fb003cafb872f305922>]
+[<fb5068cd1f3514f5b0909c5ef6f50ed6><fb5068cd1f3514f5b0909c5ef6f50ed6>]
 % ReportLab generated PDF document -- digest (opensource)
 
-/Info 9 0 R
-/Root 8 0 R
-/Size 13
+/Info 10 0 R
+/Root 9 0 R
+/Size 14
 >>
 startxref
-4858
+6429
 %%EOF
