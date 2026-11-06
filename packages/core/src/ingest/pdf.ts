@@ -45,13 +45,36 @@ function dropMargins(items: Item[], body: number): Item[] {
   return items.map((i) => (i.str.trim() && i.size < body * 0.9 && (i.end <= left - 2 || i.x >= right + 2) ? { ...i, str: "" } : i));
 }
 
+const SUPER: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "−": "⁻", "-": "⁻", "+": "⁺" };
+
+/** Small digits raised above the line: a power after a number or a lone letter ("10¹¹", "d²"),
+ *  else a footnote's mark after a word ("rational²"), which is dropped. A footnote's own number,
+ *  first on its line, stays. */
+function raised(cur: Line, it: Item, after: boolean): string | null {
+  const t = it.str.trim();
+  if (!t || !(/^[−+-]?\d[\d.]*$|^[−+-]$/.test(t) || (after && /^[.\d]+$/.test(t))) || !cur.text.trim() || !it.size || it.size >= cur.size * 0.85 || it.y <= cur.y + 1) return null;
+  // A mark sits right after a word or its punctuation; a raised number after a space (a fraction's
+  // top, "¹⁄₂") is left as it is.
+  if (/\s$/.test(cur.text) && !after) return null;
+  const power = after || /[−+-]/.test(t) || /\d$/.test(cur.text) || /(?:^|[^\p{L}])\p{L}$/u.test(cur.text);
+  return power ? [...t].map((c) => SUPER[c] ?? c).join("") : "";
+}
+
 function pageLines(items: Item[]): Line[] {
   const lines: Line[] = [];
   let cur: Line | null = null;
+  /** The last text added was a raised power, so a sign or digit right after it belongs to it. */
+  let up = false;
   for (const it of items) {
     // A line starts where its first kept text is, so a dropped margin note never moves it.
     if (it.str.trim()) {
       cur ??= { text: "", y: it.y, x: it.x, size: 0 };
+      const sup = raised(cur, it, up);
+      up = !!sup;
+      if (sup !== null) {
+        cur.text += sup;
+        continue;
+      }
       cur.size = Math.max(cur.size, it.size);
     }
     if (cur) cur.text += it.str;
@@ -76,19 +99,25 @@ function lineGap(pages: Line[][]): number {
 function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
   const key = (l?: Line) => l?.text.replace(/\d+/g, "#").toLowerCase() ?? "";
   const count = (keys: string[]) => keys.reduce((m, k) => m.set(k, (m.get(k) ?? 0) + 1), new Map<string, number>());
-  const heads = count(pages.map((p) => key(p[0])));
-  const feet = count(pages.map((p) => key(p.at(-1))));
+  const top = (p: Line[]) => p.reduce<Line | undefined>((a, l) => (!a || l.y > a.y ? l : a), undefined);
+  const bottom = (p: Line[]) => p.reduce<Line | undefined>((a, l) => (!a || l.y < a.y ? l : a), undefined);
+  const heads = count(pages.map((p) => key(top(p))));
+  const feet = count(pages.map((p) => key(bottom(p))));
   const number = /^(?:page\s*)?\d{1,4}(?:\s*(?:of|\/)\s*\d+)?$/i;
   // A page number, or a front-matter one ("viii"), at either end of the line.
   const folio = /^(?:\d{1,4}|[ivxlc]{1,6})\s|\s(?:\d{1,4}|[ivxlc]{1,6})$/;
   return pages.map((lines) => {
-    let out = lines;
-    const [head, next] = out;
-    if (head && next && head.text.length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(head.text) || folio.test(head.text) || heads.get(key(head))! > 1)) out = out.slice(1);
-    const foot = out.at(-1);
-    const prev = out.at(-2);
-    if (foot && prev && foot.text.length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(foot.text) || feet.get(key(foot))! > 1)) out = out.slice(0, -1);
-    return out;
+    // Highest and lowest on the page, whatever order the file writes them in (Chromium and many
+    // print-to-PDF tools write the head and the page number after the body).
+    const byY = [...lines].sort((a, b) => b.y - a.y);
+    const drop = new Set<Line>();
+    const [head, next] = byY;
+    if (head && next && head.text.length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(head.text) || folio.test(head.text) || heads.get(key(head))! > 1)) drop.add(head);
+    const rest = byY.filter((l) => !drop.has(l));
+    const foot = rest.at(-1);
+    const prev = rest.at(-2);
+    if (foot && prev && foot.text.length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(foot.text) || feet.get(key(foot))! > 1)) drop.add(foot);
+    return lines.filter((l) => !drop.has(l));
   });
 }
 
@@ -100,8 +129,10 @@ const FOOTNOTE = /^(?:\d{1,3}|[*†‡§])\s+\S/;
 
 // Join lines into paragraphs: a vertical gap clearly larger than the document's
 // typical line spacing (or a jump upwards, i.e. a new column) starts a paragraph.
-function paragraphs(lines: Line[], body = 0, typical = 12): string[] {
+function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<string>()): { text: string; note: boolean }[] {
   const out: string[] = [];
+  /** Paragraphs that are footnotes: a sentence running onto the next page joins the one above them. */
+  const notes = new Set<string>();
   let para = "";
   let skip = 0;
   /** Where the open list item's text starts, while one is open. */
@@ -137,12 +168,38 @@ function paragraphs(lines: Line[], body = 0, typical = 12): string[] {
     }
     const text = bullet ? "- " + l.text.replace(BULLET, "") : l.text;
     if (bullet) item = l.x + 4;
-    if (!para) para = text;
-    else if (/[a-z]-$/.test(para) && /^[a-z]/.test(text)) para = para.slice(0, -1) + text;
-    else para += " " + text;
+    para = para ? join(para, text, words) : text;
+    if (note) notes.add(para);
   });
   if (para) out.push(para);
-  return out;
+  return out.map((p) => ({ text: p, note: notes.has(p) }));
+}
+
+/** Words seen inside lines across the document (not first or last on a line, where a break may cut
+ *  them): what a word split at a line's end should be joined back into. */
+function wordsOf(pages: Line[][]): Set<string> {
+  const words = new Set<string>();
+  for (const l of pages.flat()) for (const w of l.text.toLowerCase().match(/[\p{L}\d]+(?:-[\p{L}\d]+)*/gu)?.slice(1, -1) ?? []) words.add(w);
+  return words;
+}
+
+/** Joins a line to the paragraph before it. A word broken at the end with a hyphen ("intel-"
+ *  "lectual") loses it, unless the document spells the word with one elsewhere ("fine-tuned"), or
+ *  the hyphen follows a capital ("NP-complete"). A word broken with no hyphen in the text at all
+ *  (some apps never write it) is joined when the whole word is used elsewhere and the piece is not. */
+function join(para: string, text: string, words: Set<string>): string {
+  const left = para.match(/([\p{L}\d]+)-$/u)?.[1];
+  const right = text.match(/^[\p{L}\d]+/u)?.[0] ?? "";
+  if (left !== undefined && right) {
+    if (/[a-z]$/.test(left) && /^[a-z]/.test(right)) {
+      const both = `${left}-${right}`.toLowerCase();
+      return words.has(both) && !words.has((left + right).toLowerCase()) ? para + text : para.slice(0, -1) + text;
+    }
+    return para + text;
+  }
+  const piece = para.match(/(?:^|[^\p{L}])(\p{Ll}{2,})$/u)?.[1];
+  if (piece && /^\p{Ll}{2,}/u.test(right) && words.has(piece + right) && !words.has(piece)) return para + text;
+  return para + " " + text;
 }
 
 /** The size most of the text is set in, by characters. */
@@ -225,7 +282,22 @@ export async function pdfToDoc(data: Uint8Array): Promise<PdfDoc> {
   const raw = items.map((p) => pageLines(dropMargins(p, body)));
   const typical = lineGap(raw);
   const lines = dropRunning(raw, body, typical);
-  const pages = lines.map((l, i) => `<!-- page ${i + 1} -->\n\n${paragraphs(l, body, typical).join("\n\n")}`);
+  const words = wordsOf(lines);
+  const paras = lines.map((l) => paragraphs(l, body, typical, words));
+  // A paragraph that runs onto the next page ends there: its last sentence is finished on the page
+  // it starts on, above that page's footnotes.
+  paras.forEach((page, i) => {
+    const next = paras[i + 1];
+    const at = page.findLastIndex((p) => !p.note);
+    const last = page[at]?.text;
+    const first = next?.[0];
+    if (!last || !first || first.note || /^(?:#|- )/.test(last) || /^(?:#|- )/.test(first.text)) return;
+    if (/-$/.test(last) || (!/[.!?:;”"’)\]]$/.test(last) && /^\p{Ll}/u.test(first.text))) {
+      page[at] = { text: join(last, first.text, words), note: false };
+      next.shift();
+    }
+  });
+  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${p.map((x) => x.text).join("\n\n")}`);
   const text = pages.join("\n\n") + "\n";
   if (text.replace(/<!-- page \d+ -->/g, "").trim().length < 20) {
     throw new ScannedPdf();
