@@ -42,3 +42,4 @@ export * from "./ai/explain.ts";
 export * from "./ai/recall.ts";
 export * from "./ai/check.ts";
 export * from "./cut.ts";
+export { doclingHome, doclingPath, installDocling, removeDocling } from "./ingest/docling.ts";

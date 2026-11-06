@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
 import { regionsFrom, tidyLatex } from "../src/ingest/docling.ts";
-import { addSource, addText, readTables, reimportSource, undoReimport } from "../src/ingest/index.ts";
+import { addSource, addText, readTables, tablesState, reimportSource, undoReimport } from "../src/ingest/index.ts";
 import { findItem } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -53,6 +53,7 @@ describe("PDF tables and formulas (D123)", () => {
     expect(now.body).not.toMatch(/412\s+91%/); // the cells are not also left as a line
     expect(readAnnotations(now).find((a) => a.id === kept.id)?.status).not.toBe("orphaned");
     expect(existsSync(join(now.dir, "layout.json"))).toBe(true);
+    expect(tablesState(lib, now)).toEqual({ tables: "read" });
 
     // The reading is kept: a later reimport (a better pdf.js reader) keeps the tables without Docling.
     delete process.env.ORE_DOCLING;
@@ -72,6 +73,8 @@ describe("PDF tables and formulas (D123)", () => {
     await expect(readTables(lib, item.meta.id)).rejects.toThrow(/isn't installed.*Settings/);
     process.env.ORE_DOCLING = fakeDocling(true);
     await expect(readTables(lib, item.meta.id)).rejects.toThrow("couldn't read this PDF: RuntimeError: out of memory");
+    // The reader shows why at once, not a wait on a run that already died.
+    expect(tablesState(lib, item)).toEqual({ tables_error: "The table and formula reader couldn't read this PDF: RuntimeError: out of memory" });
     expect(findItem(lib, item.meta.id).body).toBe(item.body);
     const text = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
     await expect(readTables(lib, text.meta.id)).rejects.toThrow("Only a PDF source");

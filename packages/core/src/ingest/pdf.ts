@@ -165,11 +165,12 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
     const drop = new Set<Line>();
     const [head, next] = byY;
     const t = (l: Line) => plain(l.text);
-    if (head && next && t(head).length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(t(head)) || folio.test(t(head)) || heads.get(key(head))! > 1)) drop.add(head);
+    // A table or formula Docling read (D123) is never a running head, though many pages start with one.
+    if (head && next && !isBlock(head.text) && t(head).length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(t(head)) || folio.test(t(head)) || heads.get(key(head))! > 1)) drop.add(head);
     const rest = byY.filter((l) => !drop.has(l));
     const foot = rest.at(-1);
     const prev = rest.at(-2);
-    if (foot && prev && t(foot).length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
+    if (foot && prev && !isBlock(foot.text) && t(foot).length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
     return lines.filter((l) => !drop.has(l));
   });
 }
@@ -385,14 +386,19 @@ const inside = (i: Item, b: Box) => {
  *  Docling's LaTeX. */
 function swapRegions(items: Item[], regions: Region[], blocks: string[]): Item[] {
   let out = items;
+  // A formula Docling found inside a table is one of its cells, read with the table.
+  const within = (a: Box, b: Box) => (a.l + a.r) / 2 >= b.l && (a.l + a.r) / 2 <= b.r && (a.t + a.b) / 2 >= b.b && (a.t + a.b) / 2 <= b.t;
+  const tables = regions.filter((r) => r.kind === "table");
   for (const r of regions) {
-    const at = out.findIndex((i) => i.str.trim() && inside(i, r.box));
+    if (r.kind === "formula" && tables.some((t) => within(r.box, t.box))) continue;
+    const ins = (i: Item) => !!i.str.trim() && !isBlock(i.str) && inside(i, r.box);
+    const at = out.findIndex(ins);
     if (at < 0) continue;
-    const md = r.kind === "formula" ? `$$\n${r.latex}\n$$` : table(r, out.filter((i) => i.str.trim() && inside(i, r.box)));
+    const md = r.kind === "formula" ? `$$\n${r.latex}\n$$` : table(r, out.filter(ins));
     if (!md) continue;
     const mark: Item = { str: BLOCK + blocks.length + BLOCK_, x: r.box.l, y: r.box.t, end: r.box.r, size: 0, eol: true };
     blocks.push(md);
-    const kept = out.filter((i, n) => n < at || !(i.str.trim() && inside(i, r.box)));
+    const kept = out.filter((i, n) => n < at || !ins(i));
     if (at > 0) kept[at - 1] = { ...kept[at - 1]!, eol: true };
     out = [...kept.slice(0, at), mark, ...kept.slice(at)];
   }
@@ -411,7 +417,10 @@ function table(r: Extract<Region, { kind: "table" }>, items: Item[]): string {
     const text = emphasis(own.replace(/\uE010[^\uE011]*\uE011/g, "")).trim() || c.text;
     grid[c.row]![c.col] = text.replace(/\|/g, "\\|").replace(/\s+/g, " ");
   }
-  const head = Math.max(0, r.cells.findIndex((c) => c.header) >= 0 ? Math.max(...r.cells.filter((c) => c.header).map((c) => c.row + c.rows - 1)) : 0);
+  // The header is the run of rows from the top whose every cell is a header; Docling also marks a
+  // label row lower down (a table's "FLOPs" line), which stays in the body.
+  let head = 0;
+  while (head + 1 < r.rows && r.cells.some((c) => c.row === head + 1) && r.cells.every((c) => c.row !== head + 1 || c.header)) head++;
   // Markdown has one header row: a header set over two rows reads as one, its parts joined.
   const top = grid.slice(0, head + 1).reduce((a, row) => a.map((t, i) => [t, row[i]].filter(Boolean).join(" ")), grid[0]!.map(() => ""));
   // A header row is bold already: its own bold marks would only repeat that.

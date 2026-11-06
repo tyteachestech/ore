@@ -2,6 +2,12 @@ import { relative } from "node:path";
 import {
   reimportSource,
   undoReimport,
+  readTables,
+  tablesState,
+  doclingHome,
+  doclingPath,
+  installDocling,
+  removeDocling,
   cutText,
   restoreCut,
   redoCut,
@@ -13,7 +19,7 @@ import {
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
-import { startEnrich, startEnrichMany } from "./background.ts";
+import { startEnrich, startEnrichMany, startTables } from "./background.ts";
 
 const INTENTS = Intent.options;
 
@@ -74,6 +80,8 @@ export const itemCommands: Record<string, Command> = {
       if (f.for) await matchQuestion(lib, item.meta.id, str(f.for)!);
       const kept = !!item.kept;
       const enrich = f["no-enrich"] || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
+      // A PDF's tables and formulas are read after it is added, once the optional reader is installed (D123).
+      if (!kept && item.meta.type === "pdf" && doclingPath()) startTables(lib, item.meta.id);
       const path = relative(lib.root, item.docPath);
       return {
         data: { id: item.meta.id, title: item.meta.title, type: item.meta.type, path, enrich, ...(kept ? { kept, filed: item.filed, restored: item.restored, status: item.meta.status, skills: item.meta.skills } : {}) },
@@ -182,7 +190,7 @@ export const itemCommands: Record<string, Command> = {
       const item = findItem(lib, need(ref, "<item>"));
       const annotations = anchorAnnotations(item);
       const data = {
-        ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(lib, item),
+        ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(lib, item), ...tablesState(lib, item),
         body: item.body, annotations,
         ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
       };
@@ -422,6 +430,29 @@ export const itemCommands: Record<string, Command> = {
       const data = { id, title: r.item.meta.title, changed: r.changed, moved: r.moved, removed: r.removed.map((a) => ({ id: a.id, exact: a.exact, intent: a.intent })) };
       const text = !r.changed ? `${r.item.meta.title} is up to date` : `Reimported ${r.item.meta.title}${r.removed.length ? `; removed ${r.removed.length} highlight(s) no longer in it` : ""}`;
       return { data, text };
+    },
+  },
+
+  tables: {
+    usage: "<item> | --install | --remove | --status   read a PDF's tables and display formulas with Docling and put them in its text in place of their lines; highlights stay (D123). Docling is an optional download of about 2 GB: --install gets it, --remove deletes it, --status says whether it is here. Undo with `ore reimport <item> --undo`",
+    options: { install: { type: "boolean" }, remove: { type: "boolean" }, status: { type: "boolean" } },
+    async run([ref], f) {
+      if (f.status) {
+        const installed = !!doclingPath();
+        return { data: { installed, path: installed ? doclingHome() : undefined }, text: installed ? `The table and formula reader is installed (${doclingHome()})` : "The table and formula reader isn't installed. Get it with `ore tables --install`." };
+      }
+      if (f.remove) {
+        await removeDocling();
+        return { data: { installed: false }, text: "Removed the table and formula reader" };
+      }
+      if (f.install) {
+        const home = await installDocling((done, of, label) => progress(done - 1, of, label, `${label}… (${done} of ${of})`));
+        return { data: { installed: true, path: home }, text: `Installed the table and formula reader (${home})` };
+      }
+      const lib = openLibrary();
+      const r = await readTables(lib, findItem(lib, need(ref, "<item>")).meta.id);
+      const data = { id: r.item.meta.id, title: r.item.meta.title, changed: r.changed, regions: r.regions, moved: r.moved, removed: r.removed.map((a) => ({ id: a.id, exact: a.exact, intent: a.intent })) };
+      return { data, text: !r.changed ? `Found no tables or formulas to add in ${r.item.meta.title}` : `Read ${r.regions} table(s) and formula(s) into ${r.item.meta.title}` };
     },
   },
 

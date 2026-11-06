@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import type { Region } from "./docling.ts";
 import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
@@ -520,7 +520,9 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     for (const a of draft.assets ?? []) writeAtomic(join(item.dir, "assets", a.name), a.data);
     // The old body's hash stays until the highlights are re-anchored to the new body (reanchorItem).
     // A lesson read from its course page again (lessonOf) gains its page's link.
-    const meta = { ...item.meta, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, author: item.meta.author ?? draft.author, published: draft.published ?? item.meta.published };
+    // Read again under the lock: a background enrich may have written its questions while this one read.
+    const now = readItemDir(item.dir).meta;
+    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, author: now.author ?? draft.author, published: draft.published ?? now.published };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);
@@ -540,15 +542,54 @@ function layoutOf(dir: string): Region[] | undefined {
   }
 }
 
+const tablesFile = (lib: Library, id: string, ext: "reading" | "error") => join(paths.logs(lib), `tables-${id}.${ext}`);
+
 /** Reads a PDF source's tables and formulas with Docling (D123) and puts them in its text in place of
  *  pdf.js's lines, through a reimport from the kept PDF: the prose is unchanged, so every highlight
- *  stays where it is. */
+ *  stays where it is. While it runs, and after it fails, `tablesState` says so. */
 export async function readTables(lib: Library, ref: string): Promise<Reimported & { regions: number }> {
   const item = findItem(lib, ref);
   if (item.meta.type !== "pdf" || !existsSync(join(item.dir, "source.pdf"))) throw new Error("Only a PDF source has tables and formulas to read.");
-  const regions = await (await import("./docling.ts")).runDocling(join(item.dir, "source.pdf"));
-  return { ...(await reimportSource(lib, item.meta.id, { local: true, regions })), regions: regions.length };
+  mkdirSync(paths.logs(lib), { recursive: true });
+  writeFileSync(tablesFile(lib, item.meta.id, "reading"), String(process.pid));
+  try {
+    const regions = await (await import("./docling.ts")).runDocling(join(item.dir, "source.pdf"));
+    const r = await reimportSource(lib, item.meta.id, { local: true, regions });
+    rmSync(tablesFile(lib, item.meta.id, "error"), { force: true });
+    return { ...r, regions: regions.length };
+  } catch (e) {
+    writeFileSync(tablesFile(lib, item.meta.id, "error"), e instanceof Error ? e.message : String(e));
+    throw e;
+  } finally {
+    rmSync(tablesFile(lib, item.meta.id, "reading"), { force: true });
+  }
 }
+
+/** Where a PDF's tables stand: being read now, read (its layout.json), or why the last reading failed. */
+export function tablesState(lib: Library, item: Item): { tables?: "reading" | "read"; tables_error?: string } {
+  if (item.meta.type !== "pdf") return {};
+  const pid = Number(readOr(tablesFile(lib, item.meta.id, "reading")));
+  if (pid && alive(pid)) return { tables: "reading" };
+  if (existsSync(join(item.dir, "layout.json"))) return { tables: "read" };
+  const error = readOr(tablesFile(lib, item.meta.id, "error"));
+  return error ? { tables_error: error } : {};
+}
+
+const readOr = (f: string) => {
+  try {
+    return readFileSync(f, "utf8").trim();
+  } catch {
+    return "";
+  }
+};
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 /** Puts back the version a reimport replaced, highlights included; run again, it redoes the reimport. */
 export async function undoReimport(lib: Library, ref: string): Promise<Item> {
