@@ -76,6 +76,8 @@ export const ItemMetaSchema = z.object({
   video: z.string().optional(),
   author: z.string().optional(),
   published: z.string().optional(),
+  // A PDF's tables or formulas that read as lines of text until Docling reads them (D125).
+  structure: z.array(z.enum(["tables", "formulas"])).optional(),
   captured_at: z.string(),
   source_app: z.string().optional(),
   text_sha256: z.string(),
@@ -132,6 +134,7 @@ export interface NewItem {
   assets?: Asset[];
   /** Opened from the Feed, not kept yet. */
   preview?: boolean;
+  structure?: ("tables" | "formulas")[];
 }
 
 export type Asset = { name: string; data: Uint8Array };
@@ -154,6 +157,7 @@ export async function createItem(lib: Library, input: NewItem): Promise<Item> {
     video: input.video,
     author: input.author || undefined,
     published: input.published || undefined,
+    structure: input.structure,
     captured_at: nowIso(now),
     source_app: input.source_app,
     text_sha256: sha256(body),

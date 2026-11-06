@@ -40,6 +40,7 @@ import { firstFrom, sentences, Speaker, speechAvailable } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
 import { errorText, inOrder, load, save, type Notify } from "./util";
 import { popupPlace, type Aim } from "./popup-place";
+import { TablesLine } from "./Tables";
 import { Working } from "./Working";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
@@ -602,6 +603,16 @@ function ReaderView(p: Props & { reload: () => void }) {
   }, [waiting, p.id]);
 
   /** Runs enrich again in the foreground, so a failure shows its reason. */
+  /** The PDF's tables and formulas were read into its text: show it, with the way back. */
+  const tablesRead = (r: { changed: boolean; regions: number }) => {
+    const id = p.id;
+    p.reload();
+    p.onChanged();
+    if (!r.changed) return p.notify("Found no tables or formulas to read in this PDF");
+    const step = () => void ore("reimport", id, "--undo").then(() => (p.reload(), p.onChanged()), (e) => p.notify(errorText(e), "error"));
+    p.notify("Read the tables and formulas into the text", "info", step, step);
+  };
+
   const retryEnrich = async () => {
     setRetrying(true);
     try {
@@ -2251,6 +2262,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           )}
           {/* The phone can't write prequestions (AI runs on the Mac): it shows the ones the Mac wrote. */}
           {/* No text, nothing to ask before reading it. */}
+          {!doc.preview && <TablesLine key={doc.id} doc={doc} onRead={tablesRead} />}
           {!doc.preview && (!PHONE || !!doc.prequestions?.length) && (!!doc.body.trim() || !!doc.prequestions?.length) && <Prequestions key={doc.prequestions?.length ?? 0} doc={doc} waiting={waiting || retrying} onRetry={gaveUp && !retrying ? () => void retryEnrich() : undefined} notify={p.notify} />}
           {away === "up" && !video && (
             <div className="follow-up">

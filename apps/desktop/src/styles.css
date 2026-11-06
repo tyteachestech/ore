@@ -574,6 +574,13 @@ img.thumb { filter: brightness(0.86); }
 .preq-retry:hover { background: var(--bg-hover); }
 .preq-retry:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .preq-why { margin: 2px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+/* A PDF's tables and formulas read as plain text (D125): one quiet line under the title, its offer to read them properly. */
+.pdf-tables { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 14px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.pdf-tables-btn { flex: none; height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--text); font-size: 12px; }
+.pdf-tables-btn:hover { background: var(--bg-hover); }
+.pdf-tables-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.pdf-tables-size { color: var(--faint); }
+.pdf-tables-err { color: var(--muted); overflow-wrap: anywhere; }
 /* Question rows (Perplexity "Related"): each a sentence to read for; the open one shows its answer line. */
 .preq-body { list-style: none; margin: 8px 0 0; padding: 0; }
 .preq-row { border-top: 1px solid var(--border); }

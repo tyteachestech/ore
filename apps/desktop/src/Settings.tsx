@@ -8,7 +8,8 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Hint } from "./Hint";
 import { comboOf, label, rebind, useKeymap } from "./keys";
-import { ore, opt } from "./ore";
+import { ore, opt, PHONE } from "./ore";
+import { TablesSetting } from "./Tables";
 import { setTray, trayOn } from "./quick";
 import { ShortcutEditor } from "./Shortcuts";
 import { CHIP_LOOKS, chipLook, setChipLook, type ChipLook } from "./Skills";
@@ -210,6 +211,11 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                       />
                     </Row>
                   </Group>
+                  {!PHONE && (
+                    <Group title="Import">
+                      <TablesSetting notify={notify} Row={Row} />
+                    </Group>
+                  )}
                   <Group title="Library">
                     <Row title="Library folder" text="Your sources, notes and cards, kept as plain files.">
                       <Hint text={data.library}>

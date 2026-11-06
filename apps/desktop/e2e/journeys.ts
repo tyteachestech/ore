@@ -5,12 +5,13 @@
 //   bun run e2e -- highlight         only journeys whose name contains "highlight"
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 import { chromium, type Page } from "playwright";
-import { mkdtempSync } from "node:fs";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 
 const MOCK = join(import.meta.dir, "../scripts/mock");
+const FIXTURES = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
 const BRIDGE = process.env.E2E_URL ? Number(process.env.E2E_BRIDGE ?? 1421) : 1451;
 const only = process.argv[2];
 
@@ -18,8 +19,12 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   if (process.env.E2E_URL) return { url: process.env.E2E_URL, stop: () => {} };
   const lib = mkdtempSync(join(tmpdir(), "ore-e2e-"));
   await $`bun ${join(MOCK, "seed.ts")} ${lib}`.quiet();
+  // The table and formula reader (D125) stands in as a script that writes Docling's saved reading of tables.pdf.
+  const docling = join(lib, ".ore", "docling");
+  writeFileSync(docling, `#!/bin/sh\nsleep 1\nwhile [ "$1" != "--output" ]; do shift; done\ncp "${FIXTURES}/tables.docling.json" "$2/tables.json"\n`);
+  chmodSync(docling, 0o755);
   // Ports of their own, so a mock left running for screenshots (1420, 1421) never answers instead.
-  const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50" }, stdout: "ignore", stderr: "inherit" });
+  const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50" }, stdout: "ignore", stderr: "inherit" });
   const vite = Bun.spawn(["bunx", "vite", "--port", "1450", "--strictPort"], { cwd: join(import.meta.dir, ".."), stdout: "ignore", stderr: "ignore" });
   const url = "http://localhost:1450/";
   for (let i = 0; i < 100; i++) {
@@ -106,6 +111,22 @@ journey("PDF footnote: its mark shows the note on hover, and bold stays bold", a
   await page.locator(".tip.note").getByText("We are not suggesting that people are irrational").waitFor();
   await page.mouse.move(5, 5);
   await page.locator(".tip.note").waitFor({ state: "detached" });
+});
+
+journey("PDF tables: read in the background after adding, Undo puts the lines back, one click reads them again", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(join(FIXTURES, "tables.pdf"));
+  await page.keyboard.press("Enter");
+  const doc = page.locator(".doc");
+  await doc.getByText("Each successful review raises S", { exact: false }).waitFor();
+  // The reader is installed, so the PDF's table is read as soon as it is added; the line says so meanwhile.
+  await doc.locator("table").getByText("Spaced").waitFor({ timeout: 15000 });
+  await page.locator(".pdf-tables").waitFor({ state: "detached" });
+  await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
+  await page.locator(".pdf-tables").getByText("Tables in this PDF read as plain text.").waitFor();
+  if (await doc.locator("table").count()) throw new Error("Undo left the table in");
+  await page.locator(".pdf-tables").getByRole("button", { name: "Read them properly" }).click();
+  await doc.locator("table").getByText("Massed").waitFor({ timeout: 15000 });
 });
 
 journey("cancel an add from its toast: nothing is added, and the link stays in the box", async (page) => {

@@ -42,3 +42,8 @@ export * from "./ai/explain.ts";
 export * from "./ai/recall.ts";
 export * from "./ai/check.ts";
 export * from "./cut.ts";
+export { doclingHome, doclingPath } from "./ingest/docling-path.ts";
+// Loaded only when called: Docling's runner needs Bun and node:fs/promises, which the iPhone app has not.
+type Docling = typeof import("./ingest/docling.ts");
+export const installDocling = async (...a: Parameters<Docling["installDocling"]>) => (await import("./ingest/docling.ts")).installDocling(...a);
+export const removeDocling = async () => (await import("./ingest/docling.ts")).removeDocling();
