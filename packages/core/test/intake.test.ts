@@ -16,7 +16,9 @@ import { tempLibrary } from "./helpers.ts";
 
 // Import coverage (docs/reviews/2026-10-28-import-coverage.md): every content type Ore reads has a
 // saved example here, and each must keep what a learner needs from it. Pages are real ones, saved
-// with scripts and styles stripped; `bun run intake:live` re-checks the live sites.
+// with scripts and styles stripped; `bun run intake:live` re-checks the live sites. The repo is
+// public, so a page that isn't openly licensed keeps its site's markup but not its words
+// (fixtures/intake/rewrite-page.ts), which is why its phrases below read as nonsense.
 
 const FIX = join(import.meta.dir, "fixtures/intake");
 const web = (f: string) => readFileSync(join(FIX, "web", f), "utf8");
@@ -74,15 +76,15 @@ interface Case {
 }
 
 const PAGES: Case[] = [
-  { name: "essay", url: "https://paulgraham.com/greatwork.html", fixture: "essay.html", title: "How to Do Great Work", minWords: 11000, has: ["If you collected lists of techniques", "Curiosity", "for suggestions and for reading drafts"], paragraphs: 100, links: 20 },
-  { name: "blog with diagrams and code", url: "https://lilianweng.github.io/posts/2023-06-23-agent/", fixture: "blog-images.html", title: "LLM Powered Autonomous Agents", author: "Lilian Weng", published: "2023-06-23T00:00:00Z", minWords: 6000, has: ["In a LLM-powered autonomous agent system", "In the API-Bank workflow", "After going through key ideas and demos"], headings: 12, images: 13, code: 6 },
+  { name: "essay", url: "https://paulgraham.com/greatwork.html", fixture: "essay.html", title: "How to Do Great Work", minWords: 11000, has: ["If you research drill of elaboration", "But the note reading gap of forgetting concept", "for elaboration and for example writing"], paragraphs: 100, links: 20 },
+  { name: "blog with diagrams and code", url: "https://lilianweng.github.io/posts/2023-06-23-agent/", fixture: "blog-images.html", title: "LLM Powered Autonomous Agents", author: "Lilian Weng", published: "2023-06-23T00:00:00Z", minWords: 6000, has: ["In a LLM-powered autonomous index reading", "In the FACT-Check interval", "Test model answer idea review and plan"], headings: 12, images: 13, code: 6 },
   { name: "docs with code (Python)", url: "https://docs.python.org/3/tutorial/classes.html", fixture: "docs-python.html", title: "9. Classes", minWords: 5000, has: ["Compared with other programming languages", "If the same attribute name occurs in", "Some simple generators can be coded succinctly"], headings: 15, code: 30 },
   { name: "docs with code (MDN)", url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Closures", fixture: "docs-mdn.html", title: "Closures", published: "2025-11-04T07:08:26.000Z", minWords: 2500, has: ["closure", "One solution in this case is to", "However, redefining the prototype is not recommended."], headings: 6, code: 25 },
   { name: "Wikipedia", url: "https://en.wikipedia.org/wiki/Spaced_repetition", fixture: "wikipedia.html", title: "Spaced repetition", author: "Wikipedia", published: "2001-08-09T02:05:34Z", minWords: 3500, has: ["Spaced repetition is", "In the Leitner system, correctly answered cards"], headings: 8, images: 3 },
-  { name: "newsletter (Substack)", url: "https://www.astralcodexten.com/p/the-psychopolitics-of-trauma", fixture: "substack.html", title: "The Psychopolitics Of Trauma", author: "Scott Alexander", published: "2024-01-25T03:34:57+00:00", minWords: 5000, has: ["Everyone knows politics makes people crazy", "As stated, this doesn’t really apply to", "But thinking of things this way has"], headings: 5, images: 3 },
-  { name: "tutorial", url: "https://www.freecodecamp.org/news/git-and-github-for-beginners/", fixture: "tutorial.html", title: "Git and GitHub Tutorial – Version Control for Beginners", author: "Ihechikara Abba", published: "2021-11-05T18:25:06.000Z", minWords: 2500, has: ["Git and GitHub are two technologies that", "Before we \"add\" and \"commit\" our files", "If you have followed up to this"], headings: 15, images: 8, code: 3 },
-  { name: "blog with two kinds of footnotes (Wait But Why)", url: "https://waitbutwhy.com/2015/01/artificial-intelligence-revolution-1.html", fixture: "footnotes-waitbutwhy.html", title: "The AI Revolution: The Road to Superintelligence", author: "Tim Urban", published: "2015-01-22T14:21:52+00:00", minWords: 7500, has: ["We made a fancy PDF of this post", "Plagiarize the brain", "That’s the topic of [Part 2 of this post]"], headings: 8, images: 10 },
-  { name: "course page: junk metadata is dropped", url: "https://www.coursera.org/learn/learning-how-to-learn", fixture: "coursera.html", title: "Learning How to Learn: Powerful mental tools to help you master tough subjects", minWords: 300, has: ["In this module, we’re going to be"] },
+  { name: "newsletter (Substack)", url: "https://www.astralcodexten.com/p/the-psychopolitics-of-trauma", fixture: "substack.html", title: "The Psychopolitics Of Trauma", author: "Scott Alexander", published: "2024-01-25T03:34:57+00:00", minWords: 5000, has: ["Research prompt teacher mind learn habit", "As chunk, this learn’t habit drill to", "But feedback of focus this deck step"], headings: 5, images: 3 },
+  { name: "tutorial", url: "https://www.freecodecamp.org/news/git-and-github-for-beginners/", fixture: "tutorial.html", title: "Git and GitHub Tutorial – Version Control for Beginners", author: "Ihechikara Abba", published: "2021-11-05T18:25:06.000Z", minWords: 2500, has: ["Git and GitHub are two elaboration that", "Trace we \"plan\" and \"model\" our trace", "If you note exercise up to this"], headings: 15, images: 8, code: 3 },
+  { name: "blog with two kinds of footnotes (Wait But Why)", url: "https://waitbutwhy.com/2015/01/artificial-intelligence-revolution-1.html", fixture: "footnotes-waitbutwhy.html", title: "The AI Revolution: The Road to Superintelligence", author: "Tim Urban", published: "2015-01-22T14:21:52+00:00", minWords: 7500, has: ["We gap a review CUE of this read", "Elaboration the mind", "That’s the learn of [Part 2 of this skill]"], headings: 8, images: 10 },
+  { name: "course page: junk metadata is dropped", url: "https://www.coursera.org/learn/learning-how-to-learn", fixture: "coursera.html", title: "Learning How to Learn: Powerful mental tools to help you master tough subjects", minWords: 300, has: ["In this student, we’re mind to be"] },
 ];
 
 describe("import coverage: web pages", () => {
@@ -108,8 +110,8 @@ describe("import coverage: web pages", () => {
     serve({ [url]: { body: web("footnotes-waitbutwhy.html"), type: HTML } });
     const { body } = await addSource(await tempLibrary(), url);
     // Both lists, the "fun" notes and the sources, numbered as one series.
-    expect(body).toMatch(/no one calls it AI anymore\.”\[\^7\]/);
-    expect(body).toMatch(/^\[\^7\]: Vardi, /m);
+    expect(body).toMatch(/no one skill it AI reading\.”\[\^7\]/);
+    expect(body).toMatch(/^\[\^7\]: Review, /m);
     expect(count(body, /^\[\^\d+\]: /gm)).toBe(15);
     expect(body).not.toContain("](#footnote");
   });
@@ -141,7 +143,7 @@ describe("import coverage: web pages", () => {
     expect(item.meta.title).toBe("Attention Is All You Need");
     expect(item.meta.author).toBe("Ashish Vaswani et al."); // the paper's authors, not the site's
     expect(words(item.body)).toBeGreaterThan(5000);
-    expect(item.body).toContain("Scaled Dot-Product Attention");
+    expect(item.body).toContain("Skill Card-Strength Attention");
     expect(item.body).toContain("\\sqrt{d_{k}}");
     expect(count(item.body, /^#{1,6} /gm)).toBeGreaterThanOrEqual(20);
     expect(count(item.body, /!\[[^\]]*\]\(https:\/\/arxiv\.org\/html\//g)).toBeGreaterThanOrEqual(2);
@@ -630,7 +632,7 @@ describe("import coverage: from the browser tab", () => {
     const item = await addTab(await tempLibrary(), { tab: { browser: "Safari", url, title: "x", html: web("substack.html") } });
     expect(item.meta.url).toBe(url);
     expect(item.meta.title).toBe("The Psychopolitics Of Trauma");
-    expect(item.body).toContain("Everyone knows politics makes people crazy");
+    expect(item.body).toContain("Research prompt teacher mind learn habit");
   });
 
   test("a page built in the browser (Notion) comes in as its visible text", async () => {
