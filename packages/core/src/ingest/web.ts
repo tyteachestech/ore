@@ -169,6 +169,16 @@ function siteless(title: string, h1: string | undefined): string {
 
 // Defuddle → Markdown. Fallback: Readability text as paragraphs.
 // linkedom instead of jsdom: jsdom 30's selector engine rejects Defuddle's long selectors.
+/** A paper's authors from LaTeXML's markup (arXiv's HTML papers): each `.ltx_personname`'s own text,
+ *  before its footnote marks and affiliations. "A", "A and B", or "A et al." past two. */
+function paperAuthors(doc: Document): string | undefined {
+  const names = [...doc.querySelectorAll(".ltx_authors .ltx_personname")]
+    .map((el) => [...el.childNodes].find((n) => n.nodeType === 3 && n.textContent?.trim())?.textContent?.replace(/[\s∗*†‡]+$/u, "").replace(/\s+/g, " ").trim())
+    .filter((n): n is string => !!n && /\p{L}/u.test(n));
+  if (!names.length) return undefined;
+  return names.length === 1 ? names[0] : names.length === 2 ? names.join(" and ") : `${names[0]} et al.`;
+}
+
 export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
   try {
     const { document } = parseHTML(html);
@@ -176,10 +186,11 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
+    const paper = paperAuthors(document as unknown as Document);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
     const markdown = inlineMath(htmlTables(r.content.trim()));
     if (markdown.length > 200) {
-      return { title: siteless(r.title, h1) || url, author: cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
+      return { title: siteless(r.title, h1) || url, author: paper ?? cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
     }
   } catch {
     // fall through to Readability
