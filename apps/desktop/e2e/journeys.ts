@@ -150,6 +150,37 @@ journey("source note: what he types is kept when he switches sources and comes b
   await shows("after a relaunch");
 });
 
+journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
+  const items = () => page.locator(".note-editor li").allInnerTexts();
+  const grip = async (text: string) => {
+    const box = (await page.locator(".note-editor li").filter({ hasText: text }).boundingBox())!;
+    await page.mouse.move(box.x + 30, box.y + box.height / 2);
+    const g = page.locator(".block-grip");
+    await g.waitFor();
+    return { g: (await g.boundingBox())!, box };
+  };
+  await openSource(page, TESTING);
+  const { g } = await grip("Confidence + correction");
+  const above = (await page.locator(".note-editor li").filter({ hasText: "Effortful" }).boundingBox())!;
+  await page.mouse.move(g.x + 10, g.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(above.x + 20, above.y + 2, { steps: 8 });
+  await page.locator(".block-drop").waitFor();
+  await page.mouse.up();
+  await until("the dragged item is first", async () => (await items())[0]?.startsWith("Confidence") ?? false);
+  await page.waitForTimeout(600); // the note saves after a pause
+  await page.reload();
+  await openSource(page, TESTING);
+  await until("the order survives a reload", async () => (await items())[0]?.startsWith("Confidence") ?? false);
+  await grip("Effortful");
+  await page.locator(".block-grip").click();
+  await page.locator(".menu-item", { hasText: "Turn into" }).hover();
+  await page.getByRole("menuitemcheckbox", { name: "Heading 3" }).dispatchEvent("click");
+  await until("it became a heading", () => page.locator(".note-editor h3", { hasText: "Effortful" }).isVisible());
+  await page.keyboard.press("ControlOrMeta+z"); // the editor's own undo: ⌘ on the Mac, Ctrl where CI runs
+  await until("⌘Z takes it back", async () => (await items()).some((t) => t.startsWith("Effortful")));
+});
+
 journey("diagram: draws beside the source, and a new one stays linked when the panel switches tab", async (page) => {
   await openSource(page, AGENTS);
   const note = page.locator(".note-editor [contenteditable=true]").first();

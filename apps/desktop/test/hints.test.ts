@@ -15,6 +15,9 @@ const NO_CONTROL: Record<string, string> = {
   question: "Hint keys={i} on the highlight popup's intent buttons",
   "mark-read": "label(keys[\"mark-read\"]) on the Feed row menu's Mark read / unread item",
   note: "no control; Tab moves into the popup's note field",
+  "block-up": "label(keymap[\"block-up\"]) beside Move up in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
+  "block-down": "label(keymap[\"block-down\"]) beside Move down in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
+  "block-duplicate": "label(keymap[\"block-duplicate\"]) beside Duplicate in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
   "quick-quiz": "system-wide (D76): registered with macOS, works in any app; shown and set in Settings › Review › Quick quiz",
 };
 

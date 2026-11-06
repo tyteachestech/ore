@@ -964,7 +964,7 @@ body.resizing iframe { pointer-events: none; }
 .mynotes-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 /* The open tab's sheet (Arc, Dia): a card the selected tab joins, so the note reads as its own page. */
 .mynotes-text {
-  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; margin: 0 8px 8px; padding: 20px 20px 24px;
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; margin: 0 8px 8px; padding: 20px 20px 24px 26px; /* the left room holds the ⋮⋮ block handle */
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
 }
 .side-tabs-root:has([id$="-trigger-note"][aria-selected="true"]) .mynotes-text { border-top-left-radius: 0; }
@@ -1054,7 +1054,18 @@ body.resizing iframe { pointer-events: none; }
 .qa-actions kbd { background: transparent; color: inherit; opacity: 0.7; }
 
 /* Note editor (D38): the source note and skill notes. Compact type in the panel, reading type in a skill note. */
-.note-editor { --note-size: 14px; font-size: var(--note-size); line-height: 1.6; color: var(--text-read); user-select: text; -webkit-user-select: text; cursor: text; }
+.note-editor { --note-size: 14px; position: relative; font-size: var(--note-size); line-height: 1.6; color: var(--text-read); user-select: text; -webkit-user-select: text; cursor: text; }
+/* The skill note's column scrolls, which would clip the ⋮⋮ handle in the gutter: the column reaches into the
+   page's padding by the handle's width, and its text stays where it was. */
+.skill-col:has(.note-editor) { margin-left: -28px; padding-left: 28px; }
+/* Notion's ⋮⋮ block handle (editor/BlockHandle.tsx): in the gutter left of the block under the pointer. Its
+   box reaches the text, so moving onto it never leaves the note and hides it. */
+.block-handle { position: absolute; z-index: 5; width: 22px; height: 24px; user-select: none; -webkit-user-select: none; }
+.block-grip { width: 20px; height: 24px; display: grid; place-items: center; border-radius: 4px; color: var(--faint); cursor: grab; }
+.block-grip:hover, .block-grip.on { background: var(--bg-hover); color: var(--muted); }
+.block-grip:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.block-drop { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
+.block-on { position: absolute; z-index: 0; border-radius: 4px; background: rgba(142, 166, 255, 0.1); pointer-events: none; }
 .skill-page .note-editor { --note-size: 16px; }
 .note-editor .ProseMirror { min-height: 8em; outline: none; overflow-wrap: break-word; white-space: pre-wrap; }
 .note-editor .ProseMirror > p:only-child:has(> br:only-child)::before { content: var(--placeholder); color: var(--faint); pointer-events: none; float: left; height: 0; }

@@ -19,6 +19,9 @@ import { calloutSchema, diagramName, toggleSchema, toggleSummarySchema } from ".
 import { createEditor, markdownOf, menuTrigger } from "./editor";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
+import { BlockHandle } from "./BlockHandle";
+import { blockAt, duplicate, moveBy } from "./blockops";
+import { is } from "../keys";
 
 /** What a link can point at (D39): a source, or a skill (its note, D41). */
 export type LinkTarget = { kind: "item" | "skill"; id: string; title: string };
@@ -102,6 +105,7 @@ let handoff: { pos: number; at: number } | null = null;
 /** The note editor (D38): Markdown shortcuts, a `/` menu, `[[` links, `:` emoji. No AI anywhere in it (D34.2). */
 export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(p, ref) {
   const root = useRef<HTMLDivElement>(null);
+  const host = useRef<HTMLDivElement>(null);
   const editor = useRef<Editor | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [index, setIndex] = useState(0);
@@ -428,6 +432,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   return (
     <div
+      ref={host}
       className="note-editor"
       style={{ "--placeholder": JSON.stringify(p.placeholder) } as CSSProperties}
       onBlur={p.onBlur}
@@ -444,6 +449,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onKeyDown={peek.close}
     >
       <div ref={root} />
+      {!PHONE && <BlockHandle view={view} host={host} />}
       {menu && (menu.kind !== "emoji" || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
@@ -549,7 +555,19 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
                 return true;
               }
             }
-            if (!menu) return false;
+            if (!menu) {
+              // Notion's block keys, on the caret's block: one editor step each, so ⌘Z takes it back.
+              const up = is(e, "block-up");
+              if (up || is(e, "block-down") || is(e, "block-duplicate")) {
+                const b = blockAt(view.state.doc, view.state.selection.from);
+                const tr = b && (is(e, "block-duplicate") ? duplicate(view.state, b) : moveBy(view.state, b, up ? -1 : 1));
+                if (tr) view.dispatch(tr);
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+              }
+              return false;
+            }
             // An emoji query with no match shows nothing, so its keys stay ordinary typing.
             if (menu.kind === "emoji" && !rows.length) return false;
             // Keys the menu uses stop here, so the view around the editor (Esc: back) never sees them.
