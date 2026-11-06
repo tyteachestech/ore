@@ -122,8 +122,11 @@ journey("author: add one by hand from the title's menu, it survives a reload, an
   await by.filter({ hasText: "Henry Roediger" }).waitFor();
   await page.keyboard.press("Meta+z");
   await until("⌘Z removes it", async () => (await by.count()) === 0);
+  // The byline shows at once; reload only once the redo's write has reached the library (slow on CI).
+  const saved = page.waitForResponse((r) => r.request().method() === "POST" && (r.request().postData() ?? "").includes("Henry Roediger"));
   await page.keyboard.press("Meta+Shift+z");
   await by.filter({ hasText: "Henry Roediger" }).waitFor();
+  await saved;
   await page.reload();
   await openSource(page, TESTING);
   await by.click(); // the byline edits in place
