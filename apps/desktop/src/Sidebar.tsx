@@ -266,6 +266,7 @@ export function Sidebar({ skills, items, status, skill, within, home, onHome, fe
               menu={g === freshGroup ? [] : groupMenu(g)}
               onToggle={() => toggle(g.name)}
               onAdd={() => setAdding(g.name)}
+              taken={(name) => groups.some((x) => x !== g && !!x.collection && x.collection.toLowerCase() === name.toLowerCase())}
               onRename={(name) => rename(g, name)}
               onCancelRename={() => setRenaming(null)}
             >
@@ -317,7 +318,7 @@ export function Sidebar({ skills, items, status, skill, within, home, onHome, fe
 
 /** A sidebar section: a collection, or the skills in none. The whole section drags by its header to
  *  reorder collections; while a skill from elsewhere hovers it, it lights up (Notion). */
-function Section({ group, open, target, renaming, menu, onToggle, onAdd, onRename, onCancelRename, children }: {
+function Section({ group, open, target, renaming, menu, onToggle, onAdd, taken, onRename, onCancelRename, children }: {
   group: Group;
   open: boolean;
   target: boolean;
@@ -325,6 +326,8 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, onRenam
   menu: MenuAction[];
   onToggle: () => void;
   onAdd: () => void;
+  /** Another collection already has this name. */
+  taken: (name: string) => boolean;
   onRename: (name: string) => void;
   onCancelRename: () => void;
   children: ReactNode;
@@ -346,7 +349,7 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, onRenam
       <WithMenu actions={menu}>
         <div className="side-head" ref={setActivatorNodeRef} {...a11y} {...listeners}>
           {renaming ? (
-            <RenameField value={group.collection} onSave={onRename} onCancel={onCancelRename} />
+            <RenameField value={group.collection} taken={taken} onSave={onRename} onCancel={onCancelRename} />
           ) : (
             <button className="side-label" aria-expanded={open} onClick={onToggle}>
               <span className="side-label-text">{group.name}</span>
@@ -371,9 +374,13 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, onRenam
 }
 
 /** A collection's name, edited in place like a Finder folder: Enter saves, Esc or clicking away keeps the old one. */
-function RenameField({ value, label = "Collection name", placeholder, onSave, onCancel }: { value: string; label?: string; placeholder?: string; onSave: (v: string) => void; onCancel: () => void }) {
+/** A collection's name field. A name another collection has is refused in place, as Finder refuses
+ *  a folder name that is taken: the field stays open and says so (Tyler, 2026-11-07). */
+function RenameField({ value, label = "Collection name", placeholder, taken, onSave, onCancel }: { value: string; label?: string; placeholder?: string; taken?: (v: string) => boolean; onSave: (v: string) => void; onCancel: () => void }) {
   const [v, setV] = useState(value);
+  const [refused, setRefused] = useState<string | null>(null);
   return (
+    <>
     <input
       autoFocus
       className="side-input side-rename"
@@ -382,20 +389,29 @@ function RenameField({ value, label = "Collection name", placeholder, onSave, on
       value={v}
       autoComplete="off"
       onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) => setV(e.target.value)}
+      aria-invalid={refused ? true : undefined}
+      onChange={(e) => (setV(e.target.value), setRefused(null))}
       onBlur={onCancel}
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Enter") {
           e.preventDefault();
-          onSave(v);
+          const name = v.trim().replace(/\s+/g, " ");
+          if (taken?.(name)) setRefused(name);
+          else onSave(v);
         } else if (e.key === "Escape") {
           e.preventDefault();
           onCancel();
         }
       }}
     />
+    {refused && (
+      <span className="side-taken" role="alert">
+        “{refused}” is taken
+      </span>
+    )}
+    </>
   );
 }
 

@@ -478,6 +478,21 @@ journey("Home: Continue reading rows rename from their menu, in place; Esc keeps
   await until("⌘Z puts the old title back", async () => (await row.locator(".title").count()) === 1 && (await title()) === TESTING);
 });
 
+journey("sidebar: renaming a collection to a name another one has is refused in place; Esc keeps the old name", async (page) => {
+  const head = page.locator(".side-head").filter({ hasText: /^Craft$/i });
+  await head.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  const field = page.getByLabel("Collection name");
+  await field.fill("life");
+  await page.keyboard.press("Enter");
+  await page.getByRole("alert").filter({ hasText: "is taken" }).waitFor();
+  await until("the field stays open", () => field.isVisible());
+  await field.fill("Making");
+  await until("typing clears the refusal", async () => (await page.getByRole("alert").filter({ hasText: "is taken" }).count()) === 0);
+  await page.keyboard.press("Escape");
+  await until("Esc keeps the old name, and Life is still its own", async () => (await page.locator(".side-label-text").allInnerTexts()).filter((t) => /^(craft|life)$/i.test(t)).length === 2);
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {
