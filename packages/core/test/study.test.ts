@@ -163,7 +163,14 @@ describe("review loop", () => {
 
     const idx = openIndex(lib);
     expect(idx.search("restudy").map((h) => h.kind).sort()).toEqual(["annotation", "card", "item"]);
+    // A card made from a highlight names it, so ⌘K can land there; one that wasn't names nothing.
+    const ann = idx.search("restudy").find((h) => h.kind === "annotation")!.ref;
+    const fromHl = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: ["learning"], topics: [], content_type: "fact", question: "Zebra quagga?", answer: "A", rubric: [], annotation: ann });
     idx.close();
+    const idx1 = openIndex(lib);
+    expect(idx1.search("quagga")).toMatchObject([{ kind: "card", ref: fromHl.meta.id, annotation: ann }]);
+    expect(idx1.search("Habit cue")[0]!.annotation).toBeUndefined();
+    idx1.close();
 
     writeFileSync(a.path, readFileSync(a.path, "utf8").replace("What beats restudy?", "Which practice beats rereading?"));
     expect(findCard(lib, a.meta.id).question).toBe("Which practice beats rereading?");

@@ -2,7 +2,8 @@ import { GraduationCap } from "./icons";
 import { Command } from "cmdk";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SkillIcon } from "./IconPicker";
-import { courseThumb, lessonsOf, nextLesson, ore, opt, type Item, type SearchHit, type Skill } from "./ore";
+import { LABEL } from "./Collected";
+import { courseThumb, lessonsOf, nextLesson, ore, opt, type Intent, type Item, type SearchHit, type Skill } from "./ore";
 import { Thumb } from "./Thumb";
 import { errorText, useFocusWhileMounted } from "./util";
 
@@ -16,7 +17,9 @@ type Props = {
   skills: Skill[];
   skill: string | null;
   onSkill: (id: string | null) => void;
-  /** Opens a source; `at` is where to land in it (`find:<words>`: the first place the words are). */
+  /** Opens a skill's page with its note scrolled to these words. */
+  onSkillNote: (id: string, words: string) => void;
+  /** Opens a source; `at` is where to land in it (Reader's `jumpTo`). */
   onOpen: (item: string, at?: string) => void;
   /** Ask your library: the query as a question to his sources. */
   onAsk: (question: string) => void;
@@ -37,7 +40,8 @@ const sourceLabel = (i: Source) => (
 /** `score` ranks a row against the query in place of cmdk's fuzzy match on `value`. */
 type Row = { value: string; score?: number; label: ReactNode; extra?: ReactNode; keywords?: string[]; run: () => void };
 type Group = { heading: string; score: number; rows: Row[] };
-type Hit = { item?: string; skill?: string; title: string; snippet?: string };
+/** A match in the text: `what` names a match that isn't in the source's own text; `at` is where it lands (Reader's `jumpTo`). */
+type Hit = { key: string; item?: string; skill?: string; title: string; what?: string; at?: string; snippet?: string };
 /** A naming step, Raycast-style: the input names the thing, ↵ makes it, Esc goes back. */
 type Page = { kind: "skill"; collection: string } | { kind: "collection" };
 
@@ -45,7 +49,7 @@ const TITLES = 8;
 
 /** ⌘K: recent sources, actions, skills, sources and courses by title, then sources whose text matches
  *  (`ore search`, SQLite FTS5) in their own group below. */
-export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen, onAsk, onCreated, onClose }: Props) {
+export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, onCreated, onClose }: Props) {
   const [q, setQ] = useState("");
   const [page, setPage] = useState<Page | null>(null);
   const [hits, setHits] = useState<Hit[]>([]);
@@ -65,18 +69,25 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen
       ore<SearchHit[]>("search", query, "--limit", "20").then(
         (rows) => {
           if (!live) return;
-          const seen = new Set<string>();
+          // One row per match, each landing on its own place: the words in the text, a highlight's popup,
+          // the words in a source note or a skill note.
           const out: Hit[] = [];
           for (const r of rows) {
             if (r.kind === "skill-notes") {
-              if (!seen.has(`skill ${r.ref}`)) out.push({ skill: r.ref, title: skills.find((s) => s.id === r.ref)?.name ?? r.title, snippet: r.snippet });
-              seen.add(`skill ${r.ref}`);
+              out.push({ key: `skill notes ${r.ref}`, skill: r.ref, title: skills.find((s) => s.id === r.ref)?.name ?? r.title, what: "skill note", snippet: r.snippet });
               continue;
             }
             const item = r.item ?? (r.kind === "item" ? r.ref : undefined);
-            if (!item || seen.has(item)) continue;
-            seen.add(item);
-            out.push({ item, title: items.find((i) => i.id === item)?.title ?? r.title, snippet: r.snippet });
+            if (!item) continue;
+            const intent = r.kind === "annotation" ? (r.title.split(":")[0] as Intent) : undefined;
+            out.push({
+              key: `text ${r.kind} ${r.ref}`,
+              item,
+              title: items.find((i) => i.id === item)?.title ?? r.title,
+              what: intent ? (LABEL[intent] ?? "highlight").toLowerCase() : r.kind === "notes" ? "source note" : r.kind === "card" ? "card" : undefined,
+              at: r.kind === "item" ? `find:${query}` : r.kind === "notes" ? `note:${query}` : r.kind === "annotation" ? `ann:${r.ref}` : r.annotation && `ann:${r.annotation}`,
+              snippet: r.snippet,
+            });
           }
           setHits(out);
           setError(null);
@@ -216,17 +227,17 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen
         hits
           .filter((h) => !h.item || !titled.has(h.item))
           .map((h) => ({
-            value: h.skill ? `skill notes ${h.skill}` : `text ${h.item}`,
+            value: h.key,
             label: (
               <>
                 {h.item && <Thumb item={items.find((i) => i.id === h.item) ?? { type: "article" }} />}
                 <span className="palette-hit">
-                  <span className="title">{h.skill ? `${h.title} · skill note` : h.title}</span>
+                  <span className="title">{h.what ? `${h.title} · ${h.what}` : h.title}</span>
                   {h.snippet && <span className="sub">{snippet(h.snippet, query)}</span>}
                 </span>
               </>
             ),
-            run: h.skill ? () => onSkill(h.skill!) : () => onOpen(h.item!, `find:${query}`),
+            run: h.skill ? () => onSkillNote(h.skill!, query) : () => onOpen(h.item!, h.at),
           })),
         0.01,
       ),

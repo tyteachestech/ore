@@ -4,6 +4,7 @@
 //   bun run e2e                      seeds, starts the bridge and vite, runs every journey
 //   bun run e2e -- highlight         only journeys whose name contains "highlight"
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
+//   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 import { chromium, type Page } from "playwright";
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,7 +13,8 @@ import { $ } from "bun";
 
 const MOCK = join(import.meta.dir, "../scripts/mock");
 const FIXTURES = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
-const BRIDGE = process.env.E2E_URL ? Number(process.env.E2E_BRIDGE ?? 1421) : 1451;
+const PORT = Number(process.env.ORE_E2E_PORT ?? 1450);
+const BRIDGE = process.env.E2E_URL ? Number(process.env.E2E_BRIDGE ?? 1421) : Number(process.env.ORE_E2E_MOCK_PORT ?? 1451);
 const only = process.argv[2];
 
 async function start(): Promise<{ url: string; stop: () => void }> {
@@ -25,8 +27,8 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   chmodSync(docling, 0o755);
   // Ports of their own, so a mock left running for screenshots (1420, 1421) never answers instead.
   const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50" }, stdout: "ignore", stderr: "inherit" });
-  const vite = Bun.spawn(["bunx", "vite", "--port", "1450", "--strictPort"], { cwd: join(import.meta.dir, ".."), stdout: "ignore", stderr: "ignore" });
-  const url = "http://localhost:1450/";
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), stdout: "ignore", stderr: "ignore" });
+  const url = `http://localhost:${PORT}/`;
   for (let i = 0; i < 100; i++) {
     if (await fetch(url).then((r) => r.ok, () => false)) break;
     await Bun.sleep(200);
@@ -1064,20 +1066,47 @@ journey("⌘K: Esc clears what was typed first, then closes", async (page) => {
   await until("a second Esc closes it", async () => (await input.count()) === 0);
 });
 
-journey("⌘K: a match in the text opens the source at that place, the find bar on the words", async (page) => {
+/** Types `query` in ⌘K and picks the row in the text that reads `row`. */
+async function searchPick(page: Page, query: string, row: string) {
   await page.keyboard.press("Meta+k");
-  await page.locator("[cmdk-input]").fill("plausible");
-  await page.locator("[cmdk-item]").filter({ hasText: TESTING }).first().waitFor();
-  await page.keyboard.press("Enter");
+  await page.locator("[cmdk-input]").fill(query);
+  await page.locator("[cmdk-item]").filter({ hasText: row }).first().click();
+}
+
+/** The find bar holds `words` and its current match is on screen, inside `within`. */
+async function foundOnScreen(page: Page, words: string, within: string) {
   const bar = page.getByLabel("Find in source");
-  await until("the find bar holds the words", async () => (await bar.count()) === 1 && (await bar.inputValue()) === "plausible");
-  await until("the match is on screen", () =>
-    page.evaluate(() => {
+  await until("the find bar holds the words", async () => (await bar.count()) === 1 && (await bar.inputValue()) === words);
+  await until(`the match is on screen, in ${within}`, () =>
+    page.evaluate((within) => {
       const r = [...(CSS.highlights.get("find-on") ?? [])][0] as Range | undefined;
       const b = r?.getBoundingClientRect();
-      return !!b && b.top >= 0 && b.bottom <= innerHeight;
-    }),
+      return !!r && !!b && b.top >= 0 && b.bottom <= innerHeight && !!r.startContainer.parentElement?.closest(within);
+    }, within),
   );
+}
+
+journey("⌘K: a match in the text opens the source at that place, the find bar on the words", async (page) => {
+  await searchPick(page, "confidence matters", TESTING);
+  await foundOnScreen(page, "confidence matters", ".doc");
+  await page.keyboard.press("Escape");
+});
+
+journey("⌘K: a match in a highlight's note opens that highlight; one in the source note opens the note on it", async (page) => {
+  await searchPick(page, "hold for kids", `${TESTING} · question`);
+  const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
+  await until("the highlight's popup is open on its note", async () => (await note.isVisible()) && (await note.inputValue()) === "Does this hold for kids?");
+  await page.keyboard.press("Escape");
+  await searchPick(page, "just a measurement", `${TESTING} · source note`);
+  await foundOnScreen(page, "just a measurement", ".mynotes-text");
+  await page.keyboard.press("Escape");
+});
+
+journey("⌘K: a match in a skill note opens the skill's note scrolled to the words", async (page) => {
+  await searchPick(page, "first coffee", "Habits · skill note");
+  await page.locator(".skill-page").waitFor();
+  await foundOnScreen(page, "first coffee", ".skill-note");
+  if (!(await page.locator(".skill-col").first().evaluate((el) => el.scrollTop > 0))) throw new Error("the note didn't scroll to its end");
   await page.keyboard.press("Escape");
 });
 
