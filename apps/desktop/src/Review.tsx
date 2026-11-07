@@ -76,6 +76,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const [asks, setAsks] = useState<Record<string, AskChat>>({});
   const [end, setEnd] = useState<End | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Bumped by Try again after a card failed to load: loads the same card again, the session as it was. */
+  const [loadTry, setLoadTry] = useState(0);
   const shownAt = useRef(Date.now());
   /** When the answer showed: a rating key right after it is the confidence key pressed twice. */
   const shownAnswerAt = useRef(0);
@@ -100,6 +102,11 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: () => void; setTs: (ts: string) => void }) => boolean>(() => false);
   /** Counts card showings, so a grade or passage that lands after he moved on is dropped, not shown on the next card. */
   const showing = useRef(0);
+  /** Counts grading runs, so a grade still on its way when the key points change is dropped. */
+  const grading = useRef(0);
+  /** What is on screen now, for a card edit (or its undo) that lands later. */
+  const now = useRef({ card, answer, inHead, phase });
+  now.current = { card, answer, inHead, phase };
   const entry = queue?.[0];
 
   useEffect(() => {
@@ -156,7 +163,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     return () => {
       live = false;
     };
-  }, [entry]);
+  }, [entry, loadTry]);
 
   useEffect(() => {
     if (paused) return;
@@ -262,14 +269,16 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     setGradeError(null);
     setMarks(null);
     const at = showing.current;
+    const run = ++grading.current;
+    const stale = () => at !== showing.current || run !== grading.current;
     const failed = (why: string) => {
-      if (at !== showing.current) return;
+      if (stale()) return;
       setGradeError(why);
       setMarks(card.rubric.map(() => undefined));
     };
     try {
       const g = await ore<Grade>("grade", card.id, opt("answer", answer), ...variantOpt(card));
-      if (at !== showing.current) return;
+      if (stale()) return;
       // Marks that don't line up with the rubric can't be trusted: no suggestion, he marks them himself.
       if (g.covered.length !== card.rubric.length) return failed("Couldn’t check this one: the marks didn’t match the key points.");
       setGrade(g);
@@ -470,9 +479,17 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true) => {
     const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
     const saved = await ore<CardFull>("card", "set", c.id, opt("question", question), opt("answer", answer), ...(rubric ?? []).map((p) => opt("point", p)), ...variantOpt(c));
+    const s = now.current;
     setCard((cur) => (cur?.id === c.id ? saved : cur));
-    // Marks stay with the points they were on; a point added has none yet.
-    if (rubric) setMarks((m) => m && saved.rubric.map((_, i) => m[i]));
+    // New key points: the marks and the AI's grade were for the old ones, so neither stays (nor one still
+    // on its way). He marks the new points himself, or checks again; "No idea" still missed them all.
+    if (rubric && s.card?.id === c.id && s.phase !== "answer" && saved.rubric.join("\n") !== s.card.rubric.join("\n")) {
+      const noIdea = !s.answer.trim() && !s.inHead;
+      grading.current++;
+      setGrade(null);
+      setMarks(saved.rubric.map(() => (noIdea ? false : undefined)));
+      if (!noIdea && !s.inHead) setGradeError("The key points changed.");
+    }
     if (undoable) {
       const put = (w: typeof was) => () => void setText(c, w.question, w.answer, w.rubric, false).catch((e) => notify(errorText(e), "error"));
       notify("Card edit", "quiet", put(was), put({ question, answer, rubric }));
@@ -637,7 +654,19 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         {card && !end && queue?.length ? `Card ${done + 1} of ${done + left}. ${card.question}${grade ? `. Marked ${grade.covered.filter(Boolean).length} of ${grade.covered.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
-        {error && <p className="err">{error}</p>}
+        {error && (
+          <p className="err">
+            {error}
+            {entry && !card && (
+              <>
+                {" "}
+                <button className="link" onClick={() => (setError(null), setLoadTry((n) => n + 1))}>
+                  Try again
+                </button>
+              </>
+            )}
+          </p>
+        )}
         {!error && !end && (!queue || (entry && !card)) && <p className="loading"><Working label="Getting your cards…" /></p>}
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick)}</p>}

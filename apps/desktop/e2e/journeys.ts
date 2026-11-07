@@ -2477,6 +2477,96 @@ journey("finish quiz: ⌘⌫ while Check saves leaves his answer alone; a mark w
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
+journey("finish quiz: while Check saves, his answer and how sure he is stay as saved, so the checked answer is what he sees", async (page) => {
+  await openSource(page, TESTING);
+  const writes: string[] = [];
+  let release = () => {};
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"prequestion",')) return route.fallback();
+    writes.push(body);
+    if (writes.length === 1) await new Promise<void>((ok) => (release = ok));
+    await route.fallback();
+  });
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip to questions" }).click();
+  const field = page.getByLabel("Your answer");
+  await field.fill("It feels familiar");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await until("Check is saving", async () => writes.length === 1);
+  await field.focus();
+  await page.keyboard.type(" and fluent");
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("3");
+  await page.getByRole("radio", { name: "Guess" }).click({ force: true });
+  await page.waitForTimeout(200);
+  const typed = await field.inputValue();
+  const sure = await page.getByRole("radio", { name: "Think so" }).getAttribute("aria-checked");
+  release();
+  await page.locator(".quiz-yours").waitFor();
+  await page.unroute(/\/ore$/);
+  if (typed !== "It feels familiar") throw new Error(`typing went in while it saved: “${typed}”`);
+  if (sure !== "true") throw new Error("how sure he was changed while it saved");
+  if ((await page.locator(".quiz-yours").innerText()) !== "It feels familiar" || !writes[0]!.includes("--confidence=2")) throw new Error(`saved: ${writes[0]}`);
+  await page.getByRole("button", { name: "Close quiz" }).click();
+});
+
+journey("review: a card that fails to load offers Try again, which loads it without losing the rating before it", async (page) => {
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  const session = page.locator(".review [role=progressbar]").first();
+  const first = await q.innerText();
+  await reveal(page);
+  let failed = 0;
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (!body.includes('"show",') || !body.includes('"--review"') || failed++) return route.fallback();
+    await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify("Couldn’t read the card.") });
+  });
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await page.getByText("Couldn’t read the card.").waitFor();
+  await page.unroute(/\/ore$/);
+  await page.getByRole("button", { name: "Try again" }).click();
+  await until("the next card shows", async () => (await q.isVisible()) && (await q.innerText()) !== first);
+  if ((await session.getAttribute("aria-valuenow")) !== "1") throw new Error("the rating before it was lost");
+  // Undo still takes that rating back (and leaves the card due for the journeys after this one).
+  await page.getByRole("button", { name: "Undo last rating" }).click();
+  await until("Undo puts the first card back", async () => (await q.isVisible()) && (await q.innerText()) === first);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: changing an Explain card's key points after it was checked drops the old marks and the suggested rating", async (page) => {
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ rating: 3, gaps: [], feedback: "", covered: [true, true] }) });
+  });
+  await startReview(page, /Teaching/);
+  await page.getByRole("textbox", { name: "Your answer" }).fill("Fluency feels like knowing, so you overrate yourself");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const points = page.locator(".quiz-points");
+  await until("the AI marked both points", async () => (await points.locator("li.got").count()) === 2);
+  await page.locator(".review-rate .suggested").waitFor();
+  await page.getByRole("button", { name: "Edit card" }).click();
+  const field = page.getByRole("textbox", { name: "Key points" });
+  const was = await field.inputValue();
+  await field.fill(`Says when rereading does help\n${was.split("\n")[0]}`);
+  await page.getByRole("button", { name: "Save" }).click();
+  await points.getByText("Says when rereading does help").waitFor();
+  await page.unroute(/\/ore$/);
+  await page.getByText("The key points changed.").waitFor();
+  if (await points.locator("li.got, li.missed").count()) throw new Error("marks for the old points stayed");
+  if (await page.locator(".review-rate .suggested").count()) throw new Error("a rating is still suggested from the old marks");
+  // Put the card's points back for any run after this one.
+  await page.locator(".review").focus();
+  await page.keyboard.press("Meta+z");
+  await points.getByText(was.split("\n")[1]!).waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 // —— run ——
 
 let failed = 0;
