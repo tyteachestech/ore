@@ -1863,6 +1863,11 @@ for (const [name, run] of journeys) {
   await page.close();
 }
 await browser.close();
+// The style rules a regex can't see (nested frames, off-ramp font sizes), on the same mock.
+if (!only) {
+  const style = Bun.spawnSync(["bun", join(MOCK, "style-check.ts"), url], { env: { ...process.env, ORE_BRIDGE: String(BRIDGE) }, stdout: "inherit", stderr: "inherit" });
+  if (style.exitCode !== 0) { failed++; console.log("FAIL  style-check"); } else console.log("ok    style-check");
+}
 stop();
 if (errors.length) console.log(`page errors:\n  ${[...new Set(errors)].join("\n  ")}`);
 process.exit(failed || errors.length ? 1 : 0);

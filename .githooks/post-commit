@@ -1,9 +1,12 @@
 #!/bin/sh
-# Rebuild and reinstall /Applications/Ore.app when a commit touches the desktop app.
-# Runs in the background so the commit returns at once. Log: ~/Library/Caches/ore/app-install.log
-# Only master installs: a branch commit in a worktree must not replace the app Tyler uses.
+# Rebuild and reinstall /Applications/Ore.app when master gains a change to the desktop app:
+# a commit on master here, or a pull (post-merge runs this too). Branch worktrees share these
+# hooks, so anything not on master returns at once. Runs in the background.
+# Log: ~/Library/Caches/ore/app-install.log
 [ "$(git rev-parse --abbrev-ref HEAD)" = master ] || exit 0
-git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^apps/desktop/' || exit 0
+if [ -n "$ORE_HOOK_RANGE" ]; then changed=$(git diff --name-only "$ORE_HOOK_RANGE")
+else changed=$(git diff-tree --no-commit-id --name-only -r HEAD); fi
+echo "$changed" | grep -q '^apps/desktop/' || exit 0
 root=$(git rev-parse --show-toplevel)
 cache="$HOME/Library/Caches/ore"
 mkdir -p "$cache"

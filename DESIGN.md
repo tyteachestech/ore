@@ -85,6 +85,8 @@ spacing:
 
 The source of truth is `apps/desktop/src/styles.css`, with the Terminal look (D101) layered on top in `retro.css`. Every colour and size is a token on `:root`.
 
+**Direction in progress:** the look is being re-picked; read `docs/design/signature-style.md` before any style work. This file describes what is built today.
+
 ## Overview
 
 There are two modes in one window:

@@ -120,6 +120,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`review-plan.md`](docs/design/review-plan.md) | Home, Review mode, daily goal, "Ask about this" chat, delight rules (D58 to D62, built) |
 | [`in-reader-quiz.md`](docs/design/in-reader-quiz.md) | The finish quiz with the blurred source (D52 to D57, built) |
 | [`questions-to-research.md`](docs/design/questions-to-research.md) | Answering questions in the reader's side panel and on the skill page, matched sources, Answered + card (D75, built) |
+| [`signature-style.md`](docs/design/signature-style.md) | The look being re-picked: Tyler's brief, picks so far, what it amends (in progress) |
 | [`remixing-cards.md`](docs/design/remixing-cards.md) | Fresh variants of known cards to build transfer (D66, built) |
 | [`courses-and-live-links.md`](docs/design/courses-and-live-links.md) | Courses as ordered lesson sources, and live links (D79 built; live links not now) |
 

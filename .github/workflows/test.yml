@@ -20,6 +20,7 @@ jobs:
       - run: bun run typecheck
       - run: bun test
       - run: bun run --cwd apps/desktop build
+      - run: bun apps/desktop/scripts/mock/impeccable-gate.ts
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
