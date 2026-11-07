@@ -8,7 +8,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, use
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { AskLibrary, type LibraryTurn } from "./AskLibrary";
@@ -265,6 +265,8 @@ export function App() {
   const [dropping, setDropping] = useState<{ kinds: (FileKind | null)[]; skill: string | null } | null>(null);
   /** A source row dragged toward the sidebar: the row, and the skill under the pointer. */
   const [rowDrag, setRowDrag] = useState<{ item: Item; course?: Extract<Line, { kind: "course" }>; many?: Item[]; skill: string | null; at: { x: number; y: number } } | null>(null);
+  /** Where a dragged pinned row would land among the pinned (Raycast's pinned reorder). */
+  const [pinDrop, setPinDrop] = useState<PinGap | null>(null);
   const rowSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const { notify, progress, clear: clearToast, view: toast } = useToast();
   const listRef = useRef<HTMLDivElement>(null);
@@ -1370,6 +1372,26 @@ export function App() {
     }
     void refresh();
   };
+  /** A pinned source moved among the pinned of this list (drag, or Move up/down), to `to` among them. */
+  const movePinned = async (item: Item, to: number) => {
+    const pinned = tabRows.filter((i) => i.pinned_at);
+    const from = pinned.findIndex((i) => i.id === item.id);
+    if (from < 0 || to === from) return;
+    const rest = pinned.filter((i) => i.id !== item.id);
+    const at = pinBetween(rest[to - 1]?.pinned_at, rest[to]?.pinned_at);
+    const repin = async (t: string) => {
+      setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: t } : i)) ?? all);
+      try {
+        await ore("pin", item.id, "--at", t);
+      } catch (e) {
+        notify(errorText(e), "error");
+        void refresh();
+      }
+    };
+    await repin(at);
+    notify(`Moved “${item.title}”`, "quiet", () => void repin(item.pinned_at!), () => void repin(at));
+  };
+
 
   /** Files a source, or every lesson of a course, under exactly `next` skills (their cards follow):
    *  optimistic, with Undo back to `before`. */
@@ -1409,10 +1431,22 @@ export function App() {
     }
   };
 
+  /** Move up / down among the pinned, the keyboard's way to the drag. */
+  const pinMoves = (r: Item): MenuAction[] => {
+    if (!r.pinned_at || r.archived_at) return [];
+    const pinned = tabRows.filter((i) => i.pinned_at);
+    const at = pinned.findIndex((i) => i.id === r.id);
+    if (at < 0) return [];
+    return [
+      ...(at > 0 ? [{ id: "pin-up", label: "Move up", run: () => void movePinned(r, at - 1) }] : []),
+      ...(at < pinned.length - 1 ? [{ id: "pin-down", label: "Move down", run: () => void movePinned(r, at + 1) }] : []),
+    ];
+  };
   const rowActions = (r: Item): MenuAction[] => [
     { id: "open", label: "Open", hint: "↵", run: () => openSource(r.id) },
     { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(r.id) },
     ...(r.archived_at ? [] : [{ id: "pin", label: r.pinned_at ? "Unpin" : "Pin to top", run: () => void pinSource(r) }]),
+    ...pinMoves(r),
     ...(r.url || r.source_file ? [{ id: "original", label: "Open original", hint: label(keys.original), run: () => original(r, "open") }] : []),
     { id: "reveal", label: "Reveal in Finder", hint: label(keys.reveal), run: () => original(r, "reveal") },
     { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copySources([r]) },
@@ -1764,9 +1798,21 @@ export function App() {
           const carry = l?.kind === "item" && many.length > 1 && picked.includes(l.item.id) ? many : undefined;
           if (l) setRowDrag({ item: l.kind === "course" ? lessonFirst(l) : l.item, course: l.kind === "course" ? l : undefined, many: carry, skill: null, at: { x: p.clientX, y: p.clientY } });
         }}
-        onDragMove={(e) => setRowDrag((d) => d && { ...d, skill: skillUnder(e), at: pointerOf(e) })}
+        onDragMove={(e) => {
+          setRowDrag((d) => d && { ...d, skill: skillUnder(e), at: pointerOf(e) });
+          setPinDrop(rowDrag && !rowDrag.many && !rowDrag.course && rowDrag.item.pinned_at && !skillUnder(e) ? pinGap(pointerOf(e), listRef.current) : null);
+        }}
         onDragEnd={(e) => {
           const skill = skillUnder(e);
+          const gap = pinDrop;
+          setPinDrop(null);
+          if (gap && !skill && rowDrag && !rowDrag.many && !rowDrag.course) {
+            // The gap counts the pinned rows with the dragged one still in place.
+            const pinned = tabRows.filter((i) => i.pinned_at);
+            const from = pinned.findIndex((i) => i.id === rowDrag.item.id);
+            void movePinned(rowDrag.item, gap.index > from ? gap.index - 1 : gap.index);
+            return setRowDrag(null);
+          }
           const k = skill && skills.find((x) => x.id === skill);
           // A course dropped on a skill files every lesson there.
           if (rowDrag?.many && k) {
@@ -1775,12 +1821,13 @@ export function App() {
           else if (rowDrag && !rowDrag.course && k && !rowDrag.item.skills.includes(k.id)) void fileSource(rowDrag.item, k);
           setRowDrag(null);
         }}
-        onDragCancel={() => setRowDrag(null)}
+        onDragCancel={() => (setRowDrag(null), setPinDrop(null))}
       >
         {q && byTitle.length > 0 && byText.length > 0 && <div className="list-group">Title</div>}
         {q ? byTitle.map((r) => row(r)) : lines.map(line)}
         {byText.length > 0 && <div className="list-group">In the text, highlights or notes</div>}
         {byText.map((r) => row(r))}
+        {pinDrop && <div className="row-drop" style={{ left: pinDrop.left, top: pinDrop.y - 1, width: pinDrop.width }} />}
         {rowDrag && (
           // Follows the pointer, beside it, so the skill under it stays visible.
           <div className="row-ghost" style={{ left: rowDrag.at.x + 14, top: rowDrag.at.y + 10 }}>
@@ -2148,6 +2195,21 @@ function useNarrow(px: number): boolean {
     return () => m.removeEventListener("change", on);
   }, [query]);
   return narrow;
+}
+
+type PinGap = { index: number; y: number; left: number; width: number };
+/** The gap among the list's pinned rows nearest the pointer, while it is over them (half a row past
+ *  the first and last counts too); null elsewhere, so a drag to the sidebar shows no line. */
+function pinGap(at: { x: number; y: number }, list: HTMLElement | null): PinGap | null {
+  const rows = [...(list?.querySelectorAll<HTMLElement>(".row.pinned") ?? [])].map((el) => el.getBoundingClientRect());
+  if (!rows.length) return null;
+  const first = rows[0]!;
+  const last = rows[rows.length - 1]!;
+  if (at.x < first.left || at.x > first.right || at.y < first.top - first.height / 2 || at.y > last.bottom + last.height / 2) return null;
+  let index = rows.findIndex((r) => at.y < r.top + r.height / 2);
+  if (index < 0) index = rows.length;
+  const y = index === 0 ? first.top : index === rows.length ? last.bottom : (rows[index - 1]!.bottom + rows[index]!.top) / 2;
+  return { index, y, left: first.left, width: first.width };
 }
 
 /** The sidebar skill under the pointer while a source row is dragged (its position is where the drag began plus how far it moved). */

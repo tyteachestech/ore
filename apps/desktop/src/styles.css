@@ -2036,6 +2036,7 @@ button.home-plan:hover { color: var(--text); }
 /* Dragging a source row onto a sidebar skill */
 .row.dragged { opacity: 0.4; }
 .row-ghost { position: fixed; z-index: 40; pointer-events: none; width: max-content; max-width: 320px; padding: 6px 12px; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grabbing; }
+.row-drop { position: fixed; z-index: 39; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
 
 /* Settings (⌘,): Codex and Linear. Sections on the left in the sidebar's style; each page is grouped
    cards of rows, a title and one line on the left, the control on the right. */

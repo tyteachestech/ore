@@ -493,6 +493,35 @@ journey("sidebar: renaming a collection to a name another one has is refused in 
   await until("Esc keeps the old name, and Life is still its own", async () => (await page.locator(".side-label-text").allInnerTexts()).filter((t) => /^(craft|life)$/i.test(t)).length === 2);
 });
 
+journey("pinned sources: Move up and a drag put them in his order; ⌘Z takes a move back", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = (t: string) => page.locator(".row").filter({ hasText: t }).first();
+  const menu = async (t: string, item: string) => {
+    await row(t).click({ button: "right" });
+    await page.getByRole("menuitem", { name: item }).click();
+  };
+  const pinned = () => page.locator(".row.pinned .title").allInnerTexts();
+  await menu(AGENTS, "Pin to top");
+  await menu(TESTING, "Pin to top");
+  await until("pinned in the order pinned", async () => (await pinned()).join("|") === [AGENTS, TESTING].join("|"));
+  await menu(TESTING, "Move up");
+  await until("Move up puts it first", async () => (await pinned()).join("|") === [TESTING, AGENTS].join("|"));
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back", async () => (await pinned()).join("|") === [AGENTS, TESTING].join("|"));
+  const from = (await row(TESTING).boundingBox())!;
+  const to = (await row(AGENTS).boundingBox())!;
+  await page.mouse.move(from.x + 60, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 60, to.y + 4, { steps: 8 });
+  await page.locator(".row-drop").waitFor();
+  await page.mouse.up();
+  await until("the drag puts it first", async () => (await pinned()).join("|") === [TESTING, AGENTS].join("|"));
+  await menu(TESTING, "Unpin");
+  await menu(AGENTS, "Unpin");
+  await until("unpinned again", async () => (await pinned()).length === 0);
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {
