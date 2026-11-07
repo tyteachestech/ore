@@ -459,17 +459,17 @@ export function App() {
       const archive = (on: boolean) => {
         void Promise.all(fresh.map((id) => ore("archive", id, ...(on ? [] : ["--undo"])))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
       };
-      const message = added && list.length === 1 ? added : last ? (list.length > 1 ? manyAdded(list.length - stopped.length, here) : `Added “${last.title}”`) : "";
+      const message = added && list.length === 1 ? added : last ? (list.length > 1 ? manyAdded(list.length - stopped.length - failed.length, here) : `Added “${last.title}”`) : "";
+      const run = (steps: (() => Promise<unknown>)[]) => void Promise.all(steps.map((f) => f())).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+      // A list can hold both new sources and ones here already: Undo takes back both.
+      const undo = fresh.length || revert.length ? () => (fresh.length && archive(true), revert.length && run(revert), opens && fresh.length && setOpenId((id) => (id === at ? null : id))) : undefined;
+      const redoAll = fresh.length || redo.length ? () => (fresh.length && archive(false), redo.length && run(redo)) : undefined;
       if (failure) {
         if (toastError) notify(failure, "error");
         else clearToast();
-      } else if (message) {
-        const run = (steps: (() => Promise<unknown>)[]) => void Promise.all(steps.map((f) => f())).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
-        // A list can hold both new sources and ones here already: Undo takes back both.
-        const undo = fresh.length || revert.length ? () => (fresh.length && archive(true), revert.length && run(revert), opens && fresh.length && setOpenId((id) => (id === at ? null : id))) : undefined;
-        const again = fresh.length || redo.length ? () => (fresh.length && archive(false), redo.length && run(redo)) : undefined;
-        notify(message, "info", undo, again, opens ? undefined : show);
-      }
+        // What did go in before one failed is still his to take back with ⌘Z.
+        if (message && undo) notify(message, "quiet", undo, redoAll);
+      } else if (message) notify(message, "info", undo, redoAll, opens ? undefined : show);
       return { failure, failed: [...failed, ...stopped], first, cancelled };
     },
     [notify, progress, refresh, skills, openSource],

@@ -132,6 +132,22 @@ journey("Add and Settings: Tab and ⇧Tab stay inside the panel, as a Mac sheet'
   await page.keyboard.press("Escape");
 });
 
+journey("add a list where one fails: ⌘Z still takes back the ones that went in", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".row");
+  await rows.first().waitFor();
+  const before = await rows.count();
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByLabel("Link, file path or text");
+  await box.fill(`${FIXTURES}/obsidian-note.md\n/tmp/ore-e2e-no-such-file.pdf`);
+  await page.keyboard.press("Enter");
+  await page.locator(".add-box").getByText("Added 1 of 2", { exact: false }).waitFor({ timeout: 15000 });
+  await page.keyboard.press("Escape");
+  await until("the one that went in is listed", async () => (await rows.count()) === before + 1);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => (await rows.count()) === before);
+});
+
 journey("PDF footnote: its mark shows the note on hover, and bold stays bold", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill(join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/hazards.pdf"));
