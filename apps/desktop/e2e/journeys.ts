@@ -1012,12 +1012,18 @@ journey("answer pieces: a correction he is writing stays through a blur and a fa
   await page.keyboard.press("Enter");
   const fixed = page.getByRole("button", { name: "Edit: Yes, from about age 8." });
   await fixed.waitFor();
-  // Leave the question as the seed had it.
+  // A correction still open when he clicks Answered is saved with it.
   await fixed.click();
-  await edit.fill("");
-  await page.keyboard.press("Enter");
-  await until("the piece is gone", async () => (await fixed.count()) === 0);
-  await page.waitForTimeout(300);
+  await edit.fill("Yes, from about age 9.");
+  await page.getByRole("button", { name: "Answered", exact: true }).click();
+  type Q = { id: string; note?: string; status: string; answers: { ts: string; text: string }[] };
+  const kids = async () => ((await ore("questions", "--skill=learning")) as Q[]).find((x) => x.note === "Does this hold for kids?")!;
+  await until("Answered saves the open correction", async () => (await kids()).answers.some((c) => c.text === "Yes, from about age 9."));
+  // Leave the question as the seed had it: open, with no answer.
+  await page.locator(".toast").filter({ hasText: "Answered" }).getByRole("button", { name: "Undo" }).click();
+  await until("Undo reopens it", async () => (await kids()).status !== "done");
+  const k = await kids();
+  for (const c of k.answers) await ore("answer", k.id, `--remove=${c.ts}`);
 });
 
 journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page) => {
@@ -2426,6 +2432,7 @@ journey("explain: a reworded question whose save fails is saved by the next ↵,
   await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
   if ((await field.inputValue()) !== reworded) throw new Error("the failed rename lost his words");
+  await until("the caret stays in the field, so Esc can't close over his words", () => field.evaluate((el) => el === document.activeElement));
   await field.press("Enter");
   await until("the next ↵ saves the same words", async () => (await notes()).includes(reworded));
   await learn.getByRole("button", { name: "Later" }).click();
@@ -2455,6 +2462,12 @@ journey("finish quiz: ⌘⌫ while Check saves leaves his answer alone; a mark w
   await mark.waitFor();
   if (writes.length !== 1 || !writes[0]!.includes("It feels familiar")) throw new Error(`his answer wasn't the one write: ${writes.join(" | ")}`);
   await page.unroute(/\/ore$/);
+  // While a correction saves, the marks wait, so a second click isn't lost without sign.
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = { check: 800 }));
+  await mark.click();
+  await until("the marks wait while it saves", () => page.locator(".quiz-mark[aria-pressed]").last().isDisabled());
+  await until("and come back once it is saved", async () => !(await mark.isDisabled()), 3000);
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = undefined));
   const was = await mark.getAttribute("aria-pressed");
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { check: "The library is read-only." }));
   await mark.click();

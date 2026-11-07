@@ -200,11 +200,13 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     }
   }
 
+  /** One answer write at a time: ⌘⌫ while Check saves would replace his answer with "no idea". */
+  const answering = useRef(false);
   async function check(noIdea = false) {
-    // One answer write at a time: ⌘⌫ while Check saves would replace his answer with "no idea".
-    if (qi < 0 || busy) return;
+    if (qi < 0 || answering.current) return;
     const text = noIdea ? "no idea" : answers[qi]!.trim();
     if (!text) return field.current?.focus();
+    answering.current = true;
     setBusy(true);
     try {
       const args = ["prequestion", doc.id, String(qi + 1), opt("after", text)];
@@ -216,6 +218,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     } catch (e) {
       notify(errorText(e), "error");
     } finally {
+      answering.current = false;
       setBusy(false);
     }
   }
@@ -293,14 +296,16 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
    *  Not while Done is saving or its moment shows: that would append his note and draft twice. */
   const close = () => (step <= n ? onCancel() : busy ? undefined : marked ? void finish() : void keepReading());
 
-  /** One correction at a time; a failed one puts the saved marks back. */
+  /** One correction at a time (the marks wait while one saves); a failed one puts the saved marks back. */
   const flipping = useRef(false);
+  const [marking, setMarking] = useState(false);
   async function flip(i: number) {
     if (qi < 0 || !q?.check || flipping.current) return;
     const was = q.check;
     const covered = was.covered.map((c, j) => (j === i ? !c : c));
     const k = qi;
     flipping.current = true;
+    setMarking(true);
     setQs((cur) => cur.map((x, j) => (j === k ? { ...x, check: { ...x.check!, covered, edited: true } } : x)));
     try {
       await ore("check", doc.id, String(k + 1), opt("covered", covered.map((c) => (c ? "1" : "0")).join(",")));
@@ -309,6 +314,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       notify(errorText(e), "error");
     } finally {
       flipping.current = false;
+      setMarking(false);
     }
   }
 
@@ -493,7 +499,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                     <li key={i} className={`${mark === false ? "missed" : mark ? "got" : ""}${current ? " on" : ""}`}>
                       {cov ? (
                         <Hint text={mark ? "Mark as missed" : "Mark as got"}>
-                          <button className="quiz-mark" aria-pressed={mark} aria-label={mark ? `Got: ${p.text}. Mark as missed` : `Missed: ${p.text}. Mark as got`} onClick={() => void flip(i)}>
+                          <button className="quiz-mark" aria-pressed={mark} aria-label={mark ? `Got: ${p.text}. Mark as missed` : `Missed: ${p.text}. Mark as got`} disabled={marking} onClick={() => void flip(i)}>
                             {mark ? <Check size={14} weight="bold" /> : <Circle size={14} weight="bold" />}
                           </button>
                         </Hint>

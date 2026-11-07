@@ -168,8 +168,9 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
     if (inField) {
       if (e.key === "Enter" && plain) {
         take();
-        void commitQuestion();
-        rootRef.current?.focus();
+        // A failed save keeps the caret in the field, so Esc there doesn't close the panel over his words.
+        const input = e.target as HTMLInputElement;
+        void commitQuestion().then((l) => (l ? rootRef.current : input)?.focus());
       } else e.stopPropagation();
       return;
     }

@@ -1533,8 +1533,15 @@ function ReaderView(p: Props & { reload: () => void }) {
     try {
       if (!id && lookup?.ann) id = await realId(lookup.ann);
       if (id) {
+        const was = annsRef.current.find((a) => a.id === id);
         setAnns((l) => l.map((a) => (a.id === id ? { ...a, intent: "question", note: question } : a)));
-        await annotate(id, "--intent", "question", opt("note", question));
+        try {
+          await annotate(id, "--intent", "question", opt("note", question));
+        } catch (e) {
+          // Not saved: the highlight keeps what it was.
+          if (was) setAnns((l) => l.map((a) => (a.id === id ? was : a)));
+          throw e;
+        }
         return id;
       }
       const index = idx.current;
