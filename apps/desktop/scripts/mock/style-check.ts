@@ -1,6 +1,7 @@
 // Lints the rendered app against DESIGN.md's style rules, which a regex over CSS can't see:
 //   nested frames   a box (visible edge or its own fill) inside another box on the page; only floating layers may nest
 //   off-ramp text   a computed UI font size outside the DESIGN.md ramp (reading text has its own scale)
+//   stray scroll    a horizontal scrollbar nobody asked for: content a few px wider than its scrolling column
 // Run against the mock (scripts/mock/README.md): bun apps/desktop/scripts/mock/style-check.ts [http://localhost:1420/]
 // `bun run e2e` runs it too, on its own mock (ORE_BRIDGE names that mock's bridge port).
 import { chromium, type Page } from "playwright";
@@ -38,6 +39,10 @@ async function audit(page: Page, screen: string) {
       if (!ramp.includes(Math.round(px * 2) / 2)) { const k = `${px}px ${name(el)}`; sizes.set(k, (sizes.get(k) ?? 0) + 1); }
     }
     for (const [k] of sizes) out.push(`off-ramp text: ${k}`);
+    for (const el of document.querySelectorAll("body *")) {
+      const x = getComputedStyle(el).overflowX;
+      if ((x === "auto" || x === "scroll") && el.scrollWidth > el.clientWidth) out.push(`stray scroll: ${name(el)} is ${el.scrollWidth - el.clientWidth}px too wide`);
+    }
     return [...new Set(out)];
   }, RAMP);
   for (const f of found) console.log(`${screen}  ${f}`);

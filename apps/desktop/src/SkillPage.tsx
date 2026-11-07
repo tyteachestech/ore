@@ -833,11 +833,13 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
     <div className={`question${done ? " done" : ""}`}>
       {own ? (
         <button className="question-quote" onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
+          <PixelQuestion className="question-mark" aria-hidden="true" />
           <span className="exact">{exact}</span>
         </button>
       ) : (
         <Hint text="Open this passage">
           <button className="question-quote" onClick={() => onQuestion(q)}>
+            <PixelQuestion className="question-mark" aria-hidden="true" />
             <span className="exact">“{exact}”</span>
             {q.note && <span className="note">{q.note}</span>}
             <span className="from">{q.item_title}</span>
