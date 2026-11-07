@@ -475,10 +475,44 @@ function table(r: Extract<Region, { kind: "table" }>, items: Item[]): string {
   return [line(rows[0]!), line(rows[0]!.map(() => "---")), ...rows.slice(1).map(line)].join("\n");
 }
 
+type Doc = Awaited<ReturnType<typeof openPdf>["promise"]>;
+
+/** The PDF's own outline (its bookmarks): each top-level entry's title and the page it opens on
+ *  (0-based). The author's chapters, where the outline has them (D115). */
+async function outlineOf(doc: Doc): Promise<{ title: string; page: number }[]> {
+  const top = (await doc.getOutline()) ?? [];
+  const out: { title: string; page: number }[] = [];
+  for (const e of top) {
+    const dest = typeof e.dest === "string" ? await doc.getDestination(e.dest) : e.dest;
+    const ref = Array.isArray(dest) ? dest[0] : null;
+    if (!ref || !e.title?.trim()) return []; // one it can't place: trust none of them
+    const page = typeof ref === "number" ? ref : await doc.getPageIndex(ref);
+    out.push({ title: e.title.replace(/\s+/g, " ").trim(), page });
+  }
+  return out;
+}
+
+/** Each outline entry becomes a chapter: a `<!-- chapter N -->` marker and a `## title` where its
+ *  page has the title's line (or at the page's top), so chapter recall and the outline rail see the
+ *  chapters the author made. An outline of one entry, or out of page order, is not a table of chapters. */
+function markChapters(paras: { text: string; note: boolean }[][], outline: { title: string; page: number }[]) {
+  if (outline.length < 2 || outline.some((e, i) => e.page >= paras.length || (i > 0 && e.page < outline[i - 1]!.page))) return;
+  const fold = (t: string) => plain(t).replace(/^#+\s*/, "").replace(/[*_]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  outline.forEach((e, n) => {
+    const page = paras[e.page]!;
+    const want = fold(e.title).slice(0, 40);
+    const at = page.findIndex((p) => !p.note && !isBlock(p.text) && (fold(p.text).startsWith(want) || (fold(p.text).length >= 3 && want.startsWith(fold(p.text)))));
+    const head = { text: `<!-- chapter ${n + 1} -->\n\n## ${e.title}`, note: false };
+    if (at >= 0 && fold(page[at]!.text).length <= want.length + 3) page[at] = head;
+    else page.splice(Math.max(0, at), 0, head);
+  });
+}
+
 export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promise<PdfDoc> {
   const task = openPdf(data);
   const doc = await task.promise;
   const meta = await pdfMeta(doc);
+  const outline = await outlineOf(doc).catch(() => []);
   const items: Item[][] = [];
   const figures: Asset[][] = [];
   const seen = new Map<string, number>();
@@ -526,6 +560,7 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
       next.shift();
     }
   });
+  markChapters(paras, outline);
   const shown = new Set(assets.map((a) => a.name));
   const notes = footnotes(paras);
   const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);

@@ -10,6 +10,7 @@ import { ocrMarkdown } from "../src/ingest/ocr.ts";
 import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { inlineMath } from "../src/ingest/web.ts";
+import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
 import { strToU8, zipSync } from "fflate";
 import { tempLibrary } from "./helpers.ts";
@@ -308,6 +309,21 @@ describe("import coverage: files", () => {
     expect(b.match(/^#{2,3} .+$/gm)).toEqual(["## LEARNING", "### 1.1 Why Retrieval Works", "### 1.1.1 Testing beats rereading", "### 1.1.2 Spacing out sessions"]);
     expect(b).toContain("A test can take many forms:\n\n- free recall to write down all you remember;\n\n- cued recall to answer from a prompt or a question;\n\n- practice testing to work through problems without the answers in view.\n\nEach one asks");
     expect(b).toContain("it does not.\n\n1 Ebbinghaus measured the curve on himself in the 1880s, with lists of nonsense syllables.\n\n2 A later replication");
+  });
+
+  test("PDF: its outline (bookmarks) makes the chapters, though the headings are set in the body's size", async () => {
+    // outline.pdf (make-outline-pdf.py): three chapters of two pages, each named in the PDF outline.
+    const it = await addSource(await tempLibrary(), file("outline.pdf"));
+    expect(it.meta.title).toBe("Remembering on purpose");
+    const b = it.body;
+    expect(b.match(/^<!-- chapter \d+ -->$/gm)).toEqual(["<!-- chapter 1 -->", "<!-- chapter 2 -->", "<!-- chapter 3 -->"]);
+    expect(b.match(/^## .+$/gm)).toEqual(["## Why memories fade", "## How retrieval rebuilds them", "## Spacing the practice"]);
+    expect(b).toContain("<!-- page 3 -->\n\n<!-- chapter 2 -->\n\n## How retrieval rebuilds them\n\nEach "); // on the page it opens, the title line made the heading
+    expect(b).not.toMatch(/^How retrieval rebuilds them$/m);
+    const lines = chapterLines(readFileSync(it.docPath, "utf8"), 2)!;
+    const text = readFileSync(it.docPath, "utf8").split("\n").slice(lines.from - 1, lines.to).join("\n");
+    expect(text).toContain("## How retrieval rebuilds them");
+    expect(text).not.toContain("## Spacing the practice");
   });
 
   test("PDF: footnotes, bold and italic, powers, hyphens at line and page ends, running heads written last", async () => {
