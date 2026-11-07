@@ -2601,7 +2601,9 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
   // The answer line takes focus only when he opened it (click, or Enter on the one before), never on page load,
   // so the reader's single-key shortcuts keep working.
   const focusLine = useRef(false);
-  const [open, setOpen] = useState(() => qs.some((q) => !q.before));
+  // Open while they can still do their work: before he starts reading. Once he has highlighted or is reading,
+  // the block folds to its one line so the text comes first; one click opens it again.
+  const [open, setOpen] = useState(() => qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length);
   // The row he just answered plays a short check-in, so the move from typing to answered reads as done.
   const [just, setJust] = useState(-1);
   if (!qs.length && !waiting && !onRetry) return null;
