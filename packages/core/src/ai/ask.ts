@@ -40,16 +40,19 @@ export function splitPassages(body: string): Omit<Passage, "id" | "item" | "titl
   return out;
 }
 
-/** The passages most likely to answer the question: up to `max` in all, at most five per source. */
-export function retrieve(lib: Library, question: string, max = 10): Passage[] {
+/** The passages most likely to answer the question: up to `max` in all, at most five per source.
+ *  `only` searches that one source instead of the library (the tutor's "this source"). */
+export function retrieve(lib: Library, question: string, max = 10, only?: string): Passage[] {
   const terms = queryTerms(question);
   if (!terms.length) return [];
-  const index = openIndex(lib);
-  let ids: string[];
-  try {
-    ids = index.sourcesMatching(terms, 6);
-  } finally {
-    index.close();
+  let ids: string[] = only ? [only] : [];
+  if (!only) {
+    const index = openIndex(lib);
+    try {
+      ids = index.sourcesMatching(terms, 6);
+    } finally {
+      index.close();
+    }
   }
   // Link targets and footnote marks aren't words he reads; the title and heading count half.
   const words = (s: string) => new Set(s.replace(/\]\([^)]*\)|\[\^\d+\]/g, " ").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
@@ -71,7 +74,7 @@ export function retrieve(lib: Library, question: string, max = 10): Passage[] {
   const out: Passage[] = [];
   for (const { c } of scored) {
     if (out.length >= max) break;
-    if ((per.get(c.item) ?? 0) >= 5) continue;
+    if (!only && (per.get(c.item) ?? 0) >= 5) continue;
     per.set(c.item, (per.get(c.item) ?? 0) + 1);
     const { body: _, around: __, note: ___, ...p } = c;
     out.push({ ...p, id: `P${out.length + 1}` });

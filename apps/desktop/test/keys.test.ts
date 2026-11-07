@@ -39,12 +39,12 @@ describe("shortcut editor (Settings › Keyboard shortcuts)", () => {
 
   test("undo puts back the keymap as it was", () => {
     resetKeys();
-    rebind("add", "Meta+KeyJ");
+    rebind("add", "Meta+KeyY");
     const before = saved();
     resetKeys();
     expect(isCustom("add")).toBe(false);
     restore(before);
-    expect(is(press("Meta+KeyJ"), "add")).toBe(true);
+    expect(is(press("Meta+KeyY"), "add")).toBe(true);
     resetKeys();
   });
 

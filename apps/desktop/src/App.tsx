@@ -11,7 +11,7 @@ import { copiedFiles, pastesFiles, watchCopies } from "./copied";
 import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
-import { AskLibrary, type LibraryTurn } from "./AskLibrary";
+import { Tutor, TutorBubble, type TutorTurn } from "./Tutor";
 import { Reader } from "./Reader";
 import type { SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
@@ -229,12 +229,19 @@ export function App() {
   const readerActions = useRef<MenuAction[]>([]);
   const feedPick = useRef<{ title: string; actions: MenuAction[] } | null>(null);
   const [palette, setPalette] = useState(false);
-  // Ask your library: open, and the thread so far (kept while he jumps to a cited source and back).
-  const [askOpen, setAskOpen] = useState(false);
-  const [libraryTurns, setLibraryTurns] = useState<LibraryTurn[]>([]);
-  const askLibrary = (question?: string) => {
-    if (question) setLibraryTurns((t) => [...t, { question }]);
-    setAskOpen(true);
+  // The tutor (D128): open, and the thread so far (kept while he moves around the app).
+  const [tutorOpen, setTutorOpen] = useState(false);
+  const openItemRef = useRef<{ id: string; title: string } | undefined>(undefined);
+  const [tutorTurns, setTutorTurns] = useState<TutorTurn[]>([]);
+  const tutorFrom = useRef<HTMLElement | null>(null);
+  const openTutor = (message?: string) => {
+    if (message) setTutorTurns((t) => [...t, { message, ...(openItemRef.current ? { item: openItemRef.current.id, title: openItemRef.current.title } : {}) }]);
+    if (!tutorOpen) tutorFrom.current = document.activeElement as HTMLElement | null;
+    setTutorOpen(true);
+  };
+  const closeTutor = () => {
+    setTutorOpen(false);
+    tutorFrom.current?.focus?.();
   };
   const [adding, setAdding] = useState(false);
   const [help, setHelp] = useState(false);
@@ -787,6 +794,7 @@ export function App() {
   /** The sidebar row a source sits under (Finder, Linear): the skill he came from when it holds the
    *  source, else the source's first skill, else All sources. */
   const openItem = openId ? (items ?? []).find((i) => i.id === openId) : undefined;
+  openItemRef.current = openItem;
   const sideSkill = !openItem ? skill : skill && openItem.skills.includes(skill) ? skill : (openItem.skills.find((k) => skills.some((s) => s.id === k)) ?? null);
   /** The course the open source is a lesson of (D79). */
   const openCourse = openId ? (items ?? []).find((i) => i.id === openId)?.course?.id : undefined;
@@ -806,7 +814,6 @@ export function App() {
       const close = () => {
         e.preventDefault();
         setPalette(false);
-        setAskOpen(false);
         setAdding(false);
         setHelp(false);
         setEditing(null);
@@ -815,6 +822,10 @@ export function App() {
       if (is(e, "palette")) {
         close();
         setPalette(!palette);
+      } else if (is(e, "tutor")) {
+        close();
+        if (tutorOpen) closeTutor();
+        else openTutor();
       } else if (is(e, "add")) {
         close();
         setAdding(true);
@@ -866,7 +877,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, goHome, askReview, reviewing, asking, pickFiles, toggleSidebar, setSideOpen, notesOpen, toggleNotes, palette, help, openId, onSkillPage, finishing, history, settings, closeSettings]);
+  }, [go, goHome, askReview, reviewing, asking, pickFiles, toggleSidebar, setSideOpen, notesOpen, toggleNotes, palette, help, openId, onSkillPage, finishing, history, settings, closeSettings, tutorOpen]);
 
   const inSkill = useMemo(() => (items ?? []).filter((i) => !skill || i.skills.includes(skill)), [items, skill]);
   const archivedInSkill = useMemo(() => archived.filter((i) => !skill || i.skills.includes(skill)), [archived, skill]);
@@ -1523,8 +1534,8 @@ export function App() {
       requestAnimationFrame(() => filterRef.current?.focus());
     } }] : []),
     { id: "review", label: "Start review", hint: label(keys.review), run: askReview },
-    { id: "ask-library", label: "Ask your library…", keywords: ["question", "chat", "answer", "ai"], run: () => askLibrary() },
-    ...(libraryTurns.length ? [{ id: "ask-library-new", label: "New question to your library", keywords: ["ask", "chat", "clear"], run: () => { setLibraryTurns([]); askLibrary(); } }] : []),
+    { id: "tutor", label: tutorOpen ? "Close the tutor" : "Tutor chat…", hint: label(keys.tutor), keywords: ["ask", "library", "question", "chat", "answer", "ai", "quiz"], run: () => (tutorOpen ? closeTutor() : openTutor()) },
+    ...(tutorTurns.length ? [{ id: "tutor-new", label: "New tutor chat", keywords: ["ask", "chat", "clear"], run: () => { setTutorTurns([]); openTutor(); } }] : []),
     ...(onHome ? [] : [{ id: "home", label: "Go to Home", hint: label(keys.home), run: goHome }]),
     ...(onFeed ? [] : [{ id: "go-feed", label: "Go to Feed", hint: label(keys["go-feed"]), keywords: ["rss", "newsletter", "blog", "follow"], run: goFeed }]),
     { id: "add", label: "Add source", hint: label(keys.add), run: () => setAdding(true) },
@@ -1885,7 +1896,7 @@ export function App() {
   );
 
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}`}>
+    <div className={`app${collapsed ? " collapsed" : ""}${tutorOpen ? " tutoring" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
       <Hint text={collapsed ? "Show sidebar" : "Hide sidebar"} keys="sidebar">
       <button
@@ -2050,7 +2061,9 @@ export function App() {
         )}
         </Boundary>
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
+        {!tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} />}
       </main>
+      {tutorOpen && <Tutor turns={tutorTurns} setTurns={setTutorTurns} reading={openItem ? { id: openItem.id, title: openItem.title } : null} onOpen={openSource} onClose={closeTutor} />}
 
       {reviewing && (
         <Boundary key={reviewing.run} onBack={() => endReview()}>
@@ -2088,7 +2101,7 @@ export function App() {
           skill={skill}
           onSkill={openSkill}
           onOpen={openSource}
-          onAsk={askLibrary}
+          onAsk={(q) => openTutor(q)}
           onCreated={(s) => {
             reloadSkills();
             madeSkill(s);
@@ -2097,7 +2110,6 @@ export function App() {
           onClose={() => setPalette(false)}
         />
       )}
-      {askOpen && <AskLibrary turns={libraryTurns} setTurns={setLibraryTurns} onOpen={openSource} onClose={() => setAskOpen(false)} />}
       {adding && (
         <AddBox
           skill={addTo ? skillOf(addTo) : null}

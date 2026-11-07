@@ -12,10 +12,11 @@ import variant from "./prompts/variant.md" with { type: "text" };
 import variantCheck from "./prompts/variant-check.md" with { type: "text" };
 import leaveOut from "./prompts/leave-out.md" with { type: "text" };
 import askLibrary from "./prompts/ask-library.md" with { type: "text" };
+import tutor from "./prompts/tutor.md" with { type: "text" };
 
-export type PromptName = "enrich" | "grade" | "research" | "explain" | "recall-feedback" | "key-points" | "check" | "chat" | "variant" | "variant-check" | "leave-out" | "ask-library";
+export type PromptName = "enrich" | "grade" | "research" | "explain" | "recall-feedback" | "key-points" | "check" | "chat" | "variant" | "variant-check" | "leave-out" | "ask-library" | "tutor";
 
-const TEXT: Record<PromptName, string> = { enrich, grade, research, explain, "recall-feedback": recallFeedback, "key-points": keyPoints, check, chat, variant, "variant-check": variantCheck, "leave-out": leaveOut, "ask-library": askLibrary };
+const TEXT: Record<PromptName, string> = { enrich, grade, research, explain, "recall-feedback": recallFeedback, "key-points": keyPoints, check, chat, variant, "variant-check": variantCheck, "leave-out": leaveOut, "ask-library": askLibrary, tutor };
 
 export interface Prompt {
   name: PromptName;
