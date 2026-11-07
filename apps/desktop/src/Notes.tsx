@@ -172,11 +172,19 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       },
       (e) => live && notify(`Notes: ${errorText(e)}`, "error"),
     );
+    // A diagram linked into this note's file after its editor closed (Diagram.tsx): show the file as it
+    // is now, unless he has typed since his last save (that save merges it in).
+    const written = (e: Event) => {
+      if ((e as CustomEvent<string>).detail !== key) return;
+      void flush().then((ok) => ok && queue(() => ore<Notes>("notes", ...key.split(" "))).then((r) => live && draft.current === saved.current && apply(r.text), () => {}));
+    };
+    window.addEventListener("ore:note-written", written);
     // Leaving (or quitting) writes what is pending; the CLI call outlives this view.
     const leave = () => void flush();
     window.addEventListener("beforeunload", leave);
     return () => {
       live = false;
+      window.removeEventListener("ore:note-written", written);
       window.removeEventListener("beforeunload", leave);
       leave();
     };

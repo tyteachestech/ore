@@ -7,7 +7,7 @@ import {
 import { insertTableCommand } from "@milkdown/kit/preset/gfm";
 import { toggleMark, wrapIn } from "@milkdown/kit/prose/commands";
 import type { Node as PmNode } from "@milkdown/kit/prose/model";
-import { closeHistory } from "@milkdown/kit/prose/history";
+import { closeHistory, isHistoryTransaction } from "@milkdown/kit/prose/history";
 import { NodeSelection, Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet, type EditorView, type ViewMutationRecord } from "@milkdown/kit/prose/view";
 import { $prose, $view, callCommand } from "@milkdown/kit/utils";
@@ -124,7 +124,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
   // The editor's plugins live as long as it does; they read the latest props, rows and menu
   // through this. The menu here is set as the caret moves, ahead of React's render.
-  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: -1, added: null, draw: (name) => setDrawing({ name }) });
+  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: -1, added: null, draw: (name) => setDrawing({ name }), renames: new Set() });
 
   // Creation is async: a focus asked for before the editor exists (opening the source note) waits for it.
   const wantFocus = useRef(false);
@@ -218,7 +218,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), toggleView, ghostPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), followRenames(live), toggleView, ghostPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
@@ -422,11 +422,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setIndex(i);
   };
 
-  /** Links a new diagram where /diagram was typed, once (on its first save or at Done). */
-  const linkDiagram = (name: string) => {
+  /** Links a new diagram where /diagram was typed, once (on its first save or at Done); false when this
+   *  editor has closed meanwhile, so the diagram links it through the note's file instead. */
+  const linkDiagram = (name: string): boolean => {
     const d = drawing;
+    if (!d || d.at === undefined) return true;
     const v = view();
-    if (!d || d.at === undefined || !v) return;
+    if (!v) return false;
     const at = d.at;
     d.at = undefined;
     const img = imageSchema.type(ctxOf(editor.current!)).create({ src: `diagrams/${name}.excalidraw`, alt: "Diagram" });
@@ -436,6 +438,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     // switching the panel's tab next would drop the link.
     const now = p.pull?.current?.();
     if (now != null) p.onChange(now);
+    return true;
   };
   const closeDiagram = (scene: Scene | null, name: string) => {
     const d = drawing;
@@ -448,7 +451,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     window.dispatchEvent(new CustomEvent(SAVED, { detail: `${p.dir}/${name}` }));
     linkDiagram(name);
   };
-  /** A diagram renamed in its editor: the note's link follows, and saves with the note. */
+  /** A diagram renamed in its editor: the note's link follows, and saves with the note. It is one step
+   *  of the note's ⌘Z, which renames the file back with it (followRenames). */
   const renamedDiagram = (from: string, to: string) => {
     const v = view();
     if (!v) return;
@@ -456,7 +460,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     v.state.doc.descendants((n, pos) => {
       if (n.type.name === "image" && n.attrs.src === `diagrams/${from}.excalidraw`) tr = tr.setNodeMarkup(pos, undefined, { ...n.attrs, src: `diagrams/${to}.excalidraw` });
     });
-    if (tr.docChanged) v.dispatch(tr);
+    if (!tr.docChanged) return;
+    live.current.renames.add(`${from} ${to}`).add(`${to} ${from}`);
+    v.dispatch(closeHistory(tr));
   };
   live.current.p = p;
   live.current.rowsFor = rowsFor;
@@ -561,6 +567,8 @@ type Live = {
     /** The line the + just added (`made`) or reused, while its / menu is open. */
     added: { at: number; made: boolean } | null;
     draw: (name: string) => void;
+    /** Diagram renames made in this editor, as "from to", both ways, for ⌘Z and ⇧⌘Z to follow. */
+    renames: Set<string>;
   };
 };
 
@@ -788,6 +796,48 @@ function imageView(live: Live) {
     img.className = "note-image";
     return { dom: img };
   });
+}
+
+/** The diagrams a note links, by name, once per link. */
+function diagramsIn(doc: PmNode): string[] {
+  const out: string[] = [];
+  doc.descendants((n) => {
+    const name = n.type.name === "image" ? diagramName(String(n.attrs.src ?? "")) : null;
+    if (name) out.push(name);
+  });
+  return out;
+}
+
+/** What `a` has that `b` hasn't, counting repeats. */
+const minus = (a: string[], b: string[]) => {
+  const rest = [...b];
+  return a.filter((x) => {
+    const i = rest.indexOf(x);
+    return i < 0 || (rest.splice(i, 1), false);
+  });
+};
+
+/** ⌘Z or ⇧⌘Z on a diagram's rename moves its link back or on, and its file goes with it, so the link
+ *  always opens the drawing; the preview redraws once the file is there. */
+function followRenames(live: Live) {
+  return $prose(
+    () =>
+      new Plugin({
+        appendTransaction: (trs, old, now) => {
+          if (!trs.some((tr) => tr.docChanged && isHistoryTransaction(tr))) return null;
+          const before = diagramsIn(old.doc), after = diagramsIn(now.doc);
+          const [from, ...more] = minus(before, after);
+          const [to, ...also] = minus(after, before);
+          if (!from || !to || more.length || also.length || !live.current.renames.has(`${from} ${to}`)) return null;
+          const { noteArgs, dir, notify } = live.current.p;
+          void ore<Diagram>("diagram", ...noteArgs, from, "--rename", to, "--follow-link").then(
+            () => window.dispatchEvent(new CustomEvent(SAVED, { detail: `${dir}/${to}` })),
+            (e) => notify(`Diagram “${to}” not renamed back: ${errorText(e)}`, "error"),
+          );
+          return null;
+        },
+      }),
+  );
 }
 
 /** The reader's side panel the note sits in, where its diagrams open beside the source (not on the phone,

@@ -14,7 +14,7 @@ import {
   enrichError, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter,
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -362,8 +362,8 @@ export const itemCommands: Record<string, Command> = {
   },
 
   diagram: {
-    usage: "<item> <name> | --skill <s> <name>  [--set | --rename <new>] | <item> --new   diagrams/<name>.excalidraw beside the source note or a skill note: print, or replace with an Excalidraw scene read from stdin; --new picks a free name (writes nothing); --rename <new> renames the file (change the note's link yourself)",
-    options: { skill: { type: "string" }, set: { type: "boolean" }, new: { type: "boolean" }, rename: { type: "string" } },
+    usage: "<item> <name> | --skill <s> <name>  [--set | --rename <new> [--follow-link] | --link] | <item> --new   diagrams/<name>.excalidraw beside the source note or a skill note: print, or replace with an Excalidraw scene read from stdin; --new picks a free name (writes nothing); --rename <new> renames the file (change the note's link yourself; --follow-link: the note already links <new>, as after an undo); --link adds a link to it at the end of the note unless it has one",
+    options: { skill: { type: "string" }, set: { type: "boolean" }, new: { type: "boolean" }, rename: { type: "string" }, "follow-link": { type: "boolean" }, link: { type: "boolean" } },
     async run(args, f) {
       const lib = openLibrary();
       const skill = str(f.skill);
@@ -375,8 +375,12 @@ export const itemCommands: Record<string, Command> = {
       const name = need(args[0], "<name>");
       const to = str(f.rename);
       if (to) {
-        const r = await renameDiagram(lib, note, name, to);
+        const r = await renameDiagram(lib, note, name, to, { followLink: !!f["follow-link"] });
         return { data: r, text: `Renamed to ${r.path}` };
+      }
+      if (f.link) {
+        const r = await linkDiagram(lib, note, name);
+        return { data: r, text: `Linked in ${r.path}` };
       }
       const r = f.set ? await setDiagram(lib, note, name, await readStdin()) : getDiagram(lib, note, name);
       return { data: r, text: f.set ? `Saved ${r.path}` : r.scene ? JSON.stringify(r.scene) : "No diagram yet." };
