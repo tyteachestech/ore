@@ -587,6 +587,20 @@ journey("source note: what he types is kept when he switches sources and comes b
   await shows("after a relaunch");
 });
 
+journey("prequestion: a guess typed but not stored is still there when he comes back to the source, and not marked answered", async (page) => {
+  const q = "When is an agent the wrong choice?";
+  const guess = `When a fixed workflow does the job (${Date.now() % 100000})`;
+  await openSource(page, AGENTS);
+  const line = page.getByRole("textbox", { name: q });
+  if (!(await line.isVisible())) await page.locator(".preq-head").click();
+  await page.locator(".preq-q").filter({ hasText: q }).click();
+  await line.fill(guess);
+  await openSource(page, TESTING);
+  await openSource(page, AGENTS);
+  await until("the guess is back in its line", async () => (await line.isVisible()) && (await line.inputValue()) === guess);
+  if (await page.locator(".preq-row.done").filter({ hasText: q }).count()) throw new Error("the draft was marked answered");
+});
+
 journey("note: / makes a toggle heading and @ writes a date; both are still there after a reload", async (page) => {
   const d = new Date(Date.now() + 864e5);
   const tomorrow = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -841,6 +855,59 @@ journey("skill note: coming back to a long note puts it where he left it", async
   await page.getByText("Line 80 of a long note.").waitFor();
   await until("the note is where he left it", async () => Math.abs((await col.evaluate((el) => el.scrollTop)) - 900) <= 1);
   await ore(["notes", "--skill=learning", `--set=${was}`]);
+});
+
+journey("source note: Collected, the docked tutor and another source each come back to the same scroll and caret", async (page) => {
+  const STORY = "A very long title about the neuroscience of habit formation";
+  const ore = (args: string[]) => page.evaluate((args) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args }), args);
+  const id = ((await ore(["ls"])) as { id: string; title: string }[]).find((i) => i.title.startsWith(STORY))!.id;
+  await ore(["notes", id, `--set=${Array.from({ length: 80 }, (_, i) => `Line ${i + 1} of a long note.`).join("\n\n")}`]);
+  await openSource(page, STORY);
+  const side = page.locator(".mynotes");
+  if (!(await side.count())) await page.keyboard.press("n");
+  const panel = page.locator(".mynotes-text");
+  await page.getByText("Line 80 of a long note.").waitFor();
+  await panel.evaluate((el) => (el.scrollTop = 900));
+  await page.waitForTimeout(100);
+  // The caret in the middle of line 40, as he left it mid-sentence.
+  const line = page.locator(".note-editor p", { hasText: /^Line 40 of a long note\.$/ });
+  const box = (await line.boundingBox())!;
+  await page.mouse.click(box.x + 30, box.y + box.height / 2);
+  await page.waitForTimeout(100);
+  const top = await panel.evaluate((el) => el.scrollTop);
+  // Where the caret is once the note has focus; focused as Tab would, if the page kept it.
+  const caret = async () => {
+    await page.evaluate(() => document.activeElement?.closest(".note-editor") || document.querySelector<HTMLElement>(".mynotes .ProseMirror")?.focus());
+    await page.waitForTimeout(50);
+    return page.evaluate(() => `${getSelection()!.anchorNode?.textContent}@${getSelection()!.anchorOffset}`);
+  };
+  const at = await caret();
+  if (!at.startsWith("Line 40 of a long note.@")) throw new Error(`the caret didn't land in line 40: ${at}`);
+  const back = async (when: string) => {
+    await page.getByText("Line 80 of a long note.").waitFor();
+    await until(`the note is scrolled where he left it ${when}`, async () => Math.abs((await panel.evaluate((el) => el.scrollTop)) - top) <= 1);
+    await until(`the caret is where he left it ${when}`, async () => (await caret()) === at);
+  };
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await back("after Collected");
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  await tutor.getByRole("button", { name: "Dock to the side" }).click();
+  await until("docked, the side panel steps aside", async () => (await side.count()) === 0);
+  await page.keyboard.press("Meta+j");
+  await back("after the docked tutor");
+  await page.keyboard.press("Meta+j");
+  await tutor.getByRole("button", { name: "Float over the page" }).click();
+  await page.getByRole("textbox", { name: "Message the tutor" }).focus();
+  await page.keyboard.press("Escape");
+  await until("the tutor closes", async () => (await tutor.count()) === 0);
+  await openSource(page, TESTING);
+  await openSource(page, STORY);
+  await page.getByText("Line 80 of a long note.").waitFor();
+  await until("the note is scrolled where he left it after another source", async () => Math.abs((await panel.evaluate((el) => el.scrollTop)) - top) <= 1);
+  await back("after another source");
+  await ore(["notes", id, "--set="]);
 });
 
 journey("answer pieces: one click rewrites a piece in place, ⌘Z puts the old words back; emptied, it goes with Undo", async (page) => {

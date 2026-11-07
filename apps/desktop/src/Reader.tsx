@@ -301,6 +301,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [chapterFb, setChapterFb] = useState<{ n: number; title: string; feedback?: ChapterFeedback; error?: string } | null>(null);
   const margin = useRef<MarginHandle | null>(null);
   const notesField = useRef<NoteEditorHandle>(null);
+  const sideBody = useRef<HTMLDivElement>(null);
   const notes = useSourceNote(p.id, p.notify);
   // D34.4: the finish step hides the text, highlights, notes and the source note.
   const closedBook = p.finishing;
@@ -2524,12 +2525,13 @@ function ReaderView(p: Props & { reload: () => void }) {
       )}
       {/* On the phone the note stays beside the source, a swipe away, so each keeps its place. */}
       {(notesShown || questionsShown || (PHONE && !closedBook)) && (
-        <SidePanel tab={p.sideTab} onTab={(t) => p.onShowSide(t, true)}>
+        <SidePanel tab={p.sideTab} onTab={(t) => p.onShowSide(t, true)} bodyRef={sideBody}>
           {notesShown || (PHONE && !questionsShown) ? (
             <SourceNoteBody
               id={p.id}
               notes={notes}
               editorRef={notesField}
+              scroller={sideBody}
               targets={p.targets}
               onOpen={p.onOpenLink}
               tail={
@@ -2628,21 +2630,35 @@ function BackToCurrent({ dir, onClick }: { dir: "up" | "down"; onClick: () => vo
   );
 }
 
+/** Prequestion guesses typed but not yet stored, by source and question: leaving the source keeps them for when
+ *  he comes back (Enter still stores one). */
+const preqDrafts = new Map<string, string>();
+
 /** "What do you already know?" — short attempts before reading, stored and never scored (D18). Question rows; the one
  *  you are on opens an answer line, Enter stores it and opens the next unanswered one. */
 function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: boolean; onRetry?: () => void; notify: Notify }) {
   const qs = doc.prequestions ?? [];
-  const [vals, setVals] = useState(() => qs.map((q) => q.before ?? ""));
+  const draftKey = (i: number) => `${doc.id}\n${qs[i]?.q}`;
+  const [vals, setVals] = useState(() => qs.map((q, i) => preqDrafts.get(draftKey(i)) ?? q.before ?? ""));
   const [saved, setSaved] = useState(() => qs.map((q) => q.before ?? ""));
   // One answer line open at a time (Perplexity "Related"): the rest stay visible as things to read for.
-  const [at, setAt] = useState(() => qs.findIndex((q) => !q.before));
+  // Coming back with a guess he hadn't stored opens its line again.
+  const [at, setAt] = useState(() => {
+    const kept = qs.findIndex((_, i) => preqDrafts.has(draftKey(i)));
+    return kept >= 0 ? kept : qs.findIndex((q) => !q.before);
+  });
+  const edit = (i: number, text: string) => {
+    setVals((v) => v.map((x, j) => (j === i ? text : x)));
+    if (text === (saved[i] ?? "")) preqDrafts.delete(draftKey(i));
+    else preqDrafts.set(draftKey(i), text);
+  };
   const rows = useRef<(HTMLButtonElement | null)[]>([]);
   // The answer line takes focus only when he opened it (click, or Enter on the one before), never on page load,
   // so the reader's single-key shortcuts keep working.
   const focusLine = useRef(false);
   // Open while they can still do their work: before he starts reading. Once he has highlighted or is reading,
   // the block folds to its one line so the text comes first; one click opens it again.
-  const [open, setOpen] = useState(() => qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length);
+  const [open, setOpen] = useState(() => qs.some((_, i) => preqDrafts.has(draftKey(i))) || (qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length));
   // The row he just answered plays a short check-in, so the move from typing to answered reads as done.
   const [just, setJust] = useState(-1);
   if (!qs.length && !waiting && !onRetry) return null;
@@ -2665,6 +2681,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
   // Saved at once so the row turns answered (check + his guess) the moment he moves on; rolled back if it fails.
   const keep = (i: number, text: string) => {
     const t = text.trim();
+    if (t) preqDrafts.delete(draftKey(i));
     if (!t || t === saved[i]) return !!t;
     const was = saved[i] ?? "";
     setVals((v) => v.map((x, j) => (j === i ? t : x)));
@@ -2672,6 +2689,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
     setJust(i);
     ore("prequestion", doc.id, String(i + 1), "--before", t).catch((e) => {
       setSaved((v) => v.map((x, j) => (j === i ? was : x)));
+      preqDrafts.set(draftKey(i), t);
       notify(errorText(e), "error");
     });
     return true;
@@ -2684,7 +2702,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
     if (next < 0) rows.current[i]?.focus();
   };
   const close = (i: number) => {
-    setVals((v) => v.map((x, j) => (j === i ? (saved[i] ?? "") : x)));
+    edit(i, saved[i] ?? "");
     setAt(-1);
     rows.current[i]?.focus();
   };
@@ -2732,7 +2750,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
                     value={vals[i] ?? ""}
                     placeholder="Your best guess, or ? for no idea"
                     aria-label={q.q}
-                    onChange={(e) => setVals((v) => v.map((x, j) => (j === i ? e.target.value : x)))}
+                    onChange={(e) => edit(i, e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "?" && !vals[i]) {
                         e.preventDefault();

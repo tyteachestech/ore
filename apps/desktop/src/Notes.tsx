@@ -205,10 +205,12 @@ type EditorProps = {
   targets: LinkTarget[];
   onOpen: (t: Omit<LinkTarget, "title">) => void;
   placeholder: string;
+  /** Keeps the caret for when this note opens again (NoteEditor's `place`). */
+  place?: string;
 };
 
 /** The block editor over a loaded note; reloads when text arrives from outside it. */
-export function NoteBody({ notes, editorRef, targets, onOpen, placeholder }: EditorProps) {
+export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, place }: EditorProps) {
   if (notes.text === null || notes.dir === null) return <div className="note-editor" />;
   return (
     <NoteEditor
@@ -225,6 +227,7 @@ export function NoteBody({ notes, editorRef, targets, onOpen, placeholder }: Edi
       noteArgs={notes.args}
       notify={notes.notify}
       placeholder={placeholder}
+      place={place}
     />
   );
 }
@@ -314,7 +317,7 @@ export type SideTab = "note" | "questions";
 /** The reader's right panel: one panel, two tabs (D75), like Notion's side peek. N opens the source
  *  note, C what he collected (Q too, at his questions); the same key again closes the panel. The toggle at the
  *  window's top right (⌥⌘S) shows or hides it. Resizable, width remembered. */
-export function SidePanel({ tab, onTab, children }: { tab: SideTab; onTab: (t: SideTab) => void; children: ReactNode }) {
+export function SidePanel({ tab, onTab, bodyRef, children }: { tab: SideTab; onTab: (t: SideTab) => void; bodyRef?: RefObject<HTMLDivElement | null>; children: ReactNode }) {
   const { width, dragging, divider } = useSideWidth("ore.notewidth", NOTE_WIDTH);
   return (
     <aside className={`mynotes${dragging ? " dragging" : ""}`} aria-label={tab === "note" ? "Source note" : "Collected"} style={{ width }}>
@@ -338,7 +341,7 @@ export function SidePanel({ tab, onTab, children }: { tab: SideTab; onTab: (t: S
             </Hint>
           </Tabs.List>
         </div>
-        <Tabs.Content value={tab} className="mynotes-text" tabIndex={-1}>
+        <Tabs.Content ref={bodyRef} value={tab} className="mynotes-text" tabIndex={-1}>
           {children}
         </Tabs.Content>
       </Tabs.Root>
@@ -346,12 +349,44 @@ export function SidePanel({ tab, onTab, children }: { tab: SideTab; onTab: (t: S
   );
 }
 
-/** The source note tab: his note on this source, then what links to it. */
-export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail }: Omit<EditorProps, "placeholder"> & { id: string; tail?: ReactNode }) {
+/** The source note tab: his note on this source, then what links to it. It keeps where it was scrolled and its
+ *  caret, by source, for coming back from Collected, the docked tutor or another source (and a relaunch, for the scroll). */
+export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail, scroller }: Omit<EditorProps, "placeholder" | "place"> & { id: string; tail?: ReactNode; scroller: RefObject<HTMLDivElement | null> }) {
   const target = useMemo(() => ({ item: id }), [id]);
+  const key = `ore.sourcenote.scroll.${id}`;
+  const loaded = notes.text !== null;
+  /** True until the saved place is put back: scrolls before then (the panel changing what it holds) aren't his. */
+  const restoring = useRef(true);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    restoring.current = true;
+    const keep = () => !restoring.current && save(key, String(Math.round(el.scrollTop)));
+    el.addEventListener("scroll", keep);
+    return () => el.removeEventListener("scroll", keep);
+  }, [key, scroller]);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!loaded || !el) return;
+    const want = Number(load(key) ?? 0) || 0;
+    // The editor lays out over a few frames: set it until the panel is tall enough to hold it.
+    let n = 0;
+    let raf = 0;
+    const stop = () => void (restoring.current = false);
+    const put = () => {
+      el.scrollTop = want;
+      if (Math.abs(el.scrollTop - want) > 1 && ++n < 60) raf = requestAnimationFrame(put);
+      else raf = requestAnimationFrame(stop);
+    };
+    // He scrolls first: his place wins.
+    const mine = () => (cancelAnimationFrame(raf), stop());
+    el.addEventListener("wheel", mine, { once: true });
+    put();
+    return () => (cancelAnimationFrame(raf), el.removeEventListener("wheel", mine));
+  }, [loaded, key, scroller]);
   return (
     <>
-      <NoteBody notes={notes} editorRef={editorRef} targets={targets} onOpen={onOpen} placeholder="The big idea, and what it connects to… / for blocks, [[ to link." />
+      <NoteBody notes={notes} editorRef={editorRef} targets={targets} onOpen={onOpen} place={`item:${id}`} placeholder="The big idea, and what it connects to… / for blocks, [[ to link." />
       {tail}
       <LinkedFrom target={target} onOpen={onOpen} />
     </>
