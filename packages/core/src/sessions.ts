@@ -39,8 +39,24 @@ export function readSessions(lib: Library): SessionReceipt[] {
     .filter((f) => f.endsWith(".jsonl"))
     .flatMap((f) => readJsonl<SessionReceipt>(join(dir, f)))
     .filter((s) => typeof s.ts === "string" && typeof s.id === "string");
-  const seen = new Set<string>();
-  return all.filter((s) => (seen.has(`${s.type} ${s.id}`) ? false : (seen.add(`${s.type} ${s.id}`), true))).sort((a, b) => a.ts.localeCompare(b.ts));
+  // A receipt read twice (a conflicted copy, same time) counts once, the first copy read; a session
+  // reopened by an undo on its end screen ends again, and its later end receipt counts.
+  const latest = new Map<string, SessionReceipt>();
+  for (const r of all) {
+    const k = `${r.type} ${r.id}`;
+    const had = latest.get(k);
+    if (!had || r.ts > had.ts) latest.set(k, r);
+  }
+  return [...latest.values()].sort((a, b) => a.ts.localeCompare(b.ts));
+}
+
+/** Opens an ended session again, so a rating taken back on the end screen (⌘Z) returns him to that
+ *  session's cards; its next end writes a new receipt that replaces the first. */
+export function reopenSession(lib: Library, id: string): void {
+  const open = openSessionId(lib);
+  if (open && open !== id) throw new Error(`session ${open} is open; end it first`);
+  if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
+  writeAtomic(paths.openSession(lib), id);
 }
 
 // The open session id lives in .ore/session; reviews attach to it.

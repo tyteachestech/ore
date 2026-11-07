@@ -172,23 +172,36 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
 
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
-  await page.getByRole("tab", { name: "Collected" }).click();
+  // Its own highlight, so it never leans on what an earlier journey left (or took back).
   const keeps = page.locator(".collected-chip.keep");
-  const before = Number(await keeps.innerText());
+  const count = async () => ((await keeps.count()) ? Number(await keeps.innerText()) : 0);
+  const before = (await count()) + 1;
+  await select(page, "the text feels familiar, and familiarity is easily mistaken for knowing");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.press("Enter");
+  await until("the Keep count goes up", async () => (await count()) === before);
+  await page.getByRole("tab", { name: "Collected" }).click();
   const toggle = page.locator(".cp-head.keep .cp-toggle");
   if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
-  const row = () => page.locator(".cp-head.keep ~ .cp-line").first();
+  const row = () => page.locator(".cp-head.keep ~ .cp-line").filter({ hasText: "familiarity is easily mistaken" }).first();
   await row().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Type" }).hover();
   await page.getByRole("menuitemcheckbox", { name: "Question" }).dispatchEvent("click");
-  await until("it is a question now", async () => (await keeps.count()) === 0 || Number(await keeps.innerText()) === before - 1);
+  await until("it is a question now", async () => (await count()) === before - 1);
   await page.keyboard.press("Meta+z");
-  await until("⌘Z makes it a highlight again", async () => (await keeps.count()) > 0 && Number(await keeps.innerText()) === before);
+  await until("⌘Z makes it a highlight again", async () => (await count()) === before);
   await row().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Remove highlight" }).click();
-  await until("it is gone", async () => (await keeps.count()) === 0 || Number(await keeps.innerText()) === before - 1);
+  await until("it is gone", async () => (await count()) === before - 1);
+  // At once: the remove is the newest step on the history as soon as the row goes.
   await page.keyboard.press("Meta+z");
-  await until("⌘Z brings it back", async () => (await keeps.count()) > 0 && Number(await keeps.innerText()) === before);
+  await until("⌘Z brings it back", async () => (await count()) === before);
+  // Leave the library as it was for the journeys after this one.
+  await page.waitForTimeout(300);
+  await row().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Remove highlight" }).click();
+  await until("it is gone again", async () => (await count()) === before - 1);
+  await page.waitForTimeout(500); // the write lands before the next journey reads the library
 });
 
 journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {
@@ -934,6 +947,38 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   await until("the session counts the rating", async () => (await done()) === before + 1);
   await page.getByRole("button", { name: "Undo last rating" }).click();
   await until("Undo puts the first card back", async () => (await done()) === before && (await q.innerText()) === first);
+});
+
+journey("review: ⌘Z on the end screen takes the last rating back and returns to that card; ⇧⌘Z gives it again", async (page) => {
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const q = page.locator(".review-q");
+  await pick.or(q).first().waitFor();
+  if (await pick.isVisible()) await page.keyboard.press("Enter");
+  const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
+  let last = "";
+  for (let n = 0; n < 12 && !(await doneButton.isVisible()); n++) {
+    await q.or(doneButton).first().waitFor();
+    if (await doneButton.isVisible()) break;
+    last = (await q.first().textContent()) ?? "";
+    const noIdea = page.getByRole("button", { name: "No idea" });
+    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the card moves on", async () => (await doneButton.isVisible()) || ((await q.count()) > 0 && (await q.first().textContent()) !== last));
+  }
+  await doneButton.waitFor();
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z leaves the end screen for the last card", async () => !(await doneButton.isVisible()) && (await q.count()) > 0 && (await q.first().textContent()) === last);
+  await page.keyboard.press("Shift+Meta+z");
+  await until("⇧⌘Z rates it again and the session ends again", () => doneButton.isVisible());
+  // Put every rating back for the journeys after this one.
+  const undo = page.getByRole("button", { name: "Undo last rating" });
+  for (let n = 0; n < 12 && (await undo.isVisible()); n++) {
+    await undo.click();
+    await page.waitForTimeout(250);
+  }
+  await page.keyboard.press("Escape");
 });
 
 journey("try it: 4 marks a technique to try, the skill page checks it off, and how it went is kept after a reload", async (page) => {

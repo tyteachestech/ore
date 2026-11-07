@@ -88,6 +88,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   /** Ratings go on the app history (⌘Z) with every other step; while Review is open, taking back its
    *  newest rating also shows that card again. */
   const undoNow = useRef<(ts: string) => boolean>(() => false);
+  const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: () => void; setTs: (ts: string) => void }) => boolean>(() => false);
   /** Counts card showings, so a grade or passage that lands after he moved on is dropped, not shown on the next card. */
   const showing = useRef(0);
   const entry = queue?.[0];
@@ -302,9 +303,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     let goalClosed = false;
     try {
       const elapsed = Date.now() - shownAt.current;
-      const was = { queue: queue ?? [], done, activeMs: activeMs.current };
-      const r = await ore<{ ts: string }>(
-        "review",
+      const args = [
         card.id,
         opt("rating", String(rating)),
         opt("confidence", String(conf ?? 2)),
@@ -313,18 +312,10 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         opt("elapsed-ms", String(elapsed)),
         ...variantOpt(card),
         ...(inHead ? ["--in-head"] : []),
-      );
-      reviewed.current++;
+      ];
+      await submit(args, rating, elapsed);
       drafts.delete(card.id);
-      const id = card.id;
-      const forget = notify("Rating", "quiet", () => {
-        if (!undoNow.current(r.ts)) ore("review", id, opt("undo", r.ts)).catch((e) => notify(errorText(e), "error"));
-      });
-      setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
-      if (rating > 1) setDone((n) => n + 1);
-      advance(rating === 1);
       // The session is today's slice (D65): it ends when the goal closes, and Keep going goes on.
-      activeMs.current += Math.min(elapsed, ACTIVE_CAP_MS);
       const b = before.current;
       goalClosed = !!b && b.counts && !b.met && b.active_ms + activeMs.current >= b.goal_ms;
     } catch (e) {
@@ -335,13 +326,47 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     if (goalClosed) void finish();
   };
 
-  /** ⌘Z: takes back the last rating and shows that card again, unanswered. */
+  /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
+   *  ⌘Z takes it back and ⇧⌘Z gives it again: the same rating, answer and time. Throws if the write fails. */
+  const submit = async (args: string[], rating: number, elapsed: number, again?: { forget: () => void; setTs: (ts: string) => void }) => {
+    const was = { queue: queue ?? [], done, activeMs: activeMs.current };
+    const r = await ore<{ ts: string }>("review", ...args);
+    reviewed.current++;
+    const id = args[0]!;
+    let ts = r.ts;
+    again?.setTs(ts);
+    const setTs = (t: string) => void (ts = t);
+    const forget =
+      again?.forget ??
+      notify(
+        "Rating",
+        "quiet",
+        () => {
+          if (!undoNow.current(ts)) ore("review", id, opt("undo", ts)).catch((e) => notify(errorText(e), "error"));
+        },
+        () => {
+          if (!redoNow.current(id, args, rating, elapsed, { forget, setTs }))
+            ore<{ ts: string }>("review", ...args).then((x) => setTs(x.ts), (e) => notify(errorText(e), "error"));
+        },
+      );
+    setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
+    if (rating > 1) setDone((n) => n + 1);
+    advance(rating === 1);
+    activeMs.current += Math.min(elapsed, ACTIVE_CAP_MS);
+  };
+
+  /** ⌘Z: takes back the last rating and shows that card again, unanswered. On the end screen it
+   *  opens the session again, back on that card (Anki's Undo after Congratulations). */
   const undoRating = async () => {
-    if (!last || busy || end) return;
+    if (!last || busy) return;
     last.forget();
     setBusy(true);
     try {
       await ore("review", last.card, opt("undo", last.ts));
+      if (end) {
+        await ore("session", "reopen", end.session.id);
+        setEnd(null);
+      }
       reviewed.current--;
       activeMs.current = last.activeMs;
       setDone(last.done);
@@ -355,8 +380,17 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   };
 
   undoNow.current = (ts) => {
-    if (last?.ts !== ts || end) return false;
+    if (last?.ts !== ts) return false;
     void undoRating();
+    return true;
+  };
+  // ⇧⌘Z right after ⌘Z: that card is showing again, so the rating goes in again and Review moves on.
+  redoNow.current = (id, args, rating, elapsed, again) => {
+    if (end || busy || queue?.[0]?.id !== id) return false;
+    setBusy(true);
+    submit(args, rating, elapsed, again)
+      .catch((e) => notify(errorText(e), "error"))
+      .finally(() => setBusy(false));
     return true;
   };
 
@@ -553,7 +587,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
             <span style={{ transform: `scaleX(${end ? 1 : progress})` }} />
           </div>
         )}
-        {last && !end && (
+        {last && (
           <Hint text="Undo last rating" keys="undo">
             <button className="quiz-close" aria-label="Undo last rating" disabled={busy} onClick={() => void undoRating()}>
               <ArrowCounterClockwise size={16} weight="bold" aria-hidden="true" />

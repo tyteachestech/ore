@@ -1287,14 +1287,15 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (popup?.id === id) closePopup(false);
     const s = annStep(id);
     s.drop();
+    // On the history at once, as the row goes: a ⌘Z right after must take back this step, not the one before.
+    const forget = p.notify("Highlight removed", "info", s.bring, s.remove);
     try {
       await ore("annotate", id, "--status", "deleted");
     } catch (e) {
+      forget();
       p.notify(errorText(e), "error");
       s.restore();
-      return;
     }
-    p.notify("Highlight removed", "info", s.bring, s.remove);
   }
 
   /** A highlight's menu in the Collected tab: its type, copy, remove, as in its popup. */

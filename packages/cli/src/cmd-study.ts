@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
   CardState, cardStates, calibration, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
-  readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
+  readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
 import type { Command } from "./types.ts";
@@ -235,8 +235,8 @@ export const studyCommands: Record<string, Command> = {
   },
 
   session: {
-    usage: "start|end                     review session receipts",
-    async run([sub]) {
+    usage: "start|end|reopen <id>         review session receipts; reopen: an ended session again (an undo on its end screen)",
+    async run([sub, id]) {
       const lib = openLibrary();
       if (sub === "start") {
         const r = startSession(lib);
@@ -253,7 +253,11 @@ export const studyCommands: Record<string, Command> = {
         const data = { ...r, calibration: cal?.sure_right != null ? cal : null };
         return { data, text: `Session ${r.id} ended (${r.reviews} reviews, ${r.kept} kept, ${r.rescued} rescued)` };
       }
-      throw new Error("usage: ore session start|end");
+      if (sub === "reopen") {
+        reopenSession(lib, need(id, "<id>"));
+        return { data: { id }, text: `Session ${id} reopened` };
+      }
+      throw new Error("usage: ore session start|end|reopen <id>");
     },
   },
 
