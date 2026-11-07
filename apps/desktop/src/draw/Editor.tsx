@@ -1502,7 +1502,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const onAreaKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     e.stopPropagation();
     const ed = live.current.editing;
-    if (!ed) return;
+    // Keys that pick a word from an input method (Japanese, Chinese) are still typing.
+    if (!ed || e.nativeEvent.isComposing) return;
     if (e.key === "Escape") {
       e.preventDefault();
       return endEdit("done");

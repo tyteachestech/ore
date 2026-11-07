@@ -2536,22 +2536,39 @@ journey("finish quiz: while Check saves, his answer and how sure he is stay as s
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
-journey("review: a card that fails to load offers Try again, which loads it without losing the rating before it", async (page) => {
+journey("review: a card that fails to load offers Try again, focused, which loads it without losing the rating before it; ⌘Z clears the error", async (page) => {
   await startReview(page, null);
   const q = page.locator(".review-q");
   const session = page.locator(".review [role=progressbar]").first();
   const first = await q.innerText();
+  const failNext = async () => {
+    let failed = 0;
+    await page.route(/\/ore$/, async (route) => {
+      const body = route.request().postData() ?? "";
+      if (!body.includes('"show",') || !body.includes('"--review"') || failed++) return route.fallback();
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify("Couldn’t read the card.") });
+    });
+  };
+  const error = page.getByText("Couldn’t read the card.");
+  const retry = page.getByRole("button", { name: "Try again" });
+  // ⌘Z takes the rating back: its card loads, and the error goes with the card it was about.
   await reveal(page);
-  let failed = 0;
-  await page.route(/\/ore$/, async (route) => {
-    const body = route.request().postData() ?? "";
-    if (!body.includes('"show",') || !body.includes('"--review"') || failed++) return route.fallback();
-    await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify("Couldn’t read the card.") });
-  });
+  await failNext();
   await page.getByRole("button", { name: "Good", exact: true }).click();
-  await page.getByText("Couldn’t read the card.").waitFor();
+  await error.waitFor();
   await page.unroute(/\/ore$/);
-  await page.getByRole("button", { name: "Try again" }).click();
+  await page.locator(".review").focus();
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the first card back", async () => (await q.isVisible()) && (await q.innerText()) === first);
+  if (await error.count()) throw new Error("the load error stayed on the card ⌘Z brought back");
+  // Try again takes the focus, and Enter loads the card.
+  await reveal(page);
+  await failNext();
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await error.waitFor();
+  await page.unroute(/\/ore$/);
+  await until("Try again has the focus", () => retry.evaluate((b) => b === document.activeElement));
+  await page.keyboard.press("Enter");
   await until("the next card shows", async () => (await q.isVisible()) && (await q.innerText()) !== first);
   if ((await session.getAttribute("aria-valuenow")) !== "1") throw new Error("the rating before it was lost");
   // Undo still takes that rating back (and leaves the card due for the journeys after this one).
@@ -2561,7 +2578,7 @@ journey("review: a card that fails to load offers Try again, which loads it with
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("review: changing an Explain card's key points after it was checked drops the old marks and the suggested rating", async (page) => {
+journey("review: changing an Explain card's key points after it was checked keeps the marks of points left as they were, drops the rest and the suggestion; an undo refreshes an open editor", async (page) => {
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ rating: 3, gaps: [], feedback: "", covered: [true, true] }) });
@@ -2576,19 +2593,128 @@ journey("review: changing an Explain card's key points after it was checked drop
   await page.getByRole("button", { name: "Edit card" }).click();
   const field = page.getByRole("textbox", { name: "Key points" });
   const was = await field.inputValue();
-  await field.fill(`Says when rereading does help\n${was.split("\n")[0]}`);
+  const [kept, changed] = was.split("\n") as [string, string];
+  await field.fill(`Says when rereading does help\n${kept}`);
   await page.getByRole("button", { name: "Save" }).click();
   await points.getByText("Says when rereading does help").waitFor();
   await page.unroute(/\/ore$/);
   await page.getByText("The key points changed.").waitFor();
-  if (await points.locator("li.got, li.missed").count()) throw new Error("marks for the old points stayed");
+  const got = await points.locator("li.got").allInnerTexts();
+  if (got.length !== 1 || got[0] !== kept) throw new Error(`marked got: ${got.join(" | ")}`);
+  if (await points.locator("li.missed").count()) throw new Error("a changed point kept a mark");
   if (await page.locator(".review-rate .suggested").count()) throw new Error("a rating is still suggested from the old marks");
-  // Put the card's points back for any run after this one.
-  await page.locator(".review").focus();
+  // Marking the new point gives a suggestion again, from his marks.
+  await points.locator("li", { hasText: "Says when rereading does help" }).locator(".quiz-mark").click();
+  await page.locator(".review-rate .suggested").waitFor();
+  // ⌘Z lands while the editor is open: it shows the points as they are now.
+  await page.getByRole("button", { name: "Edit card" }).click();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Meta+z");
-  await points.getByText(was.split("\n")[1]!).waitFor();
+  await until("the open editor has the points back", async () => (await field.inputValue()) === `${kept}\n${changed}`);
+  await page.keyboard.press("Escape");
+  await points.getByText(changed).waitFor();
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: while a card edit saves, the editor is read-only and Esc waits, so the saved words are the ones shown", async (page) => {
+  await startReview(page, /Teaching/);
+  await reveal(page);
+  let release = () => {};
+  let held = false;
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (!body.includes('"set",') || held) return route.fallback();
+    held = true;
+    await new Promise<void>((ok) => (release = ok));
+    await route.fallback();
+  });
+  await page.getByRole("button", { name: "Edit card" }).click();
+  const question = page.locator("#edit-q");
+  const was = await question.inputValue();
+  await question.fill(`${was} (edited)`);
+  await page.getByRole("button", { name: "Save" }).click();
+  await until("the save is held", async () => held);
+  await question.focus();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and more");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+  const typed = await question.inputValue();
+  const open = await question.isVisible();
+  release();
+  await page.unroute(/\/ore$/);
+  if (typed !== `${was} (edited)`) throw new Error(`typing went in while it saved: “${typed}”`);
+  if (!open) throw new Error("Esc closed the editor while it saved");
+  await until("the saved question shows", async () => (await page.locator(".review-q").isVisible()) && (await page.locator(".review-q").innerText()) === `${was} (edited)`);
+  await page.locator(".review").focus();
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the question back", async () => (await page.locator(".review-q").innerText()) === was);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review Ask: a failed question offers Try again, which asks it again and keeps a follow-up he has typed since", async (page) => {
+  const asked: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
+    asked.push((JSON.parse(body) as { args: string[] }).args.find((a) => a.startsWith("--message="))!);
+    if (asked.length === 1) return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify("The AI is offline.") });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Because recalling it is the practice.", proposal: null, session: "s1" }) });
+  });
+  await startReview(page, null);
+  await reveal(page);
+  await page.getByRole("button", { name: "Ask about this" }).click();
+  const box = page.getByRole("textbox", { name: "Ask about this card" });
+  await box.fill("Why does this work?");
+  await page.keyboard.press("Enter");
+  await page.locator(".ask").getByText("The AI is offline.", { exact: false }).waitFor();
+  await box.fill("And for kids?");
+  await page.locator(".ask").getByRole("button", { name: "Try again" }).click();
+  await page.locator(".ask").getByText("Because recalling it is the practice.").waitFor();
+  await page.unroute(/\/ore$/);
+  if (asked.join(" | ") !== "--message=Why does this work? | --message=Why does this work?") throw new Error(`asked: ${asked.join(" | ")}`);
+  if ((await box.inputValue()) !== "And for kids?") throw new Error("Try again cleared the follow-up");
+  if ((await page.locator(".ask-me").count()) !== 1) throw new Error("Try again put the question in the thread twice");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("typing with an input method: Enter that picks a word neither sends an answer nor ends a diagram label", async (page) => {
+  const composingEnter = (el: Element) => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", isComposing: true, bubbles: true, cancelable: true }));
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Answer…" }).click();
+  const box = page.getByLabel("Your answer to Does this hold for kids?");
+  await box.fill("たぶん");
+  await box.evaluate(composingEnter);
+  await page.waitForTimeout(300);
+  if ((await box.inputValue()) !== "たぶん" || (await page.getByRole("button", { name: "Edit: たぶん" }).count())) throw new Error("a composing Enter sent the answer");
+  await box.fill("");
+  await page.keyboard.press("Escape");
+  await openSource(page, AGENTS);
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/diagram");
+  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+  await page.keyboard.press("Enter");
+  const draw = page.locator(".diagram .draw");
+  await draw.focus();
+  const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
+  await page.keyboard.press("r");
+  await page.mouse.click(c.x + 150, c.y + 150);
+  const label = page.locator(".draw-text");
+  await label.waitFor();
+  await page.keyboard.type("記憶");
+  await label.evaluate(composingEnter);
+  await page.waitForTimeout(300);
+  if (!(await label.isVisible())) throw new Error("a composing Enter ended the label");
+  await page.keyboard.press("Enter");
+  await label.waitFor({ state: "detached" });
 });
 
 // —— run ——

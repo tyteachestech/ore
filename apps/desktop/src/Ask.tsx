@@ -14,7 +14,7 @@ const STARTERS = ["Why is this the answer?", "Give me an example", "Make this ca
 
 /** One card's chat: what he has typed, the thread, and the AI session. Review keeps it by card id,
  *  so closing Ask (or a reply landing while it is closed) loses nothing. */
-export type AskChat = { turns: Turn[]; input: string; busy: boolean; error: string | null; applied: Proposal | null; session?: string };
+export type AskChat = { turns: Turn[]; input: string; busy: boolean; error: string | null; applied: Proposal | null; session?: string; failed?: string };
 export const NO_ASK: AskChat = { turns: [], input: "", busy: false, error: null, applied: null };
 
 /** Ask about this (D61): a chat about the card he just answered, like ChatGPT's thread under a
@@ -33,10 +33,11 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
     end.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [turns, busy]);
 
-  const send = async (text: string) => {
+  /** `again`: Try again on a message that failed; it is in the thread already, and what he has typed since stays. */
+  const send = async (text: string, again = false) => {
     const message = text.trim();
     if (!message || busy) return;
-    setChat((c) => ({ ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true }));
+    setChat((c) => (again ? { ...c, error: null, busy: true } : { ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true }));
     try {
       const r = await ore<Reply>(
         "ask",
@@ -46,7 +47,7 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
       );
       setChat((c) => ({ ...c, session: r.session, busy: false, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal }] }));
     } catch (e) {
-      setChat((c) => ({ ...c, busy: false, error: errorText(e, "answer that") }));
+      setChat((c) => ({ ...c, busy: false, error: errorText(e, "answer that"), failed: message }));
     } finally {
       field.current?.focus();
     }
@@ -98,7 +99,19 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
             </span>
           </div>
         )}
-        {error && <p className="err">{error}</p>}
+        {error && (
+          <p className="err">
+            {error}
+            {chat.failed && (
+              <>
+                {" "}
+                <button className="link" onClick={() => void send(chat.failed!, true)}>
+                  Try again
+                </button>
+              </>
+            )}
+          </p>
+        )}
         <div ref={end} />
       </div>
       <div className="ask-input">
