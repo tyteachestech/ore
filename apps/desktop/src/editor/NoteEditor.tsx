@@ -6,6 +6,8 @@ import {
 } from "@milkdown/kit/preset/commonmark";
 import { insertTableCommand } from "@milkdown/kit/preset/gfm";
 import { toggleMark, wrapIn } from "@milkdown/kit/prose/commands";
+import type { Node as PmNode } from "@milkdown/kit/prose/model";
+import { closeHistory } from "@milkdown/kit/prose/history";
 import { NodeSelection, Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet, type EditorView, type ViewMutationRecord } from "@milkdown/kit/prose/view";
 import { $prose, $view, callCommand } from "@milkdown/kit/utils";
@@ -17,6 +19,7 @@ import { ore, PHONE, type Diagram } from "../ore";
 import { usePeek } from "../Peek";
 import { errorText, type Notify } from "../util";
 import { calloutSchema, diagramName, toggleSchema, toggleSummarySchema } from "./blocks";
+import { board, sizeOf, withSize, type Size } from "./board";
 import { createEditor, markdownOf, menuTrigger } from "./editor";
 import { dateRows } from "./dates";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
@@ -775,9 +778,9 @@ function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | n
 /** Images by path relative to the note load from disk through the asset protocol. A diagram
  *  (D40) shows a picture drawn from its scene; click or ↵ opens the editor. */
 function imageView(live: Live) {
-  return $view(imageSchema.node, () => (node) => {
+  return $view(imageSchema.node, () => (node, view, getPos) => {
     const name = diagramName(String(node.attrs.src ?? ""));
-    if (name) return diagramView(live, name);
+    if (name) return diagramView(live, name, node, view, getPos);
     const img = document.createElement("img");
     const src = String(node.attrs.src ?? "");
     img.src = /^(https?:|data:)/i.test(src) ? src : convertFileSrc(`${live.current.p.dir}/${decodeURI(src)}`);
@@ -794,30 +797,61 @@ const dockOf = (el: HTMLElement | null) => (PHONE ? null : (el?.closest(".mynote
 /** The scene each preview last read, so opening it skips reading the file again. */
 const lastRead = new Map<string, Diagram>();
 
-function diagramView(live: Live, name: string) {
+function diagramView(live: Live, name: string, node: PmNode, view: EditorView, getPos: () => number | undefined) {
   const dom = document.createElement("div");
   dom.className = "note-diagram";
   dom.contentEditable = "false";
   dom.setAttribute("role", "button");
   dom.setAttribute("aria-label", `Diagram ${name}, click to edit`);
-  dom.textContent = "…";
+  const inner = document.createElement("div");
+  inner.className = "note-diagram-view";
+  inner.textContent = "…";
+  dom.append(inner);
   dom.addEventListener("click", () => live.current.draw(name));
+  let alt = String(node.attrs.alt ?? "");
+  const show = (s: Size | null) => {
+    dom.classList.toggle("sized", !!s);
+    dom.style.width = s ? `${s.w}px` : "";
+    dom.style.height = s ? `${s.h}px` : "";
+  };
+  show(sizeOf(alt));
   const key = `${live.current.p.dir}/${name}`;
   let gone = false;
+  let wired = false;
   const draw = () =>
     Promise.all([import("../Diagram"), ore<Diagram>("diagram", ...live.current.p.noteArgs, name)])
       .then(([m, d]) => {
         lastRead.set(key, d);
+        // The phone's preview stays a picture: a drag there scrolls the note, a tap opens it.
+        if (!wired && !PHONE) {
+          wired = true;
+          board(dom, inner, {
+            size: () => sizeOf(alt),
+            resize: show,
+            // One editor step, so ⌘Z takes a resize back; the link keeps the size (Obsidian's `|WxH`).
+            commit: (s) => {
+              const pos = getPos();
+              if (pos === undefined || gone) return;
+              const n = view.state.doc.nodeAt(pos);
+              if (!n) return;
+              const tr = view.state.tr.setNodeMarkup(pos, undefined, { ...n.attrs, alt: withSize(String(n.attrs.alt ?? ""), s) });
+              // It stays picked, with the note's keys, so ⌘Z is right there (Notion's image).
+              view.dispatch(closeHistory(tr.setSelection(NodeSelection.create(tr.doc, pos))));
+              view.focus();
+            },
+            fitIcon: m.FIT_ICON,
+          });
+        }
         return d.scene && d.scene.elements.length ? m.preview(d.scene) : null;
       })
       .then(
         (svg) => {
           if (gone) return;
-          if (!svg) return void (dom.textContent = "Empty diagram: click to draw");
+          if (!svg) return void (inner.textContent = "Empty diagram: click to draw");
           // Markup the editor drew from the file, text escaped by React; inline so it uses the app's fonts.
-          dom.innerHTML = svg;
+          inner.innerHTML = svg;
         },
-        (e) => !gone && (dom.textContent = `Diagram ${name}: ${errorText(e)}`),
+        (e) => !gone && (inner.textContent = `Diagram ${name}: ${errorText(e)}`),
       );
   const onSaved = (e: Event) => (e as CustomEvent<string>).detail === key && void draw();
   window.addEventListener(SAVED, onSaved);
@@ -825,6 +859,13 @@ function diagramView(live: Live, name: string) {
   return {
     dom,
     ignoreMutation: () => true,
+    // A new size (or an undone one) keeps the board and where it was panned to.
+    update: (next: PmNode) => {
+      if (next.type !== node.type || diagramName(String(next.attrs.src ?? "")) !== name) return false;
+      alt = String(next.attrs.alt ?? "");
+      show(sizeOf(alt));
+      return true;
+    },
     destroy: () => {
       gone = true;
       lastRead.delete(key);

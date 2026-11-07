@@ -179,6 +179,23 @@ describe("note editor (D38)", () => {
     expect(srcs).toEqual(["diagrams/diagram-1.excalidraw"]);
   });
 
+  test("a resized diagram keeps its size in the link (Obsidian's |WxH) and saves it back", async () => {
+    const md = "![Diagram](diagrams/diagram-1.excalidraw)\n";
+    const { editor } = await open(md);
+    const { withSize } = await import("../src/editor/board");
+    let out = "";
+    editor.action((ctx) => {
+      const view = ctx.get(core.editorViewCtx);
+      let at = -1;
+      view.state.doc.descendants((n: { type: { name: string } }, p: number) => void (n.type.name === "image" && (at = p)));
+      const n = view.state.doc.nodeAt(at)!;
+      view.dispatch(view.state.tr.setNodeMarkup(at, undefined, { ...n.attrs, alt: withSize(String(n.attrs.alt), { w: 480, h: 300 }) }));
+    });
+    out = ed.markdownOf(editor);
+    expect(out).toBe("![Diagram|480x300](diagrams/diagram-1.excalidraw)\n");
+    expect((await open(out)).base).toBe(out);
+  });
+
   test("diagramName: only diagrams/<slug>.excalidraw beside the note", () => {
     expect(blocks.diagramName("diagrams/diagram-2.excalidraw")).toBe("diagram-2");
     expect(blocks.diagramName("images/a.png")).toBeNull();
