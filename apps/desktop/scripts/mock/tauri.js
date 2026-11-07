@@ -33,6 +33,9 @@ window.__TAURI_INTERNALS__ = {
         throw `The mock bridge isn’t answering on port ${port}. Start it: PORT=${port} bun scripts/mock/bridge.ts`;
       });
       const j = await r.json();
+      // window.__ORE_SLOW = { ls: 800 }: that command's answer comes back that much later (a race test).
+      const slow = window.__ORE_SLOW && window.__ORE_SLOW[args.args[0]];
+      if (slow) await new Promise((ok) => setTimeout(ok, slow));
       if (!r.ok) throw j;
       return j;
     }

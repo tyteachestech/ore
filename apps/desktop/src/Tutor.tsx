@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
-import { Hint } from "./Hint";
+import { escTaken, Hint } from "./Hint";
 import { useSideWidth } from "./Notes";
 import { ore, opt } from "./ore";
 import { errorText, type Notify } from "./util";
@@ -174,7 +174,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
       aria-label="Tutor"
       style={docked ? { width } : undefined}
       onKeyDown={(e) => {
-        if (e.key === "Escape" && !e.defaultPrevented) {
+        if (e.key === "Escape" && !escTaken(e.nativeEvent)) {
           e.preventDefault();
           e.stopPropagation();
           onClose();

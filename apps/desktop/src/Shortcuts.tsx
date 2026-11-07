@@ -1,6 +1,7 @@
 import { ArrowCounterClockwise, Keyboard, X } from "./icons";
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Hint } from "./Hint";
+import { escTaken, Hint } from "./Hint";
+import { Trap } from "./Trap";
 import { WithMenu } from "./Menu";
 import { BINDINGS, clash, comboOf, defaultOf, FIXED, invalid, isCustom, label, rebind, resetKeys, restore, saved, useKeymap, type Combo, type KeyId } from "./keys";
 import { useFocusWhileMounted, type Notify } from "./util";
@@ -10,16 +11,18 @@ const GROUPS = ["General", "Sources", "Feed", "Review", "Reader", "Quiz", "Video
 /** ⌘/: every shortcut, in a sheet over the app. Settings › Keyboard shortcuts is the same editor. */
 export function Shortcuts({ onClose, notify }: { onClose: () => void; notify: Notify }) {
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (e.key !== "Escape" || escTaken(e.nativeEvent)) return;
     e.preventDefault();
     e.stopPropagation();
     onClose();
   };
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <Trap>
       <div className="panel keys" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" onKeyDown={onKeyDown}>
         <ShortcutEditor notify={notify} />
       </div>
+      </Trap>
     </div>
   );
 }

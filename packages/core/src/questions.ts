@@ -61,11 +61,14 @@ export interface AnswerInput {
   card?: boolean;
   /** Removes the contribution with this ts. */
   remove?: string;
+  /** Rewrites the contribution with this ts to `text`, in its place (its source and quote kept). */
+  edit?: string;
 }
 
 /** Adds a piece of his answer to a question and/or closes it (D75). */
 export async function answerQuestion(lib: Library, ref: string, input: AnswerInput): Promise<{ question: Annotation; item: Item }> {
   const text = input.text?.trim();
+  if (input.edit && !text) throw new Error("--edit rewrites a contribution: give --text too (or --remove it)");
   if (!text && !input.done && !input.card && !input.remove) throw new Error("nothing to do: give --text, --done, --card or --remove");
   if (input.item && !text) throw new Error("--item names the source of a contribution: give --text too");
   if (input.item) findItem(lib, input.item);
@@ -79,7 +82,11 @@ export async function answerQuestion(lib: Library, ref: string, input: AnswerInp
       if (at === -1) throw new Error(`no contribution at ${input.remove}`);
       answers = answers.filter((_, i) => i !== at);
     }
-    if (text) answers = [...answers, { ts: nowIso(), text, item: input.item ? findItem(lib, input.item).meta.id : undefined, quote: input.quote?.trim() || undefined }];
+    if (input.edit) {
+      const at = answers.findIndex((c) => c.ts === input.edit);
+      if (at === -1) throw new Error(`no contribution at ${input.edit}`);
+      answers = answers.map((c, i) => (i === at ? { ...c, text: text! } : c));
+    } else if (text) answers = [...answers, { ts: nowIso(), text, item: input.item ? findItem(lib, input.item).meta.id : undefined, quote: input.quote?.trim() || undefined }];
     if (input.card && !answers.length) throw new Error("a card is drafted from his answer: write one first");
     const question = reviseAnnotation(item, annotation, {
       answers: answers.length ? answers : undefined,

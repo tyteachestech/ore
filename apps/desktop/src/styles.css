@@ -2464,3 +2464,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor.float .tutor-quiz { top: 8px; left: 10px; }
 .tutor-quiz button { height: 26px; padding: 0 10px; border-radius: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .tutor-quiz button:hover, .tutor-quiz button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
+/* A piece of his answer: reads as text, one click edits it in place. */
+.qa-piece { all: unset; cursor: text; border-radius: 3px; }
+.qa-piece:hover { background: var(--bg-hover); }
+.qa-piece:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.qa-piece-edit { width: 100%; font-size: 13px; }

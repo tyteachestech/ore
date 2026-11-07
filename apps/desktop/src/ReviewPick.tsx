@@ -2,6 +2,7 @@ import { Check } from "./icons";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { SkillIcon } from "./IconPicker";
 import { is } from "./keys";
+import { Trap } from "./Trap";
 import { PHONE, type Skill, type Today } from "./ore";
 import { useSwipeDown } from "./phone/sheet";
 import { load, save } from "./util";
@@ -88,6 +89,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <Trap>
       <div ref={box} className="panel review-pick" role="dialog" aria-modal="true" aria-label="What to review" tabIndex={-1} onKeyDown={onKey}>
         <h2>What to review</h2>
         <div className="pick-list">
@@ -111,6 +113,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
           </button>
         </div>
       </div>
+      </Trap>
     </div>
   );
 }

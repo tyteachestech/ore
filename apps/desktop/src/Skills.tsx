@@ -3,6 +3,7 @@ import { Command } from "cmdk";
 import { CaretDown, Check as CheckIcon, Plus } from "./icons";
 import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type KeyboardEvent as ReactKeyboardEvent, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
+import { Trap } from "./Trap";
 import { IconPicker, SkillIcon } from "./IconPicker";
 import { ore, opt, SKILL_COLORS, type Skill, type SkillColor } from "./ore";
 import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
@@ -278,6 +279,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <Trap>
       <div className="panel skill-edit" role="dialog" aria-modal="true" aria-label={`Edit skill ${skill.name}`} onKeyDown={onKey}>
         <div className="skill-edit-head">
           <Popover.Root open={picking} onOpenChange={setPicking}>
@@ -338,6 +340,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
           </span>
         </div>
       </div>
+      </Trap>
     </div>
   );
 }

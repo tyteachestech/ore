@@ -51,7 +51,35 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
   const field = useRef<HTMLTextAreaElement>(null);
   useFocusWhileMounted(field);
   const t = text.trim();
-  const hasAnswer = q.answers.length > 0;
+  /** His answer as last saved here: a piece he rewrites shows at once, before the list reloads. */
+  const [answers, setAnswers] = useState(q.answers);
+  useEffect(() => setAnswers(q.answers), [q.answers]);
+  const hasAnswer = answers.length > 0;
+  /** Rewrites one piece of his answer (Notion: click the text, type); empty removes it. On the history. */
+  const rewrite = async (ts: string, to: string, from: string, record = true): Promise<void> => {
+    const gone = !to;
+    const before = answers;
+    setAnswers((l) => (gone ? l.filter((c) => c.ts !== ts) : l.map((c) => (c.ts === ts ? { ...c, text: to } : c))));
+    try {
+      const r = await ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)]));
+      setAnswers((l) => r.answers?.map((c) => ({ ...c, item_title: l.find((x) => x.ts === c.ts)?.item_title })) ?? []);
+    } catch (e) {
+      setAnswers(before);
+      if (!record) throw e;
+      return void notify(errorText(e), "error");
+    }
+    if (!record) return;
+    // A removed piece comes back as it was written (its source and passage), at the end of his answer.
+    const piece = before.find((c) => c.ts === ts)!;
+    let back = ts;
+    if (gone)
+      notify("Removed from your answer", "info", async () => {
+        const r = await ore<Saved["question"]>("answer", q.id, opt("text", from), ...(piece.item ? [opt("item", piece.item)] : []), ...(piece.quote ? [opt("quote", piece.quote)] : []));
+        back = r.answers?.at(-1)?.ts ?? back;
+        setAnswers((l) => [...l, { ...piece, ts: back }]);
+      }, () => rewrite(back, "", from, false));
+    else notify("Changed your answer", "quiet", () => rewrite(ts, from, to, false), () => rewrite(ts, to, from, false));
+  };
 
   const send = async (how: "contribution" | "done" | "card") => {
     if (busy || (how === "contribution" && !t) || (how === "card" && !t && !hasAnswer)) return;
@@ -95,11 +123,8 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     <div className="qa-box">
       {hasAnswer && (
         <ul className="qa-answers">
-          {q.answers.map((c) => (
-            <li key={c.ts}>
-              {c.text}
-              {c.item_title && <span className="qa-from"> · {c.item_title}</span>}
-            </li>
+          {answers.map((c) => (
+            <Piece key={c.ts} text={c.text} from={c.item_title} onSave={(to) => void rewrite(c.ts, to, c.text)} />
           ))}
         </ul>
       )}
@@ -129,6 +154,48 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
         </Hint>
       </div>
     </div>
+  );
+}
+
+/** One piece of his answer: one click edits it in place, Enter saves, Esc puts it back, and saving it
+ *  empty removes it (with Undo), as a Notion block does. */
+function Piece({ text, from, onSave }: { text: string; from?: string; onSave: (to: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft === null)
+    return (
+      <li>
+        <button className="qa-piece" aria-label={`Edit: ${text}`} onClick={() => setDraft(text)}>
+          {text}
+        </button>
+        {from && <span className="qa-from"> · {from}</span>}
+      </li>
+    );
+  const done = () => {
+    const to = draft.trim();
+    setDraft(null);
+    if (to !== text) onSave(to);
+  };
+  return (
+    <li>
+      <Grow
+        autoFocus
+        className="field qa-piece-edit"
+        aria-label="Edit this part of your answer"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => setDraft(null)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            done();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setDraft(null);
+          }
+        }}
+      />
+    </li>
   );
 }
 

@@ -268,11 +268,11 @@ export const itemCommands: Record<string, Command> = {
   },
 
   answer: {
-    usage: '<question> [--text "<his words>" [--item <source>] [--quote "<passage>"]] [--done | --card] [--remove <ts>]   add to his answer (D75); --done closes it, --card closes it and drafts a card from his answer in the background',
-    options: { text: { type: "string" }, item: { type: "string" }, quote: { type: "string" }, done: { type: "boolean" }, card: { type: "boolean" }, remove: { type: "string" } },
+    usage: '<question> [--text "<his words>" [--item <source>] [--quote "<passage>"]] [--done | --card] [--remove <ts> | --edit <ts> --text "<new words>"]   add to his answer (D75), or rewrite or remove one piece of it; --done closes it, --card closes it and drafts a card from his answer in the background',
+    options: { text: { type: "string" }, item: { type: "string" }, quote: { type: "string" }, done: { type: "boolean" }, card: { type: "boolean" }, remove: { type: "string" }, edit: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
-      const { question, item } = await answerQuestion(lib, need(ref, "<question>"), { text: str(f.text), item: str(f.item), quote: str(f.quote), done: !!f.done, card: !!f.card, remove: str(f.remove) });
+      const { question, item } = await answerQuestion(lib, need(ref, "<question>"), { text: str(f.text), item: str(f.item), quote: str(f.quote), done: !!f.done, card: !!f.card, remove: str(f.remove), edit: str(f.edit) });
       const enrich = f.card ? startEnrich(lib, item.meta.id) : "skipped";
       return { data: { ...question, enrich }, text: `Question ${question.id}: ${question.status === "done" ? "answered" : "open"}, ${question.answers?.length ?? 0} contribution(s)${f.card ? `; card draft ${enrich}` : ""}` };
     },

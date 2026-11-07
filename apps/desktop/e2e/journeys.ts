@@ -114,7 +114,7 @@ journey("add: File keeps what he typed in the box; cancelling the picker keeps i
   await page.keyboard.press("Escape");
 });
 
-journey("Add and Settings: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
+journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
   const inside = (sel: string) => page.evaluate((sel) => !!document.activeElement?.closest(sel), sel);
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").waitFor();
@@ -129,7 +129,35 @@ journey("Add and Settings: Tab and ⇧Tab stay inside the panel, as a Mac sheet'
     await page.keyboard.press("Tab");
     if (!(await inside(".settings-sheet"))) throw new Error(`Tab ${n + 1} left Settings`);
   }
+  // One Esc closes the sheet, even with the hint Tab opened on a control showing.
   await page.keyboard.press("Escape");
+  await page.locator(".settings-sheet").waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  await pick.waitFor();
+  await pick.getByRole("checkbox").first().focus();
+  for (let n = 0; n < 12; n++) {
+    await page.keyboard.press(n % 2 ? "Tab" : "Shift+Tab");
+    await page.keyboard.press("Shift+Tab");
+    if (!(await inside(".review-pick"))) throw new Error(`Tab left What to review`);
+  }
+  await page.keyboard.press("Escape");
+});
+
+journey("add a list where one fails: ⌘Z still takes back the ones that went in", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".row");
+  await rows.first().waitFor();
+  const before = await rows.count();
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByLabel("Link, file path or text");
+  await box.fill(`${FIXTURES}/obsidian-note.md\n/tmp/ore-e2e-no-such-file.pdf`);
+  await page.keyboard.press("Enter");
+  await page.locator(".add-box").getByText("Added 1 of 2", { exact: false }).waitFor({ timeout: 15000 });
+  await page.keyboard.press("Escape");
+  await until("the one that went in is listed", async () => (await rows.count()) === before + 1);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => (await rows.count()) === before);
 });
 
 journey("PDF footnote: its mark shows the note on hover, and bold stays bold", async (page) => {
@@ -664,10 +692,14 @@ journey("pinned sources: Move up and a drag put them in his order; ⌘Z takes a 
     await page.getByRole("menuitem", { name: item }).click();
   };
   const pinned = () => page.locator(".row.pinned .title").allInnerTexts();
+  // A list read that answers after the move was read before it: it must not undo the move on screen.
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW: object }).__ORE_SLOW = { ls: 1200 }));
   await menu(AGENTS, "Pin to top");
   await menu(TESTING, "Pin to top");
   await until("pinned in the order pinned", async () => (await pinned()).join("|") === [AGENTS, TESTING].join("|"));
   await menu(TESTING, "Move up");
+  await page.waitForTimeout(2000);
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = undefined));
   await until("Move up puts it first", async () => (await pinned()).join("|") === [TESTING, AGENTS].join("|"));
   await page.waitForTimeout(300);
   await page.keyboard.press("Meta+z");
@@ -739,6 +771,37 @@ journey("skill note: coming back to a long note puts it where he left it", async
   await page.getByText("Line 80 of a long note.").waitFor();
   await until("the note is where he left it", async () => Math.abs((await col.evaluate((el) => el.scrollTop)) - 900) <= 1);
   await ore(["notes", "--skill=learning", `--set=${was}`]);
+});
+
+journey("answer pieces: one click rewrites a piece in place, ⌘Z puts the old words back; emptied, it goes with Undo", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Answer…" }).click();
+  const box = page.getByLabel("Your answer to Does this hold for kids?");
+  await box.fill("Mostly yes.");
+  await page.keyboard.press("Enter");
+  const piece = page.getByRole("button", { name: "Edit: Mostly yes." });
+  await piece.click();
+  const edit = page.getByLabel("Edit this part of your answer");
+  await edit.fill("Yes, from about age 8.");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Edit: Yes, from about age 8." }).waitFor();
+  await page.locator(".skill-page, main").first().click({ position: { x: 2, y: 2 } }).catch(() => {});
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await piece.waitFor();
+  await piece.click();
+  await edit.fill("");
+  await page.keyboard.press("Enter");
+  await until("emptied, it goes", async () => (await piece.count()) === 0);
+  await page.locator(".toast").filter({ hasText: "Removed from your answer" }).getByRole("button", { name: "Undo" }).click();
+  await piece.waitFor();
+  // Leave the question as the seed had it.
+  await piece.click();
+  await edit.fill("");
+  await page.keyboard.press("Enter");
+  await until("the piece is gone again", async () => (await piece.count()) === 0);
+  await page.waitForTimeout(300);
 });
 
 journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page) => {
@@ -1521,6 +1584,25 @@ journey("undo that fails: the toast says why, and ⌘Z tries the same step again
   await page.locator(".list").click({ position: { x: 5, y: 5 } }).catch(() => {});
   await page.keyboard.press("Meta+z");
   await row.waitFor();
+});
+
+journey("settings: a Review setting goes on the history; ⌘Z takes it back, ⇧⌘Z gives it again", async (page) => {
+  await page.keyboard.press("Meta+Comma");
+  await page.getByRole("tab", { name: "Review" }).click();
+  const minutes = page.getByRole("group", { name: "Minutes a day" }).or(page.getByRole("radiogroup", { name: "Minutes a day" }));
+  const on = async () => (await minutes.locator("[data-state=on]").innerText()).trim();
+  const was = await on();
+  const other = was === "30" ? "5" : "30";
+  await minutes.getByText(other, { exact: true }).click();
+  await until("the new goal shows", async () => (await on()) === other);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the old goal back", async () => (await on()) === was);
+  await page.keyboard.press("Shift+Meta+z");
+  await until("⇧⌘Z gives the new one again", async () => (await on()) === other);
+  await page.keyboard.press("Meta+z");
+  await until("and back, for the journeys after this one", async () => (await on()) === was);
+  await page.keyboard.press("Escape");
 });
 
 journey("quiz check: one click makes a passage a key point, and marks a highlight already there", async (page) => {

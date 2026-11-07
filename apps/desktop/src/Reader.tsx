@@ -1167,6 +1167,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     setFocus({ anchor: focus.head, head: focus.head });
   }
 
+  /** `ore annotate`, one write at a time per highlight: quick changes and their ⌘Z land in the order
+   *  he made them, never an older one last. */
+  const annotate = <T = unknown,>(id: string, ...args: string[]) => inOrder(`annotate ${id}`, () => ore<T>("annotate", id, ...args));
+
   /** The popup's marks are switches on one highlight (D118): Key point or Question, again for neither. */
   async function setIntent(want: Intent) {
     if (!popup) return;
@@ -1184,7 +1188,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     const to = (i: Intent) => () => void saved.then((rid) => setIntentOf(rid, i, false), () => {});
     const forget = undoable && was && was !== intent ? p.notify(`Changed to ${LABEL[intent]}`, "quiet", to(was), to(intent)) : undefined;
     try {
-      await ore("annotate", await saved, "--intent", intent);
+      await annotate(await saved, "--intent", intent);
     } catch (e) {
       forget?.();
       setAnns((l) => l.map((a) => (a.id === id && was ? { ...a, intent: was } : a)));
@@ -1214,14 +1218,14 @@ function ReaderView(p: Props & { reload: () => void }) {
       // Both return the write: one that fails rolls back here, and the history says why (history.ts).
       remove: () => {
         drop();
-        return ore("annotate", rid, "--status", "deleted").catch((e) => {
+        return annotate(rid, "--status", "deleted").catch((e) => {
           restore();
           throw e;
         });
       },
       bring: () => {
         restore();
-        return ore("annotate", rid, "--status", ann?.status ?? "open").catch((e) => {
+        return annotate(rid, "--status", ann?.status ?? "open").catch((e) => {
           drop();
           throw e;
         });
@@ -1236,7 +1240,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       setAnns((l) => l.map((a) => (a.id === rid ? { ...a, exact: s.exact, start: s.start, end: s.start + s.exact.length } : a)));
       setRepaint((n) => n + 1);
       setPopup((cur) => (cur?.id === rid ? null : cur));
-      ore("annotate", rid, opt("exact", s.exact), "--start", String(s.start)).catch((e) => {
+      annotate(rid, opt("exact", s.exact), "--start", String(s.start)).catch((e) => {
         ranges.current.set(rid, other.range);
         setAnns((l) => l.map((a) => (a.id === rid ? { ...a, exact: other.exact, start: other.start, end: other.start + other.exact.length } : a)));
         setRepaint((n) => n + 1);
@@ -1268,7 +1272,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     openPopup(id, range, note);
     try {
       const rid = await realId(id);
-      await ore("annotate", rid, opt("exact", q.exact), "--start", String(q.start));
+      await annotate(rid, opt("exact", q.exact), "--start", String(q.start));
       const s = spanStep(rid, from, to);
       p.notify("Moved the highlight’s edge", "quiet", s.back, s.again);
     } catch (e) {
@@ -1285,7 +1289,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     setAnns((l) => l.map((a) => (a.id === id ? { ...a, note } : a)));
     try {
       const rid = await realId(id);
-      await ore("annotate", rid, opt("note", note));
+      await annotate(rid, opt("note", note));
       if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => void setNoteOf(rid, was, false), () => void setNoteOf(rid, note, false));
     } catch (e) {
       setAnns((l) => l.map((a) => (a.id === id ? { ...a, note: was } : a)));
@@ -1309,7 +1313,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     const s = annStep(rid);
     s.drop();
     try {
-      await ore("annotate", rid, "--status", "deleted");
+      await annotate(rid, "--status", "deleted");
     } catch (e) {
       p.notify(errorText(e), "error");
       s.restore();
@@ -1326,7 +1330,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     // On the history at once, as the row goes: a ⌘Z right after must take back this step, not the one before.
     const forget = p.notify("Highlight removed", "info", s.bring, s.remove);
     try {
-      await ore("annotate", id, "--status", "deleted");
+      await annotate(id, "--status", "deleted");
     } catch (e) {
       forget();
       p.notify(errorText(e), "error");
@@ -1365,7 +1369,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       if (!a) return;
       if (untouched) {
         made.current.get(rid)?.();
-        await ore("annotate", rid, "--status", "deleted");
+        await annotate(rid, "--status", "deleted");
       }
       const c = await ore<{ id: string; words: number; section: boolean; removed: unknown[] }>("cut", d.id, "--from", String(a.start), "--to", String(a.end), ...(section ? ["--section"] : []));
       p.reload();
@@ -1452,7 +1456,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       if (!id && lookup?.ann) id = await realId(lookup.ann);
       if (id) {
         setAnns((l) => l.map((a) => (a.id === id ? { ...a, intent: "question", note: question } : a)));
-        await ore("annotate", id, "--intent", "question", opt("note", question));
+        await annotate(id, "--intent", "question", opt("note", question));
         return id;
       }
       const index = idx.current;
@@ -1463,7 +1467,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       let ann = await ore<Annotation>(...args);
       keptFromFeed(ann);
       // The passage was already highlighted: the core gave that one back, so it becomes the question.
-      if (ann.intent !== "question" || ann.note !== question) ann = await ore<Annotation>("annotate", ann.id, "--intent", "question", opt("note", question));
+      if (ann.intent !== "question" || ann.note !== question) ann = await annotate<Annotation>(ann.id, "--intent", "question", opt("note", question));
       ranges.current.set(ann.id, range);
       setAnns((l) => [...l.filter((a) => a.id !== ann.id), ann]);
       setLookup((cur) => cur && cur.range === range ? { ...cur, ann: ann.id } : cur);
