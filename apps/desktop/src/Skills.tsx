@@ -155,13 +155,15 @@ export const layoutOf = (groups: ReturnType<typeof skillGroups>): SkillLayout =>
 
 /** A skill's name, renamed in place like a Notion page title: click it (or open with `editing`),
  *  Enter saves through `ore skills set --name`, Esc or clicking away keeps the old name. */
-export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, onRenamed, notify }: {
+export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, onRenamed, onEnter, notify }: {
   skill: Skill;
   as?: ElementType;
   /** Starts in edit; the caller focuses `inputRef` (so it can hand focus back on close). */
   editing?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
   onRenamed: () => void;
+  /** Enter saved the name: a dialog around it closes, as a Mac dialog's default button does. */
+  onEnter?: () => void;
   notify: Notify;
 }) {
   const [draft, setDraft] = useState<string | null>(editing ? skill.name : null);
@@ -224,7 +226,7 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
           if (e.key !== "Enter" && e.key !== "Escape") return;
           e.preventDefault(); // or the Enter would also click the name button that takes focus
           refocus.current = true;
-          if (e.key === "Enter") void save();
+          if (e.key === "Enter") void save().then(() => onEnter?.());
           if (e.key === "Escape") setDraft(null);
         }}
       />
@@ -304,7 +306,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
-          <SkillName skill={skill} as="h2" editing={rename} inputRef={nameRef} onRenamed={onSaved} notify={notify} />
+          <SkillName skill={skill} as="h2" editing={rename} inputRef={nameRef} onRenamed={onSaved} onEnter={onClose} notify={notify} />
         </div>
         <div className="look-row" role="radiogroup" aria-label="Color">
           <span>Color</span>

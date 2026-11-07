@@ -440,6 +440,24 @@ journey("skill note: Esc selects the block, a second Esc leaves the note so the 
   await page.keyboard.press("ControlOrMeta+z");
 });
 
+journey("source title: one click renames it in place, Enter saves, Esc keeps the old one, ⌘Z takes it back", async (page) => {
+  await openSource(page, AGENTS);
+  await page.locator(".doc-head h1").click();
+  const field = page.getByLabel("Title");
+  await field.waitFor();
+  await field.fill("Agents, renamed");
+  await page.keyboard.press("Escape");
+  await until("Esc keeps the old title", async () => (await page.locator(".doc-head h1").innerText()) === AGENTS);
+  await page.locator(".doc-head h1").click();
+  await page.getByLabel("Title").fill("Agents, renamed");
+  await page.keyboard.press("Enter");
+  await until("Enter saves it", async () => (await page.locator(".doc-head h1").innerText()) === "Agents, renamed");
+  await page.waitForTimeout(300); // the rename's write lands, then its step is on the history
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the old title back", async () => (await page.locator(".doc-head h1").innerText()) === AGENTS);
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {

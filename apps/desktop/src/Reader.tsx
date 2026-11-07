@@ -2222,7 +2222,11 @@ function ReaderView(p: Props & { reload: () => void }) {
               />
             ) : (
               <WithMenu actions={PHONE ? [] : shownActions}>
-                <h1>{doc.title}</h1>
+                {/* One click renames it in place, as the skill page's name does (Notion's page title);
+                    a drag across it still selects the words to copy. */}
+                <h1 className={PHONE ? undefined : "renamable"} onClick={() => !PHONE && getSelection()?.isCollapsed !== false && setRenaming(true)}>
+                  {doc.title}
+                </h1>
               </WithMenu>
             )}
             {(doc.author || authoring || doc.skills.length > 0 || suggested || source || !PHONE) && (
