@@ -425,6 +425,21 @@ journey("note tables: / makes one, Tab adds a row, the column grip deletes a col
   await until("and comes back", () => side.isVisible());
 });
 
+journey("skill note: Esc selects the block, a second Esc leaves the note so the page's keys work", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const pm = page.locator(".skill-note .note-editor .ProseMirror");
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("A line to leave");
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Escape");
+  await until("Esc selects the block", async () => (await page.locator(".skill-note .block-sel").count()) === 1);
+  await page.keyboard.press("Escape");
+  await until("the second Esc leaves the note", async () => !(await pm.evaluate((e) => e.contains(document.activeElement))));
+  await page.keyboard.press("ControlOrMeta+z");
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {
