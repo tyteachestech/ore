@@ -1,5 +1,5 @@
 import { ArrowUp, Sparkle } from "./icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
@@ -12,16 +12,16 @@ type Reply = { reply: string; proposal: Proposal | null; session: string };
 
 const STARTERS = ["Why is this the answer?", "Give me an example", "Make this card clearer"];
 
+/** One card's chat: what he has typed, the thread, and the AI session. Review keeps it by card id,
+ *  so closing Ask (or a reply landing while it is closed) loses nothing. */
+export type AskChat = { turns: Turn[]; input: string; busy: boolean; error: string | null; applied: Proposal | null; session?: string };
+export const NO_ASK: AskChat = { turns: [], input: "", busy: false, error: null, applied: null };
+
 /** Ask about this (D61): a chat about the card he just answered, like ChatGPT's thread under a
  *  message. It runs on his own plan through `ore ask` (claude -p or codex); a proposed card is
  *  applied only when he clicks Use this card. Never shown before the answer, never rates. */
-export function Ask({ card, answer, onApply, onClose }: { card: CardFull; answer: string; onApply: (p: Proposal) => Promise<void>; onClose: () => void }) {
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [applied, setApplied] = useState<Proposal | null>(null);
-  const session = useRef<string | undefined>(undefined);
+export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: CardFull; answer: string; chat: AskChat; setChat: (f: (c: AskChat) => AskChat) => void; onApply: (p: Proposal) => Promise<void>; onClose: () => void }) {
+  const { turns, input, busy, error, applied } = chat;
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -36,23 +36,18 @@ export function Ask({ card, answer, onApply, onClose }: { card: CardFull; answer
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || busy) return;
-    setTurns((t) => [...t, { role: "me", text: message }]);
-    setInput("");
-    setError(null);
-    setBusy(true);
+    setChat((c) => ({ ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true }));
     try {
       const r = await ore<Reply>(
         "ask",
         card.id,
         opt("message", message),
-        ...(session.current ? [opt("session", session.current)] : [opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : [])]),
+        ...(chat.session ? [opt("session", chat.session)] : [opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : [])]),
       );
-      session.current = r.session;
-      setTurns((t) => [...t, { role: "ai", text: r.reply, proposal: r.proposal }]);
+      setChat((c) => ({ ...c, session: r.session, busy: false, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal }] }));
     } catch (e) {
-      setError(errorText(e, "answer that"));
+      setChat((c) => ({ ...c, busy: false, error: errorText(e, "answer that") }));
     } finally {
-      setBusy(false);
       field.current?.focus();
     }
   };
@@ -84,7 +79,7 @@ export function Ask({ card, answer, onApply, onClose }: { card: CardFull; answer
                     <div className="quiz-kicker">Suggested card</div>
                     <p className="ask-card-q">{t.proposal.question}</p>
                     <p className="ask-card-a">{t.proposal.answer}</p>
-                    <button className="ask-use" disabled={applied === t.proposal} onClick={() => void onApply(t.proposal!).then(() => setApplied(t.proposal!), () => {})}>
+                    <button className="ask-use" disabled={applied === t.proposal} onClick={() => void onApply(t.proposal!).then(() => setChat((c) => ({ ...c, applied: t.proposal! })), () => {})}>
                       {applied === t.proposal ? "Card updated" : "Use this card"}
                     </button>
                   </div>
@@ -114,7 +109,7 @@ export function Ask({ card, answer, onApply, onClose }: { card: CardFull; answer
           aria-label="Ask about this card"
           placeholder={turns.length ? "Ask a follow-up…" : "Ask about this card…"}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { const v = e.target.value; setChat((c) => ({ ...c, input: v })); }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();

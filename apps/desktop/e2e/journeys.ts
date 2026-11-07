@@ -275,6 +275,74 @@ journey("tutor @: typing @ lists skills and sources, Enter writes the name in, a
   await page.keyboard.press("Escape");
 });
 
+journey("tutor draft: a half-written message and its @ mention survive closing and reopening the tutor", async (page) => {
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  await field.pressSequentially("What does @agen");
+  await page.getByRole("listbox", { name: "Point the tutor at" }).getByRole("option", { name: new RegExp(AGENTS) }).waitFor();
+  await page.keyboard.press("Enter");
+  await field.pressSequentially("say about tools?");
+  await page.keyboard.press("Escape");
+  await until("Esc closes it", async () => (await tutor.count()) === 0);
+  await page.keyboard.press("Meta+j");
+  await until("the draft is still there", async () => (await field.inputValue()) === `What does @${AGENTS} say about tools?`);
+  const sent = page.waitForRequest((r) => new RegExp(`"tutor","What does @${AGENTS} say about tools\\?","--source=`).test(r.postData() ?? ""));
+  await page.keyboard.press("Enter");
+  await sent; // the mention came back with it
+  await tutor.locator(".ask-me .tutor-at").filter({ hasText: `@${AGENTS}` }).waitFor();
+  await page.keyboard.press("Escape");
+});
+
+journey("tutor pending: closing mid-reply asks once; a new chat keeps its own reply, the old one lands in the old chat, and Undo brings that chat back", async (page) => {
+  const asked: string[] = [];
+  let release: (() => void) | undefined;
+  const reply = (text: string) => JSON.stringify({ reply: text, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } });
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    const message = JSON.parse(body).args[1] as string;
+    asked.push(message);
+    if (message === "First question") await new Promise<void>((ok) => (release = ok));
+    await route.fulfill({ contentType: "application/json", body: reply(message === "First question" ? "First reply" : "Second reply") });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  await field.fill("First question");
+  await page.keyboard.press("Enter");
+  await tutor.getByText("Thinking…").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc closes it", async () => (await tutor.count()) === 0);
+  await page.keyboard.press("Meta+j");
+  await tutor.getByText("Thinking…").waitFor();
+  await page.waitForTimeout(400);
+  if (asked.length !== 1) throw new Error(`reopening asked again: ${asked.length} requests`);
+  // A new chat while it thinks: its own question gets its own reply.
+  await fresh.click();
+  await page.locator(".toast", { hasText: "Chat cleared" }).getByRole("button", { name: "Undo" }).waitFor();
+  await field.fill("Second question");
+  await page.keyboard.press("Enter");
+  await tutor.getByText("Second reply").waitFor();
+  const old = page.waitForResponse((r) => (r.request().postData() ?? "").includes('"First question"'));
+  release!();
+  await old;
+  await page.waitForTimeout(300);
+  if (await tutor.getByText("First reply").count()) throw new Error("the old reply landed in the new chat");
+  await tutor.getByText("Second reply").waitFor();
+  // Undo puts the old chat back, with the reply that came while it was away; redo returns to the new one.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await tutor.getByText("First reply").waitFor();
+  if (await tutor.getByText("Second question").count()) throw new Error("undo kept the new chat");
+  await page.keyboard.press("Meta+Shift+z");
+  await tutor.getByText("Second reply").waitFor();
+  if (await tutor.getByText("First question").count()) throw new Error("redo kept the old chat");
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
 journey("tutor hints and cards: a hint offers Show me, which asks for the answer; + Card keeps the reply's card, ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   const replies = [
@@ -1568,6 +1636,41 @@ journey("review: Enter activates the focused button (Again, Edit card, Open in s
   await until("Enter on the card records Good", async () => ratings.length === before + 2);
   if (ratings[before + 1] !== "3") throw new Error(`Enter on the card recorded ${ratings[before + 1]}`);
   for (let n = 0; n < 8 && (await undo.isVisible()); n++) await undo.click(), await page.waitForTimeout(250);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review Ask: closing and reopening it keeps the reply so far and a half-typed follow-up", async (page) => {
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Because recalling it is the practice.", proposal: null, session: "s1" }) });
+  });
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const q = page.locator(".review-q");
+  await pick.or(q).first().waitFor();
+  if (await pick.isVisible()) await page.keyboard.press("Enter");
+  await q.waitFor();
+  const noIdea = page.getByRole("button", { name: "No idea" });
+  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  const toggle = page.getByRole("button", { name: "Ask about this" });
+  await toggle.click();
+  const field = page.getByRole("textbox", { name: "Ask about this card" });
+  await field.fill("Why is this the answer?");
+  await page.keyboard.press("Enter");
+  const ask = page.getByRole("region", { name: "Ask about this" });
+  await ask.getByText("Because recalling it is the practice.").waitFor();
+  await field.fill("And after a week?");
+  await toggle.click();
+  await until("Ask closes", async () => (await ask.count()) === 0);
+  await toggle.click();
+  await ask.getByText("Because recalling it is the practice.").waitFor();
+  await until("the follow-up is still there", async () => (await field.inputValue()) === "And after a week?");
+  await field.fill("");
+  await page.keyboard.press("Escape"); // closes Ask
+  await until("Ask closes", async () => (await ask.count()) === 0);
+  await page.unroute(/\/ore$/);
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
 });
