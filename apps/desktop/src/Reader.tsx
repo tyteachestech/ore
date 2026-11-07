@@ -2039,9 +2039,11 @@ function ReaderView(p: Props & { reload: () => void }) {
       await ore("edit", doc.id, "--skills", skills.join(","));
       p.onChanged();
       if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => void fileUnder(before), () => void fileUnder(skills));
+      return true;
     } catch (e) {
       setDoc((cur) => cur && { ...cur, skills: before });
       p.notify(errorText(e), "error");
+      return false;
     }
   };
   /** A skill typed into the skill picker: made at once, so the picker can tick it. */
@@ -2405,7 +2407,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                 {PHONE ? (
                   doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
                 ) : (
-                  <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked}>
+                  <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked}>
                     {doc.skills.length > 0 &&
                       doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)}
                   </SkillPicker>

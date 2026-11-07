@@ -1454,8 +1454,11 @@ export function App() {
       }
     } catch (e) {
       notify(errorText(e), "error");
+      void refresh();
+      return false; // the picker takes its tick back
     }
     void refresh();
+    return true;
   };
   const sourceFiling = (item: Item) => ({ title: item.title, ids: new Set([item.id]), write: (ids: string[]) => ore("edit", item.id, "--skills", ids.join(",")) });
   /** Files a source under a skill, or takes it off one, from its ⋯ menu. */
@@ -1720,7 +1723,7 @@ export function App() {
             ) : !lesson && (
               <span className="row-line">
                 {authorOf(r)}
-                <SkillPicker skills={skills} value={r.skills} title={r.title} onChange={(next, before, k) => void live.current.refile(live.current.sourceFiling(r), next, before, k)} onCreate={(name) => live.current.createSkill(name)} startOpen={pickFor === r.id} onClosed={() => setPickFor(null)}>
+                <SkillPicker skills={skills} value={r.skills} title={r.title} onChange={(next, before, k) => live.current.refile(live.current.sourceFiling(r), next, before, k)} onCreate={(name) => live.current.createSkill(name)} startOpen={pickFor === r.id} onClosed={() => setPickFor(null)}>
                   {others.length > 0 && skillsOf(others)}
                 </SkillPicker>
               </span>
@@ -1799,7 +1802,7 @@ export function App() {
             </span>
             <span className="row-line">
               {authorOf({ author: c.lessons.find((l) => l.author)?.author, url: c.url ?? c.lessons[0]?.url })}
-              <SkillPicker skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, before, k) => void refile(courseFiling(c), next, before, k)} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
+              <SkillPicker skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, before, k) => refile(courseFiling(c), next, before, k)} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
                 {others.length > 0 && skillsOf(others)}
               </SkillPicker>
               {/* Closed, it says which lesson a click opens; open, the lessons below say it. */}

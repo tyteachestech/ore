@@ -66,9 +66,11 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
       if (!next.delete(id)) next.add(id);
       return next;
     });
+  // Fresh numbers can drop a ticked row, so only the ticks on rows still shown count.
+  const picked = rows.map((r) => r.skill.id).filter((id) => on.has(id));
   const start = () => {
-    if (!on.size) return;
-    const pick = on.size === rows.length ? null : rows.map((r) => r.skill.id).filter((id) => on.has(id));
+    if (!picked.length) return;
+    const pick = picked.length === rows.length ? null : picked;
     savePick(pick);
     onStart(pick);
   };
@@ -111,9 +113,9 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
           ))}
         </div>
         <div className="review-pick-foot">
-          <button className="pill-btn home-go" data-color="green" disabled={!on.size} onClick={start}>
-            {on.size ? "Start review" : "Pick a skill"}
-            {on.size > 0 && <kbd>↵</kbd>}
+          <button className="pill-btn home-go" data-color="green" disabled={!picked.length} onClick={start}>
+            {picked.length ? "Start review" : "Pick a skill"}
+            {picked.length > 0 && <kbd>↵</kbd>}
           </button>
         </div>
       </div>

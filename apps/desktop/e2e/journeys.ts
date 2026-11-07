@@ -418,6 +418,40 @@ journey("tutor hints and cards: a hint offers Show me, which asks for the answer
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor Show me: a half-written reply and its @ mention stay in the box while the hint's answer comes", async (page) => {
+  await openSource(page, TESTING);
+  const replies = [
+    { reply: "Think about what the tested group did.", citations: [], general: false, hint: true, card: null },
+    { reply: "They pulled it out of memory.", citations: [], general: false, hint: false, card: null },
+    { reply: "Yes, that is the idea.", citations: [], general: false, hint: false, card: null },
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@3" } }));
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  await field.fill("Which group did better?");
+  await page.keyboard.press("Enter");
+  await tutor.getByRole("button", { name: "Show me" }).waitFor();
+  await field.pressSequentially("Like @agen");
+  await page.getByRole("listbox", { name: "Point the tutor at" }).getByRole("option", { name: new RegExp(AGENTS) }).waitFor();
+  await page.keyboard.press("Enter");
+  await field.pressSequentially("says?");
+  const draft = `Like @${AGENTS} says?`;
+  await tutor.getByRole("button", { name: "Show me" }).click();
+  await tutor.getByText("They pulled it out of memory.").waitFor();
+  if ((await field.inputValue()) !== draft) throw new Error(`Show me cleared the draft: "${await field.inputValue()}"`);
+  const sent = page.waitForRequest((r) => (r.postData() ?? "").includes('"--source='));
+  await field.focus();
+  await page.keyboard.press("Enter");
+  await sent; // the @ mention went with it
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
 journey("tutor Quiz me: opens Review on the due cards of the source's skills, and Esc comes back", async (page) => {
   await openSource(page, TESTING);
   await page.keyboard.press("Meta+j");
@@ -760,6 +794,27 @@ journey("skill note: Esc selects the block, a second Esc leaves the note so the 
   await page.keyboard.press("Escape");
   await until("the second Esc leaves the note", async () => !(await pm.evaluate((e) => e.contains(document.activeElement))));
   await page.keyboard.press("ControlOrMeta+z");
+});
+
+journey("skill picker: a filing that fails takes its tick back, and clicking the skill again files it", async (page) => {
+  type W = { __ORE_FAIL?: Record<string, string> };
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: `Skills for ${TESTING}` }).click();
+  const picker = page.locator(".skill-picker");
+  const name = (await picker.getByRole("option").filter({ hasNot: page.locator("svg") }).first().locator(".menu-label").innerText()).trim();
+  const target = picker.getByRole("option").filter({ has: page.locator(".menu-label", { hasText: name }) });
+  const ticked = async () => (await target.locator("svg").count()) > 0; // the check
+  if (await ticked()) throw new Error(`${name} started ticked`);
+  await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = { edit: "The disk is full." }));
+  await target.click();
+  await page.locator(".toast", { hasText: "The disk is full." }).waitFor();
+  await until("the failed tick goes back", async () => !(await ticked()));
+  await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = {}));
+  await target.click();
+  await page.locator(".toast", { hasText: `Filed under ${name}` }).waitFor();
+  if (!(await ticked())) throw new Error("clicking again did not file it");
+  await target.click(); // as it was, for the journeys after this one
+  await page.locator(".toast", { hasText: `Removed from ${name}` }).waitFor();
 });
 
 journey("source title: one click renames it in place, Enter saves, Esc keeps the old one, ⌘Z takes it back", async (page) => {
@@ -2003,6 +2058,33 @@ async function reveal(page: Page) {
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await page.waitForTimeout(300); // the passage loads after the answer, and a rating key right after it is ignored
 }
+
+journey("review picker: fresh numbers that drop the only ticked skill leave nothing to start", async (page) => {
+  await page.getByRole("button", { name: "Start review" }).waitFor(); // Home has read today's numbers
+  let release!: () => void;
+  const held = new Promise<void>((ok) => (release = ok));
+  let drop = "";
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"today"')) return route.fallback();
+    const res = await route.fetch();
+    const t = (await res.json()) as { skills: { skill: string; due: number }[] };
+    await held;
+    await route.fulfill({ response: res, json: { ...t, skills: t.skills.filter((x) => x.skill !== drop) } });
+  });
+  await page.keyboard.press("Meta+r");
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const rows = pick.getByRole("checkbox");
+  await until("two skills or more are due", async () => (await rows.count()) > 1);
+  const first = await rows.first().locator(".name").innerText();
+  drop = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.name === first)!.id;
+  for (const row of (await rows.all()).slice(1)) if ((await row.getAttribute("aria-checked")) === "true") await row.click();
+  release();
+  await until("the fresh numbers land", async () => !(await pick.getByRole("checkbox", { name: new RegExp(first) }).count()));
+  await pick.getByRole("button", { name: "Pick a skill" }).waitFor();
+  if (await pick.getByRole("button", { name: "Pick a skill" }).isEnabled()) throw new Error("Start is on with no shown skill ticked");
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Escape");
+});
 
 journey("review: a Tutor card with no passage still offers Open in source after the answer, and it opens that source", async (page) => {
   // The seed's Storytelling card: the tutor kept it, so it has its source but no passage in it.
