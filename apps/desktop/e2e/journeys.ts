@@ -1217,6 +1217,86 @@ journey("diagram: draws beside the source, and a new one stays linked when the p
   await until("the size is kept in the note", async () => (await size()).join() === want.join());
 });
 
+/** Opens a source he has finished, from All sources' Done view. */
+async function openDone(page: Page, title: string) {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".view-menu").click();
+  await page.getByRole("menuitemradio", { name: /^Done/ }).click();
+  await page.locator(".row").filter({ hasText: title }).first().click();
+  await page.locator(".doc-head").filter({ hasText: title }).waitFor();
+}
+
+/** Opens a new diagram from the note's / menu, docked beside the source, and draws a box in it. */
+async function drawNew(page: Page, before?: () => Promise<void>) {
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  // On its first line: lower down may be a diagram already, which a click opens.
+  await until("the note takes the caret", async () => (await note.click({ position: { x: 8, y: 8 } }), await note.evaluate((e) => e.contains(document.activeElement))));
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/diagram");
+  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+  await page.keyboard.press("Enter");
+  const docked = page.locator(".diagram.docked");
+  await docked.waitFor();
+  await before?.();
+  const canvas = (await docked.locator(".draw").boundingBox())!;
+  await docked.locator(".draw").focus();
+  await page.keyboard.press("r");
+  await page.mouse.move(canvas.x + 60, canvas.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + 200, canvas.y + 200, { steps: 5 });
+  await page.mouse.up();
+}
+
+journey("diagram: a new one left before its first save comes back is linked once, and one whose save fails is kept with Try again", async (page) => {
+  type W = { __ORE_SLOW?: object; __ORE_FAIL?: object };
+  await openDone(page, "The Story Spine"); // no other journey draws here
+  const drawings = page.locator(".note-editor .note-diagram-view > svg");
+  // The first save is slow, and the panel switches tab right after drawing: its note closes first.
+  await drawNew(page, () => page.evaluate(() => void ((window as unknown as W).__ORE_SLOW = { diagram: 1500 })));
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await until("the note links the drawing once its save is back", async () => (await drawings.count()) === 1, 8000);
+  await page.evaluate(() => void ((window as unknown as W).__ORE_SLOW = undefined));
+  // The next one's save fails: it is kept, and Try again saves and links it.
+  await drawNew(page, () => page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = { diagram: "The disk is full." })));
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const alert = page.locator(".toast[role=alert]").filter({ hasText: "The disk is full." });
+  await alert.waitFor();
+  await Bun.sleep(9000); // past an error toast's 8 s: this one is the only way back to the drawing
+  if (!(await alert.getByRole("button", { name: "Try again" }).count())) throw new Error("the toast holding the unsaved drawing went away");
+  await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = {}));
+  await alert.getByRole("button", { name: "Try again" }).click();
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await until("Try again saves and links it", async () => (await drawings.count()) === 2, 8000);
+  await Bun.sleep(1200); // the note saves
+  await page.reload();
+  await openDone(page, "The Story Spine");
+  await until("both are linked once each after a reload", async () => (await drawings.count()) === 2 && (await page.locator(".note-editor .note-diagram").count()) === 2);
+});
+
+journey("diagram: ⌘Z on a rename takes the file back with the link, ⇧⌘Z renames it again, and a reload keeps it", async (page) => {
+  await openDone(page, "Notes on spaced repetition scheduling"); // no other journey draws here
+  await drawNew(page);
+  const board = page.locator(".note-editor .note-diagram");
+  await until("the note links it once it is saved", async () => (await board.count()) === 1, 6000);
+  const name = (await page.locator(".diagram-name").inputValue())!;
+  await page.locator(".diagram-name").fill("spacing-map");
+  await page.keyboard.press("Enter");
+  const shows = (n: string) => async () => (await board.getAttribute("aria-label")) === `Diagram ${n}, click to edit` && (await board.locator(".note-diagram-view > svg").count()) === 1;
+  await until("the link follows the rename", shows("spacing-map"));
+  await page.locator(".diagram-done").click();
+  await until("Done closes it", async () => (await page.locator(".diagram").count()) === 0);
+  await page.keyboard.press("ControlOrMeta+z");
+  await until("⌘Z puts the old name back, and the drawing with it", shows(name));
+  await page.keyboard.press("Shift+ControlOrMeta+z");
+  await until("⇧⌘Z renames it again, drawing and all", shows("spacing-map"));
+  await Bun.sleep(1500); // the note saves
+  await page.reload();
+  await openDone(page, "Notes on spaced repetition scheduling");
+  await until("a reload shows the same drawing under its new name", shows("spacing-map"));
+});
+
 journey("diagram: S styles at the pointer, keys stay on the canvas, Space never sticks, and Esc closes only the drawing", async (page) => {
   await openSource(page, TESTING); // no other journey draws here, so the diagram starts empty
   const note = page.locator(".note-editor [contenteditable=true]").first();

@@ -12,6 +12,8 @@ import { ore, oreWith, type Diagram } from "./ore";
 import { errorText, load, save as remember, type Notify } from "./util";
 
 const FULL = "ore.diagram.full";
+/** Tells the open note (Notes.tsx) its file changed outside its editor; detail is the note's CLI args, joined. */
+const NOTE_WRITTEN = "ore:note-written";
 
 export type Scene = NonNullable<Diagram["scene"]>;
 type Files = Record<string, { dataURL?: string }>;
@@ -36,8 +38,9 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
   dock?: HTMLElement | null;
   notify: Notify;
   onClose: (scene: Scene | null, name: string) => void;
-  /** The first write of a new diagram, so the note links it even if the panel closes before Done. */
-  onFirstSave?: (name: string) => void;
+  /** The first write of a new diagram, so the note links it even if the panel closes before Done; false
+   *  when the note's editor has gone meanwhile, and the link is written into the note's file instead. */
+  onFirstSave?: (name: string) => boolean;
   onRenamed?: (from: string, to: string) => void;
   onLink?: (href: string) => void;
 }) {
@@ -46,6 +49,8 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
   const [failed, setFailed] = useState<string | null>(null);
   const [initial, setInitial] = useState<{ els: El[]; files: Files } | null>(null);
   const onDisk = useRef<Scene | null>(null);
+  /** Whether the note links the file: a new diagram's first save links it, by the open note or its file. */
+  const linked = useRef(true);
   const latest = useRef<{ els: El[]; files: Files } | null>(null);
   const written = useRef<string>("");
   const timer = useRef(0);
@@ -87,6 +92,7 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
       (d) => {
         if (!live) return;
         onDisk.current = d.scene;
+        linked.current = !!d.scene;
         const els = fromScene(d.scene as never);
         written.current = d.scene ? JSON.stringify(toScene(els, d.scene as never)) : "";
         setInitial({ els, files: ((d.scene?.files ?? {}) as Files) });
@@ -109,12 +115,20 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
       if (!onDisk.current && !l.els.length) return onDisk.current;
       const scene = toScene(l.els, { ...(onDisk.current ?? { type: "excalidraw", elements: [] }), files: { ...((onDisk.current?.files as Files) ?? {}), ...l.files } } as never);
       const json = JSON.stringify(scene);
-      if (json === written.current) return onDisk.current;
-      await oreWith<Diagram>(json, "diagram", ...args, nameRef.current, "--set");
-      if (!onDisk.current) props.current.onFirstSave?.(nameRef.current);
-      written.current = json;
+      if (json !== written.current) {
+        await oreWith<Diagram>(json, "diagram", ...args, nameRef.current, "--set");
+        written.current = json;
+        onDisk.current = scene as Scene;
+      }
+      // A link that failed after its file was written is tried again with the next save.
+      if (!linked.current) {
+        if (props.current.onFirstSave?.(nameRef.current) === false) {
+          await ore("diagram", ...args, nameRef.current, "--link");
+          window.dispatchEvent(new CustomEvent(NOTE_WRITTEN, { detail: key }));
+        }
+        linked.current = true;
+      }
       setFailed(null);
-      onDisk.current = scene as Scene;
       return onDisk.current;
     };
     const next = chain.current.then(run, run);
@@ -145,7 +159,17 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
     [key, save],
   );
 
-  useEffect(() => () => void save().catch(() => {}), [save]); // leaving some other way (quit, source closed) still saves
+  // Leaving some other way (quit, source closed, the panel's tab) still saves, and links a new one. If
+  // that fails the drawing is kept here, and the toast's Try again saves it.
+  useEffect(
+    () => () => {
+      // The toast stays: for a new diagram the note has no link yet, so it is the only way back to the drawing.
+      const retry = (): void =>
+        void save().catch((e) => props.current.notify(`Diagram “${nameRef.current}” not saved: ${errorText(e)}`, "error", undefined, undefined, retry, true));
+      retry();
+    },
+    [save],
+  );
 
   // A second Esc or Done while the save is in flight waits for the same close, so the note gets
   // one link to a new diagram, not two.

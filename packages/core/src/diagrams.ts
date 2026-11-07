@@ -77,9 +77,25 @@ export async function setDiagram(lib: Library, ref: NoteRef, name: string, text:
   });
 }
 
+// Links a saved diagram at the end of its note, unless the note links it already. The app does this when
+// the note it was drawn in closed before the first save came back; the note's next save merges it in.
+export async function linkDiagram(lib: Library, ref: NoteRef, name: string): Promise<NotesResult> {
+  checkName(name);
+  return withLock(paths.lock(lib), () => {
+    const note = getNotes(lib, ref);
+    if (!existsSync(diagramPath(note.dir, name))) throw new Error(`no diagram named ${name}`);
+    if (note.text.includes(`diagrams/${name}.excalidraw`)) return note;
+    const link = `![Diagram](diagrams/${name}.excalidraw)`;
+    const text = note.text.trim() ? `${note.text.trimEnd()}\n\n${link}\n` : `${link}\n`;
+    writeAtomic(join(lib.root, note.path), text);
+    return { ...note, text };
+  });
+}
+
 // Renames a diagram's file. The link in the note is the caller's to change (the app edits it in the open
-// note, which saves through `ore notes`), so two writers never touch the same line.
-export async function renameDiagram(lib: Library, ref: NoteRef, from: string, to: string): Promise<DiagramResult> {
+// note, which saves through `ore notes`), so two writers never touch the same line. `followLink`: the
+// note's link already names `to` (the app's undo or redo of a rename), so only the file must be free.
+export async function renameDiagram(lib: Library, ref: NoteRef, from: string, to: string, opts: { followLink?: boolean } = {}): Promise<DiagramResult> {
   checkName(from);
   checkName(to);
   return withLock(paths.lock(lib), () => {
@@ -87,7 +103,7 @@ export async function renameDiagram(lib: Library, ref: NoteRef, from: string, to
     const src = diagramPath(note.dir, from);
     const dest = diagramPath(note.dir, to);
     if (!existsSync(src)) throw new Error(`no diagram named ${from}`);
-    if (existsSync(dest) || note.text.includes(`diagrams/${to}.excalidraw`)) throw new Error(`a diagram named ${to} already exists`);
+    if (existsSync(dest) || (!opts.followLink && note.text.includes(`diagrams/${to}.excalidraw`))) throw new Error(`a diagram named ${to} already exists`);
     renameSync(src, dest);
     return result(lib, note, to, parseScene(readFileSync(dest, "utf8")));
   });
