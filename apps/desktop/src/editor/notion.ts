@@ -3,7 +3,7 @@ import { keymap } from "@milkdown/kit/prose/keymap";
 import { lift, setBlockType } from "@milkdown/kit/prose/commands";
 import type { ResolvedPos } from "@milkdown/kit/prose/model";
 import { splitListItem } from "@milkdown/kit/prose/schema-list";
-import { type Command, type EditorState, Plugin, TextSelection } from "@milkdown/kit/prose/state";
+import { type Command, type EditorState, NodeSelection, Plugin, TextSelection } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet } from "@milkdown/kit/prose/view";
 import { $inputRule, $prose } from "@milkdown/kit/utils";
 import { blockAt, kindOf, turnAtCaret, type Kind } from "./blockops";
@@ -115,7 +115,38 @@ const run = (state: EditorState, dispatch: Parameters<Command>[1], kind: Kind) =
 
 /** Backspace at the start of a heading, list item, to-do, quote, callout or toggle makes it text, as
  *  in Notion; a second one joins it to the block above. */
-const backspace: Command = (state, dispatch) => {
+const backspace: Command = (state, dispatch) => pickImage(state, dispatch) || dropImage(state, dispatch) || toText(state, dispatch);
+
+/** Backspace right after an image or diagram, or at the start of the line under one, selects it
+ *  first, as Notion does; the second Backspace deletes it (`dropImage`). An empty line under it goes. */
+const pickImage: Command = (state, dispatch) => {
+  const { selection: s } = state;
+  if (!(s instanceof TextSelection) || !s.empty) return false;
+  const $c = s.$from;
+  let at = -1;
+  if ($c.nodeBefore?.type.name === "image") at = $c.pos - $c.nodeBefore.nodeSize;
+  else if ($c.parentOffset === 0 && $c.index($c.depth - 1) > 0) {
+    const above = $c.node($c.depth - 1).child($c.index($c.depth - 1) - 1);
+    if (above.isTextblock && above.lastChild?.type.name === "image") at = $c.before() - 1 - above.lastChild.nodeSize;
+  }
+  if (at < 0) return false;
+  if (dispatch) {
+    const empty = $c.parentOffset === 0 && !$c.parent.content.size;
+    const tr = empty ? state.tr.delete($c.before(), $c.after()) : state.tr;
+    dispatch(tr.setSelection(NodeSelection.create(tr.doc, at)).scrollIntoView());
+  }
+  return true;
+};
+
+/** Backspace on a selected image that is its line's only content takes the whole line with it. */
+const dropImage: Command = (state, dispatch) => {
+  const { selection: s } = state;
+  if (!(s instanceof NodeSelection) || s.node.type.name !== "image" || s.$from.parent.childCount !== 1 || s.$from.depth < 1) return false;
+  dispatch?.(state.tr.delete(s.$from.before(), s.$from.after()).scrollIntoView());
+  return true;
+};
+
+const toText: Command = (state, dispatch) => {
   const $c = atStart(state);
   if (!$c) return false;
   if ($c.parent.type.name === "heading") return setBlockType(state.schema.nodes.paragraph!)(state, dispatch);

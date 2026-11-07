@@ -231,6 +231,23 @@ describe("Backspace at the start of a block", () => {
     expect(await md("# T\n\n‸x", "{Backspace}")).toBe("# Tx");
     expect(await md("- a\n\n‸b", "{Backspace}")).toBe("- ab");
   });
+
+  // Notion: Backspace under an image or embed selects it, and only a second Backspace deletes it (Tyler, 2026-11-07).
+  test("under a diagram, the first Backspace selects it and the second deletes it", async () => {
+    const D = "![Diagram](diagrams/d.excalidraw)";
+    const picked = (st: import("@milkdown/kit/prose/state").EditorState) => (st.selection instanceof pm.NodeSelection ? st.selection.node.type.name : null);
+    for (const start of [`${D}\n\n‸`, `${D}\n\n‸x`]) {
+      const once = await run(start, ["{Backspace}"], picked);
+      expect(once.md).toContain(D);
+      expect(once.hint).toBe("image");
+      const twice = await run(start, ["{Backspace}", "{Backspace}"]);
+      expect(twice.md).not.toContain(D);
+    }
+    // The line under it stays a line of its own.
+    expect((await run(`${D}\n\n‸x`, ["{Backspace}"])).md).toBe(`${D}\n\nx`);
+    // ⌘Z brings a deleted diagram back.
+    expect(await md(`${D}\n\n‸x`, "{Backspace}", "{Backspace}", "{Mod-z}")).toContain(D);
+  });
 });
 
 describe("Tab", () => {
