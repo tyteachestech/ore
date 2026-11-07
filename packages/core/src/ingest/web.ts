@@ -3,6 +3,7 @@ import { Defuddle } from "defuddle/node";
 import { parseHTML } from "linkedom";
 import { cleanAuthor, cleanDate, FROM_TAB } from "./check.ts";
 import { td } from "./markdown.ts";
+import { notionMarkdown } from "./rendered.ts";
 import { youtubeId } from "./youtube.ts";
 
 export interface WebDoc {
@@ -180,6 +181,12 @@ function paperAuthors(doc: Document): string | undefined {
 }
 
 export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
+  // A Notion page as the browser drew it (added from the tab, or reimported from its copy).
+  const notion = notionMarkdown(html, url);
+  if (notion) {
+    const title = parseHTML(html).document.querySelector("title")?.textContent?.trim();
+    return { title: title || url, markdown: notion };
+  }
   try {
     const { document } = parseHTML(html);
     videoLinks(document as unknown as Document);
