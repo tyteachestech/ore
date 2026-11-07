@@ -8,7 +8,7 @@ import { insertTableCommand } from "@milkdown/kit/preset/gfm";
 import { toggleMark, wrapIn } from "@milkdown/kit/prose/commands";
 import type { Node as PmNode } from "@milkdown/kit/prose/model";
 import { closeHistory, isHistoryTransaction } from "@milkdown/kit/prose/history";
-import { NodeSelection, Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
+import { NodeSelection, Plugin, PluginKey, TextSelection, type EditorState } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet, type EditorView, type ViewMutationRecord } from "@milkdown/kit/prose/view";
 import { $prose, $view, callCommand } from "@milkdown/kit/utils";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -45,6 +45,8 @@ export type NoteEditorHandle = {
   /** Ends the block: lines still empty go, and the heading too when he wrote nothing under it.
    *  Resolves to what he wrote under the heading (Markdown), or null. */
   settle: () => string | null;
+  /** Whether he has written anything in the open block yet (text, or a diagram or image). */
+  written: () => boolean;
 };
 
 /** The scaffold's lines, as node decorations mapped through his edits: the heading first, then the
@@ -75,6 +77,22 @@ const blockStartPlugin = $prose(
       },
     }),
 );
+
+/** The open block in this state: its heading, if still there, where his writing starts, and
+ *  whether he has written anything (text counts, and so does a diagram or image with no words). */
+function blockIn(state: EditorState) {
+  const { doc } = state;
+  const at = Math.min(blockStart.getState(state) ?? doc.content.size, doc.content.size);
+  const first = doc.nodeAt(at);
+  const h = first?.type.name === "heading" ? { from: at, to: at + first.nodeSize } : null;
+  const from = h?.to ?? at;
+  let written = false;
+  doc.nodesBetween(from, doc.content.size, (n) => {
+    if (n.isText ? !!n.text?.trim() : n.isLeaf && n.type.name !== "hardbreak") written = true;
+    return !written;
+  });
+  return { h, from, written };
+}
 
 type Props = {
   /** The file as loaded. Remount (change `key`) to load other text. */
@@ -174,16 +192,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         const v = ctx.get(editorViewCtx);
         const lines = ghosts.getState(v.state)?.find() ?? [];
         const { doc } = v.state;
-        const at = Math.min(blockStart.getState(v.state) ?? doc.content.size, doc.content.size);
-        const first = doc.nodeAt(at);
-        const h = first?.type.name === "heading" ? { from: at, to: at + first.nodeSize } : null;
-        const from = h?.to ?? at;
-        // Text counts as written, and so does a diagram or image with no words beside it.
-        let written = false;
-        doc.nodesBetween(from, doc.content.size, (n) => {
-          if (n.isText ? !!n.text?.trim() : n.isLeaf && n.type.name !== "hardbreak") written = true;
-          return !written;
-        });
+        const { h, from, written } = blockIn(v.state);
         const empty = (d: Decoration) => {
           const node = doc.nodeAt(d.from);
           return !!node && node.type.name === "paragraph" && node.content.size === 0;
@@ -197,6 +206,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         return ctx.get(serializerCtx)(tr.doc.type.create(null, after)).trim() || null;
       });
     },
+    written: () => !!editor.current && scaffoldTitle.current !== null && editor.current.action((ctx) => blockIn(ctx.get(editorViewCtx).state).written),
   }), []);
   const wantScaffold = useRef<{ heading: string; prompts: string[] } | null>(null);
   const scaffoldTitle = useRef<string | null>(null);

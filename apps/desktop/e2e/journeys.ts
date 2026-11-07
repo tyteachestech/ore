@@ -2166,7 +2166,7 @@ journey("settle: closing a typed highlight lifts the popup away, pops its mark a
 });
 
 // Last: they add headings and a diagram to AGENTS' note, which earlier journeys lay out.
-journey("tutor Practice: an answer under a renamed heading, and a diagram-only answer, both reach the tutor; an empty one says so", async (page) => {
+journey("tutor Practice: an answer under a renamed heading, and a diagram-only answer, both reach the tutor; an empty one is refused in place", async (page) => {
   await openSource(page, AGENTS);
   const exercise = (heading: string) => ({ heading, prompts: ["Your answer"] });
   const reply = (r: string, ex: ReturnType<typeof exercise> | null) => ({ reply: r, citations: [], general: false, hint: false, exercise: ex, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } });
@@ -2212,13 +2212,20 @@ journey("tutor Practice: an answer under a renamed heading, and a diagram-only a
   await page.keyboard.press("Meta+Enter");
   await tutor.getByText("That diagram has the loop.").waitFor();
   if (!bodies[2]?.includes("diagrams/agent-loop.excalidraw")) throw new Error(`the diagram answer wasn't sent: ${bodies[2]}`);
-  // Nothing written: he is told, and nothing is sent.
+  // Nothing written: he is told, nothing is sent, and he stays in the exercise, source still hidden.
   await tutor.getByRole("button", { name: "Write it in your note" }).click();
   await page.locator(".note-editor h2", { hasText: "Draw the stopping condition" }).waitFor();
   await page.keyboard.press("Meta+Enter");
   await page.getByText("Nothing written, so nothing was sent.").waitFor();
-  await tutor.waitFor();
+  await page.waitForTimeout(300);
   if (bodies.length !== 3) throw new Error(`an empty answer was sent: ${bodies.length}`);
+  if (await tutor.count()) throw new Error("an empty answer left the exercise");
+  await page.locator(".reader-pane.hidden-src").waitFor();
+  await page.locator(".note-editor h2", { hasText: "Draw the stopping condition" }).waitFor();
+  await page.keyboard.type("When the goal is met or a limit is hit.");
+  await page.keyboard.press("Meta+Enter");
+  await tutor.getByText("Fine.").waitFor();
+  if (!bodies[3]?.includes("When the goal is met or a limit is hit.")) throw new Error(`the answer after an empty try wasn't sent: ${bodies[3]}`);
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Meta+j");
 });

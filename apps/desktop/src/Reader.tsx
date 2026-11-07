@@ -836,6 +836,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   async function endBlock(record: boolean) {
     const c = block;
     if (!c || !doc) return;
+    // An empty answer is refused where he is, as a form refuses an empty submit: the block stays open.
+    if (record && "practice" in c && notesField.current && !notesField.current.written()) return p.notify("Nothing written, so nothing was sent.", "info");
     const text = notesField.current?.settle() ?? null;
     setBlock(null);
     scaffolded.current = null;
@@ -844,7 +846,6 @@ function ReaderView(p: Props & { reload: () => void }) {
     // The exercise's answer stays in his note as he wrote it; the tutor gets it for feedback.
     if ("practice" in c) {
       void notes.flush();
-      if (record && !text) p.notify("Nothing written, so nothing was sent.", "info");
       return c.done(record ? text : null);
     }
     const title = c.title ?? `Chapter ${c.n}`;
