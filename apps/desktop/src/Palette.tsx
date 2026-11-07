@@ -16,7 +16,8 @@ type Props = {
   skills: Skill[];
   skill: string | null;
   onSkill: (id: string | null) => void;
-  onOpen: (item: string) => void;
+  /** Opens a source; `at` is where to land in it (`find:<words>`: the first place the words are). */
+  onOpen: (item: string, at?: string) => void;
   /** Ask your library: the query as a question to his sources. */
   onAsk: (question: string) => void;
   /** A skill made from the palette (New skill, New collection). */
@@ -219,7 +220,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen
                 </span>
               </>
             ),
-            run: h.skill ? () => onSkill(h.skill!) : () => onOpen(h.item!),
+            run: h.skill ? () => onSkill(h.skill!) : () => onOpen(h.item!, `find:${query}`),
           })),
         0.01,
       ),

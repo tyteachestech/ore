@@ -830,6 +830,23 @@ journey("⌘K: Esc clears what was typed first, then closes", async (page) => {
   await until("a second Esc closes it", async () => (await input.count()) === 0);
 });
 
+journey("⌘K: a match in the text opens the source at that place, the find bar on the words", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.locator("[cmdk-input]").fill("plausible");
+  await page.locator("[cmdk-item]").filter({ hasText: TESTING }).first().waitFor();
+  await page.keyboard.press("Enter");
+  const bar = page.getByLabel("Find in source");
+  await until("the find bar holds the words", async () => (await bar.count()) === 1 && (await bar.inputValue()) === "plausible");
+  await until("the match is on screen", () =>
+    page.evaluate(() => {
+      const r = [...(CSS.highlights.get("find-on") ?? [])][0] as Range | undefined;
+      const b = r?.getBoundingClientRect();
+      return !!b && b.top >= 0 && b.bottom <= innerHeight;
+    }),
+  );
+  await page.keyboard.press("Escape");
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {
