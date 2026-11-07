@@ -4,7 +4,7 @@ import { $ } from "bun";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  addSkill, addText, findItem, initLibrary, readAnnotations, recordReview, setItemStatus, setSkillLook, updateItemMeta, writeNewCard, startSession, endSession,
+  addSkill, addText, addTutorCard, findItem, initLibrary, readAnnotations, recordReview, setItemStatus, setSkillLook, updateItemMeta, writeCardMeta, writeNewCard, startSession, endSession,
 } from "../../../../packages/core/src/index.ts";
 
 const root = process.argv[2]!;
@@ -98,5 +98,8 @@ const cards = [
 const past = (d: number) => new Date(Date.now() - d * 86400_000);
 for (const [i, c] of cards.slice(0, 4).entries()) await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: past(6 + i) });
 startSession(lib); await recordReview(lib, cards[4]!.meta.id, { rating: 3, confidence: 3 }); endSession(lib);
+// A card the tutor kept yesterday: it knows its source but no passage in it, and is new in review today.
+const kept = await addTutorCard(lib, a3.meta.id, { kind: "card", content_type: "fact", question: "Which word links the Story Spine's middle beats?", answer: "Because.", rubric: [] }, { vendor: "claude", model: "mock", prompt_version: "tutor@3" });
+writeCardMeta(kept, { ...kept.meta, created: past(1).toISOString() });
 addMess(root);
 console.log("seeded", root);

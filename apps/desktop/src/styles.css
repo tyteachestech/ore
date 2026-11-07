@@ -1873,6 +1873,7 @@ button.home-plan:hover { color: var(--text); }
 .review-passage { margin: 18px 0 0; padding: 12px 14px; border-radius: 10px; background: var(--bg-card); border: 1px solid var(--border);; box-shadow: var(--lift); }
 .review-passage blockquote { margin: 0; color: var(--text-read); line-height: 1.55; user-select: text; -webkit-user-select: text; display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
 .review-passage figcaption { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--faint); font-size: 12px; }
+.review-passage figcaption:first-child { margin-top: 0; } /* a card with no passage: just its source */
 .review-passage figcaption span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-passage figcaption button { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 6px; color: var(--muted); }
 .review-passage figcaption button:hover, .review-passage figcaption button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }

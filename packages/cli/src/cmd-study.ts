@@ -41,8 +41,8 @@ export const studyCommands: Record<string, Command> = {
   },
 
   card: {
-    usage: 'show|edit|set|retire|restore <id> [--review] [--variant v] [--question "<q>"] [--answer "<a>"] [--state draft|live]   show parses the card (--review: the version review shows now, a variant in its turn, D66); edit opens $EDITOR; set replaces the question or answer (rubric kept; --variant edits that variant); retire removes it from review; restore undoes a retire, back to --state',
-    options: { question: { type: "string" }, answer: { type: "string" }, state: { type: "string" }, review: { type: "boolean" }, variant: { type: "string" } },
+    usage: 'show|edit|set|retire|restore <id> [--review] [--variant v] [--question "<q>"] [--answer "<a>"] [--point "<key point>"]... [--state draft|live]   show parses the card (--review: the version review shows now, a variant in its turn, D66); edit opens $EDITOR; set replaces the question, answer or key points (--point, one per key point, in order: the whole rubric an Explain card is graded against; --variant edits that variant, its points one for one); retire removes it from review; restore undoes a retire, back to --state',
+    options: { question: { type: "string" }, answer: { type: "string" }, point: { type: "string", multiple: true }, state: { type: "string" }, review: { type: "boolean" }, variant: { type: "string" } },
     async run([sub, ref], f) {
       if (!["show", "edit", "set", "retire", "restore"].includes(sub ?? "")) throw new Error("usage: ore card show|edit|set|retire|restore <id>");
       const lib = openLibrary();
@@ -63,13 +63,13 @@ export const studyCommands: Record<string, Command> = {
         return { data: cardJson(lib, after), text: `Saved ${after.meta.id}` };
       }
       if (sub === "set") {
-        const question = str(f.question), answer = str(f.answer);
-        if (!question?.trim() && !answer?.trim()) throw new Error("give --question or --answer");
+        const question = str(f.question), answer = str(f.answer), rubric = f.point === undefined ? undefined : ([] as string[]).concat(f.point as string | string[]); // not strs: a point may hold a comma
+        if (!question?.trim() && !answer?.trim() && !rubric) throw new Error("give --question, --answer or --point");
         if (f.variant) {
-          const v = await setVariant(lib, id, str(f.variant)!, { question, answer });
+          const v = await setVariant(lib, id, str(f.variant)!, { question, answer, rubric });
           return { data: variantJson(lib, findCard(lib, id), v), text: `Saved variant ${v.id}` };
         }
-        const c = await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, id), { question, answer }));
+        const c = await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, id), { question, answer, rubric }));
         return { data: cardJson(lib, c), text: `Saved ${c.meta.id}` };
       }
       if (sub === "retire" || sub === "restore") {

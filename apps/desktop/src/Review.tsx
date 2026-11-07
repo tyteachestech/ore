@@ -64,10 +64,12 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   /** Answered in his head (D68): no typing, no AI; he marks the key points himself. */
   const [inHead, setInHead] = useState(false);
   /** What answers the card in its source, shown after the answer: the passage it came from, or for a line
-   *  he typed (D99) the quotes the AI found, one at a time. `at` opens the source there. */
+   *  he typed (D99) the quotes the AI found, one at a time. `at` opens the source there. A card with no
+   *  passage (one the tutor kept, or whose highlight is gone) has no quotes and opens the source at the top. */
   const [passage, setPassage] = useState<{ item: string; title: string; quotes: { text: string; at: string; time?: string }[] } | null>(null);
   const [quoteAt, setQuoteAt] = useState(0);
-  const [draft, setDraft] = useState({ question: "", answer: "" });
+  /** The editor's text; `points` is an Explain card's key points, one a line. */
+  const [draft, setDraft] = useState({ question: "", answer: "", points: "" });
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
   /** Each card's Ask chat, kept while he closes and reopens it. */
@@ -90,6 +92,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
    *  review's ts and the session as it was before it. */
   const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; forget: () => void }[]>([]);
   const last = undos.at(-1);
+  /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
+  const retired = useRef(new Set<string>());
   /** Ratings go on the app history (⌘Z) with every other step; while Review is open, taking back its
    *  newest rating also shows that card again. */
   const undoNow = useRef<(ts: string) => boolean>(() => false);
@@ -191,7 +195,6 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   /** The passage the card came from, shown only after the answer (D59). */
   const loadPassage = (c: CardFull) => {
-    if (!c.annotation && !c.evidence?.length) return;
     setQuoteAt(0);
     const at = showing.current;
     ore<{ title: string; body: string; annotations: Annotation[] }>("show", c.item).then(
@@ -199,8 +202,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         if (at !== showing.current) return;
         if (c.evidence?.length)
           return setPassage({ item: c.item, title: s.title, quotes: c.evidence.map((e) => ({ text: e.exact.replace(/\[[\d:.]+\]\s*/g, ""), at: `q:${e.start}:${e.end}`, time: stampBefore(s.body, e.start) })) });
-        const a = s.annotations.find((x) => x.id === c.annotation && x.status !== "deleted");
-        if (a) setPassage({ item: c.item, title: s.title, quotes: [{ text: a.exact, at: a.id }] });
+        const a = c.annotation ? s.annotations.find((x) => x.id === c.annotation && x.status !== "deleted") : undefined;
+        setPassage({ item: c.item, title: s.title, quotes: a ? [{ text: a.exact, at: a.id }] : [] });
       },
       () => {},
     );
@@ -378,7 +381,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       reviewed.current--;
       activeMs.current = last.activeMs;
       setDone(last.done);
-      setQueue(last.queue);
+      setQueue(last.queue.filter((e) => !retired.current.has(e.id)));
       setUndos((u) => u.slice(0, -1));
     } catch (e) {
       notify(errorText(e), "error");
@@ -404,24 +407,25 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   const retire = async () => {
     if (!card || busy) return;
-    // The ratings before it would bring the retired card back with the queue as it was.
-    for (const u of undos) u.forget();
-    setUndos([]);
     setBusy(true);
     try {
       await ore("card", "retire", card.id);
       const { id, state } = card;
+      retired.current.add(id);
       notify(
         entry?.state === "draft" ? "Card deleted" : "Card retired",
         "info",
         () => {
           if (state === "retired") return;
           ore("card", "restore", id, opt("state", state)).then(
-            () => notify("Card restored. It comes back in a later review."),
+            () => {
+              retired.current.delete(id);
+              notify("Card restored. It comes back in a later review.");
+            },
             (e) => notify(errorText(e), "error"),
           );
         },
-        () => void ore("card", "retire", id).catch((e) => notify(errorText(e), "error")),
+        () => void ore("card", "retire", id).then(() => void retired.current.add(id), (e) => notify(errorText(e), "error")),
       );
       advance(false);
     } catch (e) {
@@ -457,26 +461,32 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   const edit = () => {
     if (!card) return;
-    setDraft({ question: card.question, answer: card.answer });
+    setDraft({ question: card.question, answer: card.answer, points: card.rubric.join("\n") });
     setPhase("edit");
   };
 
-  /** A card's new wording, on the history: undo puts the old words back (and on screen, if it still is). */
-  const setText = async (c: CardFull, question: string, answer: string, undoable = true) => {
-    const was = { question: c.question, answer: c.answer };
-    const saved = await ore<CardFull>("card", "set", c.id, opt("question", question), opt("answer", answer), ...variantOpt(c));
+  /** A card's new wording, and an Explain card's key points when given, on the history: undo puts the old
+   *  ones back (and on screen, if it still is). */
+  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true) => {
+    const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
+    const saved = await ore<CardFull>("card", "set", c.id, opt("question", question), opt("answer", answer), ...(rubric ?? []).map((p) => opt("point", p)), ...variantOpt(c));
     setCard((cur) => (cur?.id === c.id ? saved : cur));
+    // Marks stay with the points they were on; a point added has none yet.
+    if (rubric) setMarks((m) => m && saved.rubric.map((_, i) => m[i]));
     if (undoable) {
-      const put = (w: typeof was) => () => void setText(c, w.question, w.answer, false).catch((e) => notify(errorText(e), "error"));
-      notify("Card edit", "quiet", put(was), put({ question, answer }));
+      const put = (w: typeof was) => () => void setText(c, w.question, w.answer, w.rubric, false).catch((e) => notify(errorText(e), "error"));
+      notify("Card edit", "quiet", put(was), put({ question, answer, rubric }));
     }
   };
 
+  const draftPoints = draft.points.split("\n").map((p) => p.trim()).filter(Boolean);
+  const draftOk = !!draft.question.trim() && !!draft.answer.trim() && (card?.kind !== "prompt" || draftPoints.length > 0);
+
   const saveEdit = async () => {
-    if (!card || busy || !draft.question.trim() || !draft.answer.trim()) return;
+    if (!card || busy || !draftOk) return;
     setBusy(true);
     try {
-      await setText(card, draft.question, draft.answer);
+      await setText(card, draft.question, draft.answer, card.kind === "prompt" ? draftPoints : undefined);
       setPhase("checked");
     } catch (e) {
       notify(errorText(e), "error");
@@ -653,7 +663,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
             </div>
 
             {phase === "edit" ? (
-              <EditCard draft={draft} setDraft={setDraft} busy={busy} onSave={() => void saveEdit()} onCancel={() => setPhase("checked")} />
+              <EditCard draft={draft} setDraft={setDraft} points={card.kind === "prompt"} ok={draftOk} busy={busy} onSave={() => void saveEdit()} onCancel={() => setPhase("checked")} />
             ) : (
               <h1 className="review-q">{card.question}</h1>
             )}
@@ -787,16 +797,16 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
                         </Hint>
                       </div>
                     ) : (
-                      <blockquote>{passage.quotes[0]!.text}</blockquote>
+                      passage.quotes[0] && <blockquote>{passage.quotes[0].text}</blockquote>
                     )}
                     <figcaption>
                       <span>
-                        {passage.quotes[quoteAt]!.time && <span className="review-time">{passage.quotes[quoteAt]!.time} · </span>}
+                        {passage.quotes[quoteAt]?.time && <span className="review-time">{passage.quotes[quoteAt]!.time} · </span>}
                         {passage.title}
                       </span>
                       <button
                         // The session stays open: leaving the source picks it up again on this card.
-                        onClick={() => onOpenSource(passage.item, passage.quotes[quoteAt]!.at)}
+                        onClick={() => onOpenSource(passage.item, passage.quotes[quoteAt]?.at)}
                       >
                         Open in source <ArrowSquareOut size={12} aria-hidden="true" />
                       </button>
@@ -921,9 +931,12 @@ function Sure({ refEl, conf, onPick }: { refEl: React.RefObject<HTMLDivElement |
   );
 }
 
-function EditCard({ draft, setDraft, busy, onSave, onCancel }: {
-  draft: { question: string; answer: string };
-  setDraft: (d: { question: string; answer: string }) => void;
+function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
+  draft: { question: string; answer: string; points: string };
+  setDraft: (d: { question: string; answer: string; points: string }) => void;
+  /** An Explain card: its key points, what his answer is marked against, are edited too. */
+  points: boolean;
+  ok: boolean;
   busy: boolean;
   onSave: () => void;
   onCancel: () => void;
@@ -934,12 +947,20 @@ function EditCard({ draft, setDraft, busy, onSave, onCancel }: {
       <Grow id="edit-q" autoFocus className="field quiz-answer short" value={draft.question} onChange={(e) => setDraft({ ...draft, question: e.target.value })} />
       <label className="quiz-label" htmlFor="edit-a">Answer</label>
       <Grow id="edit-a" className="field quiz-answer" value={draft.answer} onChange={(e) => setDraft({ ...draft, answer: e.target.value })} />
+      {points && (
+        <>
+          <Hint text="One key point a line: what an answer is marked against">
+            <label className="quiz-label" htmlFor="edit-p">Key points</label>
+          </Hint>
+          <Grow id="edit-p" className="field quiz-answer" value={draft.points} onChange={(e) => setDraft({ ...draft, points: e.target.value })} />
+        </>
+      )}
       <div className="review-foot">
         <button className="quiz-ghost" onClick={onCancel}>
           Cancel
         </button>
         <Hint text="Save card" keys="finish" side="top">
-          <button className="pill-btn quiz-go" disabled={busy || !draft.question.trim() || !draft.answer.trim()} onClick={onSave}>
+          <button className="pill-btn quiz-go" disabled={busy || !ok} onClick={onSave}>
             Save
           </button>
         </Hint>
