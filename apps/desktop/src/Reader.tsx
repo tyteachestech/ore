@@ -28,7 +28,7 @@ import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { findChapterEnds, Margin, type ChapterEnd, type MarginHandle } from "./Margin";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
-import { SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
+import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
 import { QuestionsPanel } from "./Questions";
 import { Position } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
@@ -2609,7 +2609,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       )}
       {/* On the phone the note stays beside the source, a swipe away, so each keeps its place. */}
       {(notesShown || questionsShown || (PHONE && !closedBook)) && (
-        <SidePanel tab={p.sideTab} onTab={(t) => p.onShowSide(t, true)} bodyRef={sideBody}>
+        <SidePanel tab={p.sideTab} onTab={(t) => p.onShowSide(t, true)} bodyRef={sideBody} onBodyMouseDown={p.sideTab === "note" ? clickBelow(notesField) : undefined}>
           {notesShown || (PHONE && !questionsShown) ? (
             <SourceNoteBody
               id={p.id}
