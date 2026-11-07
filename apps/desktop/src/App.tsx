@@ -1985,9 +1985,10 @@ export function App() {
             onRefile={(i, next, before, k) => void refile(sourceFiling(i), next, before, k)}
             onCreateSkill={createSkill}
             onSettings={() => setSettings({ section: "review" })}
-            // Rename edits a list row's title in place, and Home has no such row; the shortcuts act on
-            // the list's selected row, so Home shows none.
+            // Home renames its own rows (onRename); the shortcuts act on the list's selected row, so
+            // Home shows none.
             sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => ({ ...a, hint: undefined }))}
+            onRename={(i, t) => void retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
             notify={notify}
           />

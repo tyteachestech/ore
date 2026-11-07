@@ -458,6 +458,26 @@ journey("source title: one click renames it in place, Enter saves, Esc keeps the
   await until("⌘Z puts the old title back", async () => (await page.locator(".doc-head h1").innerText()) === AGENTS);
 });
 
+journey("Home: Continue reading rows rename from their menu, in place; Esc keeps the title, ⌘Z takes it back", async (page) => {
+  const row = page.locator(".home-read").filter({ hasText: "The Testing Effect" }).first();
+  await row.waitFor();
+  const title = () => row.locator(".title").innerText();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
+  await page.keyboard.press("Escape");
+  await until("Esc keeps the old title", async () => (await title()) === TESTING);
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
+  await page.keyboard.press("Enter");
+  const renamed = page.locator(".home-read").filter({ hasText: "Testing, renamed" });
+  await until("Enter saves it", async () => (await renamed.count()) === 1);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the old title back", async () => (await row.locator(".title").count()) === 1 && (await title()) === TESTING);
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {
