@@ -223,3 +223,14 @@
 .popup-tools { border-left: 0; padding-left: 2px; }
 .popup-tools .intent { color: var(--faint); border-radius: 6px; }
 .popup-tools .intent:hover { color: var(--text); background: var(--bg-hover); }
+
+/* Settle (D129): closing the popup on a typed or noted highlight. Ease-out under 300 ms (review-animations
+   STANDARDS); `translate` and `scale` compose with the inline positioning transforms. */
+.popup.leaving { pointer-events: none; transition: opacity 140ms cubic-bezier(0.23, 1, 0.32, 1), translate 140ms cubic-bezier(0.23, 1, 0.32, 1), scale 140ms cubic-bezier(0.23, 1, 0.32, 1); }
+.popup.leaving.gone { opacity: 0; translate: 0 -6px; scale: 0.97; }
+.mark-icon.settle { animation: settle-pop 180ms steps(3, jump-end); }
+@keyframes settle-pop { 0% { scale: 0.6; } 50% { scale: 1.25; } 100% { scale: 1; } }
+.settle-glow { position: absolute; inset: 0; pointer-events: none; opacity: 0; animation: settle-glow 420ms cubic-bezier(0.23, 1, 0.32, 1); --glow: var(--keep); }
+.settle-glow.card { --glow: var(--card); } .settle-glow.question { --glow: var(--question); } .settle-glow.apply { --glow: var(--apply); }
+.settle-glow i { position: absolute; background: var(--glow); border-radius: 2px; }
+@keyframes settle-glow { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }

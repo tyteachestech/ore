@@ -55,7 +55,7 @@ export const Marks = memo(function Marks({ marks }: { marks: Mark[] }) {
         const text = m.kind === "evidence" ? "In the source: backs up a key point" : LABEL[m.kind];
         return (
           <Hint key={m.key} text={text} side="left">
-            <button tabIndex={-1} className={`mark-icon ${m.kind}`} aria-label={text} style={{ top, left }} onClick={m.open}>
+            <button tabIndex={-1} className={`mark-icon ${m.kind}`} data-key={m.key} aria-label={text} style={{ top, left }} onClick={m.open}>
               <Glyph size={13} weight="bold" aria-hidden="true" />
             </button>
           </Hint>
