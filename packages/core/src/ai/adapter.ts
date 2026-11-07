@@ -23,14 +23,44 @@ export interface AgentTask<T> {
 /** What one run passes to the vendor's CLI. */
 interface RunOpts { model?: string }
 
+/** What a run spent, as the vendor reports it: claude gives a dollar figure, codex only tokens. */
+export interface Usage { input_tokens: number; output_tokens: number; cost_usd?: number }
+
 export interface AgentResult<T> {
   data: T;
   ai: AiStamp;
+  usage: Usage; // summed over retries
 }
 
 interface RawRun {
   output: unknown; // parsed JSON (or a string to parse)
   model: string;
+  usage: Usage;
+}
+
+const addUsage = (a: Usage, b: Usage): Usage => ({
+  input_tokens: a.input_tokens + b.input_tokens,
+  output_tokens: a.output_tokens + b.output_tokens,
+  ...(a.cost_usd !== undefined || b.cost_usd !== undefined ? { cost_usd: (a.cost_usd ?? 0) + (b.cost_usd ?? 0) } : {}),
+});
+
+type ClaudeOut = { total_cost_usd?: number; usage?: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } };
+const claudeUsage = (o: ClaudeOut): Usage => ({
+  input_tokens: (o.usage?.input_tokens ?? 0) + (o.usage?.cache_creation_input_tokens ?? 0) + (o.usage?.cache_read_input_tokens ?? 0),
+  output_tokens: o.usage?.output_tokens ?? 0,
+  ...(typeof o.total_cost_usd === "number" ? { cost_usd: o.total_cost_usd } : {}),
+});
+
+/** Token counts from codex's `--json` events (`turn.completed` carries each turn's usage). */
+export function codexUsage(stdout: string): Usage {
+  let u: Usage = { input_tokens: 0, output_tokens: 0 };
+  for (const line of stdout.split("\n")) {
+    try {
+      const e = JSON.parse(line) as { type?: string; usage?: { input_tokens?: number; output_tokens?: number } };
+      if (e.type === "turn.completed" && e.usage) u = addUsage(u, { input_tokens: e.usage.input_tokens ?? 0, output_tokens: e.usage.output_tokens ?? 0 });
+    } catch { /* not an event line */ }
+  }
+  return u;
 }
 
 export function chooseVendor(lib: Library): Vendor {
@@ -105,7 +135,7 @@ export function vendorFailure(vendor: Vendor, r: Exec): Error {
 
 /** A `claude -p --output-format json` run's result, or why it failed. */
 function claudeResult(r: Exec) {
-  let out: { is_error?: boolean; result?: string; structured_output?: unknown; modelUsage?: Record<string, { outputTokens?: number }> };
+  let out: ClaudeOut & { is_error?: boolean; result?: string; structured_output?: unknown; modelUsage?: Record<string, { outputTokens?: number }> };
   try {
     out = JSON.parse(r.stdout);
   } catch {
@@ -137,7 +167,7 @@ async function runClaude(system: string, message: string, schema: object, task: 
   ];
   const out = claudeResult(await exec(cmd, task.cwd));
   const usage = Object.entries(out.modelUsage ?? {}).sort((a, b) => (b[1].outputTokens ?? 0) - (a[1].outputTokens ?? 0));
-  return { output: out.structured_output ?? out.result, model: usage[0]?.[0] ?? model ?? "claude-default" };
+  return { output: out.structured_output ?? out.result, model: usage[0]?.[0] ?? model ?? "claude-default", usage: claudeUsage(out) };
 }
 
 function codexConfiguredModel(): string | undefined {
@@ -166,7 +196,7 @@ async function runCodex(system: string, message: string, schema: object, task: A
   try {
     const r = await exec(cmd, task.cwd);
     if (r.code !== 0 || !existsSync(outPath)) throw vendorFailure("codex", r);
-    return { output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default" };
+    return { output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default", usage: codexUsage(r.stdout) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -188,14 +218,16 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
   const opts = { model: aiModel(lib, vendor) };
   let message = userMessage(task.input, task.files ?? []);
   let lastError = "";
+  let usage: Usage = { input_tokens: 0, output_tokens: 0 };
   for (let attempt = 1; attempt <= 2; attempt++) {
     const raw = await run(prompt.text, message, schema, task as AgentTask<unknown>, opts);
+    usage = addUsage(usage, raw.usage);
     try {
       const parsed = task.schema.safeParse(parseOutput(raw.output));
       if (!parsed.success) throw new Error(parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
       const problem = task.check?.(parsed.data);
       if (problem) throw new Error(problem);
-      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version } };
+      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage };
     } catch (e) {
       lastError = (e as Error).message;
       message = `${userMessage(task.input, task.files ?? [])}\n\nYour previous output was invalid: ${lastError}\nReturn only JSON that matches the schema.`;
