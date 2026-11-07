@@ -295,7 +295,7 @@ img.thumb { filter: brightness(0.86); }
    skill colour). Flex-centred so emoji and glyph icons sit on the text's midline. */
 .chip { display: inline-flex; align-items: center; gap: 4px; height: 18px; font-size: 11px; line-height: 1; color: var(--text); background: var(--bg-active); border: 0; border-radius: 9px; padding: 0 7px; white-space: nowrap; max-width: min(100%, 28ch); }
 /* A long skill name ends in … (its whole name on hover, SkillChip) instead of pushing the card wider. */
-.chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 16px; } /* tall enough for g and y */
 .chip[data-color] { background: color-mix(in srgb, var(--skill) 40%, var(--bg-card)); }
 .chip .icon { vertical-align: 0; line-height: 1; }
 :root[data-chips="icon"] .chip:has(> .icon) { padding: 0 5px; }
@@ -1294,6 +1294,8 @@ body.resizing iframe { pointer-events: none; }
 .col-divider:hover::after, .skill-cols.dragging .col-divider::after { background: var(--accent); }
 .skill-cols.wide > :is(.col-divider, .skill-col.side) { display: none; }
 .skill-col { min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 40px; display: flex; flex-direction: column; gap: 20px; }
+/* Room for the rows' 6px hover bleed (.fold-body), which would otherwise give the column a horizontal scrollbar. */
+.skill-col { padding-inline: 6px; margin-inline: -6px; }
 .skill-col.side { container-type: inline-size; }
 .skill-card { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px 12px;; box-shadow: var(--lift); }
 .skill-note { padding: 12px 18px 18px; }
@@ -1438,7 +1440,6 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 @keyframes try-pop { from { transform: scale(0.4); } to { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .try.done .try-check svg { animation: none; } }
 .try-quote.question-quote { padding-left: 8px; }
-.try-quote.question-quote::before { content: none; }
 .try-quote .note { margin: 0 0 2px; color: var(--text); }
 .try-quote .exact { color: var(--text-read); }
 .try.done .try-quote .note, .try.done .try-quote .exact { color: var(--faint); }
@@ -1449,10 +1450,8 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .skill-col.side .try .question-actions { position: absolute; top: 4px; right: 4px; margin: 0; padding: 2px; border-radius: 6px; background: var(--bg-raised); border: 1px solid var(--border); visibility: hidden; }
 .skill-col.side .try:hover .question-actions, .skill-col.side .try:focus-within .question-actions { visibility: visible; }
 .question-quote { position: relative; display: block; width: 100%; text-align: left; padding: 7px 8px 7px 34px; border-radius: 8px; }
-.question-quote::before {
-  content: "?"; position: absolute; left: 8px; top: 8px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
-  font-size: 11px; font-weight: 700; color: var(--question-solid); background: color-mix(in srgb, var(--question-solid) 20%, transparent);
-}
+/* The same pixel ? as the Questions header, on the first line's midline. */
+.question-quote .question-mark { position: absolute; left: 10px; top: 10px; color: var(--question-solid); }
 .question-actions { padding-left: 26px; }
 /* In the panel a question is one compact row; its actions appear on hover, Linear-style. */
 .skill-col.side .question { position: relative; }
@@ -1776,7 +1775,8 @@ button.home-plan:hover { color: var(--text); }
 .home-skill:hover { background: var(--bg-hover); }
 .home-skill:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .home-skill-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.home-skill .mark { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; }
+.home-skill .mark { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; }
+.home-skill .mark.tile .skill-icon { font-size: 14px; } /* a few px of tile around the emoji */
 .home-skill .mark.tile { background: color-mix(in srgb, var(--skill) 17%, transparent); }
 .home-skill-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-level { display: flex; align-items: center; gap: 8px; }
@@ -1807,6 +1807,9 @@ button.home-plan:hover { color: var(--text); }
 .home-read .chips-button { max-width: 40%; overflow: hidden; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
 .home-read .chip { min-width: 0; }
+/* The same 16:9 picture as the source list (D114), big enough to know a source by. */
+.home-read { height: 52px; }
+.home-read .thumb { width: 64px; height: 36px; }
 .home-read .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-read .row-rename { flex: 1; min-width: 0; height: 26px; margin: 0 -6px; padding: 0 6px; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: inherit; color: var(--text); }
 .home-read .course-of { flex: none; max-width: 35%; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

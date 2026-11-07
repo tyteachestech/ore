@@ -626,9 +626,12 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
     setReflecting(done ? t.id : null);
     if (done) setRecent((r) => [...r, t.id]);
   };
-  const reflect = (t: Try, text: string) => {
+  /** Its draft goes once it is saved; a failed save opens the field again with every word. */
+  const reflect = async (t: Try, text: string) => {
     setReflecting(null);
-    if (text && text !== t.reflection) void change(t, { status: "done", reflection: text }, "Saved how it went · a card comes from it");
+    if (!text || text === t.reflection) return void reflections.delete(t.id);
+    if (await change(t, { status: "done", reflection: text }, "Saved how it went · a card comes from it")) reflections.delete(t.id);
+    else setReflecting(t.id);
   };
   const remove = async (t: Try) => {
     let at = -1;
@@ -655,7 +658,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
   const open = ts.filter((t) => t.status !== "done");
   const tried = ts.filter((t) => t.status === "done");
   const row = (t: Try) => (
-    <TryRow key={t.id} t={t} reflecting={reflecting === t.id} onCheck={() => void check(t)} onReflect={(on) => setReflecting(on ? t.id : null)} onSave={(text) => reflect(t, text)} onPassage={() => onPassage(t)} onRemove={() => void remove(t)} />
+    <TryRow key={t.id} t={t} reflecting={reflecting === t.id} onCheck={() => void check(t)} onReflect={(on) => setReflecting(on ? t.id : null)} onSave={(text) => void reflect(t, text)} onPassage={() => onPassage(t)} onRemove={() => void remove(t)} />
   );
   return (
     <Fold id="tries" title="To try" icon={PixelTry} tone="apply" summary={open.length ? `${open.length} to try` : null} summaryFolded>
@@ -743,7 +746,6 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
           e.stopPropagation();
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            reflections.delete(id);
             onSave(v.trim());
           } else if (e.key === "Escape") {
             e.preventDefault();
@@ -833,11 +835,13 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
     <div className={`question${done ? " done" : ""}`}>
       {own ? (
         <button className="question-quote" onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
+          <PixelQuestion className="question-mark" aria-hidden="true" />
           <span className="exact">{exact}</span>
         </button>
       ) : (
         <Hint text="Open this passage">
           <button className="question-quote" onClick={() => onQuestion(q)}>
+            <PixelQuestion className="question-mark" aria-hidden="true" />
             <span className="exact">“{exact}”</span>
             {q.note && <span className="note">{q.note}</span>}
             <span className="from">{q.item_title}</span>

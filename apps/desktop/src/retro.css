@@ -114,6 +114,8 @@
 .row, .home-read, .side-item, .chip, .icon-button, .icon-btn, .skill-badge, .pick-row, .gem-ring-lv, [cmdk-item],
 .panel, .popover, .popover.menu, .toast, .popup, .quiz, .mynotes-text, .review-passage, .quiz-answer, .quiz-leave, .quiz-verdict, .quiz-stepper, .field { border-radius: 0; }
 .chip { background: transparent; box-shadow: inset 0 0 0 1px var(--border); font-size: 11px; }
+/* Square like the chips, so the group's round clip doesn't join two pills into one shape. */
+.chips-button { border-radius: 0; }
 
 /* Primary buttons: flat paper white, mono caps (claude.dev's "Try Claude Code"). */
 .pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 0; font-family: var(--mono); font-weight: 500; letter-spacing: 0.06em; }
