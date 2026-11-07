@@ -3,6 +3,7 @@ import { History, type Step } from "./history";
 import { CHECK, CROSS, PixelSpin, Sprite } from "./Working";
 import { Hint } from "./Hint";
 import { is } from "./keys";
+import { X } from "./icons";
 import { errorText, type Notify } from "./util";
 
 /** `done`: how much of a long step is finished (0 to 1), drawn as a bar along the toast's foot.
@@ -15,7 +16,7 @@ type Toast = {
   offer?: "undo" | "redo";
   step?: Step;
   show?: () => void;
-  /** Stays until its Try again is pressed: the only way back to what failed. */
+  /** Stays until its Try again is pressed (the only way back to what failed) or its × lets it go. */
   stay?: boolean;
   done?: number;
   cancel?: () => void;
@@ -194,6 +195,11 @@ export function useToast() {
               }}
             >
               {t.kind === "error" ? "Try again" : "Show"}
+            </button>
+          )}
+          {t.stay && (
+            <button className="icon-btn toast-x" aria-label="Dismiss" onClick={() => drop(t.id)}>
+              <X size={12} aria-hidden="true" />
             </button>
           )}
           {t.offer === "undo" && (

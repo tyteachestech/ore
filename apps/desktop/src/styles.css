@@ -474,6 +474,8 @@ img.thumb { filter: brightness(0.86); }
 @media (prefers-reduced-motion: reduce) { .toast-bar > span { transition: none; } }
 .toast-undo { flex: none; color: var(--accent); font-weight: 600; margin: -4px -6px -4px 0; padding: 4px 6px; border-radius: 6px; }
 .toast-undo:hover { background: var(--bg-hover); }
+/* A staying toast's ×: the plain icon button, pulled into the toast's padding so the toast keeps its height. */
+.toast-x { flex: none; margin: -4px -8px -4px -6px; }
 /* kind is a data attribute: a class "info" would pick up the ⓘ button style */
 .toast[data-kind="error"] { color: var(--error); user-select: text; -webkit-user-select: text; cursor: text; }
 /* Add a source (⌘N): paste anything; files dropped on the window */

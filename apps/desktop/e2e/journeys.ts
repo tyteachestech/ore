@@ -1344,7 +1344,7 @@ async function drawNew(page: Page, before?: () => Promise<void>) {
   await page.mouse.up();
 }
 
-journey("diagram: a new one left before its first save comes back is linked once, and one whose save fails is kept with Try again", async (page) => {
+journey("diagram: a new one left before its first save comes back is linked once, and one whose save fails is kept with Try again or let go with its ×", async (page) => {
   type W = { __ORE_SLOW?: object; __ORE_FAIL?: object };
   await openDone(page, "The Story Spine"); // no other journey draws here
   const drawings = page.locator(".note-editor .note-diagram-view > svg");
@@ -1366,6 +1366,15 @@ journey("diagram: a new one left before its first save comes back is linked once
   await page.getByRole("tab", { name: "Source note" }).click();
   await until("Try again saves and links it", async () => (await drawings.count()) === 2, 8000);
   await Bun.sleep(1200); // the note saves
+  // A third one's save fails too, and he lets it go: its × closes the toast, and the drawing is gone.
+  await drawNew(page, () => page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = { diagram: "The disk is still full." })));
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const third = page.locator(".toast[role=alert]").filter({ hasText: "The disk is still full." });
+  await third.waitFor();
+  await third.getByRole("button", { name: "Dismiss" }).click();
+  await until("its × closes the toast", async () => (await third.count()) === 0);
+  await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = {}));
+  await page.getByRole("tab", { name: "Source note" }).click();
   await page.reload();
   await openDone(page, "The Story Spine");
   await until("both are linked once each after a reload", async () => (await drawings.count()) === 2 && (await page.locator(".note-editor .note-diagram").count()) === 2);
