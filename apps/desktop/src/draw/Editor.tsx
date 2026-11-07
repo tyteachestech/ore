@@ -26,6 +26,7 @@ import { placeQuick, useStyleControls } from "./quick";
 type View = { x: number; y: number; zoom: number };
 type Editing = { id: string; kind: "label" | "text"; then?: string; fresh?: boolean };
 type Files = Record<string, { dataURL?: string; mimeType?: string; id?: string; created?: number }>;
+type Step = { els: El[]; sel: string[] };
 type Gesture =
   | { kind: "move"; start: Pt; before: El[]; ids: Set<string>; box: Box; others: Box[]; dx: number; dy: number; pick?: string[] }
   | { kind: "marquee"; start: Pt; end: Pt; add: string[] }
@@ -132,7 +133,10 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const svg = useRef<SVGSVGElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const g = useRef<Gesture | null>(null);
-  const hist = useRef<{ past: El[][]; future: El[][] }>({ past: [], future: [] });
+  // Each step keeps the scene and what was selected, so undo brings a deleted box back selected and
+  // a run of moves back on the shapes it moved (Excalidraw, Figma).
+  const hist = useRef<{ past: Step[]; future: Step[] }>({ past: [], future: [] });
+  const nudging = useRef<string | null>(null); // the selection a run of arrow-key nudges is moving, one undo step
   const live = useRef({ els, sel, view, files, editing, draft, style });
   live.current = { els, sel, view, files, editing, draft, style };
   const styleClip = useRef<Partial<El> | null>(null);
@@ -155,33 +159,49 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   /** Applies an edit as one undo step. */
   const apply = useCallback((next: El[], ids?: string[], nextFiles?: Files) => {
     const h = hist.current;
-    h.past.push(live.current.els);
+    h.past.push({ els: live.current.els, sel: live.current.sel });
     if (h.past.length > 300) h.past.shift();
     h.future = [];
+    nudging.current = null;
     setEls(next, nextFiles);
     if (ids) setSel(ids);
   }, [setEls, setSel]);
   /** Records `before` as an undo step for a change to `next` (the scene now, unless given). */
   const recordFrom = (before: El[], next: El[] = live.current.els) => {
     if (before === next || (before.length === next.length && JSON.stringify(before) === JSON.stringify(next))) return;
-    hist.current.past.push(before);
+    hist.current.past.push({ els: before, sel: live.current.sel });
     hist.current.future = [];
+    nudging.current = null;
+  };
+  /** Restores a step: its scene, and its selection where it still exists, so the next key acts on
+   *  what came back. */
+  const restore = (step: Step) => {
+    nudging.current = null;
+    setEls(step.els);
+    setSel(step.sel.filter((id) => step.els.some((e) => e.id === id && !e.locked)));
   };
   const undo = () => {
     const h = hist.current;
     const p = h.past.pop();
     if (!p) return;
-    h.future.push(live.current.els);
-    setEls(p);
-    setSel(live.current.sel.filter((id) => p.some((e) => e.id === id)));
+    h.future.push({ els: live.current.els, sel: live.current.sel });
+    restore(p);
   };
   const redo = () => {
     const h = hist.current;
     const n = h.future.pop();
     if (!n) return;
-    h.past.push(live.current.els);
-    setEls(n);
-    setSel(live.current.sel.filter((id) => n.some((e) => e.id === id)));
+    h.past.push({ els: live.current.els, sel: live.current.sel });
+    restore(n);
+  };
+  /** A run of arrow-key nudges on one selection is a single undo step (Figma); anything else recorded
+   *  in between, or a new selection, starts a new one. */
+  const nudge = (dx: number, dy: number) => {
+    const key = [...live.current.sel].sort().join(" ");
+    const next = move(live.current.els, selIds(), dx, dy);
+    if (nudging.current === key) setEls(next);
+    else apply(next);
+    nudging.current = key;
   };
 
   const map = useMemo(() => byId(els), [els]);
@@ -356,14 +376,6 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     const els = [...live.current.els, { ...t, y: p[1] - (t.height / 2) }];
     apply(els, [t.id]);
     startEdit(t.id, "text", { fresh: true });
-  };
-  const addNodeAtCentre = (type: Shape) => {
-    const v = live.current.view;
-    const { w, h } = size();
-    const c: Pt = [v.x + w / 2 / v.zoom, v.y + h / 2 / v.zoom];
-    const el = shape(type, { x: c[0] - 80, y: c[1] - 32, w: 160, h: 64 }, live.current.style);
-    apply([...live.current.els, el], [el.id]);
-    startEdit(el.id, "label", { fresh: true });
   };
   const viewCentre = (): Pt => {
     const v = live.current.view;
@@ -667,7 +679,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       e.preventDefault();
       const d = e.shiftKey ? GRID : 1;
       const [dx, dy] = dir === "right" ? [d, 0] : dir === "left" ? [-d, 0] : dir === "down" ? [0, d] : [0, -d];
-      return apply(move(live.current.els, selIds(), dx, dy));
+      return nudge(dx, dy);
     }
     // Tab on a node grows the map; with nothing picked it moves focus to the toolbars, and ⌥+arrow picks a node.
     if (e.key === "Tab" && !e.metaKey && selected.length === 1) {
@@ -1111,7 +1123,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       if (dist(cur.start, absPoints(el).at(-1)!) < 4 / live.current.view.zoom) {
         // A click, not a drag: draw point by point; Enter, Esc or double-click finishes.
         setEls(els.map((x) => (x.id === cur.id ? withPoints(x, [cur.start, toScene(e.clientX, e.clientY)]) : x)));
-        hist.current.past.push(cur.before);
+        hist.current.past.push({ els: cur.before, sel: [] });
         hist.current.future = [];
         return setMulti(cur.id);
       }
@@ -1154,7 +1166,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     if (pts.length < 2) {
       setEls(els.filter((x) => x.id !== id));
       hist.current.past.pop();
-      return;
+      return toolDone();
     }
     let next = withPoints(m, pts);
     if (m.type === "arrow") {
@@ -1397,8 +1409,12 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     return { left: (e.x - view.x) * z, top: (e.y - view.y) * z, width: (m.width + fs) * z, height: m.height * z, font: fs * z, fam, align: (e.textAlign ?? "left") as "left" | "center" | "right", angle: e.angle, colour: dark(e.strokeColor), wrap: false };
   })();
 
+  // Editing text already there starts with all of it selected, so typing replaces it and ⌘→ or a click
+  // places the caret (Excalidraw, Figma, a spreadsheet cell on Tab); a fresh box has nothing to select.
   useLayoutEffect(() => {
-    if (editing) area.current?.focus({ preventScroll: true });
+    if (!editing) return;
+    area.current?.focus({ preventScroll: true });
+    area.current?.select();
   }, [editing]);
 
   const onAreaKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
