@@ -417,5 +417,6 @@ export const clickBelow = (editorRef: RefObject<NoteEditorHandle | null>) => (e:
   const t = e.target as HTMLElement;
   if (e.button !== 0 || !(t === e.currentTarget || t.classList.contains("note-editor"))) return;
   e.preventDefault();
+  e.stopPropagation(); // the skill note's card sits in its column, and both listen
   editorRef.current?.focusEnd();
 };
