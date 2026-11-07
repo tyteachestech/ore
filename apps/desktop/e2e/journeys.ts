@@ -757,6 +757,37 @@ journey("skill note: coming back to a long note puts it where he left it", async
   await ore(["notes", "--skill=learning", `--set=${was}`]);
 });
 
+journey("answer pieces: one click rewrites a piece in place, ⌘Z puts the old words back; emptied, it goes with Undo", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Answer…" }).click();
+  const box = page.getByLabel("Your answer to Does this hold for kids?");
+  await box.fill("Mostly yes.");
+  await page.keyboard.press("Enter");
+  const piece = page.getByRole("button", { name: "Edit: Mostly yes." });
+  await piece.click();
+  const edit = page.getByLabel("Edit this part of your answer");
+  await edit.fill("Yes, from about age 8.");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Edit: Yes, from about age 8." }).waitFor();
+  await page.locator(".skill-page, main").first().click({ position: { x: 2, y: 2 } }).catch(() => {});
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await piece.waitFor();
+  await piece.click();
+  await edit.fill("");
+  await page.keyboard.press("Enter");
+  await until("emptied, it goes", async () => (await piece.count()) === 0);
+  await page.locator(".toast").filter({ hasText: "Removed from your answer" }).getByRole("button", { name: "Undo" }).click();
+  await piece.waitFor();
+  // Leave the question as the seed had it.
+  await piece.click();
+  await edit.fill("");
+  await page.keyboard.press("Enter");
+  await until("the piece is gone again", async () => (await piece.count()) === 0);
+  await page.waitForTimeout(300);
+});
+
 journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page) => {
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const open = () => page.getByText("Does this hold for kids?", { exact: true }).filter({ visible: true }).count();

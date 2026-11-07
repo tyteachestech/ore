@@ -26,6 +26,20 @@ describe("questions → answers and sources (D75)", () => {
     expect(findAnnotation(lib, q.id).annotation.answers).toHaveLength(1);
   });
 
+  test("a contribution can be rewritten in place: same place, same source, new words", async () => {
+    const lib = await tempLibrary();
+    const { annotation: q } = await addSnippet(lib, { text: "How long should the gap be?", intent: "question" });
+    const a = await addText(lib, ARTICLE);
+    await answerQuestion(lib, q.id, { text: "About 10%.", item: a.meta.id });
+    await answerQuestion(lib, q.id, { text: "Err long." });
+    const ts = findAnnotation(lib, q.id).annotation.answers![0]!.ts;
+    const { question } = await answerQuestion(lib, q.id, { edit: ts, text: "About a tenth of the delay." });
+    expect(question.answers!.map((c) => [c.text, c.item])).toEqual([["About a tenth of the delay.", a.meta.id], ["Err long.", undefined]]);
+    expect(question.answers![0]!.ts).toBe(ts);
+    await expect(answerQuestion(lib, q.id, { edit: ts })).rejects.toThrow(/--text/);
+    await expect(answerQuestion(lib, q.id, { edit: "nope", text: "x" })).rejects.toThrow(/no contribution/);
+  });
+
   test("Answered closes it; Answered + card also asks enrich for a card from his answer", async () => {
     const lib = await tempLibrary();
     const { item, annotation: q } = await addSnippet(lib, { text: "Why space practice?", intent: "question" });
