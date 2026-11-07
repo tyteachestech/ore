@@ -127,3 +127,15 @@ describe("Ask your library: answers", () => {
     expect(askLibrary(lib, "  ")).rejects.toThrow("question is empty");
   });
 });
+
+describe("Ask your library: how a quote reads", () => {
+  test("a quote keeps its exact Markdown for the jump, and reads as plain text: link text without its URL, no emphasis marks", async () => {
+    const lib = await tempLibrary();
+    await createItem(lib, { type: "article", title: "SR", body: "**Spaced repetition** is an [evidence-based learning](https://en.wikipedia.org/wiki/X \"X\") technique done with *flashcards*.[^1]" });
+    const quote = '**Spaced repetition** is an [evidence-based learning](https://en.wikipedia.org/wiki/X "X") technique done with *flashcards*.';
+    fakeClaude([{ found: true, answer: "A technique [1].", citations: [{ passage: "P1", quote }] }]);
+    const c = (await askLibrary(lib, "What is spaced repetition?")).citations[0]!;
+    expect(c.quote).toBe(quote);
+    expect(c.text).toBe("Spaced repetition is an evidence-based learning technique done with flashcards.");
+  });
+});

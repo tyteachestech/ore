@@ -100,7 +100,7 @@ export const aiCommands: Record<string, Command> = {
         try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{question, answer}]"); }
       }
       const r = await askLibrary(lib, need(words.join(" ") || undefined, '"<question>"'), earlier);
-      const text = [r.answer, ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.quote}" (${c.item} ${c.start}-${c.end})`)].join("\n");
+      const text = [r.answer, ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`)].join("\n");
       return { data: r, text };
     },
   },
