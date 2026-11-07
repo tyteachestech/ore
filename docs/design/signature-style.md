@@ -13,12 +13,13 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 - Type: Geist stays; OpenTUI Mono (OFL) for mono; Charter for a source's text.
 - Icons: MingCute's weight drawn on a 16 pixel grid (hand-cleaned); replaces Pixelarticons (D105 as amended by D129). Generators: `/mnt/project-files/signature-style/build/` (emit.py writes `icons.tsx` and `PixelIcon.tsx`).
 - Big numbers in the mono; Geist Pixel retired. Labels in sentence case.
+- Railway touch: B Rail + stations (Review steps as track with an ore cart; Home week as stations). The dot grid was dropped: no purpose.
 - Popup closing animation: A Settle (popup lifts away, margin mark pops in three pixel steps, the passage glows once).
 - Dropped: cute (too Duolingo), 3D pressed keys, 8bitcn.
 
 ## Open
 - Redraw Hand, ThumbsDown, Paperclip, Compass.
-- Railway touches on Home and Review (dot grid, progress track); the Charm-style wordmark experiment; a Rive trial.
+- The Charm-style wordmark experiment; a Rive trial.
 - A mascot later; sound after the look.
 
 ## Built
