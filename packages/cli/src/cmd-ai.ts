@@ -59,7 +59,8 @@ export const aiCommands: Record<string, Command> = {
           console.error(`${id}: ${(e as Error).message}`);
         }
       }
-      const opt = optimizeDue(lib) ? await optimize(lib) : null;
+      // A build without the optimizer (the release app) keeps the standard schedule.
+      const opt = optimizeDue(lib) ? await optimize(lib).catch(() => null) : null;
       return {
         data: { enriched: ids.length - failed, failed, optimized: !!opt?.optimized },
         text: `Enriched ${ids.length - failed} of ${ids.length}${opt?.optimized ? "; FSRS parameters refit" : ""}`,

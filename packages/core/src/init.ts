@@ -2,11 +2,12 @@ import { existsSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { libraryRoot, paths, type Library } from "./library.ts";
 import { defaultSkillsYaml } from "./skills.ts";
+import template from "./templates/library-agents.md" with { type: "text" };
 
 const DIRS = ["topics", "items", "cards", "reviews", "sessions", "inbox", ".ore", ".index"];
 
 export async function agentsTemplate(): Promise<string> {
-  return Bun.file(new URL("./templates/library-agents.md", import.meta.url)).text();
+  return template;
 }
 
 // Idempotent: creates what is missing and never overwrites existing files.

@@ -8,6 +8,23 @@ A Mac learning app that turns what you read into things you remember. Capture an
 
 It's a personal, single-user tool built by Tyler, mostly with Claude Code. It runs locally, with no accounts or API keys: your library is a folder of plain files (`~/Ore`), and AI runs through the `claude` or `codex` CLI you're already signed in to.
 
+## Try it in 5 minutes
+
+You need a Mac with Apple Silicon (M1 or later, macOS 13 or newer) and a paid Claude plan (Pro or Max) or a ChatGPT plan for the AI parts.
+
+1. **Install Ore.** Download `Ore-<version>.dmg` from the [latest release](https://github.com/tyteachestech/ore/releases/latest), open it, and drag Ore into Applications.
+2. **Open it.** Double-click Ore in Applications. If macOS says it can't check Ore for malware, click Done, open System Settings › Privacy & Security, scroll down and click **Open Anyway** next to Ore, then enter your Mac password. You only do this once.
+3. **Give it an AI.** Open Terminal (press ⌘ Space, type Terminal, press Return), paste this line and press Return:
+   ```
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+   Then type `claude`, press Return, and sign in with your Claude account in the browser window it opens. Close Terminal when it says you're signed in. (Using ChatGPT instead: install [Codex](https://github.com/openai/codex), sign in, and pick Codex in Ore's Settings › AI.)
+4. **Add 5 sources.** In Ore press ⌘N, paste a link to an article or a YouTube video, and press Return. Do it 5 times, or drop PDFs, EPUBs, Word files or slides onto the window. Each one lands in **To read**, and after a few seconds the AI adds a few questions to think about before you read it.
+5. **Read one and make a card.** Open a source, select a sentence worth remembering, and pick **Card**. When you reach the end, press ⇧⌘Return to finish it: write what you remember and answer its questions. The AI then turns your Card highlights into flashcards, in about a minute.
+6. **Do a review.** Press ⌘R. Answer the card, say how sure you were (1 to 3), and rate how it went (1 Again to 4 Easy). Ore brings it back just before you'd forget it.
+
+Your library is the folder `Ore` in your home folder: plain files you own. Nothing leaves your Mac except what the AI reads to help you.
+
 ## The loop
 
 1. **Capture.** Paste a URL or drop a file. AI drafts 2 to 4 broad *prequestions* and tags the source with your skills.
@@ -43,6 +60,21 @@ cd apps/desktop && ORE_LIBRARY=/tmp/lib bun run tauri dev
 No Mac or no Rust? The UI also runs in a plain browser against a seeded fake library: see [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md).
 
 Pick the AI vendor with `ai: claude` or `ai: codex` in the library's `skills.yaml` (or `ORE_AI=codex`).
+
+## Releasing
+
+Push a version tag and GitHub builds the app and attaches `Ore-<version>.dmg` to a release (`.github/workflows/release.yml`): set `version` in `apps/desktop/src-tauri/tauri.conf.json`, then `git tag v0.1.0 && git push origin v0.1.0`. **Actions › release › Run workflow** builds one to try without releasing. The release app carries its own `ore` (a compiled single file, `apps/desktop/scripts/bundle-cli.ts`), so it needs no Bun or checkout; a linked checkout's `ore` still wins on a developer's Mac.
+
+Without Apple secrets the build is signed ad hoc, and each friend clicks Open Anyway once (step 2 above). To sign and notarize it so it opens with no warning, add these repository secrets (Settings › Secrets and variables › Actions); the next tag uses them:
+
+| Secret | What it is |
+| --- | --- |
+| `APPLE_CERTIFICATE` | Your *Developer ID Application* certificate exported from Keychain Access as a `.p12`, then `base64 -i cert.p12 \| pbcopy` |
+| `APPLE_CERTIFICATE_PASSWORD` | The password you gave the `.p12` |
+| `APPLE_SIGNING_IDENTITY` | Its name, e.g. `Developer ID Application: Your Name (TEAMID)` (`security find-identity -v -p codesigning`) |
+| `APPLE_ID` | The Apple Account email of your developer membership |
+| `APPLE_PASSWORD` | An app-specific password for it, made at [account.apple.com](https://account.apple.com) › Sign-In and Security |
+| `APPLE_TEAM_ID` | Your 10-character Team ID ([developer.apple.com/account](https://developer.apple.com/account) › Membership details) |
 
 ## Repo layout
 

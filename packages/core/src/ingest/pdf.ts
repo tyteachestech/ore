@@ -1,4 +1,5 @@
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import * as pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
@@ -19,6 +20,10 @@ export interface PdfDoc {
 export type Structure = "tables" | "formulas";
 
 /** Figures kept per PDF, and the size of one past which it is left out. */
+// pdf.js runs its worker in-process here; handing it the module up front means it never has to find
+// pdf.worker.mjs on disk, which a compiled `ore` (the app's bundled CLI) doesn't have.
+(globalThis as { pdfjsWorker?: unknown }).pdfjsWorker = pdfWorker;
+
 const MAX_FIGURES = 80;
 const MAX_FIGURE = 5 * 1024 * 1024;
 

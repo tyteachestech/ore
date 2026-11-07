@@ -38,7 +38,9 @@ function startBackground(lib: Library, args: string[], logName: string, started?
   if (process.env.ORE_NO_ENRICH) return "skipped";
   mkdirSync(paths.logs(lib), { recursive: true });
   const log = openSync(join(paths.logs(lib), `${logName}.log`), "a");
-  const proc = Bun.spawn([process.execPath, join(import.meta.dir, "ore.ts"), ...args], {
+  // Compiled into the app (one file), `ore` is process.execPath itself; from a checkout, Bun runs ore.ts.
+  const self = import.meta.dir.startsWith("/$bunfs") ? [process.execPath] : [process.execPath, join(import.meta.dir, "ore.ts")];
+  const proc = Bun.spawn([...self, ...args], {
     cwd: lib.root,
     env: { ...process.env, ORE_LIBRARY: lib.root },
     stdio: ["ignore", log, log],

@@ -73,10 +73,15 @@ fn resolve() -> Result<(PathBuf, String), String> {
     }
     candidates.push(home.join(".bun/bin/ore"));
     candidates.extend(path.split(':').filter(|d| !d.is_empty()).map(|d| Path::new(d).join("ore")));
+    // Last, the one a release build carries beside the app as ore-cli (tauri.release.json; the app
+    // itself is MacOS/ore): a friend's Mac has no checkout, so it runs there; a linked checkout wins.
+    if let Some(dir) = env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
+        candidates.push(dir.join("ore-cli"));
+    }
     let bin = candidates
         .into_iter()
         .find(|p| p.is_file())
-        .ok_or("ore CLI not found. Run `bun link` in packages/cli, or set ORE_BIN.")?;
+        .ok_or("ore CLI not found. Reinstall Ore, or run `bun link` in packages/cli.")?;
     let dir = bin.parent().map(|d| d.display().to_string()).unwrap_or_default();
     let child_path = [
         dir,
