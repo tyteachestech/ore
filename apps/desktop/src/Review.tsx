@@ -511,8 +511,11 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       else void finish(!quick);
       return;
     }
+    // Enter on a focused control (Again, Edit card, Open in source, Undo) is that control's; Enter's
+    // shortcuts below are for the Review surface itself.
+    const onSurface = e.target === root.current || e.target === document.body;
     if (end) {
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && onSurface) {
         e.preventDefault();
         onClose();
       }
@@ -552,7 +555,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     if (/^Digit[1-4]$/.test(e.code)) {
       e.preventDefault();
       void rate(Number(e.code.slice(5)));
-    } else if (e.key === "Enter" && suggested) {
+    } else if (e.key === "Enter" && suggested && onSurface) {
       e.preventDefault();
       void rate(suggested);
     } else if (is(e, "edit-card")) {
@@ -790,10 +793,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
                         {passage.title}
                       </span>
                       <button
-                        onClick={() => {
-                          void ore("session", "end").catch(() => {});
-                          onOpenSource(passage.item, passage.quotes[quoteAt]!.at);
-                        }}
+                        // The session stays open: leaving the source picks it up again on this card.
+                        onClick={() => onOpenSource(passage.item, passage.quotes[quoteAt]!.at)}
                       >
                         Open in source <ArrowSquareOut size={12} aria-hidden="true" />
                       </button>
