@@ -749,8 +749,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     const el = docEl.current;
     const index = idx.current;
     if (!ready || !el || !index || !src || body === undefined) return null;
-    return findChapterEnds(body, src, index, el);
-  }, [ready, src, body]);
+    return findChapterEnds(body, src, index, el, doc?.type);
+  }, [ready, src, body, doc?.type]);
   const recalled = useMemo(() => new Set((doc?.chapter_recalls ?? []).map((c) => c.n)), [doc?.chapter_recalls]);
 
   // Opening the source note puts the caret in it; closing writes what is pending.

@@ -15,21 +15,31 @@ const MIN_WORDS = 500;
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 const clean = (s: string | null) => (s ?? "").replace(/\s+/g, " ").trim();
 
+/** Where each chapter starts in the source text: a division the author made (D115). An EPUB's
+ *  chapters are marked `<!-- chapter N -->`; a YouTube video's own chapter list became its `###`
+ *  headings at import (the only headings in a transcript). `at` is where the mark starts, `text`
+ *  where its rendered text does, so the chapter's last block is the one before it. */
+export function chapterMarks(body: string, type?: string): { n: number; at: number; text: number; title: string | null }[] {
+  const marks = [...body.matchAll(/<!-- chapter (\d+) -->/g)].map((m) => ({ n: Number(m[1]), at: m.index, text: m.index + m[0].length, title: null as string | null }));
+  if (marks.length || type !== "youtube") return marks;
+  return [...body.matchAll(/^### +(.+)$/gm)].map((m, i) => ({ n: i + 1, at: m.index, text: m.index + m[0].indexOf(m[1]!), title: clean(m[1]!) || null }));
+}
+
 /** The last rendered block of every chapter but the final one (the source finish covers it).
  *  react-markdown drops the `<!-- chapter N -->` markers, so each is located through the text
  *  that follows it in the source. Chapters under ~500 words (title pages, contents, intros) get none. */
-export function findChapterEnds(body: string, src: Skeleton, idx: TextIndex, article: HTMLElement): ChapterEnd[] {
-  const marks = [...body.matchAll(/<!-- chapter (\d+) -->/g)].map((m) => ({ n: Number(m[1]), at: m.index, end: m.index + m[0].length }));
+export function findChapterEnds(body: string, src: Skeleton, idx: TextIndex, article: HTMLElement, type?: string): ChapterEnd[] {
+  const marks = chapterMarks(body, type);
   const out: ChapterEnd[] = [];
   for (let i = 0; i + 1 < marks.length; i++) {
     const cur = marks[i]!;
     const next = marks[i + 1]!;
-    const text = body.slice(cur.end, next.at);
+    const text = body.slice(cur.text, next.at);
     if (words(text) < MIN_WORDS) continue;
-    let el = renderedNodeAt(src, idx, next.end)?.parentElement ?? null;
+    let el = renderedNodeAt(src, idx, next.text)?.parentElement ?? null;
     while (el && el.parentElement !== article) el = el.parentElement;
     const end = el?.previousElementSibling;
-    if (end) out.push({ n: cur.n, title: clean(text.match(/^#{1,6}[ \t]+(.+)$/m)?.[1] ?? null) || null, end });
+    if (end) out.push({ n: cur.n, title: cur.title ?? (clean(text.match(/^#{1,6}[ \t]+(.+)$/m)?.[1] ?? null) || null), end });
   }
   return out;
 }
