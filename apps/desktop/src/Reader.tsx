@@ -1211,13 +1211,20 @@ function ReaderView(p: Props & { reload: () => void }) {
     return {
       drop,
       restore,
+      // Both return the write: one that fails rolls back here, and the history says why (history.ts).
       remove: () => {
         drop();
-        ore("annotate", rid, "--status", "deleted").catch((e) => (p.notify(errorText(e), "error"), restore()));
+        return ore("annotate", rid, "--status", "deleted").catch((e) => {
+          restore();
+          throw e;
+        });
       },
       bring: () => {
         restore();
-        ore("annotate", rid, "--status", ann?.status ?? "open").catch((e) => (p.notify(errorText(e), "error"), drop()));
+        return ore("annotate", rid, "--status", ann?.status ?? "open").catch((e) => {
+          drop();
+          throw e;
+        });
       },
     };
   }

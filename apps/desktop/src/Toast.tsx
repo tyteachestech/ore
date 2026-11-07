@@ -3,7 +3,7 @@ import { History, type Step } from "./history";
 import { CHECK, CROSS, PixelSpin, Sprite } from "./Working";
 import { Hint } from "./Hint";
 import { is } from "./keys";
-import type { Notify } from "./util";
+import { errorText, type Notify } from "./util";
 
 /** `done`: how much of a long step is finished (0 to 1), drawn as a bar along the toast's foot.
  *  `settled`: a long step's toast that turned into its result, which shows a check or a cross where the
@@ -38,7 +38,9 @@ export function useToast() {
   const timers = useRef(new Map<number, number>());
   const held = useRef(false);
   const next = useRef(0);
-  const history = useRef(new History());
+  /** An undo or redo whose write failed: its toast turns into why, and the step stays where it was. */
+  const failed = useRef<(step: Step, e: unknown, what: "undo" | "redo") => void>(() => {});
+  const history = useRef(new History((step, e, what) => failed.current(step, e, what)));
 
   const commit = useCallback((ts: Toast[]) => {
     for (const id of timers.current.keys()) if (!ts.some((t) => t.id === id)) (clearTimeout(timers.current.get(id)), timers.current.delete(id));
@@ -99,6 +101,8 @@ export function useToast() {
   };
   const undone = useCallback((step: Step) => show({ message: `Undone: ${step.message}`, kind: "info", offer: step.redo ? "redo" : undefined, step }, (x) => x.step === step), [show]);
   const redone = useCallback((step: Step) => show({ message: step.message, kind: "info", offer: "undo", step }, (x) => x.step === step), [show]);
+  failed.current = (step, e, what) =>
+    show({ message: `Couldn’t ${what} “${step.message}”: ${errorText(e)}`, kind: "error" }, (x) => x.step === step);
   const undo = useCallback(() => {
     const step = history.current.undo();
     if (step) undone(step);

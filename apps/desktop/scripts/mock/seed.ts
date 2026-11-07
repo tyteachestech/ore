@@ -4,7 +4,7 @@ import { $ } from "bun";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  addSkill, addText, initLibrary, recordReview, setItemStatus, setSkillLook, updateItemMeta, writeNewCard, startSession, endSession,
+  addSkill, addText, findItem, initLibrary, readAnnotations, recordReview, setItemStatus, setSkillLook, updateItemMeta, writeNewCard, startSession, endSession,
 } from "../../../../packages/core/src/index.ts";
 
 const root = process.argv[2]!;
@@ -81,10 +81,12 @@ await $`bun ${CLI} highlight ${a1.meta.id} --exact ${"this is called the hyperco
 await $`bun ${CLI} highlight ${a2.meta.id} --exact ${"Start with the simplest solution possible"} --intent question`.quiet();
 writeFileSync(join(a1.dir, "notes.md"), "## Big idea\n\nTesting is a learning event, not just a measurement. The benefit only shows after a delay.\n\n- Effortful > easy\n- Confidence + correction = hypercorrection\n");
 
-const card = (item: string, skills: string[], question: string, answer: string, rubric: string[] = []) =>
-  writeNewCard(lib, { kind: rubric.length ? "prompt" : "card", item, skills, topics: [], content_type: rubric.length ? "concept" : "fact", question, answer, rubric });
+const card = (item: string, skills: string[], question: string, answer: string, rubric: string[] = [], annotation?: string) =>
+  writeNewCard(lib, { kind: rubric.length ? "prompt" : "card", item, skills, topics: [], content_type: rubric.length ? "concept" : "fact", question, answer, rubric, annotation });
+/** The Card highlight the first card was made from, so Review shows its passage and Open in source. */
+const fromHighlight = readAnnotations(findItem(lib, a1.meta.id)).find((a) => a.intent === "card")!.id;
 const cards = [
-  card(a1.meta.id, ["learning"], "In Roediger & Karpicke (2006), how much more did the tested group remember after one week?", "About 50% more than the rereading group."),
+  card(a1.meta.id, ["learning"], "In Roediger & Karpicke (2006), how much more did the tested group remember after one week?", "About 50% more than the rereading group.", [], fromHighlight),
   card(a1.meta.id, ["learning", "teaching"], "Explain why rereading creates an illusion of competence.", "Rereading builds fluency; familiarity feels like knowing, so learners overrate what they can recall.", ["Names fluency or familiarity", "Links it to misjudging what they know"]),
   card(a1.meta.id, ["learning"], "What is the hypercorrection effect?", "High-confidence errors, once corrected, are remembered better than low-confidence ones."),
   card(a2.meta.id, ["ai"], "What distinguishes an agent from a workflow?", "In an agent the model directs its own process and tool use; a workflow follows predefined code paths."),

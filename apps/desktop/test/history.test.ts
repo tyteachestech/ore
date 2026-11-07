@@ -67,3 +67,30 @@ test("a toast's own Undo takes back its step out of order, and its Redo does it 
   expect(log).toEqual(["undo a", "undo b", "redo a"]);
   expect(h.undo()?.message).toBe("a");
 });
+
+test("an undo whose write fails goes back on the history and says why; redo can't replay it", async () => {
+  const failed: string[] = [];
+  const h = new History((s, e, what) => failed.push(`${what} ${s.message}: ${(e as Error).message}`));
+  const ok = step("a");
+  h.push(ok);
+  const bad = { message: "b", undo: () => Promise.reject(new Error("disk full")), redo: () => {} };
+  h.push(bad);
+  expect(h.undo()).toBe(bad);
+  await Bun.sleep(0);
+  expect(failed).toEqual(["undo b: disk full"]);
+  expect(h.canRedo).toBe(false); // nothing was undone, so nothing to redo
+  expect(h.undo()).toBe(bad); // ⌘Z tries it again, not the step before it
+});
+
+test("a redo whose write fails goes back to the redo stack", async () => {
+  const failed: string[] = [];
+  const h = new History((s, _e, what) => failed.push(`${what} ${s.message}`));
+  const s = { message: "a", undo: () => {}, redo: () => Promise.reject(new Error("offline")) };
+  h.push(s);
+  h.undo();
+  expect(h.redo()).toBe(s);
+  await Bun.sleep(0);
+  expect(failed).toEqual(["redo a"]);
+  expect(h.canUndo).toBe(false);
+  expect(h.canRedo).toBe(true);
+});

@@ -1,6 +1,7 @@
 /** One step he can take back: what the toast said, its inverse, and (when it can be done again) the
- *  step itself. Both go through `ore`, never a snapshot of the library. */
-export type Step = { message: string; undo: () => void; redo?: () => void };
+ *  step itself. Both go through `ore`, never a snapshot of the library. Either may return its write's
+ *  promise: if that fails, the step goes back where it was and `onFail` says why. */
+export type Step = { message: string; undo: () => unknown; redo?: () => unknown };
 
 const LIMIT = 50;
 
@@ -9,6 +10,20 @@ const LIMIT = 50;
 export class History {
   private past: Step[] = [];
   private future: Step[] = [];
+
+  constructor(private onFail?: (step: Step, error: unknown, what: "undo" | "redo") => void) {}
+
+  /** A write that failed leaves the library as it was, so its step goes back: ⌘Z (or ⇧⌘Z) tries it again. */
+  private watch(step: Step, run: unknown, what: "undo" | "redo") {
+    if (!(run instanceof Promise)) return;
+    run.catch((e) => {
+      const [from, to] = what === "undo" ? [this.future, this.past] : [this.past, this.future];
+      const i = from.indexOf(step);
+      if (i >= 0) from.splice(i, 1);
+      if (!to.includes(step)) to.push(step);
+      this.onFail?.(step, e, what);
+    });
+  }
 
   /** A new step; anything undone before it can no longer be redone. */
   push(step: Step) {
@@ -21,7 +36,7 @@ export class History {
   undo(): Step | undefined {
     const step = this.past.pop();
     if (!step) return;
-    step.undo();
+    this.watch(step, step.undo(), "undo");
     this.future = step.redo ? [...this.future, step] : [];
     return step;
   }
@@ -30,8 +45,8 @@ export class History {
   redo(): Step | undefined {
     const step = this.future.pop();
     if (!step?.redo) return;
-    step.redo();
     this.past.push(step);
+    this.watch(step, step.redo(), "redo");
     return step;
   }
 
@@ -40,8 +55,9 @@ export class History {
   take(step: Step): boolean {
     if (!this.past.includes(step)) return false;
     this.past = this.past.filter((s) => s !== step);
-    step.undo();
+    const run = step.undo();
     this.future = step.redo ? [...this.future.filter((s) => s !== step), step] : [];
+    this.watch(step, run, "undo");
     return true;
   }
 
@@ -49,8 +65,8 @@ export class History {
   again(step: Step): boolean {
     if (!step.redo || !this.future.includes(step)) return false;
     this.future = this.future.filter((s) => s !== step);
-    step.redo();
     this.past.push(step);
+    this.watch(step, step.redo(), "redo");
     return true;
   }
 

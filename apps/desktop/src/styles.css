@@ -1828,6 +1828,7 @@ button.home-plan:hover { color: var(--text); }
 @keyframes ring-burst { from { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); } to { transform: scale(1.25); opacity: 0; box-shadow: 0 0 0 14px transparent; } }
 
 /* Review (D59): one card centred, the session bar on top, the keys at the foot. */
+.review[hidden] { display: none; }
 .review { position: fixed; inset: 0; z-index: 15; display: flex; flex-direction: column; background: var(--bg); --skill: var(--c-green); }
 .review:focus-visible { outline: none; }
 .review-head { display: flex; align-items: center; gap: 14px; height: 52px; flex: none; padding: 8px 16px 0 90px; }
