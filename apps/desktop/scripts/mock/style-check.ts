@@ -5,11 +5,6 @@
 // `bun run e2e` runs it too, on its own mock (ORE_BRIDGE names that mock's bridge port).
 import { chromium, type Page } from "playwright";
 
-// Findings already on master when this joined CI (2026-11-07), each awaiting Tyler's call. Remove a line once it is fixed.
-const KNOWN = new Set([
-  "reader  nested frame: div.note-diagram.sized inside div.mynotes-text", // diagram preview framed in the note pane (#67)
-]);
-
 const RAMP = [11, 12, 13, 14, 15, 16, 17, 20, 24, 28, 30];
 const url = process.argv[2] ?? "http://localhost:1420/";
 
@@ -45,9 +40,8 @@ async function audit(page: Page, screen: string) {
     for (const [k] of sizes) out.push(`off-ramp text: ${k}`);
     return [...new Set(out)];
   }, RAMP);
-  const fresh = found.filter((f) => !KNOWN.has(`${screen}  ${f}`));
-  for (const f of fresh) console.log(`${screen}  ${f}`);
-  return fresh.length;
+  for (const f of found) console.log(`${screen}  ${f}`);
+  return found.length;
 }
 
 const browser = await chromium.launch();

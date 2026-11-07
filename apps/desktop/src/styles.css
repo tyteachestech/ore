@@ -1203,9 +1203,10 @@ body.resizing iframe { pointer-events: none; }
 .note-editor .note-image { max-width: 100%; border-radius: 6px; display: block; }
 .note-editor .note-diagram {
   display: grid; place-items: center; min-height: 64px; margin: 4px 0; padding: 8px; cursor: pointer;
-  font-size: 12px; color: var(--faint); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 12px; color: var(--faint); background: var(--bg); border-radius: var(--radius);
 }
-.note-editor .note-diagram:hover, .note-editor .ProseMirror-selectednode.note-diagram { border-color: var(--focus); }
+/* Flat on the note at rest (one level of boxes, Notion); its edge shows on hover and selection. */
+.note-editor .note-diagram:hover, .note-editor .ProseMirror-selectednode.note-diagram { outline: 1px solid var(--focus); outline-offset: -1px; }
 .note-editor .note-diagram svg { display: block; width: auto; height: auto; max-width: 100%; max-height: 240px; }
 /* The preview is a small board (board.ts): drag pans, pinch or ⌘-scroll zooms, the edges resize it. */
 .note-editor .note-diagram { position: relative; overflow: hidden; user-select: none; }
