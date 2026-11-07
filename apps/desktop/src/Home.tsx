@@ -1,9 +1,9 @@
 import { GearSix } from "./icons";
-import { useCallback, useEffect, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { gemHint, GemRing, NearGoal } from "./Gem";
 import { Hint } from "./Hint";
 import { label, useKeymap } from "./keys";
-import { WithMenu, type MenuAction } from "./Menu";
+import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
 import { lessonsOf, levelProgress, nextLesson, ore, type Item, type Skill, type Today } from "./ore";
 import { minutes, minutesText, Ring } from "./Ring";
@@ -265,6 +265,8 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
                       <span style={{ width: `${Math.max(4, at * 100)}%` }} />
                     </span>
                   </Hint>
+                  {/* On hover the ⋯ takes the meter's place, as on every other row (Linear). */}
+                  {sourceMenu && <MoreButton label="Source actions" actions={() => withRename(sourceMenu(i), i)} />}
                 </div>
                 </WithMenu>
               );
@@ -286,7 +288,7 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
               <div className="home-skills">
                 {g.skills.map((s) => (
                   <WithMenu key={s.id} actions={skillMenu ? () => skillMenu(s) : []}>
-                    <SkillTile skill={s} strength={today.skills.find((x) => x.skill === s.id)} onOpen={() => onOpenSkill(s.id)} />
+                    <SkillTile skill={s} strength={today.skills.find((x) => x.skill === s.id)} onOpen={() => onOpenSkill(s.id)} more={skillMenu && <MoreButton label="Skill actions" actions={() => skillMenu(s)} />} />
                   </WithMenu>
                 ))}
               </div>
@@ -301,16 +303,18 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
 
 /** One skill's strength (D62, D63): its level, which never drops, and the way to the next one. */
 // The rest (ref and handlers) comes from the right-click menu's trigger.
-function SkillTile({ skill: s, strength: k, onOpen, ...trigger }: { skill: Skill; strength?: Today["skills"][number]; onOpen: () => void } & ComponentProps<"button">) {
+// A tile that opens on click, holding its ⋯ button, so not a <button> itself (as the reading rows).
+function SkillTile({ skill: s, strength: k, onOpen, more, ...trigger }: { skill: Skill; strength?: Today["skills"][number]; onOpen: () => void; more?: ReactNode } & ComponentProps<"div">) {
   const lv = k?.level ?? 0;
   const p = levelProgress({ solid: k?.solid ?? 0, level: lv, next_level_at: k?.next_level_at ?? 5 });
   return (
-    <button {...trigger} className="home-skill" data-color={s.color} onClick={onOpen}>
+    <div {...trigger} className="home-skill" data-color={s.color} role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}>
       <span className="home-skill-top">
         <span className={`mark${s.icon && s.color ? " tile" : ""}`} data-color={s.color} aria-hidden="true">
           <SkillIcon icon={s.icon} color={s.color} dot />
         </span>
         <span className="home-skill-name">{s.name}</span>
+        {more}
       </span>
       <Hint text={k ? gemHint(k, p.line) : p.line}>
         <span className="home-level">
@@ -328,7 +332,7 @@ function SkillTile({ skill: s, strength: k, onOpen, ...trigger }: { skill: Skill
           )}
         </span>
       </Hint>
-    </button>
+    </div>
   );
 }
 

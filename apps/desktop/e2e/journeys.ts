@@ -643,6 +643,50 @@ journey("reader questions: a piece of the answer, ⌘Z takes it out and ⇧⌘Z 
   await until("and out again, as it was", async () => (await pieces()) === before);
 });
 
+journey("home: a reading row and a skill tile show ⋯ on hover; it opens their menu without opening them", async (page) => {
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const row = page.locator(".home-read").first();
+  await row.hover();
+  await row.getByRole("button", { name: "Source actions" }).click();
+  await page.getByRole("menuitem", { name: "Rename…" }).waitFor();
+  await page.keyboard.press("Escape");
+  await until("still on Home", async () => (await page.locator(".home-read").count()) > 0 && (await page.locator(".doc-head").count()) === 0);
+  const tile = page.locator(".home-skill").first();
+  await tile.hover();
+  await tile.getByRole("button", { name: "Skill actions" }).click();
+  await until("its menu is open", async () => (await page.getByRole("menuitem").count()) > 0);
+  await page.keyboard.press("Escape");
+  await until("still on Home", async () => (await page.locator(".home-skill").count()) > 0);
+});
+
+journey("feed: ⌘K offers the selected post's actions, named for it, once the keyboard picks it", async (page) => {
+  // A feed of its own, served here, with posts from the last two days.
+  const day = (n: number) => new Date(Date.now() - n * 864e5).toUTCString();
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Spacing Notes</title><link>http://localhost/</link><item><title>Why spacing works</title><link>http://localhost/a.html</link><pubDate>${day(1)}</pubDate></item><item><title>Interleaving in practice</title><link>http://localhost/b.html</link><pubDate>${day(2)}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  const ore = (...args: string[]) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: [...args, "--json"] }) }).then((r) => r.json());
+  try {
+    await ore("feed", "follow", feed);
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    await page.locator(".row.post", { hasText: "Why spacing works" }).waitFor();
+    const offered = () => page.locator("[cmdk-item]", { hasText: "Mark read “Why spacing works”" }).count();
+    await page.keyboard.press("Meta+k");
+    await page.locator("[cmdk-input]").fill("mark read");
+    await until("nothing offered before a post is picked", async () => (await offered()) === 0);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Meta+k");
+    await page.locator("[cmdk-input]").fill("mark read");
+    await until("the picked post's Mark read is offered", async () => (await offered()) === 1);
+    await page.keyboard.press("Enter");
+    await until("it is marked read", async () => (await page.locator(".row.post.read", { hasText: "Why spacing works" }).count()) === 1 || (await page.locator(".row.post", { hasText: "Why spacing works" }).count()) === 0);
+  } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+    await page.getByRole("button", { name: /^Home/ }).click();
+  }
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {

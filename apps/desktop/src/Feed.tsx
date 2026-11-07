@@ -54,7 +54,7 @@ function PostThumb({ post }: { post: FeedPost }) {
  *  follows. Nothing here is in the library: opening a post reads it, and a highlight or a note line
  *  keeps it as a source. Two views (Recent, By feed) and one Unread / All switch for both, in the
  *  list title's view menu, as the sources list has. */
-export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, notify }: {
+export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, notify, pickRef }: {
   skills: Skill[];
   /** Bumped when a post he read was closed, so read marks and kept posts show. */
   tick: number;
@@ -64,6 +64,8 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   onFollow: () => void;
   onCreateSkill: (name: string) => Promise<Skill | undefined>;
   notify: Notify;
+  /** The post the keyboard has selected, with its ⋯ actions, for ⌘K (as the reader fills its own). */
+  pickRef?: { current: { title: string; actions: MenuAction[] } | null };
 }) {
   const keys = useKeymap();
   // A post is fetched before it opens: its row says so until the reader shows it.
@@ -186,6 +188,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       ...(f ? [{ id: "unfollow", label: `Unfollow ${f.title}`, danger: true, divider: true, run: () => unfollow(f) }] : []),
     ];
   };
+  if (pickRef) pickRef.current = current ? { title: current.title, actions: postActions(current) } : null;
   const feedActions = (f: FeedInfo): MenuAction[] => {
     const i = feeds.indexOf(f);
     return [
