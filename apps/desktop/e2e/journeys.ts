@@ -1707,7 +1707,10 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
   for (let n = 0; n < 12 && !(await doneButton.isVisible()); n++) {
     await q.or(doneButton).first().waitFor();
     if (await doneButton.isVisible()) break;
-    last = (await q.first().textContent()) ?? "";
+    // The last card can go while the session wraps up, between that wait and this read: look again.
+    const text = await q.first().textContent({ timeout: 1000 }).catch(() => null);
+    if (!text) continue;
+    last = text;
     const noIdea = page.getByRole("button", { name: "No idea" });
     await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
     await page.getByRole("button", { name: "Good", exact: true }).click();
