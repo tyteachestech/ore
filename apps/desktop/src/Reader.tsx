@@ -50,6 +50,11 @@ const ENRICH_GIVE_UP_MS = 20 * 60_000;
 const LISTEN_RATE = "ore.listen.rate";
 /** The chapter block's prompts (D115): shown on empty lines, never saved. */
 type Practice = { practice: true; heading: string; prompts: string[]; done: (text: string | null) => void };
+/** `pending`: an exercise for a source being opened, started once it has loaded. */
+export type PracticeRef = {
+  current: ((exercise: { heading: string; prompts: string[] }, done: (text: string | null) => void) => void) | null;
+  pending: { item: string; exercise: { heading: string; prompts: string[] }; done: (text: string | null) => void } | null;
+};
 const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece of evidence", "What it changes for you"];
 
 // The highlight note's placeholder (D94, D126); never prefilled. A plain highlight's note is open: any
@@ -223,7 +228,7 @@ type Props = {
   actionsRef: { current: MenuAction[] };
   /** Set by the reader: opens the tutor's exercise in the source note (D128.6); `done` gets what he
    *  wrote under its heading when he sends it (⌘↵), or null when he leaves with Esc. */
-  practiceRef?: { current: ((exercise: { heading: string; prompts: string[] }, done: (text: string | null) => void) => void) | null };
+  practiceRef?: PracticeRef;
   onArchive: (item: Item) => void;
   /** The course this source is a lesson of, its lessons in order (D79), and opening one of them. */
   lessons?: Item[];
@@ -810,6 +815,13 @@ function ReaderView(p: Props & { reload: () => void }) {
   if (p.practiceRef) p.practiceRef.current = closedBook || doc?.preview ? null : openPractice;
   useEffect(() => () => void (p.practiceRef && (p.practiceRef.current = null)), []);
   useEffect(() => {
+    const w = p.practiceRef?.pending;
+    if (!w || w.item !== p.id || !doc) return;
+    p.practiceRef!.pending = null;
+    if (p.practiceRef!.current) openPractice(w.exercise, w.done);
+    else w.done(null);
+  }, [doc]);
+  useEffect(() => {
     if (!block || !notesShown || notes.text === null || scaffolded.current === block) return;
     scaffolded.current = block;
     if ("practice" in block) notesField.current?.scaffold(block.heading, block.prompts);
@@ -832,6 +844,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     // The exercise's answer stays in his note as he wrote it; the tutor gets it for feedback.
     if ("practice" in c) {
       void notes.flush();
+      if (record && !text) p.notify("Nothing written, so nothing was sent.", "info");
       return c.done(record ? text : null);
     }
     const title = c.title ?? `Chapter ${c.n}`;

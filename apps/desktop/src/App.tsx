@@ -11,8 +11,8 @@ import { copiedFiles, pastesFiles, watchCopies } from "./copied";
 import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
-import { Tutor, TutorBubble, useTutorChat, type Exercise } from "./Tutor";
-import { Reader } from "./Reader";
+import { Tutor, TutorBubble, useTutorChat } from "./Tutor";
+import { Reader, type PracticeRef } from "./Reader";
 import type { SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
 import { Settings, type SettingsSection } from "./Settings";
@@ -230,7 +230,7 @@ export function App() {
   const [showCollected, setShowCollected] = useState(0);
   const [renameSource, setRenameSource] = useState(0);
   const readerActions = useRef<MenuAction[]>([]);
-  const readerPractice = useRef<((exercise: Exercise, done: (text: string | null) => void) => void) | null>(null);
+  const [readerPractice] = useState<PracticeRef>(() => ({ current: null, pending: null }));
   const feedPick = useRef<{ title: string; actions: MenuAction[] } | null>(null);
   const [palette, setPalette] = useState(false);
   // The tutor (D128): open, and the thread so far (kept while he moves around the app).
@@ -2106,13 +2106,22 @@ export function App() {
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
         {!tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} />}
       </main>
-      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={openItem ? (ex) => {
+      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
         // The note takes the room while he writes; the tutor comes back with what he sent (D128.6).
-        const practice = readerPractice.current;
-        if (!practice) return;
+        // The exercise belongs to the source it was asked about: that one opens first if he has moved on.
+        const done = (text: string | null) => {
+          if (text) tutor.ask({ message: text, item: source.id, title: source.title });
+          openTutor();
+        };
+        if (openId === source.id) {
+          if (!readerPractice.current) return;
+          setTutorOpen(false);
+          return readerPractice.current(ex, done);
+        }
+        readerPractice.pending = { item: source.id, exercise: ex, done };
         setTutorOpen(false);
-        practice(ex, (text) => openTutor(text ?? undefined));
-      } : undefined} onOpen={openSource} onClose={closeTutor} />}
+        openSource(source.id);
+      }} onOpen={openSource} onClose={closeTutor} />}
 
       {reviewing && (
         <Boundary key={reviewing.run} onBack={() => endReview()}>

@@ -120,8 +120,8 @@ const STARTERS = ["What have I been learning?", "Explain something I saved", "Pr
  *  it survives navigation; + starts a new one. */
 export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, onClose, onQuiz, onWrite }: {
   chat: TutorChat;
-  /** Write an exercise's answer in the open source's note, the source hidden (D128.6); absent with no source open. */
-  onWrite?: (exercise: Exercise) => void;
+  /** Write an exercise's answer in the note of the source it was asked about, the source hidden (D128.6). */
+  onWrite: (exercise: Exercise, source: { id: string; title: string }) => void;
   /** Quiz me: Review on his due cards in these skills (none: all of them). */
   onQuiz: (skills: string[]) => void;
   /** Docked at the right, in the side panel's place; else floating over the bottom right corner. */
@@ -160,8 +160,6 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   const end = useRef<HTMLDivElement>(null);
   const busy = turns.some((t) => t.reply === undefined && !t.error);
   const { width, dragging, divider } = useSideWidth("ore.tutorwidth", 380, 300);
-  // Writing in the note is for the source in context: the note is that source's.
-  const write = context && reading && onWrite ? onWrite : undefined;
 
   const send = (text: string) => {
     const message = text.trim();
@@ -267,12 +265,12 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                 ) : (
                   <>
                     <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} general={t.general} />
-                    {((last && (t.hint || (t.exercise && write))) || (t.card && (t.citations?.[0]?.item ?? t.item))) && (
+                    {((last && (t.hint || (t.exercise && t.item))) || (t.card && (t.citations?.[0]?.item ?? t.item))) && (
                       <div className="tutor-acts">
                         {last && t.hint && <button onClick={() => send("Show me")}>Show me</button>}
-                        {last && t.exercise && write && (
+                        {last && t.exercise && t.item && (
                           <Hint text="Source hidden · send it back" keys="finish">
-                            <button onClick={() => write(t.exercise!)}>Write it in your note</button>
+                            <button onClick={() => onWrite(t.exercise!, { id: t.item!, title: t.title ?? "" })}>Write it in your note</button>
                           </Hint>
                         )}
                         {t.card && (t.citations?.[0]?.item ?? t.item) && (

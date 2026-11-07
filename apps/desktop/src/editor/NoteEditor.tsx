@@ -1,5 +1,5 @@
 import type { Editor } from "@milkdown/kit/core";
-import { editorViewCtx } from "@milkdown/kit/core";
+import { editorViewCtx, serializerCtx } from "@milkdown/kit/core";
 import {
   createCodeBlockCommand, imageSchema, insertHrCommand, linkSchema, turnIntoTextCommand, wrapInBlockquoteCommand, wrapInBulletListCommand,
   wrapInHeadingCommand, wrapInOrderedListCommand,
@@ -59,6 +59,20 @@ const ghostPlugin = $prose(
         apply: (tr, set) => tr.getMeta(ghosts) ?? set.map(tr.mapping, tr.doc),
       },
       props: { decorations: (state) => ghosts.getState(state) ?? null },
+    }),
+);
+
+/** Where the scaffold's block starts (its heading), mapped through his edits: renaming the heading
+ *  or writing above it never loses the block. */
+const blockStart = new PluginKey<number | null>("ore-block-start");
+const blockStartPlugin = $prose(
+  () =>
+    new Plugin<number | null>({
+      key: blockStart,
+      state: {
+        init: () => null,
+        apply: (tr, at) => (tr.getMeta(blockStart) !== undefined ? tr.getMeta(blockStart) : at === null ? null : tr.mapping.map(at, 1)),
+      },
     }),
 );
 
@@ -159,27 +173,28 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       return editor.current.action((ctx) => {
         const v = ctx.get(editorViewCtx);
         const lines = ghosts.getState(v.state)?.find() ?? [];
-        // The block's heading: the last top-level heading with its title (the heading-id plugin
-        // replaces the node on every change, so it can't carry a decoration of its own).
-        let head: { from: number; to: number } | null = null;
-        v.state.doc.forEach((node, at) => {
-          if (node.type.name === "heading" && node.textContent === title) head = { from: at, to: at + node.nodeSize };
+        const { doc } = v.state;
+        const at = Math.min(blockStart.getState(v.state) ?? doc.content.size, doc.content.size);
+        const first = doc.nodeAt(at);
+        const h = first?.type.name === "heading" ? { from: at, to: at + first.nodeSize } : null;
+        const from = h?.to ?? at;
+        // Text counts as written, and so does a diagram or image with no words beside it.
+        let written = false;
+        doc.nodesBetween(from, doc.content.size, (n) => {
+          if (n.isText ? !!n.text?.trim() : n.isLeaf && n.type.name !== "hardbreak") written = true;
+          return !written;
         });
-        const h = head as { from: number; to: number } | null;
-        if (!h) return null;
-        const written = v.state.doc.textBetween(h.to, v.state.doc.content.size, "\n").trim() !== "";
         const empty = (d: Decoration) => {
-          const node = v.state.doc.nodeAt(d.from);
+          const node = doc.nodeAt(d.from);
           return !!node && node.type.name === "paragraph" && node.content.size === 0;
         };
-        const gone = [...lines.filter(empty), ...(written ? [] : [h])].sort((a, b) => b.from - a.from);
+        const gone = [...lines.filter(empty), ...(written || !h ? [] : [h])].sort((a, b) => b.from - a.from);
         let tr = v.state.tr;
         for (const d of gone) tr = tr.delete(d.from, d.to);
-        v.dispatch(tr.setMeta(ghosts, DecorationSet.empty));
+        v.dispatch(tr.setMeta(ghosts, DecorationSet.empty).setMeta(blockStart, null));
         if (!written) return null;
-        const md = markdownOf(editor.current!);
-        const i = md.lastIndexOf(`## ${title}`);
-        return (i === -1 ? "" : md.slice(md.indexOf("\n", i) + 1).trim()) || null;
+        const after = tr.doc.slice(tr.mapping.map(from), tr.doc.content.size).content;
+        return ctx.get(serializerCtx)(tr.doc.type.create(null, after)).trim() || null;
       });
     },
   }), []);
@@ -191,9 +206,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       const v = ctx.get(editorViewCtx);
       const { doc, schema } = v.state;
       // Back to a block he left with Esc: his heading is already there, so only the prompts come back.
-      let last: string | null = null;
-      doc.forEach((node) => void (node.type.name === "heading" && (last = node.textContent)));
-      const head = last === heading ? null : schema.nodes.heading!.create({ level: 2 }, schema.text(heading));
+      const heads: { text: string; at: number }[] = [];
+      doc.forEach((node, at) => void (node.type.name === "heading" && heads.push({ text: node.textContent, at })));
+      const kept = heads.at(-1)?.text === heading ? heads.at(-1) : undefined;
+      const head = kept ? null : schema.nodes.heading!.create({ level: 2 }, schema.text(heading));
       const lines = prompts.map(() => schema.nodes.paragraph!.create());
       const at = doc.content.size;
       const tr = v.state.tr.insert(at, head ? [head, ...lines] : lines);
@@ -203,7 +219,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         decos.push(Decoration.node(pos, pos + line.nodeSize, { class: "ghost", "data-ghost": prompts[i]! }, { "data-ghost": prompts[i]! }));
         pos += line.nodeSize;
       }
-      tr.setMeta(ghosts, DecorationSet.create(tr.doc, decos));
+      tr.setMeta(ghosts, DecorationSet.create(tr.doc, decos)).setMeta(blockStart, kept?.at ?? at);
       v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + (head?.nodeSize ?? 0) + 1)).scrollIntoView());
       v.focus();
     });
@@ -223,7 +239,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), followRenames(live), toggleView, ghostPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
