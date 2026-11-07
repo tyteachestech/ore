@@ -64,8 +64,10 @@ export const blockSelPlugin = $prose(
           }
           if (!(state.selection instanceof BlockSelection)) return false;
           if (e.key === "Escape" && !mod && !e.shiftKey) {
-            // Lets go, and the view around the note gets the Esc too (the reader moves focus out).
+            // Lets go and leaves the note, so Tab and the page's keys work again (the reader also moves
+            // focus to its text); a click or Enter on a block goes back in.
             view.dispatch(state.tr.setSelection(edit(state)));
+            (view.dom as HTMLElement).blur();
             return true;
           }
           if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !mod && !e.altKey) return go(step(state, e.key === "ArrowUp" ? -1 : 1, e.shiftKey));

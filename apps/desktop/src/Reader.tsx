@@ -2641,7 +2641,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
       <button className="preq-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <CaretRight className={`caret${open ? " open" : ""}`} size={12} aria-hidden="true" />
         What do you already know?
-        {waiting && <span className="quiet"><Working label="Writing prequestions…" /></span>}
+        {waiting && <span className="quiet"><Working label="Writing prequestions…" slow="Usually under a minute." /></span>}
       </button>
       {open && qs.length > 0 && (
         <ol className="preq-body">
