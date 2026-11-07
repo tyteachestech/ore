@@ -2,6 +2,7 @@ import { z } from "zod";
 import { locate } from "../anchoring.ts";
 import { findItem, listItems, type AiStamp } from "../items.ts";
 import { cardTextProblem, ContentType, writeNewCard, type Card } from "../cards.ts";
+import { getDiagram, sceneOutline } from "../diagrams.ts";
 import { withLock } from "../lock.ts";
 import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
@@ -33,7 +34,24 @@ export const TutorOutput = z.strictObject({
   hint: z.boolean(),
   // One idea from this reply worth keeping, as a card he can add with one click; null when none.
   card: TutorCard.nullable(),
+  // An open exercise for him to write (D128.6): its heading in his note, and placeholder lines under it.
+  exercise: z.strictObject({ heading: z.string().min(1).max(100), prompts: z.array(z.string().min(1)).max(3) }).nullable(),
 });
+
+/** His message with each diagram from his source note written out as lines, so a map he drew from
+ *  memory is read back like his writing. A diagram that can't be read stays a link. */
+export function withDiagrams(lib: Library, item: string | undefined, text: string): string {
+  if (!item) return text;
+  return text.replace(/!\[[^\]]*\]\(diagrams\/([a-z0-9-]+)\.excalidraw\)/g, (all, name: string) => {
+    try {
+      const scene = getDiagram(lib, item, name).scene;
+      const lines = scene ? sceneOutline(scene) : "";
+      return lines ? `[Diagram he drew:\n${lines}\n]` : all;
+    } catch {
+      return all;
+    }
+  });
+}
 
 /** What the tutor is pointed at: the source he is reading, and the sources and skills he @-mentioned. */
 export interface TutorFocus { item?: string; sources?: string[]; skills?: string[] }
@@ -60,7 +78,7 @@ export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {
 
 /** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
 export async function tutor(lib: Library, message: string, { earlier = [], ...focus }: { earlier?: TutorTurn[] } & TutorFocus = {}) {
-  const m = message.trim();
+  const m = withDiagrams(lib, focus.item, message.trim());
   if (!m) throw new Error("message is empty");
   const recent = earlier.slice(-6);
   const reading = focus.item ? findItem(lib, focus.item).meta.title : undefined;
@@ -83,6 +101,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
       const top = Math.max(0, ...[...d.reply.matchAll(/\[(\d+)\]/g)].map((x) => +x[1]!));
       if (top > d.citations.length) return `marker [${top}] has no citation`;
       if (d.card && d.card.kind === "prompt" && !d.card.rubric.length) return "a prompt card needs 2 to 4 rubric points";
+      if (d.exercise && d.card) return "an exercise is for him to answer: propose no card with it";
       return d.card ? cardTextProblem(d.card) : null;
     },
   });
@@ -92,7 +111,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
     const quote = p.text.slice(at.start, at.end);
     return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
   });
-  return { message: m, reply: data.reply, citations, general: data.general, hint: data.hint, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
+  return { message: m, reply: data.reply, citations, general: data.general, hint: data.hint, exercise: data.exercise, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
 }
 
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the

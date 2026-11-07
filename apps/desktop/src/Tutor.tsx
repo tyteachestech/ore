@@ -14,17 +14,19 @@ export type Citation = { n: number; item: string; title: string; heading: string
 /** One exchange. `item`/`title` is the source it was asked about (the context chip at the time). */
 export type TutorCard = { kind: "card" | "prompt"; content_type: string; question: string; answer: string; rubric: string[] };
 type Ai = { vendor: string; model: string; prompt_version: string };
+/** An open exercise (D128.6): its heading in his note and the placeholder lines under it. */
+export type Exercise = { heading: string; prompts: string[] };
 export type TutorTurn = {
   message: string; item?: string; title?: string; mentions?: Mention[];
-  reply?: string; citations?: Citation[]; general?: boolean; hint?: boolean; card?: TutorCard | null; ai?: Ai; error?: string;
+  reply?: string; citations?: Citation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
 };
-type Reply = { reply: string; citations: Citation[]; general: boolean; hint: boolean; card: TutorCard | null; ai: Ai };
+type Reply = { reply: string; citations: Citation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; ai: Ai };
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
-const STARTERS_READING = ["Explain this simply", "Give me an example", "Test my understanding"];
-const STARTERS = ["What have I been learning?", "Explain something I saved"];
+const STARTERS_READING = ["Explain this simply", "Give me an example", "Practice"];
+const STARTERS = ["What have I been learning?", "Explain something I saved", "Practice"];
 
 /** The tutor (D128): a chat docked at the window's right, like Notion AI's and Linear's Ask panels,
  *  opened from the bubble at the bottom right or ⌘J. It sees the source he is reading (the chip over
@@ -33,8 +35,10 @@ const STARTERS = ["What have I been learning?", "Explain something I saved"];
  *  practice. It floats over the bottom right corner (Notion AI's default) or docks at the right in the
  *  side panel's place; the header switches, and the choice is remembered. The thread lives in App, so
  *  it survives navigation; + starts a new one. */
-export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills, onOpen, onClose, onQuiz, notify }: {
+export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills, onOpen, onClose, onQuiz, onWrite, notify }: {
   notify: Notify;
+  /** Write an exercise's answer in the open source's note, the source hidden (D128.6); absent with no source open. */
+  onWrite?: (exercise: Exercise) => void;
   /** Quiz me: Review on his due cards in these skills (none: all of them). */
   onQuiz: (skills: string[]) => void;
   /** Docked at the right, in the side panel's place; else floating over the bottom right corner. */
@@ -76,6 +80,8 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
   const busy = turns.some((t) => t.reply === undefined && !t.error);
   const started = useRef(false);
   const { width, dragging, divider } = useSideWidth("ore.tutorwidth", 380, 300);
+  // Writing in the note is for the source in context: the note is that source's.
+  const write = context && reading && onWrite ? onWrite : undefined;
 
   const run = async (i: number, all: TutorTurn[]) => {
     const t = all[i]!;
@@ -83,7 +89,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
     try {
       const pointed = (t.mentions ?? []).map((m) => opt(m.kind, m.id));
       const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []));
-      setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, card: r.card, ai: r.ai, error: undefined } : x)));
+      setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, ai: r.ai, error: undefined } : x)));
     } catch (e) {
       setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, error: errorText(e, "answer that") } : x)));
     }
@@ -210,7 +216,9 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
             ))}
           </div>
         )}
-        {turns.map((t, i) => (
+        {turns.map((t, i) => {
+          const last = i === turns.length - 1 && !busy;
+          return (
           <div key={i} className="library-turn">
             <p className="ask-me">{marked(t.message, t.mentions ?? [])}</p>
             <div className="ask-ai">
@@ -226,9 +234,14 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
                 ) : (
                   <>
                     <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} general={t.general} />
-                    {((t.hint && i === turns.length - 1 && !busy) || (t.card && (t.citations?.[0]?.item ?? t.item))) && (
+                    {((last && (t.hint || (t.exercise && write))) || (t.card && (t.citations?.[0]?.item ?? t.item))) && (
                       <div className="tutor-acts">
-                        {t.hint && i === turns.length - 1 && !busy && <button onClick={() => send("Show me")}>Show me</button>}
+                        {last && t.hint && <button onClick={() => send("Show me")}>Show me</button>}
+                        {last && t.exercise && write && (
+                          <Hint text="Source hidden · send it back" keys="finish">
+                            <button onClick={() => write(t.exercise!)}>Write it in your note</button>
+                          </Hint>
+                        )}
                         {t.card && (t.citations?.[0]?.item ?? t.item) && (
                           <Hint text={t.kept && t.kept !== "adding" ? "In review from tomorrow" : t.card.question}>
                             <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Card added" : `Add card: ${t.card.question}`} disabled={!!t.kept} onClick={() => void keep(i)}>
@@ -243,7 +256,8 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         <div ref={end} />
       </div>
       <div className="tutor-foot">

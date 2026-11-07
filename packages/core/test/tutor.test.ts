@@ -3,6 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addTutorCard, tutor, tutorPassages, type TutorCard } from "../src/ai/tutor.ts";
+import { sceneOutline, setDiagram } from "../src/diagrams.ts";
 import { findCard } from "../src/cards.ts";
 import { createItem, findItem } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -74,9 +75,9 @@ describe("tutor: what it sees", () => {
 describe("tutor: replies", () => {
   test("cites the open source, placed in its doc.md, and sends the title he is reading", async () => {
     const { lib, a } = await library();
-    fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, card: null }]);
+    fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@3" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@4" });
     expect(r.general).toBe(false);
     const c = r.citations[0]!;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
@@ -87,9 +88,9 @@ describe("tutor: replies", () => {
   test("a made-up quote or a marker with no citation goes back once to fix", async () => {
     const { lib, a } = await library();
     fakeClaude([
-      { reply: "Box one [1] [2].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, card: null },
-      { reply: "Box one [1].", citations: [{ passage: "P1", quote: "Missed cards return to box one." }], general: false, hint: false, card: null },
-      { reply: "Box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, card: null },
+      { reply: "Box one [1] [2].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, exercise: null, card: null },
+      { reply: "Box one [1].", citations: [{ passage: "P1", quote: "Missed cards return to box one." }], general: false, hint: false, exercise: null, card: null },
+      { reply: "Box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, exercise: null, card: null },
     ]);
     await expect(tutor(lib, "missed card", { item: a.meta.id })).rejects.toThrow("is not in P1: copy its exact words");
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("marker [2] has no citation");
@@ -99,7 +100,7 @@ describe("tutor: replies", () => {
 
   test("with nothing in the library it still talks, marking general knowledge as such", async () => {
     const lib = await tempLibrary();
-    fakeClaude([{ reply: "Photosynthesis turns light into sugar.", citations: [], general: true, hint: false, card: null }]);
+    fakeClaude([{ reply: "Photosynthesis turns light into sugar.", citations: [], general: true, hint: false, exercise: null, card: null }]);
     const r = await tutor(lib, "what is photosynthesis?");
     expect(r).toMatchObject({ general: true, citations: [] });
     expect(sent()[0]!.passages).toEqual([]);
@@ -107,7 +108,7 @@ describe("tutor: replies", () => {
 
   test("a follow-up sends the conversation so far", async () => {
     const { lib } = await library();
-    fakeClaude([{ reply: "Less often.", citations: [], general: false, hint: false, card: null }]);
+    fakeClaude([{ reply: "Less often.", citations: [], general: false, hint: false, exercise: null, card: null }]);
     await tutor(lib, "and the right ones?", { earlier: [{ message: "What happens to a missed card?", reply: "First box." }] });
     expect(sent()[0]!.earlier).toEqual([{ message: "What happens to a missed card?", reply: "First box." }]);
   });
@@ -128,7 +129,7 @@ describe("tutor: @ sources and skills", () => {
 
   test("the AI is told what he pointed it at; an unknown skill is refused", async () => {
     const { lib, b } = await library();
-    fakeClaude([{ reply: "Easier each time.", citations: [], general: false, hint: false, card: null }]);
+    fakeClaude([{ reply: "Easier each time.", citations: [], general: false, hint: false, exercise: null, card: null }]);
     await tutor(lib, "what does this say?", { sources: [b.meta.id], skills: ["learning"] });
     expect((sent()[0] as unknown as { about: string[] }).about).toEqual(["Memory", "the skill Learning"]);
     await expect(tutor(lib, "hi", { skills: ["nope"] })).rejects.toThrow('no skill "nope"');
@@ -140,11 +141,11 @@ describe("tutor: hints and cards", () => {
     const { lib, a } = await library();
     const card: TutorCard = { kind: "prompt", content_type: "concept", question: "In the Leitner system, why does a missed card go back to box one?", answer: "So it comes back often until it sticks.", rubric: ["it is reviewed more often"] };
     fakeClaude([
-      { reply: "Look at what happens to a card you miss.", citations: [], general: false, hint: true, card: null },
-      { reply: "It goes back to box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, card: { ...card, rubric: [] } },
-      { reply: "It goes back to box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, card },
+      { reply: "Look at what happens to a card you miss.", citations: [], general: false, hint: true, exercise: null, card: null },
+      { reply: "It goes back to box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, exercise: null, card: { ...card, rubric: [] } },
+      { reply: "It goes back to box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, exercise: null, card },
     ]);
-    expect(await tutor(lib, "what's the answer to my card about missed cards?", { item: a.meta.id })).toMatchObject({ hint: true, card: null });
+    expect(await tutor(lib, "what's the answer to my card about missed cards?", { item: a.meta.id })).toMatchObject({ hint: true, exercise: null, card: null });
     const r = await tutor(lib, "show me the missed card answer", { item: a.meta.id });
     expect(r.card).toEqual(card);
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("a prompt card needs 2 to 4 rubric points");
@@ -157,5 +158,37 @@ describe("tutor: hints and cards", () => {
     expect(c.meta).toMatchObject({ item: a.meta.id, from: "tutor", state: "draft", skills: ["learning"], ai: { prompt_version: "tutor@3" } });
     expect(findCard(lib, c.meta.id).answer).toBe("Back to the first box.");
     await expect(addTutorCard(lib, a.meta.id, { kind: "prompt", content_type: "concept", question: "Why?", answer: "Because.", rubric: [] }, { vendor: "claude", model: "m", prompt_version: "tutor@3" })).rejects.toThrow("rubric");
+  });
+});
+
+describe("tutor: practice", () => {
+  test("Practice sets an open exercise with a heading for his note; an exercise with a card goes back to fix", async () => {
+    const { lib, a } = await library();
+    const exercise = { heading: "Why does a missed card go back to box one?", prompts: ["What happens to it next", "Why that helps"] };
+    const card: TutorCard = { kind: "card", content_type: "fact", question: "In the Leitner system, where does a missed card go?", answer: "Back to the first box.", rubric: [] };
+    fakeClaude([
+      { reply: "Explain why a missed card goes back to box one.", citations: [], general: false, hint: false, exercise, card },
+      { reply: "Explain why a missed card goes back to box one.", citations: [], general: false, hint: false, exercise, card: null },
+    ]);
+    const r = await tutor(lib, "Practice", { item: a.meta.id });
+    expect(r).toMatchObject({ exercise, card: null, hint: false });
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("propose no card with it");
+  });
+
+  test("a diagram he drew in his note reaches the tutor as lines: labels, then arrows", async () => {
+    const { lib, a } = await library();
+    const scene = { type: "excalidraw" as const, elements: [
+      { id: "r1", type: "rectangle" }, { id: "t1", type: "text", text: "Missed card", containerId: "r1" },
+      { id: "r2", type: "ellipse" }, { id: "t2", type: "text", text: "Box one", containerId: "r2" },
+      { id: "ar", type: "arrow", startBinding: { elementId: "r1" }, endBinding: { elementId: "r2" } }, { id: "t3", type: "text", text: "goes back", containerId: "ar" },
+      { id: "gone", type: "text", text: "Deleted", isDeleted: true },
+    ] };
+    expect(sceneOutline(scene)).toBe("- Missed card\n- Box one\n- Missed card → Box one (goes back)");
+    await setDiagram(lib, a.meta.id, "boxes", JSON.stringify(scene));
+    fakeClaude([{ reply: "Right: a miss sends it back.", citations: [], general: false, hint: false, exercise: null, card: null }]);
+    await tutor(lib, "My answer:\n\n![Diagram](diagrams/boxes.excalidraw)\n\n![Diagram](diagrams/nothing.excalidraw)", { item: a.meta.id });
+    const m = sent()[0]!.message;
+    expect(m).toContain("[Diagram he drew:\n- Missed card\n- Box one\n- Missed card → Box one (goes back)\n]");
+    expect(m).toContain("![Diagram](diagrams/nothing.excalidraw)");
   });
 });
