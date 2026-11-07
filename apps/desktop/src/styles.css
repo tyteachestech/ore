@@ -290,7 +290,9 @@ img.thumb { filter: brightness(0.86); }
 .chips { display: flex; gap: 4px; flex-wrap: wrap; }
 /* Skill pill: one opaque matte fill tinted from the skill colour, white text, no outline (≥6.5:1 for every
    skill colour). Flex-centred so emoji and glyph icons sit on the text's midline. */
-.chip { display: inline-flex; align-items: center; gap: 4px; height: 18px; font-size: 11px; line-height: 1; color: var(--text); background: var(--bg-active); border: 0; border-radius: 9px; padding: 0 7px; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 18px; font-size: 11px; line-height: 1; color: var(--text); background: var(--bg-active); border: 0; border-radius: 9px; padding: 0 7px; white-space: nowrap; max-width: min(100%, 28ch); }
+/* A long skill name ends in … (its whole name on hover, SkillChip) instead of pushing the card wider. */
+.chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .chip[data-color] { background: color-mix(in srgb, var(--skill) 40%, var(--bg-card)); }
 .chip .icon { vertical-align: 0; line-height: 1; }
 :root[data-chips="icon"] .chip:has(> .icon) { padding: 0 5px; }
@@ -1727,6 +1729,10 @@ button.home-plan:hover { color: var(--text); }
 .home-read { display: flex; align-items: center; gap: 12px; height: var(--row); padding: 0 12px; border-radius: var(--radius); text-align: left; color: var(--text); min-width: 0; }
 .home-read:hover { background: var(--bg-hover); }
 .home-read:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
+/* The title comes first: long skill pills give way to it, ending in … (DESIGN: long text). */
+.home-read .chips-button { max-width: 40%; overflow: hidden; }
+.home-read .chips { flex-wrap: nowrap; min-width: 0; }
+.home-read .chip { min-width: 0; }
 .home-read .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-read .course-of { flex: none; max-width: 35%; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); }

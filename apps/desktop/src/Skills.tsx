@@ -28,7 +28,7 @@ export function SkillChip({ skill }: { skill: Skill }) {
       <span className="chip-name">{skill.name}</span>
     </span>
   );
-  return chipLook() === "icon" ? <Hint text={skill.name}>{chip}</Hint> : chip;
+  return chipLook() === "icon" || skill.name.length > 24 ? <Hint text={skill.name}>{chip}</Hint> : chip;
 }
 
 /** A source's skill pills, and the picker they open on click: Linear's label picker (Notion's
