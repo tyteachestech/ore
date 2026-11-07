@@ -587,6 +587,58 @@ journey("diagram: keys stay on the canvas after the style panel, Space never sti
   if (!(await page.locator(".doc").count())) throw new Error("Esc closed the source as well as the drawing");
 });
 
+journey("diagram: editing picks the whole label, a run of nudges is one undo step, undo re-selects, and a one-click arrow dropped with Esc leaves the Select tool", async (page) => {
+  await openSource(page, AGENTS);
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/diagram");
+  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+  await page.keyboard.press("Enter");
+  const draw = page.locator(".diagram .draw");
+  await draw.focus();
+  await page.keyboard.press("Shift+Meta+Enter");
+  await page.locator(".diagram:not(.docked)").waitFor();
+  await draw.focus();
+  const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
+  await page.keyboard.press("r");
+  await page.mouse.click(c.x + 500, c.y + 300);
+  await page.locator(".draw-text").waitFor();
+  await page.keyboard.type("Memory");
+  await page.keyboard.press("Enter");
+  const summary = () => page.locator("#draw-summary").textContent();
+  const selected = () => page.locator(".sr-only[aria-live]").textContent();
+  await until("the box is labelled", async () => (await summary()) === "Memory");
+  // Enter on the box opens its label with all of it selected, so typing replaces it (Excalidraw, Figma).
+  await page.keyboard.press("Enter");
+  const range = await page.locator(".draw-text").evaluate((t: HTMLTextAreaElement) => [t.selectionStart, t.selectionEnd]);
+  if (range[0] !== 0 || range[1] !== 6) throw new Error(`editing selected ${range[0]}–${range[1]} of "Memory", not all of it`);
+  await page.keyboard.type("Sleep");
+  await page.keyboard.press("Enter");
+  await until("typing replaced the label", async () => (await summary()) === "Sleep");
+  // Five nudges, one ⌘Z: back where it started (Figma).
+  const rect = page.locator(".diagram .draw-canvas > g rect");
+  const x0 = Number(await rect.getAttribute("x"));
+  for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
+  await until("the box moved 5", async () => Number(await rect.getAttribute("x")) === x0 + 5);
+  await page.keyboard.press("Meta+z");
+  await until("one ⌘Z takes back the whole run", async () => Number(await rect.getAttribute("x")) === x0);
+  // ⌘Z after a delete brings the box back selected, so the next key acts on it.
+  await page.keyboard.press("Backspace");
+  await until("Backspace deletes it", async () => (await rect.count()) === 0);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z brings it back selected", async () => (await rect.count()) === 1 && (await selected()) === "Selected: Sleep");
+  // An arrow started with a click and dropped with Esc leaves no arrow and the Select tool, as a finished one does.
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("a");
+  await page.mouse.click(c.x + 900, c.y + 600);
+  await page.keyboard.press("Escape");
+  const tool = () => page.locator(".draw-tool[aria-pressed=true]").first().getAttribute("aria-label");
+  await until("the tool is Select again", async () => (await tool()) === "Select");
+  if (await page.locator(".diagram .draw-canvas > g path").count()) throw new Error("the dropped arrow stayed");
+});
+
 journey("review: rate a card, the session moves on, and Undo brings the card back", async (page) => {
   await page.getByRole("button", { name: "Start review" }).click();
   // The "What to review" sheet comes first once Home knows his skills; Enter takes them all.
