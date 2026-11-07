@@ -2106,6 +2106,36 @@ journey("quiz check: one click makes a passage a key point, and marks a highligh
   await until("⌘Z takes the mark back", async () => (await count("card")) === card0 + 1 && (await count("keep")) === keep0);
 });
 
+// Last: its question highlight would change the lists the question journeys read.
+journey("settle: closing a typed highlight lifts the popup away, pops its mark and glows once, then leaves nothing behind", async (page) => {
+  await openSource(page, TESTING);
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  const left = () => page.evaluate(() => document.querySelectorAll(".popup.leaving, .settle-glow, .mark-icon.settle").length);
+  await select(page, "Multiple-choice works too");
+  await popup.waitFor();
+  await popup.locator(".intent.question").click();
+  await page.locator(".mark-icon.question").first().waitFor();
+  await page.keyboard.press("Escape");
+  const at = await page.evaluate(() => ({
+    gone: !document.querySelector('[role="dialog"][aria-label="Highlight"]'),
+    ghost: document.querySelector(".popup.leaving")?.getAttribute("aria-hidden"),
+    glow: document.querySelectorAll(".settle-glow.question i").length,
+  }));
+  if (!at.gone || at.ghost !== "true" || !at.glow) throw new Error(`no settle: ${JSON.stringify(at)}`);
+  await until("the mark pops", async () => (await page.locator(".mark-icon.settle").count()) === 1, 300);
+  await until("nothing is left on the page", async () => (await left()) === 0, 1000);
+  // Reduced motion: the popup just goes.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.locator(".mark-icon.question").first().click();
+  await popup.waitFor();
+  await page.keyboard.press("Escape");
+  if (await left()) throw new Error("settle ran under reduced motion");
+  await page.emulateMedia({ reducedMotion: null });
+  await page.locator(".mark-icon.question").first().click();
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await page.waitForTimeout(500); // the write lands before the next journey reads the library
+});
+
 // —— run ——
 
 let failed = 0;

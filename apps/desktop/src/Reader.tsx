@@ -884,9 +884,56 @@ function ReaderView(p: Props & { reload: () => void }) {
   useEffect(() => () => keepNote(), [p.id]);
 
   function closePopup(keep = true) {
-    if (keep) keepNote();
+    if (keep) {
+      keepNote();
+      if (popupNow.current) settle(popupNow.current.id, popupNow.current.note);
+    }
     setPopup(null);
     scrollRef.current?.focus({ preventScroll: true });
+  }
+
+  /** Settle (D129, Tyler's pick A, 2026-11-07): when the popup closes on a highlight he gave a type or a note,
+   *  the popup lifts away, its margin mark pops in three pixel steps and the passage glows once. Only transform
+   *  and opacity animate, on inert copies, so the next selection or key never waits; skipped under reduced motion. */
+  function settle(id: string, note: string) {
+    const ann = annsRef.current.find((a) => a.id === id);
+    const page = pageRef.current;
+    if (!ann || !page || (ann.intent === "keep" && !note.trim())) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const pop = popupRef.current;
+    if (pop) {
+      const ghost = pop.cloneNode(true) as HTMLElement;
+      const from = pop.querySelectorAll("textarea"), to = ghost.querySelectorAll("textarea");
+      to.forEach((t, i) => (t.value = from[i]?.value ?? ""));
+      ghost.removeAttribute("role");
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.inert = true;
+      ghost.classList.add("leaving");
+      page.appendChild(ghost);
+      requestAnimationFrame(() => ghost.classList.add("gone"));
+      setTimeout(() => ghost.remove(), 200);
+    }
+    // After the close renders: the margin may redraw its marks as the popup goes.
+    requestAnimationFrame(() => {
+      const mark = page.querySelector<HTMLElement>(`.mark-icon[data-key="${CSS.escape(id)}"]`);
+      if (!mark) return;
+      mark.classList.add("settle");
+      setTimeout(() => mark.classList.remove("settle"), 240);
+    });
+    const range = ranges.current.get(id);
+    if (range) {
+      const box = page.getBoundingClientRect();
+      const glow = document.createElement("div");
+      glow.className = `settle-glow ${ann.intent}`;
+      for (const r of range.getClientRects()) {
+        if (!r.width) continue;
+        const bit = document.createElement("i");
+        Object.assign(bit.style, { top: `${r.top - box.top}px`, left: `${r.left - box.left}px`, width: `${r.width}px`, height: `${r.height}px` });
+        glow.appendChild(bit);
+      }
+      page.appendChild(glow);
+      setTimeout(() => glow.remove(), 460);
+    }
   }
 
   /** Where the popup sits for a highlight, in the page's coordinates, kept inside the page. */
