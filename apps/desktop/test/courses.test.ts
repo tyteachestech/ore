@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { lessonsOf, nextLesson, tabCount, type Item } from "../src/ore";
+import { lessonsOf, nextLesson, tabCount, titleMatches, type Item } from "../src/ore";
 
 const lesson = (id: string, part: number, status: Item["status"], course = "c1"): Item => ({
   id, type: "youtube", title: id, dir: "", captured_at: "2026-10-28T00:00:00Z", status, skills: ["ai"], course: { id: course, title: "AI Fluency", part },
@@ -21,5 +21,11 @@ describe("courses in lists (D79)", () => {
     const finished = [lesson("a", 1, "done"), lesson("b", 2, "done")];
     expect(tabCount(finished, "toread")).toBe(0);
     expect(tabCount(finished, "done")).toBe(1);
+  });
+
+  test("filtering the list by a course's title finds its lessons (⌘F), as ⌘K does", () => {
+    expect(titleMatches(lesson("Lesson 3: Prompts", 3, "inbox"), "ai fluency")).toBe(true);
+    expect(titleMatches(lesson("Lesson 3: Prompts", 3, "inbox"), "prompts")).toBe(true);
+    expect(titleMatches(source("Other", "inbox"), "ai fluency")).toBe(false);
   });
 });

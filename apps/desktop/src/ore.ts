@@ -128,6 +128,11 @@ export function courseThumb(lessons: Item[]): Pick<Item, "type" | "thumbnail"> |
   const own = lessons.find((l) => l.course_cover)?.course_cover;
   return own ? { type: "article", thumbnail: own } : lessons.find((l) => l.thumbnail);
 }
+/** Whether a filter (⌘F on a list) finds the source: by its title, or a lesson by its course's title. */
+export const titleMatches = (i: Item, q: string): boolean => {
+  const t = q.toLowerCase();
+  return i.title.toLowerCase().includes(t) || !!i.course?.title.toLowerCase().includes(t);
+};
 /** The lesson to open next: the first one not done (null when all are). */
 export const nextLesson = (lessons: Item[]): Item | null => lessons.find((l) => l.status !== "done") ?? null;
 /** How many rows a tab lists: a course counts once, in To read while any lesson is left, in Done once all are. */
