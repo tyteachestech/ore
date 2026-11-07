@@ -170,7 +170,7 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
-journey("tutor: ⌘J opens it beside the source it sees, a reply shows its sources, Esc closes it and the thread stays", async (page) => {
+journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
   await openSource(page, TESTING);
   await page.keyboard.press("Meta+j");
   const tutor = page.getByRole("complementary", { name: "Tutor" });
@@ -185,6 +185,17 @@ journey("tutor: ⌘J opens it beside the source it sees, a reply shows its sourc
   await until("Esc closes it", async () => (await tutor.count()) === 0);
   await page.getByRole("button", { name: "Open the tutor" }).click();
   await tutor.getByText("Why does this work?").waitFor();
+  // It floats by default; docked, it takes the side panel's place, and the panel comes back when it closes.
+  const side = page.locator(".mynotes");
+  await side.waitFor();
+  await tutor.getByRole("button", { name: "Dock to the side" }).click();
+  await until("docked, the side panel steps aside", async () => (await side.count()) === 0);
+  await page.keyboard.press("Meta+j");
+  await side.waitFor();
+  await page.keyboard.press("Meta+j");
+  await tutor.getByRole("button", { name: "Float over the page" }).click();
+  await side.waitFor();
+  await page.keyboard.press("Escape");
 });
 
 journey("tutor @: typing @ lists skills and sources, Enter writes the name in, and the message goes out pointed at it", async (page) => {

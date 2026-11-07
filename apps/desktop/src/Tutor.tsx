@@ -1,4 +1,4 @@
-import { ArrowUp, Plus, Sparkle, X } from "./icons";
+import { ArrowUp, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -23,8 +23,13 @@ const STARTERS = ["What have I been learning?", "Quiz me"];
  *  opened from the bubble at the bottom right or ⌘J. It sees the source he is reading (the chip over
  *  the field, removable) and what he @-mentions, answers from his sources with numbered citations that open the passage
  *  (the panel stays), says when an answer is from general knowledge, and gives hints, not answers, on
- *  practice. The thread lives in App, so it survives navigation; + starts a new one. */
-export function Tutor({ turns, setTurns, reading, sources, skills, onOpen, onClose }: {
+ *  practice. It floats over the bottom right corner (Notion AI's default) or docks at the right in the
+ *  side panel's place; the header switches, and the choice is remembered. The thread lives in App, so
+ *  it survives navigation; + starts a new one. */
+export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills, onOpen, onClose }: {
+  /** Docked at the right, in the side panel's place; else floating over the bottom right corner. */
+  docked: boolean;
+  onFit: () => void;
   turns: TutorTurn[];
   /** What @ can point at. */
   sources: { id: string; title: string }[];
@@ -107,18 +112,19 @@ export function Tutor({ turns, setTurns, reading, sources, skills, onOpen, onClo
   }, []);
   // Window-fixed controls at the top right (the reader's side panel toggle) move left of the panel.
   useEffect(() => {
+    if (!docked) return;
     document.documentElement.style.setProperty("--tutor-w", `${width}px`);
     return () => void document.documentElement.style.removeProperty("--tutor-w");
-  }, [width]);
+  }, [width, docked]);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "nearest" });
   }, [turns]);
 
   return (
     <aside
-      className={`tutor${dragging ? " dragging" : ""}`}
+      className={`tutor${docked ? "" : " float"}${dragging ? " dragging" : ""}`}
       aria-label="Tutor"
-      style={{ width }}
+      style={docked ? { width } : undefined}
       onKeyDown={(e) => {
         if (e.key === "Escape" && !e.defaultPrevented) {
           e.preventDefault();
@@ -127,13 +133,20 @@ export function Tutor({ turns, setTurns, reading, sources, skills, onOpen, onClo
         }
       }}
     >
-      <Hint text="Drag to resize · double-click to reset" side="left">
-        <div className="divider" role="separator" aria-orientation="vertical" aria-label="Resize the tutor" {...divider} />
-      </Hint>
+      {docked && (
+        <Hint text="Drag to resize · double-click to reset" side="left">
+          <div className="divider" role="separator" aria-orientation="vertical" aria-label="Resize the tutor" {...divider} />
+        </Hint>
+      )}
       <div className="tutor-head">
         <Hint text="New chat">
           <button className="icon-btn" aria-label="New chat" disabled={!turns.length || busy} onClick={() => { setTurns(() => []); setMentions([]); field.current?.focus(); }}>
             <Plus size={14} aria-hidden="true" />
+          </button>
+        </Hint>
+        <Hint text={docked ? "Float over the page" : "Dock to the side"}>
+          <button className="icon-btn" aria-label={docked ? "Float over the page" : "Dock to the side"} onClick={() => { onFit(); field.current?.focus(); }}>
+            {docked ? <Square size={14} aria-hidden="true" /> : <SidebarRight size={14} aria-hidden="true" />}
           </button>
         </Hint>
         <Hint text="Close" keys="tutor">

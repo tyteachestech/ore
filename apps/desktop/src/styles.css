@@ -2423,3 +2423,9 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-mention-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutor-mention-kind { flex: none; font: 600 10px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
 .tutor-mention-none { margin: 0; padding: 6px 10px; color: var(--muted); font-size: 13px; }
+/* Floating (Notion AI's default): a card over the bottom right corner, the page unmoved under it. */
+.tutor.float {
+  position: fixed; right: 16px; bottom: 16px; z-index: 12; width: 400px; max-width: calc(100vw - 32px); height: min(600px, calc(100vh - 80px)); min-width: 0;
+  padding-top: 40px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised); box-shadow: var(--float);
+}
+.tutor.float .tutor-head { top: 8px; right: 8px; }
