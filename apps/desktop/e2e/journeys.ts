@@ -624,12 +624,14 @@ journey("note shortcuts as in Notion: # in a numbered item makes a heading; Mark
   await page.keyboard.type("1. What is AI?");
   await page.keyboard.press("Enter");
   await page.keyboard.type("The Foundations");
-  await page.keyboard.press("Home");
+  // Line start and end as each platform's text fields take them: on a Mac, Home and End scroll and leave the caret.
+  const mac = process.platform === "darwin";
+  await page.keyboard.press(mac ? "Meta+ArrowLeft" : "Home");
   await page.keyboard.type("# ");
   await until("the item is a heading", async () => /<h1[^>]*>The Foundations/.test(await html()));
   // A key sent within a frame of the last can beat the editor's own redraw; a hand never does.
   await page.waitForTimeout(100);
-  await page.keyboard.press("End");
+  await page.keyboard.press(mac ? "Meta+ArrowRight" : "End");
   await page.waitForTimeout(100);
   await page.keyboard.press("Enter");
   // A paste as the Mac gives it, without the clipboard permission a real one needs here: its target is
