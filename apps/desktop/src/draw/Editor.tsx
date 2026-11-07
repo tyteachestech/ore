@@ -1295,7 +1295,16 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const WIDTH_KEYS = ["KeyQ", "KeyW", "KeyE"];
   const LINES = ["solid", "dashed", "dotted"] as const;
   const LINE_KEYS = ["KeyZ", "KeyX", "KeyC"];
-  /** The picker's keys: 1–5 stroke, ⇧1–5 fill, Q W E width, Z X C line, Esc closes. True when it used the key. */
+  /** Which way an arrow points is the link's meaning (A causes B, or they affect each other), so the
+   *  three common heads get keys. S is skipped: it closes the picker. */
+  const arrowOn = kinds.has("arrow") || tool === "arrow";
+  const POINTS = [
+    { label: "One way", start: null, end: "arrow" },
+    { label: "Both ways", start: "arrow", end: "arrow" },
+    { label: "No heads", start: null, end: null },
+  ] as const;
+  const POINT_KEYS = ["KeyA", "KeyD", "KeyF"];
+  /** The picker's keys: 1–5 stroke, ⇧1–5 fill, Q W E width, Z X C line, A D F arrow heads, Esc closes. True when it used the key. */
   const quickKey = (e: ReactKeyboardEvent): boolean => {
     if (e.metaKey || e.ctrlKey || e.altKey) return false;
     if (e.key === "Escape") return closeQuick(), true;
@@ -1309,6 +1318,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     if (w >= 0 && !e.shiftKey) return widthOn && setProp({ strokeWidth: WIDTHS[w]! }), true;
     const l = LINE_KEYS.indexOf(e.code);
     if (l >= 0 && !e.shiftKey) return widthOn && setProp({ strokeStyle: LINES[l]! }), true;
+    const a = POINT_KEYS.indexOf(e.code);
+    if (a >= 0 && !e.shiftKey && arrowOn) return setProp({ startArrowhead: POINTS[a]!.start, endArrowhead: POINTS[a]!.end }), true;
     return false;
   };
   /** The style rows, shared by the panel and the picker. "main" is stroke, fill and width, the ones with
@@ -1370,6 +1381,15 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
                     </Seg>
                   ))}
                 </Row>
+                {arrowOn && (
+                  <Row label="Arrow">
+                    {POINTS.map((pt, i) => (
+                      <Seg key={pt.label} on={value("startArrowhead") === pt.start && value("endArrowhead") === pt.end} badge={badges ? "ADF"[i] : undefined} onPick={() => setProp({ startArrowhead: pt.start, endArrowhead: pt.end })} label={pt.label}>
+                        <Heads start={pt.start} end={pt.end} />
+                      </Seg>
+                    ))}
+                  </Row>
+                )}
               </>
             )}
             {rest && (
@@ -1985,6 +2005,17 @@ function Head({ kind, flip: f }: { kind: string | null; flip?: boolean }) {
       {kind === "triangle" && <path d="M14 2 L20 6 L14 10 Z" fill="currentColor" />}
       {kind === "dot" && <circle cx="18" cy="6" r="2.6" fill="currentColor" />}
       {kind === "bar" && <line x1="19" y1="1.5" x2="19" y2="10.5" stroke="currentColor" strokeWidth="1.5" />}
+    </svg>
+  );
+}
+
+/** An arrow with both of its heads, for the Arrow row. */
+function Heads({ start, end }: { start: string | null; end: string | null }) {
+  return (
+    <svg width="22" height="12" viewBox="0 0 22 12" aria-hidden="true">
+      <line x1="2" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="1.5" />
+      {end && <path d="M15 2 L20 6 L15 10" fill="none" stroke="currentColor" strokeWidth="1.5" />}
+      {start && <path d="M7 2 L2 6 L7 10" fill="none" stroke="currentColor" strokeWidth="1.5" />}
     </svg>
   );
 }

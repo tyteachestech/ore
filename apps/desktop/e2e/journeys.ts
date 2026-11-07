@@ -1211,6 +1211,28 @@ journey("diagram: S styles at the pointer, keys stay on the canvas, Space never 
   await page.keyboard.press("Escape");
   await page.keyboard.press("Meta+z");
   await until("⌘Z takes the whole custom colour back in one step", async () => (await rect.getAttribute("stroke")) === before);
+  // A D F set an arrow's heads in the picker: one way, both ways, none (which way it points is the link's meaning).
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("a");
+  await page.mouse.move(c.x + 200, c.y + 150);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 350, c.y + 160, { steps: 5 });
+  await page.mouse.up();
+  await page.keyboard.press("s");
+  await quick.waitFor();
+  const heads = (name: string) => quick.getByRole("button", { name, exact: true }).getAttribute("aria-pressed");
+  await until("a new arrow points one way", async () => (await heads("One way")) === "true");
+  await page.keyboard.press("d");
+  await until("D points it both ways", async () => (await heads("Both ways")) === "true");
+  await page.keyboard.press("f");
+  await until("F takes both heads off", async () => (await heads("No heads")) === "true");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+z");
+  await page.keyboard.press("s");
+  await until("⌘Z puts the heads back", async () => (await heads("Both ways")) === "true");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Backspace"); // the rest of this journey counts the box alone
+  await until("the arrow is gone", async () => (await page.locator(".diagram .draw-canvas > g path").count()) === 0);
   // With several selected, a click on one of them picks just that one (Figma, Excalidraw).
   await page.mouse.click(c.x + 500, c.y + 300);
   await page.keyboard.press("Meta+d");
