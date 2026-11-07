@@ -1472,9 +1472,84 @@ journey("review: Open in source pauses on the card; Back to Review picks it up w
   await page.locator(".doc-head").waitFor();
   await page.keyboard.press("Escape");
   await until("Esc returns to the card", async () => (await q.isVisible()) && (await q.innerText()) === card);
-  // Put back any ratings made on the way, for the journeys after this one.
+  // The session stayed open the whole time: rating this card and leaving ends it normally, on the end screen.
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await until("the card moves on", async () => !(await q.isVisible()) || (await q.innerText()) !== card);
+  await page.keyboard.press("Escape");
+  const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
+  await doneButton.waitFor();
+  if (await page.locator(".toast", { hasText: /session/i }).count()) throw new Error("ending the session failed");
+  // Put back every rating made on the way, for the journeys after this one.
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z leaves the end screen", async () => !(await doneButton.isVisible()));
   const undo = page.getByRole("button", { name: "Undo last rating" });
-  for (let n = 0; n < 6 && (await undo.isVisible()); n++) await undo.click(), await page.waitForTimeout(200);
+  for (let n = 0; n < 6 && (await undo.isVisible()); n++) await undo.click(), await page.waitForTimeout(250);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: Enter activates the focused button (Again, Edit card, Open in source); on the card it gives the suggested Good", async (page) => {
+  const ratings: string[] = [];
+  page.on("request", (r) => {
+    const m = /"--rating=(\d)"/.exec(r.postData() ?? "");
+    if (r.url().endsWith("/ore") && m) ratings.push(m[1]!);
+  });
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const q = page.locator(".review-q");
+  await pick.or(q).first().waitFor();
+  if (await pick.isVisible()) await page.keyboard.press("Enter");
+  const open = page.getByRole("button", { name: /Open in source/ });
+  const good = page.getByRole("button", { name: "Good", exact: true });
+  // A card with its passage (a Fact card, where ↵ suggests Good).
+  for (let n = 0; n < 6; n++) {
+    await q.waitFor();
+    const noIdea = page.getByRole("button", { name: "No idea" });
+    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await good.waitFor();
+    await page.waitForTimeout(300);
+    if (await open.isVisible() && (await good.getAttribute("class"))?.includes("suggested")) break;
+    const was = await q.innerText();
+    await good.click();
+    await until("the next card", async () => (await q.innerText()) !== was);
+  }
+  const card = await q.innerText();
+  const before = ratings.length;
+  /** Tabs from the Review surface until `name` has focus, then presses Enter. */
+  const enterOn = async (name: string) => {
+    await page.locator(".review").focus();
+    for (let n = 0; n < 40; n++) {
+      await page.keyboard.press("Tab");
+      if (await page.evaluate((name) => (document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent ?? "").trim().startsWith(name), name)) break;
+    }
+    await page.keyboard.press("Enter");
+  };
+  await enterOn("Edit card");
+  await until("Enter on Edit card opens the editor", async () => !(await q.isVisible()));
+  await page.keyboard.press("Escape");
+  await q.waitFor();
+  await enterOn("Open in source");
+  await page.locator(".doc-head").waitFor();
+  await page.keyboard.press("Escape");
+  await until("back on the card", async () => (await q.isVisible()) && (await q.innerText()) === card);
+  if (ratings.length !== before) throw new Error(`Enter on a button recorded ${ratings.slice(before)}`);
+  await page.waitForTimeout(300);
+  await enterOn("Again");
+  await until("Enter on Again records Again", async () => ratings.length === before + 1);
+  if (ratings[before] !== "1") throw new Error(`Enter on Again recorded ${ratings[before]}`);
+  // Enter on the Review surface itself still gives the suggestion.
+  const undo = page.getByRole("button", { name: "Undo last rating" });
+  await undo.click();
+  await until("the card is back", async () => (await q.isVisible()) && (await q.innerText()) === card);
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await good.waitFor();
+  await page.waitForTimeout(350);
+  await page.locator(".review").focus();
+  await page.keyboard.press("Enter");
+  await until("Enter on the card records Good", async () => ratings.length === before + 2);
+  if (ratings[before + 1] !== "3") throw new Error(`Enter on the card recorded ${ratings[before + 1]}`);
+  for (let n = 0; n < 8 && (await undo.isVisible()); n++) await undo.click(), await page.waitForTimeout(250);
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
 });
