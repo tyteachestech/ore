@@ -7,7 +7,7 @@ import { openIndex, rebuildIndex } from "../src/db.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
 import { readReviews } from "../src/reviews.ts";
-import { endSession, startSession } from "../src/sessions.ts";
+import { endSession, readSessions, reopenSession, startSession } from "../src/sessions.ts";
 import { paths } from "../src/library.ts";
 import { setReviewSettings } from "../src/skills.ts";
 import { dueQueue, libraryStats, recordReview, undoReview } from "../src/study.ts";
@@ -109,6 +109,24 @@ describe("review loop", () => {
       if (was === undefined) delete process.env.ORE_DEVICE;
       else process.env.ORE_DEVICE = was;
     }
+  });
+
+  test("a rating taken back on the end screen reopens its session; the next end's receipt replaces the first", async () => {
+    const { lib, a, b } = await setup();
+    const s = startSession(lib);
+    await recordReview(lib, a.meta.id, { rating: 3, confidence: 2 });
+    const second = await recordReview(lib, b.meta.id, { rating: 3, confidence: 2 });
+    expect(endSession(lib, new Date(Date.now() + 1000)).reviews).toBe(2);
+    expect(() => reopenSession(lib, "nope")).toThrow(/no session/);
+    await undoReview(lib, b.meta.id, second.ts);
+    reopenSession(lib, s.id);
+    await Bun.sleep(5); // an undo names its review by time; the next one is never in the same millisecond
+    const again = await recordReview(lib, b.meta.id, { rating: 4, confidence: 3 });
+    expect(again.session).toBe(s.id);
+    endSession(lib, new Date(Date.now() + 2000));
+    const ends = readSessions(lib).filter((r) => r.type === "end" && r.id === s.id);
+    expect(ends).toHaveLength(1);
+    expect(ends[0]!.reviews).toBe(2);
   });
 
   test("a miss in an open session queues one relearn pass, accepted twice in one session", async () => {

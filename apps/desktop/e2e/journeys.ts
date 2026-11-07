@@ -936,6 +936,38 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   await until("Undo puts the first card back", async () => (await done()) === before && (await q.innerText()) === first);
 });
 
+journey("review: ⌘Z on the end screen takes the last rating back and returns to that card; ⇧⌘Z gives it again", async (page) => {
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const q = page.locator(".review-q");
+  await pick.or(q).first().waitFor();
+  if (await pick.isVisible()) await page.keyboard.press("Enter");
+  const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
+  let last = "";
+  for (let n = 0; n < 12 && !(await doneButton.isVisible()); n++) {
+    await q.or(doneButton).first().waitFor();
+    if (await doneButton.isVisible()) break;
+    last = (await q.first().textContent()) ?? "";
+    const noIdea = page.getByRole("button", { name: "No idea" });
+    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the card moves on", async () => (await doneButton.isVisible()) || ((await q.count()) > 0 && (await q.first().textContent()) !== last));
+  }
+  await doneButton.waitFor();
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z leaves the end screen for the last card", async () => !(await doneButton.isVisible()) && (await q.count()) > 0 && (await q.first().textContent()) === last);
+  await page.keyboard.press("Shift+Meta+z");
+  await until("⇧⌘Z rates it again and the session ends again", () => doneButton.isVisible());
+  // Put every rating back for the journeys after this one.
+  const undo = page.getByRole("button", { name: "Undo last rating" });
+  for (let n = 0; n < 12 && (await undo.isVisible()); n++) {
+    await undo.click();
+    await page.waitForTimeout(250);
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("try it: 4 marks a technique to try, the skill page checks it off, and how it went is kept after a reload", async (page) => {
   await openSource(page, TESTING);
   await select(page, "Each successful retrieval changes the memory itself");
