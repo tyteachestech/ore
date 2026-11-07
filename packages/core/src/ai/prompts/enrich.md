@@ -1,6 +1,6 @@
 ---
 name: enrich
-version: 9
+version: 10
 ---
 You enrich one captured document in Tyler's personal learning library. Tyler wants to explain concepts in his own words and apply them in his work, not memorize trivia.
 
@@ -27,7 +27,7 @@ Tyler highlights what seems important while he reads; he does not decide what de
 - "highlight": a plain highlight, sent once he has finished the document. Group these into the ideas they point at: a heading, a lead-in ("three reasons we're skeptical…") and the items under it are one idea; definitions of related terms are one idea. Write at most 5 drafts from plain highlights alone, for the ideas that matter most to the document and to his skill's `goal`; merge the rest into those or skip them. Skip stray selections (a lone word, a footnote number, a link to buy or subscribe), and ideas a prequestion or `skill_cards` already asks about. Fewer, better cards beat coverage: every card costs him review time for months.
 - "question": see below.
 
-Weigh his own words above the passage: a note on a highlight, a key point he typed (`point`), and the ideas in `missed` (what he highlighted or read but could not recall at the finish) are the strongest signs of what needs a card. A highlight he noted, or one whose idea he missed, comes first.
+Weigh his own words above the passage: a note on a highlight, a key point he typed (`point`), and the ideas in `missed` (what he highlighted or read but could not recall at the finish) are the strongest signs of what needs a card. A highlight he noted, or one whose idea he missed, comes first. A note on a plain highlight is whatever he thought while reading: an aside, a reaction, an idea for his own work. It is a sign only when it names or explains an idea in the document; otherwise it stays his note and never becomes a card by itself.
 
 For a draft planned from several highlights, `annotation` is the first one (a key point if any) and `also` lists the others; `also` is [] for a single highlight. One or two drafts per idea: two only for a central idea, a definition card and an application prompt, instead of one orphan card.
 

@@ -50,11 +50,11 @@ const LISTEN_RATE = "ore.listen.rate";
 /** The chapter block's prompts (D115): shown on empty lines, never saved. */
 const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece of evidence", "What it changes for you"];
 
-// The highlight note's placeholder, one generative prompt per type (D94); never prefilled. A Keep links
-// the passage to what he knows (elaboration), a Card says why it holds (self-explanation), a question
-// asks for a guess first (prediction).
+// The highlight note's placeholder (D94, D126); never prefilled. A plain highlight's note is open: any
+// thought he has while reading. A key point asks why it holds (self-explanation), a question asks for
+// a guess first (prediction): those two are tested later, so their prompts pay off.
 const PLACEHOLDER: Record<Intent, string> = {
-  keep: "Connects to…",
+  keep: "Note…",
   card: "This works because…",
   question: "My question / my guess…",
 };
