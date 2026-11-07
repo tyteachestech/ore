@@ -501,6 +501,7 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await openSource(page, TESTING);
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
   const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300); // the reader puts back where he was reading: a drag before that lands elsewhere
   await select(page, "ach successful retrieval changes the memory its");
   await popup.waitFor();
   await until("it snaps out to whole words", async () => (await active()) === "Each successful retrieval changes the memory itself.");
@@ -985,6 +986,37 @@ journey("answer pieces: one click rewrites a piece in place, ⌘Z puts the old w
   await edit.fill("");
   await page.keyboard.press("Enter");
   await until("the piece is gone again", async () => (await piece.count()) === 0);
+  await page.waitForTimeout(300);
+});
+
+journey("answer pieces: a correction he is writing stays through a blur and a failed save, and saves on the next try", async (page) => {
+  const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { answer: why } : {}), why);
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Answer…" }).click();
+  const box = page.getByLabel("Your answer to Does this hold for kids?");
+  await box.fill("Mostly yes.");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Edit: Mostly yes." }).click();
+  const edit = page.getByLabel("Edit this part of your answer");
+  await edit.fill("Yes, from about age 8.");
+  await box.click(); // focus leaves the piece
+  if ((await edit.inputValue().catch(() => null)) !== "Yes, from about age 8.") throw new Error("a blur lost the correction");
+  await edit.click();
+  await fail("The library is read-only.");
+  await page.keyboard.press("Enter");
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await until("the failed save gives his correction back", async () => (await edit.isVisible()) && (await edit.inputValue()) === "Yes, from about age 8.");
+  await fail(null);
+  await edit.focus();
+  await page.keyboard.press("Enter");
+  const fixed = page.getByRole("button", { name: "Edit: Yes, from about age 8." });
+  await fixed.waitFor();
+  // Leave the question as the seed had it.
+  await fixed.click();
+  await edit.fill("");
+  await page.keyboard.press("Enter");
+  await until("the piece is gone", async () => (await fixed.count()) === 0);
   await page.waitForTimeout(300);
 });
 
@@ -1939,6 +1971,9 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   await until("the session counts the rating", async () => (await done()) === before + 1);
   await page.getByRole("button", { name: "Undo last rating" }).click();
   await until("Undo puts the first card back", async () => (await done()) === before && (await q.innerText()) === first);
+  // Leave Review as he would, so its session ends: one left open carries into the journeys after this one.
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
 });
 
 journey("review: ⌘Z on the end screen takes the last rating back and returns to that card; ⇧⌘Z gives it again", async (page) => {
@@ -2086,7 +2121,7 @@ journey("review: retiring a card keeps ⌘Z for the ratings before it, and so do
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("try it: 4 marks a technique to try, the skill page checks it off, and how it went is kept after a reload", async (page) => {
+journey("try it: 4 marks a technique to try, the skill page checks it off, and how it went is kept through a failed save and after a reload", async (page) => {
   await openSource(page, TESTING);
   await select(page, "Each successful retrieval changes the memory itself");
   await page.getByRole("dialog", { name: "Highlight" }).waitFor();
@@ -2100,7 +2135,14 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const row = page.locator(".try").filter({ hasText: "Quiz myself before each edit session" });
   await row.getByRole("checkbox", { name: "Mark tried" }).click();
-  await page.getByLabel("How did it go?").fill("Caught two gaps before recording");
+  const field = page.getByLabel("How did it go?");
+  await field.fill("Caught two gaps before recording");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { tried: "The library is read-only." }));
+  await page.keyboard.press("Enter");
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await until("the failed save opens the field again with every word", async () => (await field.isVisible()) && (await field.inputValue()) === "Caught two gaps before recording");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await field.focus();
   await page.keyboard.press("Enter");
   const saved = page.locator(".try-reflection", { hasText: "Caught two gaps before recording" });
   await saved.waitFor();
@@ -2329,6 +2371,97 @@ journey("tutor Practice: Write it in your note puts the exercise in the source i
   if (!bodies[1]?.includes("When the goal is met.") || !bodies[1].includes(`"--item=${item}"`)) throw new Error(`the answer went with another source: ${bodies[1]}`);
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Meta+j");
+});
+
+/** Explain on a phrase, from the highlight popup's Explain button. */
+async function explain(page: Page, phrase: string) {
+  await select(page, phrase);
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  await popup.getByRole("button", { name: "Explain", exact: true }).click();
+  await page.getByRole("dialog", { name: `Explain ${phrase}` }).waitFor();
+}
+
+// After the question journeys: Learn this makes its term a question. On words no other journey highlights.
+journey("explain: ↵ on a focused Retry, Make card or Later does what clicking it does", async (page) => {
+  await openSource(page, AGENTS);
+  const learning = page.getByRole("dialog", { name: /^Learn / });
+  await explain(page, "subtasks");
+  const ex = page.getByRole("dialog", { name: "Explain subtasks" });
+  // The mock has no AI to explain with: Retry asks again.
+  await ex.getByRole("button", { name: "Retry" }).focus();
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(300);
+  if (await learning.count()) throw new Error("↵ on Retry started Learn this");
+  await ex.getByRole("button", { name: "Retry" }).waitFor();
+  await ex.getByRole("button", { name: "Make card" }).focus();
+  await page.keyboard.press("Enter");
+  await ex.waitFor({ state: "detached" });
+  if (await learning.count()) throw new Error("↵ on Make card started Learn this");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor(); // the card's note, as clicking Make card opens it
+  await page.keyboard.press("Escape");
+  await explain(page, "Parallelisation");
+  await page.getByRole("dialog", { name: "Explain Parallelisation" }).getByRole("button", { name: "Learn this" }).click();
+  const learn = page.getByRole("dialog", { name: "Learn Parallelisation" });
+  await learn.getByRole("button", { name: "Retry" }).waitFor(); // no AI to find sources: nothing to read now
+  await learn.getByRole("button", { name: "Later" }).focus();
+  await page.keyboard.press("Enter");
+  await learn.waitFor({ state: "detached" });
+});
+
+journey("explain: a reworded question whose save fails is saved by the next ↵, unchanged", async (page) => {
+  const ore = (args: string[]) => page.evaluate((args) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args }), args);
+  const id = ((await ore(["ls"])) as { id: string; title: string }[]).find((i) => i.title === AGENTS)!.id;
+  const notes = async () => ((await ore(["show", id])) as { annotations: { note?: string; status?: string }[] }).annotations.map((a) => a.note);
+  await openSource(page, AGENTS);
+  await explain(page, "synthesise");
+  await page.getByRole("dialog", { name: "Explain synthesise" }).getByRole("button", { name: "Learn this" }).click();
+  const learn = page.getByRole("dialog", { name: "Learn synthesise" });
+  await learn.getByRole("button", { name: "Retry" }).waitFor(); // the question is saved
+  const field = learn.getByLabel("Your question");
+  const reworded = "How does a model synthesise results from workers?";
+  await field.fill(reworded);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { annotate: "The library is read-only." }));
+  await field.press("Enter");
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  if ((await field.inputValue()) !== reworded) throw new Error("the failed rename lost his words");
+  await field.press("Enter");
+  await until("the next ↵ saves the same words", async () => (await notes()).includes(reworded));
+  await learn.getByRole("button", { name: "Later" }).click();
+  await learn.waitFor({ state: "detached" });
+});
+
+journey("finish quiz: ⌘⌫ while Check saves leaves his answer alone; a mark whose save fails goes back", async (page) => {
+  await openSource(page, TESTING);
+  const writes: string[] = [];
+  let release = () => {};
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"prequestion",')) return route.fallback();
+    writes.push(body);
+    if (writes.length === 1) await new Promise<void>((ok) => (release = ok));
+    await route.fallback();
+  });
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip to questions" }).click();
+  await page.getByLabel("Your answer").fill("It feels familiar");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await until("Check is saving", async () => writes.length === 1);
+  for (let n = 0; n < 3; n++) await page.keyboard.press("Meta+Backspace");
+  await page.waitForTimeout(300);
+  release();
+  const mark = page.locator(".quiz-mark[aria-pressed]").first();
+  await mark.waitFor();
+  if (writes.length !== 1 || !writes[0]!.includes("It feels familiar")) throw new Error(`his answer wasn't the one write: ${writes.join(" | ")}`);
+  await page.unroute(/\/ore$/);
+  const was = await mark.getAttribute("aria-pressed");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { check: "The library is read-only." }));
+  await mark.click();
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await until("the mark is back as saved", async () => (await mark.getAttribute("aria-pressed")) === was);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
 // —— run ——

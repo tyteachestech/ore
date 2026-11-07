@@ -201,7 +201,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   }
 
   async function check(noIdea = false) {
-    if (qi < 0) return;
+    // One answer write at a time: ⌘⌫ while Check saves would replace his answer with "no idea".
+    if (qi < 0 || busy) return;
     const text = noIdea ? "no idea" : answers[qi]!.trim();
     if (!text) return field.current?.focus();
     setBusy(true);
@@ -292,15 +293,22 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
    *  Not while Done is saving or its moment shows: that would append his note and draft twice. */
   const close = () => (step <= n ? onCancel() : busy ? undefined : marked ? void finish() : void keepReading());
 
+  /** One correction at a time; a failed one puts the saved marks back. */
+  const flipping = useRef(false);
   async function flip(i: number) {
-    if (qi < 0 || !q?.check) return;
-    const covered = q.check.covered.map((c, j) => (j === i ? !c : c));
+    if (qi < 0 || !q?.check || flipping.current) return;
+    const was = q.check;
+    const covered = was.covered.map((c, j) => (j === i ? !c : c));
     const k = qi;
+    flipping.current = true;
     setQs((cur) => cur.map((x, j) => (j === k ? { ...x, check: { ...x.check!, covered, edited: true } } : x)));
     try {
       await ore("check", doc.id, String(k + 1), opt("covered", covered.map((c) => (c ? "1" : "0")).join(",")));
     } catch (e) {
+      setQs((cur) => cur.map((x, j) => (j === k ? { ...x, check: was } : x)));
       notify(errorText(e), "error");
+    } finally {
+      flipping.current = false;
     }
   }
 
