@@ -691,6 +691,7 @@ journey("feed: ⌘K offers the selected post's actions, named for it, once the k
     await page.locator("[cmdk-input]").fill("mark read");
     await until("nothing offered before a post is picked", async () => (await offered()) === 0);
     await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Meta+k");
     await page.locator("[cmdk-input]").fill("mark read");
@@ -702,6 +703,16 @@ journey("feed: ⌘K offers the selected post's actions, named for it, once the k
     server.stop(true);
     await page.getByRole("button", { name: /^Home/ }).click();
   }
+});
+
+journey("⌘K: Esc clears what was typed first, then closes", async (page) => {
+  await page.keyboard.press("Meta+k");
+  const input = page.locator("[cmdk-input]");
+  await input.fill("review");
+  await page.keyboard.press("Escape");
+  await until("the query is cleared and ⌘K stays open", async () => (await input.count()) === 1 && (await input.inputValue()) === "");
+  await page.keyboard.press("Escape");
+  await until("a second Esc closes it", async () => (await input.count()) === 0);
 });
 
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {

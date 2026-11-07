@@ -46,7 +46,7 @@ has to ask for something obvious, add a row here in the same PR.**
 | Any list of sources | Each row starts with the source's thumbnail (`<Thumb>`), or its kind icon, wherever it is listed: All sources, skill page, Home, ⌘K | Raindrop, Readwise Reader |
 | Any list of sources | A source's skill chips open its skill picker on click, wherever the row is listed (All sources, skill page, Home); the row itself still opens on click | Linear labels, Notion multi-select |
 | Set of pills or tags | Clicking the set opens a multi-select: search, toggle with a click or Enter, create a new one from the query | Notion |
-| Command palette | ⌘1–⌘9 run the visible rows; recent items first with an empty query; actions on the open or selected object | Raycast |
+| Command palette | ⌘1–⌘9 run the visible rows; recent items first with an empty query; actions on the open or selected object; Esc clears the query first, then goes back a page, then closes | Raycast |
 | Reading page | ⌘F finds in the page with a match count, ⌘G/⇧⌘G or Enter/⇧Enter step, Esc closes and keeps the place | Safari, Books |
 | Reading page | ⌘+ ⌘− change text size (⌘0 is Go to Home here, so Default size is in Settings and ⌘K); width, size and a light page in Settings › Reading and ⌘K, not a popover (PR #52); the paragraph in view stays in view | Books, Readwise Reader |
 | Reading page | Highlight without the mouse: ↑↓ move a focus that appears only once the keyboard moves, ⇧↑↓ widen it, H highlights it, 1–3 pick the type, Esc clears; arrows stay with menus, lists and fields | Readwise Reader |
