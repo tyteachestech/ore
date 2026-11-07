@@ -1937,6 +1937,13 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   };
 
+  const intent = (popup && anns.find((a) => a.id === popup.id)?.intent) || "keep";
+  const popupRange = popup && ranges.current.get(popup.id);
+  const canLookUp = !PHONE && !!popupRange && lookable(popupRange.toString());
+  // Junk can be cut from the text, but not from a transcript: its words are timed to the video (D111).
+  const popupEl = popupRange && (popupRange.startContainer.nodeType === 1 ? (popupRange.startContainer as Element) : popupRange.startContainer.parentElement);
+  const canCut = !!popupEl && (!video || cardMode) && !popupEl.closest(".video-card") && !annsRef.current.find((a) => a.id === popup?.id)?.point;
+  const inHeading = !!popupEl?.closest("h1, h2, h3, h4, h5, h6");
   /** The open source's actions, Readwise Reader's document menu: ⋯ at the top right, right-click on
    *  the title, and ⌘K, each with its shortcut. */
   const actions: MenuAction[] = !doc
@@ -1978,6 +1985,14 @@ function ReaderView(p: Props & { reload: () => void }) {
         ...(video || PHONE ? [] : [{ id: "listen", label: listen ? "Stop listening" : "Listen", hint: label(keys.listen), run: () => (listen ? stopListening() : startListening()) }]),
         ...(focus ? [{ id: "highlight", label: "Highlight focused text", hint: label(keys.highlight), paletteOnly: true, run: () => highlightFocus("keep") }] : []),
         { id: "card-here", label: "Add a key point here…", hint: label(keys.card), run: cardHere },
+        // The open highlight's own tools, also in ⌘K (three ways to every action); its popup has the buttons.
+        ...(popup && !PHONE
+          ? [
+              { id: "copy-highlight", label: "Copy highlight with source", paletteOnly: true, run: () => copyHighlight(popup.id, popup.note) },
+              ...(canCut ? [{ id: "cut-text", label: inHeading ? "Remove this section from the text" : "Remove this from the text", hint: label(keys["cut-text"]), paletteOnly: true, run: () => void cutOut() }] : []),
+              { id: "remove-highlight", label: "Remove highlight", hint: label(keys.remove), paletteOnly: true, run: () => void remove() },
+            ]
+          : []),
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
         { id: "collected", label: questionsShown ? "Close collected" : "Collected", hint: label(keys.collected), run: () => p.onShowSide("questions") },
@@ -2029,13 +2044,6 @@ function ReaderView(p: Props & { reload: () => void }) {
       p.notify(errorText(e), "error");
     }
   };
-  const intent = (popup && anns.find((a) => a.id === popup.id)?.intent) || "keep";
-  const popupRange = popup && ranges.current.get(popup.id);
-  const canLookUp = !PHONE && !!popupRange && lookable(popupRange.toString());
-  // Junk can be cut from the text, but not from a transcript: its words are timed to the video (D111).
-  const popupEl = popupRange && (popupRange.startContainer.nodeType === 1 ? (popupRange.startContainer as Element) : popupRange.startContainer.parentElement);
-  const canCut = !!popupEl && (!video || cardMode) && !popupEl.closest(".video-card") && !annsRef.current.find((a) => a.id === popup?.id)?.point;
-  const inHeading = !!popupEl?.closest("h1, h2, h3, h4, h5, h6");
   /** Folds the whole card or its transcript, kept for this source. Folding the card pauses the video;
    *  opening the transcript brings the spoken word back into it. */
   const foldCard = (next: typeof vc) => {
