@@ -17,12 +17,95 @@ type Ai = { vendor: string; model: string; prompt_version: string };
 /** An open exercise (D128.6): its heading in his note and the placeholder lines under it. */
 export type Exercise = { heading: string; prompts: string[] };
 export type TutorTurn = {
+  /** Unique across chats: a reply lands only on the turn that asked for it. */
+  id: string;
   message: string; item?: string; title?: string; mentions?: Mention[];
   reply?: string; citations?: Citation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
 };
 type Reply = { reply: string; citations: Citation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; ai: Ai };
+/** What he has typed and not sent yet, with the @-mentions in it. */
+export type TutorDraft = { input: string; mentions: Mention[] };
+export type TutorChat = ReturnType<typeof useTutorChat>;
+
+let turnSeq = 0;
+const turnId = () => `${Date.now().toString(36)}-${++turnSeq}`;
+
+/** The tutor's thread, his draft and its requests, held in App so closing the panel or moving around
+ *  the app loses nothing and never asks twice. New chat sets the thread aside: Undo swaps it back. */
+export function useTutorChat(notify: Notify) {
+  const [turns, setTurns] = useState<TutorTurn[]>([]);
+  const [draft, setDraft] = useState<TutorDraft>({ input: "", mentions: [] });
+  const now = useRef(turns);
+  const update = (f: (t: TutorTurn[]) => TutorTurn[]) => setTurns((now.current = f(now.current)));
+  // Every change to a turn, by id, so a thread set aside by New chat comes back with what landed meanwhile.
+  const landed = useRef(new Map<string, Partial<TutorTurn>>());
+  const patch = (id: string, p: Partial<TutorTurn>) => {
+    landed.current.set(id, { ...landed.current.get(id), ...p });
+    update((ts) => ts.map((t) => (t.id === id ? { ...t, ...p } : t)));
+  };
+  const run = async (t: TutorTurn, before: TutorTurn[]) => {
+    const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: x.reply }] : []));
+    try {
+      const pointed = (t.mentions ?? []).map((m) => opt(m.kind, m.id));
+      const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []));
+      patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, ai: r.ai, error: undefined });
+    } catch (e) {
+      patch(t.id, { error: errorText(e, "answer that") });
+    }
+  };
+  /** Adds his message to the thread and asks. */
+  const ask = (turn: Omit<TutorTurn, "id">) => {
+    const t = { ...turn, id: turnId() };
+    const before = now.current;
+    update((ts) => [...ts, t]);
+    void run(t, before);
+  };
+  const retry = (id: string) => {
+    const i = now.current.findIndex((t) => t.id === id);
+    if (i < 0) return;
+    const { message, item, title, mentions } = now.current[i]!;
+    const t = { id, message, item, title, mentions };
+    landed.current.delete(id);
+    update((ts) => ts.map((x) => (x.id === id ? t : x)));
+    void run(t, now.current.slice(0, i));
+  };
+  /** Keeps the reply's card on the source it cites first (else the one he asked about); ⌘Z retires it. */
+  const keep = async (id: string) => {
+    const t = now.current.find((x) => x.id === id);
+    const item = t?.citations?.[0]?.item ?? t?.item;
+    if (!t?.card || !t.ai || !item || t.kept) return;
+    const mark = (kept: string | undefined) => patch(id, { kept });
+    mark("adding");
+    try {
+      const c = await ore<{ id: string }>("tutor-card", item, opt("card", JSON.stringify(t.card)), opt("ai", JSON.stringify(t.ai)));
+      mark(c.id);
+      notify(
+        "Card added",
+        "quiet",
+        () => void ore("card", "retire", c.id).then(() => mark(undefined), (e) => notify(errorText(e), "error")),
+        () => void ore("card", "restore", c.id, "--state=draft").then(() => mark(c.id), (e) => notify(errorText(e), "error")),
+      );
+    } catch (e) {
+      mark(undefined);
+      notify(errorText(e, "add that card"), "error");
+    }
+  };
+  /** A new chat, even while one is thinking (its reply goes to its own thread); Undo brings that thread back. */
+  const fresh = () => {
+    let away = now.current;
+    if (!away.length) return;
+    update(() => []);
+    const swap = () => {
+      const back = away;
+      away = now.current;
+      update(() => back.map((t) => ({ ...t, ...landed.current.get(t.id) })));
+    };
+    notify("Chat cleared", "info", swap, swap);
+  };
+  return { turns, draft, setDraft, ask, retry, keep, fresh };
+}
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
 const STARTERS_READING = ["Explain this simply", "Give me an example", "Practice"];
@@ -35,8 +118,8 @@ const STARTERS = ["What have I been learning?", "Explain something I saved", "Pr
  *  practice. It floats over the bottom right corner (Notion AI's default) or docks at the right in the
  *  side panel's place; the header switches, and the choice is remembered. The thread lives in App, so
  *  it survives navigation; + starts a new one. */
-export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills, onOpen, onClose, onQuiz, onWrite, notify }: {
-  notify: Notify;
+export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, onClose, onQuiz, onWrite }: {
+  chat: TutorChat;
   /** Write an exercise's answer in the open source's note, the source hidden (D128.6); absent with no source open. */
   onWrite?: (exercise: Exercise) => void;
   /** Quiz me: Review on his due cards in these skills (none: all of them). */
@@ -44,23 +127,21 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
   /** Docked at the right, in the side panel's place; else floating over the bottom right corner. */
   docked: boolean;
   onFit: () => void;
-  turns: TutorTurn[];
   /** What @ can point at. */
   sources: { id: string; title: string }[];
   skills: { id: string; name: string }[];
-  setTurns: (f: (t: TutorTurn[]) => TutorTurn[]) => void;
   /** The source on screen, if any. */
   reading: { id: string; title: string; skills: string[] } | null;
   onOpen: (item: string, at: string) => void;
   onClose: () => void;
 }) {
-  const [input, setInput] = useState("");
+  const { turns, draft: { input, mentions }, setDraft } = chat;
+  const setInput = (text: string) => setDraft((d) => ({ ...d, input: text }));
   // He can take the open source out of the context (the chip's ×); a new source puts it back.
   const [dropped, setDropped] = useState<string | null>(null);
   const context = reading && dropped !== reading.id ? reading : null;
   // @-mentions (Claude's and ChatGPT's @): the name goes into the text, and each one still written
   // there when he sends points the tutor at it.
-  const [mentions, setMentions] = useState<Mention[]>([]);
   const [at, setAt] = useState<{ query: string; start: number } | null>(null);
   const [pick, setPick] = useState(0);
   // Where the caret goes once a picked @name is in the text: set before the next key lands, so typing
@@ -78,61 +159,18 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const busy = turns.some((t) => t.reply === undefined && !t.error);
-  const started = useRef(false);
   const { width, dragging, divider } = useSideWidth("ore.tutorwidth", 380, 300);
   // Writing in the note is for the source in context: the note is that source's.
   const write = context && reading && onWrite ? onWrite : undefined;
-
-  const run = async (i: number, all: TutorTurn[]) => {
-    const t = all[i]!;
-    const earlier = all.slice(0, i).flatMap((x) => (x.reply ? [{ message: x.message, reply: x.reply }] : []));
-    try {
-      const pointed = (t.mentions ?? []).map((m) => opt(m.kind, m.id));
-      const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []));
-      setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, ai: r.ai, error: undefined } : x)));
-    } catch (e) {
-      setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, error: errorText(e, "answer that") } : x)));
-    }
-  };
 
   const send = (text: string) => {
     const message = text.trim();
     if (!message || busy) return;
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
-    const next = [...turns, { message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}) }];
-    setTurns(() => next);
-    setInput("");
-    setMentions([]);
+    chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}) });
+    setDraft(() => ({ input: "", mentions: [] }));
     setAt(null);
     field.current?.focus();
-    void run(next.length - 1, next);
-  };
-  const retry = (i: number) => {
-    const next = turns.map((t, j) => (j === i ? { message: t.message, item: t.item, title: t.title, mentions: t.mentions } : t));
-    setTurns(() => next);
-    void run(i, next);
-  };
-
-  /** Keeps the reply's card on the source it cites first (else the one he asked about); ⌘Z retires it. */
-  const keep = async (i: number) => {
-    const t = turns[i]!;
-    const item = t.citations?.[0]?.item ?? t.item;
-    if (!t.card || !t.ai || !item || t.kept) return;
-    const mark = (kept: string | undefined) => setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, kept } : x)));
-    mark("adding");
-    try {
-      const c = await ore<{ id: string }>("tutor-card", item, opt("card", JSON.stringify(t.card)), opt("ai", JSON.stringify(t.ai)));
-      mark(c.id);
-      notify(
-        "Card added",
-        "quiet",
-        () => void ore("card", "retire", c.id).then(() => mark(undefined), (e) => notify(errorText(e), "error")),
-        () => void ore("card", "restore", c.id, "--state=draft").then(() => mark(c.id), (e) => notify(errorText(e), "error")),
-      );
-    } catch (e) {
-      mark(undefined);
-      notify(errorText(e, "add that card"), "error");
-    }
   };
 
   /** The @word the caret is in, if any. */
@@ -145,18 +183,13 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
     if (!at) return;
     const word = `@${m.name} `;
     const text = input.slice(0, at.start) + word + input.slice(at.start + 1 + at.query.length).replace(/^ /, "");
-    setInput(text);
-    setMentions((ms) => [...ms, m]);
+    setDraft((d) => ({ input: text, mentions: [...d.mentions, m] }));
     setAt(null);
     caretAt.current = at.start + word.length;
   };
 
   useEffect(() => {
     field.current?.focus();
-    // Opened from ⌘K with a question already asked: answer it.
-    const last = turns.length - 1;
-    if (!started.current && last >= 0 && turns[last]!.reply === undefined && !turns[last]!.error) void run(last, turns);
-    started.current = true;
   }, []);
   // Window-fixed controls at the top right (the reader's side panel toggle) move left of the panel.
   useEffect(() => {
@@ -193,7 +226,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
       </div>
       <div className="tutor-head">
         <Hint text="New chat">
-          <button className="icon-btn" aria-label="New chat" disabled={!turns.length || busy} onClick={() => { setTurns(() => []); setMentions([]); field.current?.focus(); }}>
+          <button className="icon-btn" aria-label="New chat" disabled={!turns.length} onClick={() => { chat.fresh(); field.current?.focus(); }}>
             <Plus size={14} aria-hidden="true" />
           </button>
         </Hint>
@@ -219,7 +252,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
         {turns.map((t, i) => {
           const last = i === turns.length - 1 && !busy;
           return (
-          <div key={i} className="library-turn">
+          <div key={t.id} className="library-turn">
             <p className="ask-me">{marked(t.message, t.mentions ?? [])}</p>
             <div className="ask-ai">
               <Sparkle className="ask-mark" size={14} aria-hidden="true" />
@@ -227,7 +260,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
                 {t.error ? (
                   <p className="err">
                     {t.error}{" "}
-                    <button className="link" onClick={() => retry(i)}>Try again</button>
+                    <button className="link" onClick={() => chat.retry(t.id)}>Try again</button>
                   </p>
                 ) : t.reply === undefined ? (
                   <Working label="Thinking…" slow="A reply takes about 10 seconds." />
@@ -244,7 +277,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
                         )}
                         {t.card && (t.citations?.[0]?.item ?? t.item) && (
                           <Hint text={t.kept && t.kept !== "adding" ? "In review from tomorrow" : t.card.question}>
-                            <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Card added" : `Add card: ${t.card.question}`} disabled={!!t.kept} onClick={() => void keep(i)}>
+                            <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Card added" : `Add card: ${t.card.question}`} disabled={!!t.kept} onClick={() => void chat.keep(t.id)}>
                               {t.kept ? <><Check size={12} aria-hidden="true" />Card added</> : <><Plus size={12} aria-hidden="true" />Card</>}
                             </button>
                           </Hint>

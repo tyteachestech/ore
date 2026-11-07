@@ -1,7 +1,7 @@
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
-import { Ask } from "./Ask";
+import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Gem } from "./Gem";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
@@ -70,6 +70,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const [draft, setDraft] = useState({ question: "", answer: "" });
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
+  /** Each card's Ask chat, kept while he closes and reopens it. */
+  const [asks, setAsks] = useState<Record<string, AskChat>>({});
   const [end, setEnd] = useState<End | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shownAt = useRef(Date.now());
@@ -847,6 +849,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
                   <Ask
                     card={card}
                     answer={answer}
+                    chat={asks[card.id] ?? NO_ASK}
+                    setChat={(f) => setAsks((a) => ({ ...a, [card.id]: f(a[card.id] ?? NO_ASK) }))}
                     onApply={async (p) => {
                       try {
                         await setText(card, p.question, p.answer);

@@ -11,7 +11,7 @@ import { copiedFiles, pastesFiles, watchCopies } from "./copied";
 import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
-import { Tutor, TutorBubble, type Exercise, type TutorTurn } from "./Tutor";
+import { Tutor, TutorBubble, useTutorChat, type Exercise } from "./Tutor";
 import { Reader } from "./Reader";
 import type { SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
@@ -237,10 +237,9 @@ export function App() {
   const [tutorDock, setTutorDock] = useState(() => load("ore.tutor.fit") === "dock");
   const tutorDocked = tutorOpen && tutorDock;
   const openItemRef = useRef<{ id: string; title: string } | undefined>(undefined);
-  const [tutorTurns, setTutorTurns] = useState<TutorTurn[]>([]);
   const tutorFrom = useRef<HTMLElement | null>(null);
   const openTutor = (message?: string) => {
-    if (message) setTutorTurns((t) => [...t, { message, ...(openItemRef.current ? { item: openItemRef.current.id, title: openItemRef.current.title } : {}) }]);
+    if (message) tutor.ask({ message, ...(openItemRef.current ? { item: openItemRef.current.id, title: openItemRef.current.title } : {}) });
     if (!tutorOpen) tutorFrom.current = document.activeElement as HTMLElement | null;
     setTutorOpen(true);
   };
@@ -282,6 +281,7 @@ export function App() {
   const [pinDrop, setPinDrop] = useState<PinGap | null>(null);
   const rowSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const { notify, progress, clear: clearToast, view: toast } = useToast();
+  const tutor = useTutorChat(notify);
   const listRef = useRef<HTMLDivElement>(null);
 
 
@@ -1569,7 +1569,7 @@ export function App() {
     } }] : []),
     { id: "review", label: "Start review", hint: label(keys.review), run: askReview },
     { id: "tutor", label: tutorOpen ? "Close the tutor" : "Tutor chat…", hint: label(keys.tutor), keywords: ["ask", "library", "question", "chat", "answer", "ai", "quiz"], run: () => (tutorOpen ? closeTutor() : openTutor()) },
-    ...(tutorTurns.length ? [{ id: "tutor-new", label: "New tutor chat", keywords: ["ask", "chat", "clear"], run: () => { setTutorTurns([]); openTutor(); } }] : []),
+    ...(tutor.turns.length ? [{ id: "tutor-new", label: "New tutor chat", keywords: ["ask", "chat", "clear"], run: () => { tutor.fresh(); openTutor(); } }] : []),
     ...(onHome ? [] : [{ id: "home", label: "Go to Home", hint: label(keys.home), run: goHome }]),
     ...(onFeed ? [] : [{ id: "go-feed", label: "Go to Feed", hint: label(keys["go-feed"]), keywords: ["rss", "newsletter", "blog", "follow"], run: goFeed }]),
     { id: "add", label: "Add source", hint: label(keys.add), run: () => setAdding(true) },
@@ -2101,7 +2101,7 @@ export function App() {
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
         {!tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} />}
       </main>
-      {tutorOpen && <Tutor notify={notify} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} turns={tutorTurns} setTurns={setTutorTurns} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={openItem ? (ex) => {
+      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={openItem ? (ex) => {
         // The note takes the room while he writes; the tutor comes back with what he sent (D128.6).
         const practice = readerPractice.current;
         if (!practice) return;
