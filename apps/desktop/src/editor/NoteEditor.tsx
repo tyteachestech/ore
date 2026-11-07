@@ -81,6 +81,8 @@ type Props = {
   /** Set to a reader of the editor's text as of now, for a save that can't wait for its next change
    *  report (those come 200 ms after typing stops, and never when the editor closes first). */
   pull?: { current: (() => string | null) | null };
+  /** Names the note: its caret is kept when the editor closes and put back when it opens again. */
+  place?: string;
 };
 
 // The diagram editor loads only when a diagram is shown or drawn (D40, D103).
@@ -110,6 +112,8 @@ window.addEventListener(
 /** The caret of an editor that had focus as it unmounted. A remount for outside text (a merged
  *  save) mounts the next one in the same commit, which takes it, so typing carries on there. */
 let handoff: { pos: number; at: number } | null = null;
+/** The selection each note (by `place`) had when its editor last closed. */
+const places = new Map<string, { anchor: number; head: number }>();
 
 /** The note editor (D38): Markdown shortcuts, a `/` menu, `[[` links, `:` emoji. No AI anywhere in it (D34.2). */
 export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(p, ref) {
@@ -210,6 +214,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     let read: (() => string) | null = null;
     const original = live.current.p.text;
     const caret = handoff && performance.now() - handoff.at < 500 ? handoff.pos : null;
+    const kept = caret === null && live.current.p.place ? places.get(live.current.p.place) : undefined;
     // Each editor gets its own element, removed at once on unmount: creation is async, so an
     // editor still being created must never share the DOM with the next one.
     const el = root.current!.appendChild(document.createElement("div"));
@@ -225,6 +230,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       base = markdownOf(e);
       const b = base;
       if (live.current.p.pull) live.current.p.pull.current = read = () => keepUnedited(original, b, markdownOf(e));
+      if (kept && !wantScaffold.current)
+        e.action((ctx) => {
+          const v = ctx.get(editorViewCtx);
+          const at = (n: number) => v.state.doc.resolve(Math.min(n, v.state.doc.content.size));
+          v.dispatch(v.state.tr.setSelection(TextSelection.between(at(kept.anchor), at(kept.head))));
+        });
       if (wantScaffold.current) {
         const { heading, prompts } = wantScaffold.current;
         wantScaffold.current = null;
@@ -253,6 +264,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     () => () => {
       const v = editor.current?.action((ctx) => ctx.get(editorViewCtx));
       if (v?.hasFocus()) handoff = { pos: v.state.selection.head, at: performance.now() };
+      const place = live.current.p.place;
+      if (v && place) places.set(place, { anchor: v.state.selection.anchor, head: v.state.selection.head });
     },
     [],
   );
