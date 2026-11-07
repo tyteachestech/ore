@@ -5,7 +5,9 @@ import {
   ArrowCounterClockwise, ArrowClockwise, ArrowRight, Circle, CursorClick, Diamond, Eraser, Hand, LineSegment, LockSimple, LockSimpleOpen, Minus,
   PencilSimple, Plus, Question, Square, Table, TextT, TreeStructure, CornersOut,
 } from "../icons";
+import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
+import { HexColorInput, HexColorPicker } from "react-colorful";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Hint } from "../Hint";
 import { is, label, useKeymap, type KeyId } from "../keys";
@@ -1247,7 +1249,9 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const showStyle = selected.length > 0 || (tool !== "select" && tool !== "hand" && tool !== "eraser");
   const current = selected[0];
   const value = <K extends keyof Style>(k: K): Style[K] => (current && k in current ? (current[k as keyof El] as Style[K]) : style[k]);
-  const setProp = (patch: Partial<Style>) => {
+  /** `step: false` restyles without an undo step: a custom colour being dragged records one step when
+   *  its popover closes. */
+  const setProp = (patch: Partial<Style>, step = true) => {
     setStyle((s) => ({ ...s, ...patch }));
     if (!selected.length) return;
     const ids = withLabels(live.current.els, live.current.sel);
@@ -1264,8 +1268,24 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       return { ...e, ...p };
     });
     next = next.map((e) => (e.type === "text" && !e.containerId && ids.has(e.id) ? { ...e, ...measureText(e.text ?? "", e.fontSize ?? 20, e.fontFamily ?? SANS, lineHeightOf(e)) } : e));
-    apply(syncAll(reroute(next, ids)));
+    const out = syncAll(reroute(next, ids));
+    if (step) apply(out);
+    else setEls(out);
   };
+  /** A custom colour session: the scene before it, so its whole drag is one undo step. */
+  const tinting = useRef<El[] | null>(null);
+  const tint = (patch: Partial<Style>) => {
+    tinting.current ??= live.current.els;
+    setProp(patch, false);
+  };
+  const tintDone = () => {
+    if (tinting.current) recordFrom(tinting.current);
+    tinting.current = null;
+    root.current?.focus();
+  };
+  /** Colours this diagram already uses beyond the presets, so a custom one is easy to reuse. */
+  const usedColours = (k: "strokeColor" | "backgroundColor", presets: string[]) =>
+    [...new Set(els.filter((e) => !e.isDeleted && !e.customData?.oreCell).map((e) => e[k].toLowerCase()))].filter((c) => c !== "transparent" && !presets.includes(c)).slice(0, 8);
 
   /** What a style change can reach now: the selection's kinds, or the tool's (or every kind, so the
    *  next thing drawn takes it, when nothing is picked). */
@@ -1273,7 +1293,9 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const widthOn = !(kinds.size === 1 && kinds.has("text")) && tool !== "text";
   const WIDTHS = [1, 2, 4];
   const WIDTH_KEYS = ["KeyQ", "KeyW", "KeyE"];
-  /** The picker's keys: 1–5 stroke, ⇧1–5 fill, Q W E width, Esc closes. True when it used the key. */
+  const LINES = ["solid", "dashed", "dotted"] as const;
+  const LINE_KEYS = ["KeyZ", "KeyX", "KeyC"];
+  /** The picker's keys: 1–5 stroke, ⇧1–5 fill, Q W E width, Z X C line, Esc closes. True when it used the key. */
   const quickKey = (e: ReactKeyboardEvent): boolean => {
     if (e.metaKey || e.ctrlKey || e.altKey) return false;
     if (e.key === "Escape") return closeQuick(), true;
@@ -1285,6 +1307,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     }
     const w = WIDTH_KEYS.indexOf(e.code);
     if (w >= 0 && !e.shiftKey) return widthOn && setProp({ strokeWidth: WIDTHS[w]! }), true;
+    const l = LINE_KEYS.indexOf(e.code);
+    if (l >= 0 && !e.shiftKey) return widthOn && setProp({ strokeStyle: LINES[l]! }), true;
     return false;
   };
   /** The style rows, shared by the panel and the picker. "main" is stroke, fill and width, the ones with
@@ -1308,6 +1332,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
         {main && (
           <Row label="Stroke">
             {STROKES.map((c, i) => <Swatch key={c} colour={c} badge={badges ? String(i + 1) : undefined} on={value("strokeColor") === c} onPick={() => setProp({ strokeColor: c })} />)}
+            <CustomColour label="stroke" value={value("strokeColor")} presets={STROKES} used={usedColours("strokeColor", STROKES)} onPick={(c) => tint({ strokeColor: c })} onDone={tintDone} />
           </Row>
         )}
         {fillOn && (
@@ -1315,6 +1340,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
             {main && (
               <Row label="Fill">
                 {FILLS.map((c, i) => <Swatch key={c} colour={c} badge={badges ? `⇧${i + 1}` : undefined} on={value("backgroundColor") === c} onPick={() => setProp({ backgroundColor: c })} />)}
+                <CustomColour label="fill" value={value("backgroundColor")} presets={FILLS} used={usedColours("backgroundColor", FILLS)} onPick={(c) => tint({ backgroundColor: c })} onDone={tintDone} />
               </Row>
             )}
             {rest && value("backgroundColor") !== "transparent" && (
@@ -1328,23 +1354,26 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
         {widthOn && (
           <>
             {main && (
-              <Row label="Width">
-                {WIDTHS.map((w, i) => (
-                  <Seg key={w} on={value("strokeWidth") === w} badge={badges ? "QWE"[i] : undefined} onPick={() => setProp({ strokeWidth: w })} label={["Thin", "Bold", "Extra bold"][i]!}>
-                    <span className="stroke-w" style={{ height: w }} />
-                  </Seg>
-                ))}
-              </Row>
-            )}
-            {rest && (
               <>
+                <Row label="Width">
+                  {WIDTHS.map((w, i) => (
+                    <Seg key={w} on={value("strokeWidth") === w} badge={badges ? "QWE"[i] : undefined} onPick={() => setProp({ strokeWidth: w })} label={["Thin", "Bold", "Extra bold"][i]!}>
+                      <span className="stroke-w" style={{ height: w }} />
+                    </Seg>
+                  ))}
+                </Row>
+                {/* Dashed and dotted mark a weak or maybe link in a map, so they sit with the keyed rows (Tyler, 2026-11-07). */}
                 <Row label="Line">
-                  {(["solid", "dashed", "dotted"] as const).map((st) => (
-                    <Seg key={st} on={value("strokeStyle") === st} onPick={() => setProp({ strokeStyle: st })} label={st[0]!.toUpperCase() + st.slice(1)}>
+                  {LINES.map((st, i) => (
+                    <Seg key={st} on={value("strokeStyle") === st} badge={badges ? "ZXC"[i] : undefined} onPick={() => setProp({ strokeStyle: st })} label={st[0]!.toUpperCase() + st.slice(1)}>
                       <span className={`stroke-s ${st}`} />
                     </Seg>
                   ))}
                 </Row>
+              </>
+            )}
+            {rest && (
+              <>
                 <Row label="Corners">
                   <Seg on={!value("roundness")} onPick={() => setProp({ roundness: null })} label="Sharp"><span className="corner sharp" /></Seg>
                   <Seg on={!!value("roundness")} onPick={() => setProp({ roundness: { type: 3 } })} label="Round"><span className="corner round" /></Seg>
@@ -1838,6 +1867,57 @@ function Swatch({ colour, on, onPick, badge }: { colour: string; on: boolean; on
         {badge && <span className="draw-badge" aria-hidden="true">{badge}</span>}
       </button>
     </Hint>
+  );
+}
+
+/** The last swatch of a colour row (Excalidraw): it shows the custom colour in use and opens a picker
+ *  with the colours this diagram already uses and a hex field. The picker is filtered the way the
+ *  canvas shows stored colours (`dark`), so what is picked is what is drawn. */
+function CustomColour({ label, value, presets, used, onPick, onDone }: { label: string; value: string; presets: string[]; used: string[]; onPick: (c: string) => void; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const custom = value !== "transparent" && !presets.includes(value.toLowerCase()) && /^#[0-9a-f]{6}$/i.test(value);
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+  const close = () => {
+    setOpen(false);
+    onDone();
+  };
+  return (
+    <Popover.Root open={open} onOpenChange={(o) => (o ? setOpen(true) : close())}>
+      <Hint text={`Custom ${label} colour`}>
+        <Popover.Trigger asChild>
+          <button className="draw-swatch draw-custom" aria-pressed={custom} aria-label={`Custom ${label} colour`} style={custom ? ({ "--swatch": dark(value) } as CSSProperties) : undefined} data-empty={!custom || undefined}>
+            {!custom && <span aria-hidden="true">+</span>}
+          </button>
+        </Popover.Trigger>
+      </Hint>
+      <Popover.Portal>
+        <Popover.Content
+          className="popover draw-colour"
+          side="right"
+          align="start"
+          sideOffset={6}
+          collisionPadding={8}
+          aria-label={`Custom ${label} colour`}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+          onPointerDown={stop} onMouseDown={stop} onClick={stop} onContextMenu={stop} onWheel={stop}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") close();
+          }}
+        >
+          <HexColorPicker className="draw-colour-picker" color={custom ? value : "#1971c2"} onChange={onPick} />
+          {used.some((c) => c !== value.toLowerCase()) && (
+            <div className="draw-opts" role="group" aria-label="Used in this diagram">
+              {used.filter((c) => c !== value.toLowerCase()).map((c) => <Swatch key={c} colour={c} on={false} onPick={() => onPick(c)} />)}
+            </div>
+          )}
+          <label className="draw-colour-hex">
+            <span aria-hidden="true">#</span>
+            <HexColorInput color={custom ? value : ""} onChange={onPick} aria-label="Hex colour" spellCheck={false} autoFocus />
+          </label>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
