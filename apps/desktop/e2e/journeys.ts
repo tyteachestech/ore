@@ -114,7 +114,7 @@ journey("add: File keeps what he typed in the box; cancelling the picker keeps i
   await page.keyboard.press("Escape");
 });
 
-journey("Add and Settings: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
+journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
   const inside = (sel: string) => page.evaluate((sel) => !!document.activeElement?.closest(sel), sel);
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").waitFor();
@@ -128,6 +128,16 @@ journey("Add and Settings: Tab and ⇧Tab stay inside the panel, as a Mac sheet'
   for (let n = 0; n < 40; n++) {
     await page.keyboard.press("Tab");
     if (!(await inside(".settings-sheet"))) throw new Error(`Tab ${n + 1} left Settings`);
+  }
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  await pick.waitFor();
+  await pick.getByRole("checkbox").first().focus();
+  for (let n = 0; n < 12; n++) {
+    await page.keyboard.press(n % 2 ? "Tab" : "Shift+Tab");
+    await page.keyboard.press("Shift+Tab");
+    if (!(await inside(".review-pick"))) throw new Error(`Tab left What to review`);
   }
   await page.keyboard.press("Escape");
 });
