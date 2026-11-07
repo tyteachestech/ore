@@ -1,8 +1,8 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, type TutorTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, addTutorCard, type TutorTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
-import { int, need, str } from "./util.ts";
+import { int, need, str, strs } from "./util.ts";
 
 function enrichText(r: EnrichResult): string {
   if (r.skipped) return `${r.title}: skipped (${r.skipped})`;
@@ -107,17 +107,30 @@ export const aiCommands: Record<string, Command> = {
   },
 
   tutor: {
-    usage: '"<message>" [--item <source>] [--earlier <json>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), hints instead of answers on practice; --item is the source being read, --earlier is [{message, reply}]',
-    options: { item: { type: "string" }, earlier: { type: "string" } },
+    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply}]',
+    options: { item: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" } },
     async run(words, f) {
       const lib = openLibrary();
       let earlier: TutorTurn[] = [];
       if (str(f.earlier)) {
         try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply}]"); }
       }
-      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item) });
+      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill) });
       const text = [r.reply, ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`)].join("\n");
       return { data: r, text };
+    },
+  },
+
+  "tutor-card": {
+    usage: '<source> --card <json> --ai <json>   Keep the card a tutor reply proposed (D128): {kind, content_type, question, answer, rubric} as `ore tutor` returned it, with that reply\'s ai stamp; it goes into review as a draft',
+    options: { card: { type: "string" }, ai: { type: "string" } },
+    async run([ref], f) {
+      const lib = openLibrary();
+      const json = (v: string | undefined, name: string) => {
+        try { return JSON.parse(need(v, `--${name}`)); } catch (e) { throw (e as Error).message.startsWith("missing") ? e : new Error(`--${name} must be JSON`); }
+      };
+      const c = await addTutorCard(lib, need(ref, "<source>"), json(str(f.card), "card"), json(str(f.ai), "ai"));
+      return { data: { id: c.meta.id, item: c.meta.item, kind: c.meta.kind, question: c.question }, text: `Added card ${c.meta.id}` };
     },
   },
 

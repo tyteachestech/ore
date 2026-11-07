@@ -231,6 +231,9 @@ export function App() {
   const [palette, setPalette] = useState(false);
   // The tutor (D128): open, and the thread so far (kept while he moves around the app).
   const [tutorOpen, setTutorOpen] = useState(false);
+  // Floating over the corner (Notion AI's default) or docked at the right, as he last chose (D128).
+  const [tutorDock, setTutorDock] = useState(() => load("ore.tutor.fit") === "dock");
+  const tutorDocked = tutorOpen && tutorDock;
   const openItemRef = useRef<{ id: string; title: string } | undefined>(undefined);
   const [tutorTurns, setTutorTurns] = useState<TutorTurn[]>([]);
   const tutorFrom = useRef<HTMLElement | null>(null);
@@ -724,7 +727,9 @@ export function App() {
   // In a narrow window, a source with its note open hides the sidebar so the column keeps its measure
   // (D27), as Notion does; it comes back when the window widens or the note closes. ⌘\ still shows it.
   const narrow = useNarrow(1100);
-  const autoHide = !!openId && notesOpen && narrow;
+  // One panel at the right: the docked tutor takes the side panel's place, which comes back when it closes.
+  const sideShown = notesOpen && !tutorDocked;
+  const autoHide = !!openId && (sideShown || tutorDocked) && narrow;
   const [showAnyway, setShowAnyway] = useState(false);
   useEffect(() => setShowAnyway(false), [autoHide]);
   const collapsed = hideSidebar || (autoHide && !showAnyway);
@@ -754,10 +759,16 @@ export function App() {
     (tab: SideTab, stay = false) => {
       save("ore.sidetab", tab);
       setSideTab(tab);
-      setSideOpen(stay || !(notesOpen && sideTab === tab));
+      if (tutorDocked) setTutorOpen(false);
+      setSideOpen(stay || !(sideShown && sideTab === tab));
     },
-    [notesOpen, sideTab, setSideOpen],
+    [sideShown, tutorDocked, sideTab, setSideOpen],
   );
+  /** The side panel toggle: with the tutor docked in its place, the panel comes back and the tutor closes. */
+  const toggleSide = useCallback(() => {
+    if (tutorDocked) setTutorOpen(false);
+    setSideOpen(!sideShown);
+  }, [tutorDocked, sideShown, setSideOpen]);
   const toggleNotes = useCallback(() => showSide("note"), [showSide]);
 
   /** Learn this's Read now (D97): the source he went to and the passage he left, for the Back pill. */
@@ -855,7 +866,7 @@ export function App() {
         toggleSidebar();
       } else if (is(e, "side-panel")) {
         e.preventDefault();
-        if (openId && !finishing) setSideOpen(!notesOpen);
+        if (openId && !finishing) toggleSide();
       } else if (is(e, "filter")) {
         // On Home it opens All sources; in a source or on a skill page it finds on the page (Reader, SkillPage).
         if (openId || onSkillPage) return;
@@ -877,7 +888,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, goHome, askReview, reviewing, asking, pickFiles, toggleSidebar, setSideOpen, notesOpen, toggleNotes, palette, help, openId, onSkillPage, finishing, history, settings, closeSettings, tutorOpen]);
+  }, [go, goHome, askReview, reviewing, asking, pickFiles, toggleSidebar, setSideOpen, toggleSide, notesOpen, toggleNotes, palette, help, openId, onSkillPage, finishing, history, settings, closeSettings, tutorOpen]);
 
   const inSkill = useMemo(() => (items ?? []).filter((i) => !skill || i.skills.includes(skill)), [items, skill]);
   const archivedInSkill = useMemo(() => archived.filter((i) => !skill || i.skills.includes(skill)), [archived, skill]);
@@ -1896,7 +1907,7 @@ export function App() {
   );
 
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}${tutorOpen ? " tutoring" : ""}`}>
+    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
       <Hint text={collapsed ? "Show sidebar" : "Hide sidebar"} keys="sidebar">
       <button
@@ -1983,11 +1994,11 @@ export function App() {
             onOpenLesson={(id) => openSource(id)}
             onPin={(item) => void pinSource(item)}
             onMove={(item, to) => void moveSource(item, to)}
-            notesOpen={notesOpen}
+            notesOpen={sideShown}
             sideTab={sideTab}
             onShowSide={showSide}
             onCloseSide={() => setSideOpen(false)}
-            onToggleSide={() => setSideOpen(!notesOpen)}
+            onToggleSide={toggleSide}
             jumpTo={jumpTo}
             onLearnAdd={(urls, to, question, now, from) => void learnAdd(urls, to, question, now, from)}
             back={
@@ -2063,7 +2074,7 @@ export function App() {
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
         {!tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} />}
       </main>
-      {tutorOpen && <Tutor turns={tutorTurns} setTurns={setTutorTurns} reading={openItem ? { id: openItem.id, title: openItem.title } : null} onOpen={openSource} onClose={closeTutor} />}
+      {tutorOpen && <Tutor notify={notify} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} turns={tutorTurns} setTurns={setTutorTurns} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name }))} reading={openItem ? { id: openItem.id, title: openItem.title } : null} onOpen={openSource} onClose={closeTutor} />}
 
       {reviewing && (
         <Boundary key={reviewing.run} onBack={() => endReview()}>

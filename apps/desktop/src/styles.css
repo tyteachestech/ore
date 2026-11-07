@@ -2413,3 +2413,24 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .app.tutoring .panel-toggle { right: calc(12px + var(--tutor-w, 0px)); }
 .tutor .ask-input .field { display: block; }
+.tutor-foot { position: relative; }
+.tutor-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.tutor-at { color: var(--accent); }
+/* The @ list (Claude's and ChatGPT's @): above the field, the same rows as every menu. */
+.tutor-mention { position: absolute; left: 12px; right: 12px; bottom: calc(100% - 4px); z-index: 7; max-height: 280px; overflow-y: auto; padding: 4px; border-radius: 10px; background: var(--bg-raised); border: 1px solid var(--border); box-shadow: var(--float); }
+.tutor-mention .menu-item { width: 100%; justify-content: space-between; text-align: left; }
+.tutor-mention .menu-item.active { background: var(--bg-active); }
+.tutor-mention-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor-mention-kind { flex: none; font: 600 10px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.tutor-mention-none { margin: 0; padding: 6px 10px; color: var(--muted); font-size: 13px; }
+/* Floating (Notion AI's default): a card over the bottom right corner, the page unmoved under it. */
+.tutor.float {
+  position: fixed; right: 16px; bottom: 16px; z-index: 12; width: 400px; max-width: calc(100vw - 32px); height: min(600px, calc(100vh - 80px)); min-width: 0;
+  padding-top: 40px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised); box-shadow: var(--float);
+}
+.tutor.float .tutor-head { top: 8px; right: 8px; }
+/* Under a reply: Show me (the hint ladder's last rung) and + Card (keep this idea in review). */
+.tutor-acts { display: flex; gap: 6px; margin-top: 10px; }
+.tutor-acts button { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.tutor-acts button:hover:not(:disabled), .tutor-acts button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
+.tutor-acts button.done { border-color: transparent; color: var(--faint); }

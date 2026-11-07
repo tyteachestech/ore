@@ -105,7 +105,7 @@ export interface EnrichResult {
   skills: string[];
   topics: string[];
   topics_created: string[];
-  cards: { id: string; kind: string; content_type: string; question: string; answer: string; rubric: string[]; annotation?: string; from?: "notes" | "prequestion"; prequestion?: number }[];
+  cards: { id: string; kind: string; content_type: string; question: string; answer: string; rubric: string[]; annotation?: string; from?: "notes" | "prequestion" | "tutor"; prequestion?: number }[];
   ai?: { vendor: string; model: string; prompt_version: string };
 }
 
