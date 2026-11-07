@@ -113,12 +113,13 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
     else setFound({ error: "Couldn’t save the question." });
   };
 
-  /** His edit to the question is saved when he leaves the field with ↵ or goes on, never half-typed on blur. */
+  /** His edit to the question is saved when he leaves the field with ↵ or goes on, never half-typed on blur.
+   *  Null when that save failed: his words stay in the field, unsaved, for another try. */
   const commitQuestion = async () => {
     if (!learn) return learn;
     const q = learn.question.replace(/\s+/g, " ").trim();
     if (!q || q === learn.saved || !learn.id) return { ...learn, question: learn.saved };
-    await p.onAsk(q, learn.id);
+    if (!(await p.onAsk(q, learn.id))) return null;
     const next = { ...learn, question: q, saved: q };
     setLearn(next);
     return next;
@@ -126,6 +127,7 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
 
   const go = async (now: boolean) => {
     const l = await commitQuestion();
+    if (!l) return;
     const sources = Array.isArray(found) ? found.filter((s) => picked.includes(s.url)) : [];
     if (now && !sources.length) return;
     p.onClose();
@@ -136,6 +138,8 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
     const inField = (e.target as HTMLElement).tagName === "INPUT";
+    // ↵ on a focused button is that button's (Make card, Retry, Later…), not the panel's shortcut.
+    const onButton = (e.target as HTMLElement).tagName === "BUTTON";
     const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
     const take = () => {
       e.preventDefault();
@@ -152,6 +156,7 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
     if (!learn) {
       if (inField) return;
       if (plain && e.key === "Enter") {
+        if (onButton) return void e.stopPropagation();
         take();
         void startLearning();
       } else if (is(e.nativeEvent, "card")) {
@@ -163,8 +168,9 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
     if (inField) {
       if (e.key === "Enter" && plain) {
         take();
-        void commitQuestion();
-        rootRef.current?.focus();
+        // A failed save keeps the caret in the field, so Esc there doesn't close the panel over his words.
+        const input = e.target as HTMLInputElement;
+        void commitQuestion().then((l) => (l ? rootRef.current : input)?.focus());
       } else e.stopPropagation();
       return;
     }
@@ -172,6 +178,8 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
     if (e.key === "Enter" && e.metaKey) {
       take();
       void go(false);
+    } else if (e.key === "Enter" && plain && onButton) {
+      e.stopPropagation();
     } else if (e.key === "Enter" && plain) {
       take();
       void go(true);

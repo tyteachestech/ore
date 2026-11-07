@@ -55,20 +55,25 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
   const [answers, setAnswers] = useState(q.answers);
   useEffect(() => setAnswers(q.answers), [q.answers]);
   const hasAnswer = answers.length > 0;
-  /** Rewrites one piece of his answer (Notion: click the text, type); empty removes it. On the history. */
-  const rewrite = async (ts: string, to: string, from: string, record = true): Promise<void> => {
+  /** Rewrites one piece of his answer (Notion: click the text, type); empty removes it. On the history.
+   *  False when the save failed (his words are put back in the piece's field). */
+  const rewrite = async (ts: string, to: string, from: string, record = true): Promise<boolean> => {
     const gone = !to;
     const before = answers;
+    const was = before.find((c) => c.ts === ts)!;
     setAnswers((l) => (gone ? l.filter((c) => c.ts !== ts) : l.map((c) => (c.ts === ts ? { ...c, text: to } : c))));
     try {
       const r = await ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)]));
       setAnswers((l) => r.answers?.map((c) => ({ ...c, item_title: l.find((x) => x.ts === c.ts)?.item_title })) ?? []);
     } catch (e) {
-      setAnswers(before);
+      // Only this piece goes back: another piece saved meanwhile keeps its new words.
+      const at = before.indexOf(was);
+      setAnswers((l) => (gone ? (l.some((c) => c.ts === ts) ? l : [...l.slice(0, at), was, ...l.slice(at)]) : l.map((c) => (c.ts === ts ? was : c))));
       if (!record) throw e;
-      return void notify(errorText(e), "error");
+      notify(errorText(e), "error");
+      return false;
     }
-    if (!record) return;
+    if (!record) return true;
     // A removed piece comes back as it was written (its source and passage), at the end of his answer.
     const piece = before.find((c) => c.ts === ts)!;
     let back = ts;
@@ -79,11 +84,25 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
         setAnswers((l) => [...l, { ...piece, ts: back }]);
       }, () => rewrite(back, "", from, false));
     else notify("Changed your answer", "quiet", () => rewrite(ts, from, to, false), () => rewrite(ts, to, from, false));
+    return true;
+  };
+
+  /** Piece edits still open, by piece: saved before the answer is sent or the box closes, so a correction
+   *  is never dropped. False when one failed (its field stays open with his words). */
+  const editing = useRef(new Map<string, { to: string; from: string; close: () => void }>());
+  const commitPieces = async () => {
+    for (const [ts, e] of [...editing.current]) {
+      const to = e.to.trim();
+      if (to !== e.from && !(await rewrite(ts, to, e.from))) return false;
+      e.close();
+    }
+    return true;
   };
 
   const send = async (how: "contribution" | "done" | "card") => {
     if (busy || (how === "contribution" && !t) || (how === "card" && !t && !hasAnswer)) return;
     setBusy(true);
+    if (!(await commitPieces())) return setBusy(false);
     const args = ["answer", q.id];
     if (t) {
       args.push(opt("text", t));
@@ -115,7 +134,7 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
       void send("contribution");
     } else if (e.key === "Escape") {
       e.preventDefault();
-      onClose();
+      void commitPieces().then((ok) => ok && onClose());
     }
   };
 
@@ -124,7 +143,13 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
       {hasAnswer && (
         <ul className="qa-answers">
           {answers.map((c) => (
-            <Piece key={c.ts} text={c.text} from={c.item_title} onSave={(to) => void rewrite(c.ts, to, c.text)} />
+            <Piece
+              key={c.ts}
+              text={c.text}
+              from={c.item_title}
+              onSave={(to) => rewrite(c.ts, to, c.text)}
+              onEditing={(e) => (e ? editing.current.set(c.ts, e) : editing.current.delete(c.ts))}
+            />
           ))}
         </ul>
       )}
@@ -158,9 +183,20 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
 }
 
 /** One piece of his answer: one click edits it in place, Enter saves, Esc puts it back, and saving it
- *  empty removes it (with Undo), as a Notion block does. */
-function Piece({ text, from, onSave }: { text: string; from?: string; onSave: (to: string) => void }) {
+ *  empty removes it (with Undo), as a Notion block does. A blur keeps the field and what he typed; a
+ *  failed save opens it again with his words. */
+function Piece({ text, from, onSave, onEditing }: {
+  text: string;
+  from?: string;
+  onSave: (to: string) => Promise<boolean>;
+  /** The edit open now (null: none), for the box to save before it sends or closes. */
+  onEditing: (e: { to: string; from: string; close: () => void } | null) => void;
+}) {
   const [draft, setDraft] = useState<string | null>(null);
+  useEffect(() => {
+    onEditing(draft === null ? null : { to: draft, from: text, close: () => setDraft(null) });
+    return () => onEditing(null);
+  }, [draft, text]);
   if (draft === null)
     return (
       <li>
@@ -172,8 +208,9 @@ function Piece({ text, from, onSave }: { text: string; from?: string; onSave: (t
     );
   const done = () => {
     const to = draft.trim();
+    const typed = draft;
     setDraft(null);
-    if (to !== text) onSave(to);
+    if (to !== text) void onSave(to).then((ok) => ok || setDraft(typed));
   };
   return (
     <li>
@@ -183,7 +220,6 @@ function Piece({ text, from, onSave }: { text: string; from?: string; onSave: (t
         aria-label="Edit this part of your answer"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => setDraft(null)}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === "Enter" && !e.shiftKey) {
