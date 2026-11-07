@@ -37,6 +37,9 @@ export type LinkTarget = { kind: "item" | "skill"; id: string; title: string };
 
 export type NoteEditorHandle = {
   focus: () => void;
+  /** Notion's click below the note: the caret at the end, on a new empty line when the note ends in a block that
+   *  holds no text (a diagram, a table, a list). */
+  focusEnd: () => void;
   /** Notion's +: a new line at the end with the / menu open; Esc takes the line back out. */
   addBlock: () => void;
   /** A chapter's block (D115): `## heading` at the end, then one empty line per prompt, shown as a
@@ -166,6 +169,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const wantFocus = useRef(false);
   useImperativeHandle(ref, () => ({
     focus: () => (editor.current ? editor.current.action((ctx) => ctx.get(editorViewCtx).focus()) : void (wantFocus.current = true)),
+    focusEnd: () => {
+      if (!editor.current) return void (wantFocus.current = true);
+      editor.current.action((ctx) => {
+        const v = ctx.get(editorViewCtx);
+        const { doc, schema } = v.state;
+        let tr = v.state.tr;
+        if (doc.lastChild?.type !== schema.nodes.paragraph) tr = tr.insert(doc.content.size, schema.nodes.paragraph!.create());
+        v.dispatch(tr.setSelection(TextSelection.atEnd(tr.doc)).scrollIntoView());
+        v.focus();
+      });
+    },
     addBlock: () =>
       editor.current?.action((ctx) => {
         const v = ctx.get(editorViewCtx);

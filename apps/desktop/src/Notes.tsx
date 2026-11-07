@@ -1,7 +1,7 @@
 import { PixelNote, PixelStack } from "./PixelIcon";
 import * as Tabs from "@radix-ui/react-tabs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/NoteEditor";
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
@@ -335,7 +335,7 @@ export type SideTab = "note" | "questions";
 /** The reader's right panel: one panel, two tabs (D75), like Notion's side peek. N opens the source
  *  note, C what he collected (Q too, at his questions); the same key again closes the panel. The toggle at the
  *  window's top right (⌥⌘S) shows or hides it. Resizable, width remembered. */
-export function SidePanel({ tab, onTab, bodyRef, children }: { tab: SideTab; onTab: (t: SideTab) => void; bodyRef?: RefObject<HTMLDivElement | null>; children: ReactNode }) {
+export function SidePanel({ tab, onTab, bodyRef, onBodyMouseDown, children }: { tab: SideTab; onTab: (t: SideTab) => void; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
   const { width, dragging, divider } = useSideWidth("ore.notewidth", NOTE_WIDTH);
   return (
     <aside className={`mynotes${dragging ? " dragging" : ""}`} aria-label={tab === "note" ? "Source note" : "Collected"} style={{ width }}>
@@ -359,7 +359,7 @@ export function SidePanel({ tab, onTab, bodyRef, children }: { tab: SideTab; onT
             </Hint>
           </Tabs.List>
         </div>
-        <Tabs.Content ref={bodyRef} value={tab} className="mynotes-text" tabIndex={-1}>
+        <Tabs.Content ref={bodyRef} value={tab} className="mynotes-text" tabIndex={-1} onMouseDown={onBodyMouseDown}>
           {children}
         </Tabs.Content>
       </Tabs.Root>
@@ -410,3 +410,12 @@ export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail, sc
     </>
   );
 }
+
+/** A press on a note's empty space, below or beside the text, puts the caret at the note's end (Notion): the whole
+ *  panel is the note, not just its first line. Presses on the text, a link or a control are left to them. */
+export const clickBelow = (editorRef: RefObject<NoteEditorHandle | null>) => (e: ReactMouseEvent) => {
+  const t = e.target as HTMLElement;
+  if (e.button !== 0 || !(t === e.currentTarget || t.classList.contains("note-editor"))) return;
+  e.preventDefault();
+  editorRef.current?.focusEnd();
+};

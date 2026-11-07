@@ -7,7 +7,7 @@ import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import * as Popover from "@radix-ui/react-popover";
 import { IconPicker, SkillIcon } from "./IconPicker";
 import { is, isNotes, label, useKeymap } from "./keys";
-import { LinkedFrom, NoteBody, useNotes } from "./Notes";
+import { clickBelow, LinkedFrom, NoteBody, useNotes } from "./Notes";
 import { FindBar, onceFound } from "./Find";
 import { Hint } from "./Hint";
 import { Working } from "./Working";
@@ -159,8 +159,8 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
       </header>
 
       <div className={`skill-cols${split.dragging ? " dragging" : ""}${wide ? " wide" : ""}`} style={{ gridTemplateColumns: wide ? "minmax(0, 1fr)" : `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` }}>
-        <div className="skill-col" ref={noteCol} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
-          <section className="skill-card skill-note" data-tone="note">
+        <div className="skill-col" ref={noteCol} onMouseDown={clickBelow(editor)} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
+          <section className="skill-card skill-note" data-tone="note" onMouseDown={clickBelow(editor)}>
             <div className="card-head">
               <span className="card-title"><PixelNote className="card-icon" size={12} aria-hidden="true" /><h2>Your note</h2></span>
               <Hint text={wide ? "Back beside sources and questions" : "Widen the note, for wide tables"}>

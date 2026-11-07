@@ -634,6 +634,29 @@ journey("source note: what he types is kept when he switches sources and comes b
   await shows("after a relaunch");
 });
 
+journey("notes: a click on the empty space under a note puts the caret at its end (Notion), in the source note and the skill note", async (page) => {
+  const typedAtEnd = async (scope: string, line: string) =>
+    until(`${scope}: the line lands at the end of the note`, () =>
+      page.locator(`${scope} .ProseMirror`).evaluate((pm, l) => (pm.textContent ?? "").trimEnd().endsWith(l), line));
+  await openSource(page, AGENTS);
+  if (!(await page.locator(".mynotes").count())) await page.keyboard.press("n");
+  await page.locator(".mynotes .ProseMirror").waitFor();
+  const panel = page.locator(".mynotes-text");
+  const box = (await panel.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height - 30);
+  const a = `Clicked below the source note (${Date.now() % 100000})`;
+  await page.keyboard.type(a);
+  await typedAtEnd(".mynotes", a);
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.locator(".skill-note .ProseMirror").waitFor();
+  const col = page.locator(".skill-col").first();
+  const c = (await col.boundingBox())!;
+  await page.mouse.click(c.x + c.width / 2, c.y + c.height - 20);
+  const b = `Clicked below the skill note (${Date.now() % 100000})`;
+  await page.keyboard.type(b);
+  await typedAtEnd(".skill-note", b);
+});
+
 journey("prequestion: a guess typed but not stored is still there when he comes back to the source, and not marked answered", async (page) => {
   const q = "When is an agent the wrong choice?";
   const guess = `When a fixed workflow does the job (${Date.now() % 100000})`;
@@ -893,6 +916,7 @@ journey("skill note: coming back to a long note puts it where he left it", async
   const was = (await ore(["notes", "--skill=learning"])).text;
   await ore(["notes", "--skill=learning", `--set=${Array.from({ length: 80 }, (_, i) => `Line ${i + 1} of a long note.`).join("\n\n")}`]);
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.locator(".skill-note .ProseMirror").waitFor();
   const col = page.locator(".skill-col").first();
   await page.getByText("Line 80 of a long note.").waitFor();
   await col.evaluate((el) => (el.scrollTop = 900));
