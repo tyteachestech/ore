@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { FIXES } from "./src/skill-icon-fixes";
 
 // MingCute's fill icons as [name, category] pairs for the picker's search; the SVGs themselves are copied below.
 const MINGCUTE = "node_modules/mingcute_icon/svg";
@@ -17,6 +18,36 @@ const mingcuteList: Plugin = {
       readdirSync(`${MINGCUTE}/${category}`).flatMap((f) => (f.endsWith("_fill.svg") ? [[f.slice(0, -9), category]] : [])),
     );
     return `export default ${JSON.stringify(icons)};`;
+  },
+};
+
+// Skill icons on the UI icons' 16-pixel grid (D129): each MingCute icon as redrawn by scripts/pixel-skill-icons.ts, or by
+// hand in src/skill-icon-fixes.ts, served as /mingcute-px/<name>.svg in dev and written into the build.
+const pixelSvg = (rows: readonly string[]) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="${rows
+    .flatMap((row, y) => [...row].map((c, x) => (c === "#" ? `M${x} ${y}h1v1h-1z` : "")))
+    .join("")}"/></svg>`;
+let pixelCache: Record<string, string> | undefined;
+function pixelIcons(): Record<string, string> {
+  if (pixelCache) return pixelCache;
+  const auto: Record<string, string[]> = JSON.parse(readFileSync(new URL("./src/skill-icons.json", import.meta.url), "utf8"));
+  const out: Record<string, string> = {};
+  for (const [name, hex] of Object.entries(auto))
+    out[name] = pixelSvg(FIXES[name] ?? hex.map((h) => parseInt(h, 16).toString(2).padStart(16, "0").replace(/1/g, "#").replace(/0/g, ".")));
+  return (pixelCache = out);
+}
+const pixelSkillIcons: Plugin = {
+  name: "pixel-skill-icons",
+  configureServer(server) {
+    server.middlewares.use("/mingcute-px", (req, res, next) => {
+      const svg = pixelIcons()[decodeURIComponent(req.url ?? "").replace(/^\//, "").replace(/\.svg$/, "")];
+      if (!svg) return next();
+      res.setHeader("Content-Type", "image/svg+xml");
+      res.end(svg);
+    });
+  },
+  generateBundle() {
+    for (const [name, svg] of Object.entries(pixelIcons())) this.emitFile({ type: "asset", fileName: `mingcute-px/${name}.svg`, source: svg });
   },
 };
 
@@ -68,18 +99,18 @@ function snapshot(): Record<string, string> {
 }
 
 // Tauri expects a fixed dev port and no screen clearing (it prints its own logs).
-// The icon picker's data ships with the app, so it works offline: Emojibase for emoji, MingCute's fill SVGs for icons,
+// The icon picker's data ships with the app, so it works offline: Emojibase for emoji, MingCute's icons (pixelSkillIcons),
 // and Phosphor's for icons picked before MingCute (still drawn, no longer offered).
 export default defineConfig({
   plugins: [
     react(),
     mingcuteList,
+    pixelSkillIcons,
     ...(PHONE ? [phoneLibrary] : []),
     viteStaticCopy({
       targets: [
         { src: "node_modules/emojibase-data/en/{data,messages}.json", dest: "emojibase/en", rename: { stripBase: true } },
         { src: "node_modules/@phosphor-icons/core/assets/fill/*.svg", dest: "icons", rename: { stripBase: true } },
-        { src: `${MINGCUTE}/*/*_fill.svg`, dest: "mingcute", rename: { stripBase: true } },
       ],
     }),
   ],

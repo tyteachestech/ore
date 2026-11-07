@@ -2,6 +2,8 @@
 //   nested frames   a box (visible edge or its own fill) inside another box on the page; only floating layers may nest
 //   off-ramp text   a computed UI font size outside the DESIGN.md ramp (reading text has its own scale)
 //   stray scroll    a horizontal scrollbar nobody asked for: content a few px wider than its scrolling column
+//   pixel icon      a 16-grid sprite (icons.tsx, PixelIcon.tsx, skill icons) drawn at a size other than 16 or 32px, so its
+//                   pixels smear, or cut by a parent that hides overflow, so it reads as clipped
 // Run against the mock (scripts/mock/README.md): bun apps/desktop/scripts/mock/style-check.ts [http://localhost:1420/]
 // `bun run e2e` runs it too, on its own mock (ORE_BRIDGE names that mock's bridge port).
 import { chromium, type Page } from "playwright";
@@ -42,6 +44,22 @@ async function audit(page: Page, screen: string) {
     for (const el of document.querySelectorAll("body *")) {
       const x = getComputedStyle(el).overflowX;
       if ((x === "auto" || x === "scroll") && el.scrollWidth > el.clientWidth) out.push(`stray scroll: ${name(el)} is ${el.scrollWidth - el.clientWidth}px too wide`);
+    }
+    const sprites = [...document.querySelectorAll('svg[shape-rendering="crispEdges"][viewBox="0 0 16 16"], .skill-icon.glyph')];
+    for (const el of sprites) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || getComputedStyle(el).visibility === "hidden") continue;
+      if (![16, 32].includes(r.width) || r.height !== r.width) out.push(`pixel icon: ${name(el)} in ${name(el.parentElement!)} drawn at ${r.width}x${r.height}`);
+      for (let up = el.parentElement; up && up !== document.body; up = up.parentElement) {
+        const s = getComputedStyle(up);
+        if (s.overflowX === "visible" && s.overflowY === "visible" && s.clipPath === "none") continue;
+        const u = up.getBoundingClientRect();
+        if (u.width && (r.left < u.left - 0.5 || r.right > u.right + 0.5 || r.top < u.top - 0.5 || r.bottom > u.bottom + 0.5)) {
+          // A scrolled-away icon is hidden, not clipped.
+          if (r.bottom > u.top && r.top < u.bottom && r.right > u.left && r.left < u.right) out.push(`pixel icon: ${name(el)} cut by ${name(up)}`);
+          break;
+        }
+      }
     }
     return [...new Set(out)];
   }, RAMP);
