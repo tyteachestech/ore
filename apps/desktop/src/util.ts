@@ -8,6 +8,7 @@ import { useEffect, type RefObject } from "react";
  *  ⌘Z still names it as it takes it back. Every change he makes is a step, toast or not.
  *  Returns `forget`, which takes the step off the history when what it did is gone another way
  *  (a selection he dropped with Esc). */
+/** `show`: the toast's one action: Show on a result, Try again on an error. */
 export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => void, redo?: () => void, show?: () => void) => () => void;
 
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never

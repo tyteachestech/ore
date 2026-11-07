@@ -4,7 +4,7 @@ import { Grow } from "./Grow";
 import { PixelStar } from "./PixelIcon";
 import { Hint } from "./Hint";
 import { is } from "./keys";
-import { ore, oreDetached, opt, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
+import { ore, opt, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
 import { stampBefore } from "./transcript";
 import { errorText, type Notify } from "./util";
 import { PixelSpin, useLate, Working } from "./Working";
@@ -142,7 +142,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   function enrich() {
     // Drafts review items from Card highlights and the prequestions (D19), after the recall
     // feedback so the prompts' rubrics include what he missed.
-    const run = () => oreDetached("enrich", doc.id).catch((e) => notify(errorText(e), "error"));
+    // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
+    const run = (): Promise<void> =>
+      ore("enrich", doc.id).then(
+        () => {},
+        (e) => void notify(`Cards for “${doc.title}” weren’t drafted: ${errorText(e)}`, "error", undefined, undefined, () => void run()),
+      );
     if (feedbackRun.current) void feedbackRun.current.finally(run);
     else void run();
   }

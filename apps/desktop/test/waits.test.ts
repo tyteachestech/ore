@@ -12,7 +12,7 @@ const WAITS: Record<string, string> = {
   "Finish.tsx check": "Checking your answer…",
   "Finish.tsx scope": "Leaving that out…",
   "Finish.tsx recall --feedback": "Reading your recall against the source…",
-  "Finish.tsx enrich": "background: cards are drafted after he leaves; a failure shows as a toast and in the reader",
+  "Finish.tsx enrich": "background: cards are drafted after he leaves; a failure toasts its reason with Try again",
   "Reader.tsx enrich": "Writing prequestions…",
   "Reader.tsx recall --feedback": "Reading your recall against the chapter…",
   "Explain.tsx explain": "Explaining…",

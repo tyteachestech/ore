@@ -184,7 +184,7 @@ export function useToast() {
                 drop(t.id);
               }}
             >
-              Show
+              {t.kind === "error" ? "Try again" : "Show"}
             </button>
           )}
           {t.offer === "undo" && (
