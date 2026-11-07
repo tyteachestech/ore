@@ -1,9 +1,9 @@
 import type { EditorView } from "@milkdown/kit/prose/view";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { Hint } from "../Hint";
 import { DotsSix, Plus } from "../icons";
 import { MoreButton, WithMenu, type MenuAction } from "../Menu";
-import { canEdit, editTable, sizeOf, type TableEdit } from "./tables";
+import { canEdit, editTable, moveLine, sizeOf, type TableEdit } from "./tables";
 
 /** The table under the pointer, the cell it is on, and where the controls sit (in the note's box). */
 type At = {
@@ -25,8 +25,11 @@ type At = {
 export function TableControls({ view, host }: { view: () => EditorView | undefined; host: RefObject<HTMLElement | null> }) {
   const [at, setAt] = useState<At | null>(null);
   const [open, setOpen] = useState<"row" | "col" | null>(null);
+  /** Where a dragged row or column would land: a line between two of them (BlockHandle's drop line). */
+  const [line, setLine] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const dragging = useRef(false);
   const busy = useRef(false);
-  busy.current = open !== null;
+  busy.current = open !== null || dragging.current;
   const viewNow = useRef(view);
   viewNow.current = view;
   const now = useRef(at);
@@ -77,6 +80,65 @@ export function TableControls({ view, host }: { view: () => EditorView | undefin
     list.filter(([e]) => can(e)).map(([e, label]) => ({ id: e, label, run: run(e), danger: e.endsWith("delete"), divider: e.endsWith("delete") }));
   const rowActions = () => actions([["row-above", "Insert above"], ["row-below", "Insert below"], ["row-up", "Move up"], ["row-down", "Move down"], ["row-delete", "Delete row"]]);
   const colActions = () => actions([["col-left", "Insert left"], ["col-right", "Insert right"], ["col-move-left", "Move left"], ["col-move-right", "Move right"], ["col-delete", "Delete column"]]);
+  // A drag on a grip moves its row or column (Notion): press, move past 4 px, release where the line
+  // shows; Esc cancels. A press that never moved is a click, which opens the menu.
+  const onGripDown = (kind: "row" | "col") => (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const v = view();
+    const el = host.current;
+    const a = at;
+    if (e.button !== 0 || !v || !el || !a) return;
+    e.preventDefault();
+    const table = (v.nodeDOM(a.table) as HTMLElement | null)?.querySelector("table");
+    if (!table) return;
+    const from = kind === "row" ? a.row : a.col;
+    const start = { x: e.clientX, y: e.clientY };
+    let to = from;
+    const h = el.getBoundingClientRect();
+    const onMove = (m: PointerEvent) => {
+      if (!dragging.current) {
+        if (Math.hypot(m.clientX - start.x, m.clientY - start.y) < 4) return;
+        dragging.current = true;
+      }
+      const t = table.getBoundingClientRect();
+      if (kind === "row") {
+        const rects = [...table.rows].map((r) => r.getBoundingClientRect());
+        // The row whose middle the pointer passed; never above the header.
+        to = Math.min(Math.max(1, rects.findLastIndex((r) => m.clientY >= r.top)), rects.length - 1);
+        const r = rects[to]!;
+        const y = to > from ? r.bottom : r.top;
+        setLine({ x: t.left - h.left, y: y - h.top - 1, w: t.width, h: 2 });
+      } else {
+        const rects = [...table.rows[0]!.cells].map((c) => c.getBoundingClientRect());
+        to = Math.min(Math.max(0, rects.findLastIndex((c) => m.clientX >= c.left)), rects.length - 1);
+        const c = rects[to]!;
+        const x = to > from ? c.right : c.left;
+        setLine({ x: x - h.left - 1, y: t.top - h.top, w: 2, h: t.height });
+      }
+    };
+    const end = (drop: boolean) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("keydown", onKey, true);
+      const was = dragging.current;
+      dragging.current = false;
+      setLine(null);
+      if (!was) return void (drop ? setOpen(kind) : v.focus());
+      const tr = drop ? moveLine(v.state, a.table, kind, from, to) : null;
+      if (tr) v.dispatch(tr);
+      v.focus();
+      setAt(null);
+    };
+    const onUp = () => end(true);
+    const onKey = (k: KeyboardEvent) => {
+      if (k.key !== "Escape") return;
+      k.preventDefault();
+      k.stopPropagation();
+      end(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("keydown", onKey, true);
+  };
   const grip = (kind: "row" | "col", p: { x: number; y: number }, list: () => MenuAction[]) => (
     <div className={`table-ctl table-grip-at ${kind}s`} style={{ left: p.x, top: p.y }}>
       <WithMenu actions={list} keepFocus>
@@ -84,11 +146,12 @@ export function TableControls({ view, host }: { view: () => EditorView | undefin
           label={kind === "row" ? "Row actions" : "Column actions"}
           className={`table-grip ${kind}s${open === kind ? " on" : ""}`}
           icon={<DotsSix size={14} aria-hidden="true" />}
-          hint={kind === "row" ? "Row: insert, move, delete" : "Column: insert, move, delete"}
+          hint="Drag to move, click for insert, move, delete"
           align="start"
           keepFocus
           actions={list}
           open={open === kind}
+          onPointerDown={onGripDown(kind)}
           onOpenChange={(o) => {
             setOpen(o ? kind : null);
             if (!o) view()?.focus();
@@ -99,6 +162,7 @@ export function TableControls({ view, host }: { view: () => EditorView | undefin
   );
   return (
     <>
+      {line && <div className="block-drop" style={{ left: line.x, top: line.y, width: line.w, height: line.h }} />}
       {at.rowGrip && grip("row", at.rowGrip, rowActions)}
       {at.colGrip && grip("col", at.colGrip, colActions)}
       <Hint text="Add a row">
