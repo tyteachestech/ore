@@ -660,6 +660,131 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
   if (await page.locator(".diagram .draw-canvas > g path").count()) throw new Error("the dropped arrow stayed");
 });
 
+journey("diagram: align and space from keys and the picker, drags snap to edges and equal gaps (⌘ off), and a node goes with its links", async (page) => {
+  await openSource(page, "A very long title about the neuroscience");
+  // The editing journey leaves a diagram at the note's end: open it if the preview has rendered, else make one.
+  await page.locator(".note-editor [contenteditable=true]").first().waitFor();
+  const drawn = page.locator(".note-editor .note-diagram").first();
+  if (await drawn.waitFor({ timeout: 1500 }).then(() => true, () => false)) await drawn.click();
+  else {
+    const note = page.locator(".note-editor [contenteditable=true]").first();
+    await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
+    await page.keyboard.press("Meta+ArrowDown");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("/diagram");
+    await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+    await page.keyboard.press("Enter");
+  }
+  const draw = page.locator(".diagram .draw");
+  await draw.focus();
+  if (await page.locator(".diagram.docked").count()) await page.keyboard.press("Shift+Meta+Enter");
+  await page.locator(".diagram:not(.docked)").waitFor();
+  await draw.focus();
+  await page.keyboard.press("Meta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Meta+Digit0");
+  const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
+  const rects = page.locator(".diagram .draw-canvas > g rect");
+  const box = async (x: number, y: number, label: string) => {
+    await page.keyboard.press("r");
+    await page.mouse.click(c.x + x, c.y + y);
+    await page.locator(".draw-text").waitFor();
+    await page.keyboard.type(label);
+    await page.keyboard.press("Enter");
+  };
+  const drag = async (x1: number, y1: number, x2: number, y2: number, mod?: string) => {
+    if (mod) await page.keyboard.down(mod);
+    await page.mouse.move(x1, y1);
+    await page.mouse.down();
+    await page.mouse.move(x1 + 4, y1 + 4);
+    await page.mouse.move(x2, y2, { steps: 10 });
+  };
+  const drop = async (mod?: string) => {
+    await page.mouse.up();
+    if (mod) await page.keyboard.up(mod);
+  };
+  const attr = async (i: number, a: string) => Number(await rects.nth(i).getAttribute(a));
+  await box(300, 300, "A");
+  await box(600, 420, "B");
+  await until("two boxes", async () => (await rects.count()) === 2);
+  // ⌥V and ⌥H align centres (Excalidraw's keys); the Align row in the picker does the same by click.
+  await page.keyboard.press("Meta+a");
+  await page.keyboard.press("Alt+v");
+  await until("⌥V aligns the centres vertically", async () => (await attr(0, "y")) === (await attr(1, "y")));
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => (await attr(0, "y")) !== (await attr(1, "y")));
+  await page.keyboard.press("s");
+  const quick = page.locator(".draw-quick");
+  await quick.waitFor();
+  await quick.getByRole("button", { name: "Align top" }).click();
+  await until("Align top in the picker lines up the tops", async () => (await attr(0, "y")) === (await attr(1, "y")));
+  if (await quick.getByRole("button", { name: "Space evenly across" }).count()) throw new Error("Space evenly shows with only two picked");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  // Three in a row: ⌥⇧H spaces them evenly.
+  await box(1000, 300, "C");
+  await page.keyboard.press("Meta+a");
+  await page.keyboard.press("Alt+Shift+h");
+  const xs = async () => (await Promise.all([0, 1, 2].map((i) => attr(i, "x")))).sort((p, q) => p - q);
+  await until("⌥⇧H spaces the gaps evenly", async () => { const v = await xs(); return Math.abs(v[1]! - v[0]! - (v[2]! - v[1]!)) < 1; });
+  await page.keyboard.press("Escape");
+  // A drag that stops a few pixels from another box's edge snaps to it, with a guide while it does; ⌘ holds it off.
+  const b = (await rects.nth(1).boundingBox())!;
+  const cBox = (await rects.nth(2).boundingBox())!;
+  const dx = b.x + 4 - cBox.x; // C's left edge 4 px right of B's
+  await drag(cBox.x + 40, cBox.y + 40, cBox.x + 40 + dx, cBox.y + 40 + 200);
+  await until("a guide shows while snapped", async () => (await page.locator(".draw-overlay line[stroke='var(--accent)']").count()) > 0);
+  await drop();
+  await until("C snapped to B's left edge", async () => (await attr(2, "x")) === (await attr(1, "x")));
+  await page.keyboard.press("Meta+z");
+  await drag(cBox.x + 40, cBox.y + 40, cBox.x + 40 + dx, cBox.y + 40 + 200, "Meta");
+  await drop("Meta");
+  await until("⌘ keeps it where it was dropped", async () => Math.abs((await attr(2, "x")) - (await attr(1, "x")) - 4) < 1);
+  await page.keyboard.press("Meta+z");
+  // Dragged on past B at about the gap between A and B, C takes that gap exactly, with the two spans shown.
+  const a = (await rects.nth(0).boundingBox())!;
+  const gap = (await attr(1, "x")) - ((await attr(0, "x")) + 160); // in scene units (a bounding box adds the stroke)
+  const want = b.x + b.width + gap;
+  await drag(cBox.x + 40, cBox.y + 40, cBox.x + 40 + (want + 3 - cBox.x), cBox.y + 40);
+  await until("two gap spans show", async () => (await page.locator(".draw-overlay path[stroke='var(--accent)']").count()) === 2);
+  await drop();
+  await until("C sits the same gap after B", async () => Math.abs((await attr(2, "x")) - ((await attr(1, "x")) + 160 + gap)) < 0.5);
+  // Copy style carries the label's size (Tyler 4b): B's label made large, then pasted onto A.
+  await page.mouse.click(b.x + 40, b.y + 40);
+  await page.keyboard.press("s");
+  await quick.getByRole("button", { name: "More" }).click();
+  await quick.getByRole("button", { name: "Large", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Alt+Meta+c");
+  await page.mouse.click(a.x + 40, a.y + 40);
+  await page.keyboard.press("Alt+Meta+v");
+  await until("A's label takes B's size", async () => (await page.locator(".diagram .draw-canvas > g text").first().getAttribute("font-size")) === "28");
+  // A labelled box stops at its longest word (1a): C's label wraps after "Retrieval", never inside it.
+  const cc = (await rects.nth(2).boundingBox())!;
+  await page.mouse.click(cc.x + 40, cc.y + 40);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Retrieval practice");
+  await page.keyboard.press("Enter");
+  await drag(cc.x + cc.width + 3, cc.y + cc.height / 2, cc.x + 20, cc.y + cc.height / 2);
+  await drop();
+  await until("the box stays as wide as its longest word", async () => { const w = await attr(2, "width"); return w > 90 && w < 150; });
+  const bb = (await rects.nth(1).boundingBox())!;
+  // A node made with Tab and left with nothing on it or its link goes with the link (3b); a deleted node takes its links (2b).
+  const summary = () => page.locator("#draw-summary").textContent();
+  const before = await summary();
+  await page.keyboard.press("Tab");
+  await page.locator(".draw-text").waitFor();
+  await page.mouse.click(c.x + 1100, c.y + 700);
+  await until("the empty node and its link are gone", async () => (await summary()) === before);
+  await page.keyboard.press("a");
+  await drag(a.x + 40, a.y + 40, (await rects.nth(1).boundingBox())!.x + 40, bb.y + 40);
+  await drop();
+  await until("an arrow joins A to B", async () => (await summary())?.includes("→") ?? false);
+  await page.mouse.click(a.x + 40, a.y + 40);
+  await page.keyboard.press("Backspace");
+  await until("deleting A takes the arrow with it", async () => !(await summary())?.includes("→") && (await rects.count()) === 2);
+});
+
 journey("review: rate a card, the session moves on, and Undo brings the card back", async (page) => {
   await page.getByRole("button", { name: "Start review" }).click();
   // The "What to review" sheet comes first once Home knows his skills; Enter takes them all.

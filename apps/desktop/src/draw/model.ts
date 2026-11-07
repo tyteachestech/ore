@@ -561,16 +561,13 @@ export function move(els: Els, ids: Set<string>, dx: number, dy: number): El[] {
   return reroute(out, all);
 }
 
-/** Deletes elements with their labels; arrows bound to them let go. */
+/** Deletes elements with their labels, and every arrow that loses an end with them (Whimsical, Miro:
+ *  a link to a node that is gone says nothing; Tyler, 2026-11-06). */
 export function remove(els: Els, ids: Set<string>): El[] {
   const all = withLabels(els, ids);
-  return els
-    .filter((e) => !all.has(e.id))
-    .map((e) =>
-      e.type === "arrow" && ((e.startBinding && all.has(e.startBinding.elementId)) || (e.endBinding && all.has(e.endBinding.elementId)))
-        ? { ...e, startBinding: e.startBinding && all.has(e.startBinding.elementId) ? null : e.startBinding, endBinding: e.endBinding && all.has(e.endBinding.elementId) ? null : e.endBinding }
-        : e,
-    );
+  const gone = new Set(all);
+  for (const e of els) if (e.type === "arrow" && ((e.startBinding && all.has(e.startBinding.elementId)) || (e.endBinding && all.has(e.endBinding.elementId)))) gone.add(e.id);
+  return els.filter((e) => !gone.has(e.id) && !(e.containerId && gone.has(e.containerId)));
 }
 
 /** Copies of elements with new ids, offset; bindings and groups between copies are kept. */
@@ -690,8 +687,22 @@ export function flip(els: Els, ids: Set<string>, axis: "x" | "y"): El[] {
 
 export type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
-/** Resizes one element by dragging a handle to `p` (scene). `keep` holds the aspect ratio, `fromCentre` grows both ways. */
-export function resize(e: El, start: El, h: Handle, p: Pt, keep: boolean, fromCentre: boolean): El {
+/** The narrowest a labelled shape can be resized: its label's longest word still fits on one line
+ *  (Excalidraw; Tyler, 2026-11-06), the inverse of `labelWidth`. 0 for a shape with no label. */
+export function minLabelWidth(els: Els, c: El): number {
+  const t = labelOf(els, c.id);
+  if (!t) return 0;
+  const size = t.fontSize ?? 20;
+  const fam = t.fontFamily ?? SANS;
+  const word = Math.max(0, ...(t.originalText ?? t.text ?? "").split(/\s+/).map((w) => measureLine(w, size, fam)));
+  if (c.type === "ellipse") return (word + PAD * 2) * Math.SQRT2;
+  if (c.type === "diamond") return (word + PAD * 2) * 2;
+  return word + PAD * 4;
+}
+
+/** Resizes one element by dragging a handle to `p` (scene). `keep` holds the aspect ratio, `fromCentre`
+ *  grows both ways, `minW` stops the width short of it (a label's longest word). */
+export function resize(e: El, start: El, h: Handle, p: Pt, keep: boolean, fromCentre: boolean, minW = 0): El {
   const f = frame(start);
   const c: Pt = [f.x + f.w / 2, f.y + f.h / 2];
   const [lx, ly] = rot(p, c, -start.angle);
@@ -724,6 +735,12 @@ export function resize(e: El, start: El, h: Handle, p: Pt, keep: boolean, fromCe
     }
     w = x1 - x0;
     hh = y1 - y0;
+  }
+  if (minW && Math.abs(w) < minW) {
+    // the edge being dragged stops; the other stays put
+    if (h.includes("w")) x0 = x1 - minW * Math.sign(w || 1);
+    else x1 = x0 + minW * Math.sign(w || 1);
+    w = x1 - x0;
   }
   const nx = Math.min(x0, x1);
   const ny = Math.min(y0, y1);
@@ -786,10 +803,34 @@ const norm = (a: number) => {
 
 // ---------- Snapping ----------
 
-export type Guide = { axis: "x" | "y"; at: number; from: number; to: number };
+/** A guide line while snapped: an edge or centre shared with another shape, or (`gap`) the equal
+ *  spaces between the moving shape and two others in its row or column, drawn as spans. */
+export type Guide = { axis: "x" | "y"; at: number; from: number; to: number; gap?: true };
 
-/** Snaps a moving box to the edges and centres of others (within `tol`), else to the grid. Returns the
- *  offset to add and the guide lines to draw. */
+/** Equal spacing along one axis: two others in the moving box's row (or column) with a gap between
+ *  them, and the box the same gap after, before or between them. `a` is the axis start of a box,
+ *  `s` its size, `c0`–`c1` its range across. Returns the nearest offset within `tol` and its spans. */
+function spacing(b: { a: number; s: number; c0: number; c1: number }, others: { a: number; s: number; c0: number; c1: number }[], tol: number): { d: number; spans: [number, number][] } | null {
+  const row = others.filter((o) => o.c0 < b.c1 && o.c1 > b.c0).sort((p, q) => p.a - q.a);
+  let best: { d: number; spans: [number, number][] } | null = null;
+  const take = (at: number, spans: (x: number) => [number, number][]) => {
+    const d = at - b.a;
+    if (Math.abs(d) <= tol && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, spans: spans(at) };
+  };
+  for (let i = 0; i < row.length; i++)
+    for (let j = i + 1; j < row.length; j++) {
+      const [o1, o2] = [row[i]!, row[j]!];
+      const gap = o2.a - (o1.a + o1.s);
+      if (gap <= 0) continue;
+      take(o2.a + o2.s + gap, (x) => [[o1.a + o1.s, o2.a], [o2.a + o2.s, x]]);
+      take(o1.a - gap - b.s, (x) => [[x + b.s, o1.a], [o1.a + o1.s, o2.a]]);
+      if (gap > b.s) take(o1.a + o1.s + (gap - b.s) / 2, (x) => [[o1.a + o1.s, x], [x + b.s, o2.a]]);
+    }
+  return best;
+}
+
+/** Snaps a moving box to the edges and centres of others (within `tol`), else to equal spacing beside
+ *  two of them, else to the grid. Returns the offset to add and the guide lines to draw. */
 export function snapBox(b: Box, others: Box[], tol: number, grid: number | null): { dx: number; dy: number; guides: Guide[] } {
   const xs = [b.x, b.x + b.w / 2, b.x + b.w];
   const ys = [b.y, b.y + b.h / 2, b.y + b.h];
@@ -801,12 +842,16 @@ export function snapBox(b: Box, others: Box[], tol: number, grid: number | null)
     for (const t of [o.y, o.y + o.h / 2, o.y + o.h])
       for (const s of ys) if (Math.abs(t - s) <= tol && (!by || Math.abs(t - s) < Math.abs(by.d))) by = { d: t - s, at: t };
   }
-  let dx = bx?.d ?? 0;
-  let dy = by?.d ?? 0;
-  if (!bx && grid) dx = Math.round(b.x / grid) * grid - b.x;
-  if (!by && grid) dy = Math.round(b.y / grid) * grid - b.y;
+  const gx = bx ? null : spacing({ a: b.x, s: b.w, c0: b.y, c1: b.y + b.h }, others.map((o) => ({ a: o.x, s: o.w, c0: o.y, c1: o.y + o.h })), tol);
+  const gy = by ? null : spacing({ a: b.y, s: b.h, c0: b.x, c1: b.x + b.w }, others.map((o) => ({ a: o.y, s: o.h, c0: o.x, c1: o.x + o.w })), tol);
+  let dx = bx?.d ?? gx?.d ?? 0;
+  let dy = by?.d ?? gy?.d ?? 0;
+  if (!bx && !gx && grid) dx = Math.round(b.x / grid) * grid - b.x;
+  if (!by && !gy && grid) dy = Math.round(b.y / grid) * grid - b.y;
   const moved = { x: b.x + dx, y: b.y + dy, w: b.w, h: b.h };
   const guides: Guide[] = [];
+  if (gx) for (const [from, to] of gx.spans) guides.push({ axis: "y", at: moved.y + moved.h / 2, from, to, gap: true });
+  if (gy) for (const [from, to] of gy.spans) guides.push({ axis: "x", at: moved.x + moved.w / 2, from, to, gap: true });
   const near = (v: number, w: number) => Math.abs(v - w) < 0.5;
   if (bx) {
     const hit = others.filter((o) => [o.x, o.x + o.w / 2, o.x + o.w].some((v) => near(v, bx!.at)));

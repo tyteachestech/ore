@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   addChild, addMap, addMatrix, align, bounds, centre, DEFAULT_STYLE, distribute, duplicate, edgePoint, fitLink, flowDir, fromScene, growMatrix, labelOf,
-  layoutMatrix, nearestIn, nextCell, parseMap, remove, reorder, resize, rotate, route, byId, setLabel, shape, snapBox, toScene, topAt, move, type El, type Scene,
+  layoutMatrix, minLabelWidth, nearestIn, nextCell, parseMap, remove, reorder, resize, rotate, route, byId, setLabel, shape, snapBox, toScene, topAt, move, type El, type Scene,
 } from "../src/draw/model";
 import { dark } from "../src/draw/render";
 
@@ -73,15 +73,30 @@ describe("arrows", () => {
     near(p[1], 50, 1);
   });
 
-  test("deleting a shape lets go of arrows bound to it and removes its label", () => {
+  test("deleting a shape removes its label and every arrow bound to it, with the arrow's label", () => {
     const a = box(0, 0);
     const b = box(300, 0);
-    let els = addChild([a, b], a, "right", DEFAULT_STYLE).els;
-    els = setLabel(els, a.id, "A", DEFAULT_STYLE);
-    const arrow = els.find((e) => e.type === "arrow")!;
+    const made = addChild([a, b], a, "right", DEFAULT_STYLE);
+    let els = setLabel(made.els, a.id, "A", DEFAULT_STYLE);
+    els = setLabel(els, made.arrow.id, "to", DEFAULT_STYLE);
+    const arrow = made.arrow;
     const out = remove(els, new Set([a.id]));
-    expect(out.find((e) => e.id === arrow.id)?.startBinding).toBeNull();
-    expect(out.some((e) => e.containerId === a.id)).toBe(false);
+    expect(out.map((e) => e.id)).toEqual([b.id, made.node.id]);
+    expect(out.some((e) => e.containerId === arrow.id)).toBe(false);
+  });
+
+  test("a labelled box cannot be resized narrower than its longest word", () => {
+    let els = [box(0, 0, 300, 60)];
+    els = setLabel(els, els[0]!.id, "short antidisestablishment", DEFAULT_STYLE);
+    const c = els[0]!;
+    const min = minLabelWidth(els, c);
+    expect(min).toBeGreaterThan(100);
+    const r = resize(c, c, "e", [20, 30], false, false, min);
+    near(r.width, min, 0.01);
+    expect(r.x).toBe(0);
+    const l = resize(c, c, "w", [280, 30], false, false, min);
+    near(l.x + l.width, 300, 0.01); // the right edge stays put
+    expect(minLabelWidth([box(0, 0)], box(0, 0))).toBe(0);
   });
 });
 
@@ -201,6 +216,19 @@ describe("selection and arranging", () => {
     expect(s.dx).toBe(-3);
     expect(s.guides[0]).toMatchObject({ axis: "x", at: 100 });
     expect(snapBox({ x: 13, y: 27, w: 10, h: 10 }, [], 6, 20)).toMatchObject({ dx: 7, dy: -7 });
+  });
+
+  test("snapping: a box dragged near two in a row takes their gap, after, before or between them", () => {
+    const row = [{ x: 0, y: 0, w: 50, h: 50 }, { x: 80, y: 0, w: 50, h: 50 }]; // gap 30
+    const after = snapBox({ x: 163, y: 2, w: 50, h: 50 }, row, 6, null);
+    expect(after.dx).toBe(-3); // 130 + 30 = 160
+    expect(after.guides.filter((g) => g.gap).map((g) => [g.from, g.to])).toEqual([[50, 80], [130, 160]]);
+    expect(snapBox({ x: -77, y: 0, w: 50, h: 50 }, row, 6, null).dx).toBe(-3); // -80 = 0 - 30 - 50
+    const wide = [{ x: 0, y: 0, w: 50, h: 50 }, { x: 200, y: 0, w: 50, h: 50 }];
+    expect(snapBox({ x: 97, y: 0, w: 50, h: 50 }, wide, 6, null).dx).toBe(3); // centred: 50 + (150 - 50) / 2
+    // another row (no vertical overlap) is not a neighbour; an edge match wins over a gap
+    expect(snapBox({ x: 163, y: 200, w: 50, h: 50 }, row, 6, null).dx).toBe(0);
+    expect(snapBox({ x: 163, y: 2, w: 50, h: 50 }, [...row, { x: 165, y: 100, w: 10, h: 10 }], 6, null)).toMatchObject({ dx: 2 });
   });
 
   test("align, distribute, reorder, duplicate", () => {
