@@ -215,6 +215,34 @@ journey("tutor @: typing @ lists skills and sources, Enter writes the name in, a
   await page.keyboard.press("Escape");
 });
 
+journey("tutor hints and cards: a hint offers Show me, which asks for the answer; + Card keeps the reply's card, ⌘Z takes it back", async (page) => {
+  await openSource(page, TESTING);
+  const replies = [
+    { reply: "Think about what the tested group did that the rereaders didn't.", citations: [], general: false, hint: true, card: null },
+    { reply: "They pulled it out of memory, and that effort is what made it last.", citations: [], general: false, hint: false, card: { kind: "card", content_type: "fact", question: "In Roediger and Karpicke (2006), which group remembered more after a week?", answer: "The group that took a recall test.", rubric: [] } },
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@3" } }));
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  await page.getByRole("textbox", { name: "Message the tutor" }).fill("Which group did better?");
+  await page.keyboard.press("Enter");
+  await tutor.getByRole("button", { name: "Show me" }).click();
+  await tutor.getByText("Show me", { exact: true }).waitFor(); // sent as his message
+  const kept = page.waitForResponse((r) => (r.request().postData() ?? "").includes('"tutor-card"'));
+  await tutor.getByRole("button", { name: /^Add card:/ }).click();
+  await tutor.getByRole("button", { name: "Card added" }).waitFor();
+  await kept;
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // out of the field, so ⌘Z is the app's
+  await page.keyboard.press("Meta+z");
+  await tutor.getByRole("button", { name: /^Add card:/ }).waitFor();
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).

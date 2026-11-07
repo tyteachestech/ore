@@ -1,5 +1,5 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, type TutorTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, addTutorCard, type TutorTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { int, need, str, strs } from "./util.ts";
@@ -118,6 +118,19 @@ export const aiCommands: Record<string, Command> = {
       const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill) });
       const text = [r.reply, ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`)].join("\n");
       return { data: r, text };
+    },
+  },
+
+  "tutor-card": {
+    usage: '<source> --card <json> --ai <json>   Keep the card a tutor reply proposed (D128): {kind, content_type, question, answer, rubric} as `ore tutor` returned it, with that reply\'s ai stamp; it goes into review as a draft',
+    options: { card: { type: "string" }, ai: { type: "string" } },
+    async run([ref], f) {
+      const lib = openLibrary();
+      const json = (v: string | undefined, name: string) => {
+        try { return JSON.parse(need(v, `--${name}`)); } catch (e) { throw (e as Error).message.startsWith("missing") ? e : new Error(`--${name} must be JSON`); }
+      };
+      const c = await addTutorCard(lib, need(ref, "<source>"), json(str(f.card), "card"), json(str(f.ai), "ai"));
+      return { data: { id: c.meta.id, item: c.meta.item, kind: c.meta.kind, question: c.question }, text: `Added card ${c.meta.id}` };
     },
   },
 

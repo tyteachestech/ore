@@ -22,7 +22,7 @@ export const CardMetaSchema = z.object({
   annotation: z.string().optional(),
   // D118: the other highlights a card was planned from, when one idea spans several (the first is `annotation`).
   also: z.array(z.string()).optional(),
-  from: z.enum(["notes", "prequestion"]).optional(), // drafted from My notes (D19 credit) or from a prequestion after the finish (D19)
+  from: z.enum(["notes", "prequestion", "tutor"]).optional(), // drafted from My notes (D19 credit), from a prequestion after the finish (D19), or kept from a tutor reply (D128)
   prequestion: z.number().int().positive().optional(), // with from: prequestion, its number (1-based)
   skills: z.array(z.string()).default([]),
   topics: z.array(z.string()).default([]),
@@ -111,7 +111,7 @@ export interface NewCard extends CardContent {
   item: string;
   annotation?: string;
   also?: string[];
-  from?: "notes" | "prequestion";
+  from?: "notes" | "prequestion" | "tutor";
   prequestion?: number;
   skills: string[];
   topics: string[];

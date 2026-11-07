@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
-import { findItem, listItems } from "../items.ts";
+import { findItem, listItems, type AiStamp } from "../items.ts";
+import { cardTextProblem, ContentType, writeNewCard, type Card } from "../cards.ts";
+import { withLock } from "../lock.ts";
+import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
 import type { Library } from "../library.ts";
 import { runAgent, type Usage } from "./adapter.ts";
@@ -13,10 +16,23 @@ import { plainText, retrieve, splitPassages, type Citation, type Passage } from 
 
 export interface TutorTurn { message: string; reply: string }
 
+export const TutorCard = z.strictObject({
+  kind: z.enum(["card", "prompt"]),
+  content_type: ContentType,
+  question: z.string().min(1),
+  answer: z.string().min(1),
+  rubric: z.array(z.string().min(1)),
+});
+export type TutorCard = z.infer<typeof TutorCard>;
+
 export const TutorOutput = z.strictObject({
   reply: z.string().min(1),
   citations: z.array(z.strictObject({ passage: z.string(), quote: z.string().min(1) })),
   general: z.boolean(),
+  // The reply holds back an answer he is meant to find (a hint rung): the app offers "Show me".
+  hint: z.boolean(),
+  // One idea from this reply worth keeping, as a card he can add with one click; null when none.
+  card: TutorCard.nullable(),
 });
 
 /** What the tutor is pointed at: the source he is reading, and the sources and skills he @-mentioned. */
@@ -65,7 +81,9 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
         if (!locate(p.text, c.quote)) return `the quote "${c.quote}" is not in ${c.passage}: copy its exact words`;
       }
       const top = Math.max(0, ...[...d.reply.matchAll(/\[(\d+)\]/g)].map((x) => +x[1]!));
-      return top > d.citations.length ? `marker [${top}] has no citation` : null;
+      if (top > d.citations.length) return `marker [${top}] has no citation`;
+      if (d.card && d.card.kind === "prompt" && !d.card.rubric.length) return "a prompt card needs 2 to 4 rubric points";
+      return d.card ? cardTextProblem(d.card) : null;
     },
   });
   const citations: Citation[] = data.citations.map((c, i) => {
@@ -74,5 +92,22 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
     const quote = p.text.slice(at.start, at.end);
     return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
   });
-  return { message: m, reply: data.reply, citations, general: data.general, ai, usage: usage as Usage };
+  return { message: m, reply: data.reply, citations, general: data.general, hint: data.hint, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
+}
+
+/** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the
+ *  source it came from (the first one cited, else the one he was reading) and takes that source's
+ *  skills and first topic; the AI that wrote it is recorded. */
+export async function addTutorCard(lib: Library, item: string, card: TutorCard, ai: AiStamp): Promise<Card> {
+  const c = TutorCard.parse(card);
+  const problem = cardTextProblem(c);
+  if (problem) throw new Error(problem);
+  if (c.kind === "prompt" && !c.rubric.length) throw new Error("a prompt card needs rubric points");
+  return withLock(paths.lock(lib), () => {
+    const it = findItem(lib, item);
+    return writeNewCard(lib, {
+      kind: c.kind, item: it.meta.id, from: "tutor", skills: it.meta.skills, topics: it.meta.topics.slice(0, 1), content_type: c.content_type,
+      question: c.question, answer: c.answer, rubric: c.kind === "prompt" ? c.rubric : [], ai,
+    });
+  });
 }

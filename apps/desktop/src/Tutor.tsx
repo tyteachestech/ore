@@ -1,19 +1,26 @@
-import { ArrowUp, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
-import { useEffect, useRef, useState } from "react";
+import { ArrowUp, Check, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
 import { Hint } from "./Hint";
 import { useSideWidth } from "./Notes";
 import { ore, opt } from "./ore";
-import { errorText } from "./util";
+import { errorText, type Notify } from "./util";
 import { Working } from "./Working";
 import { mentionMatches, type Mention } from "./mentions";
 
 export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
 /** One exchange. `item`/`title` is the source it was asked about (the context chip at the time). */
-export type TutorTurn = { message: string; item?: string; title?: string; mentions?: Mention[]; reply?: string; citations?: Citation[]; general?: boolean; error?: string };
-type Reply = { reply: string; citations: Citation[]; general: boolean };
+export type TutorCard = { kind: "card" | "prompt"; content_type: string; question: string; answer: string; rubric: string[] };
+type Ai = { vendor: string; model: string; prompt_version: string };
+export type TutorTurn = {
+  message: string; item?: string; title?: string; mentions?: Mention[];
+  reply?: string; citations?: Citation[]; general?: boolean; hint?: boolean; card?: TutorCard | null; ai?: Ai; error?: string;
+  /** The card he kept from this reply: its id, or "adding" while it is written. */
+  kept?: string;
+};
+type Reply = { reply: string; citations: Citation[]; general: boolean; hint: boolean; card: TutorCard | null; ai: Ai };
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
 const STARTERS_READING = ["Explain this simply", "Give me an example", "Quiz me on this"];
@@ -26,7 +33,8 @@ const STARTERS = ["What have I been learning?", "Quiz me"];
  *  practice. It floats over the bottom right corner (Notion AI's default) or docks at the right in the
  *  side panel's place; the header switches, and the choice is remembered. The thread lives in App, so
  *  it survives navigation; + starts a new one. */
-export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills, onOpen, onClose }: {
+export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills, onOpen, onClose, notify }: {
+  notify: Notify;
   /** Docked at the right, in the side panel's place; else floating over the bottom right corner. */
   docked: boolean;
   onFit: () => void;
@@ -49,6 +57,14 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [at, setAt] = useState<{ query: string; start: number } | null>(null);
   const [pick, setPick] = useState(0);
+  // Where the caret goes once a picked @name is in the text: set before the next key lands, so typing
+  // straight on never splits the name.
+  const caretAt = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (caretAt.current === null) return;
+    field.current?.setSelectionRange(caretAt.current, caretAt.current);
+    caretAt.current = null;
+  }, [input]);
   const matches = at ? mentionMatches(at.query, sources, skills, mentions.filter((m) => input.includes(`@${m.name}`))) : [];
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -62,7 +78,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
     try {
       const pointed = (t.mentions ?? []).map((m) => opt(m.kind, m.id));
       const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []));
-      setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, reply: r.reply, citations: r.citations, general: r.general, error: undefined } : x)));
+      setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, card: r.card, ai: r.ai, error: undefined } : x)));
     } catch (e) {
       setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, error: errorText(e, "answer that") } : x)));
     }
@@ -86,6 +102,28 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
     void run(i, next);
   };
 
+  /** Keeps the reply's card on the source it cites first (else the one he asked about); ⌘Z retires it. */
+  const keep = async (i: number) => {
+    const t = turns[i]!;
+    const item = t.citations?.[0]?.item ?? t.item;
+    if (!t.card || !t.ai || !item || t.kept) return;
+    const mark = (kept: string | undefined) => setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, kept } : x)));
+    mark("adding");
+    try {
+      const c = await ore<{ id: string }>("tutor-card", item, opt("card", JSON.stringify(t.card)), opt("ai", JSON.stringify(t.ai)));
+      mark(c.id);
+      notify(
+        "Card added",
+        "quiet",
+        () => void ore("card", "retire", c.id).then(() => mark(undefined), (e) => notify(errorText(e), "error")),
+        () => void ore("card", "restore", c.id, "--state=draft").then(() => mark(c.id), (e) => notify(errorText(e), "error")),
+      );
+    } catch (e) {
+      mark(undefined);
+      notify(errorText(e, "add that card"), "error");
+    }
+  };
+
   /** The @word the caret is in, if any. */
   const track = (text: string, caret: number) => {
     const m = /(?:^|\s)@([^\s@]*)$/.exec(text.slice(0, caret));
@@ -99,8 +137,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
     setInput(text);
     setMentions((ms) => [...ms, m]);
     setAt(null);
-    const caret = at.start + word.length;
-    requestAnimationFrame(() => field.current?.setSelectionRange(caret, caret));
+    caretAt.current = at.start + word.length;
   };
 
   useEffect(() => {
@@ -177,7 +214,21 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
                 ) : t.reply === undefined ? (
                   <Working label="Thinking…" slow="A reply takes about 10 seconds." />
                 ) : (
-                  <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} general={t.general} />
+                  <>
+                    <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} general={t.general} />
+                    {((t.hint && i === turns.length - 1 && !busy) || (t.card && (t.citations?.[0]?.item ?? t.item))) && (
+                      <div className="tutor-acts">
+                        {t.hint && i === turns.length - 1 && !busy && <button onClick={() => send("Show me")}>Show me</button>}
+                        {t.card && (t.citations?.[0]?.item ?? t.item) && (
+                          <Hint text={t.kept && t.kept !== "adding" ? "In review from tomorrow" : t.card.question}>
+                            <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Card added" : `Add card: ${t.card.question}`} disabled={!!t.kept} onClick={() => void keep(i)}>
+                              {t.kept ? <><Check size={12} aria-hidden="true" />Card added</> : <><Plus size={12} aria-hidden="true" />Card</>}
+                            </button>
+                          </Hint>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
