@@ -68,6 +68,24 @@ export function editTable(state: EditorState, table: number, row: number, col: n
   return tr.setSelection(TextSelection.near(tr.doc.resolve(cell + 1))).scrollIntoView();
 }
 
+/** A row or column dragged by its grip from `from` to `to` (Notion), as one editor step; the header
+ *  row stays on top. The caret goes into the moved line. Null when it doesn't move. */
+export function moveLine(state: EditorState, table: number, kind: "row" | "col", from: number, to: number): Transaction | null {
+  const { rows, cols } = sizeOf(state, table);
+  const n = kind === "row" ? rows : cols;
+  const min = kind === "row" ? 1 : 0;
+  if (from === to || from < min || to < min || from >= n || to >= n) return null;
+  const move = kind === "row" ? moveTableRow({ from, to, select: false, pos: table + 1 }) : moveTableColumn({ from, to, select: false, pos: table + 1 });
+  // As editTable: the command reads the table from a caret inside it.
+  const at = state.apply(state.tr.setSelection(TextSelection.near(state.doc.resolve(cellAt(state, table, kind === "row" ? from : 0, kind === "row" ? 0 : from) + 1))));
+  let out: Transaction | null = null;
+  move(at, (tr) => void (out = tr));
+  if (!out) return null;
+  const tr = out as Transaction;
+  const cell = cellAt(at.apply(tr), table, kind === "row" ? to : 0, kind === "row" ? 0 : to);
+  return tr.setSelection(TextSelection.near(tr.doc.resolve(cell + 1))).scrollIntoView();
+}
+
 /** Tab in the last cell adds a row and goes to it (Notion, Google Docs). Before the GFM keymap. */
 export const tablePlugin = $prose(
   () =>

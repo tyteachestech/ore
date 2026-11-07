@@ -89,4 +89,18 @@ describe("note tables", () => {
     expect(rows(md)).toHaveLength(5);
     expect(rows(md)[4]).toMatch(/^\| Interleaving\s+\|\s+\|$/);
   });
+
+  test("a row or column dragged by its grip moves in one step; the header row stays on top (Notion)", async () => {
+    const T3 = T + "| Mixing | Low |\n";
+    const move = (kind: "row" | "col", from: number, to: number) => (v: View, t: number) => {
+      const tr = tables.moveLine(v.state, t, kind, from, to);
+      if (tr) v.dispatch(tr);
+      return tr;
+    };
+    expect(rows((await run(T3, move("row", 3, 1))).md).map((r) => r.split("|")[1]!.trim().replace(/^-+$/, "-"))).toEqual(["Technique", "-", "Mixing", "Spacing", "Testing"]);
+    expect(rows((await run(T3, move("row", 1, 3))).md).map((r) => r.split("|")[1]!.trim().replace(/^-+$/, "-"))).toEqual(["Technique", "-", "Testing", "Mixing", "Spacing"]);
+    expect(rows((await run(T, move("col", 0, 1))).md)[0]).toMatch(/^\| Effort\s*\| Technique \|$/);
+    expect((await run(T, move("row", 1, 0))).got).toBe(null);
+    expect((await run(T, move("row", 2, 2))).got).toBe(null);
+  });
 });

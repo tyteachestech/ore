@@ -77,7 +77,7 @@ keeps its headings and lists.
 ## Already covered elsewhere
 
 Esc block selection, ⌘A twice, ⌘D, ⌘⇧↑↓, ⋮⋮ drag and Turn into (`blockops.test.ts`); `[[` links, `/`,
-`@` dates, `:` emoji (`editor.test.ts`, `dates.test.ts`, `emoji.test.ts`); tables (`tables.test.ts`).
+`@` dates, `:` emoji (`editor.test.ts`, `dates.test.ts`, `emoji.test.ts`); tables, including dragging a row or column by its grip (2026-11-07; the header row stays on top) (`tables.test.ts`).
 
 ## Tyler's answers (2026-11-06)
 
