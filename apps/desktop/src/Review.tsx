@@ -30,8 +30,9 @@ type End = { session: SessionEnd; today: Today; before: Today | null };
 /** The remixed version shown, for the CLI calls that act on it (D66). */
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
 
-/** Quick quiz answers typed but not checked, by card: putting the window away keeps them (D76). */
-const drafts = new Map<string, string>();
+/** Answers typed but not checked, and how sure he said he was, by card: putting the quick quiz away
+ *  (D76), Esc or Open in source keep them for when the card comes up again. */
+const drafts = new Map<string, { text: string; conf?: number }>();
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
@@ -137,7 +138,9 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       (c) => {
         if (!live) return;
         setCard(c);
-        if (quick) setAnswer(drafts.get(c.id) ?? "");
+        const kept = c.kind === "prompt" ? drafts.get(c.id) : undefined;
+        setAnswer(kept?.text ?? "");
+        setConf(kept?.conf);
         shownAt.current = Date.now();
       },
       (e) => live && setError(errorText(e)),
@@ -479,6 +482,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   const pickSure = (n: number) => {
     setConf(n);
+    if (card?.kind === "prompt") drafts.set(card.id, { text: answer, conf: n });
     if (card?.kind === "card") {
       setPhase("checked");
       shownAnswerAt.current = Date.now();
@@ -657,13 +661,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
                   value={answer}
                   onChange={(e) => {
                     setAnswer(e.target.value);
-                    if (quick) drafts.set(card.id, e.target.value);
+                    drafts.set(card.id, { text: e.target.value, conf });
                   }}
                 />
                 <div className={`quiz-label${askSure ? " ask" : ""}`} id="review-sure">
                   How sure are you?
                 </div>
-                <Sure refEl={sureRef} conf={conf} onPick={(n) => (conf === n ? setConf(undefined) : pickSure(n))} />
+                <Sure refEl={sureRef} conf={conf} onPick={(n) => (conf === n ? (setConf(undefined), drafts.set(card.id, { text: answer })) : pickSure(n))} />
                 <div className="review-foot">
                   {card.in_head_ok && (
                     <Hint text="Answered in my head" keys="in-head" side="top">

@@ -13,11 +13,14 @@ const disk: Record<string, string> = { a: "note A", b: "note B" };
 const calls: string[][] = [];
 /** How long the mocked CLI takes to answer (ms): a real `ore notes` call outlives a React commit. */
 let slow = 0;
+/** Saves (`--set`) fail while true: a full disk, a synced folder that went away. */
+let failSets = false;
 (w as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
   invoke: async (_cmd: string, { args }: { args: string[] }) => {
     calls.push(args);
     if (slow) await new Promise((r) => setTimeout(r, slow));
     const [, id, set] = args;
+    if (failSets && set?.startsWith("--set=")) throw "disk full";
     if (set?.startsWith("--set=")) disk[id!] = set.slice(6);
     return { text: disk[id!], dir: `/lib/${id}`, merged: false };
   },
@@ -124,5 +127,50 @@ test("coming back to a note while its saves are in flight shows what they wrote"
   await act(async () => notes.flush());
   const sets = calls.filter((c) => c[1] === "e" && c[2]?.startsWith("--set="));
   expect(sets.map((c) => c[3])).toEqual(["--base=hello", "--base=helo", "--base=hello there"]);
+  await act(async () => root.unmount());
+});
+
+test("an append after a failed save keeps his unsaved text", async () => {
+  let notes!: Notes;
+  const Probe = ({ id }: { id: string }) => {
+    notes = useSourceNote(id, () => {});
+    return null;
+  };
+  disk.f = "start";
+  const root = createRoot(document.createElement("div") as unknown as Element);
+  await act(async () => root.render(React.createElement(Probe, { id: "f" })));
+  failSets = true;
+  await act(async () => notes.edit("start, then my words"));
+  let ok = true;
+  await act(async () => {
+    ok = await notes.append("recall", "Recall");
+  });
+  failSets = false;
+  expect(ok).toBe(false); // nothing appended over a draft that isn't on disk
+  expect(notes.text).toBe("start, then my words");
+  await act(async () => notes.flush());
+  expect(disk.f).toBe("start, then my words");
+  await act(async () => root.unmount());
+});
+
+test("leaving a note whose save failed keeps the draft for when he comes back", async () => {
+  let notes!: Notes;
+  const Probe = ({ id }: { id: string }) => {
+    notes = useSourceNote(id, () => {});
+    return null;
+  };
+  disk.g = "start";
+  const root = createRoot(document.createElement("div") as unknown as Element);
+  await act(async () => root.render(React.createElement(Probe, { id: "g" })));
+  failSets = true;
+  await act(async () => notes.edit("start, unsaved"));
+  await act(async () => root.render(React.createElement(Probe, { id: "b" })));
+  await act(async () => new Promise((r) => setTimeout(r, 0)));
+  failSets = false;
+  await act(async () => root.render(React.createElement(Probe, { id: "g" })));
+  await act(async () => new Promise((r) => setTimeout(r, 0)));
+  expect(notes.text).toBe("start, unsaved");
+  await act(async () => new Promise((r) => setTimeout(r, 0)));
+  expect(disk.g).toBe("start, unsaved"); // saved again once it can be
   await act(async () => root.unmount());
 });

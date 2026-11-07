@@ -4,14 +4,14 @@ import { Grow } from "./Grow";
 import { PixelStar } from "./PixelIcon";
 import { Hint } from "./Hint";
 import { is } from "./keys";
-import { ore, oreDetached, opt, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
+import { ore, opt, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
 import { stampBefore } from "./transcript";
 import { errorText, type Notify } from "./util";
 import { PixelSpin, useLate, Working } from "./Working";
 
 /** What Finish and ChapterRecall need from the source note: wait for a pending edit before the CLI
  *  appends to notes.md, then take the text it returns. */
-type NotesSync = { flushNotes: () => Promise<void>; onNotes: (text: string) => void };
+type NotesSync = { flushNotes: () => Promise<boolean>; onNotes: (text: string) => void };
 
 /** The source behind the quiz panel: null keeps it blurred (D52); otherwise it shows, stepping
  *  through `quotes` with `at` the current one (D55). */
@@ -142,7 +142,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   function enrich() {
     // Drafts review items from Card highlights and the prequestions (D19), after the recall
     // feedback so the prompts' rubrics include what he missed.
-    const run = () => oreDetached("enrich", doc.id).catch((e) => notify(errorText(e), "error"));
+    // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
+    const run = (): Promise<void> =>
+      ore("enrich", doc.id).then(
+        () => {},
+        (e) => void notify(`Cards for “${doc.title}” weren’t drafted: ${errorText(e)}`, "error", undefined, undefined, () => void run()),
+      );
     if (feedbackRun.current) void feedbackRun.current.finally(run);
     else void run();
   }
@@ -178,7 +183,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   async function submitRecall() {
     setBusy(true);
     try {
-      await flushNotes();
+      // The recall lands in the note and comes back as its text: not over a draft that failed to save.
+      if (!(await flushNotes())) return;
       const left = await applyScope();
       if (left === null) return;
       if (recall.trim()) {

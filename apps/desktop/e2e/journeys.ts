@@ -1253,6 +1253,38 @@ journey("diagram: align and space from keys and the picker, drags snap to edges 
   await until("deleting A takes the arrow with it", async () => !(await summary())?.includes("→") && (await rects.count()) === 2);
 });
 
+journey("review: Esc keeps a half-typed answer and how sure he was, for when the card comes back", async (page) => {
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  /** Starts a review of only the skills `only` names (null: every skill). */
+  const start = async (only: RegExp | null) => {
+    await page.getByRole("button", { name: "Start review" }).click();
+    await pick.waitFor();
+    for (const row of await pick.getByRole("checkbox").all()) {
+      const want = !only || only.test(await row.innerText());
+      if ((await row.getAttribute("aria-checked") === "true") !== want) await row.click();
+    }
+    await page.keyboard.press("Enter");
+  };
+  // Teaching's one card is a question he answers in his own words.
+  await start(/Teaching/);
+  const field = page.getByRole("textbox", { name: "Your answer" });
+  await field.fill("half an answer");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  await start(/Teaching/);
+  await until("the answer is still there", async () => (await field.inputValue()) === "half an answer");
+  await until("so is how sure he was", async () => (await page.getByRole("radio", { name: "Think so" }).getAttribute("aria-checked")) === "true");
+  await field.fill("");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  // Every skill again, for the journeys after this one.
+  await start(null);
+  await page.locator(".review-q").waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: rate a card, the session moves on, and Undo brings the card back", async (page) => {
   await page.getByRole("button", { name: "Start review" }).click();
   // The "What to review" sheet comes first once Home knows his skills; Enter takes them all.
@@ -1338,6 +1370,25 @@ journey("archive a source from its row, then Undo from the toast", async (page) 
   await until("the row leaves the list", async () => !(await row.isVisible()));
   await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
   await row.waitFor();
+});
+
+journey("finish: when drafting the cards fails, a toast says why and Try again drafts them", async (page) => {
+  await openSource(page, AGENTS);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { enrich: "Claude is signed out." }));
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Just mark done" }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  const toast = page.locator(".toast").filter({ hasText: "weren’t drafted: Claude is signed out." });
+  await toast.waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await toast.getByRole("button", { name: "Try again" }).click();
+  await toast.waitFor({ state: "detached" });
+  // Back to reading, for the journeys after this one.
+  await page.evaluate(async (title) => {
+    const ore = (args: string[]) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args });
+    const items = (await ore(["ls"])) as { id: string; title: string }[];
+    await ore(["status", items.find((i) => i.title === title)!.id, "reading"]);
+  }, AGENTS);
 });
 
 journey("quiz check: one click makes a passage a key point, and marks a highlight already there", async (page) => {
