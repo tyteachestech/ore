@@ -588,7 +588,7 @@ journey("diagram: keys stay on the canvas after the style panel, Space never sti
 });
 
 journey("diagram: editing picks the whole label, a run of nudges is one undo step, undo re-selects, and a one-click arrow dropped with Esc leaves the Select tool", async (page) => {
-  await openSource(page, AGENTS);
+  await openSource(page, "A very long title about the neuroscience"); // no other journey draws here, so the note's click lands on text, not a diagram
   const note = page.locator(".note-editor [contenteditable=true]").first();
   await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
   await page.keyboard.press("Meta+ArrowDown");
