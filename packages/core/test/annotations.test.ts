@@ -119,6 +119,13 @@ describe("questions (D47)", () => {
     expect(listQuestions(lib).map((x) => x.id)).toContain(q.annotation.id);
   });
 
+  test("a question snippet stays out of the source lists after its question is deleted", async () => {
+    const lib = await tempLibrary();
+    const q = await addSnippet(lib, { text: "Does spacing work for kids?", intent: "question" });
+    reviseAnnotation(q.item, q.annotation, { status: "deleted" });
+    expect(isQuestionOnly(findItem(lib, q.item.meta.id))).toBe(true);
+  });
+
   test("highlighting an already highlighted passage gives back that highlight", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: TEXT });

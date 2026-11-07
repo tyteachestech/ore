@@ -100,6 +100,38 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("add: File keeps what he typed in the box; cancelling the picker keeps it too, and picked files join it", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByLabel("Link, file path or text");
+  await box.fill("https://example.com/a-link");
+  await page.getByRole("button", { name: "File", exact: true }).click();
+  await page.waitForTimeout(200);
+  if ((await box.inputValue()) !== "https://example.com/a-link") throw new Error("cancelling the picker lost the box"); // cancelled: the box and its text stay
+  await page.evaluate(() => ((window as unknown as { __ORE_PICK: string[] }).__ORE_PICK = ["/tmp/paper.pdf"]));
+  await box.focus();
+  await page.keyboard.press("Meta+o");
+  await until("the picked file joins the box", async () => (await box.inputValue()) === "https://example.com/a-link\n/tmp/paper.pdf");
+  await page.keyboard.press("Escape");
+});
+
+journey("Add and Settings: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
+  const inside = (sel: string) => page.evaluate((sel) => !!document.activeElement?.closest(sel), sel);
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").waitFor();
+  for (let n = 0; n < 8; n++) {
+    await page.keyboard.press("Shift+Tab");
+    if (!(await inside(".add-box"))) throw new Error(`⇧Tab ${n + 1} left the Add box`);
+  }
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+Comma");
+  await page.locator(".settings-sheet").waitFor();
+  for (let n = 0; n < 40; n++) {
+    await page.keyboard.press("Tab");
+    if (!(await inside(".settings-sheet"))) throw new Error(`Tab ${n + 1} left Settings`);
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("PDF footnote: its mark shows the note on hover, and bold stays bold", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill(join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/hazards.pdf"));
@@ -693,6 +725,22 @@ journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", a
   await until("⌘Z puts it back in Life", async () => (await inGroup("Life", "Habits")) === 1);
 });
 
+journey("skill note: coming back to a long note puts it where he left it", async (page) => {
+  const ore = (args: string[]) => page.evaluate((args) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<{ text: string }> } }).__TAURI_INTERNALS__.invoke("ore", { args }), args);
+  const was = (await ore(["notes", "--skill=learning"])).text;
+  await ore(["notes", "--skill=learning", `--set=${Array.from({ length: 80 }, (_, i) => `Line ${i + 1} of a long note.`).join("\n\n")}`]);
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const col = page.locator(".skill-col").first();
+  await page.getByText("Line 80 of a long note.").waitFor();
+  await col.evaluate((el) => (el.scrollTop = 900));
+  await page.waitForTimeout(100);
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.getByText("Line 80 of a long note.").waitFor();
+  await until("the note is where he left it", async () => Math.abs((await col.evaluate((el) => el.scrollTop)) - 900) <= 1);
+  await ore(["notes", "--skill=learning", `--set=${was}`]);
+});
+
 journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page) => {
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const open = () => page.getByText("Does this hold for kids?", { exact: true }).filter({ visible: true }).count();
@@ -814,6 +862,37 @@ journey("⌘K: Esc clears what was typed first, then closes", async (page) => {
   await until("the query is cleared and ⌘K stays open", async () => (await input.count()) === 1 && (await input.inputValue()) === "");
   await page.keyboard.press("Escape");
   await until("a second Esc closes it", async () => (await input.count()) === 0);
+});
+
+journey("⌘K: a match in the text opens the source at that place, the find bar on the words", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.locator("[cmdk-input]").fill("plausible");
+  await page.locator("[cmdk-item]").filter({ hasText: TESTING }).first().waitFor();
+  await page.keyboard.press("Enter");
+  const bar = page.getByLabel("Find in source");
+  await until("the find bar holds the words", async () => (await bar.count()) === 1 && (await bar.inputValue()) === "plausible");
+  await until("the match is on screen", () =>
+    page.evaluate(() => {
+      const r = [...(CSS.highlights.get("find-on") ?? [])][0] as Range | undefined;
+      const b = r?.getBoundingClientRect();
+      return !!b && b.top >= 0 && b.bottom <= innerHeight;
+    }),
+  );
+  await page.keyboard.press("Escape");
+});
+
+journey("search: when searching the text fails, ⌘K and the sources filter say so instead of “no matches”", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { search: "The index is busy." }));
+  await page.keyboard.press("Meta+k");
+  await page.locator("[cmdk-input]").fill("plausible");
+  await page.locator(".panel-foot .err").filter({ hasText: "Couldn’t search the text: The index is busy." }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.keyboard.press("Meta+f");
+  await page.getByLabel("Filter sources").fill("plausible");
+  await page.getByRole("alert").filter({ hasText: "Couldn’t search the text: The index is busy." }).waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
 });
 
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {

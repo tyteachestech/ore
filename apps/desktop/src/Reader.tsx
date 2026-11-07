@@ -231,7 +231,8 @@ type Props = {
   onPin: (item: Item) => void;
   onMove: (item: Item, to: Item["status"]) => void;
   /** A highlight to scroll to once the text is ready (a question on the skill page, D47), or
-   *  `q:start:end`, a quote a card points to (D99). */
+   *  `q:start:end`, a quote a card points to (D99), or `find:<words>`, a ⌘K text match: the find bar
+   *  opens on those words at their first place. */
   jumpTo?: string;
   /** Learn this (D97): add the picked sources for his question; `now` opens the first, with a way back here. */
   onLearnAdd?: (urls: string[], skills: string[], question: string, now: boolean, from: { id: string; title: string }) => void;
@@ -638,6 +639,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     idx.current = indexText(el);
     setReady(true);
   }, []);
+
+  useEffect(() => {
+    if (ready && p.jumpTo?.startsWith("find:")) setFind((f) => ({ open: true, focus: f.focus + 1, query: p.jumpTo!.slice(5) }));
+  }, [ready, p.jumpTo]);
 
   useLayoutEffect(() => {
     if (!ready || !scrollRef.current) return;

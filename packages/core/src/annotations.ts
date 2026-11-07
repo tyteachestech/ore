@@ -143,10 +143,11 @@ export function findAnnotation(lib: Library, ref: string): { item: Item; annotat
 }
 
 /** A snippet that only carries a question (typed on a skill page, or captured with Question intent):
- *  nothing to read, so it lives under Questions and stays out of the source lists. */
+ *  nothing to read, so it lives under Questions and stays out of the source lists, also once the
+ *  question is deleted (else it would turn up under To read). */
 export function isQuestionOnly(item: Item): boolean {
   if (item.meta.type !== "snippet") return false;
-  const all = readAnnotations(item);
+  const all = latestRevs(annotationRevs(item.dir));
   return all.length > 0 && all.every((a) => a.intent === "question");
 }
 

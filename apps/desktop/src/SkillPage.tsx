@@ -59,6 +59,31 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
+  // The note column keeps where it was scrolled, like the reader (back from a source, or a relaunch).
+  const noteCol = useRef<HTMLDivElement>(null);
+  const noteScroll = `ore.skillnote.scroll.${skill.id}`;
+  const loaded = notes.text !== null;
+  /** True while the saved place is being put back: those scrolls aren't his. */
+  const restoring = useRef(false);
+  useEffect(() => {
+    const el = noteCol.current;
+    const want = Number(load(noteScroll) ?? 0);
+    if (!loaded || !el || !(want > 0)) return;
+    // The editor lays out over a few frames: set it until the column is tall enough to hold it.
+    let n = 0;
+    let raf = 0;
+    const stop = () => void (restoring.current = false);
+    const put = () => {
+      el.scrollTop = want;
+      if (Math.abs(el.scrollTop - want) > 1 && ++n < 30) raf = requestAnimationFrame(put);
+      else raf = requestAnimationFrame(stop);
+    };
+    restoring.current = true;
+    // He scrolls first: his place wins.
+    el.addEventListener("wheel", () => (cancelAnimationFrame(raf), stop()), { once: true });
+    put();
+    return () => (cancelAnimationFrame(raf), stop());
+  }, [loaded, noteScroll]);
   const editor = useRef<NoteEditorHandle>(null);
   // The closed-book popup: the D41 warm-up, or a try at his goal (D101).
   const [recalling, setRecalling] = useState<"warm" | "goal" | null>(null);
@@ -121,7 +146,7 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
       </header>
 
       <div className={`skill-cols${split.dragging ? " dragging" : ""}${wide ? " wide" : ""}`} style={{ gridTemplateColumns: wide ? "minmax(0, 1fr)" : `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` }}>
-        <div className="skill-col">
+        <div className="skill-col" ref={noteCol} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
           <section className="skill-card skill-note" data-tone="note">
             <div className="card-head">
               <span className="card-title"><PixelNote className="card-icon" size={12} aria-hidden="true" /><h2>Your note</h2></span>
@@ -735,6 +760,8 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   const [found, setFound] = useState<Research["sources"] | null>(null);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState<string[]>([]);
+  /** Suggested sources being added now: each shows it is working, and a second click does nothing. */
+  const [adding, setAdding] = useState<string[]>([]);
   const [answering, setAnswering] = useState(false);
   const done = q.status === "done";
   const exact = q.exact.replace(/\s+/g, " ").trim();
@@ -755,6 +782,8 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
 
   // D17: one click adds one source, filed under this skill and linked to the question; never auto-added.
   const add = async (url: string) => {
+    if (adding.includes(url)) return;
+    setAdding((a) => [...a, url]);
     try {
       const r = await ore<{ id: string; title: string; kept?: boolean }>("add", url, opt("skill", skill), opt("for", q.id));
       setAdded((a) => [...a, url]);
@@ -772,6 +801,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
     } catch (e) {
       notify(errorText(e), "error");
     }
+    setAdding((a) => a.filter((u) => u !== url));
   };
 
   // The same actions as the hover buttons, in the ⋯ and right-click menus; delete last (AGENTS.md).
@@ -862,9 +892,13 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
                 <span className="title">{s.title}</span> <span className="sub">{s.site} · {s.type}</span>
                 <div className="why">{s.why}</div>
               </div>
-              <button onClick={() => void add(s.url)} disabled={added.includes(s.url)}>
-                {added.includes(s.url) ? "Added" : "Add"}
-              </button>
+              {adding.includes(s.url) ? (
+                <Working label="Adding…" slow="A long page or video takes a minute." />
+              ) : (
+                <button onClick={() => void add(s.url)} disabled={added.includes(s.url)}>
+                  {added.includes(s.url) ? "Added" : "Add"}
+                </button>
+              )}
             </li>
           ))}
         </ul>

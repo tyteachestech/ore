@@ -478,12 +478,16 @@ export function App() {
   const addTo = !openId && skill && skills.some((s) => s.id === skill) ? skill : null;
 
   const files = (paths: string[]): Entry[] => paths.map((path) => ({ kind: "file", path }));
+  /** The files he picks in the system's Open panel; none when he cancels. */
+  const chooseFiles = useCallback(async () => {
+    const picked = await openDialog({ multiple: true, directory: false, filters: [{ name: "Sources", extensions: FILE_TYPES }] });
+    return picked === null ? [] : Array.isArray(picked) ? picked : [picked];
+  }, []);
   const pickFiles = useCallback(async () => {
     setAdding(false);
-    const picked = await openDialog({ multiple: true, directory: false, filters: [{ name: "Sources", extensions: FILE_TYPES }] });
-    const paths = picked === null ? [] : Array.isArray(picked) ? picked : [picked];
+    const paths = await chooseFiles();
     if (paths.length) await addSources(files(paths), addTo ? [addTo] : [], true, true);
-  }, [addSources, addTo]);
+  }, [addSources, addTo, chooseFiles]);
 
   // Dropping files: onto a skill in the sidebar files them there; anywhere else, under the open skill
   // page or in All sources. The webview gets no DOM drag events for files, so the target is found from the
@@ -909,7 +913,8 @@ export function App() {
   const [query, setQuery] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
   const q = onSkillPage ? "" : query.trim();
-  const [hits, setHits] = useState<{ q: string; snip: Map<string, string> }>({ q: "", snip: new Map() });
+  /** `error`: why searching the text failed, so it never reads as "nothing matches". */
+  const [hits, setHits] = useState<{ q: string; snip: Map<string, string>; error?: string }>({ q: "", snip: new Map() });
   useEffect(() => {
     if (!q) return;
     let live = true;
@@ -920,7 +925,7 @@ export function App() {
           for (const h of r) if (h.item && h.snippet && !snip.has(h.item)) snip.set(h.item, h.snippet);
           if (live) setHits({ q, snip });
         },
-        () => live && setHits({ q, snip: new Map() }),
+        (e) => live && setHits({ q, snip: new Map(), error: errorText(e) }),
       );
     }, 120);
     return () => {
@@ -1814,7 +1819,8 @@ export function App() {
         </div>
       )}
       {!listError && items && !q && rows.length === 0 && <div className="empty-state">{empty(status, keys)}</div>}
-      {q && hits.q === q && rows.length === 0 && <div className="empty-state">No {(TABS.find((s) => s.id === status)?.label ?? "archived").toLowerCase()} sources match “{q}”.</div>}
+      {q && hits.q === q && hits.error && <div className="empty-state err" role="alert">Couldn’t search the text: {hits.error} Titles still filter.</div>}
+      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">No {(TABS.find((s) => s.id === status)?.label ?? "archived").toLowerCase()} sources match “{q}”.</div>}
       <DndContext
         sensors={rowSensors}
         onDragStart={(e) => {
@@ -2137,7 +2143,7 @@ export function App() {
           onCreate={createSkill}
           onAdd={(list, to, toastError) => addSources(list, to, toastError)}
           onFollow={followFeed}
-          onPickFiles={() => void pickFiles()}
+          onPickFiles={chooseFiles}
           onClose={() => setAdding(false)}
           notify={notify}
         />
