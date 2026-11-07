@@ -85,6 +85,20 @@ export function search(roots: HTMLElement[], query: string): Range[] {
   return out;
 }
 
+/** Runs `go` once `query` is in the text under `root` (a note still loading), or after about a second
+ *  without it, so a ⌘K jump opens the find bar on the match. Returns the cancel. */
+export function onceFound(root: () => HTMLElement | null | undefined, query: string, go: () => void): () => void {
+  let n = 0;
+  let raf = 0;
+  const look = () => {
+    const el = root();
+    if ((el && search([el], query).length) || ++n > 60) go();
+    else raf = requestAnimationFrame(look);
+  };
+  look();
+  return () => cancelAnimationFrame(raf);
+}
+
 /** The nearest ancestor that scrolls. */
 function scrollerOf(node: Node): HTMLElement | null {
   for (let el = node.parentElement; el; el = el.parentElement) {

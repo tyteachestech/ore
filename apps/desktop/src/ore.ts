@@ -226,7 +226,7 @@ export type SkillColor = (typeof SKILL_COLORS)[number];
 /** `hook` is his one line on why he is learning it (D63); `goal` what he could show he can do (D101). */
 export type Skill = { id: string; name: string; hook?: string; goal?: string; icon?: string; color?: SkillColor; collection?: string };
 
-export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string };
+export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string; annotation?: string };
 
 /** `ore notes`: a source note or a skill note (notes.md) as it now is; `dir` is its folder, absolute. */
 export type Notes = { item?: string; skill?: string; text: string; path: string; dir: string };

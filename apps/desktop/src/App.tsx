@@ -224,6 +224,8 @@ export function App() {
   const [pickFor, setPickFor] = useState<string | null>(null);
   /** A highlight the reader scrolls to when it opens (a question on the skill page, D47). */
   const [jumpTo, setJumpTo] = useState<string | undefined>(undefined);
+  /** A ⌘K match in a skill note: the words to find there, until the skill page has. */
+  const [skillFind, setSkillFind] = useState<string | undefined>(undefined);
   const [finishing, setFinishing] = useState(false);
   const [showCollected, setShowCollected] = useState(0);
   const [renameSource, setRenameSource] = useState(0);
@@ -593,6 +595,7 @@ export function App() {
 
   /** A skill's page (D46): its stats, skill note, questions and sources. */
   const openSkill = useCallback((id: string | null) => {
+    setSkillFind(undefined);
     setOpenId(null);
     setFinishing(false);
     setSkill(id);
@@ -2069,6 +2072,8 @@ export function App() {
             onAddSource={() => setAdding(true)}
             onSkillChanged={reloadSkills}
             notify={notify}
+            findInNote={skillFind}
+            onFound={() => setSkillFind(undefined)}
           >
             {list}
           </SkillPage>
@@ -2145,6 +2150,10 @@ export function App() {
           skills={skills}
           skill={skill}
           onSkill={openSkill}
+          onSkillNote={(id, words) => {
+            openSkill(id);
+            setSkillFind(words);
+          }}
           onOpen={openSource}
           onAsk={(q) => openTutor(q)}
           onCreated={(s) => {

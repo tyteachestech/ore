@@ -89,6 +89,8 @@ export interface SearchHit {
   item: string | null;
   title: string;
   snippet: string;
+  /** A card's: the highlight it was made from, where ⌘K lands. */
+  annotation?: string;
 }
 
 export class LibraryIndex {
@@ -127,14 +129,14 @@ export class LibraryIndex {
     // A hit in the title counts five times one in the body (bm25 weights by column). Archived sources,
     // and everything in them, stay out.
     const rows = this.db
-      .query<SearchHit & { body: string }, [string, number]>(
-        "select kind, ref, item, title, body, snippet(fts, -1, '[', ']', '…', 12) as snippet from fts where fts match ? and (item is null or item not in (select id from items where archived = 1)) order by bm25(fts, 0, 0, 0, 5, 1) limit ?",
+      .query<SearchHit & { body: string; annotation: string | null }, [string, number]>(
+        "select kind, ref, item, title, body, snippet(fts, -1, '[', ']', '…', 12) as snippet, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1)) order by bm25(fts, 0, 0, 0, 5, 1) limit ?",
       )
       .all(match, spelled.length ? -1 : limit);
     return rows
       .filter((r) => spelled.every((re) => re.test(r.title) || re.test(r.body)))
       .slice(0, limit)
-      .map(({ body: _, ...hit }) => hit);
+      .map(({ body: _, annotation, ...hit }) => (annotation ? { ...hit, annotation } : hit));
   }
 
   /** Sources (not archived) whose title or text holds any of these word stems, best first (Ask your library). */

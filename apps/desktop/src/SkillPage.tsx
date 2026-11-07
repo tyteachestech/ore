@@ -8,7 +8,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { IconPicker, SkillIcon } from "./IconPicker";
 import { is, isNotes, label, useKeymap } from "./keys";
 import { LinkedFrom, NoteBody, useNotes } from "./Notes";
-import { FindBar } from "./Find";
+import { FindBar, onceFound } from "./Find";
 import { Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
@@ -37,6 +37,9 @@ type Props = {
   /** After the icon or color changed from the badge. */
   onSkillChanged: () => void;
   notify: Notify;
+  /** A ⌘K match in the skill note: the note opens scrolled to these words, the find bar on them; `onFound` once it has. */
+  findInNote?: string;
+  onFound: () => void;
   /** The skill's sources, in the view the title names. */
   children: ReactNode;
 };
@@ -55,7 +58,7 @@ function Info({ text }: { text: string }) {
 
 /** A skill's page (D46): the D23 stats as chips in the header, then two equal columns that each
  *  scroll on their own, so a long note (D41) never buries his questions (D47) and sources. */
-export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, notify, children }: Props) {
+export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, notify, findInNote, onFound, children }: Props) {
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
@@ -68,7 +71,8 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
   useEffect(() => {
     const el = noteCol.current;
     const want = Number(load(noteScroll) ?? 0);
-    if (!loaded || !el || !(want > 0)) return;
+    // A ⌘K match decides where the note is instead.
+    if (!loaded || !el || !(want > 0) || findInNote) return;
     // The editor lays out over a few frames: set it until the column is tall enough to hold it.
     let n = 0;
     let raf = 0;
@@ -111,7 +115,7 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
       } else if (is(e, "filter")) {
         // Find on the page, as in a source (D81): the note, the sources and the questions.
         e.preventDefault();
-        setFind((f) => ({ ...f, open: true, focus: f.focus + 1 }));
+        setFind((f) => ({ ...f, open: true, focus: f.focus + 1, note: false }));
       }
     };
     window.addEventListener("keydown", onKey);
@@ -121,14 +125,23 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
   const split = useSplit("ore.skill-split");
   const stats = useStats(skill.id);
   const pageRef = useRef<HTMLDivElement>(null);
-  const [find, setFind] = useState({ open: false, query: "", focus: 0 });
+  /** `note`: opened by ⌘K on a match in the skill note, so it searches only there. */
+  const [find, setFind] = useState({ open: false, query: "", focus: 0, note: false });
+  useEffect(() => {
+    if (!loaded || !findInNote) return;
+    const query = findInNote;
+    return onceFound(() => noteCol.current?.querySelector<HTMLElement>(".skill-note"), query, () => {
+      setFind((f) => ({ open: true, query, focus: f.focus + 1, note: true }));
+      onFound();
+    });
+  }, [loaded, findInNote]);
   // The note across the whole page for a wide table, until he clicks again; not kept (Tyler, option C).
   const [wide, setWide] = useState(false);
   return (
     <div className="skill-page" data-color={skill.color} ref={pageRef}>
       {find.open && (
         <FindBar
-          roots={() => [pageRef.current]}
+          roots={() => [find.note ? noteCol.current?.querySelector<HTMLElement>(".skill-note") : pageRef.current]}
           within={pageRef.current}
           query={find.query}
           onQuery={(query) => setFind((f) => ({ ...f, query }))}

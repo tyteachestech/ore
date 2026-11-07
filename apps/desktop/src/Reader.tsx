@@ -10,7 +10,7 @@ import "katex/dist/katex.min.css";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
-import { FindBar } from "./Find";
+import { FindBar, onceFound } from "./Find";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
 import { snapRange } from "./snap";
 import { Grab } from "./Grab";
@@ -231,8 +231,9 @@ type Props = {
   onPin: (item: Item) => void;
   onMove: (item: Item, to: Item["status"]) => void;
   /** A highlight to scroll to once the text is ready (a question on the skill page, D47), or
-   *  `q:start:end`, a quote a card points to (D99), or `find:<words>`, a ⌘K text match: the find bar
-   *  opens on those words at their first place. */
+   *  `q:start:end`, a quote a card points to (D99), or a ⌘K match: `find:<words>` in the text (the find
+   *  bar opens on those words at their first place), `note:<words>` in the source note (the note opens,
+   *  the find bar on its words), `ann:<id>` a highlight (scrolled to, its popup open). */
   jumpTo?: string;
   /** Learn this (D97): add the picked sources for his question; `now` opens the first, with a way back here. */
   onLearnAdd?: (urls: string[], skills: string[], question: string, now: boolean, from: { id: string; title: string }) => void;
@@ -310,8 +311,9 @@ function ReaderView(p: Props & { reload: () => void }) {
   const hidden = (closedBook && !reveal) || hideSource;
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
-  /** ⌘F: open with the bump that refocuses it; the query stays for the next ⌘F, as in Safari. */
-  const [find, setFind] = useState<{ open: boolean; focus: number; query: string }>({ open: false, focus: 0, query: "" });
+  /** ⌘F: open with the bump that refocuses it; the query stays for the next ⌘F, as in Safari. `note`:
+   *  opened by ⌘K on a match in the source note, so it searches only there. */
+  const [find, setFind] = useState<{ open: boolean; focus: number; query: string; note?: boolean }>({ open: false, focus: 0, query: "" });
   // The reading focus (Readwise Reader): blocks from `anchor` to `head`, moved with ↑ ↓ and widened with ⇧.
   const [focus, setFocus] = useState<{ anchor: HTMLElement; head: HTMLElement } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -642,7 +644,13 @@ function ReaderView(p: Props & { reload: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (ready && p.jumpTo?.startsWith("find:")) setFind((f) => ({ open: true, focus: f.focus + 1, query: p.jumpTo!.slice(5) }));
+    if (!ready) return;
+    if (p.jumpTo?.startsWith("find:")) setFind((f) => ({ open: true, focus: f.focus + 1, query: p.jumpTo!.slice(5) }));
+    else if (p.jumpTo?.startsWith("note:")) {
+      const query = p.jumpTo.slice(5);
+      p.onShowSide("note", true);
+      return onceFound(() => readerRef.current?.querySelector<HTMLElement>(".mynotes-text"), query, () => setFind((f) => ({ open: true, focus: f.focus + 1, query, note: true })));
+    }
   }, [ready, p.jumpTo]);
 
   useLayoutEffect(() => {
@@ -695,6 +703,14 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   }, [ready, anns, body, popup?.id, hidden, repaint]);
   useEffect(() => () => CSS.highlights.clear(), []);
+  // A ⌘K match in a highlight or its note: land on it with its popup open, once its range is painted.
+  const landed = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const at = p.jumpTo;
+    if (!at?.startsWith("ann:") || landed.current === at || !ranges.current.has(at.slice(4))) return;
+    landed.current = at;
+    jumpToHighlight(at.slice(4));
+  }, [painted, p.jumpTo]);
 
   // A new text size or width reflows the page: keep the passage at the top where it was (Books).
   useEffect(() => keepPlace(() => (scrollRef.current && docEl.current ? placeOf(scrollRef.current, docEl.current) : () => {})), []);
@@ -1922,7 +1938,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   const openFind = () => {
     if (popup) closePopup();
-    setFind((f) => ({ ...f, open: true, focus: f.focus + 1 }));
+    setFind((f) => ({ ...f, open: true, focus: f.focus + 1, note: false }));
   };
   const closeFind = () => {
     setFind((f) => ({ ...f, open: false }));
@@ -2275,7 +2291,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       )}
       {find.open && !closedBook && (
         <FindBar
-          roots={() => [pageRef.current, readerRef.current?.querySelector<HTMLElement>(".mynotes-text")]}
+          roots={() => [...(find.note ? [] : [pageRef.current]), readerRef.current?.querySelector<HTMLElement>(".mynotes-text")]}
           within={readerRef.current}
           query={find.query}
           onQuery={(query) => setFind((f) => ({ ...f, query }))}

@@ -1,10 +1,10 @@
 // Seeds a realistic scratch library for screenshots: bun seed.ts <root>
 import { addMess } from "./mess.ts";
 import { $ } from "bun";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  addSkill, addText, addTutorCard, findItem, initLibrary, readAnnotations, recordReview, setItemStatus, setSkillLook, updateItemMeta, writeCardMeta, writeNewCard, startSession, endSession,
+  addSkill, addText, addTutorCard, findItem, initLibrary, readAnnotations, recordReview, setItemStatus, setSkillLook, skillNotesPath, updateItemMeta, writeCardMeta, writeNewCard, startSession, endSession,
 } from "../../../../packages/core/src/index.ts";
 
 const root = process.argv[2]!;
@@ -79,6 +79,10 @@ await $`bun ${CLI} highlight ${a1.meta.id} --exact ${"Retrieval practice is the 
 await $`bun ${CLI} highlight ${a1.meta.id} --exact ${"after one week the tested group remembered roughly 50% more"} --intent card`.quiet();
 await $`bun ${CLI} highlight ${a1.meta.id} --exact ${"this is called the hypercorrection effect"} --intent question --note ${"Does this hold for kids?"}`.quiet();
 await $`bun ${CLI} highlight ${a2.meta.id} --exact ${"Start with the simplest solution possible"} --intent question`.quiet();
+// A skill note longer than the column, so a ⌘K match at its end has to scroll there.
+const habitNote = skillNotesPath(lib, "habits");
+mkdirSync(join(habitNote, ".."), { recursive: true });
+writeFileSync(habitNote, Array.from({ length: 14 }, (_, i) => `## Week ${i + 1}\n\nKept the morning walk most days; missed it when the day started late.\n`).join("\n") + "\n## What worked\n\nStacking the walk onto the first coffee made it stick.\n");
 writeFileSync(join(a1.dir, "notes.md"), "## Big idea\n\nTesting is a learning event, not just a measurement. The benefit only shows after a delay.\n\n- Effortful > easy\n- Confidence + correction = hypercorrection\n");
 
 const card = (item: string, skills: string[], question: string, answer: string, rubric: string[] = [], annotation?: string) =>
