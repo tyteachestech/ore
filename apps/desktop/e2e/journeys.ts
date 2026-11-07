@@ -418,97 +418,6 @@ journey("tutor Practice: an exercise is written in the source note with the sour
   await page.keyboard.press("Meta+j");
 });
 
-journey("tutor Practice: an answer under a renamed heading, and a diagram-only answer, both reach the tutor; an empty one says so", async (page) => {
-  await openSource(page, AGENTS);
-  const exercise = (heading: string) => ({ heading, prompts: ["Your answer"] });
-  const reply = (r: string, ex: ReturnType<typeof exercise> | null) => ({ reply: r, citations: [], general: false, hint: false, exercise: ex, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } });
-  const replies = [
-    reply("Name the loop an agent runs.", exercise("What loop does an agent run?")),
-    reply("Good. Now draw it.", exercise("Draw the agent loop")),
-    reply("That diagram has the loop.", exercise("Draw the stopping condition")),
-    reply("Fine.", null),
-  ];
-  const bodies: string[] = [];
-  await page.route(/\/ore$/, async (route) => {
-    const body = route.request().postData() ?? "";
-    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
-    bodies.push(body);
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
-  });
-  await page.keyboard.press("Meta+j");
-  const tutor = page.getByRole("complementary", { name: "Tutor" });
-  const fresh = tutor.getByRole("button", { name: "New chat" });
-  if (await fresh.isEnabled()) await fresh.click();
-  await tutor.getByRole("button", { name: "Practice", exact: true }).click();
-  // A written answer under a heading he renamed.
-  await tutor.getByRole("button", { name: "Write it in your note" }).click();
-  await page.locator(".note-editor h2", { hasText: "What loop does an agent run?" }).waitFor();
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowRight" : "End");
-  await page.keyboard.type(" (my words)");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.type("It acts, observes the result and decides again.");
-  await page.keyboard.press("Meta+Enter");
-  await tutor.getByText("Good. Now draw it.").waitFor();
-  if (!bodies[1]?.includes("It acts, observes the result and decides again.")) throw new Error(`the renamed heading's answer wasn't sent: ${bodies[1]}`);
-  // An answer that is only a diagram.
-  await tutor.getByRole("button", { name: "Write it in your note" }).click();
-  await page.locator(".note-editor h2", { hasText: "Draw the agent loop" }).waitFor();
-  await page.evaluate(() => {
-    const dt = new DataTransfer();
-    dt.setData("text/plain", "![Diagram](diagrams/agent-loop.excalidraw)");
-    const at = getSelection()!.anchorNode!;
-    (at instanceof Element ? at : at.parentElement!).dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
-  });
-  await until("the diagram is in the note", async () => (await page.locator(".note-editor .note-diagram").count()) > 0);
-  await page.keyboard.press("Meta+Enter");
-  await tutor.getByText("That diagram has the loop.").waitFor();
-  if (!bodies[2]?.includes("diagrams/agent-loop.excalidraw")) throw new Error(`the diagram answer wasn't sent: ${bodies[2]}`);
-  // Nothing written: he is told, and nothing is sent.
-  await tutor.getByRole("button", { name: "Write it in your note" }).click();
-  await page.locator(".note-editor h2", { hasText: "Draw the stopping condition" }).waitFor();
-  await page.keyboard.press("Meta+Enter");
-  await page.getByText("Nothing written, so nothing was sent.").waitFor();
-  await tutor.waitFor();
-  if (bodies.length !== 3) throw new Error(`an empty answer was sent: ${bodies.length}`);
-  await page.unroute(/\/ore$/);
-  await page.keyboard.press("Meta+j");
-});
-
-journey("tutor Practice: Write it in your note puts the exercise in the source it was asked about, not the one open now", async (page) => {
-  await openSource(page, AGENTS);
-  const exercise = { heading: "When should an agent stop?", prompts: ["Your answer"] };
-  const replies = [
-    { reply: "Say when an agent should stop.", citations: [], general: false, hint: false, exercise, card: null },
-    { reply: "Yes: when the goal is met or a limit is hit.", citations: [], general: false, hint: false, exercise: null, card: null },
-  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }));
-  const bodies: string[] = [];
-  await page.route(/\/ore$/, async (route) => {
-    const body = route.request().postData() ?? "";
-    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
-    bodies.push(body);
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
-  });
-  await page.keyboard.press("Meta+j");
-  const tutor = page.getByRole("complementary", { name: "Tutor" });
-  const fresh = tutor.getByRole("button", { name: "New chat" });
-  if (await fresh.isEnabled()) await fresh.click();
-  await tutor.getByRole("button", { name: "Practice", exact: true }).click();
-  await tutor.getByRole("button", { name: "Write it in your note" }).waitFor();
-  const item = /"--item=([^"]+)"/.exec(bodies[0] ?? "")?.[1];
-  if (!item) throw new Error(`no source on the exercise: ${bodies[0]}`);
-  await openSource(page, TESTING);
-  await tutor.getByRole("button", { name: "Write it in your note" }).click();
-  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor(); // back on the exercise's source
-  await page.locator(".note-editor h2", { hasText: exercise.heading }).waitFor();
-  await page.keyboard.type("When the goal is met.");
-  await page.keyboard.press("Meta+Enter");
-  await tutor.getByText("Yes: when the goal is met or a limit is hit.").waitFor();
-  if (!bodies[1]?.includes("When the goal is met.") || !bodies[1].includes(`"--item=${item}"`)) throw new Error(`the answer went with another source: ${bodies[1]}`);
-  await page.unroute(/\/ore$/);
-  await page.keyboard.press("Meta+j");
-});
-
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).
@@ -2254,6 +2163,98 @@ journey("settle: closing a typed highlight lifts the popup away, pops its mark a
   await page.locator(".mark-icon.question").first().click();
   await popup.getByRole("button", { name: "Remove highlight" }).click();
   await page.waitForTimeout(500); // the write lands before the next journey reads the library
+});
+
+// Last: they add headings and a diagram to AGENTS' note, which earlier journeys lay out.
+journey("tutor Practice: an answer under a renamed heading, and a diagram-only answer, both reach the tutor; an empty one says so", async (page) => {
+  await openSource(page, AGENTS);
+  const exercise = (heading: string) => ({ heading, prompts: ["Your answer"] });
+  const reply = (r: string, ex: ReturnType<typeof exercise> | null) => ({ reply: r, citations: [], general: false, hint: false, exercise: ex, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } });
+  const replies = [
+    reply("Name the loop an agent runs.", exercise("What loop does an agent run?")),
+    reply("Good. Now draw it.", exercise("Draw the agent loop")),
+    reply("That diagram has the loop.", exercise("Draw the stopping condition")),
+    reply("Fine.", null),
+  ];
+  const bodies: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    bodies.push(body);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click();
+  await tutor.getByRole("button", { name: "Practice", exact: true }).click();
+  // A written answer under a heading he renamed.
+  await tutor.getByRole("button", { name: "Write it in your note" }).click();
+  await page.locator(".note-editor h2", { hasText: "What loop does an agent run?" }).waitFor();
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowRight" : "End");
+  await page.keyboard.type(" (my words)");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.type("It acts, observes the result and decides again.");
+  await page.keyboard.press("Meta+Enter");
+  await tutor.getByText("Good. Now draw it.").waitFor();
+  if (!bodies[1]?.includes("It acts, observes the result and decides again.")) throw new Error(`the renamed heading's answer wasn't sent: ${bodies[1]}`);
+  // An answer that is only a diagram.
+  await tutor.getByRole("button", { name: "Write it in your note" }).click();
+  await page.locator(".note-editor h2", { hasText: "Draw the agent loop" }).waitFor();
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", "![Diagram](diagrams/agent-loop.excalidraw)");
+    const at = getSelection()!.anchorNode!;
+    (at instanceof Element ? at : at.parentElement!).dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await until("the diagram is in the note", async () => (await page.locator(".note-editor .note-diagram").count()) > 0);
+  await page.keyboard.press("Meta+Enter");
+  await tutor.getByText("That diagram has the loop.").waitFor();
+  if (!bodies[2]?.includes("diagrams/agent-loop.excalidraw")) throw new Error(`the diagram answer wasn't sent: ${bodies[2]}`);
+  // Nothing written: he is told, and nothing is sent.
+  await tutor.getByRole("button", { name: "Write it in your note" }).click();
+  await page.locator(".note-editor h2", { hasText: "Draw the stopping condition" }).waitFor();
+  await page.keyboard.press("Meta+Enter");
+  await page.getByText("Nothing written, so nothing was sent.").waitFor();
+  await tutor.waitFor();
+  if (bodies.length !== 3) throw new Error(`an empty answer was sent: ${bodies.length}`);
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
+journey("tutor Practice: Write it in your note puts the exercise in the source it was asked about, not the one open now", async (page) => {
+  await openSource(page, AGENTS);
+  const exercise = { heading: "When should an agent stop?", prompts: ["Your answer"] };
+  const replies = [
+    { reply: "Say when an agent should stop.", citations: [], general: false, hint: false, exercise, card: null },
+    { reply: "Yes: when the goal is met or a limit is hit.", citations: [], general: false, hint: false, exercise: null, card: null },
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }));
+  const bodies: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    bodies.push(body);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click();
+  await tutor.getByRole("button", { name: "Practice", exact: true }).click();
+  await tutor.getByRole("button", { name: "Write it in your note" }).waitFor();
+  const item = /"--item=([^"]+)"/.exec(bodies[0] ?? "")?.[1];
+  if (!item) throw new Error(`no source on the exercise: ${bodies[0]}`);
+  await openSource(page, TESTING);
+  await tutor.getByRole("button", { name: "Write it in your note" }).click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor(); // back on the exercise's source
+  await page.locator(".note-editor h2", { hasText: exercise.heading }).waitFor();
+  await page.keyboard.type("When the goal is met.");
+  await page.keyboard.press("Meta+Enter");
+  await tutor.getByText("Yes: when the goal is met or a limit is hit.").waitFor();
+  if (!bodies[1]?.includes("When the goal is met.") || !bodies[1].includes(`"--item=${item}"`)) throw new Error(`the answer went with another source: ${bodies[1]}`);
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
 });
 
 // —— run ——
