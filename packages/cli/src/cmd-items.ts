@@ -14,7 +14,7 @@ import {
   enrichError, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, loadSkills, readNotes, openLibrary, setSkillLook, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter,
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -202,7 +202,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   highlight: {
-    usage: '<item> --exact "<text>" --intent keep|card|question [--note n] [--start N] | <item> --at N --note "<line>" [--intent card|question]   --at: a card (or question) from a line he typed with nothing selected, anchored at the sentence around offset N',
+    usage: '<item> --exact "<text>" --intent keep|card|question|apply [--note n] [--start N] | <item> --at N --note "<line>" [--intent card|question]   --at: a card (or question) from a line he typed with nothing selected, anchored at the sentence around offset N',
     options: { exact: { type: "string" }, intent: { type: "string" }, note: { type: "string" }, start: { type: "string" }, at: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
@@ -275,6 +275,40 @@ export const itemCommands: Record<string, Command> = {
       const { question, item } = await answerQuestion(lib, need(ref, "<question>"), { text: str(f.text), item: str(f.item), quote: str(f.quote), done: !!f.done, card: !!f.card, remove: str(f.remove) });
       const enrich = f.card ? startEnrich(lib, item.meta.id) : "skipped";
       return { data: { ...question, enrich }, text: `Question ${question.id}: ${question.status === "done" ? "answered" : "open"}, ${question.answers?.length ?? 0} contribution(s)${f.card ? `; card draft ${enrich}` : ""}` };
+    },
+  },
+
+  tries: {
+    usage: "[--skill s]   techniques he plans to try on his own work (Apply highlights, D127), to try first, with his plan and, once tried, how it went",
+    options: { skill: { type: "string" } },
+    async run(_, f) {
+      const lib = openLibrary();
+      if (f.skill && !loadSkills(lib).skills.some((s) => s.id === f.skill)) throw new Error(`unknown skill "${f.skill}"`);
+      const data = listTries(lib, { skill: str(f.skill) });
+      const text = data.length
+        ? data
+            .map((t) =>
+              [
+                `${t.id}  ${t.status === "done" ? "tried " : "to try"}  ${t.item_title}`,
+                `    "${t.exact.replace(/\s+/g, " ")}"`,
+                ...(t.note ? [`    plan: ${t.note}`] : []),
+                ...(t.reflection ? [`    how it went: ${t.reflection}`] : []),
+              ].join("\n"),
+            )
+            .join("\n")
+        : "Nothing to try.";
+      return { data, text };
+    },
+  },
+
+  tried: {
+    usage: '<try> [--text "<how it went>"] [--undo]   check off a try (D127); with --text, a card is drafted from how it went in the background; --undo puts it back to try',
+    options: { text: { type: "string" }, undo: { type: "boolean" } },
+    async run([ref], f) {
+      const lib = openLibrary();
+      const { tried, item, card } = await markTried(lib, need(ref, "<try>"), { reflection: str(f.text), undo: !!f.undo });
+      const enrich = card ? startEnrich(lib, item.meta.id) : "skipped";
+      return { data: { ...tried, enrich }, text: `Try ${tried.id}: ${tried.status === "done" ? "tried" : "to try"}${card ? `; card draft ${enrich}` : ""}` };
     },
   },
 

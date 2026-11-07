@@ -24,6 +24,8 @@
   --keep: rgba(255, 190, 20, 0.3); /* gold, not olive: plain yellow at low alpha turns olive on near-black */
   --card: rgba(96, 165, 250, 0.32);
   --question: rgba(192, 132, 252, 0.32);
+  --apply: rgba(95, 207, 138, 0.26); /* D127: a try, the old Research green */
+  --apply-solid: #5fcf8a;
   --keep-solid: #e8c24a;
   --card-solid: #6aa8f7;
   --question-solid: #b98af5;
@@ -647,6 +649,7 @@ img.thumb { filter: brightness(0.86); }
 /* D124: a key point is blue so it never reads as a plain highlight; its star in the margin says it comes back. */
 ::highlight(hl-card) { background-color: var(--card); color: var(--text); }
 ::highlight(hl-question) { background-color: var(--question); color: var(--text); }
+::highlight(hl-apply) { background-color: var(--apply); color: var(--text); }
 ::highlight(hl-active), ::highlight(hl-lookup) { text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 4px; }
 
 /* Light reading page (D26, reading.ts): Apple Books' White theme for the source pane only; the sidebar
@@ -673,6 +676,8 @@ img.thumb { filter: brightness(0.86); }
   --keep: rgba(250, 204, 21, 0.4);
   --card: rgba(96, 165, 250, 0.3);
   --question: rgba(192, 132, 252, 0.28);
+  --apply: rgba(34, 170, 90, 0.24);
+  --apply-solid: #17884a;
   --keep-solid: #a87c00;
   --card-solid: #2668c9;
   --question-solid: #8443d6;
@@ -692,6 +697,7 @@ img.thumb { filter: brightness(0.86); }
 :root[data-page="light"] .reader-pane ::highlight(hl-keep) { background-color: rgba(250, 204, 21, 0.4); color: #17181b; }
 :root[data-page="light"] .reader-pane ::highlight(hl-card) { background-color: rgba(96, 165, 250, 0.3); color: #17181b; }
 :root[data-page="light"] .reader-pane ::highlight(hl-question) { background-color: rgba(192, 132, 252, 0.28); color: #17181b; }
+:root[data-page="light"] .reader-pane ::highlight(hl-apply) { background-color: rgba(34, 170, 90, 0.24); color: #17181b; }
 :root[data-page="light"] .reader-pane ::highlight(hl-active) { text-decoration-color: #5b5e66; }
 :root[data-page="light"] .reader-pane ::highlight(hl-spoken) { color: #17181b; }
 :root[data-page="light"] .reader-pane ::highlight(find) { background-color: rgba(255, 166, 87, 0.4); color: #17181b; }
@@ -712,6 +718,7 @@ img.thumb { filter: brightness(0.86); }
 /* Each type keeps its colour on the icon; the chosen one fills with the same tint it paints in the text. */
 .intent.keep { --hue: var(--keep-solid); --tint: var(--keep); } .intent.card { --hue: var(--card-solid); --tint: var(--card); }
 .intent.question { --hue: var(--question-solid); --tint: var(--question); }
+.intent.apply { --hue: var(--apply-solid); --tint: var(--apply); }
 .intent svg { color: var(--hue, currentColor); flex: none; }
 .intent.on { color: var(--text); background: var(--tint); }
 .popup .field { grid-column: 1; min-width: 0; align-self: start; min-height: 30px; max-height: 160px; padding: 5px 10px; line-height: 1.4; }
@@ -1033,6 +1040,7 @@ body.resizing iframe { pointer-events: none; }
 .cp-toggle[aria-expanded="true"] .cp-caret { transform: rotate(90deg); }
 .cp-head.card svg:not(.cp-caret) { color: var(--card-solid); }
 .cp-head.question svg:not(.cp-caret) { color: var(--question-solid); }
+.cp-head.apply svg:not(.cp-caret) { color: var(--apply-solid); }
 .cp-head.keep svg:not(.cp-caret) { color: var(--keep-solid); }
 .cp-count { margin-left: 6px; font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .cp-row { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 30px; text-align: left; padding: 6px 8px; border-radius: 8px; color: var(--text); line-height: 1.4; }
@@ -1232,6 +1240,7 @@ body.resizing iframe { pointer-events: none; }
 [data-tone="note"] .card-icon { color: var(--keep-solid); }
 [data-tone="read"] .card-icon { color: var(--card-solid); }
 [data-tone="question"] .card-icon { color: var(--question-solid); }
+[data-tone="apply"] .card-icon { color: var(--apply-solid); }
 .skill-note .card-head .card-title { margin-right: auto; }
 .hero-strength { margin-left: auto; flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; text-align: left; }
 .hero-strength:hover, .hero-strength[aria-expanded="true"] { background: var(--bg-hover); }
@@ -1353,6 +1362,27 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
   .skill-col { overflow: visible; padding-bottom: 0; }
 }
 .question { padding: 2px 0; }
+/* To try (D127): a check box at the left of each try, the plan over the passage; checking one off asks how it went. */
+.try { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr); padding: 2px 0; }
+.try > :not(.try-check) { grid-column: 2; }
+.try-check { grid-row: 1; align-self: start; margin: 9px 0 0 6px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px; border: 1.5px solid var(--muted); color: var(--apply-solid); }
+.try-check:hover { border-color: var(--apply-solid); background: var(--bg-hover); }
+.try-check:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.try.done .try-check { border-color: transparent; }
+.try.done .try-check svg { animation: try-pop 180ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes try-pop { from { transform: scale(0.4); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .try.done .try-check svg { animation: none; } }
+.try-quote.question-quote { padding-left: 8px; }
+.try-quote.question-quote::before { content: none; }
+.try-quote .note { margin: 0 0 2px; color: var(--text); }
+.try-quote .exact { color: var(--text-read); }
+.try.done .try-quote .note, .try.done .try-quote .exact { color: var(--faint); }
+.try-reflection { display: block; width: 100%; text-align: left; margin: 0 0 4px; padding: 2px 8px 2px 16px; border-left: 2px solid var(--apply-solid); font-size: 13px; color: var(--text-read); line-height: 1.45; }
+.try-reflection:hover { color: var(--text); }
+.try-reflect { margin: 2px 8px 6px 8px; }
+.try-reflect .field { width: 100%; min-height: 34px; padding: 7px 10px; line-height: 1.45; }
+.skill-col.side .try .question-actions { position: absolute; top: 4px; right: 4px; margin: 0; padding: 2px; border-radius: 6px; background: var(--bg-raised); border: 1px solid var(--border); visibility: hidden; }
+.skill-col.side .try:hover .question-actions, .skill-col.side .try:focus-within .question-actions { visibility: visible; }
 .question-quote { position: relative; display: block; width: 100%; text-align: left; padding: 7px 8px 7px 34px; border-radius: 8px; }
 .question-quote::before {
   content: "?"; position: absolute; left: 8px; top: 8px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
@@ -1858,6 +1888,7 @@ button.home-plan:hover { color: var(--text); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).keep { --hue: var(--keep-solid); --tint: var(--keep); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).card { --hue: var(--card-solid); --tint: var(--card); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).question { --hue: var(--question-solid); --tint: var(--question); }
+:is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).apply { --hue: var(--apply-solid); --tint: var(--apply); }
 .collected-chip {
   position: relative; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px;
   color: var(--text-read); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums;
@@ -2039,7 +2070,7 @@ button.home-plan:hover { color: var(--text); }
 }
 .mark-icon:hover { opacity: 1; background: var(--bg-hover); }
 .mark-icon.keep { --hue: var(--keep-solid); } .mark-icon.card { --hue: var(--card-solid); }
-.mark-icon.question { --hue: var(--question-solid); }
+.mark-icon.question { --hue: var(--question-solid); } .mark-icon.apply { --hue: var(--apply-solid); }
 .mark-icon.evidence { --hue: var(--c-orange); opacity: 0.8; }
 
 /* Read by screen readers, never shown. */
@@ -2099,6 +2130,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .touch-highlight .keep svg { color: var(--keep-solid); }
 .touch-highlight .card svg { color: var(--card-solid); }
 .touch-highlight .question svg { color: var(--question-solid); }
+.touch-highlight .apply svg { color: var(--apply-solid); }
 /* Today on the phone (Tyler's pick of A/B, 2026-10-31): sections are a label over a rule, never framed, and skills
    are list rows, as in Books and Settings, so a screen shows the day's work and every skill. */
 .phone .home-today { border: 0; padding: 12px 0 0; }
@@ -2146,7 +2178,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .grab-edge::after { content: ""; position: absolute; left: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--hue); }
 .grab-edge.start::after { top: -9px; }
 .grab-edge.end::after { bottom: -9px; }
-.grab-edge.keep { --hue: var(--keep-solid); } .grab-edge.card { --hue: var(--card-solid); } .grab-edge.question { --hue: var(--question-solid); }
+.grab-edge.keep { --hue: var(--keep-solid); } .grab-edge.card { --hue: var(--card-solid); } .grab-edge.question { --hue: var(--question-solid); } .grab-edge.apply { --hue: var(--apply-solid); }
 .grab-edge:active, body:has(.grab-edge:active) { cursor: grabbing; }
 .phone .marks { display: none; }
 .phone .grab-edge::before { inset: -16px -16px; }

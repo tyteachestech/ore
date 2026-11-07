@@ -13,6 +13,7 @@ const NO_CONTROL: Record<string, string> = {
   questions: "opens the Collected tab with the open passage as his answer's quote; the tab itself shows C (collected)",
   keep: "Hint keys={i} on the highlight popup's intent buttons",
   question: "Hint keys={i} on the highlight popup's intent buttons",
+  apply: "Hint keys={i} on the highlight popup's intent buttons",
   "mark-read": "label(keys[\"mark-read\"]) on the Feed row menu's Mark read / unread item",
   note: "no control; Tab moves into the popup's note field",
   "block-up": "label(keymap[\"block-up\"]) beside Move up in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",

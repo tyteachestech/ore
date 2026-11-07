@@ -69,6 +69,22 @@ export const PixelStar = sprite([
   ".#........#.",
 ]);
 
+/** Try it (D127): a box with a check, the try he checks off once he has done it. */
+export const PixelTry = sprite([
+  "..........##",
+  ".........##.",
+  "#######.##..",
+  "#.....###...",
+  "#.#..###...#",
+  "#.##.##....#",
+  "#..###.....#",
+  "#...#......#",
+  "#..........#",
+  "#..........#",
+  "############",
+  "............",
+]);
+
 /** Your note: a spiral notepad with written lines. */
 export const PixelNote = sprite([
   "..#.#.#.#...",

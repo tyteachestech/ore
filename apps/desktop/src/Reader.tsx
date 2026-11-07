@@ -57,6 +57,7 @@ const PLACEHOLDER: Record<Intent, string> = {
   keep: "Note…",
   card: "This works because…",
   question: "My question / my guess…",
+  apply: "I'll try this on…",
 };
 
 // Raw HTML never renders (skipHtml): documents come from the web and this webview can run `ore`.
@@ -650,7 +651,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       const r = rangeFor(index, { ...a, start: a.anchor?.start ?? a.start }, body.length);
       if (r) map.set(a.id, r);
     }
-    const by: Record<Intent, Range[]> = { keep: [], card: [], question: [] };
+    const by: Record<Intent, Range[]> = { keep: [], card: [], question: [], apply: [] };
     const painted: { a: Annotation; r: Range }[] = [];
     for (const a of anns) {
       const r = map.get(a.id);
@@ -1142,7 +1143,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!popup) return;
     const now = annsRef.current.find((a) => a.id === popup.id)?.intent;
     const intent = want !== "keep" && want === now ? "keep" : want;
-    if (intent === "card") noteRef.current?.focus();
+    if (intent === "card" || intent === "apply") noteRef.current?.focus();
     await setIntentOf(popup.id, intent);
   }
 

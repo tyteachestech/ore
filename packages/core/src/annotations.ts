@@ -7,7 +7,7 @@ import { findItem, itemDirs, listItems, updateItemMeta, type Item } from "./item
 import type { Library } from "./library.ts";
 import { anchor, locate, quoteSelector, type Anchor } from "./anchoring.ts";
 
-export const Intent = z.enum(["keep", "card", "question"]);
+export const Intent = z.enum(["keep", "card", "question", "apply"]);
 export type Intent = z.infer<typeof Intent>;
 
 // deleted: a removed highlight. Hidden from reads, index, anchoring and drafting.
@@ -34,6 +34,7 @@ export const AnnotationSchema = z.object({
   status: AnnotationStatus,
   answers: z.array(Contribution).optional(), // Question intent only (D75)
   card: z.boolean().optional(), // Question intent: "Answered + card", so enrich drafts a card from his answer
+  reflection: z.string().optional(), // Apply intent (D127): how it went, written when he checked it off
   // A card or question he typed with nothing selected ("Card here"): `exact` is only the sentence where he
   // was; the note is what counts, and a card is drafted from it and the whole source, with quotes.
   point: z.boolean().optional(),
@@ -149,7 +150,7 @@ export function isQuestionOnly(item: Item): boolean {
   return all.length > 0 && all.every((a) => a.intent === "question");
 }
 
-export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card">>;
+export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection">>;
 
 // Edits never rewrite history: they append the same id with rev + 1.
 export function reviseAnnotation(item: Item, current: Annotation, patch: AnnotationPatch): Annotation {
