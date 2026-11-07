@@ -196,6 +196,12 @@ journey("Collected row menu: change a highlight's type and remove it without ope
   // At once: the remove is the newest step on the history as soon as the row goes.
   await page.keyboard.press("Meta+z");
   await until("⌘Z brings it back", async () => (await count()) === before);
+  // Leave the library as it was for the journeys after this one.
+  await page.waitForTimeout(300);
+  await row().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Remove highlight" }).click();
+  await until("it is gone again", async () => (await count()) === before - 1);
+  await page.waitForTimeout(500); // the write lands before the next journey reads the library
 });
 
 journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {
