@@ -182,9 +182,10 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
                   </button>
                 </Hint>
               )}
+              {/* It opens Review settings, not where ⌘, opens, so it shows no shortcut. */}
               {onSettings && (
-                <Hint text="Settings" keys="settings">
-                  <button className="home-gear" aria-label="Settings" onClick={onSettings}>
+                <Hint text="Review settings">
+                  <button className="home-gear" aria-label="Review settings" onClick={onSettings}>
                     <GearSix size={16} aria-hidden="true" />
                   </button>
                 </Hint>

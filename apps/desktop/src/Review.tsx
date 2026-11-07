@@ -403,13 +403,18 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     try {
       await ore("card", "retire", card.id);
       const { id, state } = card;
-      notify(entry?.state === "draft" ? "Card deleted" : "Card retired", "info", () => {
-        if (state === "retired") return;
-        ore("card", "restore", id, opt("state", state)).then(
-          () => notify("Card restored. It comes back in a later review."),
-          (e) => notify(errorText(e), "error"),
-        );
-      });
+      notify(
+        entry?.state === "draft" ? "Card deleted" : "Card retired",
+        "info",
+        () => {
+          if (state === "retired") return;
+          ore("card", "restore", id, opt("state", state)).then(
+            () => notify("Card restored. It comes back in a later review."),
+            (e) => notify(errorText(e), "error"),
+          );
+        },
+        () => void ore("card", "retire", id).catch((e) => notify(errorText(e), "error")),
+      );
       advance(false);
     } catch (e) {
       notify(errorText(e), "error");
@@ -429,9 +434,12 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       reset();
       setCard(original);
       shownAt.current = Date.now();
-      notify("Dropped that version. Here’s the original.", "info", () => {
-        ore("variant", "restore", id, variant).catch((e) => notify(errorText(e), "error"));
-      });
+      notify(
+        "Dropped that version. Here’s the original.",
+        "info",
+        () => void ore("variant", "restore", id, variant).catch((e) => notify(errorText(e), "error")),
+        () => void ore("variant", "reject", id, variant).catch((e) => notify(errorText(e), "error")),
+      );
     } catch (e) {
       notify(errorText(e), "error");
     } finally {

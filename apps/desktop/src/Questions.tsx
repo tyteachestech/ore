@@ -1,9 +1,10 @@
 import { Plus, X } from "./icons";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction } from "react";
 import { Grow } from "./Grow";
+import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
-import { ore, opt, type Annotation, type Question } from "./ore";
+import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
 import { errorText, useFocusWhileMounted, type Notify } from "./util";
 
 // D75: answering a question where the answer turns up. One answer model on the skill page and in the
@@ -22,7 +23,8 @@ export function typedQuestion(q: Pick<Question, "exact" | "item_title">): boolea
   return title === q.item_title;
 }
 
-type Saved = { question: Annotation & { answers?: Question["answers"] }; added?: string };
+/** `again` is the call that saved it, run again by ⇧⌘Z after an undo. */
+type Saved = { question: Annotation & { answers?: Question["answers"] }; added?: string; again?: string[] };
 
 /** Unsent answers, per question, kept when the box closes (as the finish quiz keeps its draft). */
 const drafts = new Map<string, string>();
@@ -67,7 +69,7 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
       drafts.delete(q.id);
       setTextState("");
       setBusy(false);
-      onSaved({ question, added: t ? question.answers?.at(-1)?.ts : undefined }, how);
+      onSaved({ question, added: t ? question.answers?.at(-1)?.ts : undefined, again: args }, how);
     } catch (e) {
       notify(errorText(e), "error");
       setBusy(false);
@@ -132,21 +134,88 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
 
 /** The toast and its Undo after a save from AnswerBox. */
 export function announce(q: Question, s: Saved, how: "contribution" | "done" | "card", notify: Notify, onUndone: () => void) {
+  // The piece he added: a redo adds it again under a new time, which the next undo removes.
+  let added = s.added;
   const undo = async () => {
     try {
       if (how !== "contribution") await ore("annotate", q.id, "--status", q.status);
-      if (s.added) await ore("answer", q.id, opt("remove", s.added));
+      if (added) await ore("answer", q.id, opt("remove", added));
       onUndone();
     } catch (e) {
       notify(errorText(e), "error");
     }
   };
-  notify(how === "contribution" ? "Added to your answer" : how === "card" ? "Answered. A card is on its way" : "Answered", "info", () => void undo());
+  const redo = async () => {
+    try {
+      const r = await ore<Saved["question"]>(...s.again!);
+      if (added) added = r.answers?.at(-1)?.ts;
+      onUndone();
+    } catch (e) {
+      notify(errorText(e), "error");
+    }
+  };
+  notify(how === "contribution" ? "Added to your answer" : how === "card" ? "Answered. A card is on its way" : "Answered", "info", () => void undo(), s.again ? () => void redo() : undefined);
+}
+
+/** Mark answered / Reopen and Delete on a list of questions, the same on the skill page and in the
+ *  reader. Status goes on the history quietly (Things: completing a to-do is undoable); delete shows
+ *  its toast with Undo, and Undo puts it back where it was. */
+export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | null>>, notify: Notify) {
+  const setStatus = useCallback(
+    async (q: Question, status: "open" | "done", undoable = true) => {
+      setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, status } : x)));
+      const was = q.status === "done" ? "done" : "open";
+      const forget = undoable
+        ? notify(status === "done" ? "Marked answered" : "Reopened", "quiet", () => void setStatus({ ...q, status }, was, false), () => void setStatus(q, status, false))
+        : null;
+      try {
+        await ore("annotate", q.id, "--status", status);
+      } catch (e) {
+        forget?.();
+        setQs((l) => l && l.map((x) => (x.id === q.id ? q : x)));
+        notify(errorText(e), "error");
+      }
+    },
+    [notify, setQs],
+  );
+  const remove = useCallback(
+    async (q: Question) => {
+      let at = -1;
+      const back = () => setQs((l) => l && [...l.slice(0, at < 0 ? l.length : at), q, ...l.slice(at < 0 ? l.length : at)]);
+      setQs((l) => {
+        at = l ? l.findIndex((x) => x.id === q.id) : -1;
+        return l && l.filter((x) => x.id !== q.id);
+      });
+      // On the history at once, so a ⌘Z pressed before the write lands still takes it back, after it.
+      const write = ore("annotate", q.id, "--status", "deleted");
+      const forget = notify(
+        "Question deleted",
+        "info",
+        () => {
+          back();
+          write.catch(() => {}).then(() => ore("annotate", q.id, "--status", q.status)).catch((e) => notify(errorText(e), "error"));
+        },
+        () => {
+          setQs((l) => l && l.filter((x) => x.id !== q.id));
+          ore("annotate", q.id, "--status", "deleted").catch((e) => notify(errorText(e), "error"));
+        },
+      );
+      try {
+        await write;
+      } catch (e) {
+        forget?.();
+        back();
+        notify(errorText(e), "error");
+      }
+    },
+    [notify, setQs],
+  );
+  return { setStatus, remove };
 }
 
 /** Types a question in place, like a new skill in the sidebar: Enter saves it as a question snippet
  *  filed under these skills (as Raycast's Capture Question does), Esc or clicking away drops it. */
-export function AskQuestion({ skills, onDone }: { skills: string[]; onDone: (added: boolean) => void }) {
+export function AskQuestion({ skills, onDone, notify }: { skills: string[]; onDone: (added: boolean) => void; notify: Notify }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -154,8 +223,11 @@ export function AskQuestion({ skills, onDone }: { skills: string[]; onDone: (add
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      await ore("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
+      const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
       onDone(true);
+      // Asking goes on the history: ⌘Z takes the question back, ⇧⌘Z asks it again.
+      const set = (status: string) => void ore("annotate", r.annotation.id, "--status", status).then(() => onDone(true), (e) => notify(errorText(e), "error"));
+      notify("Question added", "quiet", () => set("deleted"), () => set("open"));
     } catch (e) {
       setError(errorText(e));
       setBusy(false);
@@ -217,6 +289,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   const [version, setVersion] = useState(0);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   const listRef = useRef<HTMLDivElement>(null);
+  const { setStatus, remove } = useQuestionEdits(setQs, notify);
   useEffect(() => void (ask && setAsking(true)), [ask]);
 
   useEffect(() => {
@@ -265,12 +338,25 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
     const match = q.matches.find((m) => m.item === item);
     const done = q.status === "done";
     const fromHere = q.answers.filter((c) => c.item === item).length;
+    // The same actions as the links under it, in the ⋯ and right-click menus; delete last (as on the skill page).
+    const actions: MenuAction[] = [
+      ...(done ? [] : [{ id: "answer", label: "Answer…", run: () => setOpen(q.id) }]),
+      ...(match?.quote ? [{ id: "jump", label: "Jump to the passage", run: () => onJumpQuote({ quote: match.quote!, start: match.start }) }] : []),
+      ...(q.here === "from" ? [{ id: "asked", label: "Show where it was asked", run: () => onJumpHighlight(q.id) }] : []),
+      ...(match && !done ? [{ id: "dismiss", label: "Not answered here", run: () => void dismiss(q) }] : []),
+      { id: "status", label: done ? "Reopen" : "Mark answered", run: () => void setStatus(q, done ? "open" : "done") },
+      { id: "delete", label: "Delete question", danger: true, divider: true, run: () => void remove(q) },
+    ];
     return (
-      <div key={q.id} className={`qp-q${open === q.id ? " open" : ""}${done ? " done" : ""}`}>
-        <button className="qp-row" data-q={q.id} aria-expanded={open === q.id} onClick={() => setOpen(open === q.id ? null : q.id)} disabled={done}>
-          <span className="qp-icon" aria-hidden="true">?</span>
-          <span className="qp-text">{questionText(q)}</span>
-        </button>
+      <WithMenu key={q.id} actions={PHONE ? [] : actions}>
+      <div className={`qp-q${open === q.id ? " open" : ""}${done ? " done" : ""}`}>
+        <div className="qp-line">
+          <button className="qp-row" data-q={q.id} aria-expanded={open === q.id} onClick={() => setOpen(open === q.id ? null : q.id)} disabled={done}>
+            <span className="qp-icon" aria-hidden="true">?</span>
+            <span className="qp-text">{questionText(q)}</span>
+          </button>
+          {!PHONE && <MoreButton label="Question actions" actions={actions} />}
+        </div>
         <div className="qp-sub">
           {match?.quote && (
             <button className="qp-link" onClick={() => onJumpQuote({ quote: match.quote!, start: match.start })}>
@@ -308,6 +394,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
           />
         )}
       </div>
+      </WithMenu>
     );
   };
 
@@ -343,6 +430,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
         {asking && (
           <AskQuestion
             skills={skills.map((s) => s.id)}
+            notify={notify}
             onDone={(added) => {
               setAsking(false);
               if (added) reload();
