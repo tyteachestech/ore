@@ -55,11 +55,13 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
 }) {
   const [open, setOpen] = useState(startOpen);
   const [query, setQuery] = useState("");
-  // Ticks made while open show at once and build on each other, before the list refreshes.
+  // Ticks made while open show at once and build on each other; whenever the skills it is given change
+  // (a save landing, or one that failed and was taken back), it shows those, open or not.
   const [sel, setSel] = useState(value);
+  const given = value.join(",");
   useEffect(() => {
-    if (!open) setSel(value);
-  }, [open, value]);
+    setSel(given ? given.split(",") : []);
+  }, [open, given]);
   // The skills it had when it opened come first (Linear's labels), so they are seen at once; the order
   // holds while it is open, so a row never jumps out from under the pointer, and re-sorts next time.
   const [first, setFirst] = useState(value);
@@ -133,6 +135,12 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
     </Popover.Root>
   );
 }
+
+/** `now` with the one change from `before` to `next` taken back, keeping any made since (a failed save's rollback). */
+export const unfile = (now: string[], next: string[], before: string[]) => [
+  ...now.filter((s) => before.includes(s) || !next.includes(s)),
+  ...before.filter((s) => !next.includes(s) && !now.includes(s)),
+];
 
 /** `skills` with the `first` ids ahead of the rest, each part keeping its sidebar order. */
 export const skillsFirst = (skills: Skill[], first: string[]): Skill[] => [

@@ -175,12 +175,13 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   const busy = turns.some((t) => t.reply === undefined && !t.error);
   const { width, dragging, divider } = useSideWidth("ore.tutorwidth", 380, 300);
 
-  const send = (text: string) => {
+  /** `typed`: the message is what is in the box, so the box empties; a starter or Show me leaves his draft. */
+  const send = (text: string, typed = false) => {
     const message = text.trim();
     if (!message || busy) return;
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
     chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}) });
-    setDraft(() => ({ input: "", mentions: [] }));
+    if (typed) setDraft(() => ({ input: "", mentions: [] }));
     setAt(null);
     field.current?.focus();
   };
@@ -386,11 +387,11 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
               }
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                send(input);
+                send(input, true);
               }
             }}
           />
-          <button className="ask-send" aria-label="Send" disabled={!input.trim() || busy} onClick={() => send(input)}>
+          <button className="ask-send" aria-label="Send" disabled={!input.trim() || busy} onClick={() => send(input, true)}>
             <ArrowUp size={14} aria-hidden="true" />
           </button>
         </div>
