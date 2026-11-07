@@ -591,6 +591,17 @@ journey("diagram: draws beside the source, and a new one stays linked when the p
   await page.locator(".diagram:not(.docked)").waitFor();
   await page.keyboard.press("Escape");
   await until("Esc closes it", async () => (await page.locator(".diagram").count()) === 0);
+  // Its preview's right-click menu opens it, and takes it out of the note; ⌘Z puts it back.
+  await page.locator(".note-editor .note-diagram").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Open diagram" }).click();
+  await page.locator(".diagram").waitFor(); // full window still, as it was left
+  await page.keyboard.press("Escape");
+  await until("Esc closes it again", async () => (await page.locator(".diagram").count()) === 0);
+  await page.locator(".note-editor .note-diagram").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Remove from note" }).click();
+  await until("it leaves the note", async () => (await page.locator(".note-editor .note-diagram").count()) === 0);
+  await page.keyboard.press("ControlOrMeta+z");
+  await until("⌘Z puts it back", async () => (await page.locator(".note-editor .note-diagram").count()) === 1);
 });
 
 journey("diagram: S styles at the pointer, keys stay on the canvas, Space never sticks, and Esc closes only the drawing", async (page) => {
