@@ -478,12 +478,16 @@ export function App() {
   const addTo = !openId && skill && skills.some((s) => s.id === skill) ? skill : null;
 
   const files = (paths: string[]): Entry[] => paths.map((path) => ({ kind: "file", path }));
+  /** The files he picks in the system's Open panel; none when he cancels. */
+  const chooseFiles = useCallback(async () => {
+    const picked = await openDialog({ multiple: true, directory: false, filters: [{ name: "Sources", extensions: FILE_TYPES }] });
+    return picked === null ? [] : Array.isArray(picked) ? picked : [picked];
+  }, []);
   const pickFiles = useCallback(async () => {
     setAdding(false);
-    const picked = await openDialog({ multiple: true, directory: false, filters: [{ name: "Sources", extensions: FILE_TYPES }] });
-    const paths = picked === null ? [] : Array.isArray(picked) ? picked : [picked];
+    const paths = await chooseFiles();
     if (paths.length) await addSources(files(paths), addTo ? [addTo] : [], true, true);
-  }, [addSources, addTo]);
+  }, [addSources, addTo, chooseFiles]);
 
   // Dropping files: onto a skill in the sidebar files them there; anywhere else, under the open skill
   // page or in All sources. The webview gets no DOM drag events for files, so the target is found from the
@@ -2137,7 +2141,7 @@ export function App() {
           onCreate={createSkill}
           onAdd={(list, to, toastError) => addSources(list, to, toastError)}
           onFollow={followFeed}
-          onPickFiles={() => void pickFiles()}
+          onPickFiles={chooseFiles}
           onClose={() => setAdding(false)}
           notify={notify}
         />

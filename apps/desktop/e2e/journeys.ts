@@ -100,6 +100,20 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("add: File keeps what he typed in the box; cancelling the picker keeps it too, and picked files join it", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByLabel("Link, file path or text");
+  await box.fill("https://example.com/a-link");
+  await page.getByRole("button", { name: "File", exact: true }).click();
+  await page.waitForTimeout(200);
+  if ((await box.inputValue()) !== "https://example.com/a-link") throw new Error("cancelling the picker lost the box"); // cancelled: the box and its text stay
+  await page.evaluate(() => ((window as unknown as { __ORE_PICK: string[] }).__ORE_PICK = ["/tmp/paper.pdf"]));
+  await box.focus();
+  await page.keyboard.press("Meta+o");
+  await until("the picked file joins the box", async () => (await box.inputValue()) === "https://example.com/a-link\n/tmp/paper.pdf");
+  await page.keyboard.press("Escape");
+});
+
 journey("PDF footnote: its mark shows the note on hover, and bold stays bold", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill(join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/hazards.pdf"));

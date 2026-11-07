@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { feedProof, type FoundFeed } from "./Feed";
 import { Hint } from "./Hint";
+import { is } from "./keys";
 import { SkillIcon } from "./IconPicker";
 import { ore, type Skill } from "./ore";
 import { copiedFiles, pastesFiles, takeCopied } from "./copied";
@@ -90,7 +91,8 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   onAdd: (list: Entry[], skills: string[], toastError: boolean) => Promise<{ failure: string | null; failed: Entry[]; cancelled: boolean }>;
   /** Follows the feed behind a link (Feed); why it failed, or null. */
   onFollow: (url: string, skills: string[]) => Promise<string | null>;
-  onPickFiles: () => void;
+  /** Opens the system's file panel: the files picked, none on Cancel. */
+  onPickFiles: () => Promise<string[]>;
   onClose: () => void;
   /** Says why an add failed after the box was closed while it ran (Esc mid-add). */
   notify: Notify;
@@ -125,6 +127,17 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
     setBusy(false);
     if (!why) return onClose();
     setError(why);
+  };
+
+  /** Picked files join the box as pasted ones do, so his text and skills stay and ↵ adds them all. */
+  const pickFiles = async () => {
+    const paths = await onPickFiles();
+    if (!open.current) return;
+    if (paths.length) {
+      setValue((v) => [v.trim(), ...paths.map((path) => entryText({ kind: "file", path }))].filter(Boolean).join("\n"));
+      setError(null);
+    }
+    ref.current?.focus();
   };
 
   const submit = async (what = list) => {
@@ -184,6 +197,11 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
               e.preventDefault();
               e.stopPropagation();
               onClose();
+            } else if (is(e.nativeEvent, "file")) {
+              // ⌘O here picks into the box, not past it (the app's ⌘O would close it).
+              e.preventDefault();
+              e.stopPropagation();
+              void pickFiles();
             }
           }}
         />
@@ -231,7 +249,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
               </button>
             </Hint>
             <Hint text="Choose a file" keys="file">
-              <button className="add-file" onClick={onPickFiles}>
+              <button className="add-file" onClick={() => void pickFiles()}>
                 <Paperclip size={13} aria-hidden="true" />
                 File
               </button>

@@ -46,6 +46,8 @@ window.__TAURI_INTERNALS__ = {
     if (cmd === "clipboard_text") return clip.text;
     // Files copied in Finder: set `window.__ORE_FILES = ["/path/a.pdf"]` before a paste that carries files.
     if (cmd === "clipboard_files") return window.__ORE_FILES ?? [];
+    // The Open panel: set `window.__ORE_PICK = ["/path/a.pdf"]` for the files he picks; unset, he cancels.
+    if (cmd === "plugin:dialog|open") return window.__ORE_PICK ?? null;
     if (cmd === "plugin:event|listen") return listeners.push({ event: args.event, handler: args.handler });
     return null;
   },
