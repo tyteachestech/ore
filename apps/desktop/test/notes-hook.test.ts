@@ -15,12 +15,15 @@ const calls: string[][] = [];
 let slow = 0;
 /** Saves (`--set`) fail while true: a full disk, a synced folder that went away. */
 let failSets = false;
+/** The next this many reads (`ore notes <id>`) fail: the CLI missing, the library folder unreachable. */
+let failReads = 0;
 (w as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
   invoke: async (_cmd: string, { args }: { args: string[] }) => {
     calls.push(args);
     if (slow) await new Promise((r) => setTimeout(r, slow));
     const [, id, set] = args;
     if (failSets && set?.startsWith("--set=")) throw "disk full";
+    if (set === undefined && failReads > 0 && failReads--) throw "library folder unreachable";
     if (set?.startsWith("--set=")) disk[id!] = set.slice(6);
     return { text: disk[id!], dir: `/lib/${id}`, merged: false };
   },
@@ -29,7 +32,7 @@ let failSets = false;
 const React = await import("react");
 const { act } = React;
 const { createRoot } = await import("react-dom/client");
-const { useSourceNote } = await import("../src/Notes");
+const { useSourceNote, NoteBody } = await import("../src/Notes");
 type Notes = ReturnType<typeof useSourceNote>;
 
 test("switching notes drops the last one's draft and loads the new one", async () => {
@@ -172,5 +175,36 @@ test("leaving a note whose save failed keeps the draft for when he comes back", 
   expect(notes.text).toBe("start, unsaved");
   await act(async () => new Promise((r) => setTimeout(r, 0)));
   expect(disk.g).toBe("start, unsaved"); // saved again once it can be
+  await act(async () => root.unmount());
+});
+
+test("a note that failed to load says so where the editor goes, and Try again loads it", async () => {
+  let notes!: Notes;
+  const toasts: string[] = [];
+  const notify = (m: string) => (toasts.push(m), () => {});
+  // Rendered only until it loads: the editor itself needs a real layout.
+  const Probe = ({ id }: { id: string }) => {
+    notes = useSourceNote(id, notify);
+    return notes.text === null ? React.createElement(NoteBody, { notes, editorRef: { current: null }, targets: [], onOpen: () => {}, placeholder: "" }) : null;
+  };
+  disk.h = "my note on h";
+  failReads = 1;
+  const el = document.createElement("div");
+  const root = createRoot(el as unknown as Element);
+  await act(async () => root.render(React.createElement(Probe, { id: "h" })));
+  await act(async () => new Promise((r) => setTimeout(r, 0)));
+  expect(notes.text).toBe(null);
+  const alert = el.querySelector('[role="alert"]');
+  expect(alert?.textContent).toContain("library folder unreachable");
+  const retry = [...el.querySelectorAll("button")].find((b) => b.textContent === "Try again");
+  expect(retry).toBeTruthy();
+  await act(async () => new Promise((r) => setTimeout(r, 20)));
+  expect(el.querySelector('[role="alert"]')).toBeTruthy(); // stays: not a toast that fades
+  await act(async () => void (retry as unknown as HTMLElement).click());
+  await act(async () => new Promise((r) => setTimeout(r, 0)));
+  expect(notes.text).toBe("my note on h");
+  expect(notes.error).toBe(null);
+  expect(disk.h).toBe("my note on h"); // a failed load never saves over the file
+  expect(toasts).toEqual([]); // said where the note goes, not in a toast that fades
   await act(async () => root.unmount());
 });
