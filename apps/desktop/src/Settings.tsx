@@ -86,29 +86,71 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     save(LAST, s);
   };
 
-  /** Shows the change at once and rolls it back if the CLI refuses it. */
-  const change = async (next: Data, run: () => Promise<unknown>) => {
-    const prev = data;
+  /** The settings as now shown, for an undo that runs after Settings has moved on. */
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  /** Shows the change at once and rolls it back if the CLI refuses it. Once it lands it goes on the
+   *  app history, so ⌘Z takes it back (and ⇧⌘Z gives it again) like any other change he makes;
+   *  those replays pass no `step`. */
+  const change = async (next: Data, run: () => Promise<unknown>, step?: { message: string; undo: () => unknown; redo: () => unknown }) => {
+    const prev = dataRef.current;
     setData(next);
+    dataRef.current = next;
     try {
       await run();
     } catch (e) {
       setData(prev);
+      dataRef.current = prev;
+      // From ⌘Z or ⇧⌘Z (no step of its own): the history says why and keeps the step.
+      if (!step) throw e;
       notify(errorText(e), "error");
+      return;
     }
+    if (step) notify(step.message, "quiet", step.undo, step.redo);
   };
-  const setGoal = (patch: Partial<Review>, flag: string, value: string) => data && change({ ...data, review: { ...data.review, ...patch } }, () => ore("goal", opt(flag, value)));
+  /** What each goal setting is called in an Undone toast. */
+  const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New cards a day", plan: "When you review", remix: "Remix cards" };
+  const setGoal = <K extends keyof Review>(key: K, flag: string, value: Review[K], record = true): Promise<void> | undefined => {
+    const d = dataRef.current;
+    if (!d) return;
+    const was = d.review[key];
+    return change({ ...d, review: { ...d.review, [key]: value } }, () => ore("goal", opt(flag, String(value))), record ? { message: `Changed “${NAMES[flag] ?? flag}”`, undo: () => setGoal(key, flag, was, false), redo: () => setGoal(key, flag, value, false) } : undefined);
+  };
 
   /** The reminder lives in skills.yaml and in a LaunchAgent that fires with the app closed (D67). */
-  const setReminder = (t: string) =>
-    data && change({ ...data, review: { ...data.review, reminder: t } }, async () => {
-      await ore("goal", opt("reminder", t || "off"));
-      // macOS refused it: put skills.yaml back, or a relaunch shows a time that never fires.
-      await invoke("set_reminder", { time: t || null }).catch(async (e) => {
-        await ore("goal", opt("reminder", data.review.reminder || "off")).catch(() => {});
-        throw new Error(`macOS didn’t take the reminder (${errorText(e)}). Pick the time again to retry.`);
-      });
-    });
+  const setReminder = (t: string, record = true): Promise<void> | undefined => {
+    const d = dataRef.current;
+    if (!d) return;
+    const was = d.review.reminder;
+    return change(
+      { ...d, review: { ...d.review, reminder: t } },
+      async () => {
+        await ore("goal", opt("reminder", t || "off"));
+        // macOS refused it: put skills.yaml back, or a relaunch shows a time that never fires.
+        await invoke("set_reminder", { time: t || null }).catch(async (e) => {
+          await ore("goal", opt("reminder", was || "off")).catch(() => {});
+          throw new Error(`macOS didn’t take the reminder (${errorText(e)}). Pick the time again to retry.`);
+        });
+      },
+      record ? { message: "Changed the reminder", undo: () => setReminder(was, false), redo: () => setReminder(t, false) } : undefined,
+    );
+  };
+  const setVendor = (v: Vendor, record = true): Promise<void> | undefined => {
+    const d = dataRef.current;
+    if (!d) return;
+    const was = { ai: d.ai, model: d.model };
+    return change({ ...d, ai: v, model: v === "claude" ? "sonnet" : "" }, async () => {
+      const r = await ore<Data>("settings", opt("ai", v));
+      setData(r);
+      dataRef.current = r;
+    }, record ? { message: "Changed the AI provider", undo: () => setVendor(was.ai, false)?.then(() => setModel(was.model, false)), redo: () => setVendor(v, false) } : undefined);
+  };
+  const setModel = (m: string, record = true): Promise<void> | undefined => {
+    const d = dataRef.current;
+    if (!d) return;
+    const was = d.model;
+    return change({ ...d, model: m }, () => ore("settings", opt("model", m)), record ? { message: "Changed the model", undo: () => setModel(was, false), redo: () => setModel(m, false) } : undefined);
+  };
 
   const { width, size, page } = useReading();
   const keys = useKeymap();
@@ -204,7 +246,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                         value={data.ai}
                         options={VENDORS}
                         disabled={!!data.ai_env}
-                        onChange={(v) => void change({ ...data, ai: v as Vendor, model: v === "claude" ? "sonnet" : "" }, async () => setData(await ore<Data>("settings", opt("ai", v))))}
+                        onChange={(v) => void setVendor(v as Vendor)}
                       />
                     </Row>
                     <Row
@@ -216,7 +258,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                         value={data.model}
                         options={modelOptions(data, models?.vendor === data.ai ? models.list : null)}
                         disabled={!!data.model_env}
-                        onChange={(v) => void change({ ...data, model: v }, () => ore("settings", opt("model", v)))}
+                        onChange={(v) => void setModel(v)}
                       />
                     </Row>
                   </Group>
@@ -247,7 +289,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                       label="Minutes a day"
                       value={String(data.review.goal_minutes)}
                       options={GOALS.map((m) => ({ id: String(m), label: String(m) }))}
-                      onChange={(v) => void setGoal({ goal_minutes: Number(v) }, "minutes", v)}
+                      onChange={(v) => void setGoal("goal_minutes", "minutes", Number(v))}
                     />
                   </Row>
                   <Row title="Weekdays only" text="Weekends never count against your week." htmlFor="weekdays">
@@ -255,7 +297,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                       id="weekdays"
                       className="switch"
                       checked={data.review.weekdays_only}
-                      onCheckedChange={(v) => void setGoal({ weekdays_only: v }, "weekdays-only", String(v))}
+                      onCheckedChange={(v) => void setGoal("weekdays_only", "weekdays-only", v)}
                     >
                       <Switch.Thumb className="switch-thumb" />
                     </Switch.Root>
@@ -265,7 +307,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                       label="New cards a day"
                       value={String(data.review.new_per_day)}
                       options={NEW.map((m) => ({ id: String(m), label: String(m) }))}
-                      onChange={(v) => void setGoal({ new_per_day: Number(v) }, "new-per-day", v)}
+                      onChange={(v) => void setGoal("new_per_day", "new-per-day", Number(v))}
                     />
                   </Row>
                 </Group>
@@ -273,7 +315,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
               {data && (
                 <Group title="Daily plan">
                   <Row title="When you review" text="Tie review to something you already do every day.">
-                    <PlanField plan={data.review.plan} onSave={(v) => void setGoal({ plan: v }, "plan", v)} />
+                    <PlanField plan={data.review.plan} onSave={(v) => void setGoal("plan", "plan", v)} />
                   </Row>
                   <Row title="Reminder" text="One notification at this time, only while today’s goal is still open.">
                     <SelectMenu label="Reminder time" value={data.review.reminder} options={REMINDERS} onChange={(t) => void setReminder(t)} />
@@ -310,7 +352,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
               {data && (
                 <Group title="Cards">
                   <Row title="Remix cards" text="Cards you know come back as new questions on the same idea, so you apply it instead of reciting it." htmlFor="remix">
-                    <Switch.Root id="remix" className="switch" checked={data.review.remix} onCheckedChange={(v) => void setGoal({ remix: v }, "remix", String(v))}>
+                    <Switch.Root id="remix" className="switch" checked={data.review.remix} onCheckedChange={(v) => void setGoal("remix", "remix", v)}>
                       <Switch.Thumb className="switch-thumb" />
                     </Switch.Root>
                   </Row>

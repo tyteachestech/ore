@@ -1523,6 +1523,25 @@ journey("undo that fails: the toast says why, and ⌘Z tries the same step again
   await row.waitFor();
 });
 
+journey("settings: a Review setting goes on the history; ⌘Z takes it back, ⇧⌘Z gives it again", async (page) => {
+  await page.keyboard.press("Meta+Comma");
+  await page.getByRole("tab", { name: "Review" }).click();
+  const minutes = page.getByRole("group", { name: "Minutes a day" }).or(page.getByRole("radiogroup", { name: "Minutes a day" }));
+  const on = async () => (await minutes.locator("[data-state=on]").innerText()).trim();
+  const was = await on();
+  const other = was === "30" ? "5" : "30";
+  await minutes.getByText(other, { exact: true }).click();
+  await until("the new goal shows", async () => (await on()) === other);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the old goal back", async () => (await on()) === was);
+  await page.keyboard.press("Shift+Meta+z");
+  await until("⇧⌘Z gives the new one again", async () => (await on()) === other);
+  await page.keyboard.press("Meta+z");
+  await until("and back, for the journeys after this one", async () => (await on()) === was);
+  await page.keyboard.press("Escape");
+});
+
 journey("quiz check: one click makes a passage a key point, and marks a highlight already there", async (page) => {
   await openSource(page, TESTING);
   // A chip shows only while its count is above 0.
