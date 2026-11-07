@@ -33,6 +33,10 @@
 .doc, .note-editor, .review-passage { font-family: var(--font-read); }
 /* The text he reads sits a step above the UI's reading grey: brighter than --text-read, short of the titles' white. */
 .doc { color: color-mix(in srgb, var(--text-read) 45%, var(--text)); }
+/* The source reads in a book serif (Matter, Apple Books): Charter ships with macOS, and Bitstream Charter is its
+   open twin on Linux, so the cloud's screenshots show the same face. His own notes stay in the system sans. */
+:root { --font-serif: Charter, "Bitstream Charter", "New York", ui-serif, Georgia, serif; }
+.doc { font-family: var(--font-serif); line-height: 1.6; }
 .sidebar { border-right: 1px solid var(--border); }
 /* The open row's 8-bit menu arrow in the left gutter (SideCursor.tsx); quieter inside a source, as the row is. */
 .sidebar:not(.peek) { position: relative; }
