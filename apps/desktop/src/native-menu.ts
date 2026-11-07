@@ -6,6 +6,8 @@
 export function nativeMenu(target: EventTarget | null, selection: Selection | null): boolean {
   const el = target && "closest" in (target as object) ? (target as Element) : (target as Node | null)?.parentElement ?? null;
   if (!el) return false;
+  // A diagram's preview in a note is an object with its own menu, though the note around it is text.
+  if (el.closest(".note-diagram")) return false;
   if (el.closest("input, textarea, [contenteditable]:not([contenteditable=false])")) return true;
   if (selection && !selection.isCollapsed && selection.rangeCount && selection.getRangeAt(0).intersectsNode(el)) return true;
   return !!el.closest(".doc") && !el.closest("a[href]");

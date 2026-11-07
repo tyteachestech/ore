@@ -25,6 +25,7 @@ import { BlockHandle } from "./BlockHandle";
 import { TableControls } from "./TableControls";
 import { KeyboardBar } from "./KeyboardBar";
 import { SelectionBar, type Sel } from "./SelectionBar";
+import { WithMenu, type MenuAction } from "../Menu";
 import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock, turnAtCaret, type Kind } from "./blockops";
 import { is } from "../keys";
 
@@ -457,6 +458,40 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   live.current.p = p;
   live.current.rowsFor = rowsFor;
 
+  /** The diagram preview under the last right-click, and its menu: open it, or take it out of the
+   *  note (⌘Z puts it back; the drawing's file stays beside the note). */
+  const rightClicked = useRef<HTMLElement | null>(null);
+  const diagramActions = (): MenuAction[] => {
+    const v = view();
+    const dom = rightClicked.current;
+    if (!v || !dom) return [];
+    let at = -1;
+    let name: string | null = null;
+    v.state.doc.descendants((n, pos) => {
+      if (at < 0 && n.type.name === "image" && v.nodeDOM(pos) === dom) {
+        at = pos;
+        name = diagramName(String(n.attrs.src ?? ""));
+      }
+      return at < 0;
+    });
+    if (at < 0 || !name) return [];
+    const drawn: string = name;
+    return [
+      { id: "open", label: "Open diagram", hint: "↵", run: () => live.current.draw(drawn) },
+      {
+        id: "remove",
+        label: "Remove from note",
+        danger: true,
+        divider: true,
+        run: () => {
+          const node = v.state.doc.nodeAt(at);
+          if (node) v.dispatch(v.state.tr.delete(at, at + node.nodeSize));
+          v.focus();
+        },
+      },
+    ];
+  };
+
   return (
     <div
       ref={host}
@@ -475,7 +510,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       // Typing puts the peek away.
       onKeyDown={peek.close}
     >
-      <div ref={root} />
+      {/* A diagram's preview has its own right-click menu (Excalidraw's embeds in Notion); the
+          note's text keeps the Mac's (native-menu.ts). */}
+      <WithMenu actions={diagramActions}>
+        <div ref={root} onContextMenuCapture={(e) => (rightClicked.current = (e.target as HTMLElement).closest?.(".note-diagram") ?? null)} />
+      </WithMenu>
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
       {PHONE && <KeyboardBar view={view} targets={p.targets} />}
