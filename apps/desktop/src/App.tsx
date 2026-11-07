@@ -227,6 +227,7 @@ export function App() {
   const [showCollected, setShowCollected] = useState(0);
   const [renameSource, setRenameSource] = useState(0);
   const readerActions = useRef<MenuAction[]>([]);
+  const feedPick = useRef<{ title: string; actions: MenuAction[] } | null>(null);
   const [palette, setPalette] = useState(false);
   // Ask your library: open, and the thread so far (kept while he jumps to a cited source and back).
   const [askOpen, setAskOpen] = useState(false);
@@ -1509,6 +1510,8 @@ export function App() {
     // A list row only once the keyboard has selected it, so ⌘K never acts on a row he can't see:
     // the same actions as its ⋯ menu, named for the row.
     ...(listPick && many.length <= 1 ? rowPalette(rowActions(listPick), listPick.title, "row") : []),
+    // A Feed post picked by the keyboard: the same actions as its ⋯ menu.
+    ...(onFeed && !openId && feedPick.current ? rowPalette(feedPick.current.actions, feedPick.current.title, "post") : []),
     // A course row picked by the keyboard: the same actions as its ⋯ menu.
     ...(!openId && !onHome && keyed && currentCourse ? rowPalette(courseActions(currentCourse), currentCourse.title, "course") : []),
     // The list's details, as the row menus' Show submenu (D108).
@@ -2041,7 +2044,7 @@ export function App() {
             notify={notify}
           />
         ) : onFeed ? (
-          <Feed skills={skills} tick={feedTick} blocked={overlay} onOpen={openPost} onFollow={() => setAdding(true)} onCreateSkill={createSkill} notify={notify} />
+          <Feed skills={skills} tick={feedTick} blocked={overlay} onOpen={openPost} onFollow={() => setAdding(true)} onCreateSkill={createSkill} notify={notify} pickRef={feedPick} />
         ) : (
           sources
         )}
