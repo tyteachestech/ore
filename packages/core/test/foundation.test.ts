@@ -283,6 +283,7 @@ describe("index", () => {
     rmSync(join(lib.root, ".index"), { recursive: true });
     mkdirSync(join(lib.root, ".index"));
     const held = new Database(join(lib.root, ".index", "library.sqlite"), { create: true });
+    held.exec("pragma busy_timeout = 5000"); // its commit waits out ore's read, as ore waits out its lock
     held.exec("create table held (x)");
     held.exec("begin immediate");
     const cli = join(import.meta.dir, "../../cli/src/ore.ts");
