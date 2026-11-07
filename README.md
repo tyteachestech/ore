@@ -71,6 +71,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | Doc | Topic |
 | --- | --- |
 | [`brief-learning-science.md`](docs/research/brief-learning-science.md) | The main evidence brief: retrieval, spacing, feedback, prequestions, motivation, what doesn't work |
+| [`brief-ai-tutor.md`](docs/research/brief-ai-tutor.md) | The tutor chat: when AI help helps learning, products and code to borrow, design calls |
 | [`skill-strength.md`](docs/research/skill-strength.md) | Which growth metric motivates without gaming (led to D63) |
 | [`skill-metrics-motivation.md`](docs/research/skill-metrics-motivation.md) | Round 2: a near goal for strength (led to the gems, D90) |
 | [`brief-notetaking.md`](docs/research/brief-notetaking.md) | Active note-taking, with [evidence](docs/research/brief-notetaking-evidence.md), [practice](docs/research/brief-notetaking-practice.md), and checks against [Ahrens](docs/research/brief-notetaking-check-ahrens.md) and [Fiorella & Mayer](docs/research/brief-notetaking-check-fiorella-mayer.md) |
