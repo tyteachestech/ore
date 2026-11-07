@@ -535,6 +535,58 @@ journey("pinned sources: Move up and a drag put them in his order; ⌘Z takes a 
   await until("unpinned again", async () => (await pinned()).length === 0);
 });
 
+journey("shortcuts: resetting one to a default another command took since asks before replacing it", async (page) => {
+  await page.keyboard.press("Meta+Comma");
+  await page.getByRole("tab", { name: "Keyboard shortcuts" }).or(page.getByRole("button", { name: "Keyboard shortcuts" })).first().click();
+  const edit = (what: string) => page.getByRole("button", { name: new RegExp(`^${what}: .*Press to change$`) });
+  const keysOf = async (what: string) => (await edit(what).getAttribute("aria-label")) ?? "";
+  const rebindTo = async (what: string, key: string) => {
+    await edit(what).click();
+    await page.keyboard.press(key);
+  };
+  await rebindTo("Slower", "Control+Alt+j");
+  await until("Slower has its new keys", async () => !(await keysOf("Slower")).includes("["));
+  await rebindTo("Faster", "BracketLeft"); // Slower's default, free now
+  await until("Faster has [", async () => (await keysOf("Faster")).includes("["));
+  await page.getByRole("button", { name: "Reset Slower to [" }).click();
+  await page.getByRole("alert").filter({ hasText: "Faster" }).waitFor();
+  await until("nothing changed yet", async () => (await keysOf("Faster")).includes("["));
+  await page.getByRole("button", { name: "Replace" }).click();
+  await until("Slower has [ again and Faster has none", async () => (await keysOf("Slower")).includes("[") && (await keysOf("Faster")).includes("Not assigned"));
+  // Put the keys back for the journeys after this one.
+  await page.getByRole("button", { name: /^Reset Faster to / }).click();
+  await until("Faster has ] again", async () => (await keysOf("Faster")).includes("]"));
+  await page.keyboard.press("Escape");
+});
+
+journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
+  const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
+  await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);
+  const from = (await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().boundingBox())!;
+  const to = (await page.locator(".sidebar .side-item", { hasText: "Storytelling" }).first().boundingBox())!;
+  await page.mouse.move(from.x + 40, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 40, from.y - 10, { steps: 4 });
+  await page.mouse.move(to.x + 40, to.y + to.height * 0.75, { steps: 10 });
+  await page.mouse.up();
+  await until("it moved to Craft", async () => (await inGroup("Craft", "Habits")) === 1);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back in Life", async () => (await inGroup("Life", "Habits")) === 1);
+});
+
+journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const open = () => page.getByText("Does this hold for kids?", { exact: true }).filter({ visible: true }).count();
+  await until("the question is listed", async () => (await open()) > 0);
+  await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Mark answered" }).click();
+  await until("it leaves the open questions", async () => (await open()) === 0);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z reopens it", async () => (await open()) > 0);
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {

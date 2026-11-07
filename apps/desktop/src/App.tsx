@@ -1934,7 +1934,8 @@ export function App() {
         onArrange={(layout, step) => {
           const before = layoutOf(skillGroups(skills));
           void arrange(layout);
-          if (step) notify(step, "info", () => void arrange(before), () => void arrange(layout));
+          // A drag is a step too, quietly (Finder): ⌘Z puts the skill or collection back where it was.
+          notify(step ?? "Moved in the sidebar", step ? "info" : "quiet", () => void arrange(before), () => void arrange(layout));
         }}
         onDeleteCollection={deleteCollection}
       />
