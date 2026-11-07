@@ -66,6 +66,11 @@ await updateItemMeta(lib, a1.meta.id, (m) => ({ ...m, prequestions: [
   { q: "When does the testing effect show up, and when doesn't it?" },
   { q: "What makes a retrieval attempt more useful?" },
 ] }));
+// A web article as a real add saves it: its site, author and date (D122).
+await updateItemMeta(lib, a2.meta.id, (m) => ({ ...m, url: "https://www.anthropic.com/research/building-effective-agents", author: "Erik Schluntz and Barry Zhang", published: "2024-12-19", prequestions: [
+  { q: "When is an agent the wrong choice?" },
+  { q: "How does a workflow differ from an agent?" },
+] }));
 await setItemStatus(lib, a1.meta.id, "reading");
 await setItemStatus(lib, a3.meta.id, "done");
 await setItemStatus(lib, a5.meta.id, "done");

@@ -79,6 +79,8 @@ export type Item = {
   type: string;
   title: string;
   author?: string;
+  /** The date it was published, as its page, file or feed gave it ("2024-12-19", "2024"). */
+  published?: string;
   url?: string;
   /** A page that plays a video (D92): the video's link; the page's link is `url`. */
   video?: string;

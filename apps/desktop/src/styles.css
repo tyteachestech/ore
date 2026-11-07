@@ -565,8 +565,13 @@ img.thumb { filter: brightness(0.86); }
 .course-lessons .part { width: 18px; flex-shrink: 0; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
 .course-lessons .here { color: var(--text); font-weight: 600; }
 .course-lessons .menu-item svg { margin-left: auto; color: var(--faint); }
-.doc-head .source { font-size: 12px; color: var(--faint); margin-left: 6px; padding: 0 4px; border-radius: 4px; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Where it's from, above the title (Reeder, Matter): a site in Geist Mono caps; a file keeps its own name. */
+.doc-head .source { display: block; margin: 8px 0 0 -4px; padding: 0 4px; border-radius: 4px; font-size: 12px; color: var(--faint); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-head .source.site { font-family: var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
 .doc-head .source:hover { color: var(--accent); }
+.doc-head .source + h1, .doc-head .source + .title-edit { margin-top: 4px; }
+.doc-head .when { color: var(--faint); font-size: 13px; margin-right: 8px; white-space: nowrap; }
+.doc-head .by + .when::before, .doc-head .by + span .when::before { content: "·"; margin-right: 6px; }
 
 .preq { margin: 0 0 34px; padding-bottom: 22px; border-bottom: 1px solid var(--border); max-width: var(--measure); }
 .preq-head { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; margin-left: -4px; padding: 0 4px; color: var(--muted); font-weight: 600; text-align: left; }
