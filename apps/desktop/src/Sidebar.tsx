@@ -193,7 +193,7 @@ export function Sidebar({ skills, items, status, skill, within, home, onHome, fe
             { id: "rename", label: "Rename…", run: () => setRenaming(g.collection) },
             ...(i > 0 ? [{ id: "up", label: "Move up", run: () => nudge(g, -1) }] : []),
             ...(i < named.length - 1 ? [{ id: "down", label: "Move down", run: () => nudge(g, 1) }] : []),
-            { id: "delete", label: "Delete collection", danger: true, run: () => onDeleteCollection(g.collection) },
+            { id: "delete", label: "Delete collection", danger: true, divider: true, run: () => onDeleteCollection(g.collection) },
           ]
         : []),
     ];

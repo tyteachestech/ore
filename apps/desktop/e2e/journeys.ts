@@ -587,6 +587,62 @@ journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page)
   await until("⌘Z reopens it", async () => (await open()) > 0);
 });
 
+journey("reader questions: ask one, ⌘Z takes it back; its ⋯ menu marks it answered and deletes it, ⌘Z each", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const head = page.locator(".cp-head", { hasText: "Questions" });
+  const toggle = head.locator(".cp-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  const ask = "Does spacing help with motor skills too?";
+  const rows = () => page.locator(".qp-line", { hasText: ask }).count();
+  await head.getByRole("button", { name: "Ask a question" }).click();
+  await page.getByLabel("New question").fill(ask);
+  await page.keyboard.press("Enter");
+  await until("the question is listed", async () => (await rows()) === 1);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => (await rows()) === 0);
+  await page.keyboard.press("Meta+Shift+z");
+  await until("⇧⌘Z asks it again", async () => (await rows()) === 1);
+  const line = page.locator(".qp-line", { hasText: ask });
+  await line.hover();
+  await line.getByRole("button", { name: "Question actions" }).click();
+  await page.getByRole("menuitem", { name: "Mark answered" }).click();
+  await until("it is struck through", async () => (await page.locator(".qp-q.done", { hasText: ask }).count()) === 1);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z reopens it", async () => (await page.locator(".qp-q.done", { hasText: ask }).count()) === 0);
+  await line.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete question" }).click();
+  await until("it is gone", async () => (await rows()) === 0);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back", async () => (await rows()) === 1);
+  // Leave the library as it was.
+  await line.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete question" }).click();
+  await until("deleted again", async () => (await rows()) === 0);
+});
+
+journey("reader questions: a piece of the answer, ⌘Z takes it out and ⇧⌘Z puts it back", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const toggle = page.locator(".cp-head", { hasText: "Questions" }).locator(".cp-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  const q = page.locator(".qp-q", { hasText: "Does this hold for kids?" });
+  const pieces = async () => Number(/(\d+) in your answer/.exec(await q.innerText())?.[1] ?? 0);
+  const before = await pieces();
+  await q.locator(".qp-row").click();
+  await page.keyboard.type("Spacing helped fourth graders in one study.");
+  await page.keyboard.press("Enter");
+  await until("the piece is added", async () => (await pieces()) === before + 1);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it out", async () => (await pieces()) === before);
+  await page.keyboard.press("Meta+Shift+z");
+  await until("⇧⌘Z puts it back", async () => (await pieces()) === before + 1);
+  await page.keyboard.press("Meta+z");
+  await until("and out again, as it was", async () => (await pieces()) === before);
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {

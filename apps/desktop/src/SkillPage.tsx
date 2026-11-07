@@ -14,7 +14,7 @@ import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
 import { levelProgress, ore, opt, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
-import { AnswerBox, AskQuestion, announce, typedQuestion } from "./Questions";
+import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
 import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
@@ -483,56 +483,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
     };
   }, [skill, notify, version]);
 
-  /** Mark answered / Reopen, on the history quietly (Things: completing a to-do is undoable). */
-  const setStatus = useCallback(
-    async (q: Question, status: "open" | "done", undoable = true) => {
-      setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, status } : x)));
-      const was = q.status === "done" ? "done" : "open";
-      const forget = undoable
-        ? notify(status === "done" ? "Marked answered" : "Reopened", "quiet", () => void setStatus({ ...q, status }, was, false), () => void setStatus(q, status, false))
-        : null;
-      try {
-        await ore("annotate", q.id, "--status", status);
-      } catch (e) {
-        forget?.();
-        setQs((l) => l && l.map((x) => (x.id === q.id ? q : x)));
-        notify(errorText(e), "error");
-      }
-    },
-    [notify],
-  );
-
-  /** Deletes a question (its highlight goes too, as in the reader), with Undo. */
-  const remove = useCallback(
-    async (q: Question) => {
-      // Undo puts it back where it was, not at the end of the list.
-      let at = -1;
-      const back = () => setQs((l) => l && [...l.slice(0, at < 0 ? l.length : at), q, ...l.slice(at < 0 ? l.length : at)]);
-      setQs((l) => {
-        at = l ? l.findIndex((x) => x.id === q.id) : -1;
-        return l && l.filter((x) => x.id !== q.id);
-      });
-      try {
-        await ore("annotate", q.id, "--status", "deleted");
-      } catch (e) {
-        back();
-        return notify(errorText(e), "error");
-      }
-      notify(
-        "Question deleted",
-        "info",
-        () => {
-          back();
-          ore("annotate", q.id, "--status", q.status).catch((e) => notify(errorText(e), "error"));
-        },
-        () => {
-          setQs((l) => l && l.filter((x) => x.id !== q.id));
-          ore("annotate", q.id, "--status", "deleted").catch((e) => notify(errorText(e), "error"));
-        },
-      );
-    },
-    [notify],
-  );
+  const { setStatus, remove } = useQuestionEdits(setQs, notify);
 
   const open = (qs ?? []).filter((q) => q.status !== "done");
   const answered = (qs ?? []).filter((q) => q.status === "done");
@@ -556,6 +507,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
       {asking && (
         <AskQuestion
           skills={[skill]}
+          notify={notify}
           onDone={(added) => {
             setAsking(false);
             if (added) {
@@ -804,9 +756,17 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   // D17: one click adds one source, filed under this skill and linked to the question; never auto-added.
   const add = async (url: string) => {
     try {
-      const r = await ore<{ title: string }>("add", url, opt("skill", skill), opt("for", q.id));
+      const r = await ore<{ id: string; title: string; kept?: boolean }>("add", url, opt("skill", skill), opt("for", q.id));
       setAdded((a) => [...a, url]);
-      notify(`Added “${r.title}”`);
+      // As adding from the bar: Undo archives what was just added, ⇧⌘Z brings it back.
+      const keep = (on: boolean) =>
+        void ore("archive", r.id, ...(on ? ["--undo"] : [])).then(
+          () => (setAdded((a) => (on ? [...a, url] : a.filter((u) => u !== url))), onAdded(), onChanged()),
+          (e) => notify(errorText(e), "error"),
+        );
+      // One already in the library stays: only what this added can be taken back.
+      if (r.kept) notify(`“${r.title}” is already in your library`);
+      else notify(`Added “${r.title}”`, "info", () => keep(false), () => keep(true));
       onAdded();
       onChanged();
     } catch (e) {
