@@ -39,9 +39,11 @@ const drafts = new Map<string, { text: string; conf?: number }>();
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-export function Review({ pick, skills, onOpenSource, onClose, notify, quick = false }: {
+export function Review({ pick, skills, onOpenSource, onClose, notify, quick = false, paused = false }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
+  /** Hidden while he reads the source a card opened; it waits on that card, its keys off. */
+  paused?: boolean;
   skills: Skill[];
   onOpenSource: (item: string, at?: string) => void;
   onClose: (again?: boolean) => void;
@@ -151,9 +153,10 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   }, [entry]);
 
   useEffect(() => {
+    if (paused) return;
     if (card && phase === "answer") (card.kind === "prompt" && !PHONE ? field.current : root.current)?.focus({ preventScroll: true });
     if (phase === "checked") root.current?.focus({ preventScroll: true });
-  }, [card, phase]);
+  }, [card, phase, paused]);
 
   /** Ends the session; `endScreen` shows the end screen if he rated anything (never on leaving the quick quiz). */
   const finish = useCallback(async (endScreen = true) => {
@@ -496,6 +499,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
+    if (paused) return;
     if (e.key === "Escape") {
       e.preventDefault();
       if (phase === "edit") setPhase("checked");
@@ -577,7 +581,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
 
   return (
-    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-label="Review">
+    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-label="Review" hidden={paused}>
       <div className="review-head" data-tauri-drag-region>
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).

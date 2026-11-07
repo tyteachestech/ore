@@ -215,7 +215,8 @@ export function App() {
   const [place, setPlace] = useState<Place>("home");
   /** Review mode (D59) over the window, for these skills (null: all). */
   /** `run` counts sessions, so "Keep going" mounts a fresh Review. */
-  const [reviewing, setReviewing] = useState<{ pick: string[] | null; run: number } | null>(null);
+  /** `paused`: the source he opened from a card (Open in source); Review waits, hidden, on the same card. */
+  const [reviewing, setReviewing] = useState<{ pick: string[] | null; run: number; paused?: string } | null>(null);
   /** What to review (D80), asked by ⌘R and the palette; Home asks from its own button. */
   const [asking, setAsking] = useState<Today | null>(null);
   const [homeTick, setHomeTick] = useState(0);
@@ -694,6 +695,14 @@ export function App() {
     [refresh],
   );
 
+  // Leaving the source he opened from a card (Esc, the Back pill, a link) goes back to Review, on that card.
+  useEffect(() => {
+    if (reviewing?.paused && openId !== reviewing.paused) {
+      setReviewing((r) => r && { pick: r.pick, run: r.run });
+      setOpenId(null);
+    }
+  }, [openId, reviewing?.paused]);
+
   /** A link in a note (D39): a source opens in the reader, a skill opens its page. */
   const openLink = useCallback(
     (t: Omit<LinkTarget, "title">) => {
@@ -816,7 +825,7 @@ export function App() {
   const openCourse = openId ? (items ?? []).find((i) => i.id === openId)?.course?.id : undefined;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (reviewing || asking) return; // Review and its picker handle their own keys
+      if ((reviewing && !reviewing.paused) || asking) return; // Review and its picker handle their own keys
       if (is(e, "settings")) {
         e.preventDefault();
         setPalette(false);
@@ -1006,7 +1015,7 @@ export function App() {
   const currentCourse = currentLine?.kind === "course" ? currentLine : null;
   const onHome = !openId && !onSkillPage && place === "home";
   const onFeed = !openId && !onSkillPage && place === "feed";
-  const overlay = palette || adding || help || !!settings || editing !== null || deleting !== null || reviewing !== null || asking !== null;
+  const overlay = palette || adding || help || !!settings || editing !== null || deleting !== null || (reviewing !== null && !reviewing.paused) || asking !== null;
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
 
@@ -2010,7 +2019,9 @@ export function App() {
             jumpTo={jumpTo}
             onLearnAdd={(urls, to, question, now, from) => void learnAdd(urls, to, question, now, from)}
             back={
-              sideQuest && sideQuest.to === openId
+              reviewing?.paused === openId
+                ? { title: "Review", go: () => setOpenId(null) }
+                : sideQuest && sideQuest.to === openId
                 ? {
                     title: sideQuest.from.title,
                     go: () => {
@@ -2095,8 +2106,9 @@ export function App() {
         <Review
           pick={reviewing.pick}
           skills={skills}
+          paused={!!reviewing.paused}
           onOpenSource={(item, at) => {
-            endReview();
+            setReviewing((r) => r && { ...r, paused: item });
             openSource(item, at);
           }}
           onClose={endReview}

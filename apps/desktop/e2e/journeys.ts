@@ -1364,6 +1364,42 @@ journey("review: Esc keeps a half-typed answer and how sure he was, for when the
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: Open in source pauses on the card; Back to Review picks it up where he was", async (page) => {
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const q = page.locator(".review-q");
+  await pick.or(q).first().waitFor();
+  if (await pick.isVisible()) await page.keyboard.press("Enter");
+  const open = page.getByRole("button", { name: /Open in source/ });
+  // Show answers until a card offers its passage (a card he typed has none).
+  for (let n = 0; n < 6 && !(await open.isVisible()); n++) {
+    await q.waitFor();
+    const noIdea = page.getByRole("button", { name: "No idea" });
+    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+    await page.waitForTimeout(300); // the passage loads after the answer
+    if (await open.isVisible()) break;
+    const was = await q.innerText();
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the next card", async () => (await q.innerText()) !== was);
+  }
+  const card = await q.innerText();
+  await open.click();
+  await page.locator(".doc-head").waitFor();
+  await page.getByRole("button", { name: /Back to Review/ }).click();
+  await until("the same card, answer still shown", async () => (await q.isVisible()) && (await q.innerText()) === card && (await page.getByRole("button", { name: "Good", exact: true }).isVisible()));
+  // Esc in the reader goes back to Review too.
+  await open.click();
+  await page.locator(".doc-head").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc returns to the card", async () => (await q.isVisible()) && (await q.innerText()) === card);
+  // Put back any ratings made on the way, for the journeys after this one.
+  const undo = page.getByRole("button", { name: "Undo last rating" });
+  for (let n = 0; n < 6 && (await undo.isVisible()); n++) await undo.click(), await page.waitForTimeout(200);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: rate a card, the session moves on, and Undo brings the card back", async (page) => {
   await page.getByRole("button", { name: "Start review" }).click();
   // The "What to review" sheet comes first once Home knows his skills; Enter takes them all.
