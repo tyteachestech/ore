@@ -557,6 +557,8 @@ journey("diagram: S styles at the pointer, keys stay on the canvas, Space never 
   await page.keyboard.press("r");
   await page.mouse.click(c.x + 500, c.y + 300);
   await page.locator(".draw-text").waitFor();
+  // An empty label shows only the caret, no prompt text (Tyler 2026-11-07).
+  if (await page.locator(".draw-text").getAttribute("placeholder")) throw new Error("a new label shows placeholder text");
   await page.keyboard.type("Memory");
   await page.keyboard.press("Enter");
   const boxes = () => page.locator(".diagram .draw-canvas > g rect").count();
