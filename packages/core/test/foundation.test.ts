@@ -273,4 +273,23 @@ describe("index", () => {
     const codes = await Promise.all(runs.map(async (p) => [await p.exited, await new Response(p.stderr).text()] as const));
     expect(codes.filter(([c]) => c !== 0)).toEqual([]);
   });
+
+  test("opening a new index waits while another process holds it, instead of failing 'database is locked'", async () => {
+    // Switching a new file to WAL doesn't wait on busy_timeout: on Tyler's Mac, 2 of 8 processes opening a
+    // fresh index at once failed at that pragma. Here another connection holds the write lock for 300 ms.
+    const lib = await tempLibrary();
+    const { Database } = await import("bun:sqlite");
+    const { rmSync } = await import("node:fs");
+    rmSync(join(lib.root, ".index"), { recursive: true });
+    mkdirSync(join(lib.root, ".index"));
+    const held = new Database(join(lib.root, ".index", "library.sqlite"), { create: true });
+    held.exec("create table held (x)");
+    held.exec("begin immediate");
+    const cli = join(import.meta.dir, "../../cli/src/ore.ts");
+    const run = Bun.spawn(["bun", cli, "search", "retrieval", "--json"], { env: { ...process.env, ORE_LIBRARY: lib.root }, stdout: "pipe", stderr: "pipe" });
+    await Bun.sleep(300);
+    held.exec("commit");
+    held.close();
+    expect([await run.exited, await new Response(run.stderr).text()]).toEqual([0, ""]);
+  });
 });

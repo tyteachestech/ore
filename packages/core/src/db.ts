@@ -148,7 +148,17 @@ function openDb(lib: Library): Database {
   const db = new Database(path, { create: true });
   // The app runs several `ore` processes at once (Home, a review, a background enrich): wait for a lock instead of failing.
   db.exec("pragma busy_timeout = 5000");
-  db.exec("pragma journal_mode = wal");
+  // Switching a new file to WAL doesn't wait on busy_timeout (2 of 8 processes opening a fresh index at
+  // once failed here on Tyler's Mac), so it waits as long by hand.
+  for (const until = Date.now() + 5000; ; ) {
+    try {
+      db.exec("pragma journal_mode = wal");
+      break;
+    } catch (e) {
+      if ((e as { code?: string }).code !== "SQLITE_BUSY" || Date.now() > until) throw e;
+      Bun.sleepSync(20);
+    }
+  }
   const version = () => {
     try {
       return db.query<{ value: string }, []>("select value from meta where key = 'schema'").get()?.value;
