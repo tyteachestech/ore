@@ -6,8 +6,23 @@ description: Run before calling any change to apps/desktop done, and when asked 
 # Interaction check
 
 Impeccable judges how a screen looks. This checks that it behaves the way every good Mac app has
-taught Tyler to expect, so he never has to ask for "the obvious thing". The rules are the
-"Interaction checklist" in `AGENTS.md`; this file is how to run them and the detail behind them.
+taught Tyler to expect, so he never has to ask for "the obvious thing". The rules are below;
+the rest of this file is how to run them and the detail behind them.
+
+## Rules
+- Full lifecycle for every object he sees (skill, collection, source, highlight, card, question, note, diagram): create, open, rename, move or re-file, reorder where the order is his, delete or archive. A missing one is a bug unless a decision rules it out; list any you skip in the PR.
+- Three ways to every action: a visible control (hover ⋯ on rows, Linear-style), the right-click menu (same actions as ⋯, destructive last), and ⌘K.
+- Create in place: the new object appears where it lives, selected, name field focused; Enter commits, Esc drops it.
+- Rename inline on the title and from its menu ("Rename…", or the "Edit…" dialog when one holds the name and the rest); Enter saves, Esc restores. One menu item per dialog: never two items that open the same dialog.
+- Delete or any destructive step acts at once and shows a toast with Undo; it goes on the app history, so ⌘Z takes back a run of steps and ⇧⌘Z redoes them (pass `redo` to `notify`). No "Are you sure?" unless undo is impossible. Every other change he makes (create, rename, type, pin, reorder, edit) goes on that history too, without a toast: `notify(msg, "quiet", undo, redo)`. A change ⌘Z can't take back is a bug.
+- Drag and drop wherever he would try it (reorder, file into a group, drop files to add); the target lights up, Esc cancels, and a "Move to…" menu item does the same by keyboard.
+- Nothing highlighted until the keyboard moves; one click opens; arrows, Enter, Esc (closes the top layer only and returns focus); Tab reaches every control.
+- Every click shows its result within 100 ms (optimistic, rolled back with an error toast); every list has an empty state with its create action; every error says what to do next.
+- Every wait on the AI or the network shows that it is working at once, where the result will land: `<Working label="Checking your answer…">` (`apps/desktop/src/Working.tsx`: pixel spinner and what it is doing, `slow=` says how long once it passes 5 s). Never a blank, a still line, or a button that only greys out. `apps/desktop/test/waits.test.ts` lists every slow `ore` call with the label its screen shows (or why nothing waits on it); a new call fails until it is listed.
+- Every state, not just the happy path: after any action he knows what happened, can take it back, and knows what to do next. Background work (enrich, remix, grading) that fails says why, with a retry, as soon as it fails, never a silent wait. A status line never hides what is waiting ("All caught up" while new cards are held back).
+- Break it before calling it done: AI signed out or missing, offline in the middle of an add, a link that won't open, a scanned PDF, an empty library, the daily limit reached. Each says what happened and the next step, and keeps what he typed. A retry never repeats what already worked.
+- Scroll, tab, collapsed groups and selection survive navigation and relaunch. The same object behaves the same on every screen.
+- Conventions by surface: every list, reader, palette, picker, editor and window behaves the way that kind of surface does in the best app (the Conventions table in the interaction-check skill). When Tyler has to ask for something obvious, add it to that table in the same PR, so it is never missed again.
 
 ## Run it
 

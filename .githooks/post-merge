@@ -1,0 +1,3 @@
+#!/bin/sh
+# A pull into master reinstalls the app if the pulled commits touch apps/desktop/.
+ORE_HOOK_RANGE="ORIG_HEAD..HEAD" exec "$(dirname "$0")/post-commit"

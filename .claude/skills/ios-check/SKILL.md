@@ -1,6 +1,6 @@
 ---
 name: ios-check
-description: Run before calling any change to the iPhone app (apps/phone, apps/desktop/src/phone, or a screen the phone shows) done, and when asked to audit or debug the iPhone app. Uses every screen on a regular iPhone and checks it against Apple's HIG and the AGENTS.md iPhone rules.
+description: Run before calling any change to the iPhone app (apps/phone, apps/desktop/src/phone, or a screen the phone shows) done, and when asked to audit or debug the iPhone app. Uses every screen on a regular iPhone and checks it against Apple's HIG and the iPhone rules below.
 ---
 
 # iOS check
@@ -8,6 +8,14 @@ description: Run before calling any change to the iPhone app (apps/phone, apps/d
 The interaction check is for the Mac. This one checks that the phone app behaves like Apple's own
 apps (Books, Notes, Mail), so Tyler never finds an "obvious" iOS bug. The rules are the "iPhone"
 section of `AGENTS.md`; this file is how to run them and the detail behind them.
+
+
+## Rules
+Copy what Apple's own apps do (Books, Notes, Mail) and check against Apple's Human Interface Guidelines; Tyler should never have to ask for basic iOS behavior.
+- Native gestures: swipe from the left edge goes back on every pushed screen; pull, tap and long-press act as they do in Apple's apps.
+- One tap per action: a selection offers its actions at once (as Books shows its highlight colours), never a button that opens another button.
+- Fits a regular iPhone (390 to 430 pt wide, no foldables): nothing wider than the screen, popovers included (they portal outside the phone screens, so style them under `.phone`); inputs 16px so iOS never zooms; nothing hidden under the keyboard (`--keyboard`) or the home indicator (safe areas).
+- Check it at 390 pt with touch (Playwright `hasTouch`) and in the iOS simulator before calling it done.
 
 ## Run it
 

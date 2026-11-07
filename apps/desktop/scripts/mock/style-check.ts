@@ -2,6 +2,7 @@
 //   nested frames   a box (visible edge or its own fill) inside another box on the page; only floating layers may nest
 //   off-ramp text   a computed UI font size outside the DESIGN.md ramp (reading text has its own scale)
 // Run against the mock (scripts/mock/README.md): bun apps/desktop/scripts/mock/style-check.ts [http://localhost:1420/]
+// `bun run e2e` runs it too, on its own mock (ORE_BRIDGE names that mock's bridge port).
 import { chromium, type Page } from "playwright";
 
 const RAMP = [11, 12, 13, 14, 15, 16, 17, 20, 24, 28, 30];
@@ -45,6 +46,7 @@ async function audit(page: Page, screen: string) {
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+if (process.env.ORE_BRIDGE) await page.addInitScript(`window.__ORE_BRIDGE = ${Number(process.env.ORE_BRIDGE)}`);
 await page.addInitScript({ path: new URL("./tauri.js", import.meta.url).pathname });
 await page.goto(url);
 await page.waitForTimeout(1500);
