@@ -1940,6 +1940,9 @@ button.home-plan:hover { color: var(--text); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).card { --hue: var(--card-solid); --tint: var(--card); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).question { --hue: var(--question-solid); --tint: var(--question); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).apply { --hue: var(--apply-solid); --tint: var(--apply); }
+/* On the Mac it sits in the reader's toolbar (Reeder), flat, so it never covers the text being read. */
+.reader-tools .collected { position: static; transform: none; padding: 0; background: none; border: 0; box-shadow: none; }
+.reader-tools .collected-chip { height: 26px; padding: 0 8px; border-radius: 6px; }
 .collected-chip {
   position: relative; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px;
   color: var(--text-read); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums;

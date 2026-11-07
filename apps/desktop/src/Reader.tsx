@@ -2030,6 +2030,17 @@ function ReaderView(p: Props & { reload: () => void }) {
   // A file on the Mac can't open on the phone; a web page opens in Safari.
   const source = PHONE && !doc.url ? null : originalLabel(doc);
   const published = pubDate(doc.published);
+  const collected = (
+    <Collected
+      anns={anns}
+      ready={ready}
+      rectOf={(id) => ranges.current.get(id)?.getBoundingClientRect()}
+      onOpen={() => {
+        if (popup) closePopup();
+        p.onShowSide("questions", true);
+      }}
+    />
+  );
   const suggested = doc.suggested_skill;
   const suggestion = async (action: "accept" | "dismiss") => {
     try {
@@ -2141,6 +2152,8 @@ function ReaderView(p: Props & { reload: () => void }) {
               <span className="unsaved">Not saved</span>
             </Hint>
           )}
+          {/* What he has collected sits in the toolbar (Reeder's article tools), never over the text he reads. */}
+          {!PHONE && collected}
           {/* Not on the phone: its note is a page of its own, the source already out of sight. */}
           {!PHONE && (
             <Hint text={hideSource ? "Show the source" : "Hide the source while you write"} keys="hide-source">
@@ -2462,17 +2475,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           {tip.text}
         </div>
       )}
-      {!closedBook && away !== "down" && (
-        <Collected
-          anns={anns}
-          ready={ready}
-          rectOf={(id) => ranges.current.get(id)?.getBoundingClientRect()}
-          onOpen={() => {
-            if (popup) closePopup();
-            p.onShowSide("questions", true);
-          }}
-        />
-      )}
+      {PHONE && !closedBook && away !== "down" && collected}
       </div>
       {closedBook && hidden && (
         <div className="hidden-chip">
