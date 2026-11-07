@@ -189,6 +189,10 @@ kbd {
 .skill-icon { display: inline-block; flex: none; width: 1em; height: 1em; line-height: 1; vertical-align: -0.125em; }
 .skill-icon.emoji { width: auto; text-align: center; font-family: "Apple Color Emoji", var(--font); }
 .skill-icon.glyph { background: var(--skill, var(--muted)); mask: center / contain no-repeat; -webkit-mask: center / contain no-repeat; }
+/* A skill's MingCute icon is a 16-grid sprite (pixelSkillIcons in vite.config.ts): drawn at 16px, or 32px in the big
+   tiles, so each pixel lands on whole device pixels, as the UI icons do (icons.tsx). */
+.skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
+:is(.skill-badge, .icon-button) .skill-icon.glyph { width: 32px; height: 32px; -webkit-mask-size: 32px; mask-size: 32px; }
 .skill-icon.dot { width: 0.5em; height: 0.5em; border-radius: 50%; vertical-align: 0.1em; background: var(--skill, var(--faint)); opacity: var(--dot-opacity, 1); }
 .skill-icon.dot:not([data-color]) { --dot-opacity: 0.45; }
 .mark .skill-icon { font-size: 15px; }
@@ -414,7 +418,6 @@ img.thumb { filter: brightness(0.86); }
 .picker-label { height: 28px; padding: 8px 6px 0; color: var(--faint); font-size: 11px; font-weight: 600; background: var(--bg-raised); }
 .picker-grid { display: grid; grid-template-columns: repeat(12, 1fr); }
 .picker-cell { height: 31px; display: grid; place-items: center; border-radius: 6px; font-size: 20px; line-height: 1; }
-.picker-cell .skill-icon.glyph { font-size: 20px; }
 .picker-cell:hover, .picker-cell[data-active] { background: var(--bg-hover); }
 .picker-cell:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
 .picker-cell.emoji { font-family: "Apple Color Emoji", var(--font); }
@@ -801,6 +804,8 @@ body.resizing iframe { pointer-events: none; }
 .ctl.play:hover:not(:disabled) { background: #fff; color: var(--bg); transform: scale(1.04); }
 .ctl.play:disabled { background: var(--bg-active); color: var(--faint); }
 .ctl.skip { width: 34px; height: 34px; border-radius: 50%; }
+.skip-icon { position: relative; display: grid; place-items: center; }
+.skip-icon > span { position: absolute; font: 400 11px var(--mono); line-height: 1; }
 .ctl { flex: none; height: 32px; min-width: 32px; border-radius: 6px; display: grid; place-items: center; color: var(--text-read); }
 .ctl:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .ctl:disabled { color: var(--faint); }

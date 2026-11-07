@@ -12,6 +12,8 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 - Picked highlight type: a neutral grey key (option B), integrated, never a big pill or an underline.
 - Type: Geist stays; OpenTUI Mono (OFL) for mono; Charter for a source's text.
 - Icons: MingCute's weight drawn on a 16 pixel grid (hand-cleaned); replaces Pixelarticons (D105 as amended by D129). Generators: `/mnt/project-files/signature-style/build/` (emit.py writes `icons.tsx` and `PixelIcon.tsx`).
+- One icon set (Tyler, 2026-11-07): every icon in the app is a 16-grid pixel MingCute sprite, never a smooth one beside it. Skill icons too: `scripts/pixel-skill-icons.ts` redraws all of MingCute into `src/skill-icons.json`, hand fixes in `src/skill-icon-fixes.ts` win (the 40 likeliest were checked by hand). Only emoji a skill picks stay as they are.
+- Sprites draw at 16 or 32px, never in between, and never in a box that cuts them; round ones share `Circle`'s outline, because a circle with long flat sides reads as cut off. `style-check.ts` (pixel icon) and `test/round-icons.test.ts` fail otherwise.
 - Big numbers in the mono; Geist Pixel retired. Labels in sentence case.
 - Wordmark: A "ore_" in Poppins ExtraBold Italic with a green cursor underscore; the app icon (Mac and iPhone).
 - Railway touch: B Rail + stations (Review steps as track with an ore cart; Home week as stations). The dot grid was dropped: no purpose.

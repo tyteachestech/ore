@@ -6,12 +6,13 @@ import { Shuffle } from "./icons";
 import { SKILL_COLORS, type SkillColor } from "./ore";
 import { load, save } from "./util";
 
-// A skill icon is one emoji or "mc:<name>", a MingCute fill icon tinted with the skill color (D36).
+// A skill icon is one emoji or "mc:<name>", a MingCute fill icon tinted with the skill color (D36), drawn on the
+// UI icons' 16-pixel grid (vite.config.ts, pixelSkillIcons).
 // "ph:<name>" (Phosphor) icons picked before MingCute still draw. Emoji data and the icon SVGs ship
 // with the app (vite.config.ts), so the picker works offline.
 const EMOJIBASE = "/emojibase";
 const iconUrl = (icon: string) =>
-  icon.startsWith("mc:") ? `url(/mingcute/${icon.slice(3)}_fill.svg)` : icon.startsWith("ph:") ? `url(/icons/${icon.slice(3)}-fill.svg)` : null;
+  icon.startsWith("mc:") ? `url(/mingcute-px/${icon.slice(3)}.svg)` : icon.startsWith("ph:") ? `url(/icons/${icon.slice(3)}-fill.svg)` : null;
 const isIcon = (icon: string) => iconUrl(icon) !== null;
 
 /** Draws a skill's icon. Without one it draws nothing, or a color dot with `dot`; a stored value it
