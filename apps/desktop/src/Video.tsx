@@ -1,4 +1,4 @@
-import { Pause, Play } from "./icons";
+import { ArrowClockwise, ArrowCounterClockwise, Pause, Play } from "./icons";
 import * as Popover from "@radix-ui/react-popover";
 import * as Slider from "@radix-ui/react-slider";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
@@ -414,18 +414,15 @@ export function VideoPlayer({ player, title, onFinish, onOpen }: { player: Playe
   );
 }
 
-/** A circular arrow with the seconds inside, like Eleven Reader's and Apple Podcasts' skip buttons. */
+/** A circular arrow with the seconds inside, like Eleven Reader's and Apple Podcasts' skip buttons: the pixel
+ *  arrow (icons.tsx) at 32px, the seconds in the pixel mono over its middle. */
 function SkipIcon({ by, back = false }: { by: number; back?: boolean }) {
+  const Arrow = back ? ArrowCounterClockwise : ArrowClockwise;
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
-      <g transform={back ? undefined : "translate(24 0) scale(-1 1)"} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3.5A8.5 8.5 0 1 1 4.64 7.75" />
-        <path d="M14.6 1.2 12 3.5l2.6 2.3" />
-      </g>
-      <text x="12" y="15.6" textAnchor="middle" fontSize="8" fontWeight="700" fill="currentColor">
-        {by}
-      </text>
-    </svg>
+    <span className="skip-icon" aria-hidden="true">
+      <Arrow size={32} />
+      <span>{by}</span>
+    </span>
   );
 }
 
