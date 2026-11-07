@@ -1284,6 +1284,24 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
   const tool = () => page.locator(".draw-tool[aria-pressed=true]").first().getAttribute("aria-label");
   await until("the tool is Select again", async () => (await tool()) === "Select");
   if (await page.locator(".diagram .draw-canvas > g path").count()) throw new Error("the dropped arrow stayed");
+  // In the picker, A D F set which way a selected arrow points: one-way, both ways, no heads.
+  await page.keyboard.press("a");
+  await page.mouse.move(c.x + 900, c.y + 600);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 1000, c.y + 600, { steps: 5 });
+  await page.mouse.up();
+  const paths = () => page.locator(".diagram .draw-canvas > g path").count();
+  await until("the arrow is drawn", async () => (await paths()) > 0);
+  const oneWay = await paths();
+  await page.keyboard.press("s");
+  await page.locator(".draw-quick").waitFor();
+  await page.keyboard.press("d");
+  await until("D gives it a head at both ends", async () => (await paths()) === oneWay + 1);
+  await page.keyboard.press("f");
+  await until("F takes both heads off", async () => (await paths()) === oneWay - 1);
+  await page.keyboard.press("a");
+  await until("A makes it one-way again", async () => (await paths()) === oneWay);
+  await page.keyboard.press("Escape");
 });
 
 journey("diagram: align and space from keys and the picker, drags snap to edges and equal gaps (⌘ off), and a node goes with its links", async (page) => {
