@@ -18,7 +18,7 @@ const WAITS: Record<string, string> = {
   "Explain.tsx explain": "Explaining…",
   "Explain.tsx research": "Finding sources…",
   "SkillPage.tsx research": "Finding sources…",
-  "SkillPage.tsx add": "background: one click adds a suggested source; a toast says when it is in",
+  "SkillPage.tsx add": "Adding…",
   "Tutor.tsx tutor": "Thinking…",
   "Ask.tsx ask": "background: the reply's own dots (ask-dots) stand in for the label, as ChatGPT's do",
   "App.tsx feed follow": "Add.tsx: Adding…",

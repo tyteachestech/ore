@@ -760,6 +760,8 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   const [found, setFound] = useState<Research["sources"] | null>(null);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState<string[]>([]);
+  /** Suggested sources being added now: each shows it is working, and a second click does nothing. */
+  const [adding, setAdding] = useState<string[]>([]);
   const [answering, setAnswering] = useState(false);
   const done = q.status === "done";
   const exact = q.exact.replace(/\s+/g, " ").trim();
@@ -780,6 +782,8 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
 
   // D17: one click adds one source, filed under this skill and linked to the question; never auto-added.
   const add = async (url: string) => {
+    if (adding.includes(url)) return;
+    setAdding((a) => [...a, url]);
     try {
       const r = await ore<{ id: string; title: string; kept?: boolean }>("add", url, opt("skill", skill), opt("for", q.id));
       setAdded((a) => [...a, url]);
@@ -797,6 +801,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
     } catch (e) {
       notify(errorText(e), "error");
     }
+    setAdding((a) => a.filter((u) => u !== url));
   };
 
   // The same actions as the hover buttons, in the ⋯ and right-click menus; delete last (AGENTS.md).
@@ -887,9 +892,13 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
                 <span className="title">{s.title}</span> <span className="sub">{s.site} · {s.type}</span>
                 <div className="why">{s.why}</div>
               </div>
-              <button onClick={() => void add(s.url)} disabled={added.includes(s.url)}>
-                {added.includes(s.url) ? "Added" : "Add"}
-              </button>
+              {adding.includes(s.url) ? (
+                <Working label="Adding…" slow="A long page or video takes a minute." />
+              ) : (
+                <button onClick={() => void add(s.url)} disabled={added.includes(s.url)}>
+                  {added.includes(s.url) ? "Added" : "Add"}
+                </button>
+              )}
             </li>
           ))}
         </ul>
