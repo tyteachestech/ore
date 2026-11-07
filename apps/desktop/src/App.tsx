@@ -8,7 +8,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, use
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { AskLibrary, type LibraryTurn } from "./AskLibrary";
@@ -902,7 +902,7 @@ export function App() {
       clearTimeout(t);
     };
   }, [q]);
-  const byTitle = useMemo(() => (q ? tabRows.filter((r) => r.title.toLowerCase().includes(q.toLowerCase())) : tabRows), [tabRows, q]);
+  const byTitle = useMemo(() => (q ? tabRows.filter((r) => titleMatches(r, q)) : tabRows), [tabRows, q]);
   const byText = useMemo(
     () => (q && hits.q === q ? tabRows.filter((r) => hits.snip.has(r.id) && !byTitle.includes(r)) : []),
     [tabRows, byTitle, hits, q],
