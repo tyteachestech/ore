@@ -45,8 +45,8 @@ export type Status = "inbox" | "reading" | "done";
 export type Tab = "toread" | "done" | "archived";
 /** Archived sources come from `ore ls --archived`, never from the main list, so no status is in that tab. */
 export const inTab = (s: Status, tab: Tab) => tab !== "archived" && (tab === "done") === (s === "done");
-export type Intent = "keep" | "card" | "question";
-export const INTENTS: Intent[] = ["keep", "card", "question"];
+export type Intent = "keep" | "card" | "question" | "apply";
+export const INTENTS: Intent[] = ["keep", "card", "question", "apply"];
 
 /** A passage of the body that supports a key point, anchored like a highlight (D56). */
 export type Evidence = { exact: string; prefix: string; suffix: string; start: number; end: number };
@@ -144,7 +144,13 @@ export type Annotation = {
   anchor?: { start: number; end: number; method: string } | null;
   /** Card here: a line he typed with nothing selected; `exact` is only the sentence where he was. */
   point?: boolean;
+  /** Apply (D127): how it went, written when he checked the try off. */
+  reflection?: string;
 };
+
+/** `ore tries`: an Apply highlight (D127), a technique he plans to try on his own work; `note` is his
+ *  plan, status "done" means tried. */
+export type Try = Annotation & { item: string; ts: string; item_title: string };
 
 /** `ore questions`: a Question-intent highlight (D47); status "done" means answered. `answers` is his
  *  answer so far, piece by piece, each naming the source he wrote it from; `matches` the sources that

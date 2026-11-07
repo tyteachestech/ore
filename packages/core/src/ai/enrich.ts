@@ -55,7 +55,10 @@ export function pendingHighlights(item: Item, cards: Card[]): Annotation[] {
   const drafted = new Set(cards.flatMap((c) => [c.meta.annotation, ...(c.meta.also ?? [])]).filter(Boolean));
   const planned = new Set(item.meta.planned ?? []);
   const wanted = (a: Annotation) =>
-    a.intent === "card" || (a.intent === "question" && a.card && a.status === "done" && a.answers?.length) || (a.intent === "keep" && item.meta.status === "done" && !planned.has(a.id));
+    a.intent === "card" ||
+    (a.intent === "question" && a.card && a.status === "done" && a.answers?.length) ||
+    (a.intent === "apply" && a.status === "done" && !!a.reflection) ||
+    (a.intent === "keep" && item.meta.status === "done" && !planned.has(a.id));
   return readAnnotations(item).filter((a) => wanted(a) && !drafted.has(a.id));
 }
 
@@ -161,12 +164,13 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
       existing_topics: topics.map((t) => ({ slug: t.slug, name: t.meta.name, aliases: t.meta.aliases })),
       highlights: pending.map((a) => ({
         annotation: a.id,
-        intent: a.intent === "card" ? "key_point" : a.intent === "keep" ? "highlight" : "question",
+        intent: a.intent === "card" ? "key_point" : a.intent === "keep" ? "highlight" : a.intent,
         note: a.note ?? null,
         text: a.exact,
         context: `${a.prefix}[[${a.exact}]]${a.suffix}`,
         answer: a.intent === "question" ? (a.answers ?? []).map((c) => c.text).join("\n") : null,
         point: a.point ?? false,
+        reflection: a.intent === "apply" ? (a.reflection ?? null) : null,
       })),
       open_questions: questions,
       notes,
@@ -189,6 +193,9 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
       for (const x of d.drafts) for (const id of new Set([x.annotation, ...x.also])) if (id) perHighlight.set(id, (perHighlight.get(id) ?? 0) + 1);
       const over = [...perHighlight].filter(([, k]) => k > 2).map(([id]) => id);
       if (over.length) return `at most two drafts per highlight: ${over.join(", ")}`;
+      const tries = pending.filter((a) => a.intent === "apply").map((a) => a.id);
+      const offTry = tries.filter((id) => d.drafts.filter((x) => x.annotation === id).length !== 1 || d.drafts.some((x) => x.annotation !== id && x.also.includes(id)));
+      if (offTry.length) return `exactly one draft per "apply" highlight, as its annotation and never in also: ${offTry.join(", ")}`;
       const uncovered = keyIds.filter((id) => !perHighlight.has(id));
       if (uncovered.length) return `every key point needs a draft (annotation or also): ${uncovered.join(", ")}`;
       const fromPlain = d.drafts.filter((x) => x.annotation && [x.annotation, ...x.also].every((id) => plainIds.has(id))).length;

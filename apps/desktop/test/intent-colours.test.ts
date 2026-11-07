@@ -23,12 +23,22 @@ describe("highlight intent colours", () => {
     expect(wrong.map(({ r, i }) => `${i}: ${r.trim()}`)).toEqual([]);
   });
 
-  test("the three intents paint three different tints on both pages", () => {
+  test("the four intents paint four different tints on both pages (D127 adds Try it, green)", () => {
+    let pages = 0;
     for (const block of css.split(":root")) {
-      const tint = (name: string) => block.match(new RegExp(`--${name}: ([^;]+);`))?.[1];
-      const [keep, card, question] = [tint("keep"), tint("card"), tint("question")];
-      if (!keep || !card || !question) continue;
-      expect(new Set([keep, card, question]).size).toBe(3);
+      const tints = ["keep", "card", "question", "apply"].map((name) => block.match(new RegExp(`--${name}: ([^;]+);`))?.[1]);
+      if (tints.some((t) => !t)) continue;
+      pages++;
+      expect(new Set(tints).size).toBe(4);
     }
+    expect(pages).toBe(2);
+  });
+
+  test("every intent has its highlight tint, popup switch and margin mark", () => {
+    for (const i of ["keep", "card", "question", "apply"]) {
+      expect(css).toContain(`::highlight(hl-${i})`);
+      expect(css).toMatch(new RegExp(`\\.intent\\.${i} \\{`));
+    }
+    for (const i of ["card", "question", "apply"]) expect(css).toContain(`.mark-icon.${i} {`);
   });
 });

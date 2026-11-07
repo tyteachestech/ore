@@ -1,5 +1,5 @@
 import { CaretRight, Collapse, Expand, Info as InfoIcon, Plus, Target, X } from "./icons";
-import { PixelBook, PixelNote, PixelQuestion } from "./PixelIcon";
+import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { useSplit } from "./split";
@@ -13,7 +13,7 @@ import { Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
-import { levelProgress, ore, opt, type Question, type Research, type Skill, type SkillStats } from "./ore";
+import { levelProgress, ore, opt, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
 import { AnswerBox, AskQuestion, announce, typedQuestion } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
@@ -27,7 +27,7 @@ type Props = {
   blocked: boolean;
   onOpen: (t: Omit<LinkTarget, "title">) => void;
   /** Opens a question's source at its passage. */
-  onQuestion: (q: Question) => void;
+  onQuestion: (q: Pick<Question, "item" | "id">) => void;
   /** Opens a source that answers, or may answer, a question (D75). */
   onOpenSource: (id: string) => void;
   /** After a source was added from a question's research, or a question was added. */
@@ -172,6 +172,7 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
           >
             {children}
           </Fold>
+          <Tries skill={skill.id} onPassage={onQuestion} notify={notify} />
           <Questions skill={skill.id} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} notify={notify} />
         </div>
       </div>
@@ -577,6 +578,184 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
         </>
       )}
     </Fold>
+  );
+}
+
+/** To try (D127): techniques from his reading he planned to try on his own work. Checking one off asks
+ *  how it went, in one line; that reflection becomes one Explain card at the next enrich. Hidden until
+ *  he marks the first one (the reader's popup is where they start), and nothing counts them (D23). */
+function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pick<Question, "item" | "id">) => void; notify: Notify }) {
+  const [ts, setTs] = useState<Try[] | null>(null);
+  const [showTried, setShowTried] = useState(false);
+  const [reflecting, setReflecting] = useState<string | null>(null);
+  // Tries he checked off while here stay in view under Tried, so what he wrote doesn't vanish (Things, Todoist).
+  const [recent, setRecent] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    ore<Try[]>("tries", opt("skill", skill)).then(
+      (r) => live && setTs(r),
+      (e) => live && notify(errorText(e), "error"),
+    );
+    return () => {
+      live = false;
+    };
+  }, [skill, notify]);
+
+  const put = (id: string, patch: Partial<Try>) => setTs((l) => l && l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  type State = { status: "open" | "done"; reflection?: string };
+  /** One write: checked off (with how it went, or none) or back to try; rolled back with an error toast. */
+  const write = async (t: Try, from: State, to: State) => {
+    put(t.id, to);
+    try {
+      // Back to try clears the reflection, so a state with an older one is two writes.
+      if (to.status === "open" || (from.reflection && !to.reflection)) await ore("tried", t.id, "--undo");
+      if (to.status === "done") await ore("tried", t.id, ...(to.reflection ? [opt("text", to.reflection)] : []));
+      return true;
+    } catch (e) {
+      put(t.id, from);
+      notify(errorText(e), "error");
+      return false;
+    }
+  };
+  const state = (t: Try): State => ({ status: t.status === "done" ? "done" : "open", reflection: t.reflection });
+  const change = async (t: Try, to: State, msg: string) => {
+    const was = state(t);
+    if (!(await write(t, was, to))) return false;
+    notify(msg, "quiet", () => void write(t, to, was), () => void write(t, was, to));
+    return true;
+  };
+  const check = async (t: Try) => {
+    const done = t.status !== "done";
+    if (!(await change(t, done ? { status: "done" } : { status: "open" }, done ? "Tried" : "Back to try"))) return;
+    setReflecting(done ? t.id : null);
+    if (done) setRecent((r) => [...r, t.id]);
+  };
+  const reflect = (t: Try, text: string) => {
+    setReflecting(null);
+    if (text && text !== t.reflection) void change(t, { status: "done", reflection: text }, "Saved how it went · a card comes from it");
+  };
+  const remove = async (t: Try) => {
+    let at = -1;
+    const back = () => setTs((l) => l && [...l.slice(0, at < 0 ? l.length : at), t, ...l.slice(at < 0 ? l.length : at)]);
+    setTs((l) => {
+      at = l ? l.findIndex((x) => x.id === t.id) : -1;
+      return l && l.filter((x) => x.id !== t.id);
+    });
+    try {
+      await ore("annotate", t.id, "--status", "deleted");
+    } catch (e) {
+      back();
+      return notify(errorText(e), "error");
+    }
+    notify(
+      "Removed",
+      "info",
+      () => (back(), void ore("annotate", t.id, "--status", t.status).catch((e) => notify(errorText(e), "error"))),
+      () => (setTs((l) => l && l.filter((x) => x.id !== t.id)), void ore("annotate", t.id, "--status", "deleted").catch((e) => notify(errorText(e), "error"))),
+    );
+  };
+
+  if (!ts?.length) return null;
+  const open = ts.filter((t) => t.status !== "done");
+  const tried = ts.filter((t) => t.status === "done");
+  const row = (t: Try) => (
+    <TryRow key={t.id} t={t} reflecting={reflecting === t.id} onCheck={() => void check(t)} onReflect={(on) => setReflecting(on ? t.id : null)} onSave={(text) => reflect(t, text)} onPassage={() => onPassage(t)} onRemove={() => void remove(t)} />
+  );
+  return (
+    <Fold id="tries" title="To try" icon={PixelTry} tone="apply" summary={open.length ? `${open.length} to try` : null} summaryFolded>
+      {open.map(row)}
+      {!open.length && <p className="quiet">All tried. Mark a technique with Try it (4) while you read to plan the next one.</p>}
+      {tried.length > 0 && (
+        <>
+          <button className="answered-toggle" aria-expanded={showTried} onClick={() => setShowTried(!showTried)}>
+            {showTried ? "Hide tried" : `Tried (${tried.length})`}
+          </button>
+          {tried.filter((t) => showTried || recent.includes(t.id)).map(row)}
+        </>
+      )}
+    </Fold>
+  );
+}
+
+/** Unsent reflections, per try, kept when the field closes. */
+const reflections = new Map<string, string>();
+
+function TryRow({ t, reflecting, onCheck, onReflect, onSave, onPassage, onRemove }: {
+  t: Try;
+  reflecting: boolean;
+  onCheck: () => void;
+  onReflect: (on: boolean) => void;
+  onSave: (text: string) => void;
+  onPassage: () => void;
+  onRemove: () => void;
+}) {
+  const done = t.status === "done";
+  const actions: MenuAction[] = [
+    { id: "open", label: "Open passage", run: onPassage },
+    { id: "check", label: done ? "Not tried yet" : "Mark tried", run: onCheck },
+    ...(done ? [{ id: "reflect", label: t.reflection ? "Edit how it went…" : "How did it go…", run: () => onReflect(true) }] : []),
+    { id: "delete", label: "Remove", danger: true, divider: true, run: onRemove },
+  ];
+  return (
+    <WithMenu actions={actions}>
+      <div className={`try${done ? " done" : ""}`}>
+        <Hint text={done ? "Not tried yet" : "Mark tried"}>
+          <button className="try-check" role="checkbox" aria-checked={done} aria-label={done ? "Not tried yet" : "Mark tried"} onClick={onCheck}>
+            {done && <PixelTry size={12} aria-hidden="true" />}
+          </button>
+        </Hint>
+        <Hint text="Open this passage">
+          <button className="question-quote try-quote" onClick={onPassage}>
+            {t.note && <span className="note">{t.note}</span>}
+            <span className="exact">“{t.exact.replace(/\s+/g, " ").trim()}”</span>
+            <span className="from">{t.item_title}</span>
+          </button>
+        </Hint>
+        {done && t.reflection && !reflecting && (
+          <Hint text="Edit how it went">
+            <button className="try-reflection" onClick={() => onReflect(true)}>{t.reflection}</button>
+          </Hint>
+        )}
+        <div className="question-actions">
+          <MoreButton label="Try actions" actions={actions} />
+        </div>
+        {reflecting && <Reflect id={t.id} initial={t.reflection ?? ""} onSave={onSave} onClose={() => onReflect(false)} />}
+      </div>
+    </WithMenu>
+  );
+}
+
+/** "How did it go?" in one field (Linear's inline edit): Enter saves, Esc closes and keeps the draft;
+ *  a blur keeps the field and what he typed. */
+function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string; onSave: (text: string) => void; onClose: () => void }) {
+  const [v, setV] = useState(() => reflections.get(id) ?? initial);
+  const field = useRef<HTMLTextAreaElement>(null);
+  useFocusWhileMounted(field);
+  return (
+    <div className="try-reflect">
+      <Grow
+        ref={field}
+        className="field"
+        aria-label="How did it go?"
+        placeholder="How did it go? What would you change next time?"
+        value={v}
+        onChange={(e) => {
+          setV(e.target.value);
+          reflections.set(id, e.target.value);
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            reflections.delete(id);
+            onSave(v.trim());
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            onClose();
+          }
+        }}
+      />
+    </div>
   );
 }
 

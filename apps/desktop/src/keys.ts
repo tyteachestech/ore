@@ -65,6 +65,7 @@ const DEFAULTS = [
   { id: "keep", label: "Highlight (no key point or question)", group: "Highlight", combo: "Digit1" },
   { id: "card", label: "Key point (nothing selected: a key point of your own, here)", group: "Highlight", combo: "Digit2" },
   { id: "question", label: "Question", group: "Highlight", combo: "Digit3" },
+  { id: "apply", label: "Try it (a technique to try on your own work)", group: "Highlight", combo: "Digit4" },
   { id: "note", label: "Write note", group: "Highlight", combo: "Tab" },
   { id: "remove", label: "Remove highlight", group: "Highlight", combo: "Backspace" },
   // The note editor's blocks (Notion's keys): the caret's block, or the one the ⋮⋮ handle is on.

@@ -2,23 +2,24 @@ import { CaretRight, Plus } from "./icons";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
 import { still } from "./SideCursor";
-import { PixelKeep, PixelQuestion, PixelStar } from "./PixelIcon";
+import { PixelKeep, PixelQuestion, PixelStar, PixelTry } from "./PixelIcon";
 import { INTENTS, PHONE, type Annotation, type Intent } from "./ore";
 import { load, save } from "./util";
 
 // D118: one highlight; a key point (`card` in the files) is a highlight he marked to come back, and the AI
 // plans the cards from all of them at the finish.
-export const LABEL: Record<Intent, string> = { keep: "Highlight", card: "Key point", question: "Question" };
-export const ICON: Record<Intent, typeof PixelKeep> = { keep: PixelKeep, card: PixelStar, question: PixelQuestion };
+export const LABEL: Record<Intent, string> = { keep: "Highlight", card: "Key point", question: "Question", apply: "Try it" };
+export const ICON: Record<Intent, typeof PixelKeep> = { keep: PixelKeep, card: PixelStar, question: PixelQuestion, apply: PixelTry };
 /** What each mark means, said on hover where he picks it. */
 export const MEANS: Record<Intent, string> = {
   keep: "Cards are planned from your highlights when you finish",
   card: "Make sure this comes back in review",
   question: "Something to find out",
+  apply: "A technique to try on your own work, then check off",
 };
 /** Highlights that are a generative step pop on their own (D65); any type pops when he writes a note on it. */
-const CELEBRATE: Intent[] = ["card", "question"];
-const PLURAL: Record<Intent, string> = { keep: "Highlights", card: "Key points", question: "Questions" };
+const CELEBRATE: Intent[] = ["card", "question", "apply"];
+const PLURAL: Record<Intent, string> = { keep: "Highlights", card: "Key points", question: "Questions", apply: "To try" };
 
 type Props = {
   anns: Annotation[];
@@ -40,7 +41,7 @@ export function Collected({ anns, ready, rectOf, onOpen }: Props) {
   const fly = useRef<{ intent: Intent; from: DOMRect } | null>(null);
 
   const counts = useMemo(() => {
-    const c: Record<Intent, number> = { keep: 0, card: 0, question: 0 };
+    const c: Record<Intent, number> = { keep: 0, card: 0, question: 0, apply: 0 };
     for (const a of anns) c[a.intent]++;
     return c;
   }, [anns]);
@@ -165,6 +166,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, 
   const of = (i: Intent) => sorted.filter((a) => a.intent === i);
   const cards = of("card");
   const keeps = of("keep");
+  const tries = of("apply");
 
   const box = useRef<HTMLDivElement>(null);
   // The key point field is gone (Enter or Esc): focus goes back to the + that opens it, never to the page body.
@@ -246,6 +248,12 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, 
         )}
         {!shut.has("question") && questions}
       </section>
+      {tries.length > 0 && (
+        <section>
+          {head("apply", "To try", PixelTry)}
+          {!shut.has("apply") && tries.map(row)}
+        </section>
+      )}
       {keeps.length > 0 && (
         <section>
           {head("keep", "Highlights", PixelKeep, shut.has("keep") ? <span className="cp-count">{keeps.length}</span> : null)}

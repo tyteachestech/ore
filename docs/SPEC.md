@@ -88,7 +88,7 @@ Body: Markdown. For YouTube, paragraphs carry `[mm:ss]` markers at the start. Fo
 
 ### annotations.jsonl (W3C-style)
 ```json
-{"id":"01J...","rev":1,"item":"01J...","ts":"...","intent":"keep|card|question",
+{"id":"01J...","rev":1,"item":"01J...","ts":"...","intent":"keep|card|question|apply",
  "exact":"selected text","prefix":"32 chars before","suffix":"32 chars after","start":1234,"end":1300,
  "note":"optional one line","status":"open|done|deleted"}
 ```
@@ -145,12 +145,14 @@ ore snippet --text|--stdin [--url] [--app] [--intent] [--note] [--skill s] [--no
 ore ls [--status] [--skill] [--topic] [--archived]   items (archived ones only with --archived); JSON adds dir and source_file (absolute; the original kept at capture, if any), thumbnail (absolute; thumbnail.* beside doc.md, D77) and has_notes (the source note has text)
 ore backfill [item]   fill in missing thumbnails and PDF authors on sources added before D77 (all sources without an item)
 ore show <item>                       frontmatter + body (or --annotations); JSON adds path, body, annotations (with anchor status), prequestions ([] when none), enrich_error (why background enrich failed, while never enriched), dir and source_file like ls, and for YouTube `transcript: {video, words: [[seconds, word]…]}` from source.vtt (D49)
-ore highlight <item> --exact "<text>" --intent keep|card|question [--note] [--start N]
+ore highlight <item> --exact "<text>" --intent keep|card|question|apply [--note] [--start N]
 ore highlight <item> --at N --note "<his line>" [--intent card|question]   # Card here (D99): a line anchored at the sentence around offset N
 ore annotate <annotation> --note|--intent|--status open|done|deleted   appends a new rev
 ore scope <item> [--reached N] [--leave-out "text"]   a partway finish (D100): leaves out prequestions answered only past body offset N, and (AI) those his note rules out
 ore questions [--skill s | --item i]  his questions (D47, D75), open first → [{...annotation, item_title, answers, matches, here?}]; status done = answered
 ore answer <q> [--text t [--item i] [--quote q]] [--done|--card] [--remove ts]   add to his answer; --card also drafts a card in the background (D75)
+ore tries [--skill s]   techniques he plans to try (Apply highlights, D127), to try first → [{...annotation, item_title}]; note = his plan, reflection = how it went
+ore tried <t> [--text "how it went"] [--undo]   check a try off; --text also drafts one Explain card in the background (D127)
 ore match <source> <q> [--drop]       a source that may answer a question, or "not answered here" (D75)
 ore prequestion <item> <n> --before "<text>" | --after "<text>" [--confidence 1-3]   record a prequestion attempt (n 1-based; confidence only with --after) → {item, n, q, before?, after?, confidence?}
 ore notes <item>                      Source note → {item, text, path, dir} (text "" when absent; path relative to the library; dir its folder, absolute)
@@ -267,7 +269,7 @@ Active note-taking (2026-10-22, D15, D18, D31–D34), all through the CLI:
 - Highlight note placeholder (D94): highlight "Note…" (D126), key point "This works because…", Question "My question… my guess:". Never prefilled. Older `research` highlights read as `question` (D91).
 - Source note as the right pane of a split screen (D44): the divider drags (280 px to 60% of the window, double-click resets, width kept in localStorage); editable whenever the source is open, autosaves with `ore notes <item> --set`. With it closed, a top-right button reads "+ Note" (empty) or "Note •" (has text).
 - Position bar and floating outline (D45): a 2 px bar under the title bar for scroll position; H1 to H3 of the rendered text as short lines at the right edge (deepest level dropped while there are more than 40), the current one brighter, hover lists the titles, click jumps. Both hidden during recalls.
-- Skill page (D46, D72), opened from the sidebar skill (an "All sources" row above the skills goes back to the full list): strength in the header (`ore stats --skill`, as gems, D90), the skill note (D41; an empty one offers the closed-book recall, which hides the page), questions (D47, D75: `ore questions --skill`; Answer writes with `ore answer`; Begin research runs `ore research <annotation>` and each source adds with `ore add <url> --skill <s> --for <q>`; Mark answered and Reopen set the annotation status; the quote opens the source scrolled to the passage), then the skill's sources (the list title is the To read / Done / Archived view menu, D74) with a dot on sources that have a source note.
+- Skill page (D46, D72), opened from the sidebar skill (an "All sources" row above the skills goes back to the full list): strength in the header (`ore stats --skill`, as gems, D90), the skill note (D41; an empty one offers the closed-book recall, which hides the page), questions (D47, D75: `ore questions --skill`; Answer writes with `ore answer`; Begin research runs `ore research <annotation>` and each source adds with `ore add <url> --skill <s> --for <q>`; Mark answered and Reopen set the annotation status; the quote opens the source scrolled to the passage), To try (D127: `ore tries --skill`, shown once he has one; the check box runs `ore tried`, then "How did it go?" saves with `ore tried --text`), then the skill's sources (the list title is the To read / Done / Archived view menu, D74) with a dot on sources that have a source note.
 - Note editor (D38, `apps/desktop/src/editor/`): Milkdown over the Markdown file; `/` menu (text, headings 1–3, lists, to-do, quote, callout, toggle, code, divider, image, link); `[[` picks a source or skill and inserts a link (D39); a click on a link opens it. Saving keeps every block he did not edit byte for byte (`preserve.ts`). Other raw HTML shows as literal text, never rendered. Images load through Tauri's asset protocol, scoped to the library at startup.
 - "Linked from" (D39) under the source note and skill notes: `ore backlinks`, each row opens the linking note.
 - Skill notes (D41): edited in place on the skill page (D46); an empty one offers "Warm up from memory". An empty note opens on "What do you know about <skill>, across what you've read?" with sources and notes hidden; ⌘↵ saves it under "Recall" (`ore notes --skill <s> --append --heading Recall`), Esc skips. Enrich does not draft from skill notes or links yet ("from your notes" / "from your links" items, D39, D41).

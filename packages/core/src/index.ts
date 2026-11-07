@@ -12,6 +12,7 @@ export * from "./library.ts";
 export * from "./lock.ts";
 export * from "./notes.ts";
 export * from "./questions.ts";
+export * from "./tries.ts";
 export * from "./links.ts";
 export * from "./diagrams.ts";
 export * from "./skills.ts";

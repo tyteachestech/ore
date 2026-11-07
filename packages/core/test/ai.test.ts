@@ -12,6 +12,7 @@ import { enrichError, enrichItem, needsEnrich, pendingHighlights, pendingItems, 
 import { chapterRecallFeedback, recallFeedback } from "../src/ai/recall.ts";
 import { anchorEvidence, checkPrequestion, finishScope, scopeFinish, setCovered, writeKeyPoints } from "../src/ai/check.ts";
 import { addHighlight, addPoint, findAnnotation, readAnnotations, reviseAnnotation } from "../src/annotations.ts";
+import { markTried } from "../src/tries.ts";
 import { listCards, writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { sha256 } from "../src/fsutil.ts";
@@ -196,7 +197,7 @@ describe("AI adapter", () => {
     expect(readTopic(lib, "agent-workflows")!.meta.status).toBe("active");
     const after = findItem(lib, item.meta.id).meta;
     expect(after.enriched_at).toBeDefined();
-    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@10" });
+    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@11" });
     const cards = listCards(lib);
     expect(cards).toHaveLength(1);
     expect(cards[0]!.meta).toMatchObject({ state: "draft", kind: "prompt", annotation: card.id, topics: ["agent-workflows"], ai: after.ai });
@@ -205,6 +206,21 @@ describe("AI adapter", () => {
     const again = await enrichItem(lib, item.meta.id);
     expect(again.skipped).toBeDefined();
     expect(calls()).toBe(1);
+  });
+
+  test("a try checked off with how it went gets exactly one Explain card, with his plan and reflection sent (D127)", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Open on the moment of change. Then rewind to how we got there." });
+    const t = addHighlight(findItem(lib, item.meta.id), { exact: "Open on the moment of change.", intent: "apply", note: "my next video" });
+    await markTried(lib, t.id, { reflection: "Hooked people; the rewind ran long." });
+    const prompt = { annotation: t.id, from_notes: false, prequestion: null, kind: "prompt", content_type: "procedure", question: "You're opening a talk on budgeting. How would you open it, and what would you watch for?", answer: "Start on the moment things changed, then rewind briefly.", rubric: ["Open on the change", "Keep the rewind short"], topics: [] };
+    const out = (drafts: object[]) => ({ prequestions: ["Q one?", "Q two?"], skills: ["ai"], suggested_skill: null, topics: [{ slug: "openings", name: "Openings", summary: "" }], drafts });
+    fakeClaude([out([]), out([prompt])]);
+    const r = await enrichItem(lib, item.meta.id);
+    expect(calls()).toBe(2);
+    expect(r.cards.map((c) => [c.kind, c.annotation])).toEqual([["prompt", t.id]]);
+    expect(readFileSync(join(binDir, "args.jsonl"), "utf8")).toContain("Hooked people; the rewind ran long.");
+    expect(pendingHighlights(findItem(lib, item.meta.id), listCards(lib))).toEqual([]);
   });
 
   const enrichOut = (prequestions: string[], drafts: object[] = []) => ({

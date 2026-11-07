@@ -805,6 +805,31 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   await until("Undo puts the first card back", async () => (await done()) === before && (await q.innerText()) === first);
 });
 
+journey("try it: 4 marks a technique to try, the skill page checks it off, and how it went is kept after a reload", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "Each successful retrieval changes the memory itself");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.press("4");
+  const sw = page.getByRole("dialog", { name: "Highlight" }).getByRole("button", { name: "Try it" });
+  await until("Try it is on", async () => (await sw.getAttribute("aria-pressed")) === "true");
+  await until("the plan field has the caret", async () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Note"));
+  await page.keyboard.type("Quiz myself before each edit session");
+  await page.keyboard.press("Enter");
+  await page.locator(".collected-chip.apply").waitFor();
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const row = page.locator(".try").filter({ hasText: "Quiz myself before each edit session" });
+  await row.getByRole("checkbox", { name: "Mark tried" }).click();
+  await page.getByLabel("How did it go?").fill("Caught two gaps before recording");
+  await page.keyboard.press("Enter");
+  const saved = page.locator(".try-reflection", { hasText: "Caught two gaps before recording" });
+  await saved.waitFor();
+  await Bun.sleep(500);
+  await page.reload();
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.locator(".answered-toggle", { hasText: "Tried" }).click();
+  await saved.waitFor();
+});
+
 journey("archive a source from its row, then Undo from the toast", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator(".row").filter({ hasText: AGENTS }).first();

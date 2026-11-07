@@ -8,7 +8,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, use
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, oreJob, opt, PHONE, type Item, type Question, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Reader } from "./Reader";
@@ -1952,7 +1952,7 @@ export function App() {
             targets={targets}
             blocked={overlay}
             onOpen={openLink}
-            onQuestion={(q: Question) => openSource(q.item, q.id)}
+            onQuestion={(q) => openSource(q.item, q.id)}
             onOpenSource={(id) => openSource(id)}
             onAdded={() => void refresh()}
             onAddSource={() => setAdding(true)}
