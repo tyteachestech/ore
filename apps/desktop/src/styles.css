@@ -2434,3 +2434,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-acts button { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 .tutor-acts button:hover:not(:disabled), .tutor-acts button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
 .tutor-acts button.done { border-color: transparent; color: var(--faint); }
+/* Quiz me (D128): his due cards in Review, for the skills in view. The panel's one text control. */
+.tutor-quiz { position: absolute; top: 7px; left: 12px; z-index: 6; }
+.tutor.float .tutor-quiz { top: 8px; left: 10px; }
+.tutor-quiz button { height: 26px; padding: 0 10px; border-radius: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.tutor-quiz button:hover, .tutor-quiz button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
