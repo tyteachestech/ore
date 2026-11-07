@@ -129,6 +129,15 @@ export function courseThumb(lessons: Item[]): Pick<Item, "type" | "thumbnail"> |
   return own ? { type: "article", thumbnail: own } : lessons.find((l) => l.thumbnail);
 }
 /** Whether a filter (⌘F on a list) finds the source: by its title, or a lesson by its course's title. */
+/** A pin time that lists a source between two pinned ones (they list by `pinned_at`): halfway
+ *  between them, or a second past the end it goes to. */
+export function pinBetween(before?: string, after?: string): string {
+  const a = before ? Date.parse(before) : NaN;
+  const b = after ? Date.parse(after) : NaN;
+  const t = !Number.isNaN(a) && !Number.isNaN(b) ? Math.round((a + b) / 2) : !Number.isNaN(b) ? b - 1000 : !Number.isNaN(a) ? a + 1000 : Date.now();
+  return new Date(t).toISOString();
+}
+
 export const titleMatches = (i: Item, q: string): boolean => {
   const t = q.toLowerCase();
   return i.title.toLowerCase().includes(t) || !!i.course?.title.toLowerCase().includes(t);

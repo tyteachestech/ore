@@ -273,9 +273,11 @@ export async function setItemArchived(lib: Library, id: string, archived: boolea
   return updateItemMeta(lib, id, (m) => ({ ...m, archived_at: archived ? (m.archived_at ?? nowIso()) : undefined }));
 }
 
-/** Pins a source to the top of every list it is in (Raycast's Pinned); `false` unpins it. */
-export async function setItemPinned(lib: Library, id: string, pinned: boolean): Promise<ItemMeta> {
-  return updateItemMeta(lib, id, (m) => ({ ...m, pinned_at: pinned ? (m.pinned_at ?? nowIso()) : undefined }));
+/** Pins a source to the top of every list it is in (Raycast's Pinned); `false` unpins it. Pinned
+ *  sources list in `pinned_at` order, so `at` (a time between two others) moves it among them. */
+export async function setItemPinned(lib: Library, id: string, pinned: boolean, at?: string): Promise<ItemMeta> {
+  if (at !== undefined && (!pinned || Number.isNaN(Date.parse(at)) || new Date(Date.parse(at)).toISOString() !== at)) throw new Error(`pin: --at needs an ISO time like 2026-11-07T08:00:00.000Z, not "${at}"`);
+  return updateItemMeta(lib, id, (m) => ({ ...m, pinned_at: pinned ? (at ?? m.pinned_at ?? nowIso()) : undefined }));
 }
 
 /** Renames a source; links store ids, so nothing that points at it breaks (D39). */

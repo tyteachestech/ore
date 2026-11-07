@@ -99,4 +99,14 @@ describe("pin a source", () => {
     await setItemPinned(lib, id, false);
     expect(findItem(lib, id).meta.pinned_at).toBeUndefined();
   });
+
+  test("a pinned source moves among the pinned by its pin time; a time that isn't one is refused", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Pinned sources can be put in his order." });
+    const id = item.meta.id;
+    await setItemPinned(lib, id, true);
+    expect((await setItemPinned(lib, id, true, "2020-01-01T00:00:00.000Z")).pinned_at).toBe("2020-01-01T00:00:00.000Z");
+    await expect(setItemPinned(lib, id, true, "tomorrow")).rejects.toThrow(/ISO time/);
+    expect(findItem(lib, id).meta.pinned_at).toBe("2020-01-01T00:00:00.000Z");
+  });
 });

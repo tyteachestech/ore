@@ -431,11 +431,11 @@ export const itemCommands: Record<string, Command> = {
   },
 
   pin: {
-    usage: "<item> [--undo]   list a source first, under Pinned; --undo unpins it",
-    options: { undo: { type: "boolean" } },
+    usage: "<item> [--at <iso time>] [--undo]   list a source first, under Pinned; --at sets its place among the pinned (they list by that time); --undo unpins it",
+    options: { undo: { type: "boolean" }, at: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
-      const meta = await setItemPinned(lib, findItem(lib, need(ref, "<item>")).meta.id, !f.undo);
+      const meta = await setItemPinned(lib, findItem(lib, need(ref, "<item>")).meta.id, !f.undo, str(f.at));
       return { data: meta, text: `${meta.pinned_at ? "Pinned" : "Unpinned"} ${meta.title}` };
     },
   },
