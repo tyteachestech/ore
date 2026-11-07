@@ -79,6 +79,7 @@ bun install                 # workspace deps (packages/*, apps/desktop)
 bun test                    # all tests (packages/core/test, apps/desktop/test: the note editor, headless)
 bun run typecheck           # tsc strict, whole workspace
 bun run golden:update       # rewrite test/golden/*.md (whole doc.md per sample source) after an import change you mean; read the diff
+bun run eval:grade          # grading eval: Ore's grader on 20 labeled cards (packages/core/eval/grade-cases.json) with Claude and Codex; prints accuracy, cost, time, saves packages/core/eval/results/grade-<date>.json. Spends AI usage: run by hand, never in CI
 bun run e2e                 # end-to-end journeys in a browser on a seeded mock library (apps/desktop/e2e); add one when a UI bug slipped past the unit tests
 bun link                    # from packages/cli: puts `ore` on PATH (~/.bun/bin/ore), pointing at this checkout
 ore --help                  # CLI reference; every command accepts --json

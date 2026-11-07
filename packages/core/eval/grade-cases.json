@@ -1,0 +1,205 @@
+{
+  "about": "Golden grading set, written for Ore (AGPL-3.0-or-later like the repo). Each case is one card, a typed answer, and the label a careful teacher gives it: right = the grader should propose Good or Easy (3-4), wrong = Again or Hard (1-2). Partial cases test the rubric: a missing required point is wrong, a missing 'Optionally' point is not.",
+  "cases": [
+    {
+      "id": "easy-capital",
+      "level": "easy",
+      "kind": "card",
+      "question": "What is the capital of Australia?",
+      "model_answer": "Canberra.",
+      "rubric": [],
+      "answer": "Canberra",
+      "label": "right"
+    },
+    {
+      "id": "easy-capital-wrong",
+      "level": "easy",
+      "kind": "card",
+      "question": "What is the capital of Australia?",
+      "model_answer": "Canberra.",
+      "rubric": [],
+      "answer": "Sydney",
+      "label": "wrong"
+    },
+    {
+      "id": "easy-blank",
+      "level": "easy",
+      "kind": "card",
+      "question": "What does FSRS stand for?",
+      "model_answer": "Free Spaced Repetition Scheduler.",
+      "rubric": [],
+      "answer": "no idea",
+      "label": "wrong"
+    },
+    {
+      "id": "easy-photosynthesis",
+      "level": "easy",
+      "kind": "card",
+      "question": "Which gas do plants take in from the air for photosynthesis?",
+      "model_answer": "Carbon dioxide (CO2).",
+      "rubric": [],
+      "answer": "CO2",
+      "label": "right"
+    },
+    {
+      "id": "easy-binary",
+      "level": "easy",
+      "kind": "card",
+      "question": "What is 1011 in binary as a decimal number?",
+      "model_answer": "11.",
+      "rubric": [],
+      "answer": "11",
+      "label": "right"
+    },
+    {
+      "id": "easy-binary-wrong",
+      "level": "easy",
+      "kind": "card",
+      "question": "What is 1011 in binary as a decimal number?",
+      "model_answer": "11.",
+      "rubric": [],
+      "answer": "13",
+      "label": "wrong"
+    },
+    {
+      "id": "easy-spacing",
+      "level": "easy",
+      "kind": "prompt",
+      "question": "What is the spacing effect?",
+      "model_answer": "Practice spread out over time is remembered longer than the same amount of practice crammed into one session.",
+      "rubric": ["Spread-out practice beats massed (crammed) practice", "The benefit is to long-term retention"],
+      "answer": "If you spread your study sessions out over days instead of cramming them into one night, you remember the material for much longer.",
+      "label": "right"
+    },
+    {
+      "id": "partial-retrieval-missing-why",
+      "level": "partial",
+      "kind": "prompt",
+      "question": "Why does testing yourself help you remember more than rereading?",
+      "model_answer": "Pulling an answer out of memory is itself practice: the effort of retrieval strengthens the memory and makes it easier to find next time, while rereading only feels familiar.",
+      "rubric": ["Retrieving from memory strengthens the memory", "Rereading gives a feeling of familiarity, not real learning"],
+      "answer": "Because rereading just makes things feel familiar, which tricks you into thinking you know them.",
+      "label": "wrong"
+    },
+    {
+      "id": "partial-optional-missing",
+      "level": "partial",
+      "kind": "prompt",
+      "question": "What does a hash table do, and how fast is a lookup?",
+      "model_answer": "It maps keys to values by hashing each key to a slot in an array, so a lookup takes constant time on average. Collisions are handled by chaining or probing.",
+      "rubric": ["Maps keys to values", "Average lookup is constant time, O(1)", "Optionally: names a way to handle collisions"],
+      "answer": "It stores key-value pairs by hashing the key to pick an array slot, so finding a value by its key is O(1) on average.",
+      "label": "right"
+    },
+    {
+      "id": "partial-one-of-three",
+      "level": "partial",
+      "kind": "prompt",
+      "question": "Name the three parts of the habit loop.",
+      "model_answer": "Cue, routine, reward.",
+      "rubric": ["Cue (trigger)", "Routine (the behavior)", "Reward"],
+      "answer": "The reward, and something else that kicks it off I think",
+      "label": "wrong"
+    },
+    {
+      "id": "partial-two-of-three",
+      "level": "partial",
+      "kind": "prompt",
+      "question": "What are the three states of matter you meet in everyday life, and what changes between them?",
+      "model_answer": "Solid, liquid and gas. Adding or removing heat changes how freely the particles move, which moves matter from one state to another.",
+      "rubric": ["Solid, liquid and gas", "Heat (energy) changes how freely the particles move"],
+      "answer": "Solid, liquid, gas.",
+      "label": "wrong"
+    },
+    {
+      "id": "partial-imprecise-but-complete",
+      "level": "partial",
+      "kind": "prompt",
+      "question": "What does compound interest mean?",
+      "model_answer": "Interest is paid on the original amount and also on the interest already earned, so the balance grows faster each period.",
+      "rubric": ["Interest is earned on past interest, not only on the principal", "Growth speeds up over time"],
+      "answer": "You get interest on your interest too, so the money snowballs and grows quicker and quicker.",
+      "label": "right"
+    },
+    {
+      "id": "partial-avoids-violated",
+      "level": "partial",
+      "kind": "prompt",
+      "question": "What is a placebo?",
+      "model_answer": "A treatment with no active ingredient, given so that any effect from expecting to get better can be measured or controlled for.",
+      "rubric": ["A treatment with no active ingredient", "Used to separate the effect of expectation from the real treatment", "Avoids: claiming placebos have no effect at all"],
+      "answer": "A fake pill with nothing active in it, used in trials as a control. It has no effect on the patient whatsoever.",
+      "label": "wrong"
+    },
+    {
+      "id": "tricky-paraphrase",
+      "level": "tricky",
+      "kind": "prompt",
+      "question": "Why do interest rate rises tend to cool inflation?",
+      "model_answer": "Higher rates make borrowing dearer and saving more rewarding, so people and firms spend less; lower demand eases pressure on prices.",
+      "rubric": ["Borrowing costs more / saving pays more", "Spending (demand) falls", "Less demand slows price rises"],
+      "answer": "Loans get pricier and putting money aside earns more, so everyone buys less stuff, and when fewer people are competing to buy, shops can't push prices up as fast.",
+      "label": "right"
+    },
+    {
+      "id": "tricky-reversed",
+      "level": "tricky",
+      "kind": "prompt",
+      "question": "In a Leitner box system, what happens to a card you get wrong?",
+      "model_answer": "It goes back to the first box, so you see it again soon.",
+      "rubric": ["It moves back to the first (most frequent) box", "So it is reviewed again soon"],
+      "answer": "It moves forward to the last box so you see it less often and stop wasting time on it.",
+      "label": "wrong"
+    },
+    {
+      "id": "tricky-long-confident-false",
+      "level": "tricky",
+      "kind": "prompt",
+      "question": "Why do we have seasons on Earth?",
+      "model_answer": "Earth's axis is tilted, so through the year each hemisphere leans toward or away from the Sun and gets more or less direct sunlight.",
+      "rubric": ["Earth's axis is tilted", "Each hemisphere gets more direct sunlight when it leans toward the Sun", "Avoids: saying seasons come from Earth's changing distance to the Sun"],
+      "answer": "Seasons happen because Earth's orbit is an ellipse, so in summer we are much closer to the Sun and in winter much farther away. The tilt of the axis also plays a small part in this, but it is mainly the distance that makes summer warm and winter cold, which is why the whole planet shares one season at a time.",
+      "label": "wrong"
+    },
+    {
+      "id": "tricky-terse-correct",
+      "level": "tricky",
+      "kind": "prompt",
+      "question": "What does a closure capture in JavaScript?",
+      "model_answer": "A function together with the variables from the scope where it was created, which it can still read and change after that scope has returned.",
+      "rubric": ["The variables of the scope where the function was defined", "They stay available after that outer function returns"],
+      "answer": "Its defining scope's variables, kept alive after the outer function returns.",
+      "label": "right"
+    },
+    {
+      "id": "tricky-misspelled",
+      "level": "tricky",
+      "kind": "prompt",
+      "question": "What do mitochondria do in a cell?",
+      "model_answer": "They turn food (glucose) and oxygen into ATP, the energy the cell runs on, through cellular respiration.",
+      "rubric": ["They produce ATP (the cell's energy)", "Through cellular respiration, using glucose and oxygen"],
+      "answer": "they make ATP, the cels energy, by respiraton using glucose and oxigen",
+      "label": "right"
+    },
+    {
+      "id": "tricky-keywords-no-understanding",
+      "level": "tricky",
+      "kind": "prompt",
+      "question": "Why does a ship made of steel float?",
+      "model_answer": "Its hull encloses a lot of air, so the ship's average density is lower than water's; it sinks until it pushes aside water weighing as much as itself, and that buoyant force holds it up.",
+      "rubric": ["Its shape encloses air, so its average density is less than water's", "It displaces water equal to its own weight (buoyancy)"],
+      "answer": "Buoyancy and density. Archimedes. Steel is less dense than water.",
+      "label": "wrong"
+    },
+    {
+      "id": "tricky-hedged-correct",
+      "level": "tricky",
+      "kind": "card",
+      "question": "What does the 'S' in the SOLID principles of software design stand for?",
+      "model_answer": "Single responsibility principle: a class should have one reason to change.",
+      "rubric": [],
+      "answer": "I think it's single responsibility, each class should only do one job / have one reason to change?",
+      "label": "right"
+    }
+  ]
+}
