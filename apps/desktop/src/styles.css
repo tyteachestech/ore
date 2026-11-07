@@ -1047,6 +1047,11 @@ body.resizing iframe { pointer-events: none; }
 .cp-count { margin-left: 6px; font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .cp-row { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 30px; text-align: left; padding: 6px 8px; border-radius: 8px; color: var(--text); line-height: 1.4; }
 .cp-row:hover { background: var(--bg-hover); }
+/* A row's ⋯ shows on hover, over the row's right end (Linear). */
+.cp-line { position: relative; }
+.cp-line .more { position: absolute; right: 4px; top: 4px; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); opacity: 0; }
+.cp-line:hover .more, .cp-line .more:focus-visible, .cp-line .more[aria-expanded="true"] { opacity: 1; }
+.cp-line .more:hover, .cp-line .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 .cp-row:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .cp-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cp-row:not(.point) .cp-text { color: var(--muted); }

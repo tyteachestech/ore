@@ -170,6 +170,27 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  const toggle = page.locator(".cp-head.keep .cp-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  const row = () => page.locator(".cp-head.keep ~ .cp-line").first();
+  await row().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Type" }).hover();
+  await page.getByRole("menuitemcheckbox", { name: "Question" }).dispatchEvent("click");
+  await until("it is a question now", async () => (await keeps.count()) === 0 || Number(await keeps.innerText()) === before - 1);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z makes it a highlight again", async () => (await keeps.count()) > 0 && Number(await keeps.innerText()) === before);
+  await row().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Remove highlight" }).click();
+  await until("it is gone", async () => (await keeps.count()) === 0 || Number(await keeps.innerText()) === before - 1);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z brings it back", async () => (await keeps.count()) > 0 && Number(await keeps.innerText()) === before);
+});
+
 journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {
   await openSource(page, TESTING);
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
