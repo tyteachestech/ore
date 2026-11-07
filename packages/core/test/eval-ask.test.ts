@@ -28,7 +28,7 @@ describe("ask-your-library eval", () => {
     const wiki = [...names].find(([, n]) => n === "web-wikipedia")![0];
     const body = (id: string) => findItem(lib, id).body;
     const at = body(wiki).indexOf("return to the first box");
-    const cite = { n: 1, item: wiki, title: "Spaced repetition", heading: "", quote: "return to the first box", start: at, end: at + 23 };
+    const cite = { n: 1, item: wiki, title: "Spaced repetition", heading: "", quote: "return to the first box", text: "return to the first box", start: at, end: at + 23 };
     const c = loadAskCases().cases.find((x) => x.id === "wiki-leitner-wrong")!;
     const r = (over: object) => ({ question: c.question, found: true, answer: "It goes back to the first box [1].", citations: [cite], ai: null, usage: null, ...over });
     expect(scoreAnswer(c, r({}), names, body)).toEqual({ answer_ok: true, citation_ok: true });

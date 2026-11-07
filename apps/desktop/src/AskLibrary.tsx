@@ -7,7 +7,7 @@ import { ore, opt } from "./ore";
 import { errorText } from "./util";
 import { Working } from "./Working";
 
-export type Citation = { n: number; item: string; title: string; heading: string; quote: string; start: number; end: number };
+export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
 export type LibraryTurn = { question: string; found?: boolean; answer?: string; citations?: Citation[]; error?: string };
 type Reply = { found: boolean; answer: string; citations: Citation[] };
 
@@ -130,7 +130,7 @@ export function AskLibrary({ turns, setTurns, onOpen, onClose }: {
                                       {c.title}
                                       {c.heading && <span className="sub"> › {c.heading}</span>}
                                     </span>
-                                    <span className="library-quote">“{c.quote}”</span>
+                                    <span className="library-quote">“{c.text}”</span>
                                   </span>
                                 </button>
                               </li>

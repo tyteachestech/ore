@@ -85,7 +85,12 @@ export const AskLibraryOutput = z.strictObject({
   citations: z.array(z.strictObject({ passage: z.string(), quote: z.string().min(1) })),
 });
 
-export interface Citation { n: number; item: string; title: string; heading: string; quote: string; start: number; end: number }
+/** `quote` is the exact Markdown at start..end (for the jump); `text` is how it reads. */
+export interface Citation { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number }
+
+/** Markdown as it reads: a link's text without its URL, no emphasis or code marks, no footnote marks. */
+export const plainText = (md: string) =>
+  md.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[\^\d+\]/g, "").replace(/(\*\*|__|\*|`)/g, "").replace(/\s+/g, " ").trim();
 export interface AskTurn { question: string; answer: string }
 
 export const NOT_FOUND = "Nothing in your library mentions that.";
@@ -120,7 +125,8 @@ export async function askLibrary(lib: Library, question: string, earlier: AskTur
     ? data.citations.map((c, i) => {
         const p = byId.get(c.passage)!;
         const at = locate(p.text, c.quote)!;
-        return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote: p.text.slice(at.start, at.end), start: p.start + at.start, end: p.start + at.end };
+        const quote = p.text.slice(at.start, at.end);
+        return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
       })
     : [];
   return { question: q, found: data.found, answer: data.answer, citations, ai, usage };
