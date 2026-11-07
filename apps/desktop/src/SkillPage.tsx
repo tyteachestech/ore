@@ -59,6 +59,31 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
+  // The note column keeps where it was scrolled, like the reader (back from a source, or a relaunch).
+  const noteCol = useRef<HTMLDivElement>(null);
+  const noteScroll = `ore.skillnote.scroll.${skill.id}`;
+  const loaded = notes.text !== null;
+  /** True while the saved place is being put back: those scrolls aren't his. */
+  const restoring = useRef(false);
+  useEffect(() => {
+    const el = noteCol.current;
+    const want = Number(load(noteScroll) ?? 0);
+    if (!loaded || !el || !(want > 0)) return;
+    // The editor lays out over a few frames: set it until the column is tall enough to hold it.
+    let n = 0;
+    let raf = 0;
+    const stop = () => void (restoring.current = false);
+    const put = () => {
+      el.scrollTop = want;
+      if (Math.abs(el.scrollTop - want) > 1 && ++n < 30) raf = requestAnimationFrame(put);
+      else raf = requestAnimationFrame(stop);
+    };
+    restoring.current = true;
+    // He scrolls first: his place wins.
+    el.addEventListener("wheel", () => (cancelAnimationFrame(raf), stop()), { once: true });
+    put();
+    return () => (cancelAnimationFrame(raf), stop());
+  }, [loaded, noteScroll]);
   const editor = useRef<NoteEditorHandle>(null);
   // The closed-book popup: the D41 warm-up, or a try at his goal (D101).
   const [recalling, setRecalling] = useState<"warm" | "goal" | null>(null);
@@ -121,7 +146,7 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
       </header>
 
       <div className={`skill-cols${split.dragging ? " dragging" : ""}${wide ? " wide" : ""}`} style={{ gridTemplateColumns: wide ? "minmax(0, 1fr)" : `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` }}>
-        <div className="skill-col">
+        <div className="skill-col" ref={noteCol} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
           <section className="skill-card skill-note" data-tone="note">
             <div className="card-head">
               <span className="card-title"><PixelNote className="card-icon" size={12} aria-hidden="true" /><h2>Your note</h2></span>

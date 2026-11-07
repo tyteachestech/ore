@@ -707,6 +707,22 @@ journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", a
   await until("⌘Z puts it back in Life", async () => (await inGroup("Life", "Habits")) === 1);
 });
 
+journey("skill note: coming back to a long note puts it where he left it", async (page) => {
+  const ore = (args: string[]) => page.evaluate((args) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<{ text: string }> } }).__TAURI_INTERNALS__.invoke("ore", { args }), args);
+  const was = (await ore(["notes", "--skill=learning"])).text;
+  await ore(["notes", "--skill=learning", `--set=${Array.from({ length: 80 }, (_, i) => `Line ${i + 1} of a long note.`).join("\n\n")}`]);
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const col = page.locator(".skill-col").first();
+  await page.getByText("Line 80 of a long note.").waitFor();
+  await col.evaluate((el) => (el.scrollTop = 900));
+  await page.waitForTimeout(100);
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.getByText("Line 80 of a long note.").waitFor();
+  await until("the note is where he left it", async () => Math.abs((await col.evaluate((el) => el.scrollTop)) - 900) <= 1);
+  await ore(["notes", "--skill=learning", `--set=${was}`]);
+});
+
 journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page) => {
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const open = () => page.getByText("Does this hold for kids?", { exact: true }).filter({ visible: true }).count();
