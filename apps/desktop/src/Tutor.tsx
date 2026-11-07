@@ -181,10 +181,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     if (!message || busy) return;
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
     chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}) });
-    if (typed) {
-      setDraft(() => ({ input: "", mentions: [] }));
-      setAt(null);
-    }
+    if (typed) setDraft(() => ({ input: "", mentions: [] }));
+    setAt(null);
     field.current?.focus();
   };
 

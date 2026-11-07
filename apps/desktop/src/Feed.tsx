@@ -9,7 +9,7 @@ import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { ore, opt, type Skill } from "./ore";
-import { SkillChip, SkillPicker } from "./Skills";
+import { SkillChip, SkillPicker, unfile } from "./Skills";
 import { errorText, load, save, type Notify } from "./util";
 import { Working } from "./Working";
 
@@ -171,11 +171,11 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   };
 
   const refile = (f: FeedInfo, next: string[], before = f.skills, undoable = true) => {
-    const put = (s: string[]) => setData((d) => d && { ...d, feeds: d.feeds.map((x) => (x.url === f.url ? { ...x, skills: s } : x)) });
-    put(next);
+    const put = (s: (now: string[]) => string[]) => setData((d) => d && { ...d, feeds: d.feeds.map((x) => (x.url === f.url ? { ...x, skills: s(x.skills) } : x)) });
+    put(() => next);
     ore("feed", "set", f.url, ...(next.length ? next.map((k) => opt("skill", k)) : [opt("skill", "")])).then(
       () => undoable && notify(`Changed the skills for ${f.title}`, "quiet", () => refile(f, before, next, false), () => refile(f, next, before, false)),
-      (e) => (put(before), notify(errorText(e), "error")),
+      (e) => (put((now) => unfile(now, next, before)), notify(errorText(e), "error")),
     );
   };
 

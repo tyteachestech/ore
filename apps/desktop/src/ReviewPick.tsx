@@ -66,7 +66,12 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
       if (!next.delete(id)) next.add(id);
       return next;
     });
-  // Fresh numbers can drop a ticked row, so only the ticks on rows still shown count.
+  // Fresh numbers can drop a ticked row: its tick goes, so it comes back unticked if it returns.
+  const shown = rows.map((r) => r.skill.id).join(",");
+  useEffect(() => {
+    const ids = shown.split(",");
+    setOn((cur) => ([...cur].every((id) => ids.includes(id)) ? cur : new Set([...cur].filter((id) => ids.includes(id)))));
+  }, [shown]);
   const picked = rows.map((r) => r.skill.id).filter((id) => on.has(id));
   const start = () => {
     if (!picked.length) return;

@@ -433,11 +433,16 @@ journey("tutor Show me: a half-written reply and its @ mention stay in the box w
   await page.keyboard.press("Meta+j");
   const tutor = page.getByRole("complementary", { name: "Tutor" });
   const field = page.getByRole("textbox", { name: "Message the tutor" });
-  await field.fill("Which group did better?");
-  await page.keyboard.press("Enter");
+  const list = page.getByRole("listbox", { name: "Point the tutor at" });
+  // A starter sent with the @ list open closes the list.
+  await field.pressSequentially("@agen");
+  await list.waitFor();
+  await tutor.locator(".tutor-starters button").first().click();
   await tutor.getByRole("button", { name: "Show me" }).waitFor();
+  if (await list.count()) throw new Error("the @ list stayed open after a starter went");
+  await field.fill("");
   await field.pressSequentially("Like @agen");
-  await page.getByRole("listbox", { name: "Point the tutor at" }).getByRole("option", { name: new RegExp(AGENTS) }).waitFor();
+  await list.getByRole("option", { name: new RegExp(AGENTS) }).waitFor();
   await page.keyboard.press("Enter");
   await field.pressSequentially("says?");
   const draft = `Like @${AGENTS} says?`;
@@ -796,25 +801,30 @@ journey("skill note: Esc selects the block, a second Esc leaves the note so the 
   await page.keyboard.press("ControlOrMeta+z");
 });
 
-journey("skill picker: a filing that fails takes its tick back, and clicking the skill again files it", async (page) => {
+journey("skill picker: a filing that fails takes its tick back, on Home and in the reader, and clicking the skill again files it", async (page) => {
   type W = { __ORE_FAIL?: Record<string, string> };
+  const check = async (button: ReturnType<Page["locator"]>) => {
+    await button.click();
+    const picker = page.locator(".skill-picker");
+    const name = (await picker.getByRole("option").filter({ hasNot: page.locator("svg") }).first().locator(".menu-label").innerText()).trim();
+    const target = picker.getByRole("option").filter({ has: page.locator(".menu-label", { hasText: name }) });
+    const ticked = async () => (await target.locator("svg").count()) > 0; // the check
+    await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = { edit: "The disk is full." }));
+    await target.click();
+    await page.locator(".toast", { hasText: "The disk is full." }).waitFor();
+    await until(`the failed tick on ${name} goes back`, async () => !(await ticked()));
+    await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = {}));
+    await target.click();
+    await page.locator(".toast", { hasText: `under ${name}` }).waitFor();
+    if (!(await ticked())) throw new Error("clicking again did not file it");
+    await target.click(); // as it was, for the journeys after this one
+    await page.locator(".toast", { hasText: `from ${name}` }).waitFor();
+    await page.keyboard.press("Escape");
+    await picker.waitFor({ state: "detached" });
+  };
+  await check(page.locator(".home").getByRole("button", { name: /^Skills for / }).first());
   await openSource(page, TESTING);
-  await page.getByRole("button", { name: `Skills for ${TESTING}` }).click();
-  const picker = page.locator(".skill-picker");
-  const name = (await picker.getByRole("option").filter({ hasNot: page.locator("svg") }).first().locator(".menu-label").innerText()).trim();
-  const target = picker.getByRole("option").filter({ has: page.locator(".menu-label", { hasText: name }) });
-  const ticked = async () => (await target.locator("svg").count()) > 0; // the check
-  if (await ticked()) throw new Error(`${name} started ticked`);
-  await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = { edit: "The disk is full." }));
-  await target.click();
-  await page.locator(".toast", { hasText: "The disk is full." }).waitFor();
-  await until("the failed tick goes back", async () => !(await ticked()));
-  await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = {}));
-  await target.click();
-  await page.locator(".toast", { hasText: `Filed under ${name}` }).waitFor();
-  if (!(await ticked())) throw new Error("clicking again did not file it");
-  await target.click(); // as it was, for the journeys after this one
-  await page.locator(".toast", { hasText: `Removed from ${name}` }).waitFor();
+  await check(page.getByRole("button", { name: `Skills for ${TESTING}` }));
 });
 
 journey("source title: one click renames it in place, Enter saves, Esc keeps the old one, ⌘Z takes it back", async (page) => {

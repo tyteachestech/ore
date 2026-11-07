@@ -41,8 +41,8 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   value: string[];
   /** The source's title, for the button's label. */
   title: string;
-  /** `changed` is the skill just ticked or unticked, for the toast. A save that resolves false failed, and its tick goes back. */
-  onChange: (next: string[], before: string[], changed: Skill) => void | Promise<boolean | void>;
+  /** `changed` is the skill just ticked or unticked, for the toast. */
+  onChange: (next: string[], before: string[], changed: Skill) => void;
   /** Makes a skill (`ore skills add`); undefined if that failed and the caller said why. */
   onCreate: (name: string) => Promise<Skill | undefined>;
   /** Opens as it appears: on a source just added with no skill, so filing it is the next keystroke. */
@@ -55,11 +55,13 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
 }) {
   const [open, setOpen] = useState(startOpen);
   const [query, setQuery] = useState("");
-  // Ticks made while open show at once and build on each other, before the list refreshes.
+  // Ticks made while open show at once and build on each other; whenever the skills it is given change
+  // (a save landing, or one that failed and was taken back), it shows those, open or not.
   const [sel, setSel] = useState(value);
+  const given = value.join(",");
   useEffect(() => {
-    if (!open) setSel(value);
-  }, [open, value]);
+    setSel(given ? given.split(",") : []);
+  }, [open, given]);
   // The skills it had when it opened come first (Linear's labels), so they are seen at once; the order
   // holds while it is open, so a row never jumps out from under the pointer, and re-sorts next time.
   const [first, setFirst] = useState(value);
@@ -68,10 +70,8 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   const shown = skillsFirst(skills, first).filter((k) => k.name.toLowerCase().includes(typed.toLowerCase()));
   const toggle = (k: Skill) => {
     const next = sel.includes(k.id) ? sel.filter((s) => s !== k.id) : [...sel, k.id];
-    const saved = onChange(next, sel, k);
+    onChange(next, sel, k);
     setSel(next);
-    const on = next.includes(k.id);
-    void Promise.resolve(saved).then((ok) => ok === false && setSel((cur) => (on ? cur.filter((s) => s !== k.id) : cur.includes(k.id) ? cur : [...cur, k.id])));
   };
   const create = async () => {
     const made = await onCreate(typed);
@@ -135,6 +135,12 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
     </Popover.Root>
   );
 }
+
+/** `now` with the one change from `before` to `next` taken back, keeping any made since (a failed save's rollback). */
+export const unfile = (now: string[], next: string[], before: string[]) => [
+  ...now.filter((s) => before.includes(s) || !next.includes(s)),
+  ...before.filter((s) => !next.includes(s) && !now.includes(s)),
+];
 
 /** `skills` with the `first` ids ahead of the rest, each part keeping its sidebar order. */
 export const skillsFirst = (skills: Skill[], first: string[]): Skill[] => [

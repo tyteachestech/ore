@@ -33,7 +33,7 @@ import { QuestionsPanel } from "./Questions";
 import { Position } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, type Annotation, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
-import { SkillChip, skillMade, SkillPicker } from "./Skills";
+import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable } from "./listen";
@@ -2039,11 +2039,9 @@ function ReaderView(p: Props & { reload: () => void }) {
       await ore("edit", doc.id, "--skills", skills.join(","));
       p.onChanged();
       if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => void fileUnder(before), () => void fileUnder(skills));
-      return true;
     } catch (e) {
-      setDoc((cur) => cur && { ...cur, skills: before });
+      setDoc((cur) => cur && { ...cur, skills: unfile(cur.skills, skills, before) });
       p.notify(errorText(e), "error");
-      return false;
     }
   };
   /** A skill typed into the skill picker: made at once, so the picker can tick it. */
@@ -2407,7 +2405,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                 {PHONE ? (
                   doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
                 ) : (
-                  <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked}>
+                  <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked}>
                     {doc.skills.length > 0 &&
                       doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)}
                   </SkillPicker>
