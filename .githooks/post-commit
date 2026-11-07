@@ -1,6 +1,8 @@
 #!/bin/sh
 # Rebuild and reinstall /Applications/Ore.app when a commit touches the desktop app.
 # Runs in the background so the commit returns at once. Log: ~/Library/Caches/ore/app-install.log
+# Only master installs: a branch commit in a worktree must not replace the app Tyler uses.
+[ "$(git rev-parse --abbrev-ref HEAD)" = master ] || exit 0
 git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^apps/desktop/' || exit 0
 root=$(git rev-parse --show-toplevel)
 cache="$HOME/Library/Caches/ore"
