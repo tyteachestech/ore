@@ -41,12 +41,13 @@ export function splitPassages(body: string): Omit<Passage, "id" | "item" | "titl
 }
 
 /** The passages most likely to answer the question: up to `max` in all, at most five per source.
- *  `only` searches that one source instead of the library (the tutor's "this source"). */
-export function retrieve(lib: Library, question: string, max = 10, only?: string): Passage[] {
+ *  `only` searches that one source (no cap per source) or those sources instead of the whole library
+ *  (the tutor's "this source", or the sources he @-mentioned). */
+export function retrieve(lib: Library, question: string, max = 10, only?: string | string[]): Passage[] {
   const terms = queryTerms(question);
   if (!terms.length) return [];
-  let ids: string[] = only ? [only] : [];
-  if (!only) {
+  let ids: string[] = only === undefined ? [] : [only].flat();
+  if (only === undefined) {
     const index = openIndex(lib);
     try {
       ids = index.sourcesMatching(terms, 6);
@@ -74,7 +75,7 @@ export function retrieve(lib: Library, question: string, max = 10, only?: string
   const out: Passage[] = [];
   for (const { c } of scored) {
     if (out.length >= max) break;
-    if (!only && (per.get(c.item) ?? 0) >= 5) continue;
+    if (typeof only !== "string" && (per.get(c.item) ?? 0) >= 5) continue;
     per.set(c.item, (per.get(c.item) ?? 0) + 1);
     const { body: _, around: __, note: ___, ...p } = c;
     out.push({ ...p, id: `P${out.length + 1}` });

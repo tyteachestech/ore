@@ -187,6 +187,23 @@ journey("tutor: ⌘J opens it beside the source it sees, a reply shows its sourc
   await tutor.getByText("Why does this work?").waitFor();
 });
 
+journey("tutor @: typing @ lists skills and sources, Enter writes the name in, and the message goes out pointed at it", async (page) => {
+  await page.keyboard.press("Meta+j");
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  await field.pressSequentially("What does @agen");
+  const list = page.getByRole("listbox", { name: "Point the tutor at" });
+  await list.getByRole("option", { name: new RegExp(AGENTS) }).waitFor();
+  await page.keyboard.press("Enter");
+  await until("the list closes", async () => (await list.count()) === 0);
+  await until("the name is in the text", async () => (await field.inputValue()) === `What does @${AGENTS} `);
+  await field.pressSequentially("say?");
+  const sent = page.waitForRequest((r) => new RegExp(`"tutor","What does @${AGENTS} say\\?","--source=`).test(r.postData() ?? ""));
+  await page.keyboard.press("Enter");
+  await sent;
+  await page.locator(".ask-me .tutor-at").filter({ hasText: `@${AGENTS}` }).waitFor();
+  await page.keyboard.press("Escape");
+});
+
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).

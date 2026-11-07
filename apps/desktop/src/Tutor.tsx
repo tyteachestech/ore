@@ -8,10 +8,11 @@ import { useSideWidth } from "./Notes";
 import { ore, opt } from "./ore";
 import { errorText } from "./util";
 import { Working } from "./Working";
+import { mentionMatches, type Mention } from "./mentions";
 
 export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
 /** One exchange. `item`/`title` is the source it was asked about (the context chip at the time). */
-export type TutorTurn = { message: string; item?: string; title?: string; reply?: string; citations?: Citation[]; general?: boolean; error?: string };
+export type TutorTurn = { message: string; item?: string; title?: string; mentions?: Mention[]; reply?: string; citations?: Citation[]; general?: boolean; error?: string };
 type Reply = { reply: string; citations: Citation[]; general: boolean };
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -20,11 +21,14 @@ const STARTERS = ["What have I been learning?", "Quiz me"];
 
 /** The tutor (D128): a chat docked at the window's right, like Notion AI's and Linear's Ask panels,
  *  opened from the bubble at the bottom right or ⌘J. It sees the source he is reading (the chip over
- *  the field, removable), answers from his sources with numbered citations that open the passage
+ *  the field, removable) and what he @-mentions, answers from his sources with numbered citations that open the passage
  *  (the panel stays), says when an answer is from general knowledge, and gives hints, not answers, on
  *  practice. The thread lives in App, so it survives navigation; + starts a new one. */
-export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
+export function Tutor({ turns, setTurns, reading, sources, skills, onOpen, onClose }: {
   turns: TutorTurn[];
+  /** What @ can point at. */
+  sources: { id: string; title: string }[];
+  skills: { id: string; name: string }[];
   setTurns: (f: (t: TutorTurn[]) => TutorTurn[]) => void;
   /** The source on screen, if any. */
   reading: { id: string; title: string } | null;
@@ -35,6 +39,12 @@ export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
   // He can take the open source out of the context (the chip's ×); a new source puts it back.
   const [dropped, setDropped] = useState<string | null>(null);
   const context = reading && dropped !== reading.id ? reading : null;
+  // @-mentions (Claude's and ChatGPT's @): the name goes into the text, and each one still written
+  // there when he sends points the tutor at it.
+  const [mentions, setMentions] = useState<Mention[]>([]);
+  const [at, setAt] = useState<{ query: string; start: number } | null>(null);
+  const [pick, setPick] = useState(0);
+  const matches = at ? mentionMatches(at.query, sources, skills, mentions.filter((m) => input.includes(`@${m.name}`))) : [];
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const busy = turns.some((t) => t.reply === undefined && !t.error);
@@ -45,7 +55,8 @@ export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
     const t = all[i]!;
     const earlier = all.slice(0, i).flatMap((x) => (x.reply ? [{ message: x.message, reply: x.reply }] : []));
     try {
-      const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []));
+      const pointed = (t.mentions ?? []).map((m) => opt(m.kind, m.id));
+      const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []));
       setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, reply: r.reply, citations: r.citations, general: r.general, error: undefined } : x)));
     } catch (e) {
       setTurns((ts) => ts.map((x, j) => (j === i ? { ...x, error: errorText(e, "answer that") } : x)));
@@ -55,16 +66,36 @@ export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
   const send = (text: string) => {
     const message = text.trim();
     if (!message || busy) return;
-    const next = [...turns, { message, ...(context ? { item: context.id, title: context.title } : {}) }];
+    const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
+    const next = [...turns, { message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}) }];
     setTurns(() => next);
     setInput("");
+    setMentions([]);
+    setAt(null);
     field.current?.focus();
     void run(next.length - 1, next);
   };
   const retry = (i: number) => {
-    const next = turns.map((t, j) => (j === i ? { message: t.message, item: t.item, title: t.title } : t));
+    const next = turns.map((t, j) => (j === i ? { message: t.message, item: t.item, title: t.title, mentions: t.mentions } : t));
     setTurns(() => next);
     void run(i, next);
+  };
+
+  /** The @word the caret is in, if any. */
+  const track = (text: string, caret: number) => {
+    const m = /(?:^|\s)@([^\s@]*)$/.exec(text.slice(0, caret));
+    setAt(m ? { query: m[1]!, start: caret - m[1]!.length - 1 } : null);
+    setPick(0);
+  };
+  const choose = (m: Mention) => {
+    if (!at) return;
+    const word = `@${m.name} `;
+    const text = input.slice(0, at.start) + word + input.slice(at.start + 1 + at.query.length).replace(/^ /, "");
+    setInput(text);
+    setMentions((ms) => [...ms, m]);
+    setAt(null);
+    const caret = at.start + word.length;
+    requestAnimationFrame(() => field.current?.setSelectionRange(caret, caret));
   };
 
   useEffect(() => {
@@ -101,7 +132,7 @@ export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
       </Hint>
       <div className="tutor-head">
         <Hint text="New chat">
-          <button className="icon-btn" aria-label="New chat" disabled={!turns.length || busy} onClick={() => { setTurns(() => []); field.current?.focus(); }}>
+          <button className="icon-btn" aria-label="New chat" disabled={!turns.length || busy} onClick={() => { setTurns(() => []); setMentions([]); field.current?.focus(); }}>
             <Plus size={14} aria-hidden="true" />
           </button>
         </Hint>
@@ -121,7 +152,7 @@ export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
         )}
         {turns.map((t, i) => (
           <div key={i} className="library-turn">
-            <p className="ask-me">{t.message}</p>
+            <p className="ask-me">{marked(t.message, t.mentions ?? [])}</p>
             <div className="ask-ai">
               <Sparkle className="ask-mark" size={14} aria-hidden="true" />
               <div className="ask-text">
@@ -142,6 +173,30 @@ export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
         <div ref={end} />
       </div>
       <div className="tutor-foot">
+        {at && (
+          <div className="tutor-mention" role="listbox" aria-label="Point the tutor at">
+            {matches.length ? (
+              matches.map((m, i) => (
+                <button
+                  key={m.kind + m.id}
+                  role="option"
+                  aria-selected={i === pick}
+                  className={`menu-item${i === pick ? " active" : ""}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseMove={() => setPick(i)}
+                  onClick={() => choose(m)}
+                >
+                  <span className="tutor-mention-name">{m.name}</span>
+                  <span className="tutor-mention-kind">{m.kind === "skill" ? "Skill" : "Source"}</span>
+                </button>
+              ))
+            ) : (
+              <p className="tutor-mention-none">No source or skill matches “{at.query}”</p>
+            )}
+          </div>
+        )}
+        {context && (
+          <div className="tutor-chips">
         {context && (
           <span className="tutor-chip">
             <span className="tutor-chip-title">{context.title}</span>
@@ -152,16 +207,40 @@ export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
             </Hint>
           </span>
         )}
+          </div>
+        )}
         <div className="ask-input">
           <Grow
             ref={field}
             rows={1}
             className="field"
             aria-label="Message the tutor"
-            placeholder={turns.length ? "Reply…" : context ? "Ask about this, or say “quiz me”…" : "Ask anything you're learning…"}
+            placeholder={turns.length ? "Reply…" : context ? "Ask about this, or @ a source or skill…" : "Ask anything, or @ a source or skill…"}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              track(e.target.value, e.target.selectionStart);
+            }}
+            onSelect={(e) => at && track(e.currentTarget.value, e.currentTarget.selectionStart)}
             onKeyDown={(e) => {
+              if (at && !e.nativeEvent.isComposing) {
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  if (matches.length) setPick((p) => (p + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
+                  return;
+                }
+                if ((e.key === "Enter" || e.key === "Tab") && matches[pick]) {
+                  e.preventDefault();
+                  choose(matches[pick]!);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setAt(null);
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 send(input);
@@ -175,6 +254,14 @@ export function Tutor({ turns, setTurns, reading, onOpen, onClose }: {
       </div>
     </aside>
   );
+}
+
+/** His message with each @name it points at in the accent colour. */
+function marked(text: string, mentions: Mention[]) {
+  if (!mentions.length) return text;
+  const names = mentions.map((m) => `@${m.name}`).sort((a, b) => b.length - a.length);
+  const re = new RegExp(`(${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
+  return text.split(re).map((part, i) => (names.includes(part) ? <span key={i} className="tutor-at">{part}</span> : part));
 }
 
 /** A reply in Markdown: each [n] a small button that opens the cited passage, and the sources under it
@@ -231,3 +318,4 @@ export function TutorBubble({ onOpen }: { onOpen: () => void }) {
     </Hint>
   );
 }
+

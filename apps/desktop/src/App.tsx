@@ -2063,7 +2063,7 @@ export function App() {
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
         {!tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} />}
       </main>
-      {tutorOpen && <Tutor turns={tutorTurns} setTurns={setTutorTurns} reading={openItem ? { id: openItem.id, title: openItem.title } : null} onOpen={openSource} onClose={closeTutor} />}
+      {tutorOpen && <Tutor turns={tutorTurns} setTurns={setTutorTurns} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name }))} reading={openItem ? { id: openItem.id, title: openItem.title } : null} onOpen={openSource} onClose={closeTutor} />}
 
       {reviewing && (
         <Boundary key={reviewing.run} onBack={() => endReview()}>

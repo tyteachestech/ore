@@ -2,7 +2,7 @@ import {
   catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, type TutorTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
-import { int, need, str } from "./util.ts";
+import { int, need, str, strs } from "./util.ts";
 
 function enrichText(r: EnrichResult): string {
   if (r.skipped) return `${r.title}: skipped (${r.skipped})`;
@@ -107,15 +107,15 @@ export const aiCommands: Record<string, Command> = {
   },
 
   tutor: {
-    usage: '"<message>" [--item <source>] [--earlier <json>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), hints instead of answers on practice; --item is the source being read, --earlier is [{message, reply}]',
-    options: { item: { type: "string" }, earlier: { type: "string" } },
+    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply}]',
+    options: { item: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" } },
     async run(words, f) {
       const lib = openLibrary();
       let earlier: TutorTurn[] = [];
       if (str(f.earlier)) {
         try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply}]"); }
       }
-      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item) });
+      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill) });
       const text = [r.reply, ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`)].join("\n");
       return { data: r, text };
     },

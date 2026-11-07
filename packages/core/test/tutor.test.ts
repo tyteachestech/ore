@@ -55,7 +55,7 @@ async function library() {
 describe("tutor: what it sees", () => {
   test("the open source's passages come first, then the library's; unrelated sources stay out", async () => {
     const { lib, a, b } = await library();
-    const ps = tutorPassages(lib, "card box", a.meta.id);
+    const ps = tutorPassages(lib, "card box", { item: a.meta.id });
     expect(ps.map((p) => p.id)).toEqual(ps.map((_, i) => `P${i + 1}`));
     expect(ps[0]!.item).toBe(a.meta.id);
     expect(ps.some((p) => p.item === b.meta.id)).toBe(true);
@@ -65,7 +65,7 @@ describe("tutor: what it sees", () => {
 
   test("a message with no words from the source (\"what's this about?\") still gets its opening", async () => {
     const { lib, a } = await library();
-    const ps = tutorPassages(lib, "summarize", a.meta.id);
+    const ps = tutorPassages(lib, "summarize", { item: a.meta.id });
     expect(ps[0]).toMatchObject({ item: a.meta.id, heading: "Boxes", text: "Spaced repetition is a way to remember." });
   });
 });
@@ -75,7 +75,7 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@1" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@2" });
     expect(r.general).toBe(false);
     const c = r.citations[0]!;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
@@ -109,5 +109,27 @@ describe("tutor: replies", () => {
     fakeClaude([{ reply: "Less often.", citations: [], general: false }]);
     await tutor(lib, "and the right ones?", { earlier: [{ message: "What happens to a missed card?", reply: "First box." }] });
     expect(sent()[0]!.earlier).toEqual([{ message: "What happens to a missed card?", reply: "First box." }]);
+  });
+});
+
+describe("tutor: @ sources and skills", () => {
+  test("@-mentioned sources come first, each with its best passages; an @ skill keeps the rest to its sources", async () => {
+    const lib = await tempLibrary();
+    const a = await createItem(lib, { type: "article", title: "Flashcard boxes", body: LEITNER, skills: ["learning"] });
+    const b = await createItem(lib, { type: "article", title: "Memory", body: "Every card you review again gets easier to recall.", skills: ["learning"] });
+    const c = await createItem(lib, { type: "article", title: "Teaching cards", body: "A card that asks one thing teaches best.", skills: ["teaching"] });
+    const ps = tutorPassages(lib, "card", { sources: [b.meta.id] });
+    expect(ps[0]!.item).toBe(b.meta.id);
+    expect(ps.some((p) => p.item === c.meta.id)).toBe(true);
+    const inSkill = tutorPassages(lib, "card", { skills: ["learning"] });
+    expect(new Set(inSkill.map((p) => p.item))).toEqual(new Set([a.meta.id, b.meta.id]));
+  });
+
+  test("the AI is told what he pointed it at; an unknown skill is refused", async () => {
+    const { lib, b } = await library();
+    fakeClaude([{ reply: "Easier each time.", citations: [], general: false }]);
+    await tutor(lib, "what does this say?", { sources: [b.meta.id], skills: ["learning"] });
+    expect((sent()[0] as unknown as { about: string[] }).about).toEqual(["Memory", "the skill Learning"]);
+    await expect(tutor(lib, "hi", { skills: ["nope"] })).rejects.toThrow('no skill "nope"');
   });
 });
