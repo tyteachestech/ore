@@ -67,7 +67,7 @@
 .home-skill-top { flex: 1; }
 
 /* Labels: section and card titles, sidebar groups, metadata. */
-.card-title h2, .home-h, .home-cont .home-h, .side-label { font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.card-title h2, .home-h, .home-cont .home-h, .side-label, .preq-head { font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .card-title .card-icon { margin-right: 2px; }
 .skill-page .row .kind, .row .count, .side-item .count, .home-read .chip, .gem-ring-lv { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 

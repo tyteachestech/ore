@@ -579,7 +579,7 @@ img.thumb { filter: brightness(0.86); }
 .doc-head .when { color: var(--muted); font-size: 13px; margin-right: 2px; white-space: nowrap; }
 .doc-head .by + .when::before, .doc-head .by + span .when::before { content: "·"; margin-right: 6px; }
 
-.preq { margin: 0 0 28px; padding-bottom: 14px; border-bottom: 1px solid var(--border); max-width: var(--measure); }
+.preq { margin: 0 0 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); max-width: var(--measure); }
 .preq-head { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; margin-left: -4px; padding: 0 4px; color: var(--muted); font-weight: 600; text-align: left; }
 .preq-head:hover { color: var(--text); }
 .preq-head .caret { color: var(--faint); flex: none; transition: transform 0.12s ease-out; }
