@@ -243,6 +243,19 @@ journey("tutor hints and cards: a hint offers Show me, which asks for the answer
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor Quiz me: opens Review on the due cards of the source's skills, and Esc comes back", async (page) => {
+  await openSource(page, TESTING);
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const sent = page.waitForRequest((r) => /"due","--skill=learning","--skill=teaching"/.test(r.postData() ?? ""));
+  await tutor.getByRole("button", { name: "Quiz me" }).click();
+  await sent;
+  await page.locator(".review").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc leaves Review", async () => (await page.locator(".review").count()) === 0);
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor(); // back on the source
+});
+
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).

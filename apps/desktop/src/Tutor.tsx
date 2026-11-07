@@ -23,8 +23,8 @@ export type TutorTurn = {
 type Reply = { reply: string; citations: Citation[]; general: boolean; hint: boolean; card: TutorCard | null; ai: Ai };
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
-const STARTERS_READING = ["Explain this simply", "Give me an example", "Quiz me on this"];
-const STARTERS = ["What have I been learning?", "Quiz me"];
+const STARTERS_READING = ["Explain this simply", "Give me an example", "Test my understanding"];
+const STARTERS = ["What have I been learning?", "Explain something I saved"];
 
 /** The tutor (D128): a chat docked at the window's right, like Notion AI's and Linear's Ask panels,
  *  opened from the bubble at the bottom right or ⌘J. It sees the source he is reading (the chip over
@@ -33,8 +33,10 @@ const STARTERS = ["What have I been learning?", "Quiz me"];
  *  practice. It floats over the bottom right corner (Notion AI's default) or docks at the right in the
  *  side panel's place; the header switches, and the choice is remembered. The thread lives in App, so
  *  it survives navigation; + starts a new one. */
-export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills, onOpen, onClose, notify }: {
+export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills, onOpen, onClose, onQuiz, notify }: {
   notify: Notify;
+  /** Quiz me: Review on his due cards in these skills (none: all of them). */
+  onQuiz: (skills: string[]) => void;
   /** Docked at the right, in the side panel's place; else floating over the bottom right corner. */
   docked: boolean;
   onFit: () => void;
@@ -44,7 +46,7 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
   skills: { id: string; name: string }[];
   setTurns: (f: (t: TutorTurn[]) => TutorTurn[]) => void;
   /** The source on screen, if any. */
-  reading: { id: string; title: string } | null;
+  reading: { id: string; title: string; skills: string[] } | null;
   onOpen: (item: string, at: string) => void;
   onClose: () => void;
 }) {
@@ -65,6 +67,9 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
     field.current?.setSelectionRange(caretAt.current, caretAt.current);
     caretAt.current = null;
   }, [input]);
+  // Quiz me's scope: the skills he @-mentioned in what he is typing, else the open source's skills.
+  const typedSkills = mentions.filter((m) => m.kind === "skill" && input.includes(`@${m.name}`)).map((m) => m.id);
+  const quizSkills = typedSkills.length ? typedSkills : (context?.skills ?? []);
   const matches = at ? mentionMatches(at.query, sources, skills, mentions.filter((m) => input.includes(`@${m.name}`))) : [];
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -175,6 +180,11 @@ export function Tutor({ docked, onFit, turns, setTurns, reading, sources, skills
           <div className="divider" role="separator" aria-orientation="vertical" aria-label="Resize the tutor" {...divider} />
         </Hint>
       )}
+      <div className="tutor-quiz">
+        <Hint text={quizSkills.length ? `Review your due cards in ${quizSkills.map((s) => skills.find((k) => k.id === s)?.name ?? s).join(", ")}` : "Review your due cards"}>
+          <button onClick={() => onQuiz(quizSkills)}>Quiz me</button>
+        </Hint>
+      </div>
       <div className="tutor-head">
         <Hint text="New chat">
           <button className="icon-btn" aria-label="New chat" disabled={!turns.length || busy} onClick={() => { setTurns(() => []); setMentions([]); field.current?.focus(); }}>
