@@ -16,3 +16,6 @@ apps/desktop/.impeccable/
 apps/desktop/dist-phone/
 apps/phone/src-tauri/target/
 apps/phone/src-tauri/gen/schemas/
+
+# The release build's bundled CLI (apps/desktop/scripts/bundle-cli.ts)
+apps/desktop/src-tauri/binaries/

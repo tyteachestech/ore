@@ -1,19 +1,27 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import ocr from "./swift/ocr.swift" with { type: "text" };
+import transcribe from "./swift/transcribe.swift" with { type: "text" };
+
+const SOURCES: Record<string, string> = { ocr, transcribe };
 
 // The Swift helpers in `swift/` (text recognition, transcription) are compiled with swiftc the
 // first time they run, into the user's cache, and again whenever their source changes.
 
 /** The compiled helper `swift/<name>.swift`, built if needed. */
 export async function swiftHelper(name: string): Promise<string> {
-  const source = join(import.meta.dir, "swift", `${name}.swift`);
+  const code = SOURCES[name];
+  if (code === undefined) throw new Error(`no Swift helper ${name}`);
   const dir = join(homedir(), "Library", "Caches", "ore", "helpers");
-  const bin = join(dir, `${name}-${createHash("sha256").update(readFileSync(source)).digest("hex").slice(0, 12)}`);
+  const bin = join(dir, `${name}-${createHash("sha256").update(code).digest("hex").slice(0, 12)}`);
   if (existsSync(bin)) return bin;
   mkdirSync(dir, { recursive: true });
+  // The source is carried in `ore` (the app bundles one compiled file), so it is written out to compile.
+  const source = `${bin}.swift`;
+  writeFileSync(source, code);
   await run("swiftc", ["-O", source, "-o", bin]).catch((e: Error) => {
     throw new Error(
       /ENOENT/.test(e.message)

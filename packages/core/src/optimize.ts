@@ -1,8 +1,19 @@
-import { computeParameters, FSRSBindingItem, FSRSBindingReview } from "@open-spaced-repetition/binding";
+import type * as Binding from "@open-spaced-repetition/binding";
+
 import { writeAtomic } from "./fsutil.ts";
 import { nowIso } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { readReviews, type Review } from "./reviews.ts";
+
+/** The FSRS optimizer's native addon, loaded only when optimizing, so every other command runs
+ *  without it: the release app's bundled `ore` is one compiled file that doesn't carry it. */
+async function binding(): Promise<typeof Binding> {
+  try {
+    return await import("@open-spaced-repetition/binding");
+  } catch {
+    throw new Error("Tuning the review schedule to your history needs Ore built from source; reviews keep the standard schedule meanwhile.");
+  }
+}
 
 export const MIN_REVIEWS_TO_OPTIMIZE = 1000;
 
@@ -10,10 +21,10 @@ const dayNumber = (iso: string) => Math.floor((Date.parse(iso) - new Date(iso).g
 
 // One training item per review after a card's first: the history up to and
 // including it, with whole-day gaps (fsrs-rs convention).
-export function trainingItems(reviews: Review[]): FSRSBindingItem[] {
+export function trainingItems(reviews: Review[], { FSRSBindingItem, FSRSBindingReview }: typeof Binding): Binding.FSRSBindingItem[] {
   const byCard = new Map<string, Review[]>();
   for (const r of reviews) byCard.set(r.card, [...(byCard.get(r.card) ?? []), r]);
-  const items: FSRSBindingItem[] = [];
+  const items: Binding.FSRSBindingItem[] = [];
   for (const rs of byCard.values()) {
     rs.sort((a, b) => a.ts.localeCompare(b.ts));
     const history = rs.map((r, i) => new FSRSBindingReview(r.rating, i === 0 ? 0 : dayNumber(r.ts) - dayNumber(rs[i - 1]!.ts)));
@@ -27,7 +38,8 @@ export async function optimize(lib: Library, opts: { force?: boolean } = {}) {
   if (reviews.length < MIN_REVIEWS_TO_OPTIMIZE && !opts.force) {
     return { optimized: false, reviews: reviews.length, needed: MIN_REVIEWS_TO_OPTIMIZE };
   }
-  const w = await computeParameters(trainingItems(reviews), { enableShortTerm: true, numRelearningSteps: 0, timeout: 500 });
+  const b = await binding();
+  const w = await b.computeParameters(trainingItems(reviews, b), { enableShortTerm: true, numRelearningSteps: 0, timeout: 500 });
   writeAtomic(paths.fsrsParams(lib), JSON.stringify({ w, reviews: reviews.length, computed_at: nowIso() }, null, 2) + "\n");
   return { optimized: true, reviews: reviews.length, w };
 }

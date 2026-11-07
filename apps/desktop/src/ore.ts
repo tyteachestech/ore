@@ -15,10 +15,29 @@ export const oreWith = <T,>(stdin: string | null, ...args: string[]): Promise<T>
 export async function oreJob<T>(job: string | null, stdin: string | null, ...args: string[]): Promise<T> {
   // On iPhone the same commands run inside the app (src/phone/core.ts).
   if (PHONE) return (await import("./phone/core")).run<T>(args, stdin);
+  const call = async () => {
+    try {
+      return await invoke<T>("ore", { args, stdin, job });
+    } catch (e) {
+      throw new Error(typeof e === "string" ? e : String(e));
+    }
+  };
+  return args[0] === "init" ? call() : firstRun(call, () => invoke("ore", { args: ["init"], stdin: null, job: null }));
+}
+
+let creating: Promise<unknown> | null = null;
+/** First launch on a new Mac: there is no library yet, so make the default one (~/Ore) once and
+ *  try again, instead of greeting a friend with "no library at …". */
+export async function firstRun<T>(call: () => Promise<T>, init: () => Promise<unknown>): Promise<T> {
   try {
-    return await invoke<T>("ore", { args, stdin, job });
+    return await call();
   } catch (e) {
-    throw new Error(typeof e === "string" ? e : String(e));
+    if (!(e instanceof Error && e.message.startsWith("no library at"))) throw e;
+    await (creating ??= init().catch((err) => {
+      creating = null;
+      throw new Error(typeof err === "string" ? err : String(err));
+    }));
+    return call();
   }
 }
 
