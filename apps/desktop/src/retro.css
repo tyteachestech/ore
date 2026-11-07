@@ -37,6 +37,8 @@
    open twin on Linux, so the cloud's screenshots show the same face. His own notes stay in the system sans. */
 :root { --font-serif: Charter, "Bitstream Charter", "New York", ui-serif, Georgia, serif; }
 .doc { font-family: var(--font-serif); line-height: 1.6; }
+/* The title is the source's own words, so it takes the same face as the text under it. */
+.doc-head h1, .doc-head .title-edit { font-family: var(--font-serif); letter-spacing: 0; }
 .sidebar { border-right: 1px solid var(--border); }
 /* The open row's 8-bit menu arrow in the left gutter (SideCursor.tsx); quieter inside a source, as the row is. */
 .sidebar:not(.peek) { position: relative; }
