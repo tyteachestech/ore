@@ -5,7 +5,7 @@
   },
   "bundle": {
     "targets": ["app", "dmg"],
-    "externalBin": ["binaries/ore"],
+    "externalBin": ["binaries/ore-cli"],
     "macOS": {
       "minimumSystemVersion": "13.0"
     }
