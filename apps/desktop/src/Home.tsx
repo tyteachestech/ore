@@ -65,9 +65,9 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
   useEffect(refresh, [refresh, reload]);
 
   const [picking, setPicking] = useState(false);
-  /** Start review asks what to review (D80) when there is a choice; with one skill due, it just starts. */
-  /** Start review waits for the skill list too, else a quick click would start every skill unasked. */
+  /** Start review shows once the skill list has loaded too: a click before it would start every skill unasked. */
   const canStart = !!today && today.due > 0 && knowsDue(today, skills);
+  /** Start review asks what to review (D80) when there is a choice; with one skill due, it just starts. */
   const ask = useCallback(() => (today && dueSkills(today, skills).length > 1 ? setPicking(true) : onReview(null)), [today, skills, onReview]);
 
   // ↵ starts review (D58, D80) unless focus is on something that takes Enter itself.
