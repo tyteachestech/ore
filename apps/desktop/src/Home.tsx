@@ -228,7 +228,7 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
                 // A row that opens on click, holding the skill picker's own button, so not a <button> itself.
                 <WithMenu key={i.id} actions={sourceMenu ? () => withRename(sourceMenu(i), i) : []}>
                 <div className="home-read" role="button" tabIndex={0} onClick={() => onOpenSource(i.id)} onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpenSource(i.id))}>
-                  <Thumb item={i} />
+                  <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
                     <input
                       className="row-rename"
