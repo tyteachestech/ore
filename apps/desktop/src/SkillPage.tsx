@@ -483,12 +483,18 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
     };
   }, [skill, notify, version]);
 
+  /** Mark answered / Reopen, on the history quietly (Things: completing a to-do is undoable). */
   const setStatus = useCallback(
-    async (q: Question, status: "open" | "done") => {
+    async (q: Question, status: "open" | "done", undoable = true) => {
       setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, status } : x)));
+      const was = q.status === "done" ? "done" : "open";
+      const forget = undoable
+        ? notify(status === "done" ? "Marked answered" : "Reopened", "quiet", () => void setStatus({ ...q, status }, was, false), () => void setStatus(q, status, false))
+        : null;
       try {
         await ore("annotate", q.id, "--status", status);
       } catch (e) {
+        forget?.();
         setQs((l) => l && l.map((x) => (x.id === q.id ? q : x)));
         notify(errorText(e), "error");
       }

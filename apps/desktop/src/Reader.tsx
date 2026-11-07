@@ -38,6 +38,7 @@ import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, source
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
+import { ownsMediaKey } from "./media-keys";
 import { errorText, inOrder, load, save, type Notify } from "./util";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
@@ -1482,7 +1483,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         return;
       }
       const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
-      if (video && player.ready && !inField && !inNote && !t.closest?.("[role=slider]")) {
+      if (video && player.ready && !inField && !inNote && !ownsMediaKey(t, e.key)) {
         const act = is(e, "play")
           ? player.toggle
           : is(e, "back")

@@ -67,7 +67,16 @@ export function ShortcutEditor({ notify, inPage, query = "" }: { notify: Notify;
     setRecording(id);
     focusKey(id);
   };
-  const reset = (id: KeyId) => step(notify, `Reset “${name(id)}” to ${keysText(defaultOf(id))}`, () => rebind(id, defaultOf(id), true));
+  // A default another command took since asks first, as recording does: Replace, or keep both as they are.
+  const reset = (id: KeyId) => {
+    const combo = defaultOf(id);
+    const other = combo ? clash(id, combo) : null;
+    if (other) {
+      setConflict({ id, combo, with: other.id });
+      return requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>(".key-replace")?.focus());
+    }
+    step(notify, `Reset “${name(id)}” to ${keysText(combo)}`, () => rebind(id, combo, true));
+  };
   const remove = (id: KeyId) => step(notify, `Removed the shortcut for “${name(id)}”`, () => rebind(id, ""));
   const replace = (c: NonNullable<typeof conflict>) => {
     setConflict(null);
