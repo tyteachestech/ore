@@ -42,6 +42,10 @@ type Player = {
   setRate: (r: number) => void;
 };
 
+/** Where a source's video picks up next time: where he stopped, or the start once it played to the
+ *  end (YouTube's own resume), so a finished video reopens at 0, paused. */
+export const resumeAt = (t: number, duration: number, ended: boolean) => (ended || (duration > 0 && t >= duration - 1) ? 0 : Math.floor(t));
+
 /** One player per source; the position is saved per source and the rate once for all (D50). */
 export function useYouTube(video: string | undefined, id: string): Player {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -75,7 +79,7 @@ export function useYouTube(video: string | undefined, id: string): Player {
   }, [origin]);
 
   const persist = useCallback(() => {
-    if (base.current.t > 0) save(posKey, String(Math.floor(time())));
+    if (base.current.t > 0) save(posKey, String(resumeAt(time(), durationRef.current, state.current === 0)));
   }, [posKey, time]);
 
   useEffect(() => {
