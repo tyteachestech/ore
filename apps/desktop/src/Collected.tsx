@@ -1,6 +1,7 @@
 import { CaretRight, Plus } from "./icons";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
+import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { still } from "./SideCursor";
 import { PixelKeep, PixelQuestion, PixelStar, PixelTry } from "./PixelIcon";
 import { INTENTS, PHONE, type Annotation, type Intent } from "./ore";
@@ -141,7 +142,7 @@ export function Collected({ anns, ready, rectOf, onOpen }: Props) {
 /** The side panel's Collected tab (Tyler, 2026-10-29): his cards, then his questions, then his keeps, each
  *  a collapsible group in reading order. A row opens its passage; + on Cards adds one where he is ("Card
  *  here"): a line he types, drafted from the whole source. */
-export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, onAsk, questions }: {
+export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, onAsk, questions, actions }: {
   anns: Annotation[];
   /** A video source: the time each highlight is spoken, for the row's right edge. */
   timeOf?: (a: Annotation) => string | null;
@@ -153,6 +154,8 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, 
   onAsk: () => void;
   /** The Questions group's own list (answering, matches: D75). */
   questions: ReactNode;
+  /** A row's ⋯ and right-click menu: the popup's actions, without opening the passage. */
+  actions?: (a: Annotation) => MenuAction[];
 }) {
   const [shut, setShut] = useState<Set<string>>(() => new Set((load("ore.collected.shut") ?? "keep").split(",").filter(Boolean)));
   const toggle = (g: string) =>
@@ -203,10 +206,15 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, 
   const row = (a: Annotation) => {
     const t = timeOf?.(a);
     return (
-      <button key={a.id} className={`cp-row${a.point ? " point" : ""}`} onClick={() => onJump(a.id)}>
-        <span className="cp-text">{a.point || (a.note && a.intent !== "keep") ? a.note : a.exact}</span>
-        {t && <span className="cp-time">{t}</span>}
-      </button>
+      <WithMenu key={a.id} actions={actions && !PHONE ? () => actions(a) : []}>
+        <div className="cp-line">
+          <button className={`cp-row${a.point ? " point" : ""}`} onClick={() => onJump(a.id)}>
+            <span className="cp-text">{a.point || (a.note && a.intent !== "keep") ? a.note : a.exact}</span>
+            {t && <span className="cp-time">{t}</span>}
+          </button>
+          {actions && !PHONE && <MoreButton label="Highlight actions" actions={() => actions(a)} />}
+        </div>
+      </WithMenu>
     );
   };
 

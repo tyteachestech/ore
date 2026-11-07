@@ -1282,6 +1282,34 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (undoable) p.notify("Highlight removed", "info", s.bring, s.remove);
   }
 
+  /** Removes a saved highlight from outside its popup (the Collected tab's menu); Undo brings it back. */
+  async function removeSaved(id: string) {
+    if (popup?.id === id) closePopup(false);
+    const s = annStep(id);
+    s.drop();
+    try {
+      await ore("annotate", id, "--status", "deleted");
+    } catch (e) {
+      p.notify(errorText(e), "error");
+      s.restore();
+      return;
+    }
+    p.notify("Highlight removed", "info", s.bring, s.remove);
+  }
+
+  /** A highlight's menu in the Collected tab: its type, copy, remove, as in its popup. */
+  const highlightActions = (a: Annotation): MenuAction[] => [
+    { id: "open", label: "Open", run: () => onSource(() => jumpToHighlight(a.id)) },
+    {
+      id: "type",
+      label: "Type",
+      run: () => {},
+      sub: INTENTS.map((i) => ({ id: i, label: LABEL[i], checked: a.intent === i, run: () => void (a.intent !== i && setIntentOf(a.id, i)) })),
+    },
+    { id: "copy", label: "Copy with source", run: () => copyHighlight(a.id) },
+    { id: "remove", label: "Remove highlight", danger: true, divider: true, run: () => void removeSaved(a.id) },
+  ];
+
   /** Removes junk from the text (D111): every block the highlight touches, or from a heading, its whole
    *  section. A fresh, untouched Keep was only a way to point, so it goes quietly first; a highlight he had
    *  goes with the text (its cards stay). Undo puts the text and its highlights back. */
@@ -2492,6 +2520,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               onAdd={(line) => void addPoint(line)}
               onJump={(id) => onSource(() => jumpToHighlight(id))}
               onAsk={() => setAsk((n) => n + 1)}
+              actions={highlightActions}
               questions={
                 <QuestionsPanel
                   item={doc.id}
