@@ -1289,6 +1289,11 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
 
   /** What a style change can reach now: the selection's kinds, or the tool's (or every kind, so the
    *  next thing drawn takes it, when nothing is picked). */
+  const arrowOn = kinds.has("arrow") || tool === "arrow";
+  /** Which way an arrow points is what the link claims (A causes B, or they affect each other), so its
+   *  three common ends get keys: A one-way, D both ways, F none (S is the picker's own key). */
+  const ENDS = [{ label: "One-way", start: null, end: "arrow" }, { label: "Both ways", start: "arrow", end: "arrow" }, { label: "No heads", start: null, end: null }] as const;
+  const END_KEYS = ["KeyA", "KeyD", "KeyF"];
   const fillOn = selected.length ? [...kinds].some((k) => k === "rectangle" || k === "ellipse" || k === "diamond") : tool === "select" || isShapeTool(tool);
   const widthOn = !(kinds.size === 1 && kinds.has("text")) && tool !== "text";
   const WIDTHS = [1, 2, 4];
@@ -1307,6 +1312,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     }
     const w = WIDTH_KEYS.indexOf(e.code);
     if (w >= 0 && !e.shiftKey) return widthOn && setProp({ strokeWidth: WIDTHS[w]! }), true;
+    const a = END_KEYS.indexOf(e.code);
+    if (a >= 0 && !e.shiftKey) return arrowOn && setProp({ startArrowhead: ENDS[a]!.start, endArrowhead: ENDS[a]!.end }), true;
     const l = LINE_KEYS.indexOf(e.code);
     if (l >= 0 && !e.shiftKey) return widthOn && setProp({ strokeStyle: LINES[l]! }), true;
     return false;
@@ -1382,7 +1389,16 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
             )}
           </>
         )}
-        {rest && (kinds.has("arrow") || tool === "arrow") && (
+        {main && arrowOn && (
+          <Row label="Arrow">
+            {ENDS.map((d, i) => (
+              <Seg key={d.label} on={value("startArrowhead") === d.start && value("endArrowhead") === d.end} badge={badges ? "ADF"[i] : undefined} onPick={() => setProp({ startArrowhead: d.start, endArrowhead: d.end })} label={d.label}>
+                <Ends start={!!d.start} end={!!d.end} />
+              </Seg>
+            ))}
+          </Row>
+        )}
+        {rest && arrowOn && (
           <>
             <Row label="Ends">
               {arrowHeads.map((h) => (
@@ -1985,6 +2001,17 @@ function Head({ kind, flip: f }: { kind: string | null; flip?: boolean }) {
       {kind === "triangle" && <path d="M14 2 L20 6 L14 10 Z" fill="currentColor" />}
       {kind === "dot" && <circle cx="18" cy="6" r="2.6" fill="currentColor" />}
       {kind === "bar" && <line x1="19" y1="1.5" x2="19" y2="10.5" stroke="currentColor" strokeWidth="1.5" />}
+    </svg>
+  );
+}
+
+/** A line with its heads, drawn like `Head`: one-way, both ways or none. */
+function Ends({ start, end }: { start: boolean; end: boolean }) {
+  return (
+    <svg width="22" height="12" viewBox="0 0 22 12" aria-hidden="true">
+      <line x1={start ? 3 : 2} y1="6" x2={end ? 19 : 20} y2="6" stroke="currentColor" strokeWidth="1.5" />
+      {end && <path d="M15 2 L20 6 L15 10" fill="none" stroke="currentColor" strokeWidth="1.5" />}
+      {start && <path d="M7 2 L2 6 L7 10" fill="none" stroke="currentColor" strokeWidth="1.5" />}
     </svg>
   );
 }
