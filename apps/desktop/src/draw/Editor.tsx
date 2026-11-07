@@ -15,7 +15,7 @@ import type { Notify } from "../util";
 import {
   absPoints, addChild, addMap, addMatrix, align, connect, tidy, bindTarget, bounds, boundsOf, byId, cellOf, centre, clone, DEFAULT_STYLE, distribute, duplicate, FILLS,
   fitLink, flip, flowDir, FONT_SIZES, frame, GAP, GRID, group, growMatrix, isLabel, isLinear, isNode, isShape, labelOf, labelWidth, layoutMatrix, linear, lineHeightOf,
-  measureText, MONO, move, nearestIn, nextCell, pickSet, remove, reorder, reroute, resize, resizeMany, rot, rotate, route, SANS, setLabel, setMeasure,
+  measureText, minLabelWidth, MONO, move, nearestIn, nextCell, pickSet, remove, reorder, reroute, resize, resizeMany, rot, rotate, route, SANS, setLabel, setMeasure,
   setText, shape, snapBox, snapPoint, STROKES, syncAll, text, topAt, ungroup, uid, union, withLabels, withPoints, wrap, describe,
   type Box, type Dir, type El, type Guide, type Handle, type Pt, type Shape, type Style, type Tool,
 } from "./model";
@@ -24,7 +24,8 @@ import { copyPng, svgMarkup } from "./export";
 import { placeQuick, useStyleControls } from "./quick";
 
 type View = { x: number; y: number; zoom: number };
-type Editing = { id: string; kind: "label" | "text"; then?: string; fresh?: boolean };
+/** `then` is the node a fresh link label hands over to; `from` the link a fresh node came with (Tab, ⌘+arrow). */
+type Editing = { id: string; kind: "label" | "text"; then?: string; from?: string; fresh?: boolean };
 type Files = Record<string, { dataURL?: string; mimeType?: string; id?: string; created?: number }>;
 type Step = { els: El[]; sel: string[] };
 type Gesture =
@@ -306,11 +307,23 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     setEditing(null);
     return els;
   };
-  const endEdit = (how: "done" | "tab" | "back-tab" | "dir", dir?: Dir) => {
+  /** `away` is a click elsewhere or focus leaving: done, except that a node just made with Tab or
+   *  ⌘+arrow and left with no label on it or its link is dropped with the link (Tyler, 2026-11-06). */
+  const endEdit = (how: "done" | "away" | "tab" | "back-tab" | "dir", dir?: Dir) => {
     const ed = live.current.editing;
     if (!ed) return;
     const before = live.current.els;
     let els = writeEdit();
+    if (how === "away" && ed.fresh && (ed.then || ed.from)) {
+      const [arrow, node] = ed.then ? [ed.id, ed.then] : [ed.from!, ed.id];
+      if (!labelOf(els, arrow) && !labelOf(els, node) && els.some((e) => e.id === node)) {
+        els = remove(els, new Set([node, arrow]));
+        recordFrom(before, els);
+        setEls(els);
+        setSel([]);
+        return root.current?.focus({ preventScroll: true });
+      }
+    }
     const self = els.find((e) => e.id === ed.id);
     if (!self) {
       recordFrom(before, els);
@@ -319,11 +332,11 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       return root.current?.focus();
     }
     // A link label typed first hands over to the node it leads to.
-    if (ed.then && (how === "tab" || how === "done")) {
+    if (ed.then && (how === "tab" || how === "done" || how === "away")) {
       els = fitLink(els, ed.id);
       recordFrom(before, els);
       setEls(els);
-      if (how === "tab" || ed.fresh) return startEdit(ed.then, "label", { fresh: true });
+      if (how === "tab" || ed.fresh) return startEdit(ed.then, "label", { fresh: true, from: ed.id });
     }
     const cell = cellOf(self);
     if (cell && (how === "tab" || how === "back-tab")) {
@@ -340,7 +353,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       recordFrom(before, made.els);
       setEls(made.els);
       reveal(bounds(made.node));
-      return how === "dir" ? startEdit(made.node.id, "label", { fresh: true }) : startEdit(made.arrow.id, "label", { then: made.node.id, fresh: true });
+      return how === "dir" ? startEdit(made.node.id, "label", { fresh: true, from: made.arrow.id }) : startEdit(made.arrow.id, "label", { then: made.node.id, fresh: true });
     } else {
       recordFrom(before, els);
       setEls(els);
@@ -470,14 +483,28 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const copyStyle = () => {
     const e = selected[0];
     if (!e) return;
-    styleClip.current = { strokeColor: e.strokeColor, backgroundColor: e.backgroundColor, fillStyle: e.fillStyle, strokeWidth: e.strokeWidth, strokeStyle: e.strokeStyle, opacity: e.opacity, roundness: e.roundness };
+    // Text size and font come along from a text or a label (Excalidraw; Tyler, 2026-11-06).
+    const t = e.type === "text" ? e : labelOf(live.current.els, e.id);
+    styleClip.current = {
+      strokeColor: e.strokeColor, backgroundColor: e.backgroundColor, fillStyle: e.fillStyle, strokeWidth: e.strokeWidth, strokeStyle: e.strokeStyle, opacity: e.opacity, roundness: e.roundness,
+      ...(t ? { fontSize: t.fontSize, fontFamily: t.fontFamily } : {}),
+    };
     notify("Style copied", "info");
   };
   const pasteStyle = () => {
     const s = styleClip.current;
     if (!s) return;
-    const ids = selIds();
-    apply(live.current.els.map((e) => (ids.has(e.id) ? { ...e, ...s, ...(e.type === "text" ? { backgroundColor: "transparent" } : {}) } : e)));
+    const { fontSize, fontFamily, ...rest } = s;
+    const ids = withLabels(live.current.els, live.current.sel);
+    const next = live.current.els.map((e) => {
+      if (!ids.has(e.id)) return e;
+      if (e.type === "text") {
+        const t = { ...e, strokeColor: rest.strokeColor ?? e.strokeColor, opacity: rest.opacity ?? e.opacity, ...(fontSize ? { fontSize } : {}), ...(fontFamily ? { fontFamily } : {}) };
+        return e.containerId ? t : { ...t, ...measureText(t.text ?? "", t.fontSize ?? 20, t.fontFamily ?? SANS, lineHeightOf(t)) };
+      }
+      return { ...e, ...rest, ...(isLinear(e) ? { backgroundColor: "transparent" } : {}) };
+    });
+    apply(syncAll(reroute(next, ids)));
   };
   const exportPng = () =>
     void copyPng(live.current.sel.length ? live.current.els.filter((e) => withLabels(live.current.els, live.current.sel).has(e.id)) : live.current.els, live.current.files).then(
@@ -518,13 +545,13 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     { id: "front", label: "Bring to front", key: "d-front", group: "Arrange", when: nonEmpty, run: () => apply(reorder(live.current.els, selIds(), "front")) },
     { id: "back", label: "Send to back", key: "d-back", group: "Arrange", when: nonEmpty, run: () => apply(reorder(live.current.els, selIds(), "back")) },
     { id: "align-left", label: "Align left", key: "d-align-left", group: "Arrange", when: () => units().length > 1, run: () => apply(align(live.current.els, units(), "left")) },
-    { id: "align-hcenter", label: "Align centres horizontally", group: "Arrange", when: () => units().length > 1, run: () => apply(align(live.current.els, units(), "hcenter")) },
+    { id: "align-hcenter", label: "Align centres horizontally", key: "d-align-hcenter", group: "Arrange", when: () => units().length > 1, run: () => apply(align(live.current.els, units(), "hcenter")) },
     { id: "align-right", label: "Align right", key: "d-align-right", group: "Arrange", when: () => units().length > 1, run: () => apply(align(live.current.els, units(), "right")) },
     { id: "align-top", label: "Align top", key: "d-align-top", group: "Arrange", when: () => units().length > 1, run: () => apply(align(live.current.els, units(), "top")) },
-    { id: "align-vcenter", label: "Align centres vertically", group: "Arrange", when: () => units().length > 1, run: () => apply(align(live.current.els, units(), "vcenter")) },
+    { id: "align-vcenter", label: "Align centres vertically", key: "d-align-vcenter", group: "Arrange", when: () => units().length > 1, run: () => apply(align(live.current.els, units(), "vcenter")) },
     { id: "align-bottom", label: "Align bottom", key: "d-align-bottom", group: "Arrange", when: () => units().length > 1, run: () => apply(align(live.current.els, units(), "bottom")) },
-    { id: "dist-h", label: "Space evenly across", group: "Arrange", when: () => units().length > 2, run: () => apply(distribute(live.current.els, units(), "x")) },
-    { id: "dist-v", label: "Space evenly down", group: "Arrange", when: () => units().length > 2, run: () => apply(distribute(live.current.els, units(), "y")) },
+    { id: "dist-h", label: "Space evenly across", key: "d-dist-h", group: "Arrange", when: () => units().length > 2, run: () => apply(distribute(live.current.els, units(), "x")) },
+    { id: "dist-v", label: "Space evenly down", key: "d-dist-v", group: "Arrange", when: () => units().length > 2, run: () => apply(distribute(live.current.els, units(), "y")) },
     { id: "flip-h", label: "Flip horizontal", key: "d-flip-h", group: "Arrange", when: nonEmpty, run: () => apply(flip(live.current.els, selIds(), "x")) },
     { id: "flip-v", label: "Flip vertical", key: "d-flip-v", group: "Arrange", when: nonEmpty, run: () => apply(flip(live.current.els, selIds(), "y")) },
     { id: "lock", label: "Lock or unlock", key: "d-lock-el", group: "Arrange", run: lockToggle },
@@ -564,7 +591,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     const made = addChild(live.current.els, e, dir ?? flowDir(live.current.els, e), live.current.style);
     apply(made.els, [made.node.id]);
     reveal(bounds(made.node));
-    if (dir) startEdit(made.node.id, "label", { fresh: true });
+    if (dir) startEdit(made.node.id, "label", { fresh: true, from: made.arrow.id });
     else startEdit(made.arrow.id, "label", { then: made.node.id, fresh: true });
   };
 
@@ -831,7 +858,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     }
     // The canvas keeps focus itself: a mousedown's default focus change would pull it out of a text box just opened.
     e.preventDefault();
-    if (live.current.editing) endEdit("done");
+    if (live.current.editing) endEdit("away");
     root.current?.focus({ preventScroll: true });
     (e.target as Element).setPointerCapture?.(e.pointerId);
     const p = toScene(e.clientX, e.clientY);
@@ -1009,7 +1036,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       const single = cur.starts.length === 1 ? cur.starts[0]! : null;
       const keep = e.shiftKey || (single?.type === "text") || (single?.type === "image" && !e.shiftKey ? true : e.shiftKey);
       let next: El[];
-      if (single) next = [resize(single, single, cur.handle, sp.p, keep && !(single.type === "image" && e.shiftKey) ? true : keep, e.altKey)];
+      if (single) next = [resize(single, single, cur.handle, sp.p, keep && !(single.type === "image" && e.shiftKey) ? true : keep, e.altKey, isShape(single) ? minLabelWidth(cur.before, single) : 0)];
       else {
         const pseudo = { ...single ?? cur.starts[0]!, type: "rectangle", x: cur.box.x, y: cur.box.y, width: cur.box.w, height: cur.box.h, angle: 0, points: undefined } as El;
         const r = resize(pseudo, pseudo, cur.handle, sp.p, e.shiftKey, e.altKey);
@@ -1266,8 +1293,18 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     const main = part !== "rest";
     const rest = part !== "main";
     const lbl = (l: string) => (labelOf(els, current?.id ?? "")?.[l === "size" ? "fontSize" : "fontFamily"]);
+    const arrange = main ? cmds.filter((c) => (c.id.startsWith("align-") || c.id.startsWith("dist-")) && c.when?.()) : [];
     return (
       <>
+        {arrange.length > 0 && (
+          <Row label="Align">
+            {arrange.map((c) => (
+              <Seg key={c.id} on={false} onPick={c.run} label={c.label} keys={c.key}>
+                <AlignGlyph how={c.id} />
+              </Seg>
+            ))}
+          </Row>
+        )}
         {main && (
           <Row label="Stroke">
             {STROKES.map((c, i) => <Swatch key={c} colour={c} badge={badges ? String(i + 1) : undefined} on={value("strokeColor") === c} onPick={() => setProp({ strokeColor: c })} />)}
@@ -1535,7 +1572,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
             live.current.draft = e.target.value;
           }}
           onKeyDown={onAreaKey}
-          onBlur={() => live.current.editing && !panel && endEdit("done")}
+          onBlur={() => live.current.editing && !panel && endEdit("away")}
           style={{
             left: editBox.left, top: editBox.top, width: editBox.width, height: editBox.height, fontSize: editBox.font, lineHeight: 1.25, fontFamily: fontOf(editBox.fam),
             textAlign: editBox.align, color: editBox.colour, transform: editBox.angle ? `rotate(${editBox.angle}rad)` : undefined, whiteSpace: editBox.wrap ? "pre-wrap" : "pre",
@@ -1758,7 +1795,15 @@ function Overlay({ selected, handles, z, hot, guides, marquee, moveBox, showPoin
         );
       })()}
       {moveBox && <rect x={moveBox.x} y={moveBox.y} width={moveBox.w} height={moveBox.h} fill="none" stroke="var(--paper)" strokeWidth={sw} strokeDasharray={`${3 / z} ${3 / z}`} opacity={0.5} />}
-      {guides.map((gd, i) => (gd.axis === "x" ? <line key={i} x1={gd.at} x2={gd.at} y1={gd.from - 8 / z} y2={gd.to + 8 / z} stroke="var(--accent)" strokeWidth={sw} /> : <line key={i} y1={gd.at} y2={gd.at} x1={gd.from - 8 / z} x2={gd.to + 8 / z} stroke="var(--accent)" strokeWidth={sw} />))}
+      {guides.map((gd, i) => {
+        if (gd.gap) {
+          // An equal space: a span between the two shapes with a tick at each end.
+          const t = 4 / z;
+          const d = gd.axis === "y" ? `M${gd.from} ${gd.at} L${gd.to} ${gd.at} M${gd.from} ${gd.at - t} L${gd.from} ${gd.at + t} M${gd.to} ${gd.at - t} L${gd.to} ${gd.at + t}` : `M${gd.at} ${gd.from} L${gd.at} ${gd.to} M${gd.at - t} ${gd.from} L${gd.at + t} ${gd.from} M${gd.at - t} ${gd.to} L${gd.at + t} ${gd.to}`;
+          return <path key={i} d={d} fill="none" stroke="var(--accent)" strokeWidth={sw} />;
+        }
+        return gd.axis === "x" ? <line key={i} x1={gd.at} x2={gd.at} y1={gd.from - 8 / z} y2={gd.to + 8 / z} stroke="var(--accent)" strokeWidth={sw} /> : <line key={i} y1={gd.at} y2={gd.at} x1={gd.from - 8 / z} x2={gd.to + 8 / z} stroke="var(--accent)" strokeWidth={sw} />;
+      })}
       {marquee && <rect x={marquee.x} y={marquee.y} width={marquee.w} height={marquee.h} fill="rgba(242, 241, 236, 0.06)" stroke="var(--paper)" strokeWidth={sw} strokeDasharray={`${4 / z} ${3 / z}`} />}
     </g>
   );
@@ -1797,9 +1842,9 @@ function Swatch({ colour, on, onPick, badge }: { colour: string; on: boolean; on
   );
 }
 
-function Seg({ on, onPick, label, children, badge }: { on: boolean; onPick: () => void; label: string; children: ReactNode; badge?: string }) {
+function Seg({ on, onPick, label, children, badge, keys }: { on: boolean; onPick: () => void; label: string; children: ReactNode; badge?: string; keys?: KeyId }) {
   return (
-    <Hint text={label}>
+    <Hint text={label} keys={keys}>
       <button className="draw-seg" aria-pressed={on} aria-label={label} aria-keyshortcuts={badge} onClick={onPick}>
         {children}
         {badge && <span className="draw-badge" aria-hidden="true">{badge}</span>}
@@ -1833,6 +1878,24 @@ function QuickStyle({ at, avoid, box, root, onMore, children }: { at: { x: numbe
       <button className="draw-quick-more" aria-expanded={at.more} onClick={onMore}>{at.more ? "Less" : "More"}</button>
     </div>
   );
+}
+
+/** The align and distribute segments' glyphs: two bars against the edge or centre they go to, three for
+ *  even spacing; drawn on a 16×12 grid like the arrowhead segments. */
+function AlignGlyph({ how }: { how: string }) {
+  const bar = (x: number, y: number, w: number, h: number) => <rect x={x} y={y} width={w} height={h} fill="currentColor" />;
+  const line = (x1: number, y1: number, x2: number, y2: number) => <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="currentColor" strokeWidth="1" />;
+  const body: Record<string, ReactNode> = {
+    "align-left": <>{line(1.5, 0, 1.5, 12)}{bar(3, 2, 10, 3)}{bar(3, 7, 6, 3)}</>,
+    "align-hcenter": <>{line(8, 0, 8, 12)}{bar(3, 2, 10, 3)}{bar(5, 7, 6, 3)}</>,
+    "align-right": <>{line(14.5, 0, 14.5, 12)}{bar(3, 2, 10, 3)}{bar(7, 7, 6, 3)}</>,
+    "align-top": <>{line(0, 1.5, 16, 1.5)}{bar(3, 3, 3, 8)}{bar(8, 3, 3, 5)}</>,
+    "align-vcenter": <>{line(0, 6, 16, 6)}{bar(3, 1, 3, 10)}{bar(8, 3, 3, 6)}</>,
+    "align-bottom": <>{line(0, 10.5, 16, 10.5)}{bar(3, 1, 3, 8)}{bar(8, 4, 3, 5)}</>,
+    "dist-h": <>{bar(0, 2, 2, 8)}{bar(7, 2, 2, 8)}{bar(14, 2, 2, 8)}</>,
+    "dist-v": <>{bar(4, 0, 8, 2)}{bar(4, 5, 8, 2)}{bar(4, 10, 8, 2)}</>,
+  };
+  return <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true">{body[how]}</svg>;
 }
 
 function Head({ kind, flip: f }: { kind: string | null; flip?: boolean }) {
