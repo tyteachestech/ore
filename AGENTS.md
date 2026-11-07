@@ -26,6 +26,7 @@ Ore's core promise is that whatever someone learns from imports as fully and rob
 - TypeScript strict. Bun runtime, one version everywhere: CI's `bun-version` in `.github/workflows/test.yml` is the Bun on Tyler's Mac (1.4.4, Tyler 2026-11-07, after a download that only broke on his older Bun); bump both together. React for UI. Tauri 2 for the shell. Tiny Swift CLI helpers only where macOS APIs are unavoidable, compiled with `swiftc`.
 - Commit task-related work with clear messages; keep unrelated edits out.
 - On Tyler's Mac, `~/Developer/ore` stays on `master`: the installed app runs its CLI (D30) against his real library. Build branches in a worktree (`git worktree add ../ore-<topic>`), never by checking one out there.
+- Git housekeeping is the thread's job, never Tyler's: do resets, rebases, branch cleanup and reinstalls yourself on the Mac (Remote Control), and never ask him to run a git command. Never rewrite master's history; if it ever must be, the thread that does it also resets `~/Developer/ore`, rebases open PRs and deletes the old branches. Name files in NFC Unicode (macOS shows NFD names as untracked).
 
 ## UI quality bar (apps/desktop)
 - Match the best app that already does it (Notion, Raindrop, Linear, Raycast, ChatGPT). Before building a control, name the app you are copying and how it behaves there.
