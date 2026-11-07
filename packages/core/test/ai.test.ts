@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { runAgent, vendorFailure } from "../src/ai/adapter.ts";
+import { runAgent, runChatTurn, vendorFailure } from "../src/ai/adapter.ts";
 import { aiModel, listModels, parseCodexModels, savedModel, setAiModel } from "../src/ai/models.ts";
 import { askAboutCard } from "../src/ai/chat.ts";
 import { explainTerm, paragraphAt } from "../src/ai/explain.ts";
@@ -96,6 +96,19 @@ describe("AI adapter", () => {
     // "log in" inside another word is no sign-in problem.
     expect(vendorFailure("codex", { ...run, stdout: '{"type":"error","message":"could not read the catalog index"}\n' }).message).toBe("codex failed (exit 1): could not read the catalog index");
     expect(vendorFailure("claude", { ...run, stdout: "", stderr: "Please log in again" }).message).toContain("/login");
+  });
+
+  test("claude runs without his MCP servers, skills or settings: on his Mac they added ~360k tokens to every call", async () => {
+    const lib = await tempLibrary();
+    fakeClaude([{ rating: 3 }, { reply: "ok", card: null }]);
+    await runAgent(lib, { prompt: "grade", cwd: lib.root, schema: Schema, input: {} });
+    await runChatTurn(lib, { system: "s", message: "m", schema: {}, cwd: lib.root });
+    for (const line of readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n")) {
+      const args = JSON.parse(line) as string[];
+      expect(args).toContain("--strict-mcp-config");
+      expect(args).toContain("--disable-slash-commands");
+      expect(args[args.indexOf("--setting-sources") + 1]).toBe("");
+    }
   });
 
   test("each vendor runs its own saved model: Sonnet by default for Claude, Codex's own default for Codex; ORE_AI_MODEL wins", async () => {

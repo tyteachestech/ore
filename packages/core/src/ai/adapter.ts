@@ -110,6 +110,10 @@ async function exec(cmd: string[], cwd: string): Promise<Exec> {
   return { stdout, stderr, code, timedOut };
 }
 
+/** `claude -p` otherwise loads his own MCP servers, skills, settings and hooks into every call: on
+ *  Tyler's Mac 21 MCP servers added ~360k input tokens (~$1.45) to each grade. Ore's tasks need none. */
+const CLAUDE_BARE = ["--strict-mcp-config", "--disable-slash-commands", "--setting-sources", ""];
+
 const SIGN_IN = { claude: "Run `claude` and /login, or pick Codex in Settings → AI.", codex: "Run `codex login`, or pick Claude in Settings → AI." };
 /** The next step for a vendor error that is about signing in. */
 const signInHint = (vendor: Vendor, msg: string) =>
@@ -162,6 +166,7 @@ async function runClaude(system: string, message: string, schema: object, task: 
     "--tools", tools.join(","),
     "--allowedTools", tools.join(","),
     "--permission-mode", "dontAsk",
+    ...CLAUDE_BARE,
     "--no-session-persistence",
     ...(model ? ["--model", model] : []),
   ];
@@ -260,6 +265,7 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
       "--system-prompt", a.system,
       "--tools", "",
       "--permission-mode", "dontAsk",
+      ...CLAUDE_BARE,
       ...(a.session ? ["--resume", session] : ["--session-id", session]),
       ...(model ? ["--model", model] : []),
     ];
