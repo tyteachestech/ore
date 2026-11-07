@@ -9,7 +9,7 @@ import { useEffect, type RefObject } from "react";
  *  Returns `forget`, which takes the step off the history when what it did is gone another way
  *  (a selection he dropped with Esc). */
 /** `show`: the toast's one action: Show on a result, Try again on an error. */
-/** `stay`: an error toast that stays until its Try again is pressed, for a failure only that toast can recover. */
+/** `stay`: an error toast that stays until its Try again is pressed or its × dismisses it, for a failure only that toast can recover. */
 export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => void, redo?: () => void, show?: () => void, stay?: boolean) => () => void;
 
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never
