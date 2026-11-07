@@ -20,6 +20,8 @@ export type TutorTurn = {
   /** Unique across chats: a reply lands only on the turn that asked for it. */
   id: string;
   message: string; item?: string; title?: string; mentions?: Mention[];
+  /** The @ context the request carried: his own @s, else the ones still in effect from before (D128.3). */
+  pointed?: Mention[];
   reply?: string; citations?: Citation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
@@ -45,10 +47,16 @@ export function useTutorChat(notify: Notify) {
     landed.current.set(id, { ...landed.current.get(id), ...p });
     update((ts) => ts.map((t) => (t.id === id ? { ...t, ...p } : t)));
   };
+  // The @ context in effect (D128.3): the last message's own @s carry to later ones until he @s
+  // something else, drops one (its chip's ×) or starts a new chat.
+  const [carry, setCarryState] = useState<Mention[]>([]);
+  const carryNow = useRef(carry);
+  const setCarry = (m: Mention[]) => setCarryState((carryNow.current = m));
+  const drop = (m: Mention) => setCarry(carryNow.current.filter((x) => x.kind !== m.kind || x.id !== m.id));
   const run = async (t: TutorTurn, before: TutorTurn[]) => {
     const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: x.reply }] : []));
     try {
-      const pointed = (t.mentions ?? []).map((m) => opt(m.kind, m.id));
+      const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
       const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []));
       patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, ai: r.ai, error: undefined });
     } catch (e) {
@@ -57,7 +65,8 @@ export function useTutorChat(notify: Notify) {
   };
   /** Adds his message to the thread and asks. */
   const ask = (turn: Omit<TutorTurn, "id">) => {
-    const t = { ...turn, id: turnId() };
+    if (turn.mentions?.length) setCarry(turn.mentions);
+    const t = { ...turn, ...(carryNow.current.length ? { pointed: carryNow.current } : {}), id: turnId() };
     const before = now.current;
     update((ts) => [...ts, t]);
     void run(t, before);
@@ -65,8 +74,8 @@ export function useTutorChat(notify: Notify) {
   const retry = (id: string) => {
     const i = now.current.findIndex((t) => t.id === id);
     if (i < 0) return;
-    const { message, item, title, mentions } = now.current[i]!;
-    const t = { id, message, item, title, mentions };
+    const { message, item, title, mentions, pointed } = now.current[i]!;
+    const t = { id, message, item, title, mentions, pointed };
     landed.current.delete(id);
     update((ts) => ts.map((x) => (x.id === id ? t : x)));
     void run(t, now.current.slice(0, i));
@@ -92,19 +101,23 @@ export function useTutorChat(notify: Notify) {
       notify(errorText(e, "add that card"), "error");
     }
   };
-  /** A new chat, even while one is thinking (its reply goes to its own thread); Undo brings that thread back. */
+  /** A new chat, even while one is thinking (its reply goes to its own thread); Undo brings that thread
+   *  back, with its @ context. */
   const fresh = () => {
     let away = now.current;
+    let awayCarry = carryNow.current;
     if (!away.length) return;
     update(() => []);
+    setCarry([]);
     const swap = () => {
-      const back = away;
-      away = now.current;
+      const [back, backCarry] = [away, awayCarry];
+      [away, awayCarry] = [now.current, carryNow.current];
       update(() => back.map((t) => ({ ...t, ...landed.current.get(t.id) })));
+      setCarry(backCarry);
     };
     notify("Chat cleared", "info", swap, swap);
   };
-  return { turns, draft, setDraft, ask, retry, keep, fresh };
+  return { turns, draft, setDraft, carry, drop, ask, retry, keep, fresh };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -135,7 +148,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   onOpen: (item: string, at: string) => void;
   onClose: () => void;
 }) {
-  const { turns, draft: { input, mentions }, setDraft } = chat;
+  const { turns, draft: { input, mentions }, setDraft, carry } = chat;
   const setInput = (text: string) => setDraft((d) => ({ ...d, input: text }));
   // He can take the open source out of the context (the chip's ×); a new source puts it back.
   const [dropped, setDropped] = useState<string | null>(null);
@@ -152,9 +165,10 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     field.current?.setSelectionRange(caretAt.current, caretAt.current);
     caretAt.current = null;
   }, [input]);
-  // Quiz me's scope: the skills he @-mentioned in what he is typing, else the open source's skills.
+  // Quiz me's scope: the skills he @-mentioned in what he is typing, else those still in effect, else the open source's.
   const typedSkills = mentions.filter((m) => m.kind === "skill" && input.includes(`@${m.name}`)).map((m) => m.id);
-  const quizSkills = typedSkills.length ? typedSkills : (context?.skills ?? []);
+  const carriedSkills = carry.filter((m) => m.kind === "skill").map((m) => m.id);
+  const quizSkills = typedSkills.length ? typedSkills : carriedSkills.length ? carriedSkills : (context?.skills ?? []);
   const matches = at ? mentionMatches(at.query, sources, skills, mentions.filter((m) => input.includes(`@${m.name}`))) : [];
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -314,18 +328,28 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
             )}
           </div>
         )}
-        {context && (
+        {(context || !!carry.length) && (
           <div className="tutor-chips">
-        {context && (
-          <span className="tutor-chip">
-            <span className="tutor-chip-title">{context.title}</span>
-            <Hint text="Leave this source out">
-              <button aria-label={`Leave “${context.title}” out`} onClick={() => { setDropped(context.id); field.current?.focus(); }}>
-                <X size={10} aria-hidden="true" />
-              </button>
-            </Hint>
-          </span>
-        )}
+            {context && (
+              <span className="tutor-chip">
+                <span className="tutor-chip-title">{context.title}</span>
+                <Hint text="Leave this source out">
+                  <button aria-label={`Leave “${context.title}” out`} onClick={() => { setDropped(context.id); field.current?.focus(); }}>
+                    <X size={10} aria-hidden="true" />
+                  </button>
+                </Hint>
+              </span>
+            )}
+            {carry.map((m) => (
+              <span key={m.kind + m.id} className="tutor-chip">
+                <span className="tutor-chip-title">@{m.name}</span>
+                <Hint text={m.kind === "skill" ? "Leave this skill out" : "Leave this source out"}>
+                  <button aria-label={`Leave “${m.name}” out`} onClick={() => { chat.drop(m); field.current?.focus(); }}>
+                    <X size={10} aria-hidden="true" />
+                  </button>
+                </Hint>
+              </span>
+            ))}
           </div>
         )}
         <div className="ask-input">

@@ -296,6 +296,51 @@ journey("tutor draft: a half-written message and its @ mention survive closing a
   await page.keyboard.press("Escape");
 });
 
+journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ replaces them, New chat clears them and Undo restores them, × drops one", async (page) => {
+  const asked: string[][] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    asked.push(JSON.parse(body).args);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `Reply ${asked.length}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click(); // an earlier journey's thread
+  const chip = (name: string) => tutor.locator(".tutor-chip").filter({ hasText: `@${name}` });
+  const send = async (before: string, at?: string, after = "") => {
+    const n = asked.length;
+    await field.pressSequentially(before);
+    if (at) {
+      await field.pressSequentially(at);
+      await page.getByRole("listbox", { name: "Point the tutor at" }).getByRole("option").first().waitFor();
+      await page.keyboard.press("Enter");
+      await field.pressSequentially(after);
+    }
+    await page.keyboard.press("Enter");
+    await tutor.getByText(`Reply ${n + 1}`).waitFor();
+    return asked[n]!.join(" ");
+  };
+  if (!(await send("Explain ", "@learn", "spacing")).includes("--skill=learning")) throw new Error("the @ skill was not sent");
+  await chip("learning").waitFor();
+  if (!(await send("Show me")).includes("--skill=learning")) throw new Error("the follow-up lost the @ skill");
+  const replaced = await send("Now ", "@Building", "please");
+  if (!replaced.includes("--source=") || replaced.includes("--skill=learning")) throw new Error(`a new @ did not replace the old: ${replaced}`);
+  await chip(AGENTS).waitFor();
+  if (await chip("learning").count()) throw new Error("the replaced skill still shows");
+  await fresh.click();
+  await until("New chat clears it", async () => (await chip(AGENTS).count()) === 0);
+  await page.locator(".toast", { hasText: "Chat cleared" }).getByRole("button", { name: "Undo" }).click();
+  await chip(AGENTS).waitFor(); // back with its thread
+  await tutor.getByRole("button", { name: `Leave “${AGENTS}” out` }).click();
+  await until("× drops it", async () => (await chip(AGENTS).count()) === 0);
+  if ((await send("And this?")).includes("--source=")) throw new Error("a dropped @ was still sent");
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
 journey("tutor pending: closing mid-reply asks once; a new chat keeps its own reply, the old one lands in the old chat, and Undo brings that chat back", async (page) => {
   const asked: string[] = [];
   let release: (() => void) | undefined;
