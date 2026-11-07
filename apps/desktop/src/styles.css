@@ -567,10 +567,15 @@ img.thumb { filter: brightness(0.86); }
 .course-lessons .part { width: 18px; flex-shrink: 0; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
 .course-lessons .here { color: var(--text); font-weight: 600; }
 .course-lessons .menu-item svg { margin-left: auto; color: var(--faint); }
-.doc-head .source { font-size: 12px; color: var(--faint); margin-left: 6px; padding: 0 4px; border-radius: 4px; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Where it's from, above the title (Reeder, Matter): a site in Geist Mono caps; a file keeps its own name. */
+.doc-head .source { display: block; margin: 8px 0 0 -4px; padding: 0 4px; border-radius: 4px; font-size: 12px; color: var(--faint); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-head .source.site { font-family: var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
 .doc-head .source:hover { color: var(--accent); }
+.doc-head .source + h1, .doc-head .source + .title-edit { margin-top: 4px; }
+.doc-head .when { color: var(--faint); font-size: 13px; margin-right: 8px; white-space: nowrap; }
+.doc-head .by + .when::before, .doc-head .by + span .when::before { content: "·"; margin-right: 6px; }
 
-.preq { margin: 0 0 34px; padding-bottom: 22px; border-bottom: 1px solid var(--border); max-width: var(--measure); }
+.preq { margin: 0 0 28px; padding-bottom: 14px; border-bottom: 1px solid var(--border); max-width: var(--measure); }
 .preq-head { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; margin-left: -4px; padding: 0 4px; color: var(--muted); font-weight: 600; text-align: left; }
 .preq-head:hover { color: var(--text); }
 .preq-head .caret { color: var(--faint); flex: none; transition: transform 0.12s ease-out; }
@@ -589,10 +594,10 @@ img.thumb { filter: brightness(0.86); }
 .pdf-tables-size { color: var(--faint); }
 .pdf-tables-err { color: var(--muted); overflow-wrap: anywhere; }
 /* Question rows (Perplexity "Related"): each a sentence to read for; the open one shows its answer line. */
-.preq-body { list-style: none; margin: 8px 0 0; padding: 0; }
+.preq-body { list-style: none; margin: 4px 0 0; padding: 0; }
 .preq-row { border-top: 1px solid var(--border); }
 .preq-row:first-child { border-top: 0; }
-.preq-q { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 12px; align-items: baseline; width: calc(100% + 12px); padding: 10px 6px; margin: 0 -6px; border-radius: 8px; text-align: left; font-size: 15px; line-height: 1.45; color: var(--text-read); }
+.preq-q { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 12px; align-items: baseline; width: calc(100% + 12px); padding: 7px 6px; margin: 0 -6px; border-radius: 8px; text-align: left; font-size: 15px; line-height: 1.45; color: var(--text-read); }
 .preq-q:hover { background: var(--bg-hover); }
 .preq-q:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
 .preq-icon { align-self: start; margin-top: 2px; color: var(--question-solid); }
@@ -604,7 +609,9 @@ img.thumb { filter: brightness(0.86); }
 @keyframes preq-check { from { transform: scale(0.6); opacity: 0; } }
 @keyframes preq-said { from { transform: translateY(-3px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .preq-row.just .preq-icon, .preq-row.just .preq-said { animation: none; } }
-.preq .preq-input { display: block; width: calc(100% - 28px); min-height: 36px; max-height: 240px; margin: 0 0 12px 28px; padding: 7px 10px; font-size: 15px; line-height: 1.45; }
+/* The answer line is a line, not a box (Matter, iA Writer): the row's rule below it is its edge; focus draws it in the accent. */
+.preq .preq-input { display: block; width: calc(100% - 28px); min-height: 30px; max-height: 240px; margin: 0 0 8px 28px; padding: 4px 0; font-size: 15px; line-height: 1.45; background: none; border: 0; border-radius: 0; }
+.preq .preq-input:focus-visible { box-shadow: inset 0 -1px 0 var(--accent); }
 .field { background: transparent; }
 .field {
   width: 100%; height: 32px; padding: 0 10px;
@@ -1958,6 +1965,9 @@ button.home-plan:hover { color: var(--text); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).card { --hue: var(--card-solid); --tint: var(--card); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).question { --hue: var(--question-solid); --tint: var(--question); }
 :is(.collected-chip, .collected-tab, .collected-token, .collected-list [cmdk-item], .collect-fly).apply { --hue: var(--apply-solid); --tint: var(--apply); }
+/* On the Mac it sits in the reader's toolbar (Reeder), flat, so it never covers the text being read. */
+.reader-tools .collected { position: static; transform: none; padding: 0; background: none; border: 0; box-shadow: none; }
+.reader-tools .collected-chip { height: 26px; padding: 0 8px; border-radius: 6px; }
 .collected-chip {
   position: relative; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px;
   color: var(--text-read); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums;

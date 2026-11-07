@@ -27,3 +27,15 @@ export const pathOf = (item: Pick<Item, "dir" | "source_file">) => item.source_f
 
 /** Shows the source's folder in Finder with its original file selected. */
 export const revealInFinder = (item: Item) => revealItemInDir(item.source_file ?? item.dir);
+
+/** The published date under a source's title, as Reeder and Matter show it ("Dec 19, 2024"); a bare year
+ *  stays a year, and anything unreadable shows nothing rather than a wrong date. */
+export function pubDate(s: string | undefined): string | null {
+  if (!s) return null;
+  if (/^\d{4}$/.test(s)) return s;
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(s);
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1]!, +m[2]! - 1, m[3] ? +m[3] : 1));
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { timeZone: "UTC", year: "numeric", month: "short", ...(m[3] ? { day: "numeric" } : {}) });
+}

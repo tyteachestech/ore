@@ -31,7 +31,7 @@ import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import { SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
 import { QuestionsPanel } from "./Questions";
 import { Position } from "./Outline";
-import { openOriginal, originalLabel, pathOf, revealInFinder } from "./original";
+import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, type Annotation, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker } from "./Skills";
 import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
@@ -2029,6 +2029,18 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   // A file on the Mac can't open on the phone; a web page opens in Safari.
   const source = PHONE && !doc.url ? null : originalLabel(doc);
+  const published = pubDate(doc.published);
+  const collected = (
+    <Collected
+      anns={anns}
+      ready={ready}
+      rectOf={(id) => ranges.current.get(id)?.getBoundingClientRect()}
+      onOpen={() => {
+        if (popup) closePopup();
+        p.onShowSide("questions", true);
+      }}
+    />
+  );
   const suggested = doc.suggested_skill;
   const suggestion = async (action: "accept" | "dismiss") => {
     try {
@@ -2140,6 +2152,8 @@ function ReaderView(p: Props & { reload: () => void }) {
               <span className="unsaved">Not saved</span>
             </Hint>
           )}
+          {/* What he has collected sits in the toolbar (Reeder's article tools), never over the text he reads. */}
+          {!PHONE && collected}
           {/* Not on the phone: its note is a page of its own, the source already out of sight. */}
           {!PHONE && (
             <Hint text={hideSource ? "Show the source" : "Hide the source while you write"} keys="hide-source">
@@ -2207,6 +2221,14 @@ function ReaderView(p: Props & { reload: () => void }) {
                 og:image or site logo only repeats what the title says, and a video's picture is its player. */}
             {doc.thumbnail && (doc.type === "pdf" || doc.type === "epub") && <Thumb item={doc} className="doc-thumb" />}
             {doc.course && p.lessons && p.lessons.length > 1 && <CourseLine id={doc.id} course={doc.course} lessons={p.lessons} onOpen={p.onOpenLesson} />}
+            {/* Where it's from, above the title (Reeder, Matter): one click opens the original. */}
+            {source && (
+              <Hint text={doc.url ? "Open the original page" : "Open the original file"} keys="original">
+                <button className={`source${doc.url ? " site" : ""}`} onClick={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}>
+                  {source} ↗
+                </button>
+              </Hint>
+            )}
             {renaming ? (
               <input
                 className="title-edit"
@@ -2231,7 +2253,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                 </h1>
               </WithMenu>
             )}
-            {(doc.author || authoring || doc.skills.length > 0 || suggested || source || !PHONE) && (
+            {(doc.author || authoring || published || doc.skills.length > 0 || suggested || !PHONE) && (
               <div className="chips">
                 {authoring ? (
                   <input
@@ -2262,6 +2284,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                     </Hint>
                   ))
                 )}
+                {published && <span className="when">{published}</span>}
                 {PHONE ? (
                   doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
                 ) : (
@@ -2281,13 +2304,6 @@ function ReaderView(p: Props & { reload: () => void }) {
                       </button>
                     </Hint>
                   </span>
-                )}
-                {source && (
-                  <Hint text={doc.url ? "Open the original page" : "Open the original file"} keys="original">
-                    <button className="source" onClick={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}>
-                      {source} ↗
-                    </button>
-                  </Hint>
                 )}
               </div>
             )}
@@ -2459,17 +2475,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           {tip.text}
         </div>
       )}
-      {!closedBook && away !== "down" && (
-        <Collected
-          anns={anns}
-          ready={ready}
-          rectOf={(id) => ranges.current.get(id)?.getBoundingClientRect()}
-          onOpen={() => {
-            if (popup) closePopup();
-            p.onShowSide("questions", true);
-          }}
-        />
-      )}
+      {PHONE && !closedBook && away !== "down" && collected}
       </div>
       {closedBook && hidden && (
         <div className="hidden-chip">
