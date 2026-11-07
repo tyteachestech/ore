@@ -1,0 +1,307 @@
+{
+  "eval": "grade",
+  "date": "2026-11-07T01:01:54.489Z",
+  "cases": 20,
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "grade@2",
+      "accuracy": 1,
+      "correct": 20,
+      "total": 20,
+      "by_level": {
+        "easy": "7/7",
+        "partial": "6/6",
+        "tricky": "7/7"
+      },
+      "errors": 0,
+      "wall_s": 16.8,
+      "cost_usd": 0.1822088,
+      "input_tokens": 86097,
+      "output_tokens": 3964,
+      "cases": [
+        {
+          "id": "easy-capital",
+          "level": "easy",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 2935,
+          "usage": {
+            "input_tokens": 4226,
+            "output_tokens": 145,
+            "cost_usd": 0.01835
+          }
+        },
+        {
+          "id": "easy-capital-wrong",
+          "level": "easy",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3326,
+          "usage": {
+            "input_tokens": 4227,
+            "output_tokens": 173,
+            "cost_usd": 0.018633999999999998
+          }
+        },
+        {
+          "id": "easy-blank",
+          "level": "easy",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3251,
+          "usage": {
+            "input_tokens": 4235,
+            "output_tokens": 179,
+            "cost_usd": 0.018726
+          }
+        },
+        {
+          "id": "easy-photosynthesis",
+          "level": "easy",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 3003,
+          "usage": {
+            "input_tokens": 4244,
+            "output_tokens": 148,
+            "cost_usd": 0.018452
+          }
+        },
+        {
+          "id": "easy-binary",
+          "level": "easy",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 2889,
+          "usage": {
+            "input_tokens": 4221,
+            "output_tokens": 149,
+            "cost_usd": 0.0057613
+          }
+        },
+        {
+          "id": "easy-binary-wrong",
+          "level": "easy",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3304,
+          "usage": {
+            "input_tokens": 4235,
+            "output_tokens": 205,
+            "cost_usd": 0.0063773
+          }
+        },
+        {
+          "id": "easy-spacing",
+          "level": "easy",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 3062,
+          "usage": {
+            "input_tokens": 4323,
+            "output_tokens": 167,
+            "cost_usd": 0.0063493
+          }
+        },
+        {
+          "id": "partial-retrieval-missing-why",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3376,
+          "usage": {
+            "input_tokens": 4358,
+            "output_tokens": 212,
+            "cost_usd": 0.006939300000000001
+          }
+        },
+        {
+          "id": "partial-optional-missing",
+          "level": "partial",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 3123,
+          "usage": {
+            "input_tokens": 4365,
+            "output_tokens": 191,
+            "cost_usd": 0.0067573
+          }
+        },
+        {
+          "id": "partial-one-of-three",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3228,
+          "usage": {
+            "input_tokens": 4282,
+            "output_tokens": 223,
+            "cost_usd": 0.0067453
+          }
+        },
+        {
+          "id": "partial-two-of-three",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3025,
+          "usage": {
+            "input_tokens": 4326,
+            "output_tokens": 186,
+            "cost_usd": 0.0065512999999999995
+          }
+        },
+        {
+          "id": "partial-imprecise-but-complete",
+          "level": "partial",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 2752,
+          "usage": {
+            "input_tokens": 4316,
+            "output_tokens": 173,
+            "cost_usd": 0.0063812999999999995
+          }
+        },
+        {
+          "id": "partial-avoids-violated",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3701,
+          "usage": {
+            "input_tokens": 4349,
+            "output_tokens": 243,
+            "cost_usd": 0.0072133
+          }
+        },
+        {
+          "id": "tricky-paraphrase",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 2862,
+          "usage": {
+            "input_tokens": 4370,
+            "output_tokens": 183,
+            "cost_usd": 0.0066973
+          }
+        },
+        {
+          "id": "tricky-reversed",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3425,
+          "usage": {
+            "input_tokens": 4306,
+            "output_tokens": 252,
+            "cost_usd": 0.0071313
+          }
+        },
+        {
+          "id": "tricky-long-confident-false",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3826,
+          "usage": {
+            "input_tokens": 4443,
+            "output_tokens": 321,
+            "cost_usd": 0.0083693
+          }
+        },
+        {
+          "id": "tricky-terse-correct",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 2906,
+          "usage": {
+            "input_tokens": 4313,
+            "output_tokens": 162,
+            "cost_usd": 0.006259300000000001
+          }
+        },
+        {
+          "id": "tricky-misspelled",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "ms": 2931,
+          "usage": {
+            "input_tokens": 4331,
+            "output_tokens": 173,
+            "cost_usd": 0.0064413000000000005
+          }
+        },
+        {
+          "id": "tricky-keywords-no-understanding",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "ms": 3893,
+          "usage": {
+            "input_tokens": 4353,
+            "output_tokens": 300,
+            "cost_usd": 0.0077993
+          }
+        },
+        {
+          "id": "tricky-hedged-correct",
+          "level": "tricky",
+          "label": "right",
+          "rating": 3,
+          "got": "right",
+          "correct": true,
+          "ms": 2924,
+          "usage": {
+            "input_tokens": 4274,
+            "output_tokens": 179,
+            "cost_usd": 0.0062733
+          }
+        }
+      ]
+    }
+  ]
+}

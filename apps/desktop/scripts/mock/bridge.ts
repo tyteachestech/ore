@@ -22,7 +22,7 @@ Bun.serve({
     }
     const { args, stdin, job } = await req.json();
     // `recall --text` only stores what he wrote; `recall --feedback` is the AI call.
-    const ai = ["enrich", "ask", "grade", "key-points", "check", "research", "explain"].includes(args[0]) || (args[0] === "recall" && args.includes("--feedback"));
+    const ai = ["enrich", "ask", "ask-library", "grade", "key-points", "check", "research", "explain"].includes(args[0]) || (args[0] === "recall" && args.includes("--feedback"));
     if (ai) {
       // ORE_MOCK_AI=<dir>: <dir>/<command>.json answers that AI command (after a moment, as the AI would).
       const canned = process.env.ORE_MOCK_AI && Bun.file(`${process.env.ORE_MOCK_AI}/${args[0]}.json`);

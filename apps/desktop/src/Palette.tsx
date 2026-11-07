@@ -17,6 +17,8 @@ type Props = {
   skill: string | null;
   onSkill: (id: string | null) => void;
   onOpen: (item: string) => void;
+  /** Ask your library: the query as a question to his sources. */
+  onAsk: (question: string) => void;
   /** A skill made from the palette (New skill, New collection). */
   onCreated: (s: Skill) => void;
   onClose: () => void;
@@ -42,7 +44,7 @@ const TITLES = 8;
 
 /** ⌘K: recent sources, actions, skills, sources and courses by title, then sources whose text matches
  *  (`ore search`, SQLite FTS5) in their own group below. */
-export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen, onCreated, onClose }: Props) {
+export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen, onAsk, onCreated, onClose }: Props) {
   const [q, setQ] = useState("");
   const [page, setPage] = useState<Page | null>(null);
   const [hits, setHits] = useState<Hit[]>([]);
@@ -221,6 +223,8 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen
           })),
         0.01,
       ),
+      // Ask your library (Notion's "Ask AI" in search): first when the query reads as a question, else last.
+      group("Ask", query.length > 1 ? [{ value: "ask", label: <>Ask your library: “{query}”</>, run: () => onAsk(query) }] : [], asksQuestion(query) ? 2 : 0.005),
     ];
   }
   groups = groups.filter((g) => g.rows.length).sort((a, b) => b.score - a.score);
@@ -322,7 +326,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen
               <>
                 {groups.some((g) => g.rows.length > 0) && (
                   <span>
-                    <kbd>↵</kbd> {/^(source |course |text |skill notes |Go to skill|All sources)/.test(selected) ? "Open" : "Run"}
+                    <kbd>↵</kbd> {/^(source |course |text |skill notes |Go to skill|All sources)/.test(selected) ? "Open" : selected === "ask" ? "Ask" : "Run"}
                   </span>
                 )}
                 <span>
@@ -336,6 +340,10 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen
     </div>
   );
 }
+
+/** A query that reads as a question: it ends in "?", or starts with a question word and has three words or more. */
+export const asksQuestion = (q: string) =>
+  /\?\s*$/.test(q) || (/^(what|why|how|who|whom|when|where|which|does|do|did|is|are|was|were|can|could|should|would|will|explain)\b/i.test(q) && q.trim().split(/\s+/).length >= 3);
 
 /** How well a title matches: every query word must appear in it, and a word that starts a title
  *  word counts more than one inside it (Linear, Raindrop). Letters scattered across a long title

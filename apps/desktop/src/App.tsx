@@ -11,6 +11,7 @@ import { copiedFiles, pastesFiles, watchCopies } from "./copied";
 import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
+import { AskLibrary, type LibraryTurn } from "./AskLibrary";
 import { Reader } from "./Reader";
 import type { SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
@@ -227,6 +228,13 @@ export function App() {
   const [renameSource, setRenameSource] = useState(0);
   const readerActions = useRef<MenuAction[]>([]);
   const [palette, setPalette] = useState(false);
+  // Ask your library: open, and the thread so far (kept while he jumps to a cited source and back).
+  const [askOpen, setAskOpen] = useState(false);
+  const [libraryTurns, setLibraryTurns] = useState<LibraryTurn[]>([]);
+  const askLibrary = (question?: string) => {
+    if (question) setLibraryTurns((t) => [...t, { question }]);
+    setAskOpen(true);
+  };
   const [adding, setAdding] = useState(false);
   const [help, setHelp] = useState(false);
   /** Settings (⌘,) and the section it opens on (undefined: the last one he looked at). */
@@ -795,6 +803,7 @@ export function App() {
       const close = () => {
         e.preventDefault();
         setPalette(false);
+        setAskOpen(false);
         setAdding(false);
         setHelp(false);
         setEditing(null);
@@ -1477,6 +1486,8 @@ export function App() {
       requestAnimationFrame(() => filterRef.current?.focus());
     } }] : []),
     { id: "review", label: "Start review", hint: label(keys.review), run: askReview },
+    { id: "ask-library", label: "Ask your library…", keywords: ["question", "chat", "answer", "ai"], run: () => askLibrary() },
+    ...(libraryTurns.length ? [{ id: "ask-library-new", label: "New question to your library", keywords: ["ask", "chat", "clear"], run: () => { setLibraryTurns([]); askLibrary(); } }] : []),
     ...(onHome ? [] : [{ id: "home", label: "Go to Home", hint: label(keys.home), run: goHome }]),
     ...(onFeed ? [] : [{ id: "go-feed", label: "Go to Feed", hint: label(keys["go-feed"]), keywords: ["rss", "newsletter", "blog", "follow"], run: goFeed }]),
     { id: "add", label: "Add source", hint: label(keys.add), run: () => setAdding(true) },
@@ -2025,6 +2036,7 @@ export function App() {
           skill={skill}
           onSkill={openSkill}
           onOpen={openSource}
+          onAsk={askLibrary}
           onCreated={(s) => {
             reloadSkills();
             madeSkill(s);
@@ -2033,6 +2045,7 @@ export function App() {
           onClose={() => setPalette(false)}
         />
       )}
+      {askOpen && <AskLibrary turns={libraryTurns} setTurns={setLibraryTurns} onOpen={openSource} onClose={() => setAskOpen(false)} />}
       {adding && (
         <AddBox
           skill={addTo ? skillOf(addTo) : null}

@@ -193,6 +193,7 @@ ore remix [<card>...] [--pending]     write variants ahead (D66): two ready per 
 ore variant reject|restore <card> <variant> [--reason]   B in review drops a variant, the reason kept for the writer; restore is its Undo
 ore grade <card> --answer "<text>" [--variant v]   AI grades against rubric (the variant's with --variant) → proposed rating, gaps, feedback, covered (one per rubric point) (does not log)
 ore ask <card> --message "<text>" [--answer "<his>"] [--session id] [--variant v]   Ask about this (D61): one chat turn on his plan → reply, proposal (a better card or null; apply with card set), session (pass back to continue)
+ore ask-library "<question>" [--earlier <json>]   Ask your library: retrieves passages through the FTS5 index (no embeddings), the AI answers only from them → {found, answer with [n] markers, citations[{n, item, title, heading, quote, start, end}]}; found false says the library doesn't cover it (no AI call when no source has the words)
 ore recall <item> --text "<text>"     store free recall (clears old feedback), append to the source note under "Recall" → {item, recall: {text, at}, notes}
 ore recall <item> --feedback          AI feedback on recall + after-answers + section lines, stored in recall.feedback → {item, feedback, questions: [{n, feedback}], missed, section_lines}
 ore recall <item> --chapter N --text "<text>" [--heading "<title>"]   upsert chapter_recalls[N] (drops its feedback), append to the source note under "Chapter N recall" → {item, chapter, recall: {text, at}, notes}
