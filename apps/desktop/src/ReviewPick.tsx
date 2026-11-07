@@ -33,6 +33,10 @@ export const dueSkills = (today: Today, skills: Skill[]) =>
     .sort((a, b) => b.due - a.due)
     .flatMap((x) => skills.filter((s) => s.id === x.skill).map((s) => ({ skill: s, due: x.due })));
 
+/** Whether the skill list names every skill with cards due. Today's numbers can land before the
+ *  skills do; until then there is no telling whether to ask what to review. */
+export const knowsDue = (today: Today, skills: Skill[]) => today.skills.every((x) => !x.due || skills.some((s) => s.id === x.skill));
+
 /** What to review this session (D80), opened by Start review, ↵ on Home and ⌘R. Preselected with his
  *  pick from earlier today, else every skill with cards due; ↵ (or ⌘R again) starts at once, so the
  *  common case costs one extra key. Rows toggle on one click or Space, Duolingo's raised checkbox. */

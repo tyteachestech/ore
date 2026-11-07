@@ -1761,6 +1761,19 @@ journey("review: Esc keeps a half-typed answer and how sure he was, for when the
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: Start review clicked before the skills have loaded still asks what to review", async (page) => {
+  // Home's numbers can land before the skill list (CI, 2026-11-07): the click must not start every skill unasked.
+  await page.addInitScript("window.__ORE_SLOW = { skills: 1500 }");
+  await page.reload();
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  await pick.or(page.locator(".review")).first().waitFor();
+  if (!(await pick.isVisible())) throw new Error("a review started without asking what to review");
+  await until("every skill with cards due is listed", async () => (await pick.getByRole("checkbox").count()) > 1);
+  await page.keyboard.press("Escape");
+  await pick.waitFor({ state: "detached" });
+});
+
 journey("review: Open in source pauses on the card; Back to Review picks it up where he was", async (page) => {
   await page.getByRole("button", { name: "Start review" }).click();
   const pick = page.getByRole("dialog", { name: "What to review" });

@@ -7,7 +7,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
 import { lessonsOf, levelProgress, nextLesson, ore, type Item, type Skill, type Today } from "./ore";
 import { minutes, minutesText, Ring } from "./Ring";
-import { dueSkills, rememberToday, ReviewPick } from "./ReviewPick";
+import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
 import { SkillChip, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
@@ -65,6 +65,8 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
   useEffect(refresh, [refresh, reload]);
 
   const [picking, setPicking] = useState(false);
+  /** Start review shows once the skill list has loaded too: a click before it would start every skill unasked. */
+  const canStart = !!today && today.due > 0 && knowsDue(today, skills);
   /** Start review asks what to review (D80) when there is a choice; with one skill due, it just starts. */
   const ask = useCallback(() => (today && dueSkills(today, skills).length > 1 ? setPicking(true) : onReview(null)), [today, skills, onReview]);
 
@@ -73,13 +75,13 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter" || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       if ((e.target as HTMLElement).closest?.("button, a, input, textarea, [contenteditable='true'], [role='dialog']")) return;
-      if (!today?.due) return;
+      if (!canStart) return;
       e.preventDefault();
       ask();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [today, ask]);
+  }, [canStart, ask]);
 
   // Arrows move between skill tiles and Continue reading (Raycast's grid): ←→ in order, ↑↓ to the
   // nearest one in the row above or below. Nothing is selected until an arrow is pressed.
@@ -175,7 +177,7 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
               </div>
               {/* Beside the ring, not on a row of its own: Today is only as tall as the ring. Nothing due: the
                   subline already says so, so no dead button. */}
-              {today.due > 0 && (
+              {canStart && (
                 <Hint text="Start review" keys="review">
                   <button className="pill-btn home-go" onClick={ask}>
                     Start review
