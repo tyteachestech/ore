@@ -890,7 +890,7 @@ journey("search: when searching the text fails, ⌘K and the sources filter say 
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /^All sources/ }).click();
   await page.keyboard.press("Meta+f");
-  await page.keyboard.type("plausible");
+  await page.getByLabel("Filter sources").fill("plausible");
   await page.getByRole("alert").filter({ hasText: "Couldn’t search the text: The index is busy." }).waitFor();
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
 });
