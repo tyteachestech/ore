@@ -1,12 +1,13 @@
 // Diagrams in the source note (D40, D103): the in-house editor in an overlay, and the static preview the
 // note shows. Loaded only when a note has a diagram or one is being drawn, so it stays out of the main bundle.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createElement, useCallback, useEffect, useRef, useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { createPortal } from "react-dom";
 import Editor from "./draw/Editor";
 import { svgMarkup } from "./draw/export";
 import { fromScene, toScene, type El } from "./draw/model";
 import { Hint } from "./Hint";
-import { Collapse, Expand } from "./icons";
+import { Collapse, CornersOut, Expand } from "./icons";
 import { ore, oreWith, type Diagram } from "./ore";
 import { errorText, load, save as remember, type Notify } from "./util";
 
@@ -19,6 +20,9 @@ type Files = Record<string, { dataURL?: string }>;
 export function preview(scene: Scene): string {
   return svgMarkup(fromScene(scene as never), (scene.files ?? {}) as Files);
 }
+
+/** The note preview's "show the whole diagram" button, the editor's zoom-to-fit icon. */
+export const FIT_ICON = renderToStaticMarkup(createElement(CornersOut, { size: 16, "aria-hidden": true }));
 
 /** The editor, over the window or, given `dock` (the reader's side panel), over the panel's sheet so the
  *  source stays readable beside it; ⤢ (⇧⌘↵) swaps the two, remembered. Autosaves through `ore diagram --set` (D30) 1 s after a change;

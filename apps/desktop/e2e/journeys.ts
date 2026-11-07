@@ -769,7 +769,7 @@ journey("diagram: draws beside the source, and a new one stays linked when the p
   await until("the note links it once it is saved", () => page.locator(".note-editor .note-diagram").count().then((n) => n === 1), 6000);
   await page.getByRole("tab", { name: "Collected" }).click(); // closes the drawing without Done
   await page.getByRole("tab", { name: "Source note" }).click();
-  await until("the link is still in the note", async () => (await page.locator(".note-editor .note-diagram svg").count()) === 1);
+  await until("the link is still in the note", async () => (await page.locator(".note-editor .note-diagram-view > svg").count()) === 1);
   await page.locator(".note-editor .note-diagram").click();
   await docked.waitFor();
   await page.keyboard.press("Shift+Meta+Enter");
@@ -787,6 +787,49 @@ journey("diagram: draws beside the source, and a new one stays linked when the p
   await until("it leaves the note", async () => (await page.locator(".note-editor .note-diagram").count()) === 0);
   await page.keyboard.press("ControlOrMeta+z");
   await until("⌘Z puts it back", async () => (await page.locator(".note-editor .note-diagram").count()) === 1);
+  // The preview is a small board: a drag pans it and doesn't open it, ⌘-scroll zooms, the fit button
+  // brings it all back, and the edges resize it, kept in the note across a reload.
+  const board = page.locator(".note-editor .note-diagram");
+  await board.locator(".note-diagram-view > svg").waitFor();
+  await board.scrollIntoViewIfNeeded();
+  let b = (await board.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2 + 60, b.y + b.height / 2 + 20, { steps: 6 });
+  await page.mouse.up();
+  const shown = () => board.locator(".note-diagram-view").evaluate((e) => (e as HTMLElement).style.transform);
+  await until("a drag pans the board", async () => (await shown()).includes("translate(60px, 20px)"));
+  await Bun.sleep(200);
+  if (await page.locator(".diagram").count()) throw new Error("a drag on the preview opened the diagram");
+  await page.keyboard.down("ControlOrMeta");
+  await page.mouse.wheel(0, -120);
+  await page.keyboard.up("ControlOrMeta");
+  await until("⌘-scroll zooms it", async () => /scale\((?!1\))/.test(await shown()));
+  await board.locator(".note-diagram-fit").click();
+  await until("the fit button brings it all back", async () => (await shown()) === "");
+  if (await page.locator(".diagram").count()) throw new Error("the fit button opened the diagram");
+  b = (await board.boundingBox())!;
+  await page.mouse.move(b.x + b.width - 3, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width - 103, b.y + b.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await page.mouse.move(b.x + 40, b.y + b.height - 3);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 40, b.y + b.height + 117, { steps: 5 });
+  await page.mouse.up();
+  const size = async () => ((r) => [Math.round(r!.width), Math.round(r!.height)])(await board.boundingBox());
+  const want = [Math.round(b.width - 100), Math.round(b.height + 120)];
+  await until(`the edges resize it to ${want}`, async () => (await size()).join() === want.join());
+  if (await page.locator(".diagram").count()) throw new Error("resizing opened the diagram");
+  await page.keyboard.press("ControlOrMeta+z");
+  await until("⌘Z takes the height back", async () => (await size()).join() === [want[0], Math.round(b.height)].join());
+  await page.keyboard.press("Shift+ControlOrMeta+z");
+  await until("⇧⌘Z puts it again", async () => (await size()).join() === want.join());
+  await Bun.sleep(1500); // the note saves
+  await page.reload();
+  await openSource(page, AGENTS);
+  await page.locator(".note-editor .note-diagram-view > svg").waitFor();
+  await until("the size is kept in the note", async () => (await size()).join() === want.join());
 });
 
 journey("diagram: S styles at the pointer, keys stay on the canvas, Space never sticks, and Esc closes only the drawing", async (page) => {
