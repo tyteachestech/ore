@@ -285,14 +285,18 @@ export function App() {
   const listRef = useRef<HTMLDivElement>(null);
 
 
+  // Only the newest list read lands: an older one answering late would put back what came after it.
+  const reads = useRef(0);
   const refresh = useCallback(async () => {
+    const n = ++reads.current;
     try {
       const [all, gone] = await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
+      if (n !== reads.current) return;
       setItems(all);
       setArchived(gone);
       setListError(null);
     } catch (e) {
-      setListError(errorText(e));
+      if (n === reads.current) setListError(errorText(e));
     }
   }, []);
 
@@ -1427,8 +1431,8 @@ export function App() {
         await ore("pin", item.id, "--at", t);
       } catch (e) {
         notify(errorText(e), "error");
-        void refresh();
       }
+      void refresh();
     };
     await repin(at);
     notify(`Moved “${item.title}”`, "quiet", () => void repin(item.pinned_at!), () => void repin(at));

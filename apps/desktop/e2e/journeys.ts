@@ -129,7 +129,9 @@ journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel,
     await page.keyboard.press("Tab");
     if (!(await inside(".settings-sheet"))) throw new Error(`Tab ${n + 1} left Settings`);
   }
+  // One Esc closes the sheet, even with the hint Tab opened on a control showing.
   await page.keyboard.press("Escape");
+  await page.locator(".settings-sheet").waitFor({ state: "detached" });
   await page.getByRole("button", { name: "Start review" }).click();
   const pick = page.getByRole("dialog", { name: "What to review" });
   await pick.waitFor();
@@ -690,10 +692,14 @@ journey("pinned sources: Move up and a drag put them in his order; ⌘Z takes a 
     await page.getByRole("menuitem", { name: item }).click();
   };
   const pinned = () => page.locator(".row.pinned .title").allInnerTexts();
+  // A list read that answers after the move was read before it: it must not undo the move on screen.
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW: object }).__ORE_SLOW = { ls: 1200 }));
   await menu(AGENTS, "Pin to top");
   await menu(TESTING, "Pin to top");
   await until("pinned in the order pinned", async () => (await pinned()).join("|") === [AGENTS, TESTING].join("|"));
   await menu(TESTING, "Move up");
+  await page.waitForTimeout(2000);
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = undefined));
   await until("Move up puts it first", async () => (await pinned()).join("|") === [TESTING, AGENTS].join("|"));
   await page.waitForTimeout(300);
   await page.keyboard.press("Meta+z");

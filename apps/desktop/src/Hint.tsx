@@ -8,6 +8,12 @@ if (typeof window !== "undefined") {
   window.addEventListener("pointerdown", () => (tabbed = false), true);
 }
 
+/** Escapes that only closed a hint: Radix marks them handled, but a hint is not a layer he sees, so the
+ *  sheet under it closes on that same Esc (one press, as on a Mac). */
+const hintEscapes = new WeakSet<Event>();
+/** Whether something on screen already took this Esc (a menu, a field), so a sheet should not close. */
+export const escTaken = (e: Event) => e.defaultPrevented && !hintEscapes.has(e);
+
 /** Hover hint for a control, Linear-style: what it does and its shortcut, read from the keymap so a
  *  rebinding shows at once. Every control whose action has a binding uses this (AGENTS.md, UI quality
  *  bar); test/hints.test.ts fails when a binding is neither hinted nor listed as having no control. */
@@ -22,7 +28,7 @@ export function Hint({ text, keys, side = "bottom", children }: { text: ReactNod
         {children}
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content className="hint" side={side} sideOffset={6} collisionPadding={8}>
+        <Tooltip.Content className="hint" onEscapeKeyDown={(e) => hintEscapes.add(e)} side={side} sideOffset={6} collisionPadding={8}>
           {text}
           {combos.map((c) => (
             <kbd key={c}>{c}</kbd>

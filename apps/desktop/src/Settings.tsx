@@ -6,7 +6,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Hint } from "./Hint";
+import { escTaken, Hint } from "./Hint";
 import { Trap } from "./Trap";
 import { comboOf, label, rebind, useKeymap } from "./keys";
 import { ore, opt, PHONE } from "./ore";
@@ -73,7 +73,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (e.key !== "Escape" || escTaken(e)) return;
       e.preventDefault();
       onClose();
     };
