@@ -11,7 +11,7 @@ import { PixelSpin, useLate, Working } from "./Working";
 
 /** What Finish and ChapterRecall need from the source note: wait for a pending edit before the CLI
  *  appends to notes.md, then take the text it returns. */
-type NotesSync = { flushNotes: () => Promise<void>; onNotes: (text: string) => void };
+type NotesSync = { flushNotes: () => Promise<boolean>; onNotes: (text: string) => void };
 
 /** The source behind the quiz panel: null keeps it blurred (D52); otherwise it shows, stepping
  *  through `quotes` with `at` the current one (D55). */
@@ -178,7 +178,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   async function submitRecall() {
     setBusy(true);
     try {
-      await flushNotes();
+      // The recall lands in the note and comes back as its text: not over a draft that failed to save.
+      if (!(await flushNotes())) return;
       const left = await applyScope();
       if (left === null) return;
       if (recall.trim()) {

@@ -794,7 +794,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!record || !text) return void scrollRef.current?.focus({ preventScroll: true });
     setChapterFb({ n: c.n, title });
     try {
-      await notes.flush();
+      // The recall comes back inside the note's text: never over a draft that failed to save.
+      if (!(await notes.flush())) throw new Error("your note’s last edit isn’t saved yet.");
       const r = await ore<{ recall: { text: string; at: string }; notes: string }>("recall", doc.id, opt("chapter", String(c.n)), opt("text", text), opt("heading", title));
       notes.apply(r.notes);
       setDoc((cur) => cur && { ...cur, chapter_recalls: [...(cur.chapter_recalls ?? []).filter((x) => x.n !== c.n), { n: c.n, ...r.recall }] });

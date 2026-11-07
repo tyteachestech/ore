@@ -20,8 +20,9 @@ type MyNotes = {
   /** Bumps when text comes from outside the editor (load, recall, append), so it reloads. */
   version: number;
   edit: (text: string) => void;
-  /** Writes a pending edit now. Every other write to notes.md waits for it. */
-  flush: () => Promise<void>;
+  /** Writes a pending edit now; false when the save failed (already reported). Every other write
+   *  to notes.md waits for it. */
+  flush: () => Promise<boolean>;
   /** `ore notes --append` under `heading`; resolves false when it failed (already reported). */
   append: (text: string, heading: string) => Promise<boolean>;
   /** Takes the full text a CLI call returned (recall, chapter recall, append). */
@@ -34,6 +35,10 @@ type MyNotes = {
   args: string[];
   notify: Notify;
 };
+
+/** Drafts whose save failed, by note, with the text they were edited from: leaving the note keeps
+ *  them here, and opening it again shows the draft and saves it, instead of the older text on disk. */
+const unsaved = new Map<string, { text: string; base: string }>();
 
 /** One note: loaded with `ore notes`, autosaved with `--set` ~800ms after the last edit, on blur,
  *  and when the view closes. */
@@ -78,7 +83,7 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     const now = owner.current === key ? pull.current?.() : null;
     if (now != null && (draft.current !== null || now !== saved.current)) draft.current = now;
     const t = draft.current;
-    if (t === null || t === saved.current) return chain.current.then(() => {});
+    if (t === null || t === saved.current) return chain.current.then(() => !unsaved.has(key));
     saved.current = t;
     // --base is read when the write runs, after the previous write's result has moved it on (else
     // two saves in flight merge his own first save back in as an outside change and duplicate
@@ -86,16 +91,19 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     const at = () => bases.current.get(key) ?? "";
     return queue(() => ore<Notes & { merged: boolean }>("notes", ...key.split(" "), opt("set", t), opt("base", at()))).then(
       (r) => {
+        unsaved.delete(key);
         // An agent or a recall changed the file meanwhile and the CLI merged it in. With no newer
         // typing, show the merged text; otherwise keep his draft and merge again on the next save.
-        if (owner.current === key && r.merged && draft.current === t) return apply(r.text);
+        if (owner.current === key && r.merged && draft.current === t) return apply(r.text), true;
         bases.current.set(key, r.merged ? t : r.text);
-        if (owner.current !== key) return;
-        if (r.merged) saved.current = null;
+        if (owner.current === key && r.merged) saved.current = null;
+        return true;
       },
       (e) => {
         if (owner.current === key && saved.current === t) saved.current = null; // retry with the next flush
+        unsaved.set(key, { text: t, base: at() });
         notify(`Notes not saved: ${errorText(e)}`, "error");
+        return false;
       },
     );
   }, [key, notify, queue]);
@@ -112,7 +120,8 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
 
   const append = useCallback(
     async (t: string, heading: string) => {
-      await flush();
+      // An append returns the file's text; over a draft that isn't on disk it would replace his words.
+      if (!(await flush())) return false;
       try {
         const r = await queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading)));
         if (owner.current === key) apply(r.text);
@@ -152,7 +161,14 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       (r) => {
         if (!live) return;
         setDir(r.dir);
-        if (draft.current === null) apply(r.text);
+        const kept = unsaved.get(key);
+        if (draft.current !== null) return;
+        if (!kept) return apply(r.text);
+        // His last save of this note failed: show that draft and try it again.
+        apply(kept.text);
+        bases.current.set(key, kept.base);
+        saved.current = null;
+        void flush();
       },
       (e) => live && notify(`Notes: ${errorText(e)}`, "error"),
     );
