@@ -1565,7 +1565,6 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
           ref={area}
           className="draw-text"
           value={draft}
-          placeholder={editing?.then ? "Link label (Tab to skip)" : editing?.fresh ? "Type a label" : undefined}
           aria-label={editing?.then ? "Link label" : "Text"}
           onChange={(e) => {
             setDraft(e.target.value);
