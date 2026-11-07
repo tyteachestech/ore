@@ -49,6 +49,7 @@ const ENRICH_GIVE_UP_MS = 20 * 60_000;
 /** Listening speed, kept apart from a video's (D50): a voice and a speaker don't match at 1x. */
 const LISTEN_RATE = "ore.listen.rate";
 /** The chapter block's prompts (D115): shown on empty lines, never saved. */
+type Practice = { practice: true; heading: string; prompts: string[]; done: (text: string | null) => void };
 const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece of evidence", "What it changes for you"];
 
 // The highlight note's placeholder (D94, D126); never prefilled. A plain highlight's note is open: any
@@ -220,6 +221,9 @@ type Props = {
   renameSource: number;
   /** The open source's actions, read by ⌘K so it lists the same ones as the ⋯ menu. */
   actionsRef: { current: MenuAction[] };
+  /** Set by the reader: opens the tutor's exercise in the source note (D128.6); `done` gets what he
+   *  wrote under its heading when he sends it (⌘↵), or null when he leaves with Esc. */
+  practiceRef?: { current: ((exercise: { heading: string; prompts: string[] }, done: (text: string | null) => void) => void) | null };
   onArchive: (item: Item) => void;
   /** The course this source is a lesson of, its lessons in order (D79), and opening one of them. */
   lessons?: Item[];
@@ -287,9 +291,9 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [tip, setTip] = useState<{ id: string; x: number; y: number; text: string } | null>(null);
   const [gaveUp, setGaveUp] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  /** The chapter whose block is live in the source note (D115). */
-  const [block, setBlock] = useState<ChapterEnd | null>(null);
-  const scaffolded = useRef<ChapterEnd | null>(null);
+  /** The block live in the source note: a chapter's recall (D115) or the tutor's exercise (D128.6). */
+  const [block, setBlock] = useState<ChapterEnd | Practice | null>(null);
+  const scaffolded = useRef<ChapterEnd | Practice | null>(null);
   /** The eye (⌥H): the source hidden while he writes, remembered. A chapter block turns it on and puts it back after. */
   const [hideSource, setHideSource] = useState(() => load("ore.hidesource") === "1");
   const hideBefore = useRef<boolean | null>(null);
@@ -771,10 +775,23 @@ function ReaderView(p: Props & { reload: () => void }) {
     setBlock(c);
     p.onShowSide("note", true);
   };
+  /** The tutor's exercise (D128.6) opens the same way, under its own heading and prompts. */
+  const openPractice = (exercise: { heading: string; prompts: string[] }, done: (text: string | null) => void) => {
+    keepNote();
+    setPopup(null);
+    setChapterFb(null);
+    if (hideBefore.current === null) hideBefore.current = hideSource;
+    setHideSource(true);
+    setBlock({ practice: true, ...exercise, done });
+    p.onShowSide("note", true);
+  };
+  if (p.practiceRef) p.practiceRef.current = closedBook || doc?.preview ? null : openPractice;
+  useEffect(() => () => void (p.practiceRef && (p.practiceRef.current = null)), []);
   useEffect(() => {
     if (!block || !notesShown || notes.text === null || scaffolded.current === block) return;
     scaffolded.current = block;
-    notesField.current?.scaffold(block.title ?? `Chapter ${block.n}`, CHAPTER_PROMPTS);
+    if ("practice" in block) notesField.current?.scaffold(block.heading, block.prompts);
+    else notesField.current?.scaffold(block.title ?? `Chapter ${block.n}`, CHAPTER_PROMPTS);
   }, [block, notesShown, notes.text === null]);
   const toggleHide = () => {
     setHideSource((v) => {
@@ -785,12 +802,17 @@ function ReaderView(p: Props & { reload: () => void }) {
   async function endBlock(record: boolean) {
     const c = block;
     if (!c || !doc) return;
-    const title = c.title ?? `Chapter ${c.n}`;
     const text = notesField.current?.settle() ?? null;
     setBlock(null);
     scaffolded.current = null;
     setHideSource(hideBefore.current ?? false);
     hideBefore.current = null;
+    // The exercise's answer stays in his note as he wrote it; the tutor gets it for feedback.
+    if ("practice" in c) {
+      void notes.flush();
+      return c.done(record ? text : null);
+    }
+    const title = c.title ?? `Chapter ${c.n}`;
     if (!record || !text) return void scrollRef.current?.focus({ preventScroll: true });
     setChapterFb({ n: c.n, title });
     try {

@@ -92,3 +92,20 @@ export async function renameDiagram(lib: Library, ref: NoteRef, from: string, to
     return result(lib, note, to, parseScene(readFileSync(dest, "utf8")));
   });
 }
+
+/** A diagram as lines an AI can read: each label or free text, then each arrow as "A → B" (with its
+ *  own label), so a map he drew from memory can be read back like his writing. */
+export function sceneOutline(scene: Scene): string {
+  type E = { id: string; type: string; text?: string; containerId?: string | null; isDeleted?: boolean; startBinding?: { elementId?: string } | null; endBinding?: { elementId?: string } | null };
+  const els = (scene.elements as E[]).filter((e) => e && typeof e.id === "string" && !e.isDeleted);
+  const clean = (s?: string) => (s ?? "").replace(/\s+/g, " ").trim();
+  const label = new Map<string, string>();
+  for (const e of els) if (e.type === "text" && clean(e.text)) label.set(e.containerId || e.id, clean(e.text));
+  const arrows = els.filter((e) => e.type === "arrow" && e.startBinding?.elementId && e.endBinding?.elementId);
+  const lines = [...label].filter(([id]) => !arrows.some((a) => a.id === id)).map(([, t]) => `- ${t}`);
+  for (const a of arrows) {
+    const from = label.get(a.startBinding!.elementId!), to = label.get(a.endBinding!.elementId!);
+    if (from && to) lines.push(`- ${from} → ${to}${label.has(a.id) ? ` (${label.get(a.id)})` : ""}`);
+  }
+  return lines.join("\n");
+}

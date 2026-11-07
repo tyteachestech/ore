@@ -256,6 +256,38 @@ journey("tutor Quiz me: opens Review on the due cards of the source's skills, an
   await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor(); // back on the source
 });
 
+journey("tutor Practice: an exercise is written in the source note with the source hidden, and ⌘↵ sends it back for feedback", async (page) => {
+  await openSource(page, AGENTS); // not TESTING: the note block journey counts that note's headings
+  const exercise = { heading: "Why does an agent need a stopping condition?", prompts: ["What goes wrong without one"] };
+  const replies = [
+    { reply: "Explain why the tested group remembered more, from memory.", citations: [], general: false, hint: false, exercise, card: null },
+    { reply: "Right: recalling it is what made it last. What would change after a month?", citations: [], general: false, hint: false, exercise: null, card: null },
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }));
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click(); // an earlier journey's thread
+  await tutor.getByRole("button", { name: "Practice", exact: true }).click();
+  await tutor.getByRole("button", { name: "Write it in your note" }).click();
+  await until("the tutor makes room for the note", async () => (await tutor.count()) === 0);
+  await page.locator(".reader-pane.hidden-src").waitFor(); // closed book while he writes
+  await page.locator(".note-editor h2", { hasText: exercise.heading }).waitFor();
+  await page.keyboard.type("They pulled it from memory, and the effort made it stick.");
+  const sent = page.waitForRequest((r) => (r.postData() ?? "").includes("They pulled it from memory, and the effort made it stick."));
+  await page.keyboard.press("Meta+Enter");
+  await sent;
+  await tutor.getByText("What would change after a month?").waitFor(); // the feedback, back in the chat
+  await until("the source shows again", async () => (await page.locator(".reader-pane.hidden-src").count()) === 0);
+  await page.locator(".note-editor").getByText("They pulled it from memory, and the effort made it stick.").waitFor(); // his answer stays in his note
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).
