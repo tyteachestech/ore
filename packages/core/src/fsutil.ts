@@ -3,12 +3,13 @@ import { hostname } from "node:os";
 import { dirname, basename, join } from "node:path";
 import { slugify } from "./ids.ts";
 
-/** A library folder's entries, without dotfiles (Finder's .DS_Store, AppleDouble ._ files, our temp files). */
-export const visible = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir).filter((n) => !n.startsWith(".")) : []);
+/** A library folder's entries, without dotfiles (Finder's .DS_Store, AppleDouble ._ files, our temp files),
+ *  in name order: the filesystem's own order differs by Mac and Bun, and readers keep the first copy they read. */
+export const visible = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir).filter((n) => !n.startsWith(".")).sort() : []);
 
 /** A library folder's subfolders, without dotfolders or stray files. */
 export const subdirs = (dir: string): string[] =>
-  existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith(".")).map((d) => d.name) : [];
+  existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith(".")).map((d) => d.name).sort() : [];
 
 // Atomic write: temp file in the same directory, then rename.
 export function writeAtomic(path: string, content: string | Uint8Array): void {

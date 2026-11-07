@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { appendFileSync, existsSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isUlid, slugify, ulid } from "../src/ids.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../src/frontmatter.ts";
-import { appendJsonl, latestRevs, readJsonl, writeAtomic } from "../src/fsutil.ts";
+import { appendJsonl, latestRevs, readJsonl, subdirs, visible, writeAtomic } from "../src/fsutil.ts";
 import { withLock } from "../src/lock.ts";
 import { addSkill, loadSkills, desiredRetention, setSkillLook } from "../src/skills.ts";
 import { createItem, listItems, renameItem } from "../src/items.ts";
@@ -226,6 +227,17 @@ describe("a log line that isn't a record", () => {
     const kept = addHighlight(item, { exact: "text", intent: "keep" });
     appendFileSync(join(item.dir, "annotations.jsonl"), 'null\n{"id":"X","rev":1}\n');
     expect(readAnnotations(item).map((a) => a.id)).toEqual([kept.id]);
+  });
+});
+
+describe("folder listings", () => {
+  test("come back in name order on every Mac and filesystem, so 'the first copy read' is the same everywhere", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ore-order-"));
+    const names = Array.from({ length: 40 }, (_, i) => `2026-${String(i).padStart(2, "0")}.${["mac", "phone", "ipad"][i % 3]}.jsonl`);
+    for (const n of [...names].reverse()) writeFileSync(join(dir, n), "");
+    for (const n of ["b", "a", "c"]) mkdirSync(join(dir, n));
+    expect(visible(dir)).toEqual([...names, "a", "b", "c"].sort());
+    expect(subdirs(dir)).toEqual(["a", "b", "c"]);
   });
 });
 
