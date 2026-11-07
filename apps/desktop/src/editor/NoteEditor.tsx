@@ -1,5 +1,5 @@
 import type { Editor } from "@milkdown/kit/core";
-import { editorViewCtx } from "@milkdown/kit/core";
+import { editorViewCtx, serializerCtx } from "@milkdown/kit/core";
 import {
   createCodeBlockCommand, imageSchema, insertHrCommand, linkSchema, turnIntoTextCommand, wrapInBlockquoteCommand, wrapInBulletListCommand,
   wrapInHeadingCommand, wrapInOrderedListCommand,
@@ -8,7 +8,7 @@ import { insertTableCommand } from "@milkdown/kit/preset/gfm";
 import { toggleMark, wrapIn } from "@milkdown/kit/prose/commands";
 import type { Node as PmNode } from "@milkdown/kit/prose/model";
 import { closeHistory, isHistoryTransaction } from "@milkdown/kit/prose/history";
-import { NodeSelection, Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
+import { NodeSelection, Plugin, PluginKey, TextSelection, type EditorState } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet, type EditorView, type ViewMutationRecord } from "@milkdown/kit/prose/view";
 import { $prose, $view, callCommand } from "@milkdown/kit/utils";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -45,6 +45,8 @@ export type NoteEditorHandle = {
   /** Ends the block: lines still empty go, and the heading too when he wrote nothing under it.
    *  Resolves to what he wrote under the heading (Markdown), or null. */
   settle: () => string | null;
+  /** Whether he has written anything in the open block yet (text, or a diagram or image). */
+  written: () => boolean;
 };
 
 /** The scaffold's lines, as node decorations mapped through his edits: the heading first, then the
@@ -61,6 +63,36 @@ const ghostPlugin = $prose(
       props: { decorations: (state) => ghosts.getState(state) ?? null },
     }),
 );
+
+/** Where the scaffold's block starts (its heading), mapped through his edits: renaming the heading
+ *  or writing above it never loses the block. */
+const blockStart = new PluginKey<number | null>("ore-block-start");
+const blockStartPlugin = $prose(
+  () =>
+    new Plugin<number | null>({
+      key: blockStart,
+      state: {
+        init: () => null,
+        apply: (tr, at) => (tr.getMeta(blockStart) !== undefined ? tr.getMeta(blockStart) : at === null ? null : tr.mapping.map(at, 1)),
+      },
+    }),
+);
+
+/** The open block in this state: its heading, if still there, where his writing starts, and
+ *  whether he has written anything (text counts, and so does a diagram or image with no words). */
+function blockIn(state: EditorState) {
+  const { doc } = state;
+  const at = Math.min(blockStart.getState(state) ?? doc.content.size, doc.content.size);
+  const first = doc.nodeAt(at);
+  const h = first?.type.name === "heading" ? { from: at, to: at + first.nodeSize } : null;
+  const from = h?.to ?? at;
+  let written = false;
+  doc.nodesBetween(from, doc.content.size, (n) => {
+    if (n.isText ? !!n.text?.trim() : n.isLeaf && n.type.name !== "hardbreak") written = true;
+    return !written;
+  });
+  return { h, from, written };
+}
 
 type Props = {
   /** The file as loaded. Remount (change `key`) to load other text. */
@@ -159,29 +191,22 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       return editor.current.action((ctx) => {
         const v = ctx.get(editorViewCtx);
         const lines = ghosts.getState(v.state)?.find() ?? [];
-        // The block's heading: the last top-level heading with its title (the heading-id plugin
-        // replaces the node on every change, so it can't carry a decoration of its own).
-        let head: { from: number; to: number } | null = null;
-        v.state.doc.forEach((node, at) => {
-          if (node.type.name === "heading" && node.textContent === title) head = { from: at, to: at + node.nodeSize };
-        });
-        const h = head as { from: number; to: number } | null;
-        if (!h) return null;
-        const written = v.state.doc.textBetween(h.to, v.state.doc.content.size, "\n").trim() !== "";
+        const { doc } = v.state;
+        const { h, from, written } = blockIn(v.state);
         const empty = (d: Decoration) => {
-          const node = v.state.doc.nodeAt(d.from);
+          const node = doc.nodeAt(d.from);
           return !!node && node.type.name === "paragraph" && node.content.size === 0;
         };
-        const gone = [...lines.filter(empty), ...(written ? [] : [h])].sort((a, b) => b.from - a.from);
+        const gone = [...lines.filter(empty), ...(written || !h ? [] : [h])].sort((a, b) => b.from - a.from);
         let tr = v.state.tr;
         for (const d of gone) tr = tr.delete(d.from, d.to);
-        v.dispatch(tr.setMeta(ghosts, DecorationSet.empty));
+        v.dispatch(tr.setMeta(ghosts, DecorationSet.empty).setMeta(blockStart, null));
         if (!written) return null;
-        const md = markdownOf(editor.current!);
-        const i = md.lastIndexOf(`## ${title}`);
-        return (i === -1 ? "" : md.slice(md.indexOf("\n", i) + 1).trim()) || null;
+        const after = tr.doc.slice(tr.mapping.map(from), tr.doc.content.size).content;
+        return ctx.get(serializerCtx)(tr.doc.type.create(null, after)).trim() || null;
       });
     },
+    written: () => !!editor.current && scaffoldTitle.current !== null && editor.current.action((ctx) => blockIn(ctx.get(editorViewCtx).state).written),
   }), []);
   const wantScaffold = useRef<{ heading: string; prompts: string[] } | null>(null);
   const scaffoldTitle = useRef<string | null>(null);
@@ -191,9 +216,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       const v = ctx.get(editorViewCtx);
       const { doc, schema } = v.state;
       // Back to a block he left with Esc: his heading is already there, so only the prompts come back.
-      let last: string | null = null;
-      doc.forEach((node) => void (node.type.name === "heading" && (last = node.textContent)));
-      const head = last === heading ? null : schema.nodes.heading!.create({ level: 2 }, schema.text(heading));
+      const heads: { text: string; at: number }[] = [];
+      doc.forEach((node, at) => void (node.type.name === "heading" && heads.push({ text: node.textContent, at })));
+      const kept = heads.at(-1)?.text === heading ? heads.at(-1) : undefined;
+      const head = kept ? null : schema.nodes.heading!.create({ level: 2 }, schema.text(heading));
       const lines = prompts.map(() => schema.nodes.paragraph!.create());
       const at = doc.content.size;
       const tr = v.state.tr.insert(at, head ? [head, ...lines] : lines);
@@ -203,7 +229,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         decos.push(Decoration.node(pos, pos + line.nodeSize, { class: "ghost", "data-ghost": prompts[i]! }, { "data-ghost": prompts[i]! }));
         pos += line.nodeSize;
       }
-      tr.setMeta(ghosts, DecorationSet.create(tr.doc, decos));
+      tr.setMeta(ghosts, DecorationSet.create(tr.doc, decos)).setMeta(blockStart, kept?.at ?? at);
       v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + (head?.nodeSize ?? 0) + 1)).scrollIntoView());
       v.focus();
     });
@@ -223,7 +249,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), followRenames(live), toggleView, ghostPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
