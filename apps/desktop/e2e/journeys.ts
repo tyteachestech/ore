@@ -114,6 +114,24 @@ journey("add: File keeps what he typed in the box; cancelling the picker keeps i
   await page.keyboard.press("Escape");
 });
 
+journey("Add and Settings: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
+  const inside = (sel: string) => page.evaluate((sel) => !!document.activeElement?.closest(sel), sel);
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").waitFor();
+  for (let n = 0; n < 8; n++) {
+    await page.keyboard.press("Shift+Tab");
+    if (!(await inside(".add-box"))) throw new Error(`⇧Tab ${n + 1} left the Add box`);
+  }
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+Comma");
+  await page.locator(".settings-sheet").waitFor();
+  for (let n = 0; n < 40; n++) {
+    await page.keyboard.press("Tab");
+    if (!(await inside(".settings-sheet"))) throw new Error(`Tab ${n + 1} left Settings`);
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("PDF footnote: its mark shows the note on hover, and bold stays bold", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill(join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/hazards.pdf"));

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { feedProof, type FoundFeed } from "./Feed";
 import { Hint } from "./Hint";
+import { Trap } from "./Trap";
 import { is } from "./keys";
 import { SkillIcon } from "./IconPicker";
 import { ore, type Skill } from "./ore";
@@ -157,6 +158,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <Trap>
       <div className="panel add-box" role="dialog" aria-modal="true" aria-label="Add a source">
         <Grow
           ref={ref}
@@ -260,6 +262,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
           </span>
         </div>
       </div>
+      </Trap>
     </div>
   );
 }
