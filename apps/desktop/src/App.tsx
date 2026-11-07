@@ -913,7 +913,8 @@ export function App() {
   const [query, setQuery] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
   const q = onSkillPage ? "" : query.trim();
-  const [hits, setHits] = useState<{ q: string; snip: Map<string, string> }>({ q: "", snip: new Map() });
+  /** `error`: why searching the text failed, so it never reads as "nothing matches". */
+  const [hits, setHits] = useState<{ q: string; snip: Map<string, string>; error?: string }>({ q: "", snip: new Map() });
   useEffect(() => {
     if (!q) return;
     let live = true;
@@ -924,7 +925,7 @@ export function App() {
           for (const h of r) if (h.item && h.snippet && !snip.has(h.item)) snip.set(h.item, h.snippet);
           if (live) setHits({ q, snip });
         },
-        () => live && setHits({ q, snip: new Map() }),
+        (e) => live && setHits({ q, snip: new Map(), error: errorText(e) }),
       );
     }, 120);
     return () => {
@@ -1818,7 +1819,8 @@ export function App() {
         </div>
       )}
       {!listError && items && !q && rows.length === 0 && <div className="empty-state">{empty(status, keys)}</div>}
-      {q && hits.q === q && rows.length === 0 && <div className="empty-state">No {(TABS.find((s) => s.id === status)?.label ?? "archived").toLowerCase()} sources match “{q}”.</div>}
+      {q && hits.q === q && hits.error && <div className="empty-state err" role="alert">Couldn’t search the text: {hits.error} Titles still filter.</div>}
+      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">No {(TABS.find((s) => s.id === status)?.label ?? "archived").toLowerCase()} sources match “{q}”.</div>}
       <DndContext
         sensors={rowSensors}
         onDragStart={(e) => {

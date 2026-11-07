@@ -847,6 +847,20 @@ journey("⌘K: a match in the text opens the source at that place, the find bar 
   await page.keyboard.press("Escape");
 });
 
+journey("search: when searching the text fails, ⌘K and the sources filter say so instead of “no matches”", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { search: "The index is busy." }));
+  await page.keyboard.press("Meta+k");
+  await page.locator("[cmdk-input]").fill("plausible");
+  await page.locator(".panel-foot .err").filter({ hasText: "Couldn’t search the text: The index is busy." }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.keyboard.press("Meta+f");
+  await page.keyboard.type("plausible");
+  await page.getByRole("alert").filter({ hasText: "Couldn’t search the text: The index is busy." }).waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+});
+
 journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a reload; Turn into, then ⌘Z", async (page) => {
   const items = () => page.locator(".note-editor li").allInnerTexts();
   const grip = async (text: string) => {

@@ -79,8 +79,14 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen
             out.push({ item, title: items.find((i) => i.id === item)?.title ?? r.title, snippet: r.snippet });
           }
           setHits(out);
+          setError(null);
         },
-        () => live && setHits([]),
+        (e) => {
+          if (!live) return;
+          setHits([]);
+          // Said in the foot, so a search that failed never reads as "No matches".
+          setError(`Couldn’t search the text: ${errorText(e)}`);
+        },
       );
     }, 150);
     return () => {
