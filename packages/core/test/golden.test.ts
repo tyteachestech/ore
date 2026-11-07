@@ -45,6 +45,7 @@ function serve(pages: Record<string, [file: string, type: string]>) {
 const HTML = "text/html; charset=utf-8";
 const CASES: { name: string; add: string; serve?: Record<string, [string, string]> }[] = [
   { name: "pdf-hazards", add: join(FIX, "files/hazards.pdf") }, // footnotes, powers, hyphens, running heads
+  { name: "pdf-outline", add: join(FIX, "files/outline.pdf") }, // the PDF outline as chapters
   { name: "pdf-textbook", add: join(FIX, "files/textbook.pdf") }, // margin notes, numbered headings, lists
   { name: "pdf-figures", add: join(FIX, "files/figures.pdf") },
   { name: "epub", add: join(FIX, "files/book.epub") }, // make-book-epub.ts
