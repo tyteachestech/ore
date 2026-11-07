@@ -17,6 +17,10 @@ type MyNotes = {
   text: string | null;
   /** The note's folder (for images); null until loaded. */
   dir: string | null;
+  /** Why the note didn't load; null while loading or once loaded. */
+  error: string | null;
+  /** Loads the note again after `error`. */
+  retry: () => void;
   /** Bumps when text comes from outside the editor (load, recall, append), so it reloads. */
   version: number;
   edit: (text: string) => void;
@@ -47,6 +51,10 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
   const [text, setText] = useState<string | null>(null);
   const [dir, setDir] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  /** Bumped by Try again: reruns the load below. */
+  const [tries, setTries] = useState(0);
+  const retry = useCallback(() => (setError(null), setTries((n) => n + 1)), []);
   const draft = useRef<string | null>(null);
   const saved = useRef<string | null>(null);
   /** The text on disk each note's draft was edited from, by note; sent as --base so the CLI merges
@@ -154,6 +162,7 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       draft.current = saved.current = null;
       setText(null);
       setDir(null);
+      setError(null);
     }
     // Loaded behind the writes still queued (his last saves of this note, made before he switched
     // away and back), or it shows the text from before them and his next save drops them.
@@ -170,7 +179,7 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
         saved.current = null;
         void flush();
       },
-      (e) => live && notify(`Notes: ${errorText(e)}`, "error"),
+      (e) => live && setError(`Couldn’t open this note: ${errorText(e)}`),
     );
     // A diagram linked into this note's file after its editor closed (Diagram.tsx): show the file as it
     // is now, unless he has typed since his last save (that save merges it in).
@@ -188,11 +197,11 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       window.removeEventListener("beforeunload", leave);
       leave();
     };
-  }, [key, apply, flush, notify, queue]);
+  }, [key, tries, apply, flush, notify, queue]);
 
   return useMemo(
-    () => ({ text, dir, version, edit, flush, append, apply, attach, pull, args: key.split(" "), notify }),
-    [text, dir, version, edit, flush, append, apply, attach, key, notify],
+    () => ({ text, dir, error, retry, version, edit, flush, append, apply, attach, pull, args: key.split(" "), notify }),
+    [text, dir, error, retry, version, edit, flush, append, apply, attach, key, notify],
   );
 }
 
@@ -211,6 +220,15 @@ type EditorProps = {
 
 /** The block editor over a loaded note; reloads when text arrives from outside it. */
 export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, place }: EditorProps) {
+  if (notes.error)
+    return (
+      <div className="empty-state err" role="alert">
+        <p>{notes.error}</p>
+        <button className="pill-btn" onClick={notes.retry}>
+          Try again
+        </button>
+      </div>
+    );
   if (notes.text === null || notes.dir === null) return <div className="note-editor" />;
   return (
     <NoteEditor
