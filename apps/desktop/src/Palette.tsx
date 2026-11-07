@@ -273,7 +273,13 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onOpen
             setNumbers(false);
             pick(n);
           } else if (e.key === "Tab") e.preventDefault(); // one input; arrows move through the list
-          else if (e.key === "Escape" || (e.key === "Backspace" && page && !q)) {
+          // Esc clears what he typed first, then goes back a page, then closes (Raycast).
+          else if (e.key === "Escape" && q) {
+            e.preventDefault();
+            e.stopPropagation();
+            setQ("");
+            setError(null);
+          } else if (e.key === "Escape" || (e.key === "Backspace" && page && !q)) {
             e.preventDefault();
             e.stopPropagation();
             if (page) open(null);
