@@ -2662,6 +2662,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               timeOf={timeOf}
               adding={adding}
               onAdding={(on) => (on ? cardHere() : setAdding(null))}
+              onEdit={setAdding}
               onAdd={(line) => void addPoint(line)}
               onJump={(id) => onSource(() => jumpToHighlight(id))}
               onAsk={() => setAsk((n) => n + 1)}
