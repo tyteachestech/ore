@@ -1,35 +1,64 @@
-/* The Terminal look (D101, Tyler 2026-10-29, option A; refs claude.dev, Oxide, Geist Pixel): a warm neutral
-   black, Geist for the interface, small uppercase Geist Mono labels, square corners, cards drawn as hairline
-   frames, flat white buttons, Geist Pixel for big numbers, segmented rings and dithered bars, 8-bit gems
-   (Gem.tsx). Reading stays in the system font. Loaded after styles.css, so equal selectors here win. */
+/* The Terminal look (D101, Tyler 2026-10-29, option A), softened (Tyler 2026-11-07, north stars opencode, Railway
+   and Charm): a matte neutral grey-black with no blue or violet cast, Geist for the interface, sentence-case
+   OpenTUI Mono labels (opencode's mono, OFL), square corners, cards drawn as hairline frames, flat light buttons,
+   pastel intents, 8-bit gems (Gem.tsx) and pixel icons (icons.tsx). Reading stays in Charter and the system font.
+   Loaded after styles.css, so equal selectors here win. */
 @font-face { font-family: "Geist"; src: url("./fonts/Geist-Regular.woff2") format("woff2"); font-weight: 400; font-display: block; }
 @font-face { font-family: "Geist"; src: url("./fonts/Geist-Medium.woff2") format("woff2"); font-weight: 500; font-display: block; }
 @font-face { font-family: "Geist"; src: url("./fonts/Geist-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: block; }
 @font-face { font-family: "Geist"; src: url("./fonts/Geist-Bold.woff2") format("woff2"); font-weight: 700 900; font-display: block; }
 @font-face { font-family: "Geist Mono"; src: url("./fonts/GeistMono-Regular.woff2") format("woff2"); font-weight: 400; font-display: block; }
 @font-face { font-family: "Geist Mono"; src: url("./fonts/GeistMono-Medium.woff2") format("woff2"); font-weight: 500 900; font-display: block; }
-@font-face { font-family: "Geist Pixel"; src: url("./fonts/GeistPixel-Square.woff2") format("woff2"); font-display: block; }
+/* OpenTUI Mono (Iosevka build, OFL, no reserved name): its Latin subset; anything outside it falls back to Geist Mono. */
+@font-face { font-family: "OpenTUI Mono"; src: url("./fonts/OpenTUIMono-Regular.woff2") format("woff2"); font-weight: 400 600; font-display: block; }
+@font-face { font-family: "OpenTUI Mono"; src: url("./fonts/OpenTUIMono-Bold.woff2") format("woff2"); font-weight: 700 900; font-display: block; }
 
 :root {
-  --bg: #141413;
-  --bg-side: #141413;
-  --bg-card: #141413;
-  --bg-raised: #1c1c1b;
-  --border: #2b2b29;
-  --text: #f2f1ec;
-  --text-read: #d9d8d2;
-  --muted: #a3a29c;
-  --faint: #8c8b85; /* 4.9:1 on --bg, 4.6:1 on --bg-raised */
+  /* opencode's neutral ramp, lifted a step (Tyler: softer, not as black). */
+  --bg: #1b1b1b;
+  --bg-side: #1b1b1b;
+  --bg-card: #1b1b1b;
+  --bg-raised: #232323;
+  --bg-hover: #262626;
+  --bg-active: #2f2f2f;
+  --border: #2f2f2f;
+  --text: #e4e4e2;
+  --text-read: #cfcfcc;
+  --muted: #a2a2a0;
+  --faint: #8c8c8a; /* 4.6:1 on --bg, 4.3:1 on --bg-raised */
   --lift: none;
-  --paper: #f2f1ec; /* the flat white of buttons and an inverted selection */
-  --ink: #141413;
+  --paper: #e4e4e2; /* the flat light of buttons and an inverted selection */
+  --ink: #1b1b1b;
+  --accent: #e4e4e2;
+  --focus: rgba(228, 228, 226, 0.45);
+  --halo: 0 0 0 3px rgba(228, 228, 226, 0.1);
+  --float: 0 0 0 1px #303030, 0 8px 24px rgba(0, 0, 0, 0.35);
+  /* Pastel intents and skills: colour stays for meaning, never loud. */
+  --keep-solid: #dcc070;
+  --card-solid: #82bde6;
+  --question-solid: #b59aec;
+  --apply-solid: #79d6b2;
+  --research-solid: #79d6b2;
+  --keep: rgba(230, 190, 80, 0.24);
+  --card: rgba(130, 189, 230, 0.22);
+  --question: rgba(181, 154, 236, 0.24);
+  --apply: rgba(121, 214, 178, 0.2);
+  --c-red: #e58a84;
+  --c-orange: #e8b48f;
+  --c-yellow: #dcc070;
+  --c-green: #79d6b2;
+  --c-teal: #6fcfcf;
+  --c-blue: #82bde6;
+  --c-purple: #b59aec;
+  --c-pink: #e79bc4;
   --font-read: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   --font: "Geist", var(--font-read);
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --mono: "OpenTUI Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --round: var(--font);
-  --pixel: "Geist Pixel", var(--mono);
+  --pixel: var(--mono); /* big numbers in the mono (round 3 kit); 8-bit stays for gems, icons, rings and bars */
   --radius: 0px;
 }
+::selection { background: rgba(228, 228, 226, 0.18); }
 .doc, .note-editor, .review-passage { font-family: var(--font-read); }
 /* The text he reads sits a step above the UI's reading grey: brighter than --text-read, short of the titles' white. */
 .doc { color: color-mix(in srgb, var(--text-read) 45%, var(--text)); }
@@ -73,9 +102,9 @@
 .home-skill-top { flex: 1; }
 
 /* Labels: section and card titles, sidebar groups, metadata. */
-.card-title h2, .home-h, .home-cont .home-h, .side-label { font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.card-title h2, .home-h, .home-cont .home-h, .side-label { font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .card-title .card-icon { margin-right: 2px; }
-.skill-page .row .kind, .row .count, .side-item .count, .home-read .chip, .gem-ring-lv { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.skill-page .row .kind, .row .count, .side-item .count, .home-read .chip, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
 
 /* Big numbers in pixel type. */
 .home-solid, .hero-strength .home-solid, .home-goal h1, .review-kept b, .review-cut b { font-family: var(--pixel); font-weight: 400; }
@@ -87,7 +116,7 @@
 .chip { background: transparent; box-shadow: inset 0 0 0 1px var(--border); font-size: 11px; }
 
 /* Primary buttons: flat paper white, mono caps (claude.dev's "Try Claude Code"). */
-.pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 0; font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+.pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 0; font-family: var(--mono); font-weight: 500; letter-spacing: 0.06em; }
 .pill-btn:active:not(:disabled) { box-shadow: none; }
 
 /* Bars are dithered tracks with a solid fill; rings are cut into segments. */
@@ -104,7 +133,7 @@
 .list:focus-visible .row.on { box-shadow: inset 2px 0 0 var(--paper), inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
 
 /* Review: what he picked is inverted, paper white with ink text (Playdate), on a hard 3px lip. */
-.review-rate button, .quiz-sure button { border-radius: 0; font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.review-rate button, .quiz-sure button { border-radius: 0; font-family: var(--mono); font-weight: 500; letter-spacing: 0.04em; }
 .review-rate button.suggested, .review-rate button.suggested:hover:not(:disabled),
 .quiz-sure button[aria-checked="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); box-shadow: 0 3px 0 #6b6a66; filter: none; }
 .pick-box { border-radius: 0; }
@@ -124,7 +153,7 @@
 /* Settings follows the skill page (Tyler, 2026-10-31): each group is a mono label over a hairline rule and its rows
    sit on the page between hairlines, no rounded card around them; controls are square like every other control. */
 .settings-group { margin-bottom: 36px; }
-.settings-group h2 { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.settings-group h2 { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .settings-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .settings-row { padding: 14px 0; }
 .settings-tab, .seg, .seg-item, .settings-btn { border-radius: 0; }
@@ -134,7 +163,7 @@
 /* The shortcut list in Settings: groups are mono labels over a rule, the list sits on the page; the search stays a field. */
 .keys-editor.in-page .keys-head { border-radius: 0; }
 .keys-editor.in-page .keys-body { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
-.keys-editor.in-page .keys-body h3 { margin-top: 20px; padding: 0 0 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.keys-editor.in-page .keys-body h3 { margin-top: 20px; padding: 0 0 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .keys-editor.in-page .keys-body h3:first-child { margin-top: 0; }
 .keys-editor.in-page .key-row { margin: 0 -8px; border-radius: 0; }
 
@@ -174,3 +203,23 @@
 @keyframes roll-in-up { from { transform: translateY(100%); } }
 @keyframes roll-out-down { to { transform: translateY(100%); } }
 @keyframes roll-in-down { from { transform: translateY(-100%); } }
+
+/* The highlight popup (round 3, Tyler 2026-11-07): a soft raised sheet with a 2px edge in the picked type's colour.
+   The types are a row of small mono tabs; the picked one sits on a grey key with only its icon in colour (option B:
+   "the underline feels cheap"). The note field and the tools column lose their frames. */
+.popup { --on: var(--keep-solid); border: 0; border-radius: 10px; padding: 8px 6px 8px 12px; overflow: hidden; width: 340px; }
+.popup:has(.intents .intent.card.on) { --on: var(--card-solid); }
+.popup:has(.intents .intent.question.on) { --on: var(--question-solid); }
+.popup:has(.intents .intent.apply.on) { --on: var(--apply-solid); }
+.popup:has(.intents)::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--on); opacity: 0.8; }
+.intents { gap: 2px; margin: 0 0 6px -4px; }
+.intents .intent { flex: none; padding: 0 9px; height: 28px; border-radius: 6px; font: 11px/16px var(--mono); letter-spacing: 0.02em; color: var(--faint); gap: 6px; }
+.intents .intent svg { color: currentColor; }
+.intents .intent:hover { background: var(--bg-hover); color: var(--text); }
+.intents .intent.on { background: var(--bg-active); color: var(--text); }
+.intents .intent.on svg { color: var(--hue); }
+.popup .field { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 2px 4px; }
+.popup .field:focus { box-shadow: none; }
+.popup-tools { border-left: 0; padding-left: 2px; }
+.popup-tools .intent { color: var(--faint); border-radius: 6px; }
+.popup-tools .intent:hover { color: var(--text); background: var(--bg-hover); }

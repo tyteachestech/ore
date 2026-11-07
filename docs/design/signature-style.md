@@ -1,6 +1,6 @@
-# Signature style: direction in progress
+# Signature style
 
-The one current brief while Ore's look is being re-picked (thread "Find Ore's signature terminal style", started 2026-11-07). DESIGN.md describes what is built today; this page says where it is heading. Update this page at each of Tyler's picks, and fold it into DESIGN.md (and the decisions it amends) when the rollout lands.
+The current brief for Ore's look (thread "Find Ore's signature terminal style", 2026-11-07; built as D129). DESIGN.md holds the tokens and component specs; this page keeps the why and what is still open. Update it at each of Tyler's picks.
 
 ## Tyler's brief
 Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, and also cool and advanced, a feeling of progressing (hence the terminal vibe). Source the look from the best real products, never guesses.
@@ -11,12 +11,15 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 - Saturation only on intents, skills and gems, in pastels: key point `#dcc070`, card `#82bde6`, question `#b59aec`, apply `#79d6b2`. No coral or red-orange.
 - Picked highlight type: a neutral grey key (option B), integrated, never a big pill or an underline.
 - Type: Geist stays; OpenTUI Mono (OFL) for mono; Charter for a source's text.
-- Icons: MingCute's weight drawn on a 16 pixel grid (hand-cleaned). Proposes replacing Pixelarticons (D105).
+- Icons: MingCute's weight drawn on a 16 pixel grid (hand-cleaned); replaces Pixelarticons (D105 as amended by D129). Generators: `/mnt/project-files/signature-style/build/` (emit.py writes `icons.tsx` and `PixelIcon.tsx`).
+- Big numbers in the mono; Geist Pixel retired. Labels in sentence case.
+- Popup closing animation: A Settle (popup lifts away, margin mark pops in three pixel steps, the passage glows once).
 - Dropped: cute (too Duolingo), 3D pressed keys, 8bitcn.
 
 ## Open
-- Popup closing animation (A settle, B drop, C spark).
+- Redraw Hand, ThumbsDown, Paperclip, Compass.
+- Railway touches on Home and Review (dot grid, progress track); the Charm-style wordmark experiment; a Rive trial.
 - A mascot later; sound after the look.
 
-## Amends when it lands
-D101 (Terminal look) and D105 (Pixelarticons). Until then, build new UI to DESIGN.md as it stands, and check this page before any style work.
+## Built
+D129 (amends D101 and D105): palette, OpenTUI Mono, sentence case, pixel MingCute icons and the grey-key popup (PR #84); Settle in its own PR.
