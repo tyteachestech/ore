@@ -144,6 +144,10 @@ describe("card remixing (D66)", () => {
     expect(reviewVersion(lib, findCard(lib, c.meta.id))?.id).toBe(a.id);
     const edited = await setVariant(lib, c.meta.id, a.id, { question: "A new question?" });
     expect(readVariants(lib, c.meta.id)[0]).toMatchObject({ rev: 2, question: "A new question?", answer: a.answer });
+    // Its key points are reworded in place, one for one, since each tests one of the original's.
+    await setVariant(lib, c.meta.id, a.id, { rubric: a.rubric.map((p) => `${p}, reworded`) });
+    expect(readVariants(lib, c.meta.id)[0]!.rubric).toEqual(a.rubric.map((p) => `${p}, reworded`));
+    await expect(setVariant(lib, c.meta.id, a.id, { rubric: [a.rubric[0]!] })).rejects.toThrow(/keeps its 2 key points/);
     await setReviewSettings(lib, { remix: false });
     expect(reviewVersion(lib, findCard(lib, c.meta.id))).toBeNull();
     expect(cardsToRemix(lib, [findCard(lib, c.meta.id)])).toEqual([]);

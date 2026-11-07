@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { findAnnotation } from "./annotations.ts";
-import { findCard, type Card } from "./cards.ts";
+import { findCard, rubricProblem, type Card } from "./cards.ts";
 import { appendJsonl, latestRevs, readJsonl } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
 import { AiStamp } from "./items.ts";
@@ -279,10 +279,16 @@ export async function restoreVariant(lib: Library, cardRef: string, variantRef: 
 }
 
 /** E in review on a variant edits the variant, not the original (D66). */
-export async function setVariant(lib: Library, cardRef: string, variantRef: string, edit: { question?: string; answer?: string }): Promise<Variant> {
+export async function setVariant(lib: Library, cardRef: string, variantRef: string, edit: { question?: string; answer?: string; rubric?: string[] }): Promise<Variant> {
   return withLock(paths.lock(lib), () => {
     const v = findVariant(lib, cardRef, variantRef);
-    const next = { ...v, rev: v.rev + 1, question: edit.question?.trim() || v.question, answer: edit.answer?.trim() || v.answer };
+    if (edit.rubric) {
+      const problem = rubricProblem("prompt", edit.rubric);
+      if (problem) throw new Error(problem);
+      // Each point stands for one of the original's (maps): reword them, don't add or drop one.
+      if (edit.rubric.length !== v.rubric.length) throw new Error(`This version keeps its ${v.rubric.length} key points: reword them, or drop the version for the original.`);
+    }
+    const next = { ...v, rev: v.rev + 1, question: edit.question?.trim() || v.question, answer: edit.answer?.trim() || v.answer, rubric: edit.rubric?.map((p) => p.trim()) ?? v.rubric };
     appendJsonl(paths.variants(lib, v.card), VariantSchema.parse(next));
     return next;
   });

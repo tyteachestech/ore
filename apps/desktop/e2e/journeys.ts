@@ -1784,6 +1784,7 @@ journey("review: Enter activates the focused button (Again, Edit card, Open in s
   await page.keyboard.press("Enter");
   await until("Enter on the card records Good", async () => ratings.length === before + 2);
   if (ratings[before + 1] !== "3") throw new Error(`Enter on the card recorded ${ratings[before + 1]}`);
+  await undo.waitFor(); // the rating is sent; Undo shows once it is in
   for (let n = 0; n < 8 && (await undo.isVisible()); n++) await undo.click(), await page.waitForTimeout(250);
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
@@ -1855,7 +1856,10 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
   for (let n = 0; n < 12 && !(await doneButton.isVisible()); n++) {
     await q.or(doneButton).first().waitFor();
     if (await doneButton.isVisible()) break;
-    last = (await q.first().textContent()) ?? "";
+    // The last card can go while the session wraps up, between that wait and this read: look again.
+    const text = await q.first().textContent({ timeout: 1000 }).catch(() => null);
+    if (!text) continue;
+    last = text;
     const noIdea = page.getByRole("button", { name: "No idea" });
     await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
     await page.getByRole("button", { name: "Good", exact: true }).click();
@@ -1874,6 +1878,116 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
     await page.waitForTimeout(250);
   }
   await page.keyboard.press("Escape");
+});
+
+/** The `ore` CLI through the bridge, as the app calls it. */
+const ore = (...args: string[]) =>
+  fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: [...args, "--json"] }) }).then(async (r) => {
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  });
+
+/** Starts a review of the skills whose row in "What to review" matches `only` (null: every skill). */
+async function startReview(page: Page, only: RegExp | null) {
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  await page.getByRole("button", { name: "Start review" }).click();
+  await pick.waitFor();
+  for (const row of await pick.getByRole("checkbox").all()) {
+    const want = !only || only.test(await row.innerText());
+    if ((await row.getAttribute("aria-checked") === "true") !== want) await row.click();
+  }
+  await page.keyboard.press("Enter");
+  await page.locator(".review-q").waitFor();
+}
+
+/** Shows the answer of the card on screen: No idea on a question, Think so on a card. */
+async function reveal(page: Page) {
+  const noIdea = page.getByRole("button", { name: "No idea" });
+  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await page.waitForTimeout(300); // the passage loads after the answer, and a rating key right after it is ignored
+}
+
+journey("review: a Tutor card with no passage still offers Open in source after the answer, and it opens that source", async (page) => {
+  // The seed's Storytelling card: the tutor kept it, so it has its source but no passage in it.
+  await startReview(page, /Storytelling/);
+  const q = page.locator(".review-q");
+  const question = "Which word links the Story Spine's middle beats?";
+  if ((await q.innerText()) !== question) throw new Error(`the card is ${await q.innerText()}`);
+  await reveal(page);
+  await page.getByRole("button", { name: /Open in source/ }).click();
+  await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
+  await page.keyboard.press("Escape");
+  await until("back on the card", async () => (await q.isVisible()) && (await q.innerText()) === question);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: editing an Explain card corrects a key point too; it's there when the editor opens again, and ⌘Z puts it back", async (page) => {
+  await startReview(page, /Teaching/);
+  const was = "Names fluency or familiarity";
+  const now = "Names fluency (it reads easily)";
+  const id = ((await ore("due")) as { id: string; question: string }[]).find((e) => e.question.startsWith("Explain why rereading"))!.id;
+  const rubric = async () => ((await ore("card", "show", id)) as { rubric: string[] }).rubric;
+  await reveal(page);
+  const points = page.locator(".quiz-points");
+  await points.getByText(was).waitFor();
+  await page.getByRole("button", { name: "Edit card" }).click();
+  const field = page.getByRole("textbox", { name: "Key points" });
+  await until("the editor lists the key points, one a line", async () => (await field.inputValue()).split("\n")[0] === was);
+  await field.fill((await field.inputValue()).replace(was, now));
+  await page.getByRole("button", { name: "Save" }).click();
+  await points.getByText(now).waitFor();
+  if ((await rubric())[0] !== now) throw new Error(`saved ${await rubric()}`);
+  await page.getByRole("button", { name: "Edit card" }).click();
+  await until("opened again, the editor has the new point", async () => (await field.inputValue()).split("\n")[0] === now);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").focus();
+  await page.keyboard.press("Meta+z");
+  await points.getByText(was).waitFor();
+  await until("⌘Z saved the old point back", async () => (await rubric())[0] === was);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: retiring a card keeps ⌘Z for the ratings before it, and so does a retire that fails", async (page) => {
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  const good = page.getByRole("button", { name: "Good", exact: true });
+  const rated: string[] = [];
+  for (let n = 0; n < 2; n++) {
+    rated.push(await q.innerText());
+    await reveal(page);
+    await good.click();
+    await until("the next card", async () => (await q.innerText()) !== rated[n]);
+  }
+  const third = await q.innerText();
+  await reveal(page);
+  const retire = page.getByRole("button", { name: /^(Retire|Delete) card$/ });
+  // The write fails: the card stays, and so does Undo for the two ratings.
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"retire"')) return route.fallback();
+    await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify("Couldn’t write the card.") });
+  });
+  await retire.click();
+  await page.locator(".toast", { hasText: "Couldn’t write the card." }).waitFor();
+  await page.unroute(/\/ore$/);
+  if (!(await page.getByRole("button", { name: "Undo last rating" }).isVisible())) throw new Error("a failed retire dropped Undo for the ratings before it");
+  await retire.click();
+  await until("the retired card goes", async () => !(await q.isVisible()) || (await q.innerText()) !== third);
+  await page.locator(".review").focus();
+  const restored = page.waitForResponse((r) => (r.request().postData() ?? "").includes('"restore"'));
+  await page.keyboard.press("Meta+z");
+  await restored;
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes back the second rating", async () => (await q.isVisible()) && (await q.innerText()) === rated[1]);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes back the first rating", async () => (await q.isVisible()) && (await q.innerText()) === rated[0]);
+  if (await page.getByRole("button", { name: "Undo last rating" }).isVisible()) throw new Error("a rating is left to undo");
+  // The retire was taken back too: the card is in review again.
+  if (!((await ore("due")) as { question: string }[]).some((e) => e.question === third)) throw new Error("the retired card didn't come back");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
 });
 
 journey("try it: 4 marks a technique to try, the skill page checks it off, and how it went is kept after a reload", async (page) => {

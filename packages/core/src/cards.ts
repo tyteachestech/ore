@@ -150,10 +150,25 @@ export function writeCardMeta(card: Card, meta: CardMeta): void {
   writeAtomic(card.path, stringifyFrontmatter(CardMetaSchema.parse(meta), body));
 }
 
-// Edit a card's question or answer in place (D59: a new draft is finished in review); the
-// rubric and frontmatter are kept. The caller holds the library lock.
-export function writeCardContent(card: Card, edit: { question?: string; answer?: string }): Card {
-  const content = { question: edit.question?.trim() || card.question, answer: edit.answer?.trim() || card.answer, rubric: card.rubric };
+/** Why these key points can't be an Explain card's rubric (D59: the grader marks one per point), or null.
+ *  Each is one line of the card's "## Rubric" list; a Fact card has none. */
+export function rubricProblem(kind: Card["meta"]["kind"], rubric: string[]): string | null {
+  if (kind === "card") return rubric.length ? "A Fact card has no key points." : null;
+  if (!rubric.length) return "An Explain card needs at least one key point: they are what its answer is marked against.";
+  if (rubric.some((p) => !p.trim())) return "A key point can’t be empty.";
+  if (rubric.some((p) => /[\r\n]/.test(p.trim()))) return "Each key point is one line.";
+  return null;
+}
+
+// Edit a card's question, answer or key points in place (D59: a new draft is finished in review);
+// what isn't given and the frontmatter are kept. The caller holds the library lock.
+export function writeCardContent(card: Card, edit: { question?: string; answer?: string; rubric?: string[] }): Card {
+  const rubric = edit.rubric?.map((p) => p.trim()) ?? card.rubric;
+  if (edit.rubric) {
+    const problem = rubricProblem(card.meta.kind, edit.rubric);
+    if (problem) throw new Error(problem);
+  }
+  const content = { question: edit.question?.trim() || card.question, answer: edit.answer?.trim() || card.answer, rubric };
   writeAtomic(card.path, stringifyFrontmatter(card.meta, renderCardBody(content)));
   return readCardFile(card.path);
 }
