@@ -1261,6 +1261,8 @@ journey("diagram: a new one left before its first save comes back is linked once
   await page.getByRole("tab", { name: "Collected" }).click();
   const alert = page.locator(".toast[role=alert]").filter({ hasText: "The disk is full." });
   await alert.waitFor();
+  await Bun.sleep(9000); // past an error toast's 8 s: this one is the only way back to the drawing
+  if (!(await alert.getByRole("button", { name: "Try again" }).count())) throw new Error("the toast holding the unsaved drawing went away");
   await page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = {}));
   await alert.getByRole("button", { name: "Try again" }).click();
   await page.getByRole("tab", { name: "Source note" }).click();

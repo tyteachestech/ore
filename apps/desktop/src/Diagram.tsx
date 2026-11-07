@@ -163,8 +163,9 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
   // that fails the drawing is kept here, and the toast's Try again saves it.
   useEffect(
     () => () => {
+      // The toast stays: for a new diagram the note has no link yet, so it is the only way back to the drawing.
       const retry = (): void =>
-        void save().catch((e) => props.current.notify(`Diagram “${nameRef.current}” not saved: ${errorText(e)}`, "error", undefined, undefined, retry));
+        void save().catch((e) => props.current.notify(`Diagram “${nameRef.current}” not saved: ${errorText(e)}`, "error", undefined, undefined, retry, true));
       retry();
     },
     [save],

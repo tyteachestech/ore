@@ -15,6 +15,8 @@ type Toast = {
   offer?: "undo" | "redo";
   step?: Step;
   show?: () => void;
+  /** Stays until its Try again is pressed: the only way back to what failed. */
+  stay?: boolean;
   done?: number;
   cancel?: () => void;
   settled?: "ok" | "bad";
@@ -52,7 +54,7 @@ export function useToast() {
     (t: Toast, ms = life(t)) => {
       clearTimeout(timers.current.get(t.id));
       timers.current.delete(t.id);
-      if (t.kind !== "progress" && !held.current) timers.current.set(t.id, window.setTimeout(() => drop(t.id), ms));
+      if (t.kind !== "progress" && !t.stay && !held.current) timers.current.set(t.id, window.setTimeout(() => drop(t.id), ms));
     },
     [drop],
   );
@@ -68,17 +70,20 @@ export function useToast() {
         commit(ts.map((x, j) => (j === i ? item : x)));
       } else {
         item = { ...t, id: ++next.current };
-        commit([...ts, item].slice(-MAX));
+        // The oldest drops off, but never one that stays.
+        const all = [...ts, item];
+        while (all.length > MAX) all.splice(Math.max(0, all.findIndex((x) => !x.stay)), 1);
+        commit(all);
       }
       arm(item);
     },
     [commit, arm],
   );
   const notify: Notify = useCallback(
-    (message, kind = "info", undo, redo, go) => {
+    (message, kind = "info", undo, redo, go, stay) => {
       const step = undo && { message, undo, redo };
       if (step) history.current.push(step);
-      if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go });
+      if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go, stay: stay && !!go });
       return () => {
         if (!step) return;
         history.current.forget(step);
