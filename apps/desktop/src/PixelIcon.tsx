@@ -6,13 +6,19 @@ import { pixels } from "./icons";
 
 type Props = Omit<SVGProps<SVGSVGElement>, "ref"> & { size?: number; weight?: string };
 
+/** The sprite's edge only: each filled cell that touches an empty one or the border, for `weight="regular"` (an off state). */
+export const outline = (rows: readonly string[]) =>
+  rows.map((row, y) =>
+    [...row].map((c, x) => (c === "#" && [rows[y - 1]?.[x], rows[y + 1]?.[x], row[x - 1], row[x + 1]].some((n) => n !== "#") ? "#" : ".")).join(""),
+  );
+
 const sprite = (rows: readonly string[]) => {
-  const d = pixels(rows);
-  return function PixelIcon({ size = 16, weight: _weight, ...rest }: Props) {
+  const d = pixels(rows), line = pixels(outline(rows));
+  return function PixelIcon({ size = 16, weight, ...rest }: Props) {
     const px = size >= 24 ? 32 : 16;
     return (
       <svg width={px} height={px} viewBox="0 0 16 16" shapeRendering="crispEdges" fill="currentColor" {...rest}>
-        <path d={d} />
+        <path d={weight === "regular" ? line : d} />
       </svg>
     );
   };
