@@ -1195,6 +1195,22 @@ journey("diagram: S styles at the pointer, keys stay on the canvas, Space never 
   await until("Backspace after a swatch click still deletes the box", async () => (await boxes()) === 0);
   await page.keyboard.press("Meta+z");
   await until("⌘Z brings it back", async () => (await boxes()) === 1);
+  // Z X C set the line in the picker (dashed for a weak link); a custom colour is one undo step and hands the keys back.
+  await page.keyboard.press("s");
+  await page.keyboard.press("x");
+  await until("X makes the line dashed", async () => !!(await rect.getAttribute("stroke-dasharray")));
+  const before = await rect.getAttribute("stroke");
+  await quick.locator(".draw-custom").first().click();
+  const hex = page.locator(".draw-colour input");
+  await until("the custom colour picker takes the caret", async () => hex.evaluate((e) => e === document.activeElement));
+  await hex.fill("7048e8");
+  await until("a typed hex restyles the box as the canvas shows it", async () => (await rect.getAttribute("stroke")) === "#af8dff");
+  await page.keyboard.press("Escape");
+  await until("Esc closes only the colour picker", async () => (await page.locator(".draw-colour").count()) === 0 && (await page.locator(".diagram").count()) === 1);
+  await until("the custom swatch shows the colour in use", async () => (await quick.locator(".draw-custom").first().getAttribute("aria-pressed")) === "true");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes the whole custom colour back in one step", async () => (await rect.getAttribute("stroke")) === before);
   // With several selected, a click on one of them picks just that one (Figma, Excalidraw).
   await page.mouse.click(c.x + 500, c.y + 300);
   await page.keyboard.press("Meta+d");
