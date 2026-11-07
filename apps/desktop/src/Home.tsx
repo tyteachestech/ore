@@ -20,7 +20,7 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 /** Home (D58): today's goal and what is due, the sources he is reading, and each skill's
  *  strength. Apple Fitness for the ring; Start review asks what to review (D80). */
-export function Home({ items, empty, skills, recent, reload, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, skillMenu, notify }: {
+export function Home({ items, empty, skills, recent, reload, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, skillMenu, notify }: {
   items: Item[];
   /** The library has no sources yet (loaded, not loading): Home says how to add the first. */
   empty?: boolean;
@@ -39,10 +39,16 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
   /** A source's and a skill's actions: the same right-click menus as in the source list and sidebar.
    *  Left out (the phone), a row has no menu at all: a long-press must not open an empty one. */
   sourceMenu?: (item: Item) => MenuAction[];
+  /** Saves a source's title, typed in place on its row from Rename…. */
+  onRename?: (item: Item, title: string) => void;
   skillMenu?: (skill: Skill) => MenuAction[];
   notify: Notify;
 }) {
   const keys = useKeymap();
+  const [renaming, setRenaming] = useState<string | null>(null);
+  /** Rename… after Open, as in the source list, typed on the row itself. */
+  const withRename = (acts: MenuAction[], i: Item): MenuAction[] =>
+    onRename ? acts.flatMap((a) => (a.id === "open" ? [a, { id: "rename", label: "Rename…", run: () => setRenaming(i.id) }] : [a])) : acts;
   const [today, setToday] = useState<Today | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -217,10 +223,30 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
               const at = Number(load(`ore.pos.${i.id}`) ?? 0) || 0;
               return (
                 // A row that opens on click, holding the skill picker's own button, so not a <button> itself.
-                <WithMenu key={i.id} actions={sourceMenu ? () => sourceMenu(i) : []}>
+                <WithMenu key={i.id} actions={sourceMenu ? () => withRename(sourceMenu(i), i) : []}>
                 <div className="home-read" role="button" tabIndex={0} onClick={() => onOpenSource(i.id)} onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpenSource(i.id))}>
                   <Thumb item={i} />
-                  <span className="title">{i.title}</span>
+                  {renaming === i.id ? (
+                    <input
+                      className="row-rename"
+                      aria-label="Title"
+                      autoFocus
+                      defaultValue={i.title}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === "Enter") {
+                          setRenaming(null);
+                          onRename?.(i, e.currentTarget.value);
+                        } else if (e.key === "Escape") setRenaming(null);
+                      }}
+                      // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
+                      onBlur={() => setRenaming(null)}
+                    />
+                  ) : (
+                    <span className="title">{i.title}</span>
+                  )}
                   {i.course && <span className="course-of">{i.course.title}</span>}
                   {onRefile && onCreateSkill && (
                     <SkillPicker skills={skills} value={i.skills} title={i.title} onChange={(next, before, k) => onRefile(i, next, before, k)} onCreate={onCreateSkill}>
