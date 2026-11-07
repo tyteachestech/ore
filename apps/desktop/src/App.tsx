@@ -1194,9 +1194,13 @@ export function App() {
     const save = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"]));
     mark(archived);
     if (archived && openId === item.id) setOpenId(null);
+    // Returns the write, so an undo that fails says so and stays undoable (history.ts).
     const apply = (on: boolean) => {
       mark(on);
-      save(on).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+      return save(on).then(refresh, (e) => {
+        void refresh();
+        throw e;
+      });
     };
     notify(`${archived ? "Archived" : "Restored"} “${item.title}”`, "info", () => apply(!archived), () => apply(archived));
     try {

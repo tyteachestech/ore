@@ -1506,6 +1506,23 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   }, AGENTS);
 });
 
+journey("undo that fails: the toast says why, and ⌘Z tries the same step again", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row").filter({ hasText: AGENTS }).first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Archive/ }).click();
+  await until("the row leaves the list", async () => !(await row.isVisible()));
+  const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { archive: why } : {}), why);
+  await fail("The library is read-only.");
+  await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
+  await page.locator(".toast").filter({ hasText: "Couldn’t undo “Archived" }).filter({ hasText: "The library is read-only." }).waitFor();
+  await until("the row stays archived", async () => !(await row.isVisible()));
+  await fail(null);
+  await page.locator(".list").click({ position: { x: 5, y: 5 } }).catch(() => {});
+  await page.keyboard.press("Meta+z");
+  await row.waitFor();
+});
+
 journey("quiz check: one click makes a passage a key point, and marks a highlight already there", async (page) => {
   await openSource(page, TESTING);
   // A chip shows only while its count is above 0.
