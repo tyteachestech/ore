@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, tr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
-import { addSource, addTab, addText } from "../src/ingest/index.ts";
+import { addSource, addTab, addText, reimportSource } from "../src/ingest/index.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
@@ -657,6 +657,25 @@ describe("import coverage: from the browser tab", () => {
     expect(item.meta.title).toBe("Team wiki");
     expect(item.body).toContain("Paragraph 8 of the team wiki");
     expect(item.body.split("\n\n").length).toBeGreaterThanOrEqual(9);
+  });
+
+  test("a Notion page keeps its headings, images, code and tables", async () => {
+    const url = "https://samheckle.notion.site/ICM-Notion-Blog-Notes-64ca302e57af4021840c045bfd750a39";
+    serve({ "https://samheckle.notion.site/image/attachment%3Afigure.png?table=block&id=1": { body: readFileSync(file("screenshot.png")), type: "image/png" } });
+    const html = web("notion-page.html");
+    const lib = await tempLibrary();
+    const item = await addTab(lib, { tab: { browser: "Chrome", url, title: "ICM Notion Blog Notes", html, text: "ICM Notion Blog Notes\nWriting guess in Notion\nTo memory step in Notion test" } });
+    expect(item.meta.title).toBe("ICM Notion Blog Notes");
+    expect(item.body.match(/^## .+/gm)).toEqual(["## Writing guess in Notion", "## Evidence your consolidation", "## Feedback"]);
+    expect(item.body).toContain("For reading: `idea x = 10`");
+    expect(item.body).toContain("```\nidea x = 10\n\nstrength prompt(){\n\tcomprehension(400,400)");
+    expect(item.body).toMatch(/!\[\]\(assets\/[^)]+\.png\)/);
+    expect(item.body).toContain("| habit 1 notes | icm |");
+    expect(item.body).toContain("You gap deck it and test note up knowledge answer and problem to practice it.");
+    // Notion's placeholder for an image it couldn't load is not content.
+    expect(item.body).not.toContain("couldn’t be found");
+    // Its kept copy reads the same way, so a reimport keeps the shape.
+    expect((await reimportSource(lib, item.meta.id, { local: true })).changed).toBe(false);
   });
 
   test("a tab still showing a sign-in says to sign in there", async () => {
