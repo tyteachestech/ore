@@ -1,5 +1,5 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, type TutorTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { int, need, str } from "./util.ts";
@@ -102,6 +102,21 @@ export const aiCommands: Record<string, Command> = {
       }
       const r = await askLibrary(lib, need(words.join(" ") || undefined, '"<question>"'), earlier);
       const text = [r.answer, ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`)].join("\n");
+      return { data: r, text };
+    },
+  },
+
+  tutor: {
+    usage: '"<message>" [--item <source>] [--earlier <json>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), hints instead of answers on practice; --item is the source being read, --earlier is [{message, reply}]',
+    options: { item: { type: "string" }, earlier: { type: "string" } },
+    async run(words, f) {
+      const lib = openLibrary();
+      let earlier: TutorTurn[] = [];
+      if (str(f.earlier)) {
+        try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply}]"); }
+      }
+      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item) });
+      const text = [r.reply, ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`)].join("\n");
       return { data: r, text };
     },
   },

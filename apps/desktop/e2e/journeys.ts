@@ -170,6 +170,23 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("tutor: ⌘J opens it beside the source it sees, a reply shows its sources, Esc closes it and the thread stays", async (page) => {
+  await openSource(page, TESTING);
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  await tutor.locator(".tutor-chip").filter({ hasText: TESTING }).waitFor();
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor(); // the page stays beside it
+  const sent = page.waitForRequest((r) => /"tutor","Why does this work\?","--item=/.test(r.postData() ?? ""));
+  await page.getByRole("textbox", { name: "Message the tutor" }).fill("Why does this work?");
+  await page.keyboard.press("Enter");
+  await sent;
+  await tutor.locator(".library-sources li").nth(1).waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc closes it", async () => (await tutor.count()) === 0);
+  await page.getByRole("button", { name: "Open the tutor" }).click();
+  await tutor.getByText("Why does this work?").waitFor();
+});
+
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).

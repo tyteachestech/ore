@@ -242,7 +242,7 @@ const NOTE_WIDTH = 380;
 
 /** A right-hand panel's width, dragged on its left-edge divider between `min` and 60% of the
  *  window, remembered under `key`; double-click resets it (D44). */
-function useSideWidth(key: string, initial: number, min = 280) {
+export function useSideWidth(key: string, initial: number, min = 280) {
   const clamp = useCallback((w: number) => Math.round(Math.max(min, Math.min(w, window.innerWidth * 0.6))), [min]);
   const [width, setWidth] = useState(() => {
     const w = Number(load(key));
