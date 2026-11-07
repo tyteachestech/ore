@@ -37,6 +37,7 @@ export * from "./ai/enrich.ts";
 export * from "./catchup.ts";
 export * from "./ai/grade.ts";
 export * from "./ai/chat.ts";
+export * from "./ai/ask.ts";
 export * from "./ai/prompts.ts";
 export * from "./ai/research.ts";
 export * from "./ai/explain.ts";

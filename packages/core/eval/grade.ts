@@ -51,7 +51,7 @@ export function score(vendor: Vendor, model: string, prompt_version: string, cas
   };
 }
 
-async function pool<T, R>(items: T[], n: number, f: (t: T) => Promise<R>): Promise<R[]> {
+export async function pool<T, R>(items: T[], n: number, f: (t: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
@@ -60,17 +60,28 @@ async function pool<T, R>(items: T[], n: number, f: (t: T) => Promise<R>): Promi
   return out;
 }
 
-/** Grades every case with one vendor in a scratch library (so his own skills.yaml plays no part). */
-export async function runVendor(vendor: Vendor, cases: Case[], model?: string, concurrency = 4): Promise<VendorRun> {
+/** Runs `f` with ORE_AI (and ORE_AI_MODEL) set to one vendor in a fresh scratch library, so his own
+ *  skills.yaml plays no part; both come back as they were. */
+export async function withVendor<T>(vendor: Vendor, model: string | undefined, f: (root: string) => Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "ore-eval-"));
   const saved = { ai: process.env.ORE_AI, model: process.env.ORE_AI_MODEL };
   process.env.ORE_AI = vendor;
   if (model) process.env.ORE_AI_MODEL = model;
   else delete process.env.ORE_AI_MODEL;
-  let stamp = { model: model ?? "", prompt_version: "" };
-  const t0 = performance.now();
   try {
     await initLibrary(root);
+    return await f(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    for (const [k, v] of [["ORE_AI", saved.ai], ["ORE_AI_MODEL", saved.model]] as const) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+}
+
+/** Grades every case with one vendor. */
+export function runVendor(vendor: Vendor, cases: Case[], model?: string, concurrency = 4): Promise<VendorRun> {
+  return withVendor(vendor, model, async (root) => {
+    let stamp = { model: model ?? "", prompt_version: "" };
+    const t0 = performance.now();
     const results = await pool(cases, concurrency, async (c): Promise<CaseResult> => {
       const start = performance.now();
       const base = { id: c.id, level: c.level, label: c.label };
@@ -84,30 +95,31 @@ export async function runVendor(vendor: Vendor, cases: Case[], model?: string, c
       }
     });
     return score(vendor, stamp.model || "(no run succeeded)", stamp.prompt_version, results, Math.round((performance.now() - t0) / 100) / 10);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    for (const [k, v] of [["ORE_AI", saved.ai], ["ORE_AI_MODEL", saved.model]] as const) if (v === undefined) delete process.env[k]; else process.env[k] = v;
-  }
+  });
 }
 
-/** Where today's results go: results/grade-YYYY-MM-DD.json, with -2, -3… for a second run that day. */
-export function resultPath(dir: string, now = new Date()): string {
+/** Where today's results go: results/<eval>-YYYY-MM-DD.json, with -2, -3… for a second run that day. */
+export function resultPath(dir: string, now = new Date(), name = "grade"): string {
   const day = now.toISOString().slice(0, 10);
   for (let n = 1; ; n++) {
-    const p = join(dir, `grade-${day}${n > 1 ? `-${n}` : ""}.json`);
+    const p = join(dir, `${name}-${day}${n > 1 ? `-${n}` : ""}.json`);
     if (!existsSync(p)) return p;
   }
 }
 
+export const pct = (x: number) => `${Math.round(x * 100)}%`;
+export const costText = (r: { cost_usd?: number; input_tokens: number; output_tokens: number }) =>
+  r.cost_usd === undefined ? `${r.input_tokens + r.output_tokens} tokens` : `$${r.cost_usd.toFixed(3)}`;
+
 export function table(runs: VendorRun[]): string {
-  const pct = (x: number) => `${Math.round(x * 100)}%`;
-  const rows = runs.map((r) => [
+  return columns(["vendor", "model", "accuracy", "by level", "cost", "time", "errors"], runs.map((r) => [
     r.vendor, r.model, `${pct(r.accuracy)} (${r.correct}/${r.total})`,
     Object.entries(r.by_level).map(([k, v]) => `${k} ${v}`).join(", "),
-    r.cost_usd === undefined ? `${r.input_tokens + r.output_tokens} tokens` : `$${r.cost_usd.toFixed(3)}`,
-    `${r.wall_s}s`, String(r.errors),
-  ]);
-  const head = ["vendor", "model", "accuracy", "by level", "cost", "time", "errors"];
+    costText(r), `${r.wall_s}s`, String(r.errors),
+  ]));
+}
+
+export function columns(head: string[], rows: string[][]): string {
   const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
   return [head, ...rows].map((r) => r.map((c, i) => c.padEnd(w[i]!)).join("  ")).join("\n");
 }

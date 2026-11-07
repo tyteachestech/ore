@@ -19,6 +19,7 @@ const WAITS: Record<string, string> = {
   "Explain.tsx research": "Finding sources…",
   "SkillPage.tsx research": "Finding sources…",
   "SkillPage.tsx add": "background: one click adds a suggested source; a toast says when it is in",
+  "AskLibrary.tsx ask-library": "Searching your library…",
   "Ask.tsx ask": "background: the reply's own dots (ask-dots) stand in for the label, as ChatGPT's do",
   "App.tsx feed follow": "Add.tsx: Adding…",
   "App.tsx feed open": "Feed.tsx: Opening…",
@@ -31,7 +32,7 @@ const WAITS: Record<string, string> = {
 };
 
 // AI calls (the mock bridge's list) and the ones that go out to the network.
-const SLOW = new Set(["enrich", "catch-up", "ask", "grade", "key-points", "check", "research", "explain", "scope", "add", "models", "tables"]);
+const SLOW = new Set(["enrich", "catch-up", "ask", "ask-library", "grade", "key-points", "check", "research", "explain", "scope", "add", "models", "tables"]);
 const SLOW_FEED = new Set(["follow", "open", "find", "--refresh"]);
 
 const src = join(import.meta.dir, "../src");

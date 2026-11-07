@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
-import { titleScore } from "../src/Palette";
+import { describe, expect, test } from "bun:test";
+import { titleScore, asksQuestion } from "../src/Palette";
 
 test("a title matches only when every query word is in it", () => {
   expect(titleScore("Notes on spaced repetition scheduling (FSRS)", "section")).toBe(0);
@@ -20,4 +20,11 @@ test("a word start ranks above a match inside a word, and the title's first word
   const first = titleScore("Prompting basics", "prompt");
   expect(start).toBeGreaterThan(inside);
   expect(first).toBeGreaterThan(start);
+});
+
+describe("Ask your library in ⌘K", () => {
+  test("a query that reads as a question puts Ask first; a title-like query leaves it last", () => {
+    for (const q of ["Why does spacing work?", "what is the testing effect", "How do Leitner boxes work", "leitner?"]) expect(asksQuestion(q)).toBe(true);
+    for (const q of ["leitner", "testing effect", "what if", "Spaced repetition"]) expect(asksQuestion(q)).toBe(false);
+  });
 });

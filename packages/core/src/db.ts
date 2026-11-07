@@ -137,6 +137,15 @@ export class LibraryIndex {
       .map(({ body: _, ...hit }) => hit);
   }
 
+  /** Sources (not archived) whose title or text holds any of these word stems, best first (Ask your library). */
+  sourcesMatching(stems: string[], limit: number): string[] {
+    const match = stems.map((t) => `"${t.replace(/"/g, "")}"*`).join(" OR ");
+    return this.db
+      .query<{ item: string }, [string, number]>("select item from fts where fts match ? and kind = 'item' and item not in (select id from items where archived = 1) order by bm25(fts, 0, 0, 0, 5, 1) limit ?")
+      .all(match, limit)
+      .map((r) => r.item);
+  }
+
   close(): void {
     this.db.close();
   }

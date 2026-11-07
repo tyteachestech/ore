@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parseFrontmatter } from "../frontmatter.ts";
 
-export type PromptName = "enrich" | "grade" | "research" | "explain" | "recall-feedback" | "key-points" | "check" | "chat" | "variant" | "variant-check" | "leave-out";
+export type PromptName = "enrich" | "grade" | "research" | "explain" | "recall-feedback" | "key-points" | "check" | "chat" | "variant" | "variant-check" | "leave-out" | "ask-library";
 
 export interface Prompt {
   name: PromptName;

@@ -1,5 +1,5 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { int, need, str } from "./util.ts";
@@ -86,6 +86,21 @@ export const aiCommands: Record<string, Command> = {
       const lib = openLibrary();
       const r = await askAboutCard(lib, need(ref, "<card>"), { message: need(str(f.message), "--message"), answer: str(f.answer), session: str(f.session), variant: str(f.variant) });
       const text = [r.reply, ...(r.proposal ? ["", "Proposed card:", `Q: ${r.proposal.question}`, `A: ${r.proposal.answer}`] : []), "", `(session ${r.session})`].join("\n");
+      return { data: r, text };
+    },
+  },
+
+  "ask-library": {
+    usage: '"<question>" [--earlier <json>]   Ask your library: an answer from your sources, each claim cited to a passage (start/end in its doc.md), or says the library doesn\'t cover it; --earlier is [{question, answer}] for a follow-up',
+    options: { earlier: { type: "string" } },
+    async run(words, f) {
+      const lib = openLibrary();
+      let earlier: AskTurn[] = [];
+      if (str(f.earlier)) {
+        try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{question, answer}]"); }
+      }
+      const r = await askLibrary(lib, need(words.join(" ") || undefined, '"<question>"'), earlier);
+      const text = [r.answer, ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.quote}" (${c.item} ${c.start}-${c.end})`)].join("\n");
       return { data: r, text };
     },
   },
