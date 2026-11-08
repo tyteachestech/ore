@@ -38,6 +38,7 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 - Answer patterns are regexes: a right answer in unexpected words can fail, and a wrong one that names the right terms can pass.
 - The tutor answers an absent question from general knowledge after saying so (D128); the eval counts that right and reports how often it happens. `ore ask-library` refuses instead.
 - "Says it in words" is a phrase match, not a judge: a refusal in unusual words can fail.
+- Two answer patterns were loosened after reading the 2026-11-08 misses, both cases a right answer the pattern was too literal for ("connects names to objects" for "mapping"; a citation of the 1880s sentence the name follows). Changing labels after looking at outputs is normal (criteria drift, Shankar et al.), but it means later runs, not that one, are the clean measure.
 
 ## Learn more
 

@@ -43,7 +43,7 @@ export type Chat = "tutor" | "ask";
  *  is not from his sources (the tutor's "Not from your sources"; ask-library's found: false). */
 export interface Answer { found: boolean; answer: string; citations: Citation[]; outside: boolean }
 
-const WHERE = String.raw`\b(?:sources?|library|notes|passages|excerpts?)\b`;
+const WHERE = String.raw`\b(?:sources?|library|notes?|passages?|excerpts?)\b`;
 const NOT = String.raw`\b(?:don'?t|doesn'?t|do not|does not|isn'?t|aren'?t|no|not|none|nothing)\b`;
 /** A reply that says, in words, that his sources don't hold the answer ("your sources don't say…",
  *  "that's not in your notes"). */
