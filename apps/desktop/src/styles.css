@@ -774,6 +774,8 @@ img.thumb { filter: brightness(0.86); }
   position: fixed; z-index: 15; max-width: 320px; pointer-events: none;
   background: var(--bg-raised); border: 1px solid var(--border); border-radius: 6px;
   padding: 6px 10px; color: var(--text-read); font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  /* A long note previews its first six lines; the popup shows it all (TIP_HEIGHT in Reader.tsx). */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden;
 }
 /* Hover hints with the action's shortcut (Hint.tsx; Linear's tooltips). */
 .hint {

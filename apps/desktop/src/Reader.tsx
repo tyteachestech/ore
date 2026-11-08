@@ -92,6 +92,9 @@ function noteText(mark: Element): string {
   return (block.textContent ?? "").slice((back.textContent ?? "").length).replace(/^[:\s]+/, "").trim();
 }
 
+/** The tallest a hover preview gets (`.tip`, six lines), to keep it in the window. */
+const TIP_HEIGHT = 140;
+
 /** A highlight the core couldn't place: its "text not found in item <id>" gives him nothing to do. */
 const placeError = (e: unknown) => {
   const why = errorText(e);
@@ -2681,9 +2684,16 @@ function ReaderView(p: Props & { reload: () => void }) {
           )}
         </div>
       </div>
-      {tip && (
-        // A note's preview stays on screen at a phone's width too.
-        <div className={tip.id.startsWith("fn:") ? "tip note" : "tip"} style={{ left: tip.id.startsWith("fn:") ? Math.max(12, Math.min(tip.x + 12, innerWidth - Math.min(360, innerWidth - 24) - 12)) : tip.x + 12, top: tip.y + 18 }}>
+      {tip && !popup && (
+        // A note's preview stays on screen at a phone's width too, and in the window: at most six lines
+        // (styles.css), above the pointer when there is no room below. Never over an open popup.
+        <div
+          className={tip.id.startsWith("fn:") ? "tip note" : "tip"}
+          style={{
+            left: Math.max(12, Math.min(tip.x + 12, innerWidth - Math.min(tip.id.startsWith("fn:") ? 360 : 320, innerWidth - 24) - 12)),
+            ...(tip.y + 18 + TIP_HEIGHT <= innerHeight ? { top: tip.y + 18 } : { bottom: innerHeight - tip.y + 10 }),
+          }}
+        >
           {tip.text}
         </div>
       )}

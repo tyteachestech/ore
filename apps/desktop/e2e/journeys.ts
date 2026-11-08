@@ -815,6 +815,43 @@ journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to t
   await until("then ⌘[ leaves the source, as before", async () => !(await page.locator(".doc").isVisible()));
 });
 
+journey("highlight note: a long note's hover preview stays inside the window", async (page) => {
+  await openSource(page, AGENTS);
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300);
+  await select(page, "Evaluator-optimiser loops");
+  await popup.waitFor();
+  await popup.getByLabel("Note").fill("A long thought about this loop, written out at length. ".repeat(55));
+  await page.keyboard.press("Escape");
+  await popup.waitFor({ state: "hidden" });
+  await page.waitForTimeout(400);
+  // Hover near the right edge and low in the window, where an unclamped preview runs off both.
+  const at = (await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("Evaluator-optimiser loops");
+      if (i < 0) continue;
+      const scroll = document.querySelector(".reader-scroll")!;
+      const r0 = document.createRange();
+      r0.setStart(n, i);
+      r0.setEnd(n, i + 1);
+      scroll.scrollTop += r0.getBoundingClientRect().top - (innerHeight - 120);
+      const r = document.createRange();
+      r.setStart(n, i + 10);
+      r.setEnd(n, i + 11);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + 1, y: b.top + b.height / 2 };
+    }
+  }))!;
+  await page.mouse.move(at.x - 5, at.y);
+  await page.mouse.move(at.x, at.y);
+  const tip = page.locator(".tip");
+  await tip.waitFor();
+  const box = (await tip.boundingBox())!;
+  const view = page.viewportSize()!;
+  if (box.y < 0 || box.y + box.height > view.height || box.x + box.width > view.width) throw new Error(`the preview runs off the window: ${JSON.stringify(box)}`);
+});
+
 journey("highlight: one the core can't place says what to do, not “text not found in item <id>”", async (page) => {
   await openSource(page, TESTING);
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { highlight: 'ore: text not found in item 01M6Y59CWZB27HBM869RVJPBGR: "Tom & Jerry"' }));
