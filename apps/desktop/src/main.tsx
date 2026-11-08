@@ -11,6 +11,7 @@ import { suppressPageMenu } from "./native-menu";
 import { QuickQuiz } from "./QuickQuiz";
 import "./styles.css";
 import "./retro.css";
+import "./tailwind.css";
 
 suppressPageMenu(document);
 

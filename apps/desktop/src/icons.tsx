@@ -1,11 +1,12 @@
 import type { JSX, SVGProps } from "react";
 
-/* UI icons (D105, amended 2026-11-07): MingCute's filled icons (Apache-2.0, github.com/Richard9394/MingCute) redrawn
-   on a 16-pixel grid, so they keep MingCute's weight and roundness but read as 8-bit. Each was converted from the fill
-   SVG and then cleaned by hand; edit a sprite here, a row per line, `#` for a pixel. They keep the names of the Phosphor
-   icons they first replaced, so call sites keep theirs. A sprite stays sharp only when each of its pixels lands on whole
-   device pixels, so it draws at 16px (32px at 24 and up) with crisp edges, whatever size is asked. There is no fill
-   weight: a selected icon shows by its row, never a second drawing. */
+/* UI icons (D105, amended 2026-11-07 and 2026-11-08): MingCute's filled icons (Apache-2.0, github.com/Richard9394/MingCute)
+   redrawn on a 16-pixel grid, so they keep MingCute's weight and roundness but read as 8-bit. Each was converted from the
+   fill SVG and then cleaned by hand; edit a sprite here, a row per line, `#` for a pixel. They keep the names of the
+   Phosphor icons they first replaced, so call sites keep theirs. Since 2026-11-08 (Tyler's pick E of six sets) each pixel
+   draws as a round dot, as Nothing's glyphs do, and the sprite is a quarter bigger than asked: 20px for 16 (40px at 24
+   and up). Dots need no whole device pixels, so nothing smears. There is no fill weight: a selected icon shows by its
+   row, never a second drawing. */
 export type IconProps = Omit<SVGProps<SVGSVGElement>, "ref" | "children"> & { size?: number; weight?: string };
 export type Icon = (props: IconProps) => JSX.Element;
 
@@ -13,12 +14,19 @@ export type Icon = (props: IconProps) => JSX.Element;
 export const pixels = (rows: readonly string[]) =>
   rows.map((row, y) => [...row].map((t, x) => (t === "#" ? `M${x} ${y}h1v1h-1z` : "")).join("")).join("");
 
+/** The same sprite as round dots, one per pixel (radius 0.44 of a cell), in one path. */
+export const dots = (rows: readonly string[]) =>
+  rows.map((row, y) => [...row].map((t, x) => (t === "#" ? `M${x + 0.5} ${y + 0.06}a.44 .44 0 1 0 0 .88a.44 .44 0 1 0 0-.88z` : "")).join("")).join("");
+
+/** The size a sprite draws at: a quarter over what is asked, in two steps. */
+export const spriteSize = (size: number) => (size >= 24 ? 40 : 20);
+
 function sprite(rows: readonly string[]): Icon {
-  const d = pixels(rows);
+  const d = dots(rows);
   return ({ size = 16, weight: _weight, ...rest }) => {
-    const px = size >= 24 ? 32 : 16;
+    const px = spriteSize(size);
     return (
-      <svg width={px} height={px} viewBox="0 0 16 16" fill="currentColor" shapeRendering="crispEdges" {...rest}>
+      <svg width={px} height={px} viewBox="0 0 16 16" fill="currentColor" data-sprite="" {...rest}>
         <path d={d} />
       </svg>
     );

@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,11 +22,11 @@ const mingcuteList: Plugin = {
   },
 };
 
-// Skill icons on the UI icons' 16-pixel grid (D129): each MingCute icon as redrawn by scripts/pixel-skill-icons.ts, or by
+// Skill icons on the UI icons' 16-pixel grid (D129), each pixel a round dot (2026-11-08): each MingCute icon as redrawn by scripts/pixel-skill-icons.ts, or by
 // hand in src/skill-icon-fixes.ts, served as /mingcute-px/<name>.svg in dev and written into the build.
 const pixelSvg = (rows: readonly string[]) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="${rows
-    .flatMap((row, y) => [...row].map((c, x) => (c === "#" ? `M${x} ${y}h1v1h-1z` : "")))
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="${rows
+    .flatMap((row, y) => [...row].map((c, x) => (c === "#" ? `M${x + 0.5} ${y + 0.06}a.44 .44 0 1 0 0 .88a.44 .44 0 1 0 0-.88z` : "")))
     .join("")}"/></svg>`;
 let pixelCache: Record<string, string> | undefined;
 function pixelIcons(): Record<string, string> {
@@ -104,6 +105,7 @@ function snapshot(): Record<string, string> {
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     mingcuteList,
     pixelSkillIcons,
     ...(PHONE ? [phoneLibrary] : []),
