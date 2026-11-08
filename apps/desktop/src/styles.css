@@ -1994,12 +1994,27 @@ button.home-plan:hover { color: var(--text); }
 .ask-send:disabled { background: var(--bg-active); color: var(--faint); }
 /* Ask your library: a thread over the app (Notion's Q&A), its sources numbered under each answer (Perplexity). */
 .library-turn { display: flex; flex-direction: column; gap: 10px; }
-.cite { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; margin: 0 1px; border-radius: 4px; vertical-align: 1px; background: var(--bg-active); color: var(--muted); font: 600 10px/1 var(--mono); }
-.cite:hover, .cite:focus-visible { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); outline: none; }
-.library-sources { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+/* A citation pill (ChatGPT's desktop app): the source's short name, its passage or page on hover. */
+.cite { display: inline-flex; align-items: center; gap: 3px; max-width: 136px; height: 18px; padding: 0 7px; margin-left: 2px; border-radius: 9px; vertical-align: 1px; background: var(--bg-active); color: var(--muted); font-size: 11px; line-height: 1; }
+.cite:hover, .cite:focus-visible, .cite[data-state$="open"] { background: color-mix(in srgb, var(--text) 14%, transparent); color: var(--text); outline: none; }
+.cite-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cite-more { flex: none; color: var(--faint); }
+.cite:hover .cite-more { color: var(--muted); }
+.cite-card {
+  z-index: 30; width: 280px; padding: 4px; display: flex; flex-direction: column;
+  background: var(--bg-raised); border-radius: 10px; box-shadow: var(--float);
+  animation: hint-in 0.1s ease-out;
+}
+.cite-card button { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 6px; text-align: left; }
+.cite-card button:hover { background: var(--bg-hover); }
+.cite-where { font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cite-title { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cite-quote { font-size: 12px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tutor-sources { display: inline-flex; align-items: center; height: 22px; margin-top: 8px; padding: 0 9px; border-radius: 11px; background: var(--bg-active); color: var(--muted); font-size: 12px; }
+.tutor-sources:hover, .tutor-sources:focus-visible, .tutor-sources[aria-expanded="true"] { color: var(--text); outline: none; }
+.library-sources, .ask-text .library-sources { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .library-sources button { display: flex; gap: 10px; width: 100%; padding: 6px 8px; margin-left: -8px; border-radius: 6px; text-align: left; }
 .library-sources button:hover, .library-sources button:focus-visible { background: var(--bg-hover); outline: none; }
-.library-n { flex: none; width: 16px; height: 16px; margin-top: 2px; display: grid; place-items: center; border-radius: 4px; background: var(--bg-active); color: var(--muted); font: 600 10px/1 var(--mono); }
 .library-src { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .library-title { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .library-title .sub { color: var(--faint); }

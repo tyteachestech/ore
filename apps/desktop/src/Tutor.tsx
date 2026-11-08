@@ -1,11 +1,13 @@
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { ArrowUp, Check, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { citeRuns, siteName } from "./cite-pills";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
-import { escTaken, Hint } from "./Hint";
+import { escTaken, Hint, onlyTabbed } from "./Hint";
 import { useSideWidth } from "./Notes";
 import { ore, opt } from "./ore";
 import { errorText, type Notify } from "./util";
@@ -429,35 +431,69 @@ function marked(text: string, mentions: Mention[]) {
   return text.split(re).map((part, i) => (names.includes(part) ? <span key={i} className="tutor-at">{part}</span> : part));
 }
 
-/** A reply in Markdown: each [n] a small button that opens the cited passage, or the web page in the
- *  browser, and the sources under it (Perplexity's numbered sources, a page by its site). A reply from
- *  general knowledge says so. */
+const citeName = (c: AnyCitation) => ("url" in c ? siteName(c.site) : c.title);
+
+/** One run of citations as a pill named for its first source, "+1" for each more; its card on hover
+ *  says where each is and quotes it, and a click opens it. Every source is also under Sources. */
+function Pill({ run, open }: { run: AnyCitation[]; open: (c: AnyCitation) => void }) {
+  return (
+    <Tooltip.Root delayDuration={150}>
+      <Tooltip.Trigger asChild onFocus={onlyTabbed}>
+        <button className="cite" aria-label={run.map((c) => `Source ${c.n}: ${"url" in c ? (c.title ? `${c.title} (${c.site})` : c.site) : c.title}`).join("; ")} onClick={() => open(run[0]!)}>
+          <span className="cite-name">{citeName(run[0]!)}</span>
+          {run.length > 1 && <span className="cite-more">+{run.length - 1}</span>}
+        </button>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content className="cite-card" side="top" align="start" sideOffset={6} collisionPadding={8}>
+          {run.map((c) => (
+            <button key={c.n} tabIndex={-1} onClick={() => open(c)}>
+              <span className="cite-where">{"url" in c ? c.site : c.heading ? `Your source › ${c.heading}` : "Your source"}</span>
+              {c.title && <span className="cite-title">{c.title}</span>}
+              <span className="cite-quote">{c.text}</span>
+            </button>
+          ))}
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
+
+/** A reply in Markdown, cited as ChatGPT's desktop app cites: each run of [n] markers one small pill
+ *  named for its source ("britannica", "How spaced repetition works", "+1" for a second), its passage or
+ *  page on hover, opened on click (his source at the quote, a page in the browser). The full list waits
+ *  behind "Sources" under the reply. A reply from general knowledge says so. */
 function Answer({ text, citations, general, onOpen, onLink }: { text: string; citations: AnyCitation[]; general?: boolean; onOpen: (item: string, at: string) => void; onLink: (url: string) => void }) {
-  const open = (c: AnyCitation) => ("url" in c ? onLink(c.url) : onOpen(c.item, `q:${c.start}:${c.end}`));
+  const [listed, setListed] = useState(false);
+  const opener = useRef({ onOpen, onLink });
+  opener.current = { onOpen, onLink };
+  const open = (c: AnyCitation) => ("url" in c ? opener.current.onLink(c.url) : opener.current.onOpen(c.item, `q:${c.start}:${c.end}`));
+  // Made once per set of citations, so a re-render (a keystroke, a streaming reply) doesn't remount the pills and close an open card.
+  const components = useMemo(() => ({
+    a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+      if (!href?.startsWith("#cite-")) return <span>{children}</span>;
+      const nums = href.slice(6).split(",");
+      const run = nums.map((n) => citations.find((x) => x.n === Number(n))).filter((c): c is AnyCitation => !!c);
+      return run.length ? <Pill run={run} open={open} /> : <span>{nums.map((n) => `[${n}]`).join("")}</span>;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [citations]);
   return (
     <>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ href, children }) => {
-            const c = href?.startsWith("#cite-") ? citations.find((x) => x.n === Number(href.slice(6))) : undefined;
-            return c ? (
-              <button className="cite" aria-label={`Source ${c.n}: ${"url" in c ? (c.title ? `${c.title} (${c.site})` : c.site) : c.title}`} onClick={() => open(c)}>{c.n}</button>
-            ) : (
-              <span>{children}</span>
-            );
-          },
-        }}
-      >
-        {text.replace(/\[(\d+)\](?!\()/g, "[$1](#cite-$1)")}
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {citeRuns(text)}
       </ReactMarkdown>
       {general && <p className="tutor-general">Not from your sources</p>}
       {!!citations.length && (
+        <button className="tutor-sources" aria-expanded={listed} onClick={() => setListed(!listed)}>
+          Sources
+        </button>
+      )}
+      {listed && (
         <ol className="library-sources">
           {citations.map((c) => (
             <li key={c.n}>
               <button onClick={() => open(c)}>
-                <span className="library-n">{c.n}</span>
                 <span className="library-src">
                   <span className="library-title">
                     {/* A page leads with its site, so a long title can't hide that it is from the web (Perplexity). */}
@@ -465,7 +501,7 @@ function Answer({ text, citations, general, onOpen, onLink }: { text: string; ci
                     {c.title}
                     {!("url" in c) && c.heading && <span className="sub"> › {c.heading}</span>}
                   </span>
-                  <span className="library-quote">“{c.text}”</span>
+                  <span className="library-quote">{c.text}</span>
                 </span>
               </button>
             </li>

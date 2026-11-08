@@ -315,6 +315,9 @@ journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources
   await page.getByRole("textbox", { name: "Message the tutor" }).fill("Why does this work?");
   await page.keyboard.press("Enter");
   await sent;
+  // Its sources wait behind "Sources" (ChatGPT): pills in the text, the list on a click.
+  await tutor.locator(".cite").first().waitFor();
+  await tutor.getByRole("button", { name: "Sources" }).click();
   await tutor.locator(".library-sources li").nth(1).waitFor();
   await page.keyboard.press("Escape");
   await until("Esc closes it", async () => (await tutor.count()) === 0);
@@ -363,7 +366,7 @@ journey("tutor citation: a numbered source in a reply opens that source at the q
   await page.keyboard.press("Escape");
 });
 
-journey("tutor web citation: a page the tutor found on the web shows its site and opens in the browser", async (page) => {
+journey("tutor web citation: a page the tutor found on the web is a pill named for its site, shows the words on hover and opens in the browser", async (page) => {
   const url = "https://www.britannica.com/biography/Hermann-Ebbinghaus";
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"tutor",')) return route.fallback();
@@ -383,8 +386,16 @@ journey("tutor web citation: a page the tutor found on the web shows its site an
     if (await fresh.isEnabled()) await fresh.click();
     await page.getByRole("textbox", { name: "Message the tutor" }).fill("When was Ebbinghaus born?");
     await page.keyboard.press("Enter");
-    await tutor.locator(".library-sources").getByText("britannica.com ·").waitFor();
-    await tutor.getByRole("button", { name: "Source 1: Hermann Ebbinghaus (britannica.com)" }).click();
+    // The pill is named for the site, and its card on hover shows the page and the words it holds.
+    const pill = tutor.getByRole("button", { name: "Source 1: Hermann Ebbinghaus (britannica.com)" });
+    await pill.getByText("britannica", { exact: true }).waitFor();
+    await pill.hover();
+    await page.locator(".cite-card").getByText("born on January 24, 1850").waitFor();
+    // Typing re-renders the chat; the open card must not be remounted away.
+    await page.getByRole("textbox", { name: "Message the tutor" }).pressSequentially("and", { delay: 30 });
+    if (!(await page.locator(".cite-card").isVisible())) throw new Error("typing closed the citation's card");
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("");
+    await pill.click();
     await until("the page opens in the browser", async () => ((await page.evaluate(() => (window as any).__opened)) as string[]).includes(url));
   } finally {
     await page.unroute(/\/ore$/);
