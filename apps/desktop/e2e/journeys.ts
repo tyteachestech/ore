@@ -2315,7 +2315,7 @@ journey("review: the next card is loaded while he answers, so a rating moves str
   await q.waitFor({ timeout: 8000 });
   const first = await q.innerText();
   await page.waitForTimeout(1500);
-  await page.getByRole("radio", { name: "Think so" }).or(page.getByRole("button", { name: "No idea" })).first().click();
+  await reveal(page);
   await page.getByRole("button", { name: "Good", exact: true }).click();
   const t0 = Date.now();
   await page.waitForFunction((first) => { const el = document.querySelector(".review-q"); return !!el && el.textContent !== first; }, first, { timeout: 8000 });
