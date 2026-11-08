@@ -531,15 +531,15 @@ describe("import coverage: files", () => {
         "",
         "| Word | Meaning | Example | Added | Reviews |",
         "| --- | --- | --- | --- | --- |",
-        '| olvidar | to forget | Sin repasar, "olvidamos" rápido. | 2025-03-04 | 3 |',
-        "| recordar | to remember, to recall | Recordar es practicar \\| de verdad. | 2025-03-05 | 5 |",
-        "| repasar | to review |  | 2025-03-06 | 8 |",
+        '| cocinar | to cook | Sin sal, "cocinamos" mal. | 2025-03-04 | 3 |',
+        "| hornear | to bake, to roast | Hornear es esperar \\| de verdad. | 2025-03-05 | 5 |",
+        "| hervir | to boil |  | 2025-03-06 | 8 |",
         "",
         "## Grammar",
         "",
         "| Rule | Example |",
         "| --- | --- |",
-        "| Ser for what something is | La memoria es frágil. |",
+        "| Ser for what something is | La sopa es rica. |",
         "| Estar for how it is now | Estoy cansado. |",
         "",
       ].join("\n"),
@@ -571,9 +571,9 @@ describe("import coverage: files", () => {
     // Markdown's own characters in a cell.
     const csv = await addSource(await tempLibrary(), file("verbs.csv"));
     expect(csv.meta.title).toBe("verbs");
-    expect(csv.body).toBe('| word | meaning | note |\n| --- | --- | --- |\n| olvidar | to forget, lose | irregular? no, regular |\n| recordar | to remember to recall | o → ue: "recuerdo" |\n| \\*soler\\* | to usually do | \\<always\\> \\[with\\] an infinitive |\n');
-    writeFileSync(join(d, "es.csv"), "palabra;significado\nolvidar;to forget, lose\n");
-    expect((await addSource(await tempLibrary(), join(d, "es.csv"))).body).toBe("| palabra | significado |\n| --- | --- |\n| olvidar | to forget, lose |\n");
+    expect(csv.body).toBe('| word | meaning | note |\n| --- | --- | --- |\n| cocinar | to cook, prepare | irregular? no, regular |\n| hornear | to bake to roast | regular: "horneo" |\n| \\*soler\\* | to usually do | \\<always\\> \\[with\\] an infinitive |\n');
+    writeFileSync(join(d, "es.csv"), "palabra;significado\ncocinar;to cook, prepare\n");
+    expect((await addSource(await tempLibrary(), join(d, "es.csv"))).body).toBe("| palabra | significado |\n| --- | --- |\n| cocinar | to cook, prepare |\n");
     writeFileSync(join(d, "terms.tsv"), "term\tdefinition\nspacing\treviews spread over days\n");
     expect((await addSource(await tempLibrary(), join(d, "terms.tsv"))).body).toContain("| spacing | reviews spread over days |");
     writeFileSync(join(d, "empty.csv"), "\n\n");

@@ -10,15 +10,15 @@ wb = Workbook()
 ws = wb.active
 ws.title = "Spanish"
 ws.append(["Word", "Meaning", "Example", "Added", "Reviews"])
-ws.append(["olvidar", "to forget", 'Sin repasar, "olvidamos" rápido.', date(2025, 3, 4), 3])
-ws.append(["recordar", "to remember, to recall", "Recordar es practicar | de verdad.", date(2025, 3, 5), 5])
+ws.append(["cocinar", "to cook", 'Sin sal, "cocinamos" mal.', date(2025, 3, 4), 3])
+ws.append(["hornear", "to bake, to roast", "Hornear es esperar | de verdad.", date(2025, 3, 5), 5])
 ws.append([])
-ws.append(["repasar", "to review", None, date(2025, 3, 6), None])
+ws.append(["hervir", "to boil", None, date(2025, 3, 6), None])
 ws["E5"] = "=E2+E3"
 wb.create_sheet("Empty")
 notes = wb.create_sheet("Grammar")
 notes.append(["Rule", "Example"])
-notes.append(["Ser for what something is", "La memoria es frágil."])
+notes.append(["Ser for what something is", "La sopa es rica."])
 notes.append(["Estar for how it is now", "Estoy cansado."])
 wb.properties.title = "Spanish vocabulary"
 wb.properties.creator = "Ada Learner"
