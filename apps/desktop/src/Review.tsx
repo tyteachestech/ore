@@ -1,4 +1,5 @@
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, PencilSimple, ThumbsDown, Trash, X } from "./icons";
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
@@ -40,7 +41,7 @@ const drafts = new Map<string, { text: string; conf?: number }>();
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-export function Review({ pick, skills, onOpenSource, onClose, notify, quick = false, paused = false }: {
+export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Hidden while he reads the source a card opened; it waits on that card, its keys off. */
@@ -48,6 +49,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   skills: Skill[];
   onOpenSource: (item: string, at?: string) => void;
   onClose: (again?: boolean) => void;
+  /** A rating taken back (⌘Z) or given again after Review closed: today's numbers changed. */
+  onLogged?: () => void;
   notify: Notify;
   quick?: boolean;
 }) {
@@ -71,9 +74,24 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
    *  passage (one the tutor kept, or whose highlight is gone) has no quotes and opens the source at the top. */
   const [passage, setPassage] = useState<{ item: string; title: string; quotes: { text: string; at: string; time?: string }[] } | null>(null);
   const [quoteAt, setQuoteAt] = useState(0);
+  /** Why the passage can't show (its source deleted since the card was made), in its place. */
+  const [passageGone, setPassageGone] = useState<string | null>(null);
   /** The editor's text; `points` is an Explain card's key points, one a line. */
   const [draft, setDraft] = useState({ question: "", answer: "", points: "" });
-  const [busy, setBusy] = useState(false);
+  const [busy, showBusy] = useState(false);
+  /** `busy` as of now, for the guards: two keys in one task would both see the state before either set it. */
+  const busyNow = useRef(false);
+  /** Runs once Review is idle again, after it has closed (when no effect will run it). */
+  const whenIdle = useRef<(() => void) | null>(null);
+  const setBusy = (on: boolean) => {
+    busyNow.current = on;
+    showBusy(on);
+    const f = !on && whenIdle.current;
+    if (f) {
+      whenIdle.current = null;
+      setTimeout(f);
+    }
+  };
   const [asking, setAsking] = useState(false);
   /** Each card's Ask chat, kept while he closes and reopens it. */
   const [asks, setAsks] = useState<Record<string, AskChat>>({});
@@ -89,6 +107,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const sureRef = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const reviewed = useRef(0);
+  /** This window's session, named by id in every call: the main window and the quick quiz can each have
+   *  one open (D76), and the last one started is not always this one. `open`: not ended yet. */
+  const session = useRef<{ id: string; open: boolean } | null>(null);
+  /** Settles once this showing's `session start` has: a rating waits for it, so it never goes in unnamed. */
+  const sessionReady = useRef<Promise<unknown>>(Promise.resolve());
+  /** False once Review has closed: ⌘Z and ⇧⌘Z on a rating from it then only change the log. */
+  const mounted = useRef(false);
   /** Active time in this session, to end it when today's goal closes (D65). */
   const activeMs = useRef(0);
   const before = useRef<Today | null>(null);
@@ -116,9 +141,15 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const entry = queue?.[0];
 
   useEffect(() => {
+    let live = true;
     void (async () => {
       try {
-        await ore("session", "start");
+        const started = ore<{ id: string }>("session", "start");
+        sessionReady.current = started.catch(() => {});
+        const s = await started;
+        // Closed before the session began: it ends at once, as leaving would have ended it.
+        if (!live) return void ore("session", "end", s.id).catch(() => {});
+        session.current = { id: s.id, open: true };
         const t = ore<Today>("today").then((t) => {
           before.current = t;
           setStart(t);
@@ -132,7 +163,33 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         setError(errorText(e));
       }
     })();
+    mounted.current = true;
+    return () => {
+      live = false;
+      mounted.current = false;
+      // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
+      // this session ends, by its id, never another window's.
+      const s = session.current;
+      if (s?.open) void ore("session", "end", s.id).catch(() => {});
+      session.current = null;
+    };
   }, [pick]);
+
+  // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
+  // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
+  // goes only if he hasn't started on it.
+  useEffect(() => {
+    if (quick || PHONE) return;
+    const un = listen("quiz-closed", () => {
+      ore<DueEntry[]>("due", "--all", ...(pick ?? []).map((s) => opt("skill", s))).then((fresh) => {
+        const due = new Set(fresh.map((e) => e.id));
+        const s = now.current;
+        const started = s.phase !== "answer" || !!s.answer.trim();
+        setQueue((q) => q && (q.every((e) => due.has(e.id)) ? q : q.filter((e, i) => due.has(e.id) || (i === 0 && started))));
+      }, () => {});
+    });
+    return () => void un.then((f) => f());
+  }, [quick, pick]);
 
   /** A fresh start on a card: no answer, no marks, its clock not yet started. */
   const reset = () => {
@@ -147,6 +204,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     setRemark(false);
     setInHead(false);
     setPassage(null);
+    setPassageGone(null);
     setAsking(false);
   };
 
@@ -199,10 +257,14 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   /** Ends the session; `endScreen` shows the end screen if he rated anything (never on leaving the quick quiz). */
   const finish = useCallback(async (endScreen = true) => {
-    if (busy) return;
+    if (busyNow.current) return;
+    const s = session.current;
+    // Left before the session began: closing ends it once it has.
+    if (!s?.open) return onClose();
     setBusy(true);
     try {
-      const session = await ore<SessionEnd>("session", "end");
+      const receipt = await ore<SessionEnd>("session", "end", s.id);
+      s.open = false;
       if (reviewed.current && !endScreen) return onClose();
       if (!reviewed.current) {
         if (quick) return onClose();
@@ -212,19 +274,42 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         notify(nothingDue(before.current, pick));
         return onClose();
       }
-      setEnd({ session, today: await ore<Today>("today"), before: before.current });
+      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
     } finally {
       setBusy(false);
     }
-  }, [busy, notify, onClose, queue, quick, pick]);
+  }, [notify, onClose, queue, quick, pick]);
 
   useEffect(() => {
     // The quick quiz with nothing due says so and waits for Esc instead of closing under his hand.
     if (queue && !queue.length && !end && !(quick && !reviewed.current)) void finish();
   }, [queue, end, finish, quick]);
+
+  /** ⌘Z presses while a rating saved or the session wrapped up: they go to the history once that is
+   *  done, so they take back the newest steps (that rating first), never an older card's meanwhile. */
+  const undosWaiting = useRef<{ n: number; key: KeyboardEventInit }>({ n: 0, key: {} });
+  const sendUndos = () => {
+    const w = undosWaiting.current;
+    const n = w.n;
+    w.n = 0;
+    // While the first is taken back Review is busy again, so the rest queue up anew and wait their turn.
+    for (let i = 0; i < n; i++) document.body.dispatchEvent(new KeyboardEvent("keydown", { ...w.key, bubbles: true, cancelable: true }));
+  };
+  useEffect(() => {
+    if (!busy && !busyNow.current && undosWaiting.current.n) sendUndos();
+  }, [busy]);
+  // Closed with presses still waiting (a click away from the quick quiz): the history still gets them.
+  useEffect(
+    () => () => {
+      if (!undosWaiting.current.n) return;
+      if (busyNow.current) whenIdle.current = sendUndos;
+      else setTimeout(sendUndos);
+    },
+    [],
+  );
 
   /** The passage the card came from, shown only after the answer (D59). */
   const loadPassage = (c: CardFull) => {
@@ -238,7 +323,11 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         const a = c.annotation ? s.annotations.find((x) => x.id === c.annotation && x.status !== "deleted") : undefined;
         setPassage({ item: c.item, title: s.title, quotes: a ? [{ text: a.exact, at: a.id }] : [] });
       },
-      () => {},
+      (e) => {
+        if (at !== showing.current) return;
+        const why = errorText(e);
+        setPassageGone(/no item matches/.test(why) ? "Its source is no longer in the library." : `Couldn’t load its source. ${why}`);
+      },
     );
   };
 
@@ -345,11 +434,12 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   };
 
   const rate = async (rating: number) => {
-    if (!card || phase !== "checked" || busy) return;
+    if (!card || phase !== "checked" || busyNow.current) return;
     setBusy(true);
     let goalClosed = false;
     try {
       const elapsed = Date.now() - shownAt.current;
+      await sessionReady.current;
       const args = [
         card.id,
         opt("rating", String(rating)),
@@ -359,6 +449,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         opt("elapsed-ms", String(elapsed)),
         ...variantOpt(card),
         ...(inHead ? ["--in-head"] : []),
+        ...(session.current ? [opt("session", session.current.id)] : []),
       ];
       await submit(args, rating, elapsed);
       drafts.delete(card.id);
@@ -388,12 +479,14 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       notify(
         "Rating",
         "quiet",
+        // With Review closed, only the log changes (its session stays ended), and Home reads its numbers again.
         () => {
-          if (!undoNow.current(ts)) ore("review", id, opt("undo", ts)).catch((e) => notify(errorText(e), "error"));
+          if (!(mounted.current && undoNow.current(ts))) ore("review", id, opt("undo", ts)).then(() => onLogged?.(), (e) => notify(errorText(e), "error"));
         },
         () => {
-          if (!redoNow.current(id, args, rating, elapsed, { forget, setTs }))
-            ore<{ ts: string }>("review", ...args).then((x) => setTs(x.ts), (e) => notify(errorText(e), "error"));
+          // Given again after Review closed: its session has ended, so the rating goes in with none.
+          if (!(mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })))
+            ore<{ ts: string }>("review", ...args.filter((a) => !a.startsWith("--session="))).then((x) => (setTs(x.ts), onLogged?.()), (e) => notify(errorText(e), "error"));
         },
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
@@ -406,7 +499,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   /** ⌘Z: takes back the last rating and shows that card again, unanswered. On the end screen it
    *  opens the session again, back on that card (Anki's Undo after Congratulations). */
   const undoRating = async () => {
-    if (!last || busy) return;
+    if (!last || busyNow.current) return;
     dropAhead();
     last.forget();
     setBusy(true);
@@ -414,6 +507,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       await ore("review", last.card, opt("undo", last.ts));
       if (end) {
         await ore("session", "reopen", end.session.id);
+        if (session.current) session.current.open = true;
         setEnd(null);
       }
       reviewed.current--;
@@ -435,7 +529,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   };
   // ⇧⌘Z right after ⌘Z: that card is showing again, so the rating goes in again and Review moves on.
   redoNow.current = (id, args, rating, elapsed, again) => {
-    if (end || busy || queue?.[0]?.id !== id) return false;
+    if (end || busyNow.current || queue?.[0]?.id !== id) return false;
     setBusy(true);
     submit(args, rating, elapsed, again)
       .catch((e) => notify(errorText(e), "error"))
@@ -444,7 +538,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   };
 
   const retire = async () => {
-    if (!card || busy) return;
+    if (!card || busyNow.current) return;
     dropAhead();
     setBusy(true);
     try {
@@ -477,7 +571,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   /** B, Bad version (D66): drops the remix without logging a review and shows the original. */
   const badVersion = async () => {
-    if (!card?.variant || busy) return;
+    if (!card?.variant || busyNow.current) return;
     dropAhead();
     setBusy(true);
     try {
@@ -543,7 +637,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const draftOk = !!draft.question.trim() && !!draft.answer.trim() && (card?.kind !== "prompt" || draftPoints.length > 0);
 
   const saveEdit = async () => {
-    if (!card || busy || !draftOk) return;
+    if (!card || busyNow.current || !draftOk) return;
     setBusy(true);
     try {
       await setText(card, draft.question, draft.answer, card.kind === "prompt" ? draftPoints : undefined);
@@ -572,6 +666,14 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
     if (paused) return;
+    if (is(e, "undo") && busyNow.current && !(inTextField(e) && !(e.target as HTMLElement).hasAttribute("data-app-undo"))) {
+      // The step it should take back isn't on the history yet (or is being taken back): it waits.
+      e.preventDefault();
+      e.stopPropagation();
+      undosWaiting.current.n++;
+      undosWaiting.current.key = { code: e.code, key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey };
+      return;
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       if (phase === "edit") {
@@ -588,6 +690,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     // Enter on a focused control (Again, Edit card, Open in source, Undo) is that control's; Enter's
     // shortcuts below are for the Review surface itself.
     const onSurface = e.target === root.current || e.target === document.body;
+    // A held ↵ gave the last rating once; its repeats never press Done (focused) or Try again.
+    if ((end || !card) && e.key === "Enter" && e.repeat) return e.preventDefault();
     if (end) {
       if (e.key === "Enter" && onSurface) {
         e.preventDefault();
@@ -892,6 +996,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
                       >
                         Open in source <ArrowSquareOut size={12} aria-hidden="true" />
                       </button>
+                    </figcaption>
+                  </figure>
+                )}
+                {passageGone && (
+                  <figure className="review-passage">
+                    <figcaption>
+                      <span>{passageGone}</span>
                     </figcaption>
                   </figure>
                 )}

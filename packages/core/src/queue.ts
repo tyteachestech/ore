@@ -15,7 +15,7 @@ export interface QueueEntry {
   question: string;
   due: string | null; // null: never reviewed
   retrievability: number; // 0 when never reviewed
-  relearn: boolean; // missed earlier in the open session, not yet re-asked
+  relearn: boolean; // missed earlier today, not yet re-asked
 }
 
 const NO_TOPIC = "(none)";
@@ -58,7 +58,7 @@ function orderGroup(entries: QueueEntry[]): QueueEntry[] {
   return out;
 }
 
-// SPEC §3: everything due interleaved by topic; relearn passes from this session last.
+// SPEC §3: everything due interleaved by topic; today's relearn passes last.
 export function orderQueue(entries: QueueEntry[]): QueueEntry[] {
   return [...orderGroup(entries.filter((e) => !e.relearn)), ...entries.filter((e) => e.relearn).sort(compare)];
 }
