@@ -1,5 +1,5 @@
 {
-  "about": "Ask-your-library eval: questions over the golden sample docs (packages/core/test/golden, imported into a scratch library). An answer is right when every regex in `answer` matches it (case-insensitive). Its citations are right when every quote is really in the source it names and at least one comes from a source in `sources` and matches `evidence`. The `absent` questions aren't covered by any golden doc: right means the answer says so and cites nothing.",
+  "about": "Ask-your-library eval: questions over the golden sample docs (packages/core/test/golden, imported into a scratch library). An answer is right when every regex in `answer` matches it (case-insensitive). Its citations are right when every quote is really in the source it names and at least one comes from a source in `sources` and matches `evidence`. The `absent` questions aren't covered by any golden doc: right means the answer says so and cites nothing. Most are near misses, a person or topic the docs do cover but not the fact asked (Ebbinghaus is there, his birth year isn't; a 90% target is there, FSRS's default isn't), which is where a grounded answer is most tempted to stretch.",
   "cases": [
     { "id": "wiki-origin", "question": "Who first came up with spaced repetition, and when?", "sources": ["web-wikipedia"], "answer": ["Ebbinghaus", "1880"], "evidence": "Ebbinghaus" },
     { "id": "wiki-leitner-wrong", "question": "In the Leitner system, what happens to a card you answer incorrectly?", "sources": ["web-wikipedia"], "answer": ["first (box|group)"], "evidence": "first (box|group)" },
@@ -27,6 +27,10 @@
     { "id": "absent-austen", "question": "Who wrote Pride and Prejudice?" },
     { "id": "absent-sleep-hours", "question": "How many hours of sleep do I need to consolidate memories?" },
     { "id": "absent-caffeine", "question": "Does caffeine improve memory?" },
-    { "id": "absent-leitner-birth", "question": "In what year was Sebastian Leitner born?" }
+    { "id": "absent-leitner-birth", "question": "In what year was Sebastian Leitner born?" },
+    { "id": "absent-ebbinghaus-born", "question": "In what year was Hermann Ebbinghaus born?" },
+    { "id": "absent-fsrs-default", "question": "What desired retention does FSRS use by default?" },
+    { "id": "absent-walrus", "question": "Which Python version added the walrus operator?" },
+    { "id": "absent-python-lambda", "question": "How do you write a lambda function in Python?" }
   ]
 }
