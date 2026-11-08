@@ -1,4 +1,5 @@
 import { CaretDown, CaretUp, Check, Circle, CircleHalf, MagnifyingGlass, X } from "./icons";
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { PixelStar } from "./PixelIcon";
@@ -439,15 +440,16 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <div className="quiz-label" id="quiz-sure">
             How sure are you?
           </div>
-          <div className="quiz-sure" role="radiogroup" aria-labelledby="quiz-sure">
+          {/* One Tab stop, ← → between the three, as Review's; picking the one picked clears it. */}
+          <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="quiz-sure" value={conf[qi] ? String(conf[qi]) : ""} onValueChange={(v) => pickSure(v ? Number(v) : conf[qi]!)}>
             {SURE.map((label, i) => (
               <Hint key={label} text={<>{label} <kbd>{i + 1}</kbd></>} side="top">
-                <button role="radio" aria-checked={conf[qi] === i + 1} aria-disabled={busy || undefined} onClick={() => pickSure(i + 1)}>
+                <ToggleGroup.Item value={String(i + 1)} aria-disabled={busy || undefined}>
                   {label}
-                </button>
+                </ToggleGroup.Item>
               </Hint>
             ))}
-          </div>
+          </ToggleGroup.Root>
           <div className="quiz-grow" />
           <div className="quiz-foot">
             <Hint text="No idea" keys="no-idea" side="top">

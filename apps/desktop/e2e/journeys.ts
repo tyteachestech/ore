@@ -3552,6 +3552,35 @@ journey("finish quiz: while Check saves, his answer and how sure he is stay as s
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
+journey("how sure: one Tab stop in Review and the finish quiz, ← → move between the three, Space picks", async (page) => {
+  const focused = () => page.evaluate(() => ({ role: document.activeElement?.getAttribute("role"), name: (document.activeElement as HTMLElement | null)?.innerText.trim() }));
+  const walk = async (field: ReturnType<Page["getByRole"]>) => {
+    await field.fill("an answer");
+    await field.focus();
+    await page.keyboard.press("Tab");
+    if ((await focused()).role !== "radio") throw new Error(`Tab from the answer went to ${JSON.stringify(await focused())}`);
+    // Radix moves focus a tick after the key.
+    await page.keyboard.press("ArrowRight");
+    await until("→ moves to Think so", async () => (await focused()).name === "Think so", 2000);
+    await page.keyboard.press("ArrowRight");
+    await until("→ moves to Sure", async () => (await focused()).name === "Sure", 2000);
+    await page.keyboard.press("Space");
+    await until("Sure is picked", async () => (await page.getByRole("radio", { name: "Sure" }).getAttribute("aria-checked")) === "true");
+    await page.keyboard.press("Tab");
+    if ((await focused()).role === "radio") throw new Error("Tab stopped on another of the three");
+  };
+  await startReview(page, /Teaching/);
+  await walk(page.getByRole("textbox", { name: "Your answer" }));
+  await page.getByRole("textbox", { name: "Your answer" }).fill("");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip to questions" }).click();
+  await walk(page.getByLabel("Your answer"));
+  await page.getByRole("button", { name: "Close quiz" }).click();
+});
+
 journey("review that can't start because ore failed offers Try again, focused, which starts it", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { due: "The `ore` command isn’t answering." }));
   await page.getByRole("button", { name: "Start review" }).click();

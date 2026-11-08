@@ -1,5 +1,6 @@
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
@@ -1114,16 +1115,17 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
 
 function Sure({ refEl, conf, onPick }: { refEl: React.RefObject<HTMLDivElement | null>; conf?: number; onPick: (n: number) => void }) {
   return (
-    <div className="quiz-sure" role="radiogroup" aria-labelledby="review-sure" ref={refEl}>
+    // One Tab stop, ← → between the three (Radix, as Settings' segmented rows); a click on the one picked picks it again.
+    <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="review-sure" ref={refEl} value={conf ? String(conf) : ""} onValueChange={(v) => onPick(v ? Number(v) : conf!)}>
       {SURE.map((label, i) => (
         <Hint key={label} text={<>{label} <kbd>{i + 1}</kbd></>} side="top">
           {/* Keeps focus in the answer, so on iPhone the keyboard stays up and Check doesn't move under the finger. */}
-          <button role="radio" aria-checked={conf === i + 1} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i + 1)}>
+          <ToggleGroup.Item value={String(i + 1)} onMouseDown={(e) => e.preventDefault()}>
             {label}
-          </button>
+          </ToggleGroup.Item>
         </Hint>
       ))}
-    </div>
+    </ToggleGroup.Root>
   );
 }
 
