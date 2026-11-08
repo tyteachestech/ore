@@ -5,6 +5,7 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 ## Merge as you go
 - Tyler has standing approval for a thread to merge its own PR once CI is green (typecheck, tests, build, e2e), without waiting for his review. Flag anything risky first, such as a change to the library's file format.
 - Before merging, run `/code-review` on the PR's diff and fix what it confirms. Self-merge has no other reviewer.
+- Before merging, also check master's last *completed* test run is green (Actions › Test, filter by master). A run cancelled by the next push shows no red, so a broken master can hide for several merges; that is how #174's break went unseen until #186.
 - Stacked PRs merge in order, each rebased onto master first.
 
 ## After a merge: pull, and the app reinstalls
