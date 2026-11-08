@@ -80,3 +80,11 @@ describe("shortcut editor (Settings › Keyboard shortcuts)", () => {
     expect(rebind("d-group", "Meta+KeyG")).toBeNull();
   });
 });
+
+describe("shortcut editor: Review's keys", () => {
+  test("Undo and Redo work in Review too, so Review's own keys meet them", () => {
+    resetKeys();
+    expect(clash("undo", "KeyE")?.id).toBe("edit-card");
+    expect(clash("edit-card", "Meta+KeyZ")?.id).toBe("undo");
+  });
+});

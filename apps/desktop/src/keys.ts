@@ -281,8 +281,8 @@ export function invalid(id: KeyId, combo: Combo): string | null {
 
 /** Review's own commands: they work only in Review, where the app's other keys are off (App.tsx). */
 export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["no-idea", "in-head", "edit-card", "retire-card", "ask", "bad-version"]);
-/** App keys Review reads too, and the quick quiz, which works from any app. */
-const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-next", "passage-prev", "quick-quiz"]);
+/** App keys that work in Review too (⌘↵, the passage arrows, Undo and Redo, by its button and the toast), and the quick quiz, which works from any app. */
+const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-next", "passage-prev", "undo", "redo", "quick-quiz"]);
 
 /** The binding that already has `combo` where `id` works (the app, Review, or the diagram editor), if any. */
 export function clash(id: KeyId, combo: Combo): (Binding & { id: KeyId }) | null {
