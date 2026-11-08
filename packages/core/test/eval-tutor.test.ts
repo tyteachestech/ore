@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { failures, loadTutorCases } from "../eval/tutor.ts";
 
-const reply = (over: object = {}) => ({ reply: "Think about which box the hard cards go to?", hint: true, exercise: false, cited: 0, searched: false, ...over });
+const reply = (over: object = {}) => ({ reply: "Think about which box the hard cards go to?", hint: true, steps: [], exercise: false, cited: 0, searched: false, ...over });
 
 describe("tutor pedagogy eval", () => {
   test("cases load with unique ids and valid patterns; each checks something", () => {
@@ -15,10 +15,10 @@ describe("tutor pedagogy eval", () => {
   });
 
   test("a hint that holds the answer back passes; one that gives it away, or searches, fails", () => {
-    const e = { hint: true, withholds: ["first (box|group)"], no_search: true };
+    const e = { hint: true, steps: [], withholds: ["first (box|group)"], no_search: true };
     expect(failures(e, reply())).toEqual([]);
     expect(failures(e, reply({ reply: "It goes back to the first box." }))).toEqual(["gave /first (box|group)/"]);
-    expect(failures(e, reply({ hint: false, searched: true }))).toEqual(["not a hint", "searched the web"]);
+    expect(failures(e, reply({ hint: false, steps: [], searched: true }))).toEqual(["not a hint", "searched the web"]);
   });
 
   test("feedback must ask him something and never score him; a worked example's own numbers aren't the answer", () => {

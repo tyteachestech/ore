@@ -2534,6 +2534,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor.float .tutor-head { top: 8px; right: 8px; }
 /* Under a reply: Show me (the hint ladder's last rung) and + Card (keep this idea in review). */
 .tutor-acts { display: flex; gap: 6px; margin-top: 10px; }
+.ask-text .tutor-steps { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.tutor-steps li::marker { color: var(--faint); font-variant-numeric: tabular-nums; }
 .tutor-acts button { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 .tutor-acts button:hover:not(:disabled), .tutor-acts button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
 .tutor-acts button.done { border-color: transparent; color: var(--faint); }

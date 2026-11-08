@@ -34,10 +34,12 @@ export type TutorTurn = {
   /** While the reply is written: its text so far, and whether it is searching the web (claude streams both). */
   partial?: string; searching?: boolean;
   reply?: string; citations?: AnyCitation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
+  /** A worked answer's steps, shown one at a time (D142); empty for any other reply. */
+  steps?: string[];
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
 };
-type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; ai: Ai };
+type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; steps?: string[]; ai: Ai };
 /** What he has typed and not sent yet, with the @-mentions in it. */
 export type TutorDraft = { input: string; mentions: Mention[] };
 export type TutorChat = ReturnType<typeof useTutorChat>;
@@ -65,7 +67,9 @@ export function useTutorChat(notify: Notify) {
   const setCarry = (m: Mention[]) => setCarryState((carryNow.current = m));
   const drop = (m: Mention) => setCarry(carryNow.current.filter((x) => x.kind !== m.kind || x.id !== m.id));
   const run = async (t: TutorTurn, before: TutorTurn[]) => {
-    const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: x.reply }] : []));
+    // A worked answer's steps are part of what the tutor said, so a follow-up ("why step 2?") can lean on them.
+    const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
+    const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: said(x) }] : []));
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
@@ -74,7 +78,7 @@ export function useTutorChat(notify: Notify) {
     try {
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
       const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
-      patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, ai: r.ai, error: undefined, partial: undefined, searching: undefined });
+      patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined });
     } catch (e) {
       patch(t.id, { error: errorText(e, "answer that"), partial: undefined, searching: undefined });
     } finally {
@@ -329,7 +333,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                   <Working label={t.searching ? "Searching the web…" : "Thinking…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />
                 ) : (
                   <>
-                    <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} />
+                    <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />
                     {((last && (t.hint || (t.exercise && t.item))) || (t.card && (firstSource(t.citations) ?? t.item))) && (
                       <div className="tutor-acts">
                         {last && t.hint && <button onClick={() => send("Show me")}>Show me</button>}
@@ -497,7 +501,7 @@ function Pill({ run, open }: { run: AnyCitation[]; open: (c: AnyCitation) => voi
  *  named for its source ("britannica", "How spaced repetition works", "+1" for a second), its passage or
  *  page on hover, opened on click (his source at the quote, a page in the browser). The full list waits
  *  behind "Sources" under the reply. A reply from general knowledge says so. */
-function Answer({ text, citations, general, onOpen, onLink }: { text: string; citations: AnyCitation[]; general?: boolean; onOpen: (item: string, at: string) => void; onLink: (url: string) => void }) {
+function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }: { text: string; citations: AnyCitation[]; general?: boolean; onOpen: (item: string, at: string) => void; onLink: (url: string) => void; steps?: string[]; id?: string; onSteps?: () => void }) {
   const [listed, setListed] = useState(false);
   const opener = useRef({ onOpen, onLink });
   opener.current = { onOpen, onLink };
@@ -517,6 +521,15 @@ function Answer({ text, citations, general, onOpen, onLink }: { text: string; ci
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {citeRuns(text)}
       </ReactMarkdown>
+      {!!steps?.length && id && (
+        <Steps id={id} steps={steps} onDone={onSteps}>
+          {(s) => (
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+              {citeRuns(s)}
+            </ReactMarkdown>
+          )}
+        </Steps>
+      )}
       {general && <p className="tutor-general">Not from your sources</p>}
       {!!citations.length && (
         <button className="tutor-sources" aria-expanded={listed} onClick={() => setListed(!listed)}>
@@ -541,6 +554,43 @@ function Answer({ text, citations, general, onOpen, onLink }: { text: string; ci
             </li>
           ))}
         </ol>
+      )}
+    </>
+  );
+}
+
+/** How many steps of each worked answer he has shown, so closing the tutor or moving around keeps his place. */
+const stepsShown = new Map<string, number>();
+
+/** A worked answer one step at a time (D142, after assistant-ui's math block): the first shows, Next step
+ *  shows the one after, and the hover asks him to work it out first, so he explains each move to himself
+ *  before he reads it (faded worked examples; self-explanation). */
+function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; onDone?: () => void; children: (step: string) => ReactNode }) {
+  const [n, setN] = useState(() => Math.min(stepsShown.get(id) ?? 1, steps.length));
+  const list = useRef<HTMLOListElement>(null);
+  const next = () => {
+    const k = n + 1;
+    stepsShown.set(id, k);
+    setN(k);
+    // The button goes with the last step: the field takes the focus, for what he wants to ask next.
+    if (k === steps.length) onDone?.();
+  };
+  useEffect(() => {
+    if (n > 1) list.current?.lastElementChild?.scrollIntoView({ block: "nearest" });
+  }, [n]);
+  return (
+    <>
+      <ol className="tutor-steps" ref={list}>
+        {steps.slice(0, n).map((s, i) => (
+          <li key={i}>{children(s)}</li>
+        ))}
+      </ol>
+      {n < steps.length && (
+        <div className="tutor-acts">
+          <Hint text="Work out the next step yourself first">
+            <button onClick={next}>Next step</button>
+          </Hint>
+        </div>
       )}
     </>
   );

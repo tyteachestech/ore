@@ -462,7 +462,7 @@ journey("tutor scroll: a reply streaming in while he reads higher up leaves his 
     if (!body.includes('"tutor",')) return route.fallback();
     id = (JSON.parse(body).args as string[]).find((a) => a.startsWith("--stream="))!.slice(9);
     await held;
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: long, citations: [], general: true, searched: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@6" } }) });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: long, citations: [], general: true, searched: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@7" } }) });
   });
   try {
     await page.keyboard.press("Meta+j");
@@ -660,6 +660,56 @@ journey("tutor hints and cards: a hint offers Show me, which asks for the answer
   await tutor.getByRole("button", { name: /^Add card:/ }).waitFor();
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Meta+j");
+});
+
+journey("tutor steps: Show me's worked answer shows one step at a time, Next step adds the next, the last hands the field the focus, and the steps stay and go with the next message (D142)", async (page) => {
+  await openSource(page, TESTING);
+  const steps = ["The tested group pulled the facts out of memory.", "Pulling them out made the memory stronger.", "So a week later they **remembered more**."];
+  const replies = [
+    { reply: "Think about what the tested group did.", citations: [], general: false, hint: true, steps: [], exercise: null, card: null },
+    { reply: "Here's the working.", citations: [], general: false, hint: false, steps, exercise: null, card: null },
+    { reply: "Step 2 is the testing effect.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null },
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@7" } }));
+  const bodies: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    bodies.push(body);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    await field.fill("Why did the tested group remember more?");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: "Show me" }).click();
+    const shown = tutor.locator(".tutor-steps li");
+    await shown.first().waitFor();
+    if ((await shown.count()) !== 1) throw new Error(`Show me opened with ${await shown.count()} steps, not one`);
+    const next = tutor.getByRole("button", { name: "Next step" });
+    await next.click();
+    await until("Next step shows the second", async () => (await shown.count()) === 2 && (await shown.nth(1).innerText()).includes("stronger"));
+    await next.click();
+    await until("the last step shows", async () => (await shown.count()) === 3);
+    await shown.nth(2).locator("strong").waitFor();
+    if (await next.count()) throw new Error("Next step stayed after the last step");
+    await until("the field has the focus", () => field.evaluate((f) => f === document.activeElement));
+    // Closed and opened again, the steps he showed stay shown.
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+j");
+    await until("the steps came back as he left them", async () => (await shown.count()) === 3);
+    // The next message carries the steps as what the tutor said.
+    await field.fill("Why step 2?");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("Step 2 is the testing effect.").waitFor();
+    if (!bodies[2]!.includes("2. Pulling them out made the memory stronger.")) throw new Error("the follow-up didn't carry the steps");
+  } finally {
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
 });
 
 journey("tutor Show me: a half-written reply and its @ mention stay in the box while the hint's answer comes", async (page) => {
