@@ -491,7 +491,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
         <>
           <div className={`quiz-verdict ${verdict ?? "wait"}`} role="status">
             <span className="quiz-badge" aria-hidden="true">
-              {verdict === "yes" ? <Check size={16} weight="bold" /> : verdict === "part" ? <CircleHalf size={16} weight="fill" /> : waiting ? <Matrix stage={q.points ? "check" : "read"} /> : <MagnifyingGlass size={15} weight="bold" />}
+              {verdict === "yes" ? <Check size={16} weight="bold" /> : verdict === "part" ? <CircleHalf size={16} weight="fill" /> : waiting ? <Matrix /> /* never the check pattern here: in this badge a check means he got it */ : <MagnifyingGlass size={15} weight="bold" />}
             </span>
             <div>
               <b>{verdict === "yes" ? "You got it" : verdict === "part" ? "Partly there" : verdict === "no" ? "Not yet. Here’s where it is" : failed ? "Couldn’t check this one" : q.points ? "Checking your answer…" : "Finding the key points…"}</b>

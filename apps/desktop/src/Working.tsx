@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { still as stillMotion } from "./SideCursor";
 
 /** What the AI is doing while he waits, each with its own pattern on the matrix (D146). */
 export type Stage = "work" | "read" | "search" | "write" | "check";
@@ -72,7 +73,7 @@ export const MATRIX: Record<Stage, string[][]> = {
   })(),
 };
 /** The frame shown under reduced motion: the one that reads as the stage on its own. */
-export const STILL: Record<Stage, number> = { work: 0, read: 2, search: 0, write: 7, check: 6 };
+export const STILL: Record<Stage, number> = { work: 0, read: 2, search: 1, write: 7, check: 6 };
 const PACE: Record<Stage, number> = { work: 100, read: 160, search: 110, write: 90, check: 120 };
 
 /** The 5×5 dot matrix: 2 px cells a pixel apart, lit in the text's colour, trailing cells at 40% and the
@@ -80,7 +81,7 @@ const PACE: Record<Stage, number> = { work: 100, read: 160, search: 110, write: 
  *  under reduced motion and in tests (no timers), on the stage's telling frame. */
 export function Matrix({ stage = "work", className }: { stage?: Stage; className?: string }) {
   const frames = MATRIX[stage];
-  const still = typeof matchMedia !== "function" || matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const still = typeof matchMedia !== "function" || stillMotion();
   const [i, setI] = useState(0);
   useEffect(() => {
     setI(0);

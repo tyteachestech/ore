@@ -33,6 +33,8 @@ export type TutorTurn = {
   pointed?: Mention[];
   /** While the reply is written: its text so far, and whether it is searching the web (claude streams both). */
   partial?: string; searching?: boolean;
+  /** A web search has run on this turn, so the reply is being written from what it found (D146). */
+  searched?: boolean;
   reply?: string; citations?: AnyCitation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
   /** A worked answer's steps, shown one at a time (D142); empty for any other reply. */
   steps?: string[];
@@ -74,7 +76,7 @@ export function useTutorChat(notify: Notify) {
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
-      if (p.stream === t.id) patch(t.id, p.reply !== undefined ? { partial: p.reply } : { searching: !!p.searching });
+      if (p.stream === t.id) patch(t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
     }).catch(() => () => {});
     try {
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
@@ -332,7 +334,9 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                   // Its [n] markers wait for the citations, which come with the whole reply.
                   <Answer text={t.partial.replace(/\s?\[\d*$|\s?\[\d+\](?!\()/g, "")} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
                 ) : t.reply === undefined ? (
-                  <Working stage={t.searching ? "search" : "read"} label={t.searching ? "Searching the web…" : "Reading your sources…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />
+                  // What it is doing, as far as the stream says (D146): his sources come first (D137), a web search
+                  // is reported as it starts and ends, and after one the reply is written from what it found.
+                  <Working stage={t.searching ? "search" : t.searched ? "write" : "read"} label={t.searching ? "Searching the web…" : t.searched ? "Writing…" : "Reading your sources…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />
                 ) : (
                   <>
                     <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />
