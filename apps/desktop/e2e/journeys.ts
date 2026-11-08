@@ -1309,12 +1309,20 @@ journey("reader questions: a piece of the answer, ⌘Z takes it out and ⇧⌘Z 
   const toggle = page.locator(".cp-head", { hasText: "Questions" }).locator(".cp-toggle");
   if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
   const q = page.locator(".qp-q", { hasText: "Does this hold for kids?" });
-  const pieces = async () => Number(/(\d+) in your answer/.exec(await q.innerText())?.[1] ?? 0);
+  // The row is one line (D134): the pieces show in its answer box, so each look opens it and closes it again.
+  const pieces = async () => {
+    await q.locator(".qp-row").click();
+    await q.locator(".qa-actions").waitFor();
+    const n = await q.locator(".qa-piece").count();
+    await page.keyboard.press("Escape");
+    await q.locator(".qa-actions").waitFor({ state: "detached" });
+    return n;
+  };
   const before = await pieces();
   await q.locator(".qp-row").click();
   await page.keyboard.type("Spacing helped fourth graders in one study.");
   await page.keyboard.press("Enter");
-  await until("the piece is added", async () => (await pieces()) === before + 1);
+  await until("the piece is added", async () => (await q.locator(".qa-piece").count()) === before + 1);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Meta+z");
   await until("⌘Z takes it out", async () => (await pieces()) === before);

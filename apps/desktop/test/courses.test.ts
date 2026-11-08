@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { lessonsOf, nextLesson, tabCount, titleMatches, type Item } from "../src/ore";
+import { lessonsOf, nextLesson, titleMatches, type Item } from "../src/ore";
 
 const lesson = (id: string, part: number, status: Item["status"], course = "c1"): Item => ({
   id, type: "youtube", title: id, dir: "", captured_at: "2026-10-28T00:00:00Z", status, skills: ["ai"], course: { id: course, title: "AI Fluency", part },
@@ -12,15 +12,6 @@ describe("courses in lists (D79)", () => {
     expect(lessonsOf(items, "c1").map((l) => l.id)).toEqual(["a", "b", "c"]);
     expect(nextLesson(lessonsOf(items, "c1"))?.id).toBe("b");
     expect(nextLesson([lesson("a", 1, "done")])).toBeNull();
-  });
-
-  test("a course counts once: in To read while a lesson is left, in Done once all are", () => {
-    const open = [lesson("a", 1, "done"), lesson("b", 2, "inbox"), source("s", "reading"), source("t", "done")];
-    expect(tabCount(open, "toread")).toBe(2);
-    expect(tabCount(open, "done")).toBe(1);
-    const finished = [lesson("a", 1, "done"), lesson("b", 2, "done")];
-    expect(tabCount(finished, "toread")).toBe(0);
-    expect(tabCount(finished, "done")).toBe(1);
   });
 
   test("filtering the list by a course's title finds its lessons (⌘F), as ⌘K does", () => {
