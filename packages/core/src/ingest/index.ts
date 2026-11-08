@@ -372,11 +372,18 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   if (!draft.body.trim()) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
   const ready = await withImages(draft);
   // The same file added again (dropped twice, or a copy) is the source already here.
-  const same = !isUrl && allItems(lib, { preview: true }).find((i) => i.meta.text_sha256 === sha256(ready.body) && !i.meta.course);
+  const same = !isUrl && sameText(lib, ready.body);
   const item = same ? await keep(lib, same, opts) : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview });
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same) await makeThumbnail(item);
   return item;
+}
+
+/** The source already here with this text (a file dropped twice, text pasted again), by the hash createItem
+ *  stores: of the body with its line ends as every read sees them, so Windows line ends match too. */
+function sameText(lib: Library, body: string): Item | undefined {
+  const hash = sha256(body.replace(/\r\n?/g, "\n"));
+  return allItems(lib, { preview: true }).find((i) => i.meta.text_sha256 === hash && !i.meta.course);
 }
 
 /** Kept sources: what adding one again did, so the app can say it ("Added to AI", "back from Archived"). */
@@ -440,7 +447,7 @@ export async function addText(lib: Library, text: string, opts: AddOptions = {})
   const md = markdownFile(source, "");
   const body = md.body.trim() + "\n";
   if (!body.trim()) throw new Error("text is empty: only frontmatter, no text to read");
-  const same = allItems(lib, { preview: true }).find((i) => i.meta.text_sha256 === sha256(body) && !i.meta.course);
+  const same = sameText(lib, body);
   if (same) return keep(lib, same, opts);
   const first = body.split("\n")[0]!.replace(/^#+\s*/, "");
   const title = md.title || (first.length > 80 ? first.slice(0, 77).trimEnd() + "…" : first);

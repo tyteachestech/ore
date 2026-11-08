@@ -131,4 +131,14 @@ describe("ingest", () => {
     expect(listItems(lib).length).toBe(1);
     expect(findItem(lib, a.meta.id).meta.skills).toEqual(["learning"]);
   });
+
+  test("the same text with Windows line ends is the same source, pasted or as a file", async () => {
+    const lib = await tempLibrary();
+    const a = await addText(lib, "# Line ends\n\nThe same words, whatever ends the lines.\n");
+    expect((await addText(lib, "# Line ends\r\n\r\nThe same words, whatever ends the lines.\r\n")).meta.id).toBe(a.meta.id);
+    const file = join(lib.root, "line-ends.md");
+    writeFileSync(file, "# Line ends\r\n\r\nThe same words, whatever ends the lines.\r\n");
+    expect((await addSource(lib, file)).meta.id).toBe(a.meta.id);
+    expect(listItems(lib).length).toBe(1);
+  });
 });
