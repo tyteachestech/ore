@@ -143,7 +143,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     f?.setSelectionRange(f.value.length, f.value.length);
   }, [step, isChecked]);
 
-  function enrich() {
+  /** `back`: settles once he is back from the panel; a failure says so only then, in front of "Finished …". */
+  function enrich(back: Promise<unknown>) {
     // Drafts review items from Card highlights and the prequestions (D19), after the recall
     // feedback so the prompts' rubrics include what he missed.
     // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
@@ -151,7 +152,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     const run = (): Promise<void> =>
       ore("enrich", doc.id).then(
         () => {},
-        (e) => void notify(`Cards for “${doc.title}” weren’t drafted: ${errorText(e)}`, "error", undefined, undefined, () => void run(), true),
+        (e) => void back.then(() => notify(`Cards for “${doc.title}” weren’t drafted: ${errorText(e)}`, "error", undefined, undefined, () => void run(), true)),
       );
     if (feedbackRun.current) void feedbackRun.current.finally(run);
     else void run();
@@ -244,14 +245,16 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       return;
     }
     drafts.delete(doc.id);
+    // Drafting starts at once, so a window closed during the moment still drafts the cards.
+    let gone = () => {};
+    enrich(new Promise<void>((ok) => (gone = ok)));
     // Done on "Done with this source?": a second of "Source finished" before going back (D106).
     if (!marked) {
       setMoment(true);
       await new Promise((go) => setTimeout(go, 1100));
     }
     (then ?? onDone)();
-    // After "Finished …", so a drafting failure lands in front of it rather than behind.
-    enrich();
+    gone();
   }
 
   /** Quizzed without finishing: the source stays in To read and nothing is drafted yet; the next

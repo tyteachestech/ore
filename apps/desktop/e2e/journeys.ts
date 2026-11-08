@@ -3191,6 +3191,21 @@ journey("ore down at launch: Home's Try again brings back the skills and the sou
   await page.locator(".row").filter({ hasText: TESTING }).first().waitFor();
 });
 
+journey("finish: drafting the cards starts on Done, not after the moment, so closing the window then still drafts them", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Drafting at once\n\nA short page whose cards are drafted the moment he says Done.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A short page whose cards are drafted").waitFor();
+  const enriched: number[] = [];
+  page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["enrich"') && enriched.push(Date.now()));
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".quiz-done.moment").waitFor();
+  await until("drafting has started while the moment shows", async () => enriched.length > 0, 900);
+  if (await page.locator(".toast").filter({ hasText: "Finished “Drafting at once”" }).count()) throw new Error("drafting started only after the moment");
+});
+
 journey("finish: drafting that fails after Done stays in front of “Finished” until he acts on it", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# Drafting that fails\n\nA short page whose cards can't be drafted, because the AI is down.");
