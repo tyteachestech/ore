@@ -120,6 +120,16 @@ export class LibraryIndex {
       .map((r) => ({ ...(r as unknown as ItemRow), skills: JSON.parse(r.skills as string), topics: JSON.parse(r.topics as string) }));
   }
 
+  /** Sources' doc.md files that have no row: the sync that saw them change couldn't read them (`ore doctor` says why). */
+  unindexedDocs(): string[] {
+    const indexed = new Set(this.db.query<{ path: string }, []>("select path from items").all().map((r) => r.path));
+    return this.db
+      .query<{ path: string }, []>("select path from files where kind = 'doc'")
+      .all()
+      .map((r) => r.path)
+      .filter((p) => !indexed.has(relative(this.lib.root, p)));
+  }
+
   search(query: string, limit = 20): SearchHit[] {
     // FTS5 drops "+" and "#" from words, so "c++" would find every word starting with c. A term that ends
     // in them ("c++", "c#", "f#") asks the index for the bare word and keeps only rows that spell it out.

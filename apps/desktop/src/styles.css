@@ -1792,6 +1792,8 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .home-plan { display: block; max-width: 100%; margin: -6px 0 10px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; text-align: left; border-radius: 4px; }
 button.home-plan:hover { color: var(--text); }
 .home-plan.empty { color: var(--faint); }
+.home-plan.home-unreadable { margin: 8px 0 0; }
+.home-unreadable-why { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; color: var(--muted); }
 .home-plan.empty:hover { color: var(--muted); }
 .home-goal h1 { font-family: var(--round); margin: 0; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .home-goal .goal-of { color: var(--muted); font-size: 15px; font-weight: 500; letter-spacing: 0; }

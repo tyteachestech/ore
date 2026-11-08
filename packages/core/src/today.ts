@@ -1,4 +1,7 @@
+import { dirname } from "node:path";
 import { openIndex, withIndex, type CardRow, type LibraryIndex } from "./db.ts";
+import { errorLine } from "./fsutil.ts";
+import { readItemDir } from "./items.ts";
 import type { Library } from "./library.ts";
 import { readReviews, type Review } from "./reviews.ts";
 import { readSessions } from "./sessions.ts";
@@ -104,6 +107,8 @@ export interface Today {
   week: { date: string; status: DayStatus; active_ms: number }[];
   days_met: number;
   skills: ({ skill: string; due: number } & Omit<Strength, "explain">)[];
+  /** Sources whose doc.md can't be read (files-10): they drop out of every list, so Home names them. */
+  unreadable: { dir: string; error: string }[];
 }
 
 export function today(lib: Library, now = new Date()): Today {
@@ -165,10 +170,23 @@ export function today(lib: Library, now = new Date()): Today {
       week,
       days_met: daysMet.size,
       skills,
+      unreadable: unreadable(index),
     };
   } finally {
     index.close();
   }
+}
+
+/** Read again for the reason: a folder that reads now lost its row to another with the same id, which doctor names. */
+function unreadable(index: LibraryIndex): Today["unreadable"] {
+  return index.unindexedDocs().flatMap((doc) => {
+    try {
+      readItemDir(dirname(doc));
+      return [];
+    } catch (e) {
+      return [{ dir: dirname(doc), error: errorLine(e) }];
+    }
+  });
 }
 
 /** A skill's strength from the library (for `ore stats --skill`). */
