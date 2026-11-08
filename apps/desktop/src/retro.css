@@ -106,7 +106,7 @@
 
 /* Big numbers in pixel type. */
 .home-solid, .hero-strength .home-solid, .home-goal h1, .review-kept b, .review-cut b { font-family: var(--pixel); font-weight: 400; }
-.home-goal h1 span { font-family: var(--font); }
+.home-goal .goal-of { font-family: var(--font); }
 
 /* Square corners everywhere a row, chip or control sits. */
 .row, .home-read, .side-item, .chip, .icon-button, .icon-btn, .skill-badge, .pick-row, .gem-ring-lv, [cmdk-item],
