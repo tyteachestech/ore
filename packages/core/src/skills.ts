@@ -335,15 +335,21 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[]): P
 // goes: cards keep reviewing and the skill note stays on disk. `archive` also archives the sources
 // filed only under this skill.
 /** What deleting a skill changed, so `restoreSkill` can put it all back (Undo): the skill and its place
- *  in skills.yaml, the sources, cards and topics it was taken off, and which sources it archived. */
+ *  in skills.yaml, the sources, cards and topics it was taken off and its place in each one's skills
+ *  (the first is the primary one), and which sources it archived. A bare id (printed before places
+ *  were kept) goes back at the end. */
+const Place = z.number().int().min(0).optional();
+const Untagged = z.union([z.string().transform((id) => ({ id, at: undefined })), z.object({ id: z.string(), at: Place })]);
 export const RemovedSkillSchema = z.object({
   skill: SkillSchema,
   at: z.number().int().min(0),
-  items: z.array(z.object({ id: z.string(), archived: z.boolean() })),
-  cards: z.array(z.string()),
-  topics: z.array(z.string()),
+  items: z.array(z.object({ id: z.string(), archived: z.boolean(), at: Place })),
+  cards: z.array(Untagged),
+  topics: z.array(Untagged),
 });
-export type RemovedSkill = z.infer<typeof RemovedSkillSchema>;
+export type RemovedSkill = z.input<typeof RemovedSkillSchema>;
+/** `skills` with `id` put back at `at` (the end when it isn't known). */
+const putBack = (skills: string[], id: string, at?: number) => [...skills.slice(0, at ?? skills.length), id, ...skills.slice(at ?? skills.length)];
 
 export async function removeSkill(lib: Library, id: string, opts: { archive?: boolean } = {}): Promise<{ skill: Skill; untagged: number; archived: number; removed: RemovedSkill }> {
   return withLock(paths.lock(lib), () => {
@@ -359,15 +365,15 @@ export async function removeSkill(lib: Library, id: string, opts: { archive?: bo
       const archive = !!opts.archive && !skills.length && !item.meta.archived_at;
       const meta = ItemMetaSchema.parse({ ...item.meta, skills, ...(archive ? { archived_at: nowIso() } : {}) });
       writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
-      removed.items.push({ id: item.meta.id, archived: archive });
+      removed.items.push({ id: item.meta.id, archived: archive, at: item.meta.skills.indexOf(id) });
     }
     for (const c of listCards(lib).filter((c) => c.meta.skills.includes(id))) {
       writeCardMeta(c, { ...c.meta, skills: c.meta.skills.filter((s) => s !== id) });
-      removed.cards.push(c.meta.id);
+      removed.cards.push({ id: c.meta.id, at: c.meta.skills.indexOf(id) });
     }
     for (const t of listTopics(lib).filter((t) => t.meta.skills.includes(id))) {
       writeTopic({ ...t, meta: { ...t.meta, skills: t.meta.skills.filter((s) => s !== id) } });
-      removed.topics.push(t.slug);
+      removed.topics.push({ id: t.slug, at: t.meta.skills.indexOf(id) });
     }
     // Last, so a run cut off midway leaves the skill still there: running it again finishes the job.
     list.items.splice(i, 1);
@@ -387,18 +393,19 @@ export async function restoreSkill(lib: Library, input: RemovedSkill): Promise<S
     if (list.items.some((m) => m.get("id") === id)) throw new Error(`a skill "${id}" already exists`);
     list.items.splice(Math.min(r.at, list.items.length), 0, doc.createNode(r.skill) as YAMLLib.YAMLMap);
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
-    const back = new Map(r.items.map((x) => [x.id, x.archived]));
+    const back = new Map(r.items.map((x) => [x.id, x]));
     for (const item of allItems(lib)) {
-      if (!back.has(item.meta.id) || item.meta.skills.includes(id)) continue;
+      const was = back.get(item.meta.id);
+      if (!was || item.meta.skills.includes(id)) continue;
       const { archived_at, ...rest } = item.meta;
-      const meta = ItemMetaSchema.parse({ ...rest, skills: [...item.meta.skills, id], ...(back.get(item.meta.id) ? {} : archived_at ? { archived_at } : {}) });
+      const meta = ItemMetaSchema.parse({ ...rest, skills: putBack(item.meta.skills, id, was.at), ...(was.archived ? {} : archived_at ? { archived_at } : {}) });
       writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     }
-    const cards = new Set(r.cards);
-    for (const c of listCards(lib).filter((c) => cards.has(c.meta.id) && !c.meta.skills.includes(id))) writeCardMeta(c, { ...c.meta, skills: [...c.meta.skills, id] });
-    for (const slug of r.topics) {
+    const cards = new Map(r.cards.map((c) => [c.id, c.at]));
+    for (const c of listCards(lib).filter((c) => cards.has(c.meta.id) && !c.meta.skills.includes(id))) writeCardMeta(c, { ...c.meta, skills: putBack(c.meta.skills, id, cards.get(c.meta.id)) });
+    for (const { id: slug, at } of r.topics) {
       const t = readTopic(lib, slug);
-      if (t && !t.meta.skills.includes(id)) writeTopic({ ...t, meta: { ...t.meta, skills: [...t.meta.skills, id] } });
+      if (t && !t.meta.skills.includes(id)) writeTopic({ ...t, meta: { ...t.meta, skills: putBack(t.meta.skills, id, at) } });
     }
     return r.skill;
   });

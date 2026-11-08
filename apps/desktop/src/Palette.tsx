@@ -210,6 +210,8 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
         ...(skill ? [{ value: "All sources", label: "All sources", run: () => onSkill(null) }] : []),
         ...skills.map((s) => ({
           value: `Go to skill: ${s.name}`,
+          // Scored by its name too, so the skill named what he typed is the top row.
+          keywords: [s.name],
           label: (
             <>
               <SkillIcon icon={s.icon} color={s.color} dot className="palette-icon" />
@@ -371,12 +373,16 @@ export const asksQuestion = (q: string) =>
 
 /** How well a title matches: every query word must appear in it, and a word that starts a title
  *  word counts more than one inside it (Linear, Raindrop). Letters scattered across a long title
- *  never match, which cmdk's fuzzy score allows. */
+ *  never match, which cmdk's fuzzy score allows. Accents fold ("cafe" finds Café, Raycast), a query
+ *  of emoji (🔥) matches the titles that hold it, and the title that is the query ranks first. */
 export function titleScore(title: string, query: string): number {
-  const t = title.toLowerCase();
+  const t = fold(title);
+  const q = fold(query).trim();
+  const exact = t.trim() === q ? 1 : 0;
   // A word keeps a trailing # or + (C#, C++, F#), or "c#" would match every title with a c-word.
-  const terms = query.toLowerCase().match(/[\p{L}\p{N}_]+[#+]*/gu) ?? [];
-  if (!terms.length) return 0;
+  const terms = q.match(/[\p{L}\p{N}_]+[#+]*/gu) ?? [];
+  // No letters: emoji (🔥) match the titles that hold them; punctuation alone (: . -) matches nothing.
+  if (!terms.length) return /\p{Extended_Pictographic}/u.test(q) && t.includes(q) ? 1 + (t.startsWith(q) ? 0.5 : 0) + exact : 0;
   let score = 0;
   for (const term of terms) {
     let i = t.indexOf(term);
@@ -385,8 +391,10 @@ export function titleScore(title: string, query: string): number {
     for (; i >= 0 && !start; i = t.indexOf(term, i + 1)) start = i === 0 || !/[\p{L}\p{N}]/u.test(t.charAt(i - 1));
     score += start ? 1 : 0.5;
   }
-  return score / terms.length + (t.startsWith(terms[0]!) ? 0.5 : 0);
+  return score / terms.length + (t.startsWith(terms[0]!) ? 0.5 : 0) + exact;
 }
+/** Lower case with accents taken off, so "cafe" and "Café" are one word. */
+const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 /** One line of a search snippet: FTS5 brackets the matched words; a bracket around anything
  *  else is the source's own Markdown and stays as written. */

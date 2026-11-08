@@ -6,6 +6,7 @@ import { openIndex } from "../src/db.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { allItems, findItem, listItems, setItemArchived, setItemPinned } from "../src/items.ts";
 import { loadSkills, removeSkill, restoreSkill } from "../src/skills.ts";
+import { findCard, writeNewCard } from "../src/cards.ts";
 import { paths } from "../src/library.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -86,6 +87,25 @@ describe("delete a skill", () => {
     expect(findItem(lib, both).meta.skills).toEqual(["focus-attention", "habits"]);
     expect(findItem(lib, gone).meta.archived_at).toBeDefined(); // archived before the delete: stays archived
     await expect(restoreSkill(lib, r.removed)).rejects.toThrow("already exists");
+  });
+
+  test("restore puts the skill back at its place in each source's and card's skills, so the first skill stays first", async () => {
+    const lib = await tempLibrary();
+    const item = (await addSnippet(lib, { text: "Habits first, then focus.", skills: ["habits", "focus-attention", "learning"] })).item.meta.id;
+    const card = writeNewCard(lib, { kind: "card", item, skills: ["focus-attention", "habits", "learning"], topics: [], content_type: "fact", question: "Q?", answer: "A", rubric: [] }).meta.id;
+    const r = await removeSkill(lib, "habits");
+    await restoreSkill(lib, JSON.parse(JSON.stringify(r.removed)));
+    expect(findItem(lib, item).meta.skills).toEqual(["habits", "focus-attention", "learning"]);
+    expect(findCard(lib, card).meta.skills).toEqual(["focus-attention", "habits", "learning"]);
+  });
+
+  test("restore still takes what a delete printed before it kept places", async () => {
+    const lib = await tempLibrary();
+    const item = (await addSnippet(lib, { text: "Old undo.", skills: ["habits", "learning"] })).item.meta.id;
+    const r = await removeSkill(lib, "habits");
+    const old = { ...r.removed, items: r.removed.items.map(({ id, archived }) => ({ id, archived })), cards: [], topics: [] };
+    await restoreSkill(lib, old);
+    expect(findItem(lib, item).meta.skills).toEqual(["learning", "habits"]);
   });
 });
 

@@ -29,6 +29,7 @@ import { Feed, feedProof, type FeedPost, type FoundFeed } from "./Feed";
 import { dueSkills, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { Review } from "./Review";
 import { useToast } from "./Toast";
+import { lineAfter, lineKey, type Line } from "./lines";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
@@ -69,9 +70,8 @@ type CourseAdd = {
 /** A source that was in the library already: what adding it again did. */
 type Kept = { kept: true; filed: string[]; restored: boolean };
 
-/** A line of a source list: a source, or a course (D79) standing for its lessons, listed under it when open. */
-type Line = { kind: "item"; item: Item; lesson?: boolean } | { kind: "course"; id: string; title: string; url?: string; lessons: Item[]; next: Item | null; open: boolean };
-const lineKey = (l: Line) => (l.kind === "item" ? l.item.id : `course:${l.id}`);
+/** `ore status` args to `to`: back to Done (an Undo), a source keeps the finish date it had. */
+const back = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
 const lessonFirst = (l: Extract<Line, { kind: "course" }>) => l.next ?? l.lessons[0]!;
 
 /** Which sources the list shows, as the list's title (Linear's view menu): To read, Done, and
@@ -293,11 +293,27 @@ export function App() {
 
   // Only the newest list read lands: an older one answering late would put back what came after it.
   const reads = useRef(0);
+  // Nor one that began before a row's optimistic write: it would put the row back (a second A then
+  // archives it again). Each write reads the list again once it settles; a read begun after it lands,
+  // so a write that hangs never freezes the list.
+  const writes = useRef(0);
+  const writing = <T,>(p: Promise<T>) => (writes.current++, p);
+  /** One action's writes, one after another: an Undo pressed while its archive still saves waits for it,
+   *  or the two `ore` runs race and the archive can land last, leaving it archived. */
+  const inOrder = () => {
+    let last: Promise<unknown> = Promise.resolve();
+    return <T,>(write: () => Promise<T>): Promise<T> => {
+      const p = last.then(write);
+      last = p.catch(() => {});
+      return writing(p);
+    };
+  };
   const refresh = useCallback(async () => {
     const n = ++reads.current;
+    const w = writes.current;
     try {
       const [all, gone] = await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
-      if (n !== reads.current) return;
+      if (n !== reads.current || w !== writes.current) return;
       setItems(all);
       setArchived(gone);
       setListError(null);
@@ -1013,7 +1029,19 @@ export function App() {
     (): Line[] => (q ? rows.map((item) => ({ kind: "item", item })) : (onSkillPage && !showAll ? groups.slice(0, SKILL_CAP) : groups).flat()),
     [q, rows, groups, onSkillPage, showAll],
   );
-  const currentLine = lines.find((l) => lineKey(l) === cursor) ?? lines[0];
+  // When the selected row leaves the list in place (archived, moved to Done), the row after it takes the
+  // selection, else the one before (Finder, Mail, Linear), never the first row: a second A then archives
+  // the row he sees selected.
+  const listView = `${place}|${skill}|${status}|${q}`;
+  const drawn = useRef<{ view: string; lines: Line[] }>({ view: listView, lines: [] });
+  const found = lines.find((l) => lineKey(l) === cursor);
+  const neighbour = !found && cursor && drawn.current.view === listView ? lineAfter(drawn.current.lines, lines, cursor) : undefined;
+  const currentLine = found ?? neighbour ?? lines[0];
+  useEffect(() => {
+    drawn.current = { view: listView, lines };
+    // For good, so a list read that still has the gone row doesn't hand the selection back to it.
+    if (neighbour) setCursor(lineKey(neighbour));
+  }, [listView, lines, neighbour]);
   const itemIds = useMemo(() => lines.flatMap((l) => (l.kind === "item" ? [l.item.id] : [])), [lines]);
   /** The picked sources still in view, in list order. */
   const many = useMemo(() => {
@@ -1114,10 +1142,13 @@ export function App() {
     // The same element serves every tab: a list never scrolled (or left at the top) starts at the top.
     const want = listScrolls()[scrollAt] ?? 0;
     el.scrollTop = want;
+    // The row he has selected stays in view (Finder, Raindrop), though opening it moved it up (D110).
+    const sel = keyed && found ? document.getElementById(`row-${lineKey(found)}`) : null;
+    sel?.scrollIntoView({ block: "nearest" });
     // What sits below the list (a skill page's questions) loads after it, so the place may not exist
     // yet: keep putting it back as the content grows, until it fits or he scrolls himself. Until then
     // a scroll is ours, clamped short, and saving it would lose his place.
-    let pending = el.scrollTop < want - 1;
+    let pending = !sel && el.scrollTop < want - 1;
     const settle = () => {
       if (!pending) return;
       el.scrollTop = want;
@@ -1223,12 +1254,15 @@ export function App() {
       setItems((all) => (on ? all?.filter((i) => i.id !== item.id) : all && [moved, ...all.filter((i) => i.id !== item.id)]) ?? all);
       setArchived((all) => (on ? [moved, ...all.filter((i) => i.id !== item.id)] : all.filter((i) => i.id !== item.id)));
     };
-    const save = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"]));
+    const queue = inOrder();
+    const save = (on: boolean) => queue(() => ore("archive", item.id, ...(on ? [] : ["--undo"])));
     mark(archived);
     if (archived && openId === item.id) setOpenId(null);
     // Returns the write, so an undo that fails says so and stays undoable (history.ts).
     const apply = (on: boolean) => {
       mark(on);
+      // Undo selects the source it put back, as Finder selects what it puts back.
+      if (on !== archived) setCursor(item.id);
       return save(on).then(refresh, (e) => {
         void refresh();
         throw e;
@@ -1327,13 +1361,15 @@ export function App() {
     const ids = new Set(c.lessons.map((l) => l.id));
     setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
     if (openId && ids.has(openId)) setOpenId(null);
+    const queue = inOrder();
     const apply = (on: boolean) => {
       if (on) setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
-      ore("course", "archive", c.id, ...(on ? [] : ["--undo"])).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+      else setCursor(`course:${c.id}`);
+      queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"]))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
     };
     notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
     try {
-      await ore("course", "archive", c.id);
+      await queue(() => ore("course", "archive", c.id));
     } catch (e) {
       notify(errorText(e), "error");
     }
@@ -1361,10 +1397,15 @@ export function App() {
   const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null) => {
     const sel = many;
     const ids = new Set(sel.map((i) => i.id));
+    const was = cursor;
+    const queue = inOrder();
     const go = async (forward: boolean) => {
       if (patch) setItems((all) => all && (forward ? all.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) : [...all.filter((i) => !ids.has(i.id)), ...sel]));
+      if (!forward) setCursor(was);
       try {
-        for (const i of sel) await write(i, forward);
+        await queue(async () => {
+          for (const i of sel) await write(i, forward);
+        });
       } catch (e) {
         notify(errorText(e), "error");
       }
@@ -1383,7 +1424,7 @@ export function App() {
   const archiveMany = () => batch(`Archived ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null);
   const restoreMany = () => batch(`Restored ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])));
   const moveMany = (to: Item["status"]) =>
-    batch(`Moved ${sourcesN(many.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, f ? to : i.status), (i) => ({ ...i, status: to }));
+    batch(`Moved ${sourcesN(many.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }));
   const fileMany = (k: Skill, on: boolean) => {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
     batch(
@@ -1423,7 +1464,7 @@ export function App() {
   const moveSource = useCallback(
     async (item: Item, to: Item["status"], undoable = true) => {
       try {
-        await ore("status", item.id, to);
+        await ore("status", item.id, ...back(item, to));
         await refresh();
         if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => void moveSource(item, item.status, false), () => void moveSource(item, to, false));
       } catch (e) {
@@ -2251,6 +2292,7 @@ export function App() {
           sources={{
             all: (items ?? []).filter((i) => i.skills.includes(deleting)).length,
             only: (items ?? []).filter((i) => i.skills.length === 1 && i.skills[0] === deleting).length,
+            archived: archived.filter((i) => i.skills.includes(deleting)).length,
           }}
           onDone={(deleted) => {
             setDeleting(null);

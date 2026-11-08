@@ -162,7 +162,7 @@ ore notes <item> --set "<text>" [--base "<text>"]   replace notes.md as given ("
 ore notes <item> --append "<text>" --heading "<h>"   append rule below → same shape
 ore diagram <item> <name> [--set]    diagrams/<name>.excalidraw → {item, name, path, scene} (scene null when absent); --set reads an Excalidraw scene from stdin (checked, atomic); --rename <new> renames the file (the note's link is the caller's to change); `--skill <s> <name>` does the same beside a skill note
 ore diagram <item> --new             first free name `diagram-N` (no file, no link in notes.md); writes nothing
-ore status <item> inbox|reading|done   set reading status; done records finished_at (orders unseen drafts, freshest source first)
+ore status <item> inbox|reading|done [--at <iso>]   set reading status; done records finished_at (orders unseen drafts, freshest source first); --at puts back the one it had (Undo of a move out of Done)
 ore archive <item> [--undo]           sets archived_at: hidden from lists, questions and search; files kept, its cards keep reviewing
 ore reimport <item> [--undo]          fetches a linked source's original again and updates it in place (D93); --undo puts the old version back, again redoes
 ore tables <item> | --install | --remove | --status   reads a PDF's tables and display formulas with Docling into its text, highlights kept (D125); `ore show` gives `tables: reading|read` or `tables_error`; --install downloads Docling (about 2 GB, optional), --remove deletes it

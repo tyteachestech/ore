@@ -9,7 +9,7 @@ bun run eval:tutor --vendor claude --model claude-haiku-5-5
 
 ## How it works
 
-- **Set** (`packages/core/eval/tutor-cases.json`): 12 single turns over the golden docs, some with the turns before (`earlier`) and a source open (`reading`). Each lists what its reply must do: be a hint or not, hold or withhold patterns (the answer he is meant to find), set an exercise or not, ask him something, cite a passage, give no score, not search, stay short.
+- **Set** (`packages/core/eval/tutor-cases.json`): 13 single turns over the golden docs, some with the turns before (`earlier`) and a source open (`reading`). Each lists what its reply must do: be a hint or not, hold or withhold patterns (the answer he is meant to find), set an exercise or not, split a worked answer into steps (D142), ask him something, cite a passage, give no score, not search, stay short.
 - **Checks** are code (`failures` in `eval/tutor.ts`, tested in `test/eval-tutor.test.ts`): the `hint` and `exercise` flags the tutor returns, regexes on the reply, the citation count and whether it searched.
 - **Report**: cases passed with a 95% interval, misses with the failed checks and the start of the reply, cost and time. Results in `packages/core/eval/results/tutor-<date>.json`.
 
