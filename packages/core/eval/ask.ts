@@ -63,7 +63,7 @@ export const passagesFor = (lib: Library, chat: Chat, question: string): Passage
 export const retrieved = (c: AskCase, ps: Passage[], names: Map<string, string>) =>
   ps.some((p) => c.sources.includes(names.get(p.item) ?? "") && new RegExp(c.evidence, "i").test(p.text));
 
-export interface AskResult { id: string; absent: boolean; retrieved?: boolean; found?: boolean; answer?: string; cited?: string[]; answer_ok: boolean; citation_ok: boolean; ms: number; usage?: Usage | null; error?: string }
+export interface AskResult { id: string; absent: boolean; retrieved?: boolean; found?: boolean; outside?: boolean; answer?: string; cited?: string[]; answer_ok: boolean; citation_ok: boolean; ms: number; usage?: Usage | null; error?: string }
 
 /** Answer: every pattern matches. Citations: every quote is really where it says, and one is from an
  *  expected source and holds the evidence. An absent question is right only when it cites nothing and
@@ -96,7 +96,7 @@ export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", con
         got = isAbsent ? undefined : retrieved(c as AskCase, passagesFor(lib, chat, c.question), names);
         const r = await ask(lib, chat, c.question);
         if (r.ai) stamp = r.ai;
-        return { id: c.id, absent: isAbsent, retrieved: got, found: r.found, answer: r.answer, cited: r.citations.map((x) => `${names.get(x.item)}: ${x.quote}`), ...scoreAnswer(c, r, names, body), ms: Math.round(performance.now() - start), usage: r.usage };
+        return { id: c.id, absent: isAbsent, retrieved: got, found: r.found, outside: r.outside, answer: r.answer, cited: r.citations.map((x) => `${names.get(x.item)}: ${x.quote}`), ...scoreAnswer(c, r, names, body), ms: Math.round(performance.now() - start), usage: r.usage };
       } catch (e) {
         return { id: c.id, absent: isAbsent, retrieved: got, answer_ok: false, citation_ok: false, ms: Math.round(performance.now() - start), error: (e as Error).message };
       }
