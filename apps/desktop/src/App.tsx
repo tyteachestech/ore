@@ -2175,7 +2175,7 @@ export function App() {
             renameSource={renameSource}
             actionsRef={readerActions}
             practiceRef={readerPractice}
-            onArchive={(item) => void archiveSource(item)}
+            onArchive={(item) => void (item.archived_at ? restoreSource(item) : archiveSource(item))}
             lessons={openCourse ? lessonsOf(items ?? [], openCourse) : undefined}
             onOpenLesson={(id) => openSource(id)}
             onPin={(item) => void pinSource(item)}
