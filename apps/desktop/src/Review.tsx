@@ -11,7 +11,7 @@ import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { ore, opt, PHONE, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today } from "./ore";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, type Notify } from "./util";
+import { errorText, focusPicked, type Notify } from "./util";
 import { Working } from "./Working";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
@@ -1121,7 +1121,7 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
 function Sure({ refEl, conf, onPick }: { refEl: React.RefObject<HTMLDivElement | null>; conf?: number; onPick: (n: number) => void }) {
   return (
     // One Tab stop, ← → between the three (Radix, as Settings' segmented rows); a click on the one picked picks it again.
-    <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="review-sure" ref={refEl} value={conf ? String(conf) : ""} onValueChange={(v) => onPick(v ? Number(v) : conf!)}>
+    <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="review-sure" ref={refEl} value={conf ? String(conf) : ""} onValueChange={(v) => onPick(v ? Number(v) : conf!)} onFocus={focusPicked}>
       {SURE.map((label, i) => (
         <Hint key={label} text={<>{label} <kbd>{i + 1}</kbd></>} side="top">
           {/* Keeps focus in the answer, so on iPhone the keyboard stays up and Check doesn't move under the finger. */}

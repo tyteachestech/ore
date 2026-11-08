@@ -3616,6 +3616,18 @@ journey("how sure: one Tab stop in Review and the finish quiz, ← → move betw
     await until("Sure is picked", async () => (await page.getByRole("radio", { name: "Sure" }).getAttribute("aria-checked")) === "true");
     await page.keyboard.press("Tab");
     if ((await focused()).role === "radio") throw new Error("Tab stopped on another of the three");
+    // Back into the row, focus lands on the one he picked, by key or by click.
+    await page.keyboard.press("Shift+Tab");
+    await until("⇧Tab lands on Sure", async () => (await focused()).name === "Sure", 2000);
+    await page.getByRole("radio", { name: "Guess" }).click();
+    await until("Guess is picked", async () => (await page.getByRole("radio", { name: "Guess" }).getAttribute("aria-checked")) === "true");
+    await field.focus();
+    await page.keyboard.press("Tab");
+    await until("Tab lands on Guess", async () => (await focused()).name === "Guess", 2000);
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await field.focus();
+    await page.keyboard.press("Tab");
+    await until("Tab lands on Think so, the one picked", async () => (await focused()).name === "Think so", 2000);
   };
   await startReview(page, /Teaching/);
   await walk(page.getByRole("textbox", { name: "Your answer" }));

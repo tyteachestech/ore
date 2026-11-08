@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, type FocusEvent, type RefObject } from "react";
 
 /** A toast; `undo` adds an Undo button and puts the step on the app's history (⌘Z), and `redo`,
  *  the step again, lets ⇧⌘Z repeat it after an undo (AGENTS.md: delete acts at once, then offers Undo).
@@ -66,3 +66,11 @@ export function inOrder<T>(key: string, write: () => Promise<T>): Promise<T> {
   void done.then(() => writing.get(key) === done && writing.delete(key));
   return next;
 }
+
+/** A radio row's onFocus (How sure): Tab or ⇧Tab into it lands on the one picked, as a Mac radio group's
+ *  does, not on the last one the keys or a click passed over. */
+export const focusPicked = (e: FocusEvent<HTMLElement>) => {
+  if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+  const picked = e.currentTarget.querySelector<HTMLElement>('[aria-checked="true"]');
+  if (picked && picked !== e.target) picked.focus();
+};

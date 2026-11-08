@@ -7,7 +7,7 @@ import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
 import { stampBefore } from "./transcript";
-import { errorText, type Notify } from "./util";
+import { errorText, focusPicked, type Notify } from "./util";
 import { PixelSpin, useLate, Working } from "./Working";
 
 /** What Finish and ChapterRecall need from the source note: wait for a pending edit before the CLI
@@ -462,7 +462,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             How sure are you?
           </div>
           {/* One Tab stop, ← → between the three, as Review's; picking the one picked clears it. */}
-          <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="quiz-sure" value={conf[qi] ? String(conf[qi]) : ""} onValueChange={(v) => pickSure(v ? Number(v) : conf[qi]!)}>
+          <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="quiz-sure" value={conf[qi] ? String(conf[qi]) : ""} onValueChange={(v) => pickSure(v ? Number(v) : conf[qi]!)} onFocus={focusPicked}>
             {SURE.map((label, i) => (
               <Hint key={label} text={<>{label} <kbd>{i + 1}</kbd></>} side="top">
                 <ToggleGroup.Item value={String(i + 1)} aria-disabled={busy || undefined}>
