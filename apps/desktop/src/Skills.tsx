@@ -185,6 +185,8 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
     refocus.current = false;
   }, [draft]);
   const [saving, setSaving] = useState(false);
+  /** `saving` for the blur's timeout, which runs after the render it was made in. */
+  const busy = useRef(false);
   /** True once the name is saved (or unchanged); a failed save keeps his draft in the field. */
   const save = async () => {
     const v = (draft ?? "").trim().replace(/\s+/g, " ");
@@ -193,7 +195,7 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
     if (v === skill.name) return close();
     const to = (name: string) => () =>
       void ore("skills", "set", skill.id, opt("name", name)).then(onRenamed, (e) => notify(errorText(e), "error"));
-    setSaving(true);
+    setSaving((busy.current = true));
     try {
       await ore("skills", "set", skill.id, opt("name", v));
       onRenamed();
@@ -203,7 +205,7 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
       notify(errorText(e), "error");
       return false;
     } finally {
-      setSaving(false);
+      setSaving((busy.current = false));
     }
   };
   if (draft === null)
@@ -236,14 +238,14 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
         // Clicking away keeps the old name; a focus that comes straight back (a dialog opening) does not count.
         onBlur={(e) => {
           const input = e.currentTarget;
-          setTimeout(() => document.activeElement !== input && setDraft(null), 0);
+          setTimeout(() => !busy.current && document.activeElement !== input && setDraft(null), 0);
         }}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key !== "Enter" && e.key !== "Escape") return;
           e.preventDefault(); // or the Enter would also click the name button that takes focus
           if (e.key === "Enter" && !saving) void save().then((ok) => ok && onEnter?.());
-          if (e.key === "Escape") {
+          if (e.key === "Escape" && !saving) {
             refocus.current = true;
             setDraft(null);
           }

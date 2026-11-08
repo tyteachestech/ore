@@ -543,6 +543,7 @@ journey("Collected: a key point he is typing survives closing its group and swit
   if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
   await page.getByRole("button", { name: "Add a key point" }).click();
   const field = page.getByRole("textbox", { name: "Key point", exact: true });
+  await until("+ puts the caret in the field", () => field.evaluate((el) => el === document.activeElement));
   await field.fill("Retrieval beats rereading for the long run");
   await toggle.click();
   await toggle.click();
@@ -550,6 +551,7 @@ journey("Collected: a key point he is typing survives closing its group and swit
   await page.getByRole("tab", { name: "Source note" }).click();
   await page.getByRole("tab", { name: "Collected" }).click();
   if ((await field.inputValue()) !== "Retrieval beats rereading for the long run") throw new Error("switching to the note lost his words");
+  if (await field.evaluate((el) => el === document.activeElement)) throw new Error("coming back to Collected took the caret into the kept field");
   await field.press("Escape");
 });
 

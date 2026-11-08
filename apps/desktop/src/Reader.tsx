@@ -281,6 +281,9 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [adding, setAdding] = useState<string | null>(null);
   /** Where Card here was opened: the source offset his line is anchored at. */
   const hereAt = useRef<number | null>(null);
+  /** He asked for the key point field (+, Card here, a failed save): it takes focus once, not on every remount. */
+  const focusAdd = useRef(false);
+  const [addAsk, setAddAsk] = useState(0);
   const [ask, setAsk] = useState(0);
   const askedCollected = useRef(p.showCollected);
   useEffect(() => {
@@ -1101,8 +1104,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** A key point of his own ("Card here", Tyler, 2026-10-29; D118): a line he types, anchored where he is now, drafted from the whole source. */
   function cardHere() {
     if (popup) closePopup();
-    hereAt.current = here();
+    // A draft he kept stays anchored where he started it.
+    if (adding === null) hereAt.current = here();
+    focusAdd.current = true;
     setAdding((cur) => cur ?? "");
+    setAddAsk((n) => n + 1);
     p.onShowSide("questions", true);
   }
 
@@ -1122,6 +1128,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       p.notify("Key point added", "quiet", s.remove, s.bring);
     } catch (e) {
       setAnns((l) => l.filter((a) => a.id !== tmp));
+      focusAdd.current = true;
       setAdding(line);
       p.notify(errorText(e), "error");
     }
@@ -2663,6 +2670,12 @@ function ReaderView(p: Props & { reload: () => void }) {
               adding={adding}
               onAdding={(on) => (on ? cardHere() : setAdding(null))}
               onEdit={setAdding}
+              addAsk={addAsk}
+              takeAddFocus={() => {
+                const want = focusAdd.current;
+                focusAdd.current = false;
+                return want;
+              }}
               onAdd={(line) => void addPoint(line)}
               onJump={(id) => onSource(() => jumpToHighlight(id))}
               onAsk={() => setAsk((n) => n + 1)}

@@ -399,6 +399,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
 
   useEffect(() => {
     let live = true;
+    setFailed(null);
     ore<Question[]>("questions", opt("item", item)).then(
       // Answered ones stay out, except those answered just now (kept in place, struck through).
       (r) => live && (setFailed(null), setQs((cur) => r.filter((q) => q.status !== "done" || cur?.some((c) => c.id === q.id)))),
@@ -407,7 +408,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
     return () => {
       live = false;
     };
-  }, [item, version, notify]);
+  }, [item, version]);
 
   const dismiss = async (q: Question) => {
     setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x)));
@@ -545,7 +546,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
         {failed && (
           <div className="empty-state err" role="alert">
             <p>{failed}</p>
-            <button className="pill-btn" onClick={() => (setFailed(null), reload())}>
+            <button className="pill-btn" onClick={reload}>
               Try again
             </button>
           </div>
