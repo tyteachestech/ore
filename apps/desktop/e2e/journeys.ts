@@ -1566,6 +1566,49 @@ journey("shortcuts: resetting one to a default another command took since asks b
   await page.keyboard.press("Escape");
 });
 
+/** Walks a menu with ↓ to the item named `label` and picks it with ↵, as he does without the mouse. */
+async function pickWithKeys(page: Page, label: string) {
+  const at = () => page.evaluate(() => (document.activeElement?.getAttribute("role") === "menuitem" ? document.activeElement.textContent ?? "" : ""));
+  for (let i = 0; i < 12 && !(await at()).startsWith(label); i++) await page.keyboard.press("ArrowDown");
+  if (!(await at()).startsWith(label)) throw new Error(`no “${label}” in the menu`);
+  await page.keyboard.press("Enter");
+}
+
+const hasCaret = (page: Page, sel: string) => page.locator(sel).evaluate((el) => el === document.activeElement).catch(() => false);
+
+journey("row menu by keyboard: ↓ and ↵ stay in the menu, never move or open the list under it; Rename… opens the title in place", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".row");
+  await rows.nth(2).waitFor();
+  await rows.nth(1).click({ button: "right" });
+  await page.getByRole("menu").waitFor();
+  await pickWithKeys(page, "Rename…");
+  await until("the title field has the caret", () => hasCaret(page, ".row-rename"));
+  await page.waitForTimeout(300);
+  if (!(await hasCaret(page, ".row-rename"))) throw new Error("the title field lost the caret");
+  if (await page.locator(".doc-head").count()) throw new Error("↵ in the menu also opened a source");
+  if (await page.locator(".row[aria-selected=true]").count()) throw new Error("↓ in the menu moved the list's selection");
+  await page.keyboard.press("Escape");
+});
+
+journey("⋯ menus by keyboard: Edit author… and New skill open their field with the caret in it", async (page) => {
+  await openSource(page, AGENTS);
+  await page.getByRole("button", { name: "Source actions" }).click();
+  await pickWithKeys(page, "Edit author…");
+  await until("the author field has the caret", () => hasCaret(page, ".author-edit"));
+  await page.waitForTimeout(300);
+  if (!(await hasCaret(page, ".author-edit"))) throw new Error("the author field lost the caret");
+  await page.keyboard.press("Escape");
+  await page.locator(".side-head", { hasText: "Craft" }).hover();
+  await page.getByRole("button", { name: "Actions for Craft" }).click();
+  await pickWithKeys(page, "New skill");
+  const name = '[aria-label="New skill name"]';
+  await until("the new skill field has the caret", () => hasCaret(page, name));
+  await page.waitForTimeout(300);
+  if (!(await hasCaret(page, name))) throw new Error("the new skill field lost the caret");
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);
