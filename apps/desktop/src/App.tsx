@@ -36,7 +36,7 @@ import { SkillPage } from "./SkillPage";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChip, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
-import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, type Entry, type FileKind } from "./paste";
+import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, type Entry, type FileKind } from "./paste";
 import { errorText, load, save } from "./util";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, PAGES, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
@@ -526,21 +526,51 @@ export function App() {
   // pointer position Tauri reports (see dropPoint).
   const dropRef = useRef({ addSources, addTo });
   dropRef.current = { addSources, addTo };
+  // Images dropped on a note go into the note, as in Notion (NoteEditor shows where and puts them in).
   useEffect(() => {
     let kinds: (FileKind | null)[] = [];
+    let paths: string[] = [];
+    let note: HTMLElement | null = null;
     const target = (p: { x: number; y: number }) => {
       const { x, y } = dropPoint(p, MAC, devicePixelRatio);
       const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-drop-skill]");
       return el ? el.dataset.dropSkill || null : dropRef.current.addTo;
     };
+    /** The note under the pointer, when every file dragged is an image a note can hold. */
+    const noteAt = (p: { x: number; y: number }) => {
+      if (!paths.length || !paths.every(noteImage)) return null;
+      const { x, y } = dropPoint(p, MAC, devicePixelRatio);
+      const el = document.elementFromPoint(x, y)?.closest<HTMLElement>(".note-editor");
+      return el ? { el, x, y } : null;
+    };
+    const tell = (el: HTMLElement, type: string, detail: unknown) => el.dispatchEvent(new CustomEvent(type, { detail }));
+    /** Moves the note's drop line to `to`, taking it off a note the pointer left. */
+    const over = (to: ReturnType<typeof noteAt>) => {
+      if (note && note !== to?.el) tell(note, "ore-image-drag", null);
+      note = to?.el ?? null;
+      if (to) tell(to.el, "ore-image-drag", { x: to.x, y: to.y });
+    };
     const off = getCurrentWebview().onDragDropEvent((e) => {
       const p = e.payload;
-      if (p.type === "enter") kinds = p.paths.map(fileKind);
-      if (p.type === "enter" || p.type === "over") setDropping(kinds.length ? { kinds, skill: target(p.position) } : null);
-      else if (p.type === "leave") setDropping(null);
+      if (p.type === "enter") {
+        kinds = p.paths.map(fileKind);
+        paths = p.paths;
+      }
+      if (p.type === "enter" || p.type === "over") {
+        const n = noteAt(p.position);
+        over(n);
+        setDropping(kinds.length && !n ? { kinds, skill: target(p.position) } : null);
+      } else if (p.type === "leave") {
+        over(null);
+        setDropping(null);
+      }
       else if (p.type === "drop") {
         setDropping(null);
-        if (p.paths.length) {
+        paths = p.paths;
+        const n = noteAt(p.position);
+        over(null);
+        if (n) tell(n.el, "ore-image-drop", { paths: p.paths, x: n.x, y: n.y });
+        else if (p.paths.length) {
           const to = target(p.position);
           void dropRef.current.addSources(files(p.paths), to ? [to] : [], true, true);
         }

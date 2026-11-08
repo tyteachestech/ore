@@ -49,6 +49,18 @@ async function act(md: string, start: string, run: (v: View, b: import("../src/e
 const NOTE = "## Ideas\n\nFirst line.\n\n- Apple\n- Pear\n  - Nested\n- Plum\n\nLast line.\n";
 
 describe("block actions (⋮⋮ handle)", () => {
+  test("a dropped image's gaps: before, between and after the note's top-level blocks, never in a list", async () => {
+    let gaps: number[] = [];
+    await act(NOTE, "First", (v) => {
+      gaps = ops.topGaps(v.state.doc).map((g) => g.pos);
+      const ends: number[] = [0];
+      v.state.doc.forEach((n, p) => void ends.push(p + n.nodeSize));
+      expect(gaps).toEqual(ends);
+      return null;
+    });
+    expect(gaps.length).toBe(5); // heading, line, list, line: 4 blocks, 5 gaps
+  });
+
   test("each list item is its own block; a one-item list is the list", async () => {
     expect(await act(NOTE, "Pear", (v, b) => ops.remove(v.state, b))).toBe("## Ideas\n\nFirst line.\n\n- Apple\n- Plum\n\nLast line.\n");
     expect(await act("Top.\n\n- Only\n\nEnd.\n", "Only", (v, b) => ops.remove(v.state, b))).toBe("Top.\n\nEnd.\n");

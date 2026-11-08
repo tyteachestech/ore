@@ -1419,6 +1419,35 @@ journey("note shortcuts as in Notion: # in a numbered item makes a heading; Mark
   await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
 });
 
+journey("note images: a pasted screenshot and an image dropped from Finder go into the note, not the library, and ⌘Z takes one out", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  // A 1×1 PNG on the clipboard, as ⌃⇧⌘4 leaves a screenshot: no text with it.
+  await pm.evaluate((el) => {
+    const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+    const dt = new DataTransfer();
+    dt.items.add(new File([png], "image.png", { type: "image/png" }));
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await until("the screenshot is in the note", async () => (await pm.locator('img.note-image[src*="pasted"]').count()) === 1);
+  // From Finder the app hears the drop (Tauri) and hands the note its paths.
+  const file = join(mkdtempSync(join(tmpdir(), "ore-drop-")), "Whiteboard.png");
+  writeFileSync(file, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+  const box = (await pm.locator("p").first().boundingBox())!;
+  const at = { x: box.x + 20, y: box.y + 2 };
+  await page.locator(".note-editor").first().evaluate((el, at) => el.dispatchEvent(new CustomEvent("ore-image-drag", { detail: at })), at);
+  await page.locator(".note-editor .block-drop").waitFor();
+  await page.locator(".note-editor").first().evaluate((el, d) => el.dispatchEvent(new CustomEvent("ore-image-drop", { detail: d })), { paths: [file], ...at });
+  await until("the dropped image is in the note, above the first line", async () => (await pm.locator('img.note-image[src*="whiteboard"]').count()) === 1);
+  if (await page.locator(".note-editor .block-drop").count()) throw new Error("the drop line stayed");
+  await page.keyboard.press("ControlOrMeta+z");
+  await until("⌘Z takes the dropped one out", async () => (await pm.locator('img.note-image[src*="whiteboard"]').count()) === 0);
+  if (await page.locator(".toast", { hasText: "Added" }).count()) throw new Error("an image was added as a source");
+});
+
 journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words, ⌘↵ closes a toggle", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);
