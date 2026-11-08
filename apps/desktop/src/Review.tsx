@@ -975,7 +975,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                   </>
                 )}
                 {card.kind === "prompt" && !marks && !gradeError && (
-                  <p className="loading review-grading"><Working label="Checking your answer…" slow="This can take about 20 seconds." /></p>
+                  <p className="loading review-grading"><Working stage="check" label="Checking your answer…" slow="This can take about 20 seconds." /></p>
                 )}
                 {grade?.feedback && <p className="review-feedback">{grade.feedback}</p>}
                 {gradeError && PHONE ? (

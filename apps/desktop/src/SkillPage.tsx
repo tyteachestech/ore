@@ -883,7 +883,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
               Answer
             </button>
             <button tabIndex={-1} onClick={() => void research()} disabled={busy}>
-              {busy ? <Working label="Finding sources…" /> : "Begin research"}
+              {busy ? <Working stage="search" label="Finding sources…" /> : "Begin research"}
             </button>
           </>
         )}

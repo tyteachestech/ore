@@ -332,7 +332,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                   // Its [n] markers wait for the citations, which come with the whole reply.
                   <Answer text={t.partial.replace(/\s?\[\d*$|\s?\[\d+\](?!\()/g, "")} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
                 ) : t.reply === undefined ? (
-                  <Working label={t.searching ? "Searching the web…" : "Thinking…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />
+                  <Working stage={t.searching ? "search" : "read"} label={t.searching ? "Searching the web…" : "Reading your sources…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />
                 ) : (
                   <>
                     <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />

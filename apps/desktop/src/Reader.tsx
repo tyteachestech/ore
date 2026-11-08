@@ -2863,7 +2863,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                     </div>
                     {!chapterFb.feedback && !chapterFb.error && (
                       <p className="loading">
-                        <Working label="Reading your recall against the chapter…" />
+                        <Working stage="read" label="Reading your recall against the chapter…" />
                       </p>
                     )}
                     {chapterFb.error && (
@@ -3039,7 +3039,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
       <button className="preq-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <CaretRight className={`caret${open ? " open" : ""}`} size={12} aria-hidden="true" />
         What do you already know?
-        {waiting && <span className="quiet"><Working label="Writing prequestions…" slow="Usually under a minute." /></span>}
+        {waiting && <span className="quiet"><Working stage="write" label="Writing prequestions…" slow="Usually under a minute." /></span>}
       </button>
       {open && qs.length > 0 && (
         <ol className="preq-body">
