@@ -3,6 +3,7 @@ import type * as YAMLLib from "yaml";
 import { z } from "zod";
 import { listCards, writeCardMeta } from "./cards.ts";
 import { parseYaml, stringifyFrontmatter, loadYaml } from "./frontmatter.ts";
+import { isOther, tidyCollection } from "./collection-name.ts";
 import { writeAtomic } from "./fsutil.ts";
 import { allItems, findItem, ItemMetaSchema, updateItemMeta, type ItemMeta } from "./items.ts";
 import { nowIso, slugify } from "./ids.ts";
@@ -88,7 +89,11 @@ export function loadSkills(lib: Library): SkillsFile {
     const why = loadYaml().parseDocument(text).errors[0]?.message.split("\n")[0]?.replace(/:$/, "") ?? "it isn’t valid YAML";
     throw new Error(`skills.yaml in your library has a typo: ${why}. Fix it in a text editor.`);
   }
-  return parseSkillsFile(data).file;
+  const { file } = parseSkillsFile(data);
+  // A collection named Other, saved before it was refused, reads as none: its skills join Other, and
+  // the next arrange writes them so.
+  for (const s of file.skills) if (s.collection !== undefined && isOther(s.collection)) delete s.collection;
+  return file;
 }
 
 /** What `loadSkills` had to leave out of skills.yaml to read it, for `ore doctor`. */
@@ -225,11 +230,10 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
   });
 }
 
-// A collection's name as saved. "Other" is what the sidebar and Home call the skills in no collection,
-// so a collection by that name would show as a second Other.
+// A collection's name as saved; a collection named Other would show as a second Other (collection-name.ts).
 function collectionName(name: string): string {
-  const c = name.trim().replace(/\s+/g, " ");
-  if (c.toLowerCase() === "other") throw new Error(`"${c}" is the name of the skills in no collection`);
+  const c = tidyCollection(name);
+  if (isOther(c)) throw new Error(`"${c}" is the name of the skills in no collection`);
   return c;
 }
 
@@ -282,7 +286,7 @@ export async function addSkill(lib: Library, name: string, collection = ""): Pro
     const existing = skills.find((s) => sameName(s.name, n));
     if (existing) throw new Error(`skill "${existing.name}" already exists`);
     const id = newSkillId(skills, n);
-    const c = collection.trim();
+    const c = collectionName(collection);
     const skill: Skill = { id, name: n, priority: DEFAULT_PRIORITY, ...(c ? { collection: c } : {}) };
     (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
