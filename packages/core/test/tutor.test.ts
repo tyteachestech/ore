@@ -150,7 +150,7 @@ describe("tutor: the web", () => {
   test("a quote of a page's title with quotes in it holds, though the search lists titles JSON-escaped", async () => {
     const { lib } = await library();
     const page = { url: "https://www.hackster.io/news/python-3-8-walrus", title: 'Python 3.8 Brings "Walrus Operator," Standardizes ABI' };
-    fakeClaude([{ web: searched([page], "Python 3.8 added assignment expressions."), out: { reply: "Python 3.8 [1].", citations: [{ passage: page.url, quote: page.title }], general: false, hint: false, exercise: null, card: null } }]);
+    fakeClaude([{ web: searched([page], "Python 3.8 added assignment expressions."), out: { reply: "Python 3.8 [1].", steps: [], citations: [{ passage: page.url, quote: page.title }], general: false, hint: false, exercise: null, card: null } }]);
     const r = await tutor(lib, "When did the walrus operator arrive?");
     expect(r.citations[0]).toMatchObject({ url: page.url, quote: page.title });
     expect(sent()).toHaveLength(1);
