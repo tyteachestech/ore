@@ -43,6 +43,8 @@ function serve(pages: Record<string, [file: string, type: string]>) {
 }
 
 const HTML = "text/html; charset=utf-8";
+// Each golden doc is also a source in the Ask eval (eval/ask.ts): a new one on the same topic as a
+// question there can crowd out that question's evidence, so pick a fixture's subject apart from theirs.
 const CASES: { name: string; add: string; serve?: Record<string, [string, string]> }[] = [
   { name: "pdf-hazards", add: join(FIX, "files/hazards.pdf") }, // footnotes, powers, hyphens, running heads
   { name: "pdf-outline", add: join(FIX, "files/outline.pdf") }, // the PDF outline as chapters
@@ -52,6 +54,8 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "epub", add: join(FIX, "files/book.epub") }, // make-book-epub.ts
   { name: "word", add: join(FIX, "files/notes.docx") },
   { name: "powerpoint", add: join(FIX, "files/deck.pptx") },
+  { name: "rtf-textedit", add: join(FIX, "files/textedit.rtf") },
+  { name: "rtf-word", add: join(FIX, "files/word.rtf") },
   { name: "notebook", add: join(FIX, "files/numpy.ipynb") },
   { name: "youtube-auto-captions", add: "https://www.youtube.com/watch?v=oreGolden01", serve: { "https://captions.test/talk.en.vtt": ["video/talk.en.vtt", "text/vtt"] } },
   // Wikipedia (CC BY-SA 4.0) and the Python docs (PSF License) may be shared.

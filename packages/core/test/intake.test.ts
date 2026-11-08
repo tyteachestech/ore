@@ -373,6 +373,41 @@ describe("import coverage: files", () => {
     await expect(addSource(await tempLibrary(), sketch)).rejects.toThrow(/can’t read “.sketch” files yet.*docx, pptx.*png/);
   });
 
+  test("RTF from TextEdit: its heading, bold and italic, list, accents and dashes", async () => {
+    const item = await addSource(await tempLibrary(), file("textedit.rtf"));
+    expect(item.meta).toMatchObject({ type: "article", title: "Notes on retrieval practice" });
+    const b = item.body;
+    expect(b).toStartWith("### Notes on retrieval practice\n\nTesting yourself beats rereading. A café study group");
+    expect(b).toContain("rereads its notes together — even when");
+    expect(b).toContain("Three habits help, and the **first** matters most:\n\n- Space reviews out over days\n- Mix topics in one session\n- Explain each answer in your own words\n\n");
+    expect(b).toEndWith("*Write the question before you read the answer.* Then check it the next day: that’s the retrieval that sticks.\n");
+    expect(b).not.toMatch(/Helvetica|disc|\\/);
+  });
+
+  test("RTF from Word: title and author, outline headings, a table, a picture, Unicode, no header or field codes", async () => {
+    const item = await addSource(await tempLibrary(), file("word.rtf"));
+    expect(item.meta).toMatchObject({ title: "Mixing topics in practice", author: "Ada Learner" });
+    const b = item.body;
+    expect(b).toStartWith("# Why mixing works\n\nPractising one kind of problem at a time");
+    expect(b).toContain("**Interleaving** the kinds of problem beats blocking them.");
+    expect(b).toContain("In Japanese the idea is 間隔反復 (spaced repetition), and its root word is 記憶.");
+    expect(b).toContain("The original study is in the appendix.");
+    expect(b).toContain("# A mixed week\n\n| **Day** | **Problems** |\n| --- | --- |\n| Monday | area, volume |\n| Tuesday | volume, angles |\n\nScores on the mixed test:");
+    const pic = b.match(/!\[\]\((assets\/[0-9a-f]{16}\.png)\)/)?.[1];
+    expect(readFileSync(join(item.dir, pic!)).subarray(1, 4).toString()).toBe("PNG");
+    expect(b).toEndWith("That's all for this week.\n");
+    expect(b).not.toMatch(/Study guide, draft|HYPERLINK|Times New Roman|Normal;|wordml/);
+    expect(readFileSync(join(item.dir, "source.rtf"), "utf8")).toStartWith("{\\rtf1");
+  });
+
+  test("a damaged or empty RTF file says so", async () => {
+    const d = mkdtempSync(join(tmpdir(), "ore-rtf-"));
+    writeFileSync(join(d, "cut.rtf"), new Uint8Array(readFileSync(file("deck.pptx")).subarray(0, 300)));
+    await expect(addSource(await tempLibrary(), join(d, "cut.rtf"))).rejects.toThrow(/That RTF file is damaged.*save it again/);
+    writeFileSync(join(d, "empty.rtf"), "{\\rtf1\\ansi{\\fonttbl\\f0 Helvetica;}\\par}");
+    await expect(addSource(await tempLibrary(), join(d, "empty.rtf"))).rejects.toThrow(/no text to read/);
+  });
+
   test("Pages, Keynote, Kindle and old Word files say how to save a copy Ore reads", async () => {
     const d = mkdtempSync(join(tmpdir(), "ore-export-"));
     const lib = await tempLibrary();

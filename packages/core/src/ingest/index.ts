@@ -74,7 +74,7 @@ const PLAYLIST = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/playlist\?/;
 const PODCAST = /^https?:\/\/(?:podcasts\.apple\.com\/.+[?&]i=|open\.spotify\.com\/episode\/|overcast\.fm\/|pca\.st\/)/;
 const X_POST = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/\w+\/status\//;
 /** File types Ore reads, by extension. */
-export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
+export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "rtf", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
 /** Audio transcribed on the Mac (D96); as `audio.ts` AUDIO_TYPES, which loads only when used. */
 const AUDIO_TYPES = ["mp3", "m4a", "wav", "aac", "aiff", "flac"];
 /** Video files, heard from their sound on the Mac; as `audio.ts` VIDEO_TYPES. */
@@ -134,6 +134,10 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     const o = await Promise.resolve().then(() => (kind === "docx" ? office.docxToDoc(bytes) : office.pptxToDoc(bytes))).catch(damaged(kind === "docx" ? "Word" : "PowerPoint", kind === "docx" ? "Word or Pages" : "PowerPoint or Keynote"));
     return { type: "article", title: o.title ?? fileStem(name), author: o.author, url, body: o.body, source: { ext: kind, data: bytes }, assets: o.assets };
   }
+  if (kind === "rtf") {
+    const r = (await import("./rtf.ts")).rtfToDoc(bytes);
+    return { type: "article", title: r.title ?? fileStem(name), author: r.author, url, body: r.body, source: { ext: "rtf", data: bytes }, assets: r.assets };
+  }
   const text = decodeText(bytes);
   if (kind === "ipynb") {
     const n = (await import("./notebook.ts")).notebookToDoc(text);
@@ -177,6 +181,7 @@ function kindOf(name: string, ctype = ""): string | null {
   if (ctype.includes("epub") || ext === "epub") return "epub";
   if (ctype.includes("wordprocessingml") || ext === "docx") return "docx";
   if (ctype.includes("presentationml") || ext === "pptx") return "pptx";
+  if (/\brtf\b/.test(ctype) || ext === "rtf") return "rtf";
   if (["ipynb", "srt", "vtt"].includes(ext)) return ext;
   if (IMAGE_TYPES.includes(ext) || AUDIO_TYPES.includes(ext)) return ext;
   const audio = ctype.match(/^audio\/(mpeg|mp3|mp4|x-m4a|aac|wav|x-wav|flac|aiff)/)?.[1];
@@ -381,7 +386,7 @@ async function keep(lib: Library, had: Item, opts: AddOptions): Promise<Item & K
 /** Whether a link reads best by fetching it (a video's transcript, a GitHub file, a PDF), not from the
  *  page a browser shows. */
 const readsByLink = async (url: string) =>
-  isYoutubeUrl(url) || VIDEO_SITE.test(url) || !!(await import("./links.ts")).rewrite(url) || /\.(pdf|epub|docx|pptx|ipynb)(?:[?#]|$)/i.test(url);
+  isYoutubeUrl(url) || VIDEO_SITE.test(url) || !!(await import("./links.ts")).rewrite(url) || /\.(pdf|epub|docx|pptx|rtf|ipynb)(?:[?#]|$)/i.test(url);
 
 /** The page open in his browser as a source (D96): signed-in, paywalled and browser-built pages come
  *  in as he sees them. A link Ore reads better by fetching (a video, a PDF) is added by its link. */
