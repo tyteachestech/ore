@@ -1745,6 +1745,21 @@ journey("Edit skill: the colours are one Tab stop, and ← → move and pick, as
   await page.keyboard.press("Escape");
 });
 
+journey("Settings: Esc in the review plan field drops the draft and keeps focus in Settings; the next Esc closes it", async (page) => {
+  await page.keyboard.press("Meta+Comma");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings.getByRole("tab", { name: "Review" }).click();
+  const plan = settings.getByLabel("After what do you review?");
+  const was = await plan.inputValue();
+  await plan.click();
+  await plan.fill("my coffee, half typed");
+  await page.keyboard.press("Escape");
+  await until("the draft is dropped", async () => (await plan.inputValue()) === was);
+  if (!(await settings.evaluate((s) => s.contains(document.activeElement)))) throw new Error("focus left Settings");
+  await page.keyboard.press("Escape");
+  await settings.waitFor({ state: "detached" });
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);
