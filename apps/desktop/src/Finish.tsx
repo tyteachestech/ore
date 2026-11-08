@@ -143,10 +143,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     // Drafts review items from Card highlights and the prequestions (D19), after the recall
     // feedback so the prompts' rubrics include what he missed.
     // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
+    // Its Try again is the only way back to the cards, so the failure stays until he acts on it.
     const run = (): Promise<void> =>
       ore("enrich", doc.id).then(
         () => {},
-        (e) => void notify(`Cards for “${doc.title}” weren’t drafted: ${errorText(e)}`, "error", undefined, undefined, () => void run()),
+        (e) => void notify(`Cards for “${doc.title}” weren’t drafted: ${errorText(e)}`, "error", undefined, undefined, () => void run(), true),
       );
     if (feedbackRun.current) void feedbackRun.current.finally(run);
     else void run();
@@ -239,13 +240,14 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       return;
     }
     drafts.delete(doc.id);
-    enrich();
     // Done on "Done with this source?": a second of "Source finished" before going back (D106).
     if (!marked) {
       setMoment(true);
       await new Promise((go) => setTimeout(go, 1100));
     }
     (then ?? onDone)();
+    // After "Finished …", so a drafting failure lands in front of it rather than behind.
+    enrich();
   }
 
   /** Quizzed without finishing: the source stays in To read and nothing is drafted yet; the next

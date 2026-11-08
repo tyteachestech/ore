@@ -3103,6 +3103,26 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   }, AGENTS);
 });
 
+journey("finish: drafting that fails after Done stays in front of “Finished” until he acts on it", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Drafting that fails\n\nA short page whose cards can't be drafted, because the AI is down.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A short page whose cards").waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { enrich: "Codex isn’t installed." }));
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".toast").filter({ hasText: "Finished “Drafting that fails”" }).waitFor();
+  const failure = page.locator(".toast").filter({ hasText: "weren’t drafted: Codex isn’t installed." });
+  await failure.waitFor();
+  await page.waitForTimeout(300);
+  const front = await page.locator(".toasts > .toast").last().innerText();
+  if (!front.includes("weren’t drafted")) throw new Error(`the toast in front is “${front}”, not the drafting failure`);
+  // Try again is the only way back to the cards, so the failure stays until he acts on it.
+  if (!(await failure.getByRole("button", { name: "Dismiss" }).count())) throw new Error("the drafting failure goes away by itself");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+});
+
 journey("undo that fails: the toast says why, and ⌘Z tries the same step again", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator(".row").filter({ hasText: AGENTS }).first();
