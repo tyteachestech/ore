@@ -46,7 +46,7 @@ Both on the big library with tutor@6 (`results/ask-2026-11-08-8.json`, `-9.json`
 | Sonnet 5.5 | 20/20 | 20/20 | 14/14, 14/14 | 9/9 | 4.9 s / 10.9 s | 12/12 | $0.99 |
 | Haiku 5.5 | 20/20 | 18/20 | 13/14, 12/14 | 9/9 | 7.3 s / 14.9 s | 12/12 | $0.15 |
 
-Haiku costs about a seventh as much and teaches as well, but cites less exactly (a quote from the wrong part of a passage, one of two sources left uncited, a turn that claimed the video's transcript wasn't there) and is slower here, since a failed quote check costs it a second round. The tutor stays on Sonnet; Settings › AI › Model switches it.
+Haiku costs about a seventh as much and teaches as well, but cites less exactly (a quote from the wrong part of a passage, one of two sources left uncited, a turn that claimed the video's transcript wasn't there) and was slower in this run (the eval doesn't record why; a failed quote check sending it back for a second round is the likely cost). The tutor stays on Sonnet; Settings › AI › Model switches it.
 
 ## Limits
 
