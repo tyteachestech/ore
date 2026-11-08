@@ -198,7 +198,32 @@ describe("import coverage: web pages", () => {
     expect(b).toContain("---\n\n## Comments\n\n> **Fact** · [2025-01-14](https://meta.discourse.org/t/understanding-discourse-for-new-users/96331/131)\n> \n> > Discourse:\n> > \n> > Generation at the spaced of the OP");
     expect(b).toContain("> **reading** · [2025-09-18](https://meta.discourse.org/t/understanding-discourse-for-new-users/96331/134)");
     expect(count(b, /^> \*\*/gm)).toBe(2); // every reply
+    expect(b).toContain("> [![Knowledge_20250114_094145_Example](https://global.discourse-cdn.com/meta/optimized/4X/d/2/0/d202079c06ae53472d1dd6ac81330cd400643737_2_690x226.jpeg)]");
     expect(b).not.toContain("Likes");
+  });
+
+  test("a Discourse topic's corners: later pages, a page that won't load, link previews, dates, a link partway in", async () => {
+    const post = (n: number, who: string, html: string) =>
+      `<div class="topic-body crawler-post"><span itemprop="author"><span itemprop="name">${who}</span></span><time datetime="2025-01-0${n}T10:00:00Z"></time><span itemprop="position">${n}</span><div class="post" itemprop="text">${html}</div><span class="post-likes">3 Likes</span></div>`;
+    const page = (posts: string, next?: number) =>
+      `<html><head><meta name="generator" content="Discourse 2026.11.0"><meta property="og:title" content="Spacing questions"><link rel="canonical" href="https://forum.test/t/spacing/7">${next ? `<link rel="next" href="/t/spacing/7?page=${next}">` : ""}</head><body>${posts}</body></html>`;
+    const first = post(1, "josé", `<p>${"How far apart should reviews be when the test is a month away? ".repeat(5)}</p>`);
+    const preview = `<aside class="onebox" data-onebox-src="https://example.com/spacing"><header class="source">example.com</header><article class="onebox-body"><h3><a href="https://example.com/spacing">The spacing effect</a></h3><p>A summary.</p></article></aside>`;
+    const when = `<span class="discourse-local-date" data-date="2025-01-09" data-email-preview="Thursday, January 9, 2025 10:00 AM UTC">2025-01-09T10:00:00Z</span>`;
+    const quoted = `<aside class="quote" data-username="ada" data-topic="3"><div class="title"><img class="avatar" src="https://forum.test/a.png"> <a href="https://forum.test/t/other/3/2">ada:</a></div><blockquote><p>Space them out.</p></blockquote></aside>`;
+    serve({
+      "https://forum.test/t/spacing/7?page=2": { body: page(post(3, "lin", `<p>Read this: ${when}.</p>`), 3), type: HTML },
+    });
+    const b = (await htmlToDoc(page(first + post(2, "ada", quoted + preview)), "https://forum.test/t/spacing/7")).markdown;
+    expect(b).toContain("> **ada** · [2025-01-02](https://forum.test/t/spacing/7/2)\n> \n> > [ada](https://forum.test/t/other/3/2):\n> > \n> > Space them out.\n> \n> [The spacing effect](https://example.com/spacing)");
+    expect(b).not.toContain("page=2"); // no next page on the first one: nothing more to read
+    const paged = (await htmlToDoc(page(first + post(2, "ada", "<p>Space them out.</p>"), 2), "https://forum.test/t/spacing/7"));
+    expect(paged.author).toBe("josé");
+    expect(paged.markdown).toContain("> **lin** · [2025-01-03](https://forum.test/t/spacing/7/3)\n> \n> Read this: Thursday, January 9, 2025 10:00 AM UTC.");
+    // Page 3 won't load: the doc says where the rest are rather than ending as if whole.
+    expect(paged.markdown).toEndWith("Later replies aren't here: [read them on the forum](https://forum.test/t/spacing/7?page=3)\n");
+    expect(paged.markdown).not.toContain("Likes");
+    await expect(htmlToDoc(page(post(21, "lin", `<p>${"A reply far down the topic. ".repeat(10)}</p>`)), "https://forum.test/t/spacing/7/21")).rejects.toThrow("Add the topic from its start instead: https://forum.test/t/spacing/7");
   });
 
   test("slides online (Speaker Deck): every slide's picture and words, in order, not the site's other decks", async () => {

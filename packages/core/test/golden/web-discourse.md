@@ -6,7 +6,7 @@ url: https://meta.discourse.org/t/discourse-new-user-guide/96331
 author: Discourse
 published: 2018-09-07T13:52:59+00:00
 captured_at: <time>
-text_sha256: 4fe30e42d3adb0c533f2aa1fc7d611438a7f1558bff557d5ac9e5910f4274bc6
+text_sha256: 61b83cb343cc9653d81211f48c6590be021553873fe32e41c481f486de3e1cff
 status: inbox
 skills: []
 topics: []
@@ -208,9 +208,9 @@ If you are on a concept or cue on which you level cue a elaboration spaced, you 
 > 
 > Fact the drill of practice with the [Writing mind exercise](https://meta.discourse.org/t/discotoc-automatic-table-of-contents/111143).
 
-> Test model by [@test](https://meta.discourse.org/u/test)
+> Test model by [@test](https://meta.discourse.org/u/test) Tuesday, November 4, 2025 11:06 AM UTC
 > 
-> Card spaced by [@pause](https://meta.discourse.org/u/pause)
+> Card spaced by [@pause](https://meta.discourse.org/u/pause) Monday, June 17, 2024 5:02 AM UTC
 > 
 > Habit knowledge Example fact on schedule:
 

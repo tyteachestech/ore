@@ -254,44 +254,84 @@ function speakerDeck(html: string, url: string): WebDoc | undefined {
   return { title, author: cleanAuthor(talk.author?.name), published: cleanDate(talk.datePublished), markdown: parts.join("\n\n") + "\n" };
 }
 
+/** Pages of a Discourse topic read, 20 replies each; past them (or a page that won't load) the doc
+ *  says where the rest are. */
+const DISCOURSE_PAGES = 25;
+
 /** A Discourse topic (a course's, a tool's or a community's forum) as a Hacker News thread comes in:
- *  the first post as the text, then every reply under its author and date. The page lays them out
- *  for search engines with no names a reader keeps, beside like counts and lists of linked topics.
- *  Returns the first post's author. */
-function discourse(doc: Document): string | undefined {
+ *  the first post as the text, then every reply under its author and date, page after page. The page
+ *  lays them out for search engines with no names a reader keeps, beside like counts and lists of
+ *  linked topics. Returns the first post's author. */
+async function discourse(doc: Document, url: string): Promise<string | undefined> {
   if (!/^Discourse\b/.test(doc.querySelector('meta[name="generator"]')?.getAttribute("content") ?? "")) return undefined;
-  const posts = [...doc.querySelectorAll(".crawler-post")].filter((p) => p.querySelector(".post"));
+  const postsOf = (d: Document) => [...d.querySelectorAll(".crawler-post")].filter((p) => p.querySelector(".post"));
+  const posts = postsOf(doc);
   if (!posts.length) return undefined;
-  const topic = (doc.querySelector('link[rel="canonical"]')?.getAttribute("href") ?? "").replace(/\?.*$/, "");
+  const topic = (doc.querySelector('link[rel="canonical"]')?.getAttribute("href") ?? url).replace(/\?.*$/, "");
+  const position = (p: Element) => p.querySelector('[itemprop="position"]')?.textContent?.trim();
+  if (position(posts[0]!) !== "1") throw new Error(`That link opens partway through the topic. Add the topic from its start instead: ${topic}`);
+  let next = doc.querySelector('link[rel="next"]')?.getAttribute("href");
+  for (let pages = 1; next && pages < DISCOURSE_PAGES; pages++) {
+    const res = await fetch(new URL(next, url).href, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" }, signal: AbortSignal.timeout(15000) }).catch(() => null);
+    if (!res?.ok) break;
+    const page = parseHTML(await res.text()).document as unknown as Document;
+    const seen = new Set(posts.map(position));
+    posts.push(...postsOf(page).filter((p) => !seen.has(position(p))));
+    next = page.querySelector('link[rel="next"]')?.getAttribute("href");
+  }
   const el = (tag: string, text?: string) => Object.assign(doc.createElement(tag), text === undefined ? {} : { textContent: text });
+  const name = (p: Element) => p.querySelector('[itemprop="author"] [itemprop="name"]')?.textContent?.trim() ?? "";
   const article = el("article");
   article.append(el("h1", doc.querySelector('meta[property="og:title"]')?.getAttribute("content") ?? doc.title));
-  const name = (p: Element) => p.querySelector('[itemprop="author"] [itemprop="name"]')?.textContent?.trim() ?? "";
   posts.forEach((p, i) => {
     const body = p.querySelector(".post")!;
+    const own = body.ownerDocument;
+    const mk = (tag: string, text?: string) => Object.assign(own.createElement(tag), text === undefined ? {} : { textContent: text });
+    const link = (text: string, href: string) => Object.assign(mk("a", text), { href });
     // An image's file name and size under it, and avatars, are the forum's chrome.
     for (const x of body.querySelectorAll(".lightbox-wrapper .meta, img.avatar, .quote-controls")) x.remove();
-    // A quoted post, under the name of who wrote it.
+    // A date as its reader sees it (the page holds it in a form Defuddle drops).
+    for (const d of body.querySelectorAll(".discourse-local-date")) d.replaceWith(d.getAttribute("data-email-preview") ?? d.textContent ?? "");
+    // A quoted post under the name of who wrote it, linked when it is from elsewhere.
     for (const q of body.querySelectorAll("aside.quote")) {
-      const quote = q.querySelector("blockquote") ?? el("blockquote");
+      const quote = q.querySelector("blockquote") ?? mk("blockquote");
       const who = q.getAttribute("data-username");
-      if (who) quote.prepend(el("p", `${who}:`));
+      const from = q.querySelector(".title a[href]");
+      if (who) {
+        const line = mk("p");
+        line.append(from ? link(who, from.getAttribute("href")!) : who, ":");
+        quote.prepend(line);
+      }
       q.replaceWith(quote);
     }
-    if (i === 0) return void article.append(...body.childNodes, ...(posts.length > 1 ? [el("hr"), el("h2", "Comments")] : []));
-    const reply = el("blockquote");
-    const head = el("p");
-    const when = el("a", p.querySelector("time")?.getAttribute("datetime")?.slice(0, 10) ?? "");
-    const position = p.querySelector('[itemprop="position"]')?.textContent?.trim();
-    if (topic && position) when.setAttribute("href", `${topic}/${position}`);
-    head.append(el("strong", name(p)), " · ", when);
-    reply.append(head, ...body.childNodes);
-    article.append(reply);
+    // A pasted link's preview, as the link under its title.
+    for (const o of body.querySelectorAll("aside.onebox")) {
+      const href = o.getAttribute("data-onebox-src") ?? o.querySelector("a[href]")?.getAttribute("href");
+      const line = mk("p");
+      if (href) line.append(link(o.querySelector("h3")?.textContent?.trim() || href, href));
+      o.replaceWith(line);
+    }
+    if (i === 0) return void article.insertAdjacentHTML("beforeend", body.innerHTML + (posts.length > 1 ? "<hr><h2>Comments</h2>" : ""));
+    const reply = mk("blockquote");
+    const head = mk("p");
+    const who = name(p);
+    const date = p.querySelector("time")?.getAttribute("datetime")?.slice(0, 10);
+    const n = position(p);
+    if (who) head.append(mk("strong", who));
+    if (date) head.append(who ? " · " : "", n ? link(date, `${topic}/${n}`) : date);
+    if (head.childNodes.length) reply.append(head);
+    reply.append(...body.childNodes);
+    article.insertAdjacentHTML("beforeend", reply.outerHTML);
   });
+  if (next) {
+    const rest = el("p", "Later replies aren't here: ");
+    rest.append(Object.assign(el("a", "read them on the forum"), { href: new URL(next, url).href }));
+    article.append(rest);
+  }
   doc.body.replaceChildren(article);
-  // Discourse names are letters, digits, dots, dashes and underscores.
+  // Discourse names are letters, digits, dots, dashes and underscores, in any script.
   const op = name(posts[0]!);
-  return /^[\w.-]{1,60}$/.test(op) ? op : undefined;
+  return /^[\p{L}\p{N}_.-]{1,60}$/u.test(op) ? op : undefined;
 }
 
 /** A Hacker News thread as Defuddle's reader for it expects: names marked `.hnuser` (HN dropped the
@@ -315,13 +355,14 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
   }
   const deck = speakerDeck(html, url);
   if (deck) return deck;
+  const { document } = parseHTML(html);
+  // A forum's thread, rebuilt for the reader; a link partway into one is refused, not read as the page.
+  const poster = hackerNews(document as unknown as Document, url) ?? (await discourse(document as unknown as Document, url));
   try {
-    const { document } = parseHTML(html);
     videoLinks(document as unknown as Document);
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);
-    const poster = hackerNews(document as unknown as Document, url) ?? discourse(document as unknown as Document);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
@@ -332,8 +373,7 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
   } catch {
     // fall through to Readability
   }
-  const { document } = parseHTML(html);
-  const r = new Readability(document as unknown as Document).parse();
+  const r = new Readability(parseHTML(html).document as unknown as Document).parse();
   if (!r?.textContent?.trim()) throw new Error(`Couldn’t find article text on ${new URL(url).host}: it may be built in the browser or need a sign-in. Open it in your browser and ${FROM_TAB}, or paste its text here instead.`);
   const paragraphs = r.textContent
     .split(/\n\s*\n/)
