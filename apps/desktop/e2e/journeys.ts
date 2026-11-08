@@ -3249,6 +3249,7 @@ journey("review: hovering or focusing a key point he got underlines the words of
   await points.nth(1).hover();
   await until("a missed point underlines nothing", async () => (await mark.count()) === 0);
   // The keyboard reaches it too: focus on the point's mark shows its words, and VoiceOver hears them.
+  await page.mouse.move(0, 0);
   await points.nth(0).locator(".quiz-mark").focus();
   await until("focus underlines the words", async () => (await mark.count()) === 1);
   const label = await points.nth(0).locator(".quiz-mark").getAttribute("aria-label");

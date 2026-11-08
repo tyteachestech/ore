@@ -14,6 +14,8 @@ describe("quoteIn", () => {
     expect(quoteIn(answer, "Some forgetting makes retrieval")).toBe("some  forgetting makes\nretrieval");
     expect(quoteIn(answer, 'retrieval "effortful"')).toBe("retrieval “effortful”");
     expect(quoteIn(answer, "…which strengthens it.")).toBe("which strengthens it.");
+    // İ lowers to two characters; the words after it still come back as he wrote them.
+    expect(quoteIn("İstanbul spacing helps retrieval", "spacing helps retrieval")).toBe("spacing helps retrieval");
   });
   test("words he didn't write find nothing", () => {
     expect(quoteIn(answer, "forgetting makes recall effortful")).toBe("");

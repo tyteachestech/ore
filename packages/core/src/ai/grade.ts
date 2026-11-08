@@ -17,13 +17,15 @@ function fold(s: string): { text: string; at: number[] } {
   let text = "";
   const at: number[] = [];
   for (let i = 0; i < s.length; i++) {
-    let c = s[i]!.toLowerCase().replace(/[‘’]/, "'").replace(/[“”]/, '"');
-    if (/\s/.test(c)) {
-      if (text.endsWith(" ")) continue;
-      c = " ";
+    // One character can lower to two (İ): each keeps the offset it came from.
+    for (let c of s[i]!.toLowerCase().replace(/[‘’]/, "'").replace(/[“”]/, '"')) {
+      if (/\s/.test(c)) {
+        if (text.endsWith(" ")) continue;
+        c = " ";
+      }
+      text += c;
+      at.push(i);
     }
-    text += c;
-    at.push(i);
   }
   return { text, at };
 }
@@ -48,7 +50,10 @@ export function gradeShown(lib: Library, shown: Shown, answer: string) {
     cwd: lib.root,
     schema: GradeOutput,
     input: { ...shown, answer },
-    check: (d) => (d.covered.length === shown.rubric.length ? null : `covered needs exactly ${shown.rubric.length} entries, one per rubric point`),
+    check: (d) =>
+      d.covered.length !== shown.rubric.length ? `covered needs exactly ${shown.rubric.length} entries, one per rubric point`
+        : d.evidence.length !== shown.rubric.length ? `evidence needs exactly ${shown.rubric.length} entries, one per rubric point ("" where not covered)`
+        : null,
   });
 }
 
