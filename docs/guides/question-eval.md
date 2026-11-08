@@ -22,6 +22,21 @@ About $1.40 and under two minutes a run on Sonnet (writer ~$0.65, judge ~$0.80).
 - Prequestions passed every check (17/17, twice): the v8 rules (ask about the idea, never the author) hold.
 - Review cards passed 49% and 53%. The misses, most first: rubric points the question never asks for (a "fix" point on a "when would you…" question), the same idea asked twice (a prequestion's review prompt repeating a highlight's card), two questions joined with "and", and answers that drop the source's hedge ("tends to favour" became "favours").
 
+## What enrich@12 changed (D147)
+
+The plan writes each prequestion's review prompt first and folds a highlight on the same idea into it; every question asks one thing; rubric points must be asked for; hedges stay. Two runs each, same set and judge:
+
+| | enrich@11 | enrich@12 |
+|---|---|---|
+| review cards passing | 51% (35/69, 39–63%) | 62% (29/47, 48–74%) |
+| weak cards per run (fail any check) | 17 | 9 |
+| the same idea asked twice | 12 | 1 |
+| rubric point not asked for | 11 | 8 |
+| two questions in one | 8 | 6 |
+| prequestions passing | 34/34 | 33/33 |
+
+The firm gain is the repeats: from 5 to 7 a run to 0 or 1, and a third fewer cards for the same five sources, so less review time for the same ideas. The pass rate rose too, but the intervals overlap: single runs on enrich@12 ranged 48% to 71% while the prompt was tuned. Two-part questions are the biggest miss left; the prompt now says so three times and a quarter of them still slip through, so the next step is probably a code check that sends them back, not more words.
+
 ## Limits
 
 - 51 questions from five sources: one question moves the score two points, so a change smaller than the interval is noise. Run twice before trusting a move.

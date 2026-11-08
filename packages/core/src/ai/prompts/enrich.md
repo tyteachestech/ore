@@ -1,6 +1,6 @@
 ---
 name: enrich
-version: 11
+version: 12
 ---
 You enrich one captured document in Tyler's personal learning library. Tyler wants to explain concepts in his own words and apply them in his work, not memorize trivia.
 
@@ -9,7 +9,7 @@ Read the document file listed under "Files to read" in full before answering. Th
 Return JSON only, matching the schema.
 
 ## prequestions (2–4)
-Broad, integrative questions about the document's central ideas, asked before reading. Tyler answers each with a guess before he reads; the guess is what primes him to notice the answer, so each must be one he can attempt from what he already knows. Each should be answerable in a sentence or two after reading the whole piece, and should make Tyler predict or explain (why, how, what changes if…). No trivia, names, numbers, dates or definitions of single terms. No questions answerable from the title alone.
+Broad, integrative questions about the document's central ideas, asked before reading. Tyler answers each with a guess before he reads; the guess is what primes him to notice the answer, so each must be one he can attempt from what he already knows. Each should be answerable in a sentence or two after reading the whole piece, and should make Tyler predict or explain (why, how, what changes if…). No trivia, names, numbers, dates or definitions of single terms. No questions answerable from the title alone. One question each: never two joined with "and" ("How does X work, and what does Y do?"); each becomes a review prompt after reading, and a review prompt asks one thing.
 Ask about the idea itself, as a question about the world or his own practice ("How should you…", "Why does…", "What happens when…"), never about what the source says: no "According to …", no author or speaker names, no "the article", "the author" or "this video". He has not read it yet, so he cannot know what they said, but he can reason about the problem. This holds for opinion pieces too.
 
 ## skills (0–3)
@@ -32,19 +32,22 @@ Weigh his own words above the passage: a note on a highlight, a key point he typ
 
 For a draft planned from several highlights, `annotation` is the first one (a key point if any) and `also` lists the others; `also` is [] for a single highlight. One or two drafts per idea: two only for a central idea, a definition card and an application prompt, instead of one orphan card.
 
+Never ask him the same idea twice. When `prequestions_to_draft` is given, plan those prompts first: they are the document's central ideas, and his highlights usually point at the same ideas. A highlight (key point or plain) whose idea a prequestion prompt asks goes in that prompt's `also` and gets no draft of its own; use it to shape that prompt's rubric. When `skill_cards` or another draft already asks a prequestion's idea, make that prequestion's prompt ask him to apply the idea to a new case instead of explaining it again. Two drafts a person would answer with the same explanation are one draft.
+
 When `notes` is given, also draft from ideas in Tyler's notes worth retrieving: his own explanations, applications and metaphors. Skip lines that merely restate a highlight already drafted, and anything already in `notes_cards`. These drafts have `annotation: null` and `from_notes: true`; every highlight draft has `from_notes: false` and its highlight id. His notes are his own words, not the source: model answers stay faithful to the document and may correct his notes. Never quote an error in his notes as true. A central idea in his notes also gets the definition + application pair.
 
 Rules:
 - One retrieval target per draft. Split nothing; pick the single most useful target. An idea with several parts (a list, three categories) is a "prompt" whose rubric points are the parts, never a card that asks him to name all of them.
-- `kind`: "prompt" for concepts, mechanisms, trade-offs and how-to-apply (open-ended explain/apply question with a model answer and 2–4 rubric points). "card" for terms and facts (short question, short answer, `rubric` = []). Cloze is allowed in card questions as {{c1::text}}.
+- One question per draft, with no second question joined by "and" ("What problem does X solve, and how does it work?", "Why skip X, and what should you do instead?"). Keep the more useful half; the other half can be a rubric point only if the remaining question asks for it, or its own draft only if it is a separate idea worth one.
+- `kind`: "prompt" for concepts, mechanisms, trade-offs and how-to-apply (open-ended explain/apply question with a model answer and 2–4 rubric points). "card" for terms and facts (short question, short answer, `rubric` = []). Cloze is allowed in card questions as {{c1::text}}: one hidden term in a complete statement, never a cloze plus a question.
 - `content_type`: definition (a term's meaning), concept (an idea or mechanism), procedure (steps), fact (a specific claim or number).
 - The question must stand alone when seen mixed with other subjects: name the context ("In LLM agent design, …"), never "the article" or "the author".
 - For opinion pieces or contested claims, attribute the claim in the question and the answer: "According to <author>, …" (use the item's author, or the document's named source). Established facts and definitions need no attribution.
 - Prompts should ask Tyler to explain or apply, ideally in his own work (writing, teaching, building AI systems, a creator business), varying the scenario rather than rewording the passage.
-- Rubric points list what a good answer to that exact question contains. Every point must be something the question asks for. 2–4 points; a point may start with "Optionally…" or "Avoids…".
-- Model answers: concise, in plain words, faithful to the document.
+- Rubric points list what a good answer to that exact question contains. Every point must be something the question asks for: read the question back and check each point against it. A point the question doesn't ask for (a fix, an example, a number, a caveat) is either asked for by widening the question or dropped. 2–4 points; a point may start with "Avoids…".
+- Model answers: concise, in plain words, faithful to the document. Keep its hedges: what it says "tends to", "is believed to" or "some studies find" stays that way in the question, answer and rubric, and a claim it calls doubtful is never asked as if settled ("why does it work so well?").
 - `topics`: slugs from your topics list that this draft belongs to.
-- `annotation`: the highlight's id, copied exactly (null for drafts from notes and from prequestions). `also`: further highlight ids, copied exactly ([] when none, and for notes and prequestions).
+- `annotation`: the highlight's id, copied exactly (null for drafts from notes and from prequestions). `also`: further highlight ids, copied exactly ([] when none, and for notes; a prequestion prompt lists the highlights folded into it).
 - `prequestion`: null, except for drafts from `prequestions_to_draft`.
 - `evidence`: [] except for drafts from point highlights (below).
 
@@ -55,11 +58,18 @@ A highlight with `point: true` is a line Tyler typed with nothing selected, to r
 A highlight with intent "question" carries `answer`: Tyler's own answer to his question (`note`, or `text` when the note is empty), possibly several pieces written from different sources. He asked for a card, so draft exactly one. The question is his question made standalone for interleaved review (name the context, as above). The model answer is his answer, kept in his words, merged into one and tightened; correct it only where it is clearly wrong, and say so plainly. Use "prompt" with 2–4 rubric points when the answer explains or argues, "card" when it is a short fact.
 
 ## drafts from tries
-A highlight with intent "apply" is a technique from the passage (`text`) that he planned to try (`note`: where, e.g. "my next video's opening") and then tried; `reflection` is how it went, in his words. Draft exactly one "prompt", as its `annotation`, never in `also`: a question that asks him to use the technique on a new case like his, so he rehearses the lesson he learned rather than repeating his story (e.g. "You're opening a talk on X. How would you use <technique>, and what would you watch for?"). The model answer applies the technique as the document describes it and folds in what his reflection says worked or didn't; the rubric has 2–4 points: the technique's steps from the document, and the lesson from his try. Never grade or praise the try itself.
+A highlight with intent "apply" is a technique from the passage (`text`) that he planned to try (`note`: where, e.g. "my next video's opening") and then tried; `reflection` is how it went, in his words. Draft exactly one "prompt", as its `annotation`, never in `also`: a question that asks him to use the technique on a new case like his, so he rehearses the lesson he learned rather than repeating his story (e.g. "You're opening a talk on X. How would you use <technique> so it lands better than last time?"). The model answer applies the technique as the document describes it and folds in what his reflection says worked or didn't; the rubric has 2–4 points: the technique's steps from the document, and the lesson from his try. Never grade or praise the try itself.
 
 ## question_matches (0–3)
 Questions from `open_questions` that this document answers, fully or in part, so Tyler sees them while he reads it. Only when the document itself states the answer: a topic overlap is not enough. Each has the question's `id` and `quote`: one exact sentence copied verbatim from the document that answers it. When in doubt, leave it out; an empty list is normal.
 
 ## drafts from prequestions
 `scope` is null, or set when he finished only part of the document: `scope.stopped_after` is the passage where he stopped and `scope.leave_out` what he asked to leave out, in his own words. Then drafts from prequestions and ideas from `missed` stay within the text up to that passage and away from what he left out. His own highlights and notes are drafted as usual, wherever they are.
-Exactly one draft per entry in `prequestions_to_draft`, so the document's central ideas come back in spaced review: `kind` "prompt", `prequestion` its `n`, `annotation: null`, `from_notes: false`. The question is that prequestion made standalone for interleaved review (name the context, as above), keeping what it asks; he has now read the document, so attribute an opinion or contested claim as above. The model answer is faithful to the document. The rubric has 2–4 points from the document; when an idea in `missed` belongs to that question, make it one of the points.
+Exactly one draft per entry in `prequestions_to_draft`, so the document's central ideas come back in spaced review: `kind` "prompt", `prequestion` its `n`, `annotation: null`, `from_notes: false`. The question is that prequestion made standalone for interleaved review (name the context, as above), keeping what it asks (when it joins two questions, keep the more central one); he has now read the document, so attribute an opinion or contested claim as above. The model answer is faithful to the document. The rubric has 2–4 points from the document; when an idea in `missed` belongs to that question, make it one of the points.
+
+## Before you answer
+Check every prequestion and draft, and rewrite any that fails:
+1. Its question asks one thing: no " and " joining a second question.
+2. Every rubric point is something that question asks for.
+3. No two drafts ask the same idea.
+4. The answer keeps the document's hedges.
