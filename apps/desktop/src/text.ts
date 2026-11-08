@@ -4,34 +4,137 @@
 // in the source skeleton to recover the exact source text (so `ore highlight` gets an exact
 // match), and a stored annotation's `exact` is matched in the rendered skeleton to paint it.
 
+import { decodeNamedCharacterReference } from "decode-named-character-reference";
+
 const IGNORED = new Set([..." \t\n\r\f\v   *_`[]|~"]);
 
 export type Skeleton = { chars: string; map: number[] };
 
-/** Skeleton of Markdown source; `map[i]` is the source offset of skeleton char i. */
+// A link's destination and optional title (CommonMark): balanced or escaped parens, `<…>`, or a quoted
+// title, as Wikipedia writes them (`…/Memory_\(psychology\) "Memory (psychology)"`).
+const DEST = String.raw`(?:<[^<>\n]*>|(?:[^\s()\\]|\\.|\((?:[^\s()\\]|\\.)*\))*)`;
+const TITLE = String.raw`(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\((?:[^()\\]|\\.)*\))`;
+const TAIL = String.raw`\(\s*${DEST}(?:\s+${TITLE})?\s*\)`;
+const LABEL = String.raw`(?:[^\[\]\\\n]|\\.)*`;
+const label = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Which characters are code (a fenced block's lines, a code span's text), where Markdown syntax does
+ *  not apply: the reader shows each one as written. 1 marks code, 2 a fence line (never shown). */
+function codeOf(md: string): Uint8Array {
+  const code = new Uint8Array(md.length);
+  let open: { ch: string; len: number; quotes: number } | null = null;
+  let at = 0;
+  for (const line of md.split("\n")) {
+    const end = at + line.length;
+    if (open) {
+      const close = line.match(/^[ \t>]*(`{3,}|~{3,})[ \t]*$/);
+      if (close && close[1]![0] === open.ch && close[1]!.length >= open.len) {
+        open = null;
+        code.fill(2, at + line.indexOf(close[1]!), end);
+      } else {
+        // Inside a quote each code line starts with the quote's ">", which is not code.
+        const lead = line.match(new RegExp(`^(?:[ \\t]*>[ \\t]?){0,${open.quotes}}[ \\t]*`))![0].length;
+        code.fill(1, at + lead, end);
+      }
+    } else {
+      const m = line.match(/^((?:[ \t]*(?:>[ \t]?|[-+*][ \t]+|\d{1,9}[.)][ \t]+))*[ \t]*)(`{3,}|~{3,})(.*)$/);
+      if (m && !(m[2]![0] === "`" && m[3]!.includes("`"))) {
+        open = { ch: m[2]![0]!, len: m[2]!.length, quotes: (m[1]!.match(/>/g) ?? []).length };
+        code.fill(2, at + m[1]!.length, end);
+      }
+    }
+    at = end + 1;
+  }
+  // Code spans: a run of backticks up to the next run of the same length in the same paragraph.
+  const blank = /\n[ \t]*\n/g;
+  for (let i = 0; i < md.length; i++) {
+    if (md[i] !== "`" || code[i]) continue;
+    let n = 1;
+    while (md[i + n] === "`") n++;
+    blank.lastIndex = i;
+    const stop = md[i - 1] === "\\" ? -1 : (blank.exec(md)?.index ?? md.length);
+    let close = -1;
+    for (let j = md.indexOf("`", i + n); j >= 0 && j < stop && !code[j]; ) {
+      let m = 1;
+      while (md[j + m] === "`") m++;
+      if (m === n) {
+        close = j;
+        break;
+      }
+      j = md.indexOf("`", j + m);
+    }
+    if (close >= 0) code.fill(1, i + n, close);
+    i = (close >= 0 ? close : i) + n - 1;
+  }
+  return code;
+}
+
+/** The text an HTML character reference shows as (`&amp;` is "&"), or null when it is not one. */
+function entity(ref: string): string | null {
+  const num = ref.match(/^&#(?:(\d{1,7})|[xX]([0-9a-fA-F]{1,6}));$/);
+  if (num) {
+    const cp = num[1] ? parseInt(num[1], 10) : parseInt(num[2]!, 16);
+    return cp === 0 || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff) ? "�" : String.fromCodePoint(cp);
+  }
+  const named = decodeNamedCharacterReference(ref.slice(1, -1));
+  return named === false ? null : named;
+}
+
+/** Skeleton of Markdown source; `map[i]` is the source offset of skeleton char i. Syntax is looked
+ *  for outside code only, so a `# comment`, `List<String>` or `echo $$` in code stays text. */
 export function sourceSkeleton(md: string): Skeleton {
-  const mask = new Uint8Array(md.length);
+  const code = codeOf(md);
+  // Code is blanked out (same length, lines kept), so the patterns below never match inside it.
+  let prose = md;
+  if (code.includes(1)) {
+    const cs: string[] = [];
+    for (let i = 0; i < md.length; i++) cs.push(code[i] === 1 && md[i] !== "\n" ? "\x01" : md[i]!);
+    prose = cs.join("");
+  }
+  const mask = code.map((c) => (c === 2 ? 1 : 0)); // code fences and their info strings
   const hide = (re: RegExp, from = 0) => {
-    for (const m of md.matchAll(re)) mask.fill(1, m.index + from, m.index + m[0].length);
+    for (const m of prose.matchAll(re)) mask.fill(1, m.index + from, m.index + m[0].length);
   };
   hide(/<!--[\s\S]*?-->/g);
   hide(/\$\$[\s\S]*?\$\$/g); // math: rendered by KaTeX, outside the text index
-  hide(/!\[[^\]\n]*\]\([^)\n]*\)/g); // images
-  hide(/\]\([^)\n]*\)/g, 1); // link destinations
+  hide(new RegExp(String.raw`!\[[^\]\n]*\]${TAIL}`, "g")); // images
+  hide(new RegExp(String.raw`\]${TAIL}`, "g"), 1); // link destinations
+  // Reference links: a definition never shows, and `[text][label]` shows only its text.
+  const defined = new Set<string>();
+  for (const m of prose.matchAll(new RegExp(String.raw`^ {0,3}\[(${LABEL})\]:[ \t]*(?:<[^<>\n]*>|\S+)(?:[ \t]+${TITLE})?[ \t]*$`, "gm"))) {
+    if (m[1]!.startsWith("^") || !label(m[1]!)) continue;
+    defined.add(label(m[1]!));
+    mask.fill(1, m.index, m.index + m[0].length);
+  }
+  for (const m of prose.matchAll(new RegExp(String.raw`\[(${LABEL})\]\[(${LABEL})\]`, "g"))) {
+    if (defined.has(label(m[2]! || m[1]!))) mask.fill(1, m.index + m[1]!.length + 2, m.index + m[0].length);
+  }
+  // An autolink shows without its angle brackets.
+  for (const m of prose.matchAll(/<(?:[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>@]+)>/g)) mask[m.index] = mask[m.index + m[0].length - 1] = 1;
   hide(/<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>\n]*)?\/?>/g); // inline HTML tags (never rendered)
-  hide(/^[ \t]*(?:```|~~~).*$/gm); // code fences and their info strings
   hide(/^[ \t]*(?:#{1,6}[ \t]+|(?:>[ \t]?)+|(?:[-+*]|\d{1,9}[.)])[ \t]+)+/gm); // block markers
   hide(/^[ \t]*(?:[-*_][ \t]*){3,}$/gm); // thematic breaks
   hide(/^[ \t|:-]*-{3,}[ \t|:-]*$/gm); // table separator rows
-  hide(/\\(?=[\\`*_{}[\]()#+\-.!|>~])/g); // backslash escapes
+  for (const m of prose.matchAll(/\\[!-/:-@[-`{-~]/g)) mask[m.index] = 1; // backslash escapes: the "\" goes, the mark stays
   hide(/(?<=^ {0,3}\[\^[^\]\s]+\]):/gm); // a footnote's "[^7]:" shows as its number alone (`footnotes`)
+  // A character reference shows as its character ("&amp;" is "&"), kept at its "&".
+  const sub = new Map<number, string>();
+  for (const m of prose.matchAll(/(?<!\\)&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/g)) {
+    const text = mask[m.index] ? null : entity(m[0]);
+    if (text === null) continue;
+    sub.set(m.index, text);
+    mask.fill(1, m.index + 1, m.index + m[0].length);
+  }
   const parts: string[] = [];
   const map: number[] = [];
   for (let i = 0; i < md.length; i++) {
-    const c = md[i]!;
-    if (mask[i] || IGNORED.has(c)) continue;
-    parts.push(c);
-    map.push(i);
+    if (mask[i]) continue;
+    const t = sub.get(i) ?? md[i]!;
+    for (let k = 0; k < t.length; k++) {
+      if (IGNORED.has(t[k]!)) continue;
+      parts.push(t[k]!);
+      map.push(i);
+    }
   }
   return { chars: parts.join(""), map };
 }
@@ -94,40 +197,84 @@ function find(hay: string, pre: string, needle: string, suf: string, hint: numbe
 
 /** Skeleton offset of a DOM point inside the indexed root. */
 export function skeletonOffset(idx: TextIndex, node: Node, offset: number): number {
-  if (node.nodeType === Node.TEXT_NODE) {
-    const base = idx.first.get(node as Text);
-    if (base === undefined) return 0;
-    return base + plainSkeleton((node as Text).data.slice(0, offset)).length;
+  const base = node.nodeType === Node.TEXT_NODE ? idx.first.get(node as Text) : undefined;
+  if (base !== undefined) return base + plainSkeleton((node as Text).data.slice(0, offset)).length;
+  // Between elements, or in text left out of the index (math): the first indexed text after the point.
+  const at = document.createRange();
+  at.setStart(node, offset);
+  let lo = 0;
+  let hi = idx.nodes.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (at.comparePoint(idx.nodes[mid]!, 0) < 0) lo = mid + 1;
+    else hi = mid;
   }
-  const child = node.childNodes[offset] ?? node;
-  const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT);
-  const t = walker.nextNode() as Text | null;
-  return t ? (idx.first.get(t) ?? 0) : 0;
+  return lo < idx.nodes.length ? idx.first.get(idx.nodes[lo]!)! : idx.chars.length;
 }
 
-/** The exact source text and offset for a rendered selection, or null when it cannot be mapped. */
-export function sourceQuote(src: Skeleton, body: string, idx: TextIndex, sel: Range): { exact: string; start: number } | null {
-  const needle = plainSkeleton(sel.toString());
-  if (!needle) return null;
+/** The skeleton index of the first source character at or after body offset `at`. */
+function sourceIndex(src: Skeleton, at: number): number {
+  let lo = 0;
+  let hi = src.map.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (src.map[mid]! < at) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** Roughly where in the body a rendered selection starts, for when it can't be quoted exactly: the core
+ *  then saves the match nearest it, not the first in the source. */
+export function sourceHint(src: Skeleton, idx: TextIndex, sel: Range): number {
   const at = skeletonOffset(idx, sel.startContainer, sel.startOffset);
+  const i = Math.round((at / Math.max(1, idx.chars.length)) * src.chars.length);
+  return src.map[Math.min(i, src.map.length - 1)] ?? 0;
+}
+
+/** The exact source text and offset for a rendered selection, or null when it cannot be mapped. The
+ *  needle is the index's own text between the selection's ends, so it skips what the index skips (math). */
+export function sourceQuote(src: Skeleton, body: string, idx: TextIndex, sel: Range): { exact: string; start: number } | null {
+  const at = skeletonOffset(idx, sel.startContainer, sel.startOffset);
+  const to = skeletonOffset(idx, sel.endContainer, sel.endOffset);
+  const needle = idx.chars.slice(at, to);
+  if (!needle) return null;
   const pre = idx.chars.slice(Math.max(0, at - 24), at);
-  const suf = idx.chars.slice(at + needle.length, at + needle.length + 24);
+  const suf = idx.chars.slice(to, to + 24);
   const hint = (at / Math.max(1, idx.chars.length)) * src.chars.length;
   const h = find(src.chars, pre, needle, suf, hint);
   if (h === null) return null;
   const start = src.map[h]!;
-  const end = src.map[h + needle.length - 1]! + 1;
+  let end = src.map[h + needle.length - 1]! + 1;
+  // A character reference ("&amp;") is one character on the page: the quote takes all of it.
+  const ref = body[end - 1] === "&" ? body.slice(end - 1, end + 40).match(/^&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/) : null;
+  if (ref) end += ref[0].length - 1;
   return { exact: body.slice(start, end), start };
 }
 
 type Quote = { exact: string; prefix: string; suffix: string; start: number };
 
-/** A DOM range for a stored annotation, located by its quote (context first, then position). */
-export function rangeFor(idx: TextIndex, q: Quote, bodyLength: number): Range | null {
-  const needle = sourceSkeleton(q.exact).chars;
+/** A DOM range for a stored annotation, located by its quote (context first, then position). A quote
+ *  still at its offset is cut from the body's own skeleton, since a piece of code read alone (a
+ *  `# comment` line out of its fence) would read as Markdown. */
+export function rangeFor(idx: TextIndex, src: Skeleton, body: string, q: Quote): Range | null {
+  let needle: string;
+  let pre: string;
+  let suf: string;
+  if (q.exact && body.startsWith(q.exact, q.start)) {
+    const a = sourceIndex(src, q.start);
+    const b = sourceIndex(src, q.start + q.exact.length);
+    needle = src.chars.slice(a, b);
+    pre = src.chars.slice(Math.max(0, a - 24), a);
+    suf = src.chars.slice(b, b + 24);
+  } else {
+    needle = sourceSkeleton(q.exact).chars;
+    pre = sourceSkeleton(q.prefix).chars;
+    suf = sourceSkeleton(q.suffix).chars;
+  }
   if (!needle) return null;
-  const hint = (q.start / Math.max(1, bodyLength)) * idx.chars.length;
-  const h = find(idx.chars, sourceSkeleton(q.prefix).chars, needle, sourceSkeleton(q.suffix).chars, hint);
+  const hint = (q.start / Math.max(1, body.length)) * idx.chars.length;
+  const h = find(idx.chars, pre, needle, suf, hint);
   if (h === null) return null;
   const last = h + needle.length - 1;
   const range = document.createRange();
@@ -139,13 +286,7 @@ export function rangeFor(idx: TextIndex, q: Quote, bodyLength: number): Range | 
 /** The rendered text node holding the first character at or after source offset `at` (e.g. just
  *  past a `<!-- chapter N -->` marker, which never renders), or null when it cannot be mapped. */
 export function renderedNodeAt(src: Skeleton, idx: TextIndex, at: number): Text | null {
-  let lo = 0;
-  let hi = src.map.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (src.map[mid]! < at) lo = mid + 1;
-    else hi = mid;
-  }
+  const lo = sourceIndex(src, at);
   if (lo >= src.chars.length) return null;
   const hint = (lo / Math.max(1, src.chars.length)) * idx.chars.length;
   const pre = src.chars.slice(Math.max(0, lo - 24), lo);

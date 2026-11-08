@@ -34,7 +34,7 @@ import { Position } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, type Annotation, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
-import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
+import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
@@ -671,11 +671,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   // Paint highlights with the CSS Custom Highlight API; the Markdown DOM is never mutated.
   useEffect(() => {
     const index = idx.current;
-    if (!ready || !index || body === undefined) return;
+    if (!ready || !index || body === undefined || !src) return;
     const map = ranges.current;
     for (const a of anns) {
       if (map.has(a.id)) continue;
-      const r = rangeFor(index, { ...a, start: a.anchor?.start ?? a.start }, body.length);
+      const r = rangeFor(index, src, body, { ...a, start: a.anchor?.start ?? a.start });
       if (r) map.set(a.id, r);
     }
     const by: Record<Intent, Range[]> = { keep: [], card: [], question: [], apply: [] };
@@ -702,7 +702,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     else CSS.highlights.delete("hl-active");
     // `q:start:end` is a quote a card points to (D99), not a highlight.
     const q = p.jumpTo?.match(/^q:(\d+):(\d+)$/);
-    const jump = jumped.current ? undefined : q ? rangeFor(index, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }, body.length) : p.jumpTo && map.get(p.jumpTo);
+    const jump = jumped.current ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }) : p.jumpTo && map.get(p.jumpTo);
     const el = scrollRef.current;
     if (jump && el) {
       jumped.current = true;
@@ -752,8 +752,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     CSS.highlights.delete("hl-evidence");
     CSS.highlights.delete("hl-evidence-on");
     setEvidence([]);
-    if (!reveal || !ready || !index || !el || body === undefined) return;
-    const rs = reveal.quotes.map((q) => rangeFor(index, q, body.length));
+    if (!reveal || !ready || !index || !el || body === undefined || !src) return;
+    const rs = reveal.quotes.map((q) => rangeFor(index, src, body, q));
     setEvidence(rs);
     const cur = rs[reveal.at];
     CSS.highlights.set("hl-evidence", new Highlight(...rs.filter((r, i): r is Range => !!r && i !== reveal.at)));
@@ -1031,8 +1031,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   function jumpToQuote(m: { quote: string; start?: number }) {
     const el = scrollRef.current;
     const index = idx.current;
-    if (!el || !index || body === undefined) return;
-    const r = rangeFor(index, { exact: m.quote, prefix: "", suffix: "", start: m.start ?? 0 }, body.length);
+    if (!el || !index || body === undefined || !src) return;
+    const r = rangeFor(index, src, body, { exact: m.quote, prefix: "", suffix: "", start: m.start ?? 0 });
     if (!r) return p.notify("Couldn’t find that passage in the text any more.", "error");
     toThird(r, "smooth");
     CSS.highlights.set("hl-evidence-on", new Highlight(r));
@@ -1142,7 +1142,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!text.trim()) return;
     const q = sourceQuote(src, doc.body, index, range);
     const args = ["highlight", p.id, opt("exact", q?.exact ?? text.trim()), "--intent", intent];
-    if (q) args.push("--start", String(q.start));
+    // Never without a place: the core saves the match nearest it, not the first one in the source.
+    args.push("--start", String(q ? q.start : sourceHint(src, index, range)));
     const tmp = `pending-${Date.now()}`;
     const promise = ore<Annotation>(...args);
     pending.current.set(tmp, promise);
