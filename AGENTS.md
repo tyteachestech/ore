@@ -6,6 +6,7 @@ Ore is a Mac-first, AI-first, local-files personal learning app: capture anythin
 - `docs/DECISIONS.md` — settled decisions, by D-number: grep the ones your change touches. Do not reopen them; propose changes explicitly.
 - `docs/SPEC.md` — data model, CLI, scheduling, AI adapter, deliverables.
 - `docs/research/` — evidence and option briefs behind the decisions.
+- `docs/design/daily-session.md` — who Ore is for and the daily session: a 10 min to 1 hour habit over a due backlog that never empties. Check queue rules, Home and rewards against it.
 - `docs/WORKFLOW.md` — merging, reinstalling the app on Tyler's Mac, parallel threads.
 
 ## Purpose rule (Tyler, 2026-10-25)
