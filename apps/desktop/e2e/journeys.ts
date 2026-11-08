@@ -242,6 +242,27 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("highlight popup open: typing letters doesn't start Listen or open the original", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "Each successful retrieval changes the memory itself");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.evaluate(() => {
+    const t = (window as any).__TAURI_INTERNALS__;
+    const invoke = t.invoke;
+    (window as any).__calls = [];
+    t.invoke = (cmd: string, args: unknown) => ((window as any).__calls.push(cmd), invoke(cmd, args));
+  });
+  await page.keyboard.type("hel"); // one L: a second would stop what the first started
+  await Bun.sleep(300);
+  if (await page.locator(".listen-bar").count()) throw new Error("L started Listen");
+  const toast = (await page.locator(".toast").allInnerTexts()).join(" ");
+  if (/read aloud|Reading aloud/i.test(toast)) throw new Error(`L started Listen: ${toast}`);
+  await page.keyboard.type("o");
+  await Bun.sleep(200);
+  const opened = ((await page.evaluate(() => (window as any).__calls)) as string[]).filter((c) => c.includes("opener"));
+  if (opened.length) throw new Error(`O opened the original: ${opened}`);
+});
+
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
   await openSource(page, TESTING);
   await page.keyboard.press("Meta+j");

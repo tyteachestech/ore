@@ -36,7 +36,7 @@ import { INTENTS, ore, opt, PHONE, visible, type Annotation, type ChapterFeedbac
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
-import { firstFrom, sentences, Speaker, speechAvailable } from "./listen";
+import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
 import { errorText, inOrder, load, save, type Notify } from "./util";
@@ -536,7 +536,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       end: stopListening,
       error: (why) => {
         stopListening();
-        p.notify(`Reading aloud stopped (${why}). Press ${label(keys.listen)} to start again from here.`, "error");
+        p.notify(`Reading aloud stopped: ${speechTrouble(why)}. Press ${label(keys.listen)} to start again from here.`, "error");
       },
     });
     following.current = true;
@@ -1632,7 +1632,8 @@ function ReaderView(p: Props & { reload: () => void }) {
           return;
         }
       }
-      if (!video && !PHONE && !inField && !inNote && doc && is(e, "listen")) {
+      // Not while the highlight popup is open: a letter typed there is the start of a thought, not a command.
+      if (!video && !PHONE && !popup && !inField && !inNote && doc && is(e, "listen")) {
         e.preventDefault();
         if (listen) stopListening();
         else startListening();
@@ -1655,7 +1656,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           return;
         }
       }
-      if ((!inField && !inNote && is(e, "original")) || is(e, "reveal")) {
+      if ((!popup && !inField && !inNote && is(e, "original")) || is(e, "reveal")) {
         e.preventDefault();
         if (doc) void (is(e, "original") ? openOriginal(doc) : revealInFinder(doc)).catch((err) => p.notify(errorText(err), "error"));
         return;
