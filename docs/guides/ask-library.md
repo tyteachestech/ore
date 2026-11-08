@@ -13,7 +13,8 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 1. **Search** (`packages/core/src/ai/ask.ts`, `retrieve`). The question loses stop words and is cut to stems ("spacing" → "spac"). SQLite FTS5 ranks sources by BM25 (`db.ts`, `sourcesMatching`) and keeps the best six. Each is cut into paragraph passages under their headings, and passages are ranked by the rarer question words they hold, a small IDF score; title and heading words count half. Up to ten passages go to the AI, five at most from one source. The tutor puts the open source and anything he @-mentions first, then up to eight from the rest of the library (`tutorPassages`).
 2. **Answer**. The AI sees only the numbered passages and returns JSON: the reply with `[n]` markers, and per marker a passage id and an exact quote.
 3. **Check**. Every quote must be found in its passage (`locate`, the same fuzzy anchoring highlights use), every marker must have a citation, and an unknown passage is refused. A web citation's URL must be one the search returned and its quote words the search returned: a web task runs `claude -p` with `--output-format stream-json`, whose events carry each WebSearch's links and text (`webSeen` in `adapter.ts`). A failed check goes back to the AI once with the reason.
-4. **Place**. Each quote is mapped to its character offsets in the source's `doc.md`. The citation opens the reader at `q:start:end`, which marks that range (`apps/desktop/e2e/journeys.ts`, "tutor citation").
+4. **Stream** (D138). While the AI writes, the reply so far goes to the app as it comes, so the first words show in about 2 seconds; its markers wait for the citations, which come with the checked answer.
+5. **Place**. Each quote is mapped to its character offsets in the source's `doc.md`. The citation opens the reader at `q:start:end`, which marks that range (`apps/desktop/e2e/journeys.ts`, "tutor citation").
 
 ## The eval
 
