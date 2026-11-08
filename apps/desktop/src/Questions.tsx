@@ -126,6 +126,9 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
   const onKeyDown = (e: ReactKeyboardEvent) => {
     // Keys typed here never reach the reader (finish, Esc back to sources) or the page.
     e.stopPropagation();
+    // Enter that picks a word from an input method (Japanese, Chinese) is still typing; WKWebView
+    // sends that Enter as keyCode 229 with isComposing false.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (is(e.nativeEvent, "finish")) {
       e.preventDefault();
       void send("card");
@@ -222,6 +225,7 @@ function Piece({ text, from, onSave, onEditing }: {
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation();
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             done();
@@ -352,6 +356,7 @@ export function AskQuestion({ skills, onDone, notify }: { skills: string[]; onDo
         onBlur={() => !busy && onDone(false)}
         onKeyDown={(e) => {
           e.stopPropagation();
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           if (e.key === "Enter") {
             e.preventDefault();
             void add();

@@ -325,7 +325,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   };
 
   /** Picks how sure he is; picking the same one again clears it. */
-  const pickSure = (n: number) => setConf((v) => v.map((x, j) => (j === qi ? (x === n ? undefined : n) : x)));
+  const pickSure = (n: number) => {
+    // While Check saves, how sure he was is what it saves.
+    if (busy) return;
+    setConf((v) => v.map((x, j) => (j === qi ? (x === n ? undefined : n) : x)));
+  };
 
   const primary = () => {
     if (busy) return;
@@ -420,6 +424,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             ref={field}
             className="field quiz-answer"
             aria-label="Your answer"
+            // While Check saves, what's saved is what he typed: no edits that would be dropped.
+            readOnly={busy}
             value={answers[qi]}
             onChange={(e) => setAnswers((v) => v.map((x, j) => (j === qi ? e.target.value : x)))}
             placeholder="From memory…"
@@ -430,7 +436,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <div className="quiz-sure" role="radiogroup" aria-labelledby="quiz-sure">
             {SURE.map((label, i) => (
               <Hint key={label} text={<>{label} <kbd>{i + 1}</kbd></>} side="top">
-                <button role="radio" aria-checked={conf[qi] === i + 1} onClick={() => pickSure(i + 1)}>
+                <button role="radio" aria-checked={conf[qi] === i + 1} aria-disabled={busy || undefined} onClick={() => pickSure(i + 1)}>
                   {label}
                 </button>
               </Hint>

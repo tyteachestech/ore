@@ -1548,17 +1548,18 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
   height: 40px; border-radius: 12px; font: 650 14px var(--round); color: var(--muted); background: var(--bg-raised);
   border: 1px solid var(--border); box-shadow: 0 3px 0 var(--border); transition: background-color 150ms;
 }
-.quiz-sure button:hover { background: var(--bg-hover); color: var(--text); }
-.quiz-sure button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--border); }
+.quiz-sure button:hover:not([aria-disabled="true"]) { background: var(--bg-hover); color: var(--text); }
+.quiz-sure button:active:not([aria-disabled="true"]) { transform: translateY(2px); box-shadow: 0 1px 0 var(--border); }
 .quiz-sure button[aria-checked="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 24%, var(--bg-raised)); color: var(--text); box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 45%, #000); }
+.quiz-sure button[aria-disabled="true"] { opacity: 0.5; }
 .quiz-sure button:focus-visible { outline: none; box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--focus); }
 .quiz-grow { flex: 1; min-height: 16px; }
 .quiz-foot { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .quiz .pill-btn.quiz-go { height: 42px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; box-shadow: 0 3px 0 color-mix(in srgb, var(--skill) 55%, #000); }
 .quiz .pill-btn.quiz-go.wide { flex: 1; justify-content: center; }
 .quiz-ghost { height: 42px; padding: 0 14px; white-space: nowrap; border-radius: 999px; color: var(--muted); font-weight: 600; }
-.quiz-ghost:hover:not(:disabled), .quiz-ghost:focus-visible { background: var(--bg-hover); color: var(--text); }
-.quiz-ghost:disabled { opacity: 0.45; }
+.quiz-ghost:hover:not(:disabled, [aria-disabled="true"]), .quiz-ghost:focus-visible { background: var(--bg-hover); color: var(--text); }
+.quiz-ghost:disabled, .quiz-ghost[aria-disabled="true"] { opacity: 0.45; }
 .quiz-verdict { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--bg-hover); }
 .quiz-verdict b { display: block; font-size: 15px; }
 .quiz-verdict span:not(.quiz-badge) { color: var(--muted); }

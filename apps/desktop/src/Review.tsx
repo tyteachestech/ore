@@ -15,6 +15,7 @@ import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
 
 const SURE = ["Guess", "Think so", "Sure"] as const;
+const KEY_POINTS_CHANGED = "The key points changed.";
 const RATINGS = ["Again", "Hard", "Good", "Easy"] as const;
 /** A missed card comes back this many cards later (D59). */
 const AGAIN_GAP = 3;
@@ -61,6 +62,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const [gradeError, setGradeError] = useState<string | null>(null);
   /** One per key point: got, missed, or not marked yet (an in-head answer starts unmarked, D68). */
   const [marks, setMarks] = useState<(boolean | undefined)[] | null>(null);
+  /** A key point changed under his marks: nothing is suggested until he marks again. */
+  const [remark, setRemark] = useState(false);
   /** Answered in his head (D68): no typing, no AI; he marks the key points himself. */
   const [inHead, setInHead] = useState(false);
   /** What answers the card in its source, shown after the answer: the passage it came from, or for a line
@@ -76,6 +79,9 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const [asks, setAsks] = useState<Record<string, AskChat>>({});
   const [end, setEnd] = useState<End | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Bumped by Try again after a card failed to load: loads the same card again, the session as it was. */
+  const [loadTry, setLoadTry] = useState(0);
+  const retryLoad = () => setLoadTry((n) => n + 1);
   const shownAt = useRef(Date.now());
   /** When the answer showed: a rating key right after it is the confidence key pressed twice. */
   const shownAnswerAt = useRef(0);
@@ -100,6 +106,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: () => void; setTs: (ts: string) => void }) => boolean>(() => false);
   /** Counts card showings, so a grade or passage that lands after he moved on is dropped, not shown on the next card. */
   const showing = useRef(0);
+  /** Counts grading runs, so a grade still on its way when the key points change is dropped. */
+  const grading = useRef(0);
+  /** What is on screen now, for a card edit (or its undo) that lands later. */
+  const now = useRef({ card, answer, inHead, phase, marks, grade, draft });
+  now.current = { card, answer, inHead, phase, marks, grade, draft };
+  /** The card's words as the editor last loaded them: an undo refreshes the editor only if he hasn't typed since. */
+  const loaded = useRef(draft);
   const entry = queue?.[0];
 
   useEffect(() => {
@@ -131,6 +144,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     setGrade(null);
     setGradeError(null);
     setMarks(null);
+    setRemark(false);
     setInHead(false);
     setPassage(null);
     setAsking(false);
@@ -141,6 +155,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     if (!entry) return;
     let live = true;
     setCard(null);
+    setError(null);
     reset();
     ore<CardFull>("card", "show", entry.id, "--review").then(
       (c) => {
@@ -156,7 +171,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     return () => {
       live = false;
     };
-  }, [entry]);
+  }, [entry, loadTry]);
 
   useEffect(() => {
     if (paused) return;
@@ -261,15 +276,18 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     if (!card) return;
     setGradeError(null);
     setMarks(null);
+    setRemark(false);
     const at = showing.current;
+    const run = ++grading.current;
+    const stale = () => at !== showing.current || run !== grading.current;
     const failed = (why: string) => {
-      if (at !== showing.current) return;
+      if (stale()) return;
       setGradeError(why);
       setMarks(card.rubric.map(() => undefined));
     };
     try {
       const g = await ore<Grade>("grade", card.id, opt("answer", answer), ...variantOpt(card));
-      if (at !== showing.current) return;
+      if (stale()) return;
       // Marks that don't line up with the rubric can't be trusted: no suggestion, he marks them himself.
       if (g.covered.length !== card.rubric.length) return failed("Couldn’t check this one: the marks didn’t match the key points.");
       setGrade(g);
@@ -287,7 +305,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     if (card.kind === "card") return 3; // D59: ↵ is Good on a Fact card
     if (inHead || gradeError) {
       // His own marks decide; nothing is suggested until he marks one.
-      if (!marks || marks.every((m) => m === undefined)) return undefined;
+      if (remark || !marks || marks.every((m) => m === undefined)) return undefined;
       const got = marks.filter(Boolean).length;
       return got === marks.length ? 3 : got ? 2 : 1;
     }
@@ -461,7 +479,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   const edit = () => {
     if (!card) return;
-    setDraft({ question: card.question, answer: card.answer, points: card.rubric.join("\n") });
+    loaded.current = { question: card.question, answer: card.answer, points: card.rubric.join("\n") };
+    setDraft(loaded.current);
     setPhase("edit");
   };
 
@@ -470,9 +489,26 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true) => {
     const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
     const saved = await ore<CardFull>("card", "set", c.id, opt("question", question), opt("answer", answer), ...(rubric ?? []).map((p) => opt("point", p)), ...variantOpt(c));
+    const s = now.current;
     setCard((cur) => (cur?.id === c.id ? saved : cur));
-    // Marks stay with the points they were on; a point added has none yet.
-    if (rubric) setMarks((m) => m && saved.rubric.map((_, i) => m[i]));
+    // New key points: the AI's grade was for the old ones, so it goes (and one still on its way). A point
+    // whose words stayed keeps its mark; a changed one waits for his. "No idea" still missed them all.
+    if (rubric && s.card?.id === c.id && s.phase !== "answer" && saved.rubric.join("\n") !== s.card.rubric.join("\n")) {
+      const noIdea = !s.answer.trim() && !s.inHead;
+      const marked = new Map(s.card.rubric.map((p, i) => [p, s.marks?.[i]]));
+      grading.current++;
+      setGrade(null);
+      setMarks(saved.rubric.map((p) => (noIdea ? false : marked.get(p))));
+      // Marks carried over from the AI's grade are its, not his: he marks again before a suggestion.
+      if (!noIdea) setRemark(!!s.grade || saved.rubric.some((p) => !marked.has(p)));
+      if (!noIdea && !s.inHead) setGradeError(KEY_POINTS_CHANGED);
+    }
+    // The editor open on this card (an undo landed meanwhile): it shows the card as it now is.
+    const d = s.draft, l = loaded.current;
+    if (s.card?.id === c.id && s.phase === "edit" && d.question === l.question && d.answer === l.answer && d.points === l.points) {
+      loaded.current = { question: saved.question, answer: saved.answer, points: saved.rubric.join("\n") };
+      setDraft(loaded.current);
+    }
     if (undoable) {
       const put = (w: typeof was) => () => void setText(c, w.question, w.answer, w.rubric, false).catch((e) => notify(errorText(e), "error"));
       notify("Card edit", "quiet", put(was), put({ question, answer, rubric }));
@@ -514,7 +550,9 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     if (paused) return;
     if (e.key === "Escape") {
       e.preventDefault();
-      if (phase === "edit") setPhase("checked");
+      if (phase === "edit") {
+        if (!busy) setPhase("checked");
+      }
       else if (asking) {
         setAsking(false);
         root.current?.focus({ preventScroll: true });
@@ -533,7 +571,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       }
       return;
     }
-    if (!card) return;
+    if (!card) {
+      if (e.key === "Enter" && onSurface && error && entry) {
+        e.preventDefault();
+        retryLoad();
+      }
+      return;
+    }
     if (phase === "edit") {
       if (is(e, "finish")) {
         e.preventDefault();
@@ -637,7 +681,21 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         {card && !end && queue?.length ? `Card ${done + 1} of ${done + left}. ${card.question}${grade ? `. Marked ${grade.covered.filter(Boolean).length} of ${grade.covered.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
-        {error && <p className="err">{error}</p>}
+        {error && (
+          <p className="err">
+            {error}
+            {entry && !card && (
+              <>
+                {" "}
+                <Hint text={<>Try again <kbd>↵</kbd></>}>
+                  <button className="link" autoFocus onClick={retryLoad}>
+                    Try again
+                  </button>
+                </Hint>
+              </>
+            )}
+          </p>
+        )}
         {!error && !end && (!queue || (entry && !card)) && <p className="loading"><Working label="Getting your cards…" /></p>}
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick)}</p>}
@@ -742,7 +800,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
                                   className="quiz-mark"
                                   aria-pressed={mark}
                                   aria-label={mark ? `Got: ${p}. Mark as missed` : mark === false ? `Missed: ${p}. Mark as got` : `${p}. Mark as got`}
-                                  onClick={() => setMarks((m) => m!.map((x, j) => (j === i ? !x : x)))}
+                                  onClick={() => (setRemark(false), setMarks((m) => m!.map((x, j) => (j === i ? !x : x))))}
                                 >
                                   {mark ? <Check size={14} weight="bold" /> : <Circle size={14} weight="bold" />}
                                 </button>
@@ -763,7 +821,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
                 {grade?.feedback && <p className="review-feedback">{grade.feedback}</p>}
                 {gradeError && PHONE ? (
                   // The phone can't run the AI that checks answers (D7); a retry would fail the same way.
-                  <p className="review-grade-failed">Checking answers runs on your Mac for now. Mark what you got.</p>
+                  <p className="review-grade-failed">{gradeError === KEY_POINTS_CHANGED ? gradeError : "Checking answers runs on your Mac for now."} Mark what you got.</p>
                 ) : gradeError && (
                   <p className="review-grade-failed">
                     {gradeError} Mark what you got, or{" "}
@@ -944,19 +1002,19 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
   return (
     <div className="review-edit">
       <label className="quiz-label" htmlFor="edit-q">Question</label>
-      <Grow id="edit-q" autoFocus className="field quiz-answer short" value={draft.question} onChange={(e) => setDraft({ ...draft, question: e.target.value })} />
+      <Grow id="edit-q" autoFocus readOnly={busy} className="field quiz-answer short" value={draft.question} onChange={(e) => setDraft({ ...draft, question: e.target.value })} />
       <label className="quiz-label" htmlFor="edit-a">Answer</label>
-      <Grow id="edit-a" className="field quiz-answer" value={draft.answer} onChange={(e) => setDraft({ ...draft, answer: e.target.value })} />
+      <Grow id="edit-a" readOnly={busy} className="field quiz-answer" value={draft.answer} onChange={(e) => setDraft({ ...draft, answer: e.target.value })} />
       {points && (
         <>
           <Hint text="One key point a line: what an answer is marked against">
             <label className="quiz-label" htmlFor="edit-p">Key points</label>
           </Hint>
-          <Grow id="edit-p" className="field quiz-answer" value={draft.points} onChange={(e) => setDraft({ ...draft, points: e.target.value })} />
+          <Grow id="edit-p" readOnly={busy} className="field quiz-answer" value={draft.points} onChange={(e) => setDraft({ ...draft, points: e.target.value })} />
         </>
       )}
       <div className="review-foot">
-        <button className="quiz-ghost" onClick={onCancel}>
+        <button className="quiz-ghost" aria-disabled={busy || undefined} onClick={() => !busy && onCancel()}>
           Cancel
         </button>
         <Hint text="Save card" keys="finish" side="top">
