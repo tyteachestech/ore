@@ -567,7 +567,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
 
 /** To try (D127): techniques from his reading he planned to try on his own work. Checking one off asks
  *  how it went, in one line; that reflection becomes one Explain card at the next enrich. A second line,
- *  "Next time I'll…" (D146), keeps the round and puts the try back in To try with that plan. Hidden until
+ *  "Next time I'll…" (D148), keeps the round and puts the try back in To try with that plan. Hidden until
  *  he marks the first one (the reader's popup is where they start), and nothing counts them (D23). */
 function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pick<Question, "item" | "id">) => void; notify: Notify }) {
   const [ts, setTs] = useState<Try[] | null>(null);
@@ -658,7 +658,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
 
   if (!ts?.length) return null;
   const open = ts.filter((t) => t.status !== "done");
-  // The record of use (D146): every idea he has tried, with each round's plan and how it went. An idea
+  // The record of use (D148): every idea he has tried, with each round's plan and how it went. An idea
   // planned again is in both lists: its next plan above, its rounds so far here.
   const used = ts.filter((t) => t.status === "done" || t.uses?.length);
   const row = (t: Try, record = false) => (
@@ -744,7 +744,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
 
 /** "How did it go?" and "Next time I'll…" (Linear's inline edit): Enter in either saves both, Esc closes
  *  and keeps the draft; a blur keeps the box and what he typed. The second line, when filled, is the
- *  next try's plan (D146). */
+ *  next try's plan (D148). */
 function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string; onSave: (text: string, next: string) => void; onClose: () => void }) {
   const [v, setV] = useState(() => drafts.get(id)?.text ?? initial);
   const [next, setNext] = useState(() => drafts.get(id)?.next ?? "");

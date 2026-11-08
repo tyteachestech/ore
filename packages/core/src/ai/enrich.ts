@@ -58,7 +58,7 @@ export function pendingHighlights(item: Item, cards: Card[]): Annotation[] {
   const wanted = (a: Annotation) =>
     a.intent === "card" ||
     (a.intent === "question" && a.card && a.status === "done" && a.answers?.length) ||
-    // D146: a try re-planned with "Next time I'll…" is open again, but the round he wrote up still gets its card.
+    // D148: a try re-planned with "Next time I'll…" is open again, but the round he wrote up still gets its card.
     (a.intent === "apply" && reflections(a).length > 0) ||
     (a.intent === "keep" && item.meta.status === "done" && !planned.has(a.id));
   return readAnnotations(item).filter((a) => wanted(a) && !drafted.has(a.id));

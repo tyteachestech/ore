@@ -35,7 +35,7 @@ export const AnnotationSchema = z.object({
   answers: z.array(Contribution).optional(), // Question intent only (D75)
   card: z.boolean().optional(), // Question intent: "Answered + card", so enrich drafts a card from his answer
   reflection: z.string().optional(), // Apply intent (D127): how it went, written when he checked it off
-  // Apply intent (D146): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
+  // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
   // (his plan and how it went move here) and the try is open again with the new plan as its note.
   uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional() })).optional(),
   // A card or question he typed with nothing selected ("Card here"): `exact` is only the sentence where he

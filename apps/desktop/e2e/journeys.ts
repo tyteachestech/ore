@@ -3558,7 +3558,7 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   await page.locator(".answered-toggle", { hasText: "Used" }).click();
   await saved.waitFor();
-  // D146: "Next time I'll…" plans the next try: the row is back in To try with that plan, and the round so far is its record under Used.
+  // D148: "Next time I'll…" plans the next try: the row is back in To try with that plan, and the round so far is its record under Used.
   await saved.click();
   await page.getByLabel("Next time I'll…").fill("Quiz myself before writing, too");
   await page.keyboard.press("Enter");
@@ -3580,7 +3580,7 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   if (!mine || mine.status !== "done" || mine.uses?.length) throw new Error(`the library kept the re-plan: ${JSON.stringify(mine)}`);
 });
 
-journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D146)", async (page) => {
+journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D148)", async (page) => {
   const calls = oreCalls(page);
   await startReview(page, null);
   await reveal(page);

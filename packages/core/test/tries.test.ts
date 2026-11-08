@@ -52,7 +52,7 @@ describe("tries: Apply highlights checked off with how it went (D127)", () => {
     await expect(markTried(lib, k.id, { reflection: "x" })).rejects.toThrow(/not a try/);
   });
 
-  test("Next time I'll… closes the round and opens the try again with the new plan; one highlight per idea (D146)", async () => {
+  test("Next time I'll… closes the round and opens the try again with the new plan; one highlight per idea (D148)", async () => {
     const lib = await tempLibrary();
     const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
     const it = findItem(lib, src.meta.id);

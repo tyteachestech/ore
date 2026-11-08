@@ -86,7 +86,7 @@ await $`bun ${CLI} highlight ${a1.meta.id} --exact ${"Retrieval practice is the 
 await $`bun ${CLI} highlight ${a1.meta.id} --exact ${"after one week the tested group remembered roughly 50% more"} --intent card`.quiet();
 await $`bun ${CLI} highlight ${a1.meta.id} --exact ${"this is called the hypercorrection effect"} --intent question --note ${"Does this hold for kids?"}`.quiet();
 await $`bun ${CLI} highlight ${a2.meta.id} --exact ${"Start with the simplest solution possible"} --intent question`.quiet();
-// A technique to try on his own work (D127), the one the end of a review shows (D146).
+// A technique to try on his own work (D127), the one the end of a review shows (D148).
 await $`bun ${CLI} highlight ${a3.meta.id} --exact ${"The spine forces cause and effect"} --intent apply --note ${"Outline Thursday's video on the spine before writing"}`.quiet();
 // A skill note longer than the column, so a ⌘K match at its end has to scroll there.
 const habitNote = skillNotesPath(lib, "habits");

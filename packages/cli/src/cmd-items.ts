@@ -305,7 +305,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   tried: {
-    usage: '<try> [--text "<how it went>"] [--next "<plan>"] [--undo]   check off a try (D127); with --text, a card is drafted from how it went in the background; --next "Next time I\'ll…" (D146) keeps the round and opens the try again with that plan; --undo steps back',
+    usage: '<try> [--text "<how it went>"] [--next "<plan>"] [--undo]   check off a try (D127); with --text, a card is drafted from how it went in the background; --next "Next time I\'ll…" (D148) keeps the round and opens the try again with that plan; --undo steps back',
     options: { text: { type: "string" }, next: { type: "string" }, undo: { type: "boolean" } },
     async run([ref], f) {
       const lib = openLibrary();

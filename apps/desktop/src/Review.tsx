@@ -29,7 +29,7 @@ const CUT_SHOWN = 8;
 
 type Phase = "answer" | "checked" | "edit";
 /** The session receipt, and today before and after it (for the ring and level-ups). */
-/** `next`: the oldest try still to try on his own work (D146), shown once on the end screen; null when none. */
+/** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
 type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null };
 
 /** The remixed version shown, for the CLI calls that act on it (D66). */
@@ -1255,7 +1255,7 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
         </Hint>
       )}
       {!t.met && t.counts && <p className="quiz-faint">{minutesText(Math.max(0, t.goal_ms - t.active_ms))} min to today’s goal</p>}
-      {/* D146: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
+      {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
       {end.next && (
         <Hint text="To try on your own work · opens the passage">
           <button className="review-try" onClick={() => onTry(end.next!)}>

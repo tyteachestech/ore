@@ -6,7 +6,7 @@ import { nowIso } from "./ids.ts";
 
 // D127: techniques he plans to try on his own work (Apply-intent highlights). His plan is the note;
 // checking one off records how it went (`reflection`), and enrich then drafts one Explain card from it.
-// D146: "Next time I'll…" closes the round into `uses` and opens the try again with that line as its plan.
+// D148: "Next time I'll…" closes the round into `uses` and opens the try again with that line as its plan.
 
 export interface TryView extends Annotation {
   item_title: string;
@@ -34,7 +34,7 @@ export interface TriedInput {
   undo?: boolean;
 }
 
-/** Checks a try off with how it went, plans the next round, or steps back (D127, D146). */
+/** Checks a try off with how it went, plans the next round, or steps back (D127, D148). */
 export async function markTried(lib: Library, ref: string, input: TriedInput): Promise<{ tried: Annotation; item: Item; card: boolean }> {
   return withLock(paths.lock(lib), () => {
     const { item, annotation } = findAnnotation(lib, ref);
