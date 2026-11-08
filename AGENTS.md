@@ -68,7 +68,7 @@ bun run e2e                 # end-to-end journeys in a browser on a seeded mock 
 bun link                    # from packages/cli: puts `ore` on PATH (~/.bun/bin/ore), pointing at this checkout
 ore --help                  # CLI reference; every command accepts --json
 ORE_LIBRARY=/tmp/lib ore init   # scratch library for manual testing; never test against ~/Ore
-bun run app:install         # from ~/Developer/ore on master (the live checkout; ~/Desktop/projects/omni-learn is an old copy with no remote): builds the Tauri app and replaces /Applications/Ore.app; dev: `cd apps/desktop && ORE_LIBRARY=/tmp/lib bun run tauri dev` (Cargo target in ~/Library/Caches/ore)
+bun run app:install         # from ~/Developer/ore on master (the live checkout): builds the Tauri app and replaces /Applications/Ore.app; dev: `cd apps/desktop && ORE_LIBRARY=/tmp/lib bun run tauri dev` (Cargo target in ~/Library/Caches/ore)
 git config core.hooksPath .githooks   # once per clone: a commit or pull on master touching apps/desktop/ reinstalls the app in the background (log: ~/Library/Caches/ore/app-install.log)
 ```
 AI vendor for enrichment and grading: `ai:` in the library's `skills.yaml` (`claude` or `codex`), `ORE_AI` overrides; its model: `models:` there (Settings › AI › Model, D116), `ORE_AI_MODEL` overrides. Background enrich logs: `<library>/.ore/logs/`.
