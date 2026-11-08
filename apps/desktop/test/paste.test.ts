@@ -16,6 +16,13 @@ describe("add box entries", () => {
     expect(entries("file:///Users/t/My%20Essay.pdf")).toEqual([{ kind: "file", path: "/Users/t/My Essay.pdf" }]);
   });
 
+  test("a domain typed without https:// or www. is a link, a file or code name is not", () => {
+    expect(entries("paulgraham.com/greatwork.html")).toEqual([{ kind: "link", url: "https://paulgraham.com/greatwork.html" }]);
+    expect(entries("en.wikipedia.org/wiki/Spaced_repetition")).toEqual([{ kind: "link", url: "https://en.wikipedia.org/wiki/Spaced_repetition" }]);
+    expect(entries("example.com\nnews.ycombinator.com\nlinear.app\nbun.sh")).toHaveLength(4);
+    for (const t of ["Node.js", "README.md", "main.py", "e.g.", "v1.2", "notes.docx", "example.com is good"]) expect(entries(t)[0]!.kind).toBe("text");
+  });
+
   test("a list of links is one source each; anything mixed is text", () => {
     expect(entries("https://a.com\n\nwww.b.org\n")).toHaveLength(2);
     expect(entries("Read this: https://a.com")).toEqual([{ kind: "text", text: "Read this: https://a.com" }]);

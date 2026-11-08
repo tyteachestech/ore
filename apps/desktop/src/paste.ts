@@ -20,6 +20,9 @@ export type Entry = { kind: "link"; url: string } | { kind: "file"; path: string
 
 const FILE = new RegExp(`^(/|~/)\\S.*\\.(${FILE_TYPES.join("|")})$`, "i");
 const WWW = /^www\.[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i;
+/** A domain typed bare (paulgraham.com/x): a link, unless its ending names a file or code (README.md, main.py). */
+const SITE = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.([a-z]{2,})(\/\S*)?$/i;
+const NOT_SITE = new Set([...FILE_TYPES, "js", "jsx", "ts", "tsx", "py", "rb", "json", "yml", "yaml", "css", "swift", "java", "log"]);
 
 function one(line: string): Entry | null {
   if (/^https?:\/\/\S+$/i.test(line)) return { kind: "link", url: line };
@@ -32,6 +35,8 @@ function one(line: string): Entry | null {
   }
   if (FILE.test(line)) return { kind: "file", path: line };
   if (WWW.test(line)) return { kind: "link", url: `https://${line}` };
+  const site = SITE.exec(line);
+  if (site && !NOT_SITE.has(site[2]!.toLowerCase())) return { kind: "link", url: `https://${line}` };
   return null;
 }
 

@@ -46,5 +46,5 @@ Detector: 8 counted findings, none new against the baseline (Geist `@font-face`,
 - Questions on the skill page take five Tab stops per row and no ↑↓.
 - 73 `outline: none` overrides; a few leave only a `bg-hover` fill as focus.
 - The ⓘ and Questions-head dot sprites barely read at 20px (glyph cut out of a filled disc).
-- Add saves any text as a source; a bare domain could offer "Add as a link?".
+- ~~Add saves any text as a source; a bare domain could offer "Add as a link?".~~ Done: a bare domain is a link (Link · site shows before ↵), a file or code name stays text.
 - Settings' text-size stepper pairs a round minus (a round icon by rule, `round-icons.test.ts`) with a bare plus.
