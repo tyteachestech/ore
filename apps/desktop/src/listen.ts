@@ -44,6 +44,15 @@ export function firstFrom(list: Range[], top: number): number {
   return i < 0 ? 0 : i;
 }
 
+/** A speech error code (SpeechSynthesisErrorEvent.error) in plain words, for the toast. */
+export function speechTrouble(why: string): string {
+  if (why === "voice-unavailable" || why === "language-unavailable") return "the Mac has no voice for this language";
+  if (why === "audio-busy" || why === "audio-hardware") return "the Mac's sound output was busy";
+  if (why === "network") return "the voice needs the internet and couldn't reach it";
+  if (why === "not-allowed") return "macOS didn't allow it";
+  return "the Mac's voice couldn't read this part";
+}
+
 export const speechAvailable = () => typeof speechSynthesis !== "undefined" && typeof SpeechSynthesisUtterance !== "undefined";
 
 /** Speaks `list` from a sentence on, one utterance per sentence. Pause, a new speed or a jump

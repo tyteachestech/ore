@@ -3,7 +3,7 @@ import { Window } from "happy-dom";
 
 const w = new Window();
 for (const k of ["document", "NodeFilter", "HTMLElement", "Node"] as const) (globalThis as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k];
-const { sentences } = await import("../src/listen");
+const { sentences, speechTrouble } = await import("../src/listen");
 
 describe("listen (D85)", () => {
   test("sentences run in reading order, across inline marks, skipping code and stamps", () => {
@@ -25,4 +25,12 @@ describe("listen (D85)", () => {
       "Spoken words here.",
     ]);
   });
+});
+
+test("a speech error toast says what happened in words, never the raw code", () => {
+  for (const code of ["synthesis-failed", "voice-unavailable", "audio-busy", "network", "not-allowed", "anything-new"]) {
+    const words = speechTrouble(code);
+    expect(words).not.toContain(code);
+    expect(words).toMatch(/^the |^macOS /);
+  }
 });
