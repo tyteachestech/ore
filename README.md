@@ -115,7 +115,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`brief-notionrpg-engram.md`](docs/research/brief-notionrpg-engram.md) · [`brief-notetaking-notionrpg.md`](docs/research/brief-notetaking-notionrpg.md) | Tyler's earlier tools, and what carried over |
 | [`tp-learn-reference-map.md`](docs/research/tp-learn-reference-map.md) | Open-source projects studied as references |
 
-**Design docs** ([`docs/design/`](docs/design/)): proposals Tyler approved, with the reasoning.
+**Design docs** ([`docs/design/`](docs/design/), [index by area](docs/design/README.md)): proposals Tyler approved, with the reasoning.
 
 | Doc | Status |
 | --- | --- |
