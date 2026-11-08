@@ -42,6 +42,17 @@ jobs:
         working-directory: apps/desktop
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      - name: The bundled CLI starts and reads a library
+        run: |
+          cli=$(ls apps/desktop/src-tauri/binaries/ore-cli-*)
+          export ORE_LIBRARY="$RUNNER_TEMP/lib"
+          "$cli" init "$ORE_LIBRARY" --json > /dev/null
+          "$cli" skills add Piano --json > /dev/null
+          "$cli" add --stdin --no-enrich --json <<< "# Notes on recall
+
+          Retrieval beats rereading." > /dev/null
+          "$cli" ls --json | grep -q "Notes on recall"
+          "$cli" search recall --json | grep -q "Notes on recall"
       - name: Ore.dmg
         run: |
           version=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
