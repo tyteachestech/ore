@@ -17,11 +17,11 @@ below is MIT, BSD or Apache-2.0; Rare UI is ideas only). Ore is on Radix with it
 
 ## Ranking
 
-★ = the ones I'd build, in order.
+★ = the ones I'd build, in order. ✓ = already built elsewhere.
 
 | # | Pitch | Workflow | Replaces / adds | From | Effort |
 |---|---|---|---|---|---|
-| ★1 | Citation hover preview | Tutor / Ask | Tutor's bare `[n]` buttons | assistant-ui Inline citation, AI Elements Inline citation | S |
+| ✓1 | Citation hover preview (**built** by the AI tutor loop as source pills with a hover card) | Tutor / Ask | Tutor's bare `[n]` buttons | assistant-ui Inline citation, AI Elements Inline citation | S |
 | ★2 | Evidence marked in his answer | Review, Practice | Review's got / missed key point list | assistant-ui Confidence marker | M |
 | ★3 | Worked answer one step at a time | Tutor's Show me | Show me's whole worked answer | assistant-ui Math block | M |
 | ★4 | Keep part of a reply | Tutor | + Card on a whole reply | Dice UI Selection toolbar, assistant-ui Quote reply | M |
@@ -32,11 +32,14 @@ below is MIT, BSD or Apache-2.0; Rare UI is ideas only). Ore is on Radix with it
 | 9 | Diagram answers | Tutor → note | Text-only replies | assistant-ui Diagram | L |
 | 10 | Highlights on the video timeline | Video and lecture files | Video.tsx's bare scrubber | Dice UI Media player | L |
 
-★1, ★3, ★4, ★5 and 7 change `Tutor.tsx` or the tutor prompt, which the AI tutor loop is working on tonight:
+★3, ★4, ★5 and 7 change `Tutor.tsx` or the tutor prompt, which the AI tutor loop is working on tonight:
 they go to that loop, or wait until its PRs land. ★2 touches the grader prompt and `Review.tsx`; 6 touches
 `Reader.tsx`.
 
-## ★1 Citation hover preview
+## ✓1 Citation hover preview
+
+**Built** (2026-11-08, AI tutor loop): numbered citations became source pills whose hover card shows the
+location, title and quoted words, and the source list sits behind a Sources pill. Kept here for the record.
 
 - **Replaces:** the tutor's `[n]`, a button that opens the passage (or web page) and shows nothing until clicked.
 - **Workflow:** Ask your library and the tutor (D128, D137).
