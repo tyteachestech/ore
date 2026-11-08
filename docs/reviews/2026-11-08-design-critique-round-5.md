@@ -44,7 +44,7 @@ Detector: 8 counted findings, none new against the baseline (Geist `@font-face`,
 
 ## Still open
 - ~~Questions on the skill page take five Tab stops per row and no ↑↓.~~ Done: the row then its ⋯, ↑ ↓ between rows.
-- 73 `outline: none` overrides; a few leave only a `bg-hover` fill as focus.
+- ~~73 `outline: none` overrides; a few leave only a `bg-hover` fill as focus.~~ Done: the 13 controls whose focus was only their hover fill get the ring back (one rule at the end of styles.css); the rest swap the outline for a ring of their own, or are scroll areas and fields.
 - ~~The ⓘ and Questions-head dot sprites barely read at 20px (glyph cut out of a filled disc).~~ Done: the ? hook is one open curve with no dot inside it; the ⓘ sprite was unused and is gone.
 - ~~Add saves any text as a source; a bare domain could offer "Add as a link?".~~ Done: a bare domain is a link (Link · site shows before ↵), a file or code name stays text.
 - Settings' text-size stepper pairs a round minus (a round icon by rule, `round-icons.test.ts`) with a bare plus.

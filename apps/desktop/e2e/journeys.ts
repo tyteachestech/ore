@@ -284,6 +284,14 @@ journey("skill page Questions: each row is one Tab stop then its ⋯, and ↑ �
   if (!(await rows.first().evaluate((b) => b === document.activeElement))) throw new Error("↑ didn't move back");
 });
 
+journey("Tab shows a focus ring on a control whose hover is a fill (Home's gear)", async (page) => {
+  await page.keyboard.press("Tab");
+  const gear = page.locator(".home-gear").first();
+  await gear.focus();
+  const ring = await gear.evaluate((b) => b.matches(":focus-visible") && getComputedStyle(b).outlineStyle);
+  if (ring !== "solid") throw new Error(`the focused gear shows outline ${ring}`);
+});
+
 journey("⌘K ↵ on Home starts review, never flips a display setting", async (page) => {
   await page.keyboard.press("Meta+k");
   await page.locator("[cmdk-item]").first().waitFor();
