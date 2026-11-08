@@ -69,6 +69,15 @@ describe("Ask your library: retrieval", () => {
     for (const p of ps) expect(LEITNER.slice(p.start, p.end)).toBe(p.text);
   });
 
+  test("a list stays in one passage with the line that leads into it, however long the lead-in", () => {
+    const lead = "A test can take many forms, and each one asks the mind to rebuild what it learned from the page before it, which is the part that makes it last:";
+    const md = `## Testing\n\n${lead}\n\n- **free recall** to write down all you remember;\n\n- **cued recall** to answer from a prompt;\n\n- **practice testing** to work problems.\n\nA new paragraph that is long enough to stand on its own, so it starts a passage of its own here, with more than forty words in it to be sure it does not join the one before it at all.`;
+    const ps = splitPassages(md);
+    expect(ps).toHaveLength(2);
+    expect(ps[0]!.text).toContain("practice testing");
+    expect(ps[1]!.text).toStartWith("A new paragraph");
+  });
+
   test("finds the passages that hold the question's words, best first; archived sources and unrelated ones stay out", async () => {
     const { lib, a } = await library();
     const hits = retrieve(lib, "What happens to a missed card in the Leitner boxes?");

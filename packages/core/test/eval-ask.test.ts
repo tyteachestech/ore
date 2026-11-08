@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findItem } from "../src/items.ts";
-import { addGolden, ask, loadAskCases, passagesFor, retrieved, scoreAnswer } from "../eval/ask.ts";
+import { addGolden, ask, loadAskCases, passagesFor, retrieved, saysNotThere, scoreAnswer } from "../eval/ask.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const saved = { path: process.env.PATH, ai: process.env.ORE_AI };
@@ -51,6 +51,14 @@ describe("ask-your-library eval", () => {
     expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(false);
   });
 
+  test("a reply says the answer isn't in his sources in words, even when it cites what is there nearby", () => {
+    for (const t of ["Your passages don't give his birth year. They do say he devised it in 1973 [1].", "Your notes only say that consolidation happens during sleep [1]. They don't give a number of hours.",
+      "Your source says consolidation happens during sleep, but gives no number of hours.[1]", "That date isn’t in the passages you shared.", "It's none of your sources, so this is general knowledge."])
+      expect({ t, says: saysNotThere(t) }).toEqual({ t, says: true });
+    for (const t of ["FSRS defaults to 90% retention [1].", "Your source says consolidation happens during sleep [1].", "Sebastian Leitner was born in 1919."])
+      expect({ t, says: saysNotThere(t) }).toEqual({ t, says: false });
+  });
+
   test("scoring: the answer must hold every pattern; a citation must be real and one must hold the evidence; an absent question must say so", async () => {
     const lib = await tempLibrary();
     const names = await addGolden(lib);
@@ -66,7 +74,8 @@ describe("ask-your-library eval", () => {
     expect(scoreAnswer(c, r({ citations: [] }), names, body).citation_ok).toBe(false);
     const absent = loadAskCases().absent[0]!;
     expect(scoreAnswer(absent, r({ found: false, citations: [], outside: true }), names, body)).toEqual({ answer_ok: true, citation_ok: true });
-    expect(scoreAnswer(absent, r({}), names, body).answer_ok).toBe(false); // cited a passage for a fact the library lacks
+    expect(scoreAnswer(absent, r({}), names, body).answer_ok).toBe(false); // cited a passage as if it held the answer
+    expect(scoreAnswer(absent, r({ outside: true }), names, body)).toEqual({ answer_ok: true, citation_ok: true }); // said so, and cited what is there nearby
     expect(scoreAnswer(absent, r({ found: false, citations: [], outside: false }), names, body).answer_ok).toBe(false); // answered without saying it isn't his sources
   });
 });

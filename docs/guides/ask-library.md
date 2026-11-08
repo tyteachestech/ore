@@ -18,10 +18,10 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 ## The eval
 
 - **Set** (`packages/core/eval/ask-cases.json`): the golden sample docs (`packages/core/test/golden`: Wikipedia, Python docs, a textbook PDF, EPUB, Word, slides, a notebook, a YouTube transcript) imported into a scratch library. 20 questions they answer, each with answer patterns, the sources that hold it and an evidence pattern. 9 they don't: two off-topic, seven near misses where the person or topic is there but the fact isn't (Ebbinghaus's birth year, FSRS's default retention next to an unrelated "90%").
-- **Retrieval**, with no AI: did a passage from an expected source holding the evidence reach the AI? CI checks this for all 20 questions on both chats (`packages/core/test/eval-ask.test.ts`), so a search change that loses evidence fails the build for free.
+- **Retrieval**, with no AI: do the passages from the expected sources that reach the AI hold the evidence and every part of the answer? CI checks this for all 20 questions on both chats (`packages/core/test/eval-ask.test.ts`), so a search change that loses evidence fails the build for free.
 - **Answer**: every pattern matches the reply.
 - **Citation**: every quote is really at its offsets in its source, and one comes from an expected source and holds the evidence.
-- **Says not there**: an absent question is right only when the reply cites nothing and says so: labelled general knowledge, or a reply that names his sources or library (a plain refusal). An unlabelled answer with no citation fails.
+- **Says not there**: an absent question is right when the reply says the answer isn't from his sources: in words ("your sources don't give his birth year"), or, with no citation, by the "Not from your sources" label. It may cite what his sources do say nearby, but then it has to say so in words, or the citation reads as the answer's source. The report also counts how many then answer from general knowledge.
 - Answer and citation accuracy carry 95% intervals, as in the grading eval.
 
 ## Design decisions
@@ -36,7 +36,8 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 
 - 20 answerable questions over 11 docs; the set has no questions that need two sources combined, and no follow-up turns.
 - Answer patterns are regexes: a right answer in unexpected words can fail, and a wrong one that names the right terms can pass.
-- The tutor may still answer an absent question from general knowledge (labelled); the eval counts that right, since he is told it isn't his sources.
+- The tutor answers an absent question from general knowledge after saying so (D128); the eval counts that right and reports how often it happens. `ore ask-library` refuses instead.
+- "Says it in words" is a phrase match, not a judge: a refusal in unusual words can fail.
 
 ## Learn more
 
