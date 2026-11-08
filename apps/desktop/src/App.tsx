@@ -487,14 +487,18 @@ export function App() {
         if (!failure) setPickFor(at);
       }
       // Undo archives only what this add made (files and cards kept), never a source that was here already.
-      const archive = (on: boolean) => {
-        void Promise.all(fresh.map((id) => ore("archive", id, ...(on ? [] : ["--undo"])))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
-      };
+      // Run only from the history, which puts a failed step back and says why.
+      const archive = (on: boolean) => Promise.all(fresh.map((id) => ore("archive", id, ...(on ? [] : ["--undo"])))).finally(refresh);
       const message = added && list.length === 1 ? added : last ? (list.length > 1 ? manyAdded(list.length - stopped.length - failed.length, here) : `Added “${last.title}”`) : "";
-      const run = (steps: (() => Promise<unknown>)[]) => void Promise.all(steps.map((f) => f())).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+      const run = (steps: (() => Promise<unknown>)[]) => Promise.all(steps.map((f) => f())).finally(refresh);
       // A list can hold both new sources and ones here already: Undo takes back both.
-      const undo = fresh.length || revert.length ? () => (fresh.length && archive(true), revert.length && run(revert), opens && fresh.length && setOpenId((id) => (id === at ? null : id))) : undefined;
-      const redoAll = fresh.length || redo.length ? () => (fresh.length && archive(false), redo.length && run(redo)) : undefined;
+      const undo = fresh.length || revert.length
+        ? () => {
+            if (opens && fresh.length) setOpenId((id) => (id === at ? null : id));
+            return Promise.all([fresh.length && archive(true), revert.length && run(revert)]);
+          }
+        : undefined;
+      const redoAll = fresh.length || redo.length ? () => Promise.all([fresh.length && archive(false), redo.length && run(redo)]) : undefined;
       if (failure) {
         if (toastError) notify(failure, "error");
         else clearToast();
@@ -678,7 +682,7 @@ export function App() {
       const r = await ore<{ feed: { url: string; title: string }; already: boolean; found: FoundFeed }>("feed", "follow", url, ...to.map((k) => opt("skill", k)));
       setFeedTick((n) => n + 1);
       if (r.already) notify(`Already following ${r.feed.title}`, "info", undefined, undefined, goFeed);
-      else notify(`Following ${r.feed.title} · ${feedProof(r.found)}`, "info", () => void ore("feed", "unfollow", r.feed.url).then(() => setFeedTick((n) => n + 1), (e) => notify(errorText(e), "error")), () => void ore("feed", "follow", url, ...to.map((k) => opt("skill", k))).then(() => setFeedTick((n) => n + 1)), goFeed);
+      else notify(`Following ${r.feed.title} · ${feedProof(r.found)}`, "info", () => ore("feed", "unfollow", r.feed.url).then(() => setFeedTick((n) => n + 1)), () => ore("feed", "follow", url, ...to.map((k) => opt("skill", k))).then(() => setFeedTick((n) => n + 1)), goFeed);
       return null;
     } catch (e) {
       return errorText(e);
@@ -1283,11 +1287,14 @@ export function App() {
     setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: t } : i)) ?? all);
     try {
       await ore("edit", id, "--title", t);
-      if (undoable) notify(`Renamed to “${t}”`, "quiet", () => void retitle(id, t, before, false), () => void retitle(id, before, t, false));
+      if (undoable) notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
     } catch (e) {
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       notify(errorText(e), "error");
+    } finally {
+      void refresh();
     }
-    void refresh();
   };
 
   const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
@@ -1329,7 +1336,7 @@ export function App() {
 
   /** Lays out the sidebar at once (optimistic), then saves through `ore skills arrange`; a failure
    *  puts the old layout back. */
-  const arrange = async (layout: SkillLayout) => {
+  const arrange = async (layout: SkillLayout, fromHistory = false) => {
     const byId = new Map(skills.map((s) => [s.id, s]));
     setSkills(layout.flatMap((g) => g.skills.flatMap((id) => {
       const s = byId.get(id);
@@ -1338,9 +1345,12 @@ export function App() {
     try {
       await ore("skills", "arrange", JSON.stringify(layout));
     } catch (e) {
+      // From the history (undo or redo): it puts the step back and says why.
+      if (fromHistory) throw e;
       notify(errorText(e), "error");
+    } finally {
+      reloadSkills();
     }
-    reloadSkills();
   };
   /** Removes a collection: its skills join the ones in none, with Undo. */
   const deleteCollection = (collection: string) => {
@@ -1350,7 +1360,7 @@ export function App() {
     const rest = kept.find((g) => !g.collection);
     const next = rest ? kept.map((g) => (g === rest ? { ...g, skills: [...freed, ...g.skills] } : g)) : [...kept, { collection: "", skills: freed }];
     void arrange(next);
-    notify(`Deleted collection “${collection}”`, "info", () => void arrange(before), () => void arrange(next));
+    notify(`Deleted collection “${collection}”`, "info", () => arrange(before, true), () => arrange(next, true));
   };
   /** Files a skill under another collection (or none), at the end of it, with Undo. */
   const moveSkill = (s: Skill, collection: string) => {
@@ -1360,7 +1370,7 @@ export function App() {
     const next = into ? out.map((g) => (g === into ? { ...g, skills: [...g.skills, s.id] } : g)) : [...out, { collection, skills: [s.id] }];
     const after = next.filter((g) => g.skills.length);
     void arrange(after);
-    notify(collection ? `Moved “${s.name}” to ${collection}` : `Moved “${s.name}” out of ${s.collection}`, "info", () => void arrange(before), () => void arrange(after));
+    notify(collection ? `Moved “${s.name}” to ${collection}` : `Moved “${s.name}” out of ${s.collection}`, "info", () => arrange(before, true), () => arrange(after, true));
   };
   const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
 
@@ -1397,14 +1407,12 @@ export function App() {
       await ore("course", "set", id, opt("title", t));
       if (undoable) notify(`Renamed to “${t}”`, "quiet", () => recourse(id, t, before, false), () => recourse(id, before, t, false));
     } catch (e) {
-      // An undo's or redo's failure goes back to the history, which says so.
-      if (!undoable) {
-        void refresh();
-        throw e;
-      }
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       notify(errorText(e), "error");
+    } finally {
+      void refresh();
     }
-    void refresh();
   };
   const courseSkills = (c: CourseLine) => [...new Set(c.lessons.flatMap((l) => l.skills))];
   const courseFiling = (c: CourseLine) => ({ title: c.title, ids: new Set(c.lessons.map((l) => l.id)), write: (ids: string[]) => ore("course", "set", c.id, opt("skills", ids.join(","))) });
@@ -1423,7 +1431,8 @@ export function App() {
     const apply = (on: boolean) => {
       if (on) setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
       else setCursor(`course:${c.id}`);
-      queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"]))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+      // Run only from the history, which puts a failed step back and says why.
+      return queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"]))).finally(refresh);
     };
     notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
     try {
@@ -1457,7 +1466,7 @@ export function App() {
     const ids = new Set(sel.map((i) => i.id));
     const was = cursor;
     const queue = inOrder();
-    const go = async (forward: boolean) => {
+    const go = async (forward: boolean, fromHistory = false) => {
       if (patch) setItems((all) => all && (forward ? all.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) : [...all.filter((i) => !ids.has(i.id)), ...sel]));
       if (!forward) setCursor(was);
       try {
@@ -1465,13 +1474,15 @@ export function App() {
           for (const i of sel) await write(i, forward);
         });
       } catch (e) {
+        if (fromHistory) throw e;
         notify(errorText(e), "error");
+      } finally {
+        void refresh();
       }
-      void refresh();
     };
     unpick();
     void go(true);
-    notify(message, "info", () => void go(false), () => void go(true));
+    notify(message, "info", () => go(false, true), () => go(true, true));
   };
   const copySources = (list: Item[]) =>
     void copyCited(citeSources(list)).then(() => notify(list.length > 1 ? `Copied ${sourcesN(list.length)} as Markdown` : "Copied as Markdown"), (e) => notify(errorText(e), "error"));
@@ -1524,8 +1535,10 @@ export function App() {
       try {
         await ore("status", item.id, ...back(item, to));
         await refresh();
-        if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => void moveSource(item, item.status, false), () => void moveSource(item, to, false));
+        if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => moveSource(item, item.status, false), () => moveSource(item, to, false));
       } catch (e) {
+        // From the history (undo or redo): it puts the step back and says why.
+        if (!undoable) throw e;
         notify(errorText(e), "error");
       }
     },
@@ -1538,12 +1551,15 @@ export function App() {
     setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at } : i)) ?? all);
     try {
       await ore("pin", item.id, ...(pinned_at ? [] : ["--undo"]));
-      const flip = (on: boolean) => () => void pinSource({ ...item, pinned_at: on ? undefined : "x" }, false);
+      const flip = (on: boolean) => () => pinSource({ ...item, pinned_at: on ? undefined : "x" }, false);
       if (undoable) notify(pinned_at ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(!pinned_at), flip(!!pinned_at));
     } catch (e) {
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       notify(errorText(e), "error");
+    } finally {
+      void refresh();
     }
-    void refresh();
   };
   /** A pinned source moved among the pinned of this list (drag, or Move up/down), to `to` among them. */
   const movePinned = async (item: Item, to: number) => {
@@ -1552,34 +1568,39 @@ export function App() {
     if (from < 0 || to === from) return;
     const rest = pinned.filter((i) => i.id !== item.id);
     const at = pinBetween(rest[to - 1]?.pinned_at, rest[to]?.pinned_at);
-    const repin = async (t: string) => {
+    const repin = async (t: string, fromHistory = false) => {
       setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: t } : i)) ?? all);
       try {
         await ore("pin", item.id, "--at", t);
       } catch (e) {
+        if (fromHistory) throw e;
         notify(errorText(e), "error");
+      } finally {
+        void refresh();
       }
-      void refresh();
     };
     await repin(at);
-    notify(`Moved “${item.title}”`, "quiet", () => void repin(item.pinned_at!), () => void repin(at));
+    notify(`Moved “${item.title}”`, "quiet", () => repin(item.pinned_at!, true), () => repin(at, true));
   };
 
 
   /** Files a source, or every lesson of a course, under exactly `next` skills (their cards follow):
    *  optimistic, with Undo back to `before`. */
-  const refile = async (what: { title: string; ids: Set<string>; write: (skills: string[]) => Promise<unknown> }, next: string[], before: string[], changed?: Skill) => {
+  const refile = async (what: { title: string; ids: Set<string>; write: (skills: string[]) => Promise<unknown> }, next: string[], before: string[], changed?: Skill, fromHistory = false) => {
     setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
     try {
       await what.write(next);
       if (changed) {
         const on = next.includes(changed.id);
-        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => void refile(what, before, next), () => void refile(what, next, before));
+        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true), () => refile(what, next, before, undefined, true));
       }
     } catch (e) {
+      // From the history (undo or redo): it puts the step back and says why.
+      if (fromHistory) throw e;
       notify(errorText(e), "error");
+    } finally {
+      void refresh();
     }
-    void refresh();
   };
   const sourceFiling = (item: Item) => ({ title: item.title, ids: new Set([item.id]), write: (ids: string[]) => ore("edit", item.id, "--skills", ids.join(",")) });
   /** Files a source under a skill, or takes it off one, from its ⋯ menu. */
@@ -2118,7 +2139,7 @@ export function App() {
           const before = layoutOf(skillGroups(skills));
           void arrange(layout);
           // A drag is a step too, quietly (Finder): ⌘Z puts the skill or collection back where it was.
-          notify(step ?? "Moved in the sidebar", step ? "info" : "quiet", () => void arrange(before), () => void arrange(layout));
+          notify(step ?? "Moved in the sidebar", step ? "info" : "quiet", () => arrange(before, true), () => arrange(layout, true));
         }}
         onDeleteCollection={deleteCollection}
       />
@@ -2193,7 +2214,7 @@ export function App() {
               setOpenId(null);
               setFinishing(false);
               void refresh();
-              if (item) notify(`Finished “${item.title}” · cards start tomorrow`, "info", () => void moveSource(item, "reading", false), () => void moveSource(item, "done", false));
+              if (item) notify(`Finished “${item.title}” · cards start tomorrow`, "info", () => moveSource(item, "reading", false), () => moveSource(item, "done", false));
             }}
             notify={notify}
           />

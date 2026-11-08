@@ -215,8 +215,10 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
       if (fromPreq.some((x) => x.from_notes || x.annotation !== null || x.kind !== "prompt")) return "prequestion drafts must be prompts with annotation null and from_notes false";
       const got = fromPreq.map((x) => x.prequestion!).sort((a, b) => a - b);
       if (got.join() !== preqNs.join()) return `exactly one prompt per number in prequestions_to_draft (${preqNs.join(", ") || "none"}); got ${got.join(", ") || "none"}`;
-      const bad = d.drafts.flatMap((x) => (!x.from_notes && x.prequestion === null ? [x.annotation ?? "", ...x.also] : x.also)).filter((id) => !pendingIds.has(id));
+      const bad = d.drafts.flatMap((x) => (!x.from_notes && x.prequestion === null ? [x.annotation ?? ""] : [])).filter((id) => !pendingIds.has(id));
       if (bad.length) return `drafts reference unknown highlight ids: ${bad.join(", ")}`;
+      // A mistyped id in `also` is dropped, not a failed run; a key point it should have named is still checked below.
+      for (const x of d.drafts) x.also = x.also.filter((id) => pendingIds.has(id));
       const perHighlight = new Map<string, number>();
       for (const x of d.drafts) for (const id of new Set([x.annotation, ...x.also])) if (id) perHighlight.set(id, (perHighlight.get(id) ?? 0) + 1);
       const over = [...perHighlight].filter(([, k]) => k > 2).map(([id]) => id);
@@ -295,7 +297,7 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
       .map((d) => {
         const ts = d.topics.map(slugify).filter((s) => slugs.includes(s) || meta.topics.includes(s));
         return writeNewCard(lib, {
-          kind: d.kind, item: meta.id, ...source(d), also: d.from_notes || d.prequestion !== null ? undefined : d.also.filter((id) => id !== d.annotation), skills: meta.skills,
+          kind: d.kind, item: meta.id, ...source(d), also: d.from_notes ? undefined : d.also.filter((id) => id !== d.annotation), skills: meta.skills,
           topics: ts.length ? ts : meta.topics.slice(0, 1), content_type: d.content_type, question: d.question, answer: d.answer,
           rubric: d.kind === "prompt" ? d.rubric : [], ai,
           evidence: d.annotation && points.has(d.annotation) ? anchorEvidence(fresh.body, d.evidence) : undefined,

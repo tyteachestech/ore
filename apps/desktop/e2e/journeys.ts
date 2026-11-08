@@ -4942,6 +4942,25 @@ journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the sugges
   }
 });
 
+journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {
+  const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { edit: why } : {}), why);
+  await openSource(page, AGENTS);
+  const title = () => page.locator(".doc-head h1").innerText();
+  await page.locator(".doc-head h1").click();
+  await page.getByLabel("Title").fill("Agents, retitled");
+  await page.keyboard.press("Enter");
+  await until("Enter saves it", async () => (await title()) === "Agents, retitled");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await fail("The library is read-only.");
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: "Couldn’t undo" }).filter({ hasText: "The library is read-only." }).waitFor();
+  await until("the failed undo leaves the new title", async () => (await title()) === "Agents, retitled");
+  await fail(null);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z again takes it back", async () => (await title()) === AGENTS);
+});
+
 // —— run ——
 
 let failed = 0;
