@@ -84,11 +84,11 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   // A row opens on click and a list takes arrow keys: what happens in here stays in here (the
   // portal still bubbles React events up to the row).
   const stop = (e: SyntheticEvent) => e.stopPropagation();
+  // Off screen in a long list (Lite.tsx): the pills as the trigger renders them, the picker once the row scrolls in.
+  const bare = lite && !open;
   const button = (
     <button
-      type="button"
-      aria-haspopup="dialog"
-      aria-expanded={open}
+      {...(bare && { type: "button", "aria-haspopup": "dialog", "aria-expanded": false })}
       className={children ? "chips-button" : "chips-add"}
       aria-label={`Skills for ${title}`}
       onClick={stop}
@@ -98,8 +98,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
       {children || <Plus size={11} weight="bold" aria-hidden="true" />}
     </button>
   );
-  // Off screen in a long list (Lite.tsx): the pills alone, the picker once the row scrolls in.
-  if (lite && !open) return button;
+  if (bare) return button;
   return (
     <Popover.Root
       open={open}

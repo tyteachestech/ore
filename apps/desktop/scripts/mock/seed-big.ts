@@ -109,7 +109,7 @@ for (const skill of ids)
   for (let k = 0; k < WEIGHT[skill]! * SCALE; k++) {
     const topic = pick(TOPICS[skill]!);
     let title = pick(FRAMES)(topic);
-    if (seen.has(title)) title = `${title} (part ${k})`;
+    for (let n = k; seen.has(title); n += ids.length) title = `${title.replace(/ \(part \d+\)$/, "")} (part ${n})`;
     seen.add(title);
     const type = typeOf();
     // 1 in 6 also goes under a second skill; 1 in 25 has no skill (All sources only).
@@ -161,13 +161,11 @@ if (SCALE > 1) {
   await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, captured_at: ago(20), status: "reading" }));
   const live = { ...item, body: text };
   const sentences = [...new Set(text.split("\n").filter((l) => l && !l.startsWith("#")).flatMap((p) => p.split(/(?<=\.) /)))];
-  for (let h = 0, at = 0; h < 200; h++) {
-    at = text.indexOf(sentences[Math.floor(rnd() * sentences.length)]!, Math.floor((h / 200) * text.length * 0.5));
-    if (at < 0) continue;
-    const exact = text.slice(at, text.indexOf(".", at) + 1);
-    try {
-      addHighlight(live, { exact, intent: pick(["keep", "keep", "card", "question"]), start: at, note: rnd() < 0.2 ? "Does this hold for kids?" : undefined });
-    } catch {}
+  // Spread over the first half, each a whole sentence found from its own place on.
+  for (let h = 0; h < 200; h++) {
+    const exact = sentences[Math.floor(rnd() * sentences.length)]!;
+    const at = text.indexOf(exact, Math.floor((h / 200) * text.length * 0.5));
+    if (at >= 0) addHighlight(live, { exact, intent: pick(["keep", "keep", "card", "question"]), start: at, note: rnd() < 0.2 ? "Does this hold for kids?" : undefined });
   }
   made.push({ id: item.meta.id, skills: ["learning"], status: "reading", topic: "Spaced repetition", body: text, captured: 20 });
 }

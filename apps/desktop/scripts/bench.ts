@@ -129,9 +129,15 @@ const steps: [string, (page: Page) => Promise<Result>][] = [
   }],
 ];
 
-const browser = await chromium.launch();
+if (ONLY && !steps.some(([n]) => n.includes(ONLY))) {
+  bridge.kill();
+  vite.kill();
+  throw new Error(`no step matches --only ${ONLY}: ${steps.map(([n]) => n).join(", ")}`);
+}
 const runs = new Map<string, Result[]>();
+let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 try {
+  browser = await chromium.launch();
   for (let r = 0; r < ROUNDS; r++) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     page.setDefaultTimeout(30000);
@@ -152,7 +158,7 @@ try {
     await page.close();
   }
 } finally {
-  await browser.close();
+  await browser?.close();
   bridge.kill();
   vite.kill();
 }

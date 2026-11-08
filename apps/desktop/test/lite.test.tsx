@@ -26,19 +26,25 @@ const renderToStaticMarkup = (el: ReactElement) => {
 // A long list's off-screen rows render their controls without Radix (Lite.tsx): All sources with
 // 950 rows opened in 0.65 s with every row's menus built, 0.2 s without. The button must stay the same.
 const both = (el: ReactElement) => [true, false].map((lite) => renderToStaticMarkup(<Lite.Provider value={lite}>{el}</Lite.Provider>));
-const attrs = (html: string) => html.replace(/ (data-state|id|aria-controls)="[^"]*"/g, "");
+/** The button's attributes, as a sorted list, leaving out the ones only an open-able trigger needs. */
+const attrs = (html: string) => {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  const b = div.querySelector("button")!;
+  return [...b.attributes].map((a) => `${a.name}=${a.value}`).filter((a) => !/^(data-state|id|aria-controls)=/.test(a)).sort();
+};
 
 describe("lite rows", () => {
   test("⋯ is the same button either way, without its menu off screen", () => {
     const [lite, full] = both(<MoreButton label="Actions for A source" actions={() => []} />);
-    expect(attrs(lite!)).toBe(attrs(full!));
+    expect(attrs(lite!)).toEqual(attrs(full!));
     expect(lite).not.toContain("data-state");
     expect(full).toContain("data-state");
   });
 
   test("the skill pills are the same button either way", () => {
     const [lite, full] = both(<SkillPicker skills={[]} value={[]} title="A source" onChange={() => {}} onCreate={async () => undefined} />);
-    expect(attrs(lite!)).toBe(attrs(full!));
+    expect(attrs(lite!)).toEqual(attrs(full!));
     expect(lite).not.toContain("data-state");
   });
 

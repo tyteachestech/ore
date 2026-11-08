@@ -121,13 +121,14 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   /** Focus stays where the action put it (the note's text), not back on the button. */
   keepFocus?: boolean;
 }) {
+  // Off screen in a long list (Lite.tsx): the same button as the trigger renders, its menu and hint once it scrolls in.
+  const lite = useLite() && !open;
   const button = (
-    <button type="button" aria-haspopup="menu" aria-expanded="false" className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => (onPointerDown?.(e), e.stopPropagation())}>
+    <button {...(lite && { type: "button", "aria-haspopup": "menu", "aria-expanded": false })} className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => (onPointerDown?.(e), e.stopPropagation())}>
       {icon ?? <DotsThree size={16} aria-hidden="true" />}
     </button>
   );
-  // Off screen in a long list (Lite.tsx): the same button, its menu and hint once it scrolls in.
-  if (useLite() && !open) return button;
+  if (lite) return button;
   return (
     <DropdownMenu.Root modal={false} open={open} onOpenChange={onOpenChange}>
       <Hint text={hint}>
