@@ -109,8 +109,10 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   /** Counts grading runs, so a grade still on its way when the key points change is dropped. */
   const grading = useRef(0);
   /** What is on screen now, for a card edit (or its undo) that lands later. */
-  const now = useRef({ card, answer, inHead, phase, marks });
-  now.current = { card, answer, inHead, phase, marks };
+  const now = useRef({ card, answer, inHead, phase, marks, grade, draft });
+  now.current = { card, answer, inHead, phase, marks, grade, draft };
+  /** The card's words as the editor last loaded them: an undo refreshes the editor only if he hasn't typed since. */
+  const loaded = useRef(draft);
   const entry = queue?.[0];
 
   useEffect(() => {
@@ -477,7 +479,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   const edit = () => {
     if (!card) return;
-    setDraft({ question: card.question, answer: card.answer, points: card.rubric.join("\n") });
+    loaded.current = { question: card.question, answer: card.answer, points: card.rubric.join("\n") };
+    setDraft(loaded.current);
     setPhase("edit");
   };
 
@@ -496,11 +499,16 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       grading.current++;
       setGrade(null);
       setMarks(saved.rubric.map((p) => (noIdea ? false : marked.get(p))));
-      if (!noIdea) setRemark(saved.rubric.some((p) => !marked.has(p)));
+      // Marks carried over from the AI's grade are its, not his: he marks again before a suggestion.
+      if (!noIdea) setRemark(!!s.grade || saved.rubric.some((p) => !marked.has(p)));
       if (!noIdea && !s.inHead) setGradeError(KEY_POINTS_CHANGED);
     }
     // The editor open on this card (an undo landed meanwhile): it shows the card as it now is.
-    if (s.card?.id === c.id && s.phase === "edit") setDraft({ question: saved.question, answer: saved.answer, points: saved.rubric.join("\n") });
+    const d = s.draft, l = loaded.current;
+    if (s.card?.id === c.id && s.phase === "edit" && d.question === l.question && d.answer === l.answer && d.points === l.points) {
+      loaded.current = { question: saved.question, answer: saved.answer, points: saved.rubric.join("\n") };
+      setDraft(loaded.current);
+    }
     if (undoable) {
       const put = (w: typeof was) => () => void setText(c, w.question, w.answer, w.rubric, false).catch((e) => notify(errorText(e), "error"));
       notify("Card edit", "quiet", put(was), put({ question, answer, rubric }));
@@ -564,7 +572,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       return;
     }
     if (!card) {
-      if (e.key === "Enter" && error && entry) {
+      if (e.key === "Enter" && onSurface && error && entry) {
         e.preventDefault();
         retryLoad();
       }
@@ -679,9 +687,11 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
             {entry && !card && (
               <>
                 {" "}
-                <button className="link" autoFocus onClick={retryLoad}>
-                  Try again
-                </button>
+                <Hint text={<>Try again <kbd>↵</kbd></>}>
+                  <button className="link" autoFocus onClick={retryLoad}>
+                    Try again
+                  </button>
+                </Hint>
               </>
             )}
           </p>
@@ -1004,7 +1014,7 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
         </>
       )}
       <div className="review-foot">
-        <button className="quiz-ghost" disabled={busy} onClick={onCancel}>
+        <button className="quiz-ghost" aria-disabled={busy || undefined} onClick={() => !busy && onCancel()}>
           Cancel
         </button>
         <Hint text="Save card" keys="finish" side="top">

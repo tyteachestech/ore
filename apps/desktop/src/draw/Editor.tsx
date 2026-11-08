@@ -1503,7 +1503,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     e.stopPropagation();
     const ed = live.current.editing;
     // Keys that pick a word from an input method (Japanese, Chinese) are still typing.
-    if (!ed || e.nativeEvent.isComposing) return;
+    if (!ed || e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === "Escape") {
       e.preventDefault();
       return endEdit("done");

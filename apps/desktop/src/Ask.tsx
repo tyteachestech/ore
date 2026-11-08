@@ -34,9 +34,12 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
   }, [turns, busy]);
 
   /** `again`: Try again on a message that failed; it is in the thread already, and what he has typed since stays. */
+  /** One request at a time: a double click on Try again sends once (busy is a render behind). */
+  const sending = useRef(false);
   const send = async (text: string, again = false) => {
     const message = text.trim();
-    if (!message || busy) return;
+    if (!message || busy || sending.current) return;
+    sending.current = true;
     setChat((c) => (again ? { ...c, error: null, busy: true } : { ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true }));
     try {
       const r = await ore<Reply>(
@@ -45,10 +48,11 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
         opt("message", message),
         ...(chat.session ? [opt("session", chat.session)] : [opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : [])]),
       );
-      setChat((c) => ({ ...c, session: r.session, busy: false, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal }] }));
+      setChat((c) => ({ ...c, session: r.session, busy: false, failed: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal }] }));
     } catch (e) {
       setChat((c) => ({ ...c, busy: false, error: errorText(e, "answer that"), failed: message }));
     } finally {
+      sending.current = false;
       field.current?.focus();
     }
   };

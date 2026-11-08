@@ -2628,7 +2628,7 @@ journey("finish quiz: while Check saves, his answer and how sure he is stay as s
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
-journey("review: a card that fails to load offers Try again, focused, which loads it without losing the rating before it; ⌘Z clears the error", async (page) => {
+journey("review: a card that fails to load offers Try again, focused, which loads it without losing the rating before it; Undo clears the error", async (page) => {
   await startReview(page, null);
   const q = page.locator(".review-q");
   const session = page.locator(".review [role=progressbar]").first();
@@ -2643,16 +2643,17 @@ journey("review: a card that fails to load offers Try again, focused, which load
   };
   const error = page.getByText("Couldn’t read the card.");
   const retry = page.getByRole("button", { name: "Try again" });
-  // ⌘Z takes the rating back: its card loads, and the error goes with the card it was about.
+  // Enter on Undo takes the rating back (it is Undo's Enter, not Try again's): its card loads, and the
+  // error goes with the card it was about.
   await reveal(page);
   await failNext();
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await error.waitFor();
   await page.unroute(/\/ore$/);
-  await page.locator(".review").focus();
-  await page.keyboard.press("Meta+z");
-  await until("⌘Z puts the first card back", async () => (await q.isVisible()) && (await q.innerText()) === first);
-  if (await error.count()) throw new Error("the load error stayed on the card ⌘Z brought back");
+  await page.getByRole("button", { name: "Undo last rating" }).focus();
+  await page.keyboard.press("Enter");
+  await until("Undo puts the first card back", async () => (await q.isVisible()) && (await q.innerText()) === first);
+  if (await error.count()) throw new Error("the load error stayed on the card Undo brought back");
   // Try again takes the focus, and Enter loads the card.
   await reveal(page);
   await failNext();
@@ -2670,7 +2671,7 @@ journey("review: a card that fails to load offers Try again, focused, which load
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("review: changing an Explain card's key points after it was checked keeps the marks of points left as they were, drops the rest and the suggestion; an undo refreshes an open editor", async (page) => {
+journey("review: changing an Explain card's key points after it was checked keeps the marks of points left as they were, but suggests nothing until he marks; an undo refreshes an untouched open editor only", async (page) => {
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ rating: 3, gaps: [], feedback: "", covered: [true, true] }) });
@@ -2680,31 +2681,48 @@ journey("review: changing an Explain card's key points after it was checked keep
   await page.getByRole("radio", { name: "Think so" }).click();
   await page.getByRole("button", { name: "Check", exact: true }).click();
   const points = page.locator(".quiz-points");
+  const suggested = page.locator(".review-rate .suggested");
   await until("the AI marked both points", async () => (await points.locator("li.got").count()) === 2);
-  await page.locator(".review-rate .suggested").waitFor();
+  await suggested.waitFor();
   await page.getByRole("button", { name: "Edit card" }).click();
   const field = page.getByRole("textbox", { name: "Key points" });
   const was = await field.inputValue();
   const [kept, changed] = was.split("\n") as [string, string];
-  await field.fill(`Says when rereading does help\n${kept}`);
-  await page.getByRole("button", { name: "Save" }).click();
-  await points.getByText("Says when rereading does help").waitFor();
+  const save = async (text: string, shows: string) => {
+    if (!(await field.isVisible())) await page.getByRole("button", { name: "Edit card" }).click();
+    await field.fill(text);
+    await page.getByRole("button", { name: "Save" }).click();
+    await points.locator("li").first().filter({ hasText: shows }).waitFor();
+  };
+  // Only reordered: both marks stay, but they were the AI's, so nothing is suggested until he marks.
+  await save(`${changed}\n${kept}`, changed);
   await page.unroute(/\/ore$/);
   await page.getByText("The key points changed.").waitFor();
+  if ((await points.locator("li.got").count()) !== 2) throw new Error("a reorder lost a mark");
+  if (await suggested.count()) throw new Error("the AI's marks still suggest a rating after the points changed");
+  // A changed point loses its mark; one left as it was keeps it.
+  await save(`Says when rereading does help\n${kept}`, "Says when rereading does help");
   const got = await points.locator("li.got").allInnerTexts();
   if (got.length !== 1 || got[0] !== kept) throw new Error(`marked got: ${got.join(" | ")}`);
   if (await points.locator("li.missed").count()) throw new Error("a changed point kept a mark");
-  if (await page.locator(".review-rate .suggested").count()) throw new Error("a rating is still suggested from the old marks");
+  if (await suggested.count()) throw new Error("a rating is suggested before he marks");
   // Marking the new point gives a suggestion again, from his marks.
   await points.locator("li", { hasText: "Says when rereading does help" }).locator(".quiz-mark").click();
-  await page.locator(".review-rate .suggested").waitFor();
-  // ⌘Z lands while the editor is open: it shows the points as they are now.
+  await suggested.waitFor();
+  // ⌘Z lands while the editor is open and untouched: it shows the points as they are now.
   await page.getByRole("button", { name: "Edit card" }).click();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Meta+z");
-  await until("the open editor has the points back", async () => (await field.inputValue()) === `${kept}\n${changed}`);
+  await until("the open editor has the points back", async () => (await field.inputValue()) === `${changed}\n${kept}`);
+  // ⇧⌘Z lands after he typed in the editor: his typing stays.
+  await field.fill("His own wording");
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const id = ((await ore("due")) as { id: string; question: string }[]).find((e) => e.question.startsWith("Explain why rereading"))!.id;
+  await page.keyboard.press("Shift+Meta+z");
+  await until("⇧⌘Z saved the new points again", async () => ((await ore("card", "show", id)) as { rubric: string[] }).rubric[0] === "Says when rereading does help");
+  await page.waitForTimeout(200);
+  if ((await field.inputValue()) !== "His own wording") throw new Error("an undo threw away what he typed in the editor");
   await page.keyboard.press("Escape");
-  await points.getByText(changed).waitFor();
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
 });
@@ -2763,12 +2781,14 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   await page.keyboard.press("Enter");
   await page.locator(".ask").getByText("The AI is offline.", { exact: false }).waitFor();
   await box.fill("And for kids?");
-  await page.locator(".ask").getByRole("button", { name: "Try again" }).click();
+  await page.locator(".ask").getByRole("button", { name: "Try again" }).dblclick();
   await page.locator(".ask").getByText("Because recalling it is the practice.").waitFor();
   await page.unroute(/\/ore$/);
   if (asked.join(" | ") !== "--message=Why does this work? | --message=Why does this work?") throw new Error(`asked: ${asked.join(" | ")}`);
   if ((await box.inputValue()) !== "And for kids?") throw new Error("Try again cleared the follow-up");
   if ((await page.locator(".ask-me").count()) !== 1) throw new Error("Try again put the question in the thread twice");
+  await page.waitForTimeout(300);
+  if (asked.length !== 2) throw new Error(`a double click on Try again asked ${asked.length - 1} times`);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
@@ -2776,17 +2796,30 @@ journey("review Ask: a failed question offers Try again, which asks it again and
 
 journey("typing with an input method: Enter that picks a word neither sends an answer nor ends a diagram label", async (page) => {
   const composingEnter = (el: Element) => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", isComposing: true, bubbles: true, cancelable: true }));
+  // WKWebView's commit Enter: keyCode 229, isComposing false.
+  const imeEnter = (el: Element) => {
+    const e = new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true });
+    Object.defineProperty(e, "keyCode", { get: () => 229 });
+    el.dispatchEvent(e);
+  };
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Answer…" }).click();
   const box = page.getByLabel("Your answer to Does this hold for kids?");
   await box.fill("たぶん");
   await box.evaluate(composingEnter);
+  await box.evaluate(imeEnter);
   await page.waitForTimeout(300);
   if ((await box.inputValue()) !== "たぶん" || (await page.getByRole("button", { name: "Edit: たぶん" }).count())) throw new Error("a composing Enter sent the answer");
   await box.fill("");
   await page.keyboard.press("Escape");
-  await openSource(page, AGENTS);
+  // A source of its own, so the note is empty whatever ran before.
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Words in other scripts\n\nA short page to draw beside.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A short page to draw beside.").waitFor();
+  if (!(await page.locator(".mynotes").count())) await page.keyboard.press("n");
   const note = page.locator(".note-editor [contenteditable=true]").first();
   await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
   await page.keyboard.press("Meta+ArrowDown");
@@ -2803,6 +2836,7 @@ journey("typing with an input method: Enter that picks a word neither sends an a
   await label.waitFor();
   await page.keyboard.type("記憶");
   await label.evaluate(composingEnter);
+  await label.evaluate(imeEnter);
   await page.waitForTimeout(300);
   if (!(await label.isVisible())) throw new Error("a composing Enter ended the label");
   await page.keyboard.press("Enter");
