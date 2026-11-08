@@ -149,6 +149,15 @@ const withImages = (base: Components, dir: string): Components => ({
 /** A figure open to fill the window (D143): its image in the text, and where it sat. */
 type Zoomed = { img: HTMLImageElement; from: DOMRect };
 
+/** The figure a click opens (D143): a loaded picture in the text, not a link (the link wins), and not already
+ *  about as big as the window. */
+function zoomable(t: EventTarget | null, doc: HTMLElement | null): Zoomed | null {
+  const img = (t as Element | null)?.closest?.("img");
+  if (!(img instanceof HTMLImageElement) || !doc?.contains(img) || img.closest("a[href]") || !img.naturalWidth) return null;
+  const from = img.getBoundingClientRect();
+  return Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height) > 1.1 ? { img, from } : null;
+}
+
 /** A figure, slide or chart drawn at the column's width opens to fill the window, so labels too small to
  *  read there can be read (Medium, Readwise Reader). It grows from where it sits; a click or a scroll puts it
  *  back the same way, Esc at once (keys don't animate). While it is open no key reaches the page behind. */
@@ -161,7 +170,7 @@ function FigureZoom({ fig, onClose }: { fig: Zoomed; onClose: () => void }) {
   const back = () => {
     if (leaving.current) return;
     leaving.current = true;
-    if (still) close.current();
+    if (still || !open) close.current(); // not grown yet: nothing to animate back
     else setOpen(false);
   };
   const backRef = useRef(back);
@@ -2008,12 +2017,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. Add it with ${label(keys.file)} to read it here.`, "error");
   };
   const onClick = (e: MouseEvent) => {
-    // A figure opens to fill the window (D143), unless it is a link (the link wins) or already about as big.
-    const fig = (e.target as Element).closest?.("img");
-    if (fig instanceof HTMLImageElement && docEl.current?.contains(fig) && !fig.closest("a[href]") && fig.naturalWidth) {
-      const from = fig.getBoundingClientRect();
-      if (Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height) > 1.1) return setZoom({ img: fig, from });
-    }
+    const fig = zoomable(e.target, docEl.current);
+    if (fig) return setZoom(fig);
     const a = (e.target as Element).closest?.("a[href]");
     if (!a || !docEl.current?.contains(a)) return;
     e.preventDefault();
@@ -2095,7 +2100,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       return;
     }
     // A link or a figure inside a highlight opens the link or the figure; the rest of the highlight opens its popup.
-    if ((e.target as Element).closest?.("a[href], img")) return;
+    if ((e.target as Element).closest?.("a[href]") || zoomable(e.target, el)) return;
     const id = hitTest(ranges.current, e.clientX, e.clientY);
     const range = id && ranges.current.get(id);
     if (id && range) {
