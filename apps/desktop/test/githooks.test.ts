@@ -1,4 +1,5 @@
-// The app reinstall hooks (.githooks): only master's changes to apps/desktop/ reinstall Ore.app.
+// The app reinstall hooks (.githooks): only master's changes to apps/desktop/, or to what its compiled
+// `ore` is built from (packages/, the root package files; D30), reinstall Ore.app.
 // Every worktree shares core.hooksPath, so a commit on a thread's branch must not install that branch.
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, chmodSync } from "node:fs";
@@ -54,8 +55,15 @@ describe("app reinstall hooks", () => {
     expect(await installs()).toBe("master");
   });
 
-  test("a commit elsewhere on master does not", async () => {
+  test("a commit to the CLI's code or the lockfile reinstalls too, since the app carries a compiled ore", async () => {
     commit(repo, "packages/core/a.ts");
+    expect(await installs()).toBe("master");
+    commit(repo, "bun.lock");
+    expect(await installs()).toBe("master");
+  });
+
+  test("a commit elsewhere on master does not", async () => {
+    commit(repo, "docs/a.md");
     expect(await installs()).toBe("");
   });
 
