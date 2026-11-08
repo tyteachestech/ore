@@ -72,6 +72,14 @@ type Kept = { kept: true; filed: string[]; restored: boolean };
 /** A line of a source list: a source, or a course (D79) standing for its lessons, listed under it when open. */
 type Line = { kind: "item"; item: Item; lesson?: boolean } | { kind: "course"; id: string; title: string; url?: string; lessons: Item[]; next: Item | null; open: boolean };
 const lineKey = (l: Line) => (l.kind === "item" ? l.item.id : `course:${l.id}`);
+/** The row of `now` that came after `key` in `was` (else the nearest before it), for a row that left the list. */
+const lineAfter = (was: Line[], now: Line[], key: string): Line | undefined => {
+  const at = was.findIndex((l) => lineKey(l) === key);
+  if (at < 0) return undefined;
+  const here = new Map(now.map((l) => [lineKey(l), l]));
+  for (const l of [...was.slice(at + 1), ...was.slice(0, at).reverse()]) if (here.has(lineKey(l))) return here.get(lineKey(l));
+  return undefined;
+};
 const lessonFirst = (l: Extract<Line, { kind: "course" }>) => l.next ?? l.lessons[0]!;
 
 /** Which sources the list shows, as the list's title (Linear's view menu): To read, Done, and
@@ -293,11 +301,15 @@ export function App() {
 
   // Only the newest list read lands: an older one answering late would put back what came after it.
   const reads = useRef(0);
+  // Nor one that lands while a row's optimistic write is still saving: it would put the row back (a
+  // second A then archives it again). Each write reads the list again once it settles.
+  const writes = useRef(0);
+  const writing = <T,>(p: Promise<T>) => (writes.current++, p.finally(() => writes.current--));
   const refresh = useCallback(async () => {
     const n = ++reads.current;
     try {
       const [all, gone] = await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
-      if (n !== reads.current) return;
+      if (n !== reads.current || writes.current) return;
       setItems(all);
       setArchived(gone);
       setListError(null);
@@ -1013,7 +1025,19 @@ export function App() {
     (): Line[] => (q ? rows.map((item) => ({ kind: "item", item })) : (onSkillPage && !showAll ? groups.slice(0, SKILL_CAP) : groups).flat()),
     [q, rows, groups, onSkillPage, showAll],
   );
-  const currentLine = lines.find((l) => lineKey(l) === cursor) ?? lines[0];
+  // When the selected row leaves the list in place (archived, moved to Done), the row after it takes the
+  // selection, else the one before (Finder, Mail, Linear), never the first row: a second A then archives
+  // the row he sees selected.
+  const listView = `${place}|${skill}|${status}|${q}`;
+  const drawn = useRef<{ view: string; lines: Line[] }>({ view: listView, lines: [] });
+  const found = lines.find((l) => lineKey(l) === cursor);
+  const neighbour = !found && cursor && drawn.current.view === listView ? lineAfter(drawn.current.lines, lines, cursor) : undefined;
+  const currentLine = found ?? neighbour ?? lines[0];
+  useEffect(() => {
+    drawn.current = { view: listView, lines };
+    // For good, so a list read that still has the gone row doesn't hand the selection back to it.
+    if (neighbour) setCursor(lineKey(neighbour));
+  }, [listView, lines, neighbour]);
   const itemIds = useMemo(() => lines.flatMap((l) => (l.kind === "item" ? [l.item.id] : [])), [lines]);
   /** The picked sources still in view, in list order. */
   const many = useMemo(() => {
@@ -1223,12 +1247,15 @@ export function App() {
       setItems((all) => (on ? all?.filter((i) => i.id !== item.id) : all && [moved, ...all.filter((i) => i.id !== item.id)]) ?? all);
       setArchived((all) => (on ? [moved, ...all.filter((i) => i.id !== item.id)] : all.filter((i) => i.id !== item.id)));
     };
-    const save = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"]));
+    const save = (on: boolean) => writing(ore("archive", item.id, ...(on ? [] : ["--undo"])));
     mark(archived);
     if (archived && openId === item.id) setOpenId(null);
+    const was = cursor;
     // Returns the write, so an undo that fails says so and stays undoable (history.ts).
     const apply = (on: boolean) => {
       mark(on);
+      // Undo puts the selection back where it was, as Finder selects what it puts back.
+      if (on !== archived) setCursor(was);
       return save(on).then(refresh, (e) => {
         void refresh();
         throw e;
@@ -1329,11 +1356,11 @@ export function App() {
     if (openId && ids.has(openId)) setOpenId(null);
     const apply = (on: boolean) => {
       if (on) setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
-      ore("course", "archive", c.id, ...(on ? [] : ["--undo"])).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+      writing(ore("course", "archive", c.id, ...(on ? [] : ["--undo"]))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
     };
     notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
     try {
-      await ore("course", "archive", c.id);
+      await writing(ore("course", "archive", c.id));
     } catch (e) {
       notify(errorText(e), "error");
     }
@@ -1361,10 +1388,14 @@ export function App() {
   const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null) => {
     const sel = many;
     const ids = new Set(sel.map((i) => i.id));
+    const was = cursor;
     const go = async (forward: boolean) => {
       if (patch) setItems((all) => all && (forward ? all.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) : [...all.filter((i) => !ids.has(i.id)), ...sel]));
+      if (!forward) setCursor(was);
       try {
-        for (const i of sel) await write(i, forward);
+        await writing((async () => {
+          for (const i of sel) await write(i, forward);
+        })());
       } catch (e) {
         notify(errorText(e), "error");
       }

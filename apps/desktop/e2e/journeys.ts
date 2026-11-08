@@ -3925,6 +3925,30 @@ journey("typing with an input method: Enter that picks a word neither sends an a
   await label.waitFor({ state: "detached" });
 });
 
+journey("list archive: A selects the row after the archived one, so a second A archives that row; ⌘Z brings each back", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const titles = () => page.locator(".list .row .title").allInnerTexts();
+  const selected = () => page.locator(".list .row[aria-selected=true] .title").innerText();
+  await until("To read lists three sources", async () => (await titles()).length >= 3);
+  const before = await titles();
+  await page.locator(".list").focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  if ((await selected()) !== before[1]) throw new Error(`↓↓ selected “${await selected()}”, not the second row`);
+  // Finder, Mail and Linear: the row after the one that went takes the selection.
+  await page.keyboard.press("a");
+  await until(`“${before[2]}” is selected after the archive`, async () => (await selected()) === before[2]);
+  await page.keyboard.press("a");
+  await until("the second A archives the row after", async () => !(await titles()).includes(before[2]!));
+  const after = await titles();
+  if (!after.includes(before[0]!)) throw new Error(`the second A archived “${before[0]}”, which he never picked`);
+  await page.waitForTimeout(500);
+  await page.keyboard.press("Meta+z");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z ⌘Z bring both back", async () => (await titles()).length === before.length);
+  for (const t of before) if (!(await titles()).includes(t)) throw new Error(`“${t}” did not come back`);
+});
+
 // —— run ——
 
 let failed = 0;
