@@ -29,16 +29,16 @@ const Absent = z.strictObject({ id: z.string(), question: z.string(), outside: z
 export type AskCase = z.infer<typeof Case>;
 
 export function loadAskCases(path = join(import.meta.dir, "ask-cases.json")) {
-  return z.object({ cases: z.array(Case), hard: z.array(Case), absent: z.array(Absent) }).parse(JSON.parse(readFileSync(path, "utf8")));
+  return z.object({ cases: z.array(Case), hard: z.array(Case.required({ group: true })), absent: z.array(Absent) }).parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
 export const GOLDEN = join(import.meta.dir, "../test/golden");
 /** A year of use, ~240 generated sources, many on the same topics as the golden docs (`--library big`). */
 const SEED_BIG = join(import.meta.dir, "../../../apps/desktop/scripts/mock/seed-big.ts");
 
-/** Fills a library with seed-big's ~240 sources, so the golden docs compete for the six places a search keeps. */
+/** Fills a library with seed-big's ~240 sources, so the golden docs compete for the eight places a search keeps. */
 export function addBig(root: string) {
-  const r = Bun.spawnSync(["bun", SEED_BIG, root], { stdout: "ignore", stderr: "pipe" });
+  const r = Bun.spawnSync([process.execPath, SEED_BIG, root], { stdout: "ignore", stderr: "pipe" });
   if (r.exitCode !== 0) throw new Error(`seed-big failed: ${r.stderr.toString().trim()}`);
 }
 
@@ -102,9 +102,12 @@ export const asked = (c: AskCase | z.infer<typeof Absent>, names: Map<string, st
 };
 
 /** Retrieval, before any AI: the passages from expected sources hold the evidence and every part of
- *  the answer (all three forms of a list, not just one). A miss here is the search's, not the model's. */
+ *  the answer (all three forms of a list, not just one), and a two-source question gets passages from
+ *  each. A miss here is the search's, not the model's. */
 export function retrieved(c: AskCase, ps: Passage[], names: Map<string, string>): boolean {
-  const text = ps.filter((p) => c.sources.includes(names.get(p.item) ?? "")).map((p) => p.text).join("\n\n");
+  const from = ps.filter((p) => c.sources.includes(names.get(p.item) ?? ""));
+  if (c.all_sources && !c.sources.every((s) => from.some((p) => names.get(p.item) === s))) return false;
+  const text = from.map((p) => p.text).join("\n\n");
   return [c.evidence, ...c.answer].every((r) => new RegExp(r, "i").test(text));
 }
 
@@ -137,7 +140,8 @@ export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", con
     const body = (id: string) => bodies.get(id) ?? bodies.set(id, findItem(lib, id).body).get(id)!;
     let stamp = { model: model ?? "", prompt_version: "" };
     const t0 = performance.now();
-    const all = [...cases, ...hard, ...absent];
+    // `ore ask-library` has no open source, so the questions about one ("how does this say…") are the tutor's only.
+    const all = [...cases, ...hard.filter((c) => chat === "tutor" || !c.reading), ...absent];
     const results = await pool(all, concurrency, async (c): Promise<AskResult> => {
       const start = performance.now();
       const isAbsent = !("answer" in c);
@@ -168,7 +172,7 @@ export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", con
       answer_accuracy: n(answerable, "answer_ok") / answerable.length, answer_ci95: wilson(n(answerable, "answer_ok"), answerable.length),
       citation_accuracy: n(answerable, "citation_ok") / answerable.length, citation_ci95: wilson(n(answerable, "citation_ok"), answerable.length),
       answered: `${n(answerable, "answer_ok")}/${answerable.length}`, cited: `${n(answerable, "citation_ok")}/${answerable.length}`, says_absent: `${n(none, "answer_ok")}/${none.length}`, then_answers: none.filter((x) => x.general).length,
-      web_cited: none.filter((x) => x.cited?.some((q) => /^https?:/.test(q))).length, searched_needlessly: answerable.filter((x) => x.searched).length,
+      web_cited: none.filter((x) => x.cited?.some((q) => /^https?:/.test(q))).length, searched_needlessly: [...answerable, ...harder].filter((x) => x.searched).length,
       median_ms: { answerable: median(answerable.map((x) => x.ms)), absent: median(none.map((x) => x.ms)) },
       harder: { retrieval: `${harder.filter((r) => r.retrieved).length}/${harder.length}`, answered: `${n(harder, "answer_ok")}/${harder.length}`, cited: `${n(harder, "citation_ok")}/${harder.length}`, groups },
       errors: results.filter((r) => r.error).length, wall_s: Math.round((performance.now() - t0) / 100) / 10,

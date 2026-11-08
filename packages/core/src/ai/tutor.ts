@@ -74,7 +74,7 @@ export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {
     here.push(...ps);
   }
   const inSkills = focus.skills?.length ? listItems(lib).filter((i) => i.meta.skills.some((s) => focus.skills!.includes(s))).map((i) => i.meta.id) : undefined;
-  const rest = (inSkills ? (inSkills.length ? retrieve(lib, query, PASSAGES, inSkills) : []) : retrieve(lib, query, PASSAGES - 2)).filter((p) => !focused.includes(p.item));
+  const rest = (inSkills ? (inSkills.length ? retrieve(lib, query, PASSAGES, inSkills) : []) : retrieve(lib, query, PASSAGES)).filter((p) => !focused.includes(p.item));
   return [...here, ...rest].slice(0, Math.max(PASSAGES, here.length)).map((p, i) => ({ ...p, id: `P${i + 1}` }));
 }
 

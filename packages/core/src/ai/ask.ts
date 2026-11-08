@@ -17,12 +17,18 @@ export function queryTerms(text: string): string[] {
   return [...new Set(words.map(stem))];
 }
 /** A word cut to a stem matched as a prefix: "memories" and "memory" become "memor", "studying" and
- *  "study" "stud", "quizzing" "quiz", "boxes" "box", while "notes" stays "note" (not "not"). */
+ *  "study" "stud", "quizzing" "quiz", "boxes" "box", "days" "day", while "notes" stays "note" (not "not").
+ *  A stem keeps at least three letters, and -y only goes after four, so "very" and "added" don't shrink
+ *  to prefixes of unrelated words ("ver", "ad"). */
 export function stem(w: string): string {
-  const cut = w.replace(/(?<=\p{L}{3})(?:ies|ied|ying|ing|ed|ly|y)$/u, "");
-  // A doubled last letter left by -ing or -ed goes back to one (quizz, stopp), except ll and ss (call, miss).
-  if (cut !== w) return cut.replace(/([b-df-hj-km-rt-z])\1$/u, "$1");
-  return w.replace(/(?<=\p{L}{2}(?:s|x|z|ch|sh))es$/u, "").replace(/(?<=\p{L}{3}[^s])s$/u, "");
+  const ies = w.replace(/(?<=\p{L}{3})(?:ies|ied|ying)$/u, "");
+  if (ies !== w) return ies;
+  // A doubled last letter left by -ing or -ed goes back to one (quizz, stopp), except ll and ss (call, miss) and when two letters would be left (add).
+  const ing = w.replace(/(?<=\p{L}{3})(?:ing|ed)$/u, "");
+  if (ing !== w) return ing.replace(/(?<=\p{L}{2})([b-df-hj-km-rt-z])\1$/u, "$1");
+  const y = w.replace(/(?<=\p{L}{4})l?y$/u, "");
+  if (y !== w) return y;
+  return w.replace(/(?<=\p{L}{2}(?:s|x|z|ch|sh))es$/u, "").replace(/(?<=\p{L}{2}[^s])s$/u, "");
 }
 
 /** How many passages go to the AI: 14 kept every question's evidence in a 250-source library, where 10
@@ -66,22 +72,22 @@ export function retrieve(lib: Library, question: string, max = PASSAGES, only?: 
   if (only === undefined) {
     const index = openIndex(lib);
     try {
-      ids = index.sourcesMatching(terms, 6);
+      ids = index.sourcesMatching(terms, 8); // six lost a two-source question's second source among 250
     } finally {
       index.close();
     }
   }
-  // Link targets and footnote marks aren't words he reads; the title and heading count half.
+  // Link targets and footnote marks aren't words he reads; a word in the title or heading counts as half a match.
   const tokens = (s: string) => s.replace(/\]\([^)]*\)|\[\^\d+\]/g, " ").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
   const words = (s: string) => new Set(tokens(s));
-  const cands: (Passage & { body: Set<string>; tf: Map<string, number>; len: number; around: Set<string>; note: boolean })[] = [];
+  const cands: (Passage & { tf: Map<string, number>; len: number; around: Set<string>; note: boolean })[] = [];
   for (const id of ids) {
     let item;
     try { item = findItem(lib, id); } catch { continue; } // gone since the index was built
     for (const p of splitPassages(item.body)) {
       const ts = tokens(p.text);
       const tf = new Map(terms.map((t) => [t, ts.filter((w) => w.startsWith(t)).length]));
-      cands.push({ ...p, id: "", item: item.meta.id, title: item.meta.title, body: new Set(ts), tf, len: ts.length, around: words(`${item.meta.title} ${p.heading}`), note: p.text.startsWith("[^") });
+      cands.push({ ...p, id: "", item: item.meta.id, title: item.meta.title, tf, len: ts.length, around: words(`${item.meta.title} ${p.heading}`), note: p.text.startsWith("[^") });
     }
   }
   const has = (ws: Set<string>, t: string) => [...ws].some((w) => w.startsWith(t));
@@ -93,7 +99,8 @@ export function retrieve(lib: Library, question: string, max = PASSAGES, only?: 
   const b = 0.75;
   const bm25 = (c: (typeof cands)[number], t: string) => {
     const f = c.tf.get(t)!;
-    return f ? (f * (k1 + 1)) / (f + k1 * (1 - b + (b * c.len) / avg)) : has(c.around, t) ? 0.5 : 0;
+    // Never less than the title or heading alone would give (a long passage's one mention can fall below half).
+    return Math.max(f ? (f * (k1 + 1)) / (f + k1 * (1 - b + (b * c.len) / avg)) : 0, has(c.around, t) ? 0.5 : 0);
   };
   const scored = cands
     // A footnote (often a reference list entry) counts half.
@@ -106,7 +113,7 @@ export function retrieve(lib: Library, question: string, max = PASSAGES, only?: 
     if (out.length >= max) break;
     if (typeof only !== "string" && (per.get(c.item) ?? 0) >= 5) continue;
     per.set(c.item, (per.get(c.item) ?? 0) + 1);
-    const { body: _, around: __, note: ___, ...p } = c;
+    const { tf: _, len: __, around: ___, note: ____, ...p } = c;
     out.push({ ...p, id: `P${out.length + 1}` });
   }
   return out;
