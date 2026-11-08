@@ -1,0 +1,171 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-08T18:42:48.393Z",
+  "set": "271d4fda",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@6",
+      "passed": "11/12",
+      "accuracy": 0.9166666666666666,
+      "ci95": [
+        0.6461140782014047,
+        0.9851352905492264
+      ],
+      "errors": 0,
+      "wall_s": 19.7,
+      "cost_usd": 0.3669896,
+      "input_tokens": 151752,
+      "output_tokens": 6164,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Try this one yourself first. Picture the Leitner box with its groups, each reviewed less often than the one before. A card you get right moves one step along. What would the system do with a card you fail? Your \"Paper flash cards\" section in *Spaced repetition* covers it if you want to check.\n\nGive me your best guess and I'll tell you what's right and what's missing.",
+          "ms": 7886,
+          "usage": {
+            "input_tokens": 13064,
+            "output_tokens": 529,
+            "cost_usd": 0.050405000000000005
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "An incorrectly answered card goes back to the first box. That means you review it again soon and often. [1] Correct answers move a card to the next box, which comes up less often. [2]\n\nSo the box acts as a sorter. Cards you fail restart at the most frequent review, and cards you get right earn longer gaps.",
+          "ms": 5256,
+          "usage": {
+            "input_tokens": 13117,
+            "output_tokens": 398,
+            "cost_usd": 0.049307
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Close on the format, but not the release. That's two misses, so here's the answer: FSRS arrived in Anki **23.10**, which means October 2023. Your Spaced repetition source says FSRS, the Free Spaced Repetition Scheduler, \"is available in Anki starting with release 23.10\" [1]. A tip for recall: 22.04 is a year too early, and the \"23\" is the year.",
+          "ms": 8623,
+          "usage": {
+            "input_tokens": 13318,
+            "output_tokens": 783,
+            "cost_usd": 0.053960999999999995
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Good news: your \"Spaced repetition\" source covers this, so start there. Look at the Algorithms section, in the last bullet, where FSRS (Free Spaced Repetition Scheduler) is listed. It names two apps that added it, and a version number goes with each. Which one is Anki's? Tell me what you find, or take a guess.",
+          "ms": 4925,
+          "usage": {
+            "input_tokens": 13138,
+            "output_tokens": 269,
+            "cost_usd": 0.048101
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": false,
+          "failed": [
+            "gave /(?:is|be|get|gives?|=|→)\\s*\\**10\\b/"
+          ],
+          "reply": "Let's start with a similar case, then you can try yours. The function is `return gap * 2.5 if remembered else 1` [1]. It reads as \"if you remembered, multiply the gap by 2.5. Otherwise the next gap is 1.\"\n\n**Worked example:** a gap of 10 days that you remembered. `remembered` is true, so you take the first branch and get 10 × 2.5 = 25. If you'd forgotten, you'd take the `else` branch and get 1.\n\nNow yours: a gap of 4 that you remembered. Which branch applies, and what number comes out?",
+          "ms": 7251,
+          "usage": {
+            "input_tokens": 12648,
+            "output_tokens": 795,
+            "cost_usd": 0.024405200000000002
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start with the first chapter. Question 1: according to the book, why is forgetting most of what you read within a week *not* a sign of a weak mind? Answer in your own words.",
+          "ms": 3695,
+          "usage": {
+            "input_tokens": 11064,
+            "output_tokens": 217,
+            "cost_usd": 0.0122892
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table gives 25% at 7 days, so about a quarter, not half [1]. The 58% is the day-1 figure, which is closer to \"about half.\" The book says recall drops fast at first and then levels off [2], and that's why the 25% at day 7 is already close to the 21% at day 30. The book also says its numbers are illustrative, not from one study [3].\n\nNext one: according to the book, which review matters most, and why?",
+          "ms": 6618,
+          "usage": {
+            "input_tokens": 11563,
+            "output_tokens": 732,
+            "cost_usd": 0.0194352
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right: 25% at 7 days. [1] It also fits the book's point that recall drops fast at first and then levels off, so the first review matters most. [2]\n\nNext one: what does the table show for day 30, and why does that number matter for the curve's shape?",
+          "ms": 3956,
+          "usage": {
+            "input_tokens": 12740,
+            "output_tokens": 301,
+            "cost_usd": 0.0198332
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one to write from memory, no peeking at the chapter. Name the three kinds of test the chapter lists, and say why spacing helps. Then pick something you're learning right now and say how you'd use one of those ideas on it. Write it here or in your note.",
+          "ms": 4019,
+          "usage": {
+            "input_tokens": 12927,
+            "output_tokens": 305,
+            "cost_usd": 0.0206212
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "You've got the diagnostic half. A quiz breaks the illusion at once: either the answer comes, or it does not [1]. That shows you what you don't know yet.\n\nTwo things are missing:\n- **The strengthening half.** Testing doesn't only measure. Each time you recall an idea, the path to it gets easier to find next time [2]. So a test is also a way of learning.\n- **Why rereading misleads.** Rereading feels fluent, and that fluency fools us into thinking we know the page [3]. That is the reason it loses to testing.\n\nHere's a follow-up. Say you reread a chapter and feel sure you know it. What would you do in the next ten minutes to check that, and what would the result tell you?",
+          "ms": 7425,
+          "usage": {
+            "input_tokens": 12869,
+            "output_tokens": 917,
+            "cost_usd": 0.026509199999999997
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is easy, and easy feels like knowing. Your chapter says it \"feels fluent, and that fluency fools us into thinking we know the page.\" [1] The words look familiar, so your brain reads that familiarity as \"I've got this.\" But recognizing a page isn't the same as being able to pull the idea out on your own. A quiz breaks the illusion at once: \"either the answer comes, or it does not.\" [2] It also pays off: your notes list an effect size of 0.61 for retrieval practice against 0.13 for rereading. [3]",
+          "ms": 5738,
+          "usage": {
+            "input_tokens": 12500,
+            "output_tokens": 618,
+            "cost_usd": 0.0220432
+          }
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, that's a legit signal. Stopping when you're tired is fine, and your sources even back it up: practice spread over days beats the same practice crammed into one night [1]. If you've got five minutes of energy left, one quick recall question would lock in today's work, but calling it a day is also a good plan. Which sounds better?",
+          "ms": 4176,
+          "usage": {
+            "input_tokens": 12804,
+            "output_tokens": 300,
+            "cost_usd": 0.0200792
+          }
+        }
+      ]
+    }
+  ]
+}
