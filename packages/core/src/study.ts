@@ -130,8 +130,17 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const reviews = readReviews(lib);
     const today = localDay(now);
     const doneToday = reviews.filter((r) => localDay(r.ts) === today);
+    // Relearn passes are owed for misses today, or since the open session began if that was earlier (a
+    // session running past midnight).
+    const session = openSessionId(lib);
+    const began = session ? readSessions(lib).find((s) => s.type === "start" && s.id === session)?.ts : undefined;
     const ownToday = new Map<string, Review[]>();
-    for (const r of doneToday) ownToday.set(r.card, [...(ownToday.get(r.card) ?? []), r]);
+    for (const r of reviews) {
+      if (localDay(r.ts) !== today && !(began && r.ts >= began)) continue;
+      const own = ownToday.get(r.card);
+      if (own) own.push(r);
+      else ownToday.set(r.card, [r]);
+    }
     const settings = reviewSettings(lib);
     const limit = opts.newLimit !== false;
     const newLeft = limit ? Math.max(0, settings.new_per_day - doneToday.filter((r) => r.finishing).length) : Infinity;

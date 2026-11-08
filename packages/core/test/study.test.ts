@@ -163,6 +163,18 @@ describe("review loop", () => {
     expect(dueQueue(lib2, tomorrow).find((e) => e.id === c.meta.id)?.relearn ?? false).toBe(false);
   });
 
+  test("a miss just before midnight keeps its relearn pass in a session that runs past it, once", async () => {
+    const { lib, a } = await setup();
+    const midnight = new Date(Date.now() + 2 * 864e5);
+    midnight.setHours(0, 0, 0, 0);
+    const at = (min: number) => new Date(midnight.getTime() + min * 60_000);
+    await startSession(lib, at(-10));
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 3, now: at(-5) });
+    expect(dueQueue(lib, at(5)).find((e) => e.id === a.meta.id)?.relearn).toBe(true);
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 3, now: at(6) }); // missed again on its pass
+    expect(dueQueue(lib, at(7)).find((e) => e.id === a.meta.id)?.relearn ?? false).toBe(false);
+  });
+
   test("two windows' sessions overlap: each logs and ends its own, by id", async () => {
     const { lib, a, b } = await setup();
     const main = await startSession(lib);
