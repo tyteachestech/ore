@@ -4,7 +4,7 @@ type: article
 title: Spanish vocabulary
 author: Ada Learner
 captured_at: <time>
-text_sha256: caf97a0e2a6ee1160bb67e86085569384800fa24b52a0a2fc6212f36a6a7871a
+text_sha256: d34477d04935a08424b9905dc6982b9717c590c532dcadb58f288925a545234b
 status: inbox
 skills: []
 topics: []
@@ -13,13 +13,13 @@ topics: []
 
 | Word | Meaning | Example | Added | Reviews |
 | --- | --- | --- | --- | --- |
-| olvidar | to forget | Sin repasar, "olvidamos" rápido. | 2025-03-04 | 3 |
-| recordar | to remember, to recall | Recordar es practicar \| de verdad. | 2025-03-05 | 5 |
-| repasar | to review |  | 2025-03-06 | 8 |
+| cocinar | to cook | Sin sal, "cocinamos" mal. | 2025-03-04 | 3 |
+| hornear | to bake, to roast | Hornear es esperar \| de verdad. | 2025-03-05 | 5 |
+| hervir | to boil |  | 2025-03-06 | 8 |
 
 ## Grammar
 
 | Rule | Example |
 | --- | --- |
-| Ser for what something is | La memoria es frágil. |
+| Ser for what something is | La sopa es rica. |
 | Estar for how it is now | Estoy cansado. |
