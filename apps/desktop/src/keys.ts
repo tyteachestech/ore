@@ -279,12 +279,19 @@ export function invalid(id: KeyId, combo: Combo): string | null {
   return null;
 }
 
-/** The binding that already has `combo` where `id` works (the app, or the diagram editor), if any. */
+/** Review's own commands: they work only in Review, where the app's other keys are off (App.tsx). */
+export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["no-idea", "in-head", "edit-card", "retire-card", "ask", "bad-version"]);
+/** App keys Review reads too, and the quick quiz, which works from any app. */
+const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-next", "passage-prev", "quick-quiz"]);
+
+/** The binding that already has `combo` where `id` works (the app, Review, or the diagram editor), if any. */
 export function clash(id: KeyId, combo: Combo): (Binding & { id: KeyId }) | null {
   if (!combo) return null;
-  const scope = (x: Binding) => x.scope ?? "app";
+  const scope = (x: Binding) => x.scope ?? (IN_REVIEW.has(x.id) ? "review" : "app");
+  const meet = (x: Binding, y: Binding) =>
+    scope(x) === scope(y) || (scope(x) !== "diagram" && scope(y) !== "diagram" && (IN_REVIEW_TOO.has(x.id) || IN_REVIEW_TOO.has(y.id)));
   const b = DEFAULTS.find((x) => x.id === id)!;
-  return DEFAULTS.find((x) => x.id !== id && scope(x) === scope(b) && keymap[x.id] === combo) ?? null;
+  return DEFAULTS.find((x) => x.id !== id && meet(x, b) && keymap[x.id] === combo) ?? null;
 }
 
 const put = (next: Record<string, Combo>, id: KeyId, combo: Combo) => {

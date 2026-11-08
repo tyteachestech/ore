@@ -24,6 +24,18 @@ describe("shortcut editor (Settings › Keyboard shortcuts)", () => {
     expect(clash("d-select", "Meta+KeyK")).toBeNull();
   });
 
+  test("Review's own keys clash only with the keys that work in Review", () => {
+    resetKeys();
+    // Edit card's E works only on a card in Review, where Rename source's keys are off.
+    expect(clash("rename", "KeyE")).toBeNull();
+    expect(clash("edit-card", "KeyR")).toBeNull();
+    // Inside Review they still meet each other, ⌘↵, the passage arrows' keys and the system-wide quick quiz.
+    expect(clash("edit-card", "KeyB")?.id).toBe("bad-version");
+    expect(clash("edit-card", "Meta+Enter")?.id).toBe("finish");
+    expect(clash("finish", "KeyE")?.id).toBe("edit-card");
+    expect(clash("ask", "Ctrl+Alt+KeyQ")?.id).toBe("quick-quiz");
+  });
+
   test("any shortcut can be removed, and a menu click still runs it", () => {
     resetKeys();
     expect(rebind("palette", "")).toBeNull();
