@@ -2,6 +2,7 @@ import { GraduationCap } from "./icons";
 import { Command } from "cmdk";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SkillIcon } from "./IconPicker";
+import { isOther } from "../../../packages/core/src/collection-name";
 import { LABEL } from "./Collected";
 import { courseThumb, lessonsOf, nextLesson, ore, opt, type Intent, type Item, type SearchHit, type Skill } from "./ore";
 import { Thumb } from "./Thumb";
@@ -142,7 +143,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   let groups: Group[];
   if (page) {
     // "Other" is the skills in no collection, so naming it adds a skill there, as naming a collection that exists adds one to it.
-    const other = page.kind === "collection" && query.toLowerCase() === "other";
+    const other = page.kind === "collection" && isOther(query);
     const exists = page.kind === "collection" && (other ? "Other" : collections.find((c) => c.toLowerCase() === query.toLowerCase()));
     groups = query
       ? [

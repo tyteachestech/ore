@@ -3,6 +3,7 @@ import { Command } from "cmdk";
 import { CaretDown, Check as CheckIcon, Plus } from "./icons";
 import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type KeyboardEvent as ReactKeyboardEvent, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
+import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
@@ -157,8 +158,6 @@ export const skillsFirst = (skills: Skill[], first: string[]): Skill[] => [
 
 /** The header over the skills in no collection, once there are collections. No collection takes its name. */
 export const UNGROUPED = "Other";
-/** Whether a collection name is the ungrouped skills' header, any case. */
-export const isUngroupedName = (name: string) => name.trim().toLowerCase() === UNGROUPED.toLowerCase();
 
 /** Sidebar groups: each collection in the order it first appears in skills.yaml, then the rest
  *  (`collection` is "" for those). */
@@ -393,7 +392,7 @@ function CollectionPicker({ value, collections, onPick }: { value: string; colle
                   {c === value && <Check />}
                 </Command.Item>
               ))}
-              {typed && !isUngroupedName(typed) && !collections.some((c) => c.toLowerCase() === typed.toLowerCase()) && (
+              {typed && !isOther(typed) && !collections.some((c) => c.toLowerCase() === typed.toLowerCase()) && (
                 <Command.Item value={`create ${typed}`} onSelect={() => choose(typed)}>
                   <span className="sub">Create</span> {typed}
                 </Command.Item>

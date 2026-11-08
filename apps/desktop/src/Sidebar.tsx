@@ -9,10 +9,11 @@ import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Hint } from "./Hint";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
+import { isOther, tidyCollection } from "../../../packages/core/src/collection-name";
 import { SkillIcon } from "./IconPicker";
 import { useSideCursor } from "./SideCursor";
 import { ore, opt, type Skill } from "./ore";
-import { isUngroupedName, layoutOf, skillGroups, UNGROUPED, type SkillLayout } from "./Skills";
+import { layoutOf, skillGroups, UNGROUPED, type SkillLayout } from "./Skills";
 import { errorText, load, save } from "./util";
 
 const CLOSED = "ore.side-closed";
@@ -149,7 +150,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
 
   const rename = (g: Group, name: string) => {
     setRenaming(null);
-    const v = name.trim().replace(/\s+/g, " ");
+    const v = tidyCollection(name);
     if (!v || v === g.collection) return;
     if (closed.includes(g.name)) setClosedSaved(closed.map((n) => (n === g.name ? v : n)));
     onArrange(layoutOf(groups.map((x) => (x === g ? { ...x, collection: v } : x))), `Renamed collection “${g.collection}” to “${v}”`);
@@ -158,10 +159,10 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   // first skill (a collection is the skills in it), Esc or clicking away drops it.
   const nameCollection = (name: string) => {
     setNaming(false);
-    const v = name.trim().replace(/\s+/g, " ");
+    const v = tidyCollection(name);
     if (!v) return;
     // "Other" is where skills in no collection already go.
-    if (isUngroupedName(v)) return newSkill();
+    if (isOther(v)) return newSkill();
     const existing = groups.find((g) => g.collection.toLowerCase() === v.toLowerCase());
     if (!existing) setFresh(v);
     setAdding(existing?.name ?? v);
@@ -261,7 +262,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
               menu={g === freshGroup ? [] : groupMenu(g)}
               onToggle={() => toggle(g.name)}
               onAdd={() => setAdding(g.name)}
-              taken={(name) => isUngroupedName(name) || groups.some((x) => x !== g && !!x.collection && x.collection.toLowerCase() === name.toLowerCase())}
+              taken={(name) => isOther(name) || groups.some((x) => x !== g && !!x.collection && x.collection.toLowerCase() === name.toLowerCase())}
               onRename={(name) => rename(g, name)}
               onCancelRename={() => setRenaming(null)}
             >
