@@ -1651,10 +1651,12 @@ journey("icon picker: it opens with the caret in Filter, so typing searches at o
     await page.keyboard.type("star");
     await until("Filter has what he typed", async () => (await page.locator(".picker-search").first().inputValue()) === "star");
     await page.keyboard.press("Escape");
+    await page.locator(".picker").waitFor({ state: "detached" });
   };
-  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  // Habits has an icon, so its picker opens on Icons: ~1,700 pixel icons, drawn as they scroll into view.
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit skill…" }).click();
-  await page.getByRole("dialog", { name: "Edit skill Creativity" }).getByRole("button", { name: "Add icon" }).click();
+  await page.getByRole("dialog", { name: "Edit skill Habits" }).getByRole("button", { name: "Change icon" }).click();
   await typed();
   await page.keyboard.press("Escape");
   await page.locator(".sidebar .side-item", { hasText: "Storytelling" }).first().click();

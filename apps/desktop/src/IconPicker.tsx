@@ -180,6 +180,7 @@ const loadIcons = () =>
   ));
 
 const COLS = 12;
+const PAGE = COLS * 12;
 const label = (icon: string) => icon.slice(3).replaceAll(/[-_]/g, " ");
 
 function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillColor | ""; onPick: (icon: string) => void }) {
@@ -201,6 +202,12 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
       .map((x) => x.i);
   }, [all, query]);
   useEffect(() => setActive(0), [query]);
+  // The grid draws a page of rows at a time, more as it scrolls or the arrows go past them: each icon
+  // is an SVG mask of up to 256 dots, and drawing all ~1,700 at once held the page for seconds.
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [query]);
+  useEffect(() => void (active >= limit && setLimit(active + PAGE - (active % COLS))), [active, limit]);
+  const more = (el: HTMLElement) => el.scrollTop + el.clientHeight > el.scrollHeight - 200 && limit < shown.length && setLimit((l) => l + PAGE);
   // The arrows move the active cell; keep it in view as they leave the visible rows (not on hover).
   const scroll = useRef<HTMLDivElement>(null);
   const keyed = useRef(false);
@@ -246,7 +253,7 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
           </button>
         </Hint>
       </div>
-      <div className="picker-scroll" ref={scroll}>
+      <div className="picker-scroll" ref={scroll} onScroll={(e) => more(e.currentTarget)}>
         {!query && recent.length > 0 && (
           <div className="picker-section">
             <div className="picker-label">Recent</div>
@@ -258,7 +265,7 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
         ) : shown.length ? (
           <div className="picker-section">
             {!query && <div className="picker-label">Icons</div>}
-            <div className="picker-grid">{shown.map((i, n) => cell(`mc:${i.name}`, n))}</div>
+            <div className="picker-grid">{shown.slice(0, limit).map((i, n) => cell(`mc:${i.name}`, n))}</div>
           </div>
         ) : (
           <div className="picker-note">No icons found.</div>
