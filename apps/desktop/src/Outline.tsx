@@ -22,7 +22,8 @@ function outlineHeadings(doc: HTMLElement): Heading[] {
 
 /** Position bar and floating outline (D45): how far down the source he is, and a Notion-style
  *  table of contents at the right edge. No percent, no time left (D27). */
-export function Position({ scroll, doc, ready }: { scroll: RefObject<HTMLDivElement | null>; doc: HTMLElement | null; ready: boolean }) {
+/** `onJump`: called before a jump, so ⌘[ can come back to where he was. */
+export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTMLDivElement | null>; doc: HTMLElement | null; ready: boolean; onJump?: () => void }) {
   const [progress, setProgress] = useState(0);
   const [current, setCurrent] = useState(-1);
   const headings = useMemo(() => (ready && doc ? outlineHeadings(doc) : []), [ready, doc]);
@@ -89,6 +90,7 @@ export function Position({ scroll, doc, ready }: { scroll: RefObject<HTMLDivElem
   const jump = (h: Heading) => {
     const el = scroll.current;
     if (!el) return;
+    onJump?.();
     el.scrollTop += h.el.getBoundingClientRect().top - el.getBoundingClientRect().top - 24;
     el.focus({ preventScroll: true });
   };

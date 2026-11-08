@@ -791,6 +791,30 @@ journey("highlight: a triple click keeps the paragraph as one step, so one ⌘Z 
   if (left.some((t) => t.includes("Rereading"))) throw new Error(`one ⌘Z left ${JSON.stringify(left)}`);
 });
 
+journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to the jump again, before leaving the source", async (page) => {
+  const part = (n: number) => `## Part ${n}\n\n` + `Part ${n} says one thing at length, so the source runs long enough to scroll. `.repeat(12);
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# A long read in parts\n\n${Array.from({ length: 10 }, (_, i) => part(i + 1)).join("\n\n")}`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("Part 1 says one thing").first().waitFor();
+  await page.waitForTimeout(500);
+  const top = () => page.evaluate(() => Math.round(document.querySelector(".reader-scroll")?.scrollTop ?? -1000));
+  const from = await top();
+  await page.locator("nav.outline").hover();
+  await page.locator(".outline-panel button").filter({ hasText: "Part 9" }).click();
+  await until("the outline jumps", async () => (await top()) > from + 400);
+  const jumped = await top();
+  await page.mouse.move(640, 400);
+  await page.keyboard.press("Meta+BracketLeft");
+  await until("⌘[ goes back to where he was", async () => Math.abs((await top()) - from) < 4);
+  if (!(await page.locator(".doc").isVisible())) throw new Error("⌘[ left the source");
+  await page.keyboard.press("Meta+BracketRight");
+  await until("⌘] goes to the jump again", async () => Math.abs((await top()) - jumped) < 4);
+  await page.keyboard.press("Meta+BracketLeft");
+  await page.keyboard.press("Meta+BracketLeft");
+  await until("then ⌘[ leaves the source, as before", async () => !(await page.locator(".doc").isVisible()));
+});
+
 journey("highlight: one the core can't place says what to do, not “text not found in item <id>”", async (page) => {
   await openSource(page, TESTING);
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { highlight: 'ore: text not found in item 01M6Y59CWZB27HBM869RVJPBGR: "Tom & Jerry"' }));

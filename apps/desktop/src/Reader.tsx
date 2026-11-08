@@ -20,7 +20,7 @@ import { Grow } from "./Grow";
 import { Hint } from "./Hint";
 import { Thumb } from "./Thumb";
 import { SkillIcon } from "./IconPicker";
-import { is, isLoose, label, useKeymap } from "./keys";
+import { inTextField, is, isLoose, label, useKeymap } from "./keys";
 import { bigger, keepPlace, placeOf, smaller } from "./reading";
 import { againIn, define, lookable, wordAt } from "./lookup";
 import { Explain } from "./Explain";
@@ -1885,7 +1885,10 @@ function ReaderView(p: Props & { reload: () => void }) {
       // number, a note back to the last mark before it.
       const byId = (from && (id.startsWith("fnref-") ? ids.findLast((n) => n.compareDocumentPosition(from) & Node.DOCUMENT_POSITION_FOLLOWING) : noteFor(from))) || ids[0];
       const heading = !byId && el ? Array.from(el.querySelectorAll("h1, h2, h3, h4, h5, h6")).find((h) => slug(h.textContent ?? "") === slug(dec(id))) : undefined;
-      if (byId || heading) return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
+      if (byId || heading) {
+        markPlace();
+        return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
+      }
       return p.notify(`That part of the page wasn’t saved with it.${doc?.url && doc.type !== "snippet" ? " Reimport the source from its ⋯ menu to fetch it again." : ""}`, "error");
     }
     if (/^(?:https?|mailto):/i.test(href)) return void openUrl(href).catch((e) => p.notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
@@ -1900,6 +1903,32 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (a.matches("a.fn") && matchMedia("(hover: none)").matches) return showNote(a);
     followLink(a.getAttribute("href")!, a);
   };
+
+  // A jump inside the source (the outline, a footnote, a heading link) keeps where he was: ⌘[ goes back
+  // there and ⌘] to the jump again before they leave the source, as Safari's anchor history and Books'
+  // Back to page do. Caught first, so the app's view history only takes over once these run out.
+  const places = useRef<{ back: number[]; fwd: number[] }>({ back: [], fwd: [] });
+  const markPlace = () => {
+    const el = scrollRef.current;
+    if (el) places.current = { back: [...places.current.back, el.scrollTop], fwd: [] };
+  };
+  useEffect(() => {
+    places.current = { back: [], fwd: [] };
+    const onKey = (e: KeyboardEvent) => {
+      const by = is(e, "nav-back") ? "back" : is(e, "nav-forward") ? "fwd" : null;
+      const el = scrollRef.current;
+      // Only from the text: in a diagram beside it ⌘[ is Send backward.
+      const t = e.target as Node;
+      if (!by || !el || inTextField(e) || (t !== document.body && !el.contains(t)) || !places.current[by].length) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const other = by === "back" ? "fwd" : "back";
+      places.current[other].push(el.scrollTop);
+      el.scrollTop = places.current[by].pop()!;
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [p.id]);
 
   // A double click's word waits out the Mac's double-click time (0.5 s by default): a third click
   // makes it the paragraph, one highlight and one step, as Books acts on the final selection.
@@ -2294,7 +2323,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   return (
     <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}`} ref={readerRef}>
       <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
-      {!closedBook && !video && !PHONE && <Position scroll={scrollRef} doc={docEl.current} ready={ready} />}
+      {!closedBook && !video && !PHONE && <Position scroll={scrollRef} doc={docEl.current} ready={ready} onJump={markPlace} />}
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
         <Hint text="Back to the passage you left" keys="nav-back" side="top">
