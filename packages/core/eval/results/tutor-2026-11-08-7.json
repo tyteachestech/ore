@@ -1,0 +1,169 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-08T19:58:12.223Z",
+  "set": "717e44c6",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-haiku-5-5",
+      "prompt_version": "tutor@6",
+      "passed": "12/12",
+      "accuracy": 1,
+      "ci95": [
+        0.7574992425007574,
+        1
+      ],
+      "errors": 0,
+      "wall_s": 28.2,
+      "cost_usd": 0.024962160000000004,
+      "input_tokens": 197383,
+      "output_tokens": 12754,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Try it from the Leitner box picture: after a wrong answer, which box does the card go back to, and why would that help? The \"Paper flash cards\" section of your *Spaced repetition* source covers this. Give it a go and I'll check your answer.",
+          "ms": 8515,
+          "usage": {
+            "input_tokens": 27622,
+            "output_tokens": 814,
+            "cost_usd": 0.0033658000000000004
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Incorrectly answered cards go back to the first box, so you see them again sooner and more often. [1] Each correct answer moves a card to the next, less frequent box, so the cards you miss get the most repetition. [2]",
+          "ms": 7988,
+          "usage": {
+            "input_tokens": 13558,
+            "output_tokens": 808,
+            "cost_usd": 0.0031154000000000004
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Not 22.04, that's a year too early. It's **23.10**, the October 2023 release, so the number reads year.month. [1]",
+          "ms": 9128,
+          "usage": {
+            "input_tokens": 13796,
+            "output_tokens": 1239,
+            "cost_usd": 0.0033785000000000004
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Look at the last bullet under **Algorithms** in *Spaced repetition*. It names FSRS and then says where it's available. The release number comes right after the Anki mention, so check that part of the sentence. Tell me the number you find, and we'll see if it matches the source.",
+          "ms": 7664,
+          "usage": {
+            "input_tokens": 13610,
+            "output_tokens": 647,
+            "cost_usd": 0.0030453000000000004
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "Start with the one line that does the work: `return gap * 2.5 if remembered else 1` [1]. When you remember the item, the gap is multiplied by 2.5. When you don't, it resets to 1.\n\nHere's a worked example with a different number: a gap of 2 that you remembered. That's 2 × 2.5 = 5, so the next gap is 5 days.\n\nNow try your case. What does `next_gap(4, True)` return?",
+          "ms": 10042,
+          "usage": {
+            "input_tokens": 26361,
+            "output_tokens": 1297,
+            "cost_usd": 0.0018314900000000003
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Quiz on. Question 1, from section 2 (Practice) of *A Small Book of Remembering*: what keeps a memory, rereading it or calling it back? Answer in your own words.",
+          "ms": 14383,
+          "usage": {
+            "input_tokens": 11335,
+            "output_tokens": 635,
+            "cost_usd": 0.00090394
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table gives **25%** at day 7 [1], not half. Recall falls fast at first and then levels off [2]. The book also says its numbers are illustrative, not from one study [3], so treat them as the shape of the curve rather than exact figures.\n\nNext: from day 1 to day 7, how many percentage points does recall drop?",
+          "ms": 8000,
+          "usage": {
+            "input_tokens": 11837,
+            "output_tokens": 1483,
+            "cost_usd": 0.0014283400000000002
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Yes, 25%. Recall falls from 58% on day 1 to 25% on day 7 [1]. Next: according to the retrieval notes, which of the three habits matters most?",
+          "ms": 10217,
+          "usage": {
+            "input_tokens": 26856,
+            "output_tokens": 1036,
+            "cost_usd": 0.00173653
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Good, let's do a recall-and-use exercise. Close the chapter and write what you remember about spacing and testing. Then apply one of those ideas to something you're studying this week. You can write it in the chat or in your note.",
+          "ms": 8323,
+          "usage": {
+            "input_tokens": 13470,
+            "output_tokens": 783,
+            "cost_usd": 0.00140494
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "Yes, testing shows you what you don't know yet. Rereading hides that because it feels smooth: \"A quiz breaks the illusion at once: either the answer comes, or it does not.\" [1]\n\nYour answer misses the other half. Recalling also strengthens memory: \"Each time we recall an idea, the path to it gets easier to find the next time.\" [2] Add that and your answer covers both reasons.\n\nWhy do you think rereading feels like it's working when it isn't?",
+          "ms": 10413,
+          "usage": {
+            "input_tokens": 13014,
+            "output_tokens": 1989,
+            "cost_usd": 0.0019167399999999997
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Rereading feels like it works because the page becomes familiar, and familiar text reads smoothly. That smoothness is mistaken for knowledge: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [1] A quiz tests the difference, since \"either the answer comes, or it does not.\" [2]",
+          "ms": 8118,
+          "usage": {
+            "input_tokens": 12768,
+            "output_tokens": 1199,
+            "cost_usd": 0.00147254
+          }
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough. Stopping for today is allowed, and a tired brain isn't learning much anyway. Your source says \"Practice spread over days beats the same practice crammed into one night\" [1], so a short session tomorrow will do more than pushing through tonight. Want a two-minute recall of what you read today, or call it done?",
+          "ms": 5496,
+          "usage": {
+            "input_tokens": 13156,
+            "output_tokens": 824,
+            "cost_usd": 0.00136264
+          }
+        }
+      ]
+    }
+  ]
+}
