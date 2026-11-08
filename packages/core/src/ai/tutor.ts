@@ -18,6 +18,9 @@ import { PASSAGES, plainText, retrieve, splitPassages, type Citation, type Passa
 
 export interface TutorTurn { message: string; reply: string }
 
+/** A reply with its worked answer's steps numbered under it (D142): what it said, as text. */
+export const withSteps = (r: { reply: string; steps: string[] }) => [r.reply, ...r.steps.map((s, i) => `${i + 1}. ${s}`)].join("\n");
+
 export const TutorCard = z.strictObject({
   kind: z.enum(["card", "prompt"]),
   content_type: ContentType,
@@ -38,6 +41,8 @@ export const TutorOutput = z.strictObject({
   card: TutorCard.nullable(),
   // An open exercise for him to write (D128.6): its heading in his note, and placeholder lines under it.
   exercise: z.strictObject({ heading: z.string().min(1).max(100), prompts: z.array(z.string().min(1)).max(3) }).nullable(),
+  // A worked answer in its steps, which the app shows one at a time (D142); [] for any other reply.
+  steps: z.array(z.string().min(1)).max(8),
 });
 
 /** His message with each diagram from his source note written out as lines, so a map he drew from
@@ -136,7 +141,9 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
         if (!p) return `no passage ${c.passage}; cite one of ${passages.map((x) => x.id).join(", ") || "none (there are no passages)"}, or a page your web search returned`;
         if (!locate(p.text, c.quote)) return `the quote "${c.quote}" is not in ${c.passage}: copy its exact words`;
       }
-      const top = Math.max(0, ...[...d.reply.matchAll(/\[(\d+)\]/g)].map((x) => +x[1]!));
+      const top = Math.max(0, ...[...[d.reply, ...d.steps].join("\n").matchAll(/\[(\d+)\]/g)].map((x) => +x[1]!));
+      if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
+      if (d.steps.length && (d.hint || d.exercise)) return "steps are a worked answer: not with a hint or an exercise";
       if (top > d.citations.length) return `marker [${top}] has no citation`;
       if (d.card && d.card.kind === "prompt" && !d.card.rubric.length) return "a prompt card needs 2 to 4 rubric points";
       if (d.exercise && d.card) return "an exercise is for him to answer: propose no card with it";
@@ -157,7 +164,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
     const quote = p.text.slice(at.start, at.end);
     return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
   });
-  return { message: m, reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
+  return { message: m, reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
 }
 
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the

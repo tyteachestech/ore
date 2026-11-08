@@ -9,7 +9,7 @@ import { basename, join } from "node:path";
 import { z } from "zod";
 import type { Usage, Vendor } from "../src/ai/adapter.ts";
 import { askLibrary, retrieve, type Citation, type Passage, type WebCitation } from "../src/ai/ask.ts";
-import { tutor, tutorPassages } from "../src/ai/tutor.ts";
+import { tutor, tutorPassages, withSteps } from "../src/ai/tutor.ts";
 import { parseFrontmatter } from "../src/frontmatter.ts";
 import { createItem, findItem, ItemType } from "../src/items.ts";
 import type { Library } from "../src/library.ts";
@@ -81,13 +81,14 @@ export async function ask(lib: Library, chat: Chat, q: string | Asked) {
     return { found: r.found, answer: r.answer, citations: r.citations, web: [], outside: !r.found, general: false, searched: false, ai: r.ai, usage: r.usage };
   }
   const r = await tutor(lib, question, { earlier, item });
+  const said = withSteps(r);
   const citations = r.citations.filter((c): c is Citation => !("url" in c));
   const web = r.citations.filter((c): c is WebCitation => "url" in c);
   // Not from his sources: the reply says his sources don't hold it. With no passage cited, the "Not from
   // your sources" label or the web pages' links say so too; a reply that cites a nearby passage must say
   // it in words, or the citation reads as the answer's source.
-  const outside = citations.length ? saysNotThere(r.reply) : r.general || web.length > 0 || saysNotThere(r.reply);
-  return { found: citations.length > 0, answer: r.reply, citations, web, outside, general: r.general, searched: r.searched, ai: r.ai, usage: r.usage };
+  const outside = citations.length ? saysNotThere(said) : r.general || web.length > 0 || saysNotThere(said);
+  return { found: citations.length > 0, answer: said, citations, web, outside, general: r.general, searched: r.searched, ai: r.ai, usage: r.usage };
 }
 
 /** The passages that chat would put in front of the AI for the question, with its follow-up and open source as the chat uses them. */

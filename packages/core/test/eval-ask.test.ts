@@ -59,18 +59,18 @@ describe("ask-your-library eval", () => {
   test("the tutor is asked as the app asks it; general knowledge with no citation reads as not from his sources", async () => {
     const lib = await tempLibrary();
     await addGolden(lib);
-    fakeClaude({ reply: "Ebbinghaus was born in 1850.", citations: [], general: true, hint: false, exercise: null, card: null });
+    fakeClaude({ reply: "Ebbinghaus was born in 1850.", citations: [], general: true, hint: false, steps: [], exercise: null, card: null });
     const r = await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?");
     expect(r).toMatchObject({ found: false, outside: true, answer: "Ebbinghaus was born in 1850.", citations: [] });
     expect(r.ai?.prompt_version).toMatch(/^tutor@/);
     // A plain refusal counts too; an unlabelled answer with no citation doesn't.
-    fakeClaude({ reply: "Your sources don't say when he was born.", citations: [], general: false, hint: false, exercise: null, card: null });
+    fakeClaude({ reply: "Your sources don't say when he was born.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null });
     expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(true);
-    fakeClaude({ reply: "He was born in 1850.", citations: [], general: false, hint: false, exercise: null, card: null });
+    fakeClaude({ reply: "He was born in 1850.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null });
     expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(false);
     // A web page's link says so too: it is plainly not one of his sources.
     const page = { url: "https://www.britannica.com/biography/Hermann-Ebbinghaus", title: "Hermann Ebbinghaus" };
-    fakeClaude({ reply: "He was born in 1850 [1].", citations: [{ passage: page.url, quote: "born on January 24, 1850" }], general: false, hint: false, exercise: null, card: null }, [
+    fakeClaude({ reply: "He was born in 1850 [1].", citations: [{ passage: page.url, quote: "born on January 24, 1850" }], general: false, hint: false, steps: [], exercise: null, card: null }, [
       { type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "WebSearch", input: { query: "q" } }] } },
       { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "Hermann Ebbinghaus was born on January 24, 1850." }] }, tool_use_result: { results: [{ content: [page] }] } },
     ]);
