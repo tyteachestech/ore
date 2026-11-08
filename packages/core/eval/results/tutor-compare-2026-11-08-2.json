@@ -1,0 +1,342 @@
+{
+  "eval": "tutor-compare",
+  "against": "local-compare",
+  "date": "2026-11-08T21:24:48.998Z",
+  "set": "8b3d646a",
+  "runs": [
+    {
+      "vendor": "claude",
+      "new_prompt": "tutor@8",
+      "old_prompt": "tutor@7",
+      "runs": 2,
+      "new": 8,
+      "old": 9,
+      "same": 9,
+      "old_won": [
+        "quiz-me",
+        "quiz-right-answer",
+        "practice-sets-exercise",
+        "exercise-feedback",
+        "own-question-answers",
+        "flashcard-show-me",
+        "quiz-wrong-answer"
+      ],
+      "errors": 0,
+      "cost_usd": 0.8580214999999998,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "pick": "same",
+          "why": "Both give the same hint (a correct answer moves a card toward longer gaps), neither says where a missed card goes, both point to the \"Paper flash cards\" section, and both end on a question for him to answer, so the differences are too small to matter.",
+          "new": "Let's get you there without me handing it over. Think about how the boxes work: a correct answer moves a card to a box with longer gaps. So what would a miss do to the card's place in that line of boxes? The \"Paper flash cards\" section of your Spaced repetition source covers it if you want to check.\n\nWhat's your guess?",
+          "old": "Let's get you there without me handing it over. Think of the Leitner box as a row of groups, where each later group gets revisited less often. If you get a card right, it moves toward the later groups. So where would a card you got wrong have to go? Your \"Spaced repetition\" source has a \"Paper flash cards\" section that covers this if you want to check your guess.",
+          "usage": {
+            "input_tokens": 53878,
+            "output_tokens": 1445,
+            "cost_usd": 0.0337759
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "pick": "new",
+          "why": "Both give the answer plainly with why and citations, but A is concise and answers directly, while B pads with a step list including an unneeded \"correct answer\" step and an awkward \"worked out in steps\" framing.",
+          "new": "A card you answer incorrectly goes back to the first box. [1] That box is reviewed most often, so the card gets \"more aggressive review and repetition\" until you can recall it. Each box further along has a longer wait before you see its cards again, so a miss sends the card back to the short gaps. [2]",
+          "old": "Here's the answer, worked out in steps.\n1. Cards sit in boxes (groups), and each box is revisited on its own schedule. Each later box waits longer before review. [2]\n2. Answer correctly and the card moves up to the next, less frequent box.\n3. Answer incorrectly and the card goes back to the first group. [3]\n4. The first box is the most frequently reviewed, so a missed card gets \"more aggressive review and repetition.\" [1]",
+          "usage": {
+            "input_tokens": 53865,
+            "output_tokens": 1479,
+            "cost_usd": 0.05170759999999999
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "pick": "new",
+          "why": "Both plainly give 23.10 with source-grounded reasoning, but A contradicts itself (\"a year earlier\" then \"a year and a half too early\") and pads with extra steps, while B is accurate and concise.",
+          "new": "Not quite. It was **23.10**, so it came a year and a half after 22.04. Your sources say FSRS is \"available in Anki starting with release 23.10\" [1]. The release notes cited there are dated October 31, 2023, which fits the year.month pattern: 23 for 2023, 10 for October.",
+          "old": "It's Anki 23.10, which is a year earlier than your guess. Here's how to get there.\n1. Your format is right: Anki versions read year.month, so 22.04 would mean April 2022. That's a year and a half too early.\n2. Your Spaced repetition source says FSRS \"is available in Anki starting with release 23.10\" [1], so the year is 2023 and the month is October.\n3. The source's reference list backs this up. It cites the \"Anki Release 23.10\" page [2], dated October 31, 2023, which matches the year.month reading.",
+          "usage": {
+            "input_tokens": 57054,
+            "output_tokens": 2599,
+            "cost_usd": 0.054535400000000005
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "pick": "new",
+          "why": "Both avoid naming the release, but B gives a hint that leaves the thinking to him (find the bullet, read it, or recall it, then check together), while A all but spells out the lookup by asking which release number sits next to Anki.",
+          "new": "Start with your \"Spaced repetition\" source, in the Algorithms section. Look for the bullet that spells out what FSRS stands for. The rest of that line says which apps support it and from which release. Read it and tell me what you find, or what you remember, and I'll help you check it.",
+          "old": "Good one to work out from your own sources. Look at your \"Spaced repetition\" source, in the Algorithms section. It lists several algorithm families, and FSRS is one of them. Find the line that names FSRS and see what it says about where it's available. Which release number is mentioned next to Anki?",
+          "usage": {
+            "input_tokens": 38748,
+            "output_tokens": 1060,
+            "cost_usd": 0.0272158
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "pick": "same",
+          "why": "Both work a 2-day example, never state the answer for the 4-day case, and end by handing his case back, with only trivial wording differences.",
+          "new": "Start with the function in the book. It has two branches, and the only question is which one you land in. [1]\n\nHere's a similar case with different numbers. Say the gap was 2 days and you remembered. The `remembered` branch applies, so you multiply the gap: 2 × 2.5 = 5 days. If you had forgotten, the other branch would send you back to 1 day, whatever the old gap was.\n\nNow try yours. You remembered after a gap of 4 days, so which branch applies, and what number comes out?",
+          "old": "Start with what the function does: it takes the last gap and whether you remembered, then returns one of two results [1]. The `if remembered` part picks which one.\n\nHere's a similar case with different numbers. Say the gap was 2 days and you remembered. The function takes the first branch, `2 * 2.5`, so the next gap is 5 days. If you had forgotten, it would skip that and return 1 day.\n\nNow try yours. The gap is 4 days and you remembered, so which branch runs, and what number comes out?",
+          "usage": {
+            "input_tokens": 37061,
+            "output_tokens": 2014,
+            "cost_usd": 0.0373242
+          }
+        },
+        {
+          "id": "worked-example-show-me",
+          "pick": "same",
+          "why": "Both plainly give the answer (10 days) with the why, cite the source, and are equally concise; B quotes the actual code line while A paraphrases it, but that difference is too small to decide.",
+          "new": "The book's function is a one-liner with two branches, and your 4-day gap was remembered, so the first branch runs.\n1. Read the function: `return gap * 2.5 if remembered else 1`. It returns `gap * 2.5` when `remembered` is true, and `1` otherwise [1].\n2. You remembered, so `remembered` is true and the `gap * 2.5` branch is the one that runs.\n3. Plug in the gap of 4: 4 * 2.5 = 10. The next gap is **10 days**.\n4. Had you forgotten, the `else` branch would return 1, so the gap would reset to 1 day.",
+          "old": "Here's the worked answer. The book's function is the one in the scheduling section [1], and we trace it with a gap of 4 days and a \"remembered\" result.\n1. The function takes two inputs: `gap` is 4 and `remembered` is true, since you remembered it.\n2. The function is one line: it returns `gap * 2.5` if `remembered`, and `1` otherwise [1].\n3. Because you remembered, the first branch runs, so it computes 4 × 2.5.\n4. That gives **10**: the next gap is 10 days. (Had you forgotten, it would have reset to 1 day.)",
+          "usage": {
+            "input_tokens": 37707,
+            "output_tokens": 1250,
+            "cost_usd": 0.0300686
+          }
+        },
+        {
+          "id": "quiz-me",
+          "pick": "old",
+          "why": "B asks one clear, answerable recall question tied to the book and asks for the learner's own words, while A hands over the forgetting-curve fact and then asks a vague \"which review matters most\" that is hard to answer or grade.",
+          "new": "Let's start with the first one, from the forgetting curve in \"A Small Book of Remembering\". Recall drops fast at first and then levels off. Based on that, which review matters most, and why?",
+          "old": "Let's start with the first chapter of *A Small Book of Remembering*. Question 1: According to the book, why is most of what we read gone within a week? Is it a sign of weak minds, or something else? Answer in your own words.",
+          "usage": {
+            "input_tokens": 34085,
+            "output_tokens": 839,
+            "cost_usd": 0.0241144
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "pick": "new",
+          "why": "Both correct the answer and give 25%, but B's next question (\"why does the book say the first review matters most?\") doesn't presuppose the answer, whereas A's \"which review matters most, and why?\" is a broader question and A's extra citation [2]/[3] adds slightly more clutter; B is tighter and its follow-up is cleaner.",
+          "new": "Not quite. The table says 25% at 7 days, so about a quarter [1]. You may be thinking of day 1, which is 58%. Recall drops fast early on and then levels off [2].\n\nNext question: why does the book say the first review matters most?",
+          "old": "Not quite. The table gives 25% at 7 days, about a quarter [1]. \"About half\" is closer to day 1, which is 58% [2]. Most of the drop happens early, and then the curve levels off [3].\n\nNext question: according to the book, which review matters most, and why?",
+          "usage": {
+            "input_tokens": 35217,
+            "output_tokens": 1481,
+            "cost_usd": 0.031146800000000002
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "pick": "old",
+          "why": "B says right with the answer and then asks the learner to work out the day 7 to day 30 loss and what it implies, while A already does that analysis for him and then asks a question its own explanation answers.",
+          "new": "Right, 25% at 7 days. [1] Notice the drop from 58% at day 1 to 25% at day 7, then only to 21% at day 30. That's the curve levelling off. [2]\n\nNext one: why does the book say the first review matters most?",
+          "old": "Right, 25% at 7 days. [1] Next one: the book says recall drops fast and then levels off. Looking at the table, how much more is lost between day 7 and day 30, and what does that say about when the first review matters?",
+          "usage": {
+            "input_tokens": 37532,
+            "output_tokens": 836,
+            "cost_usd": 0.0247684
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "pick": "old",
+          "why": "A asks him to explain why one study method beats another and then apply it, which leaves the thinking to him, while B only asks him to list the counted items (\"pull them up\") before using one, which is a shallower recall task.",
+          "new": "Here's one to write from memory, no peeking at the chapter. The chapter names three kinds of testing and two ways of arranging practice. Pull them up, then use one on something you're learning right now.",
+          "old": "Here's one to write from memory, no peeking at the chapter. Chapter 1 names several ways to study, and some work better than others. Explain why one of them beats the other, then use it on something you're learning right now.",
+          "usage": {
+            "input_tokens": 38348,
+            "output_tokens": 1099,
+            "cost_usd": 0.027090000000000003
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "pick": "old",
+          "why": "Both name the correct diagnostic half first, but A adds only the one missing idea (retrieval strengthens memory) and ends with a transfer question, while B lists two gaps and then asks about rereading fluency after it has already explained it.",
+          "new": "You've got the diagnostic half: a test shows you what you don't know yet. The book makes the same point: \"A quiz breaks the illusion at once: either the answer comes, or it does not.\" [1]\n\nTwo things are missing:\n- **Testing also changes memory.** Recalling isn't only a measurement. Each time you recall an idea, \"the path to it gets easier to find the next time.\" [2]\n- **Why rereading fools you.** It feels fluent, and that fluency fools you into thinking you know the page. [3]\n\nSuppose you reread a chapter and feel confident. What exactly is that feeling based on, and why can't it tell you what you'd be able to recall?",
+          "old": "That's the diagnostic half, and it's right: a quiz breaks the illusion at once, because either the answer comes or it doesn't [1]. Rereading feels fluent, and that fluency fools you into thinking you know the page [2].\n\nYou left out the other half. Testing doesn't only reveal gaps. Each time you recall an idea, the path to it gets easier to find next time [3]. That's why the source calls a test a way of learning, not just a measure.\n\nNext step: think of something you're learning right now. What would a cued-recall test of it look like?",
+          "usage": {
+            "input_tokens": 37813,
+            "output_tokens": 2808,
+            "cost_usd": 0.0456124
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "pick": "old",
+          "why": "Both give the same grounded, cited answer to the learner's own question, but B adds an unrequested \"Quick check\" question, which goes beyond \"what is needed and no more,\" while A stops once it has explained and cited the answer.",
+          "new": "Because rereading is smooth, and your brain reads smooth as \"I know this.\" Your chapter says it directly: rereading feels fluent, and that fluency fools us into thinking we know the page [1]. Recognizing words you've just seen is easy, but it isn't the same as being able to pull them out of memory later. A quiz breaks the illusion at once: either the answer comes, or it does not [2]. Your notes add that quizzing groups learn more than rereading groups, even when the rereading feels better [3].\n\nQuick check: next time you finish a page, what could you do to test whether you really know it?",
+          "old": "Because rereading is smooth, and your brain reads smooth as \"I know this.\" Your chapter says it directly: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [1] Recognizing words you've just seen is easy, but that's not the same as being able to pull them out of memory later. A quiz exposes the gap right away: \"either the answer comes, or it does not.\" [2] That's also why your notes mention study groups where rereading \"feels better\" but quizzing teaches more. [3]",
+          "usage": {
+            "input_tokens": 37194,
+            "output_tokens": 1643,
+            "cost_usd": 0.0334364
+          }
+        },
+        {
+          "id": "small-talk",
+          "pick": "same",
+          "why": "Both validate stopping, cite the same spacing source [1], and offer a tiny optional finish or calling it a day, so the one-card review in A and the free-recall note in B are too close to call.",
+          "new": "That's a fair place to stop. Rest is part of how this works, and your own sources say practice spread over days beats the same practice crammed into one night [1]. Stopping now is the spacing, not a failure. If you want a tiny finish, do one quick review of a card or two, then close the app. Or call it a day. Which sounds better?",
+          "old": "Fair enough, and stopping is a legitimate move. Your own sources say practice spread over days beats the same practice crammed into one night [1], so calling it a day is the spacing effect working in your favor. If you want one tiny thing before you go, try writing down one thing you remember from today without looking. Then close the app and rest. Want to do that, or just call it?",
+          "usage": {
+            "input_tokens": 37823,
+            "output_tokens": 1075,
+            "cost_usd": 0.0272148
+          }
+        },
+        {
+          "id": "flashcard-hint",
+          "pick": "same",
+          "why": "Both withhold where a missed card goes, give the same box-and-wait scaffold, ask the learner to reason about a miss, and point to the same \"Paper flash cards\" section, so neither is meaningfully better.",
+          "new": "Let's see if you can get it without me just telling you. Picture the Leitner box: groups of cards, where each later group gets revisited after a longer wait. A card you get right earns a move in one direction. What do you think a miss should do to its wait, and where would that put it? Your \"Paper flash cards\" section in the Spaced repetition source covers it if you want to peek.",
+          "old": "Let's get you there without me just saying it. In the Leitner system, cards sit in boxes, and each box has a longer wait before you see its cards again. If getting a card right moves it to the next box, what do you think a miss should do? Your \"Paper flash cards\" section in *Spaced repetition* covers this if you want to check.",
+          "usage": {
+            "input_tokens": 38577,
+            "output_tokens": 1425,
+            "cost_usd": 0.0310476
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "pick": "old",
+          "why": "On \"Show me\" after a hint, A gives the answer plainly with the reasoning in grounded, cited steps (why wrong answers return to box one), while B states the answer with only a brief reason and less grounding.",
+          "new": "A card you answer incorrectly goes back to the first box. [1] That's the point: the cards you miss get the most frequent review, while ones you get right move to boxes that come up less often. [2]",
+          "old": "Here's the answer, worked out in steps.\n1. The Leitner system sorts cards into boxes (groups), and each box is reviewed on a different schedule.\n2. Each later box is revisited less often: \"Each succeeding group has a longer period of time before the learner is required to revisit the cards.\" [2]\n3. A wrong answer sends the card the other way: \"If they fail, they send it back to the first group.\" [3]\n4. So the answer: an incorrectly answered card returns to the first box, where it gets \"more aggressive review and repetition.\" [1]",
+          "usage": {
+            "input_tokens": 38738,
+            "output_tokens": 1079,
+            "cost_usd": 0.027818199999999998
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "pick": "new",
+          "why": "Both give the answer plainly after two misses and ground it in the source, but B is concise and says what the learner needs, while A pads with a four-step walkthrough, a repetitive final step, and an extra citation that adds little.",
+          "new": "Close on the format, but it's a bit later than that: FSRS arrived in Anki **23.10**. Your source says it's \"which is available in Anki starting with release 23.10\" [1]. That's two misses, so here's the answer. The year was 2023 and the month was October. The numbering is year.month, so 23.10 means October 2023.",
+          "old": "Close on the format, but that's two tries, so here's the answer: FSRS arrived in Anki 23.10. The steps below show how to get there.\n1. Anki names releases year.month, so 22.04 would mean April 2022. That's a year too early, because FSRS is a newer algorithm.\n2. Your Spaced repetition source lists FSRS (Free Spaced Repetition Scheduler) among the algorithm families and says it is available in Anki starting with release 23.10 [1].\n3. The source's references back this up. They cite the release notes titled \"Anki Release 23.10\" [2], dated October 31, 2023.\n4. So the number to remember is 23.10, meaning October 2023. Only the 23 and the 10 are the pieces to hold on to.",
+          "usage": {
+            "input_tokens": 39397,
+            "output_tokens": 2066,
+            "cost_usd": 0.038413199999999995
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "pick": "same",
+          "why": "Both withhold the release and point him to the FSRS line in his Spaced repetition source to find it himself, and the small differences (A's extra References pointer, B's \"XX.XX\" format hint) don't make either clearly better.",
+          "new": "Your *Spaced repetition* source covers this. Look in the \"Algorithms\" section, in the bullet where FSRS (*Free Spaced Repetition Scheduler*) is named [1]. That same sentence also says which software has it and starting from which release. Find it and tell me what you get. If you'd rather check yourself, the References section cites the Anki release notes too.",
+          "old": "Good one to work out. Your \"Spaced repetition\" source has a section on algorithms, and FSRS is listed there by its full name, Free Spaced Repetition Scheduler. Find that line and look at what it says about Anki. The release is given as a version number, so you're looking for something shaped like \"XX.XX\". What do you find?",
+          "usage": {
+            "input_tokens": 38798,
+            "output_tokens": 1319,
+            "cost_usd": 0.0300058
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "pick": "new",
+          "why": "Both withhold the answer for 4 days and hand the case back, but A quotes the book's actual next_gap line (grounding the learner who has no idea where to start) while B only describes the function vaguely.",
+          "new": "Start by reading the function as \"if I remembered, do this, otherwise do that.\" The book gives it as `return gap * 2.5 if remembered else 1` [1].\n\nHere's a similar case. Say the gap was 2 days and you remembered. `remembered` is true, so the first branch runs: 2 × 2.5 = 5 days. If you had forgotten after a 6-day gap, the `else` branch would run and the answer would be 1 day, whatever the old gap was.\n\nNow try yours: you remembered after a gap of 4 days. Which branch runs, and what number comes out?",
+          "old": "Start with the function itself: it takes the last gap and whether you remembered, then returns a new gap. [1] Here's a similar case, so you can see how it runs.\n\nSay the last gap was 6 days and you remembered. `remembered` is true, so the function takes the first branch and returns 6 × 2.5 = 15 days. If you had forgotten, it would skip that branch and return 1 day.\n\nNow try yours: the gap was 4 days and you remembered. Which branch runs, and what number comes out?",
+          "usage": {
+            "input_tokens": 37090,
+            "output_tokens": 1974,
+            "cost_usd": 0.0370402
+          }
+        },
+        {
+          "id": "worked-example-show-me",
+          "pick": "same",
+          "why": "Both plainly give the correct 10-day answer with the why, cite the book, and stay concise, differing only in minor wording (B states the answer up front, A's \"three moves\" intro lists four steps).",
+          "new": "Here's the worked answer: the next gap is **10 days**. The steps below show how the function gets there.\n1. The book's function is `next_gap(gap, remembered)`, and its one line is `return gap * 2.5 if remembered else 1`. It picks one of two results depending on `remembered`. [1]\n2. You remembered, so `remembered` is true and the `else 1` branch doesn't run. The function returns `gap * 2.5`.\n3. Your gap was 4 days, so the result is `4 * 2.5 = 10`. The next review is in 10 days.\n4. If you had forgotten, the function would return 1 whatever the old gap was.",
+          "old": "Here's the worked answer. The book's function is in the \"Scheduling reviews\" section [1], and it gives the result in three moves.\n1. Read the signature: `next_gap(gap, remembered)` takes the current gap (4) and whether you remembered (True).\n2. The body is one line: `gap * 2.5 if remembered else 1`. Since `remembered` is true, the `else 1` part is skipped [1].\n3. So the result is 4 × 2.5 = **10 days**.\n4. Had you forgotten, the gap would reset to 1 day instead.",
+          "usage": {
+            "input_tokens": 37695,
+            "output_tokens": 1534,
+            "cost_usd": 0.032860600000000004
+          }
+        },
+        {
+          "id": "quiz-me",
+          "pick": "new",
+          "why": "A asks one focused reasoning question tied to the book's forgetting-curve table, while B packs in two questions, one of which (\"does it mean our minds are weak?\") leaks its own answer.",
+          "new": "Let's start with the forgetting curve in *A Small Book of Remembering*. The book says recall drops fast at first and then levels off. Why does that make the first review the one that matters most? Answer in your own words, and use the numbers in the table if you like.",
+          "old": "Let's start with the book you have open. Question one: according to \"A Small Book of Remembering\", why do we forget most of what we read within a week, and does it mean our minds are weak?",
+          "usage": {
+            "input_tokens": 34077,
+            "output_tokens": 740,
+            "cost_usd": 0.0230924
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "pick": "old",
+          "why": "Both say plainly that half is wrong and give 25%, but A stays tight and asks a next question that leaves the thinking to him, while B adds an unrequested explanation of the curve's shape and follows with a leading either/or question.",
+          "new": "Not quite. The table says 25% at 7 days, so about a quarter, not half [1]. You may be thinking of day 1, where it's 58%. The drop is steep early and then flattens, which is why the book says the first review matters most [2].\n\nNext question: what does the book say keeps a memory, rereading or something else?",
+          "old": "Not quite. The table has 25% recalled at 7 days, so about a quarter, not half [1]. Roughly half is closer to the 1-day figure, which is 58%.\n\nNext question: the book says the first review matters most. What does the shape of the forgetting curve have to do with that?",
+          "usage": {
+            "input_tokens": 35247,
+            "output_tokens": 1764,
+            "cost_usd": 0.0340968
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "pick": "new",
+          "why": "Both mark the answer right with no score, but A's feedback (\"the big drop comes early\", 58% at 1 day) already answers its own next question about why the first review matters, while B adds less and leaves the reasoning to the learner.",
+          "new": "Right, 25% at 7 days. [1] Notice how little it drops after that: 21% at 30 days.\n\nNext one: the book says the first review matters most. Why does the shape of the curve make that true?",
+          "old": "Right, 25% at 7 days. [1] The book's point is that the big drop comes early, since 58% is recalled after 1 day and only 21% after 30. [2] Next question: why does the book say the first review matters most?",
+          "usage": {
+            "input_tokens": 37507,
+            "output_tokens": 1155,
+            "cost_usd": 0.0278584
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "pick": "old",
+          "why": "A gives a concrete retrieval prompt (three ways to test yourself, the spacing effect) plus an application step, leaving the thinking to the learner, while B is vague, never says what to recall, and mostly restates the chapter's topics.",
+          "new": "Here's one to write from memory, no peeking. Chapter 1 covers the testing effect and the spacing effect, so let's use both on something real in your life.",
+          "old": "Here's one from Chapter 1. Close the chapter and write from memory: the three ways to test yourself, and what the spacing effect says. Then pick something you're learning right now and say how you'd use one of these on it this week.",
+          "usage": {
+            "input_tokens": 38342,
+            "output_tokens": 781,
+            "cost_usd": 0.023885999999999998
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "pick": "same",
+          "why": "Both open by crediting the diagnostic point, give the same two missing ideas with citations, and end with a follow-up question that leaves the thinking to him, so B's sharper gap-naming roughly offsets A's tighter, more focused question.",
+          "new": "You've got the diagnostic half. A quiz shows you what you don't know yet, because \"either the answer comes, or it does not\" [1].\n\nTwo things are missing:\n- **Testing also does the learning.** Recalling an idea makes it easier to find next time, so \"a test is not only a measure of what we know but a way of learning it\" [2]. Your answer treats a test as a gauge only.\n- **Why rereading does worse.** It feels fluent, \"and that fluency fools us into thinking we know the page\" [3]. That is the contrast with testing.\n\nHere's a follow-up. Say a friend rereads their notes three times and feels sure they know them. What would you tell them to do tonight, and why would it feel worse than rereading?",
+          "old": "That's right, and it's half the story. A test shows you what you don't know yet, because \"either the answer comes, or it does not\" [1].\n\nTwo things are missing:\n- **Testing also teaches.** Recalling an idea isn't only a check: \"the path to it gets easier to find the next time\" [2]. A test is a way of learning, not just a measure.\n- **Why rereading misleads.** It feels fluent, and \"that fluency fools us into thinking we know the page\" [3]. So rereading hides the gaps that testing exposes.\n\nTry this: if testing both reveals gaps and strengthens memory, what should you do right after you miss a question?",
+          "usage": {
+            "input_tokens": 37874,
+            "output_tokens": 2734,
+            "cost_usd": 0.0451164
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "pick": "old",
+          "why": "Both answer his own question plainly with cited sources, but B also explains why (recognizing a page isn't the same as pulling it from memory) and stops there, while A adds an unrequested practice prompt and a stat dump.",
+          "new": "Because rereading is easy. The page looks familiar, and that smoothness gets mistaken for knowing it: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [1] A quiz doesn't allow that illusion. \"Either the answer comes, or it does not.\" [2] The numbers back this up. Your notes list an effect size of 0.61 for retrieval practice and 0.13 for rereading. [3]\n\nNext time you finish a page, close it and try writing down what you remember. How much comes back?",
+          "old": "It feels like it works because rereading is *fluent*: the page looks familiar, so your brain reads that ease as \"I know this.\" [1] That's the trap, since recognizing a page isn't the same as being able to pull the idea out of memory. A quiz breaks the illusion at once: either the answer comes, or it doesn't. [2] Your notes say the same thing: a study group that rereads can feel better and still learn less than one that quizzes each other. [3]",
+          "usage": {
+            "input_tokens": 37155,
+            "output_tokens": 1619,
+            "cost_usd": 0.0330404
+          }
+        },
+        {
+          "id": "small-talk",
+          "pick": "same",
+          "why": "Both accept the learner's decision to stop, use the same grounded spacing citation [1], and offer one optional tiny review step, so the small wording differences (A's single card versus B's one or two cards plus \"close the app\") don't change the teaching quality.",
+          "new": "That's a fair place to stop. Being tired is a good reason to quit for today, and your sources say spreading practice over days beats cramming it into one night [1]. So stopping now isn't a loss. If you want one tiny thing before you go, answer a single review card, then call it a day. Want that, or are you done for today?",
+          "old": "Fair enough, that's a normal place to land after a long day. Stopping when you're spent is fine, and your sources say spreading practice over days beats cramming it into one night [1], so quitting now isn't a failure. If you want a tiny last step, flip through one or two cards and call it done. Or just close the app. Which sounds better?",
+          "usage": {
+            "input_tokens": 37808,
+            "output_tokens": 933,
+            "cost_usd": 0.025734800000000002
+          }
+        }
+      ]
+    }
+  ]
+}
