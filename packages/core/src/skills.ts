@@ -215,6 +215,7 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
         throw new Error(`color must be one of ${SkillColor.options.join("|")}`);
       if (key === "icon" && v && !isSkillIcon(v)) throw new Error('icon must be one emoji or "mc:<name>"');
       if ((key === "hook" || key === "goal") && v.length > HOOK_MAX) throw new Error(`${key} must be at most ${HOOK_MAX} characters`);
+      if (key === "collection") collectionName(v);
       if (v) node.set(key, v);
       else node.delete(key);
     }
@@ -222,6 +223,14 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     return skill;
   });
+}
+
+// A collection's name as saved. "Other" is what the sidebar and Home call the skills in no collection,
+// so a collection by that name would show as a second Other.
+function collectionName(name: string): string {
+  const c = name.trim().replace(/\s+/g, " ");
+  if (c.toLowerCase() === "other") throw new Error(`"${c}" is the name of the skills in no collection`);
+  return c;
 }
 
 // The sidebar's layout: collections in order, each with its skills in order ("" holds the skills in
@@ -242,7 +251,7 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
     const names = new Set<string>();
     const order: YAMLLib.YAMLMap[] = [];
     for (const g of layout) {
-      const c = g.collection.trim().replace(/\s+/g, " ");
+      const c = collectionName(g.collection);
       if (c && names.has(c.toLowerCase())) throw new Error(`collection "${c}" is listed twice`);
       names.add(c.toLowerCase());
       for (const id of g.skills) {

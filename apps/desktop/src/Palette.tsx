@@ -141,7 +141,9 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
   let groups: Group[];
   if (page) {
-    const exists = page.kind === "collection" && collections.find((c) => c.toLowerCase() === query.toLowerCase());
+    // "Other" is the skills in no collection, so naming it adds a skill there, as naming a collection that exists adds one to it.
+    const other = page.kind === "collection" && query.toLowerCase() === "other";
+    const exists = page.kind === "collection" && (other ? "Other" : collections.find((c) => c.toLowerCase() === query.toLowerCase()));
     groups = query
       ? [
           {
@@ -149,7 +151,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
             score: 1,
             rows: [
               page.kind === "collection"
-                ? { value: "create", label: exists ? <>Add a skill to “{exists}”</> : <>Create collection “{query}”</>, run: () => open({ kind: "skill", collection: exists || query }) }
+                ? { value: "create", label: exists ? <>Add a skill to “{exists}”</> : <>Create collection “{query}”</>, run: () => open({ kind: "skill", collection: other ? "" : exists || query }) }
                 : { value: "create", label: <>Create skill “{query}”{page.collection && <span className="sub">in {page.collection}</span>}</>, run: () => void create(query) },
             ],
           },

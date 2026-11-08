@@ -1609,6 +1609,25 @@ journey("⋯ menus by keyboard: Edit author… and New skill open their field wi
   await page.keyboard.press("Escape");
 });
 
+journey("sidebar: New collection “Other” names a skill among the ungrouped ones, in the sidebar and in ⌘K", async (page) => {
+  const box = (await page.locator(".sidebar").boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height - 20, { button: "right" });
+  await page.getByRole("menuitem", { name: "New collection" }).click();
+  await page.getByLabel("New collection name").fill("Other");
+  await page.keyboard.press("Enter");
+  await page.locator('.sidebar [role=group][aria-label="Other"]').getByLabel("New skill name").waitFor();
+  await page.keyboard.press("Escape");
+  // In ⌘K, naming it Other adds a skill to the skills in no collection, as an existing name joins that one.
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("New collection");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("other");
+  await page.getByRole("option", { name: "Add a skill to “Other”" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await until("one Other heading", async () => (await page.locator(".side-label-text").allInnerTexts()).filter((t) => /^other$/i.test(t)).length === 1);
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);

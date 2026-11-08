@@ -33,4 +33,12 @@ describe("sidebar layout (arrangeSkills)", () => {
     await expect(arrangeSkills(lib, [{ collection: "", skills: [...all, "nope"] }])).rejects.toThrow("unknown");
     await expect(arrangeSkills(lib, [{ collection: "A", skills: all.slice(0, 1) }, { collection: "a", skills: all.slice(1) }])).rejects.toThrow("twice");
   });
+
+  test("refuses a collection named Other, the name the sidebar and Home give the skills in no collection", async () => {
+    const lib = await tempLibrary();
+    const all = loadSkills(lib).skills.map((s) => s.id);
+    await expect(arrangeSkills(lib, [{ collection: " other ", skills: all.slice(0, 1) }, { collection: "", skills: all.slice(1) }])).rejects.toThrow("no collection");
+    await expect(setSkillLook(lib, all[0]!, { collection: "Other" })).rejects.toThrow("no collection");
+    expect(loadSkills(lib).skills.every((s) => !s.collection)).toBe(true);
+  });
 });
