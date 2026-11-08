@@ -1,0 +1,175 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-08T18:41:44.869Z",
+  "set": "efb6f2c1",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@5",
+      "passed": "9/12",
+      "accuracy": 0.75,
+      "ci95": [
+        0.46768966087934005,
+        0.9110599603710386
+      ],
+      "errors": 0,
+      "wall_s": 21.2,
+      "cost_usd": 0.26339190000000007,
+      "input_tokens": 177574,
+      "output_tokens": 6078,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's get you there yourself. Think about the boxes: a correct answer moves a card to a box with longer gaps between reviews. What would the opposite move be for a card you got wrong? Your \"Paper flash cards\" section in the Spaced repetition source covers both cases, so have a look and tell me what you think.",
+          "ms": 8025,
+          "usage": {
+            "input_tokens": 12975,
+            "output_tokens": 466,
+            "cost_usd": 0.0227898
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "It goes back to the first box. In the Leitner system, incorrectly answered cards return to the first box for more aggressive review and repetition [1]. Correct ones move on to the next, less frequent box [1]. Each box after the first waits longer before you see its cards again [2].",
+          "ms": 5296,
+          "usage": {
+            "input_tokens": 13028,
+            "output_tokens": 437,
+            "cost_usd": 0.0227118
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": false,
+          "failed": [
+            "no /23\\.10/"
+          ],
+          "reply": "Right format, wrong number: 22.04 is too early. Your Spaced repetition source has a line about FSRS in its Algorithms section, and that line names the Anki release. Look it up there and tell me what you find.",
+          "ms": 9840,
+          "usage": {
+            "input_tokens": 26788,
+            "output_tokens": 519,
+            "cost_usd": 0.0269824
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Start with the \"Algorithms\" section of your Spaced repetition source. Find the bullet that names FSRS, which stands for Free Spaced Repetition Scheduler. It lists more than one app that supports it, so read for the Anki part only. What does it say there?",
+          "ms": 7648,
+          "usage": {
+            "input_tokens": 26430,
+            "output_tokens": 555,
+            "cost_usd": 0.026647499999999998
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": false,
+          "failed": [
+            "gave /\\b10\\b/"
+          ],
+          "reply": "Let's start with a similar case. The function is `return gap * 2.5 if remembered else 1` [1]. It reads as \"if remembered, use gap × 2.5, otherwise use 1.\"\n\nSay you had a gap of 10 days and *forgot*. The `else` side applies, so the next gap is 1 day. The 10 doesn't matter at all in that case.\n\nNow try yours. You had a gap of 4 days and remembered, so which side applies, and what number does it give you?",
+          "ms": 8430,
+          "usage": {
+            "input_tokens": 12551,
+            "output_tokens": 844,
+            "cost_usd": 0.0248738
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": false,
+          "failed": [
+            "doesn't ask"
+          ],
+          "reply": "Okay, first question, from the book's opening chapter: it says most of what we read is gone within a week. Is that a sign of weak minds? Explain what the book says is actually going on, in your own words.",
+          "ms": 3557,
+          "usage": {
+            "input_tokens": 10966,
+            "output_tokens": 222,
+            "cost_usd": 0.0123138
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table puts recall at 25% after 7 days, closer to a quarter than a half [1]. Your \"about half\" is nearer the day-1 figure of 58%.\n\nNext question: the book says the first review matters most. What shape of curve explains that?",
+          "ms": 5479,
+          "usage": {
+            "input_tokens": 11470,
+            "output_tokens": 511,
+            "cost_usd": 0.0172198
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days [1]. Notice the shape: 58% after day 1, then 25% at day 7, and only 21% at day 30. That's the \"drops fast, then levels off\" idea, which is why the first review matters most [2].\n\nNext question: why does the book say the first review matters most, based on that table?",
+          "ms": 4184,
+          "usage": {
+            "input_tokens": 12649,
+            "output_tokens": 322,
+            "cost_usd": 0.020045800000000003
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one from Chapter 1. Pick the kind of study you'd normally do for an exam, then write from memory: what the chapter says about the testing effect and spacing, and how you'd change your own routine because of them. Don't peek at the chapter until you've written it.",
+          "ms": 4505,
+          "usage": {
+            "input_tokens": 12830,
+            "output_tokens": 305,
+            "cost_usd": 0.0205998
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "That's right, and it's half of the story. Testing shows you what you don't know yet. A quiz \"breaks the illusion at once: either the answer comes, or it does not.\" [1]\n\nTwo things are missing:\n- **Recall also strengthens memory.** Testing does more than measure: \"Each time we recall an idea, the path to it gets easier to find the next time.\" [2]\n- **Why rereading misleads.** It \"feels fluent, and that fluency fools us into thinking we know the page.\" [3] That fluency is what hides the gaps you found.\n\nHere's a follow-up: say you spot a gap during a test. What would you do next so the test helps your memory and not just your awareness?",
+          "ms": 7690,
+          "usage": {
+            "input_tokens": 12773,
+            "output_tokens": 962,
+            "cost_usd": 0.026941800000000002
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is smooth. The words are familiar, so the page feels easy, and that ease gets mistaken for knowing it: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [1] Recognizing something is not the same as being able to pull it out of memory. A quiz shows the difference right away: \"either the answer comes, or it does not.\" [2] The numbers in your notes back this up. Retrieval practice has an effect size of 0.61 against 0.13 for rereading. [3]",
+          "ms": 5960,
+          "usage": {
+            "input_tokens": 12404,
+            "output_tokens": 622,
+            "cost_usd": 0.0220658
+          }
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, that's a good place to stop. Stopping when you're tired is actually on your side: your sources say practice spread over days beats the same practice crammed into one night [1]. So a rest now isn't lost time. If you want a tiny finish first, skim one highlight you made today and say it back from memory, then call it a day. Or just close the app and come back tomorrow.",
+          "ms": 4391,
+          "usage": {
+            "input_tokens": 12710,
+            "output_tokens": 313,
+            "cost_usd": 0.0201998
+          }
+        }
+      ]
+    }
+  ]
+}

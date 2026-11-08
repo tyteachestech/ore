@@ -1,0 +1,169 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-08T18:45:17.758Z",
+  "set": "82d85859",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@6",
+      "passed": "12/12",
+      "accuracy": 1,
+      "ci95": [
+        0.7574992425007574,
+        1
+      ],
+      "errors": 0,
+      "wall_s": 21.5,
+      "cost_usd": 0.1150372,
+      "input_tokens": 151763,
+      "output_tokens": 6227,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Try working it out from the boxes. A card you get right moves up to a box you see less often. So what would the system do with a card you've just failed? Think about which box would make you see it most often.\n\nHave a go, and if you're stuck I'll narrow it down.",
+          "ms": 8902,
+          "usage": {
+            "input_tokens": 13067,
+            "output_tokens": 464,
+            "cost_usd": 0.009078300000000001
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Here it is: an incorrectly answered card goes back to the first box, so it gets reviewed more often again [1]. Correct cards move on to the next, less frequent box [2]. Each later box waits longer before you see its cards again, so a miss sends the card back to the shortest wait [3].",
+          "ms": 5608,
+          "usage": {
+            "input_tokens": 13120,
+            "output_tokens": 444,
+            "cost_usd": 0.0088875
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Close on the format, but not the date: it was **23.10**. Your sources say FSRS is \"available in Anki starting with release 23.10\" [1]. That's two misses, so here's the answer. The year-month format you used is right, so 23.10 means October 2023.\n\nIf it helps, FSRS stands for Free Spaced Repetition Scheduler. Anki's 23.10 release notes are dated October 31, 2023, which fits the version number.",
+          "ms": 8368,
+          "usage": {
+            "input_tokens": 13325,
+            "output_tokens": 722,
+            "cost_usd": 0.0116919
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Good one to work out. Look at your \"Spaced repetition\" source, in the Algorithms section. It lists a few algorithm families, and one of them is FSRS (Free Spaced Repetition Scheduler). The same line says where FSRS shows up and from which release. Read that line and tell me the number you find. Anki also has the version noted in the references, if you want to check it.",
+          "ms": 4690,
+          "usage": {
+            "input_tokens": 13135,
+            "output_tokens": 279,
+            "cost_usd": 0.0072312
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start with a similar case, and then you can try yours. The function says to return `gap * 2.5` if you remembered, and `1` if you didn't [1].\n\nSay the gap was **2 days** and you remembered:\n- `remembered` is true, so we take the first branch.\n- The result is 2 × 2.5 = **5 days**.\n\nIf you'd forgotten after a 2-day gap, the answer would be 1 day, whatever the old gap was.\n\nNow try yours: the gap was 4 days and you remembered. What does `next_gap` give?",
+          "ms": 7136,
+          "usage": {
+            "input_tokens": 12642,
+            "output_tokens": 771,
+            "cost_usd": 0.0120902
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start with the forgetting curve. According to the book, recall drops fast at first and then levels off. Without looking back: why does the book say the *first* review matters most, and roughly what share of a reading do you think people still recall after a day?",
+          "ms": 3824,
+          "usage": {
+            "input_tokens": 11061,
+            "output_tokens": 234,
+            "cost_usd": 0.0065737999999999994
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table gives 25% at 7 days [1], so about a quarter. Half is closer to the 1-day figure of 58%. The book also says its numbers are illustrative, not from one study [2], so read the shape of the curve more than the exact values.\n\nNext question: why does the book say the first review matters most?",
+          "ms": 6424,
+          "usage": {
+            "input_tokens": 11562,
+            "output_tokens": 699,
+            "cost_usd": 0.011269999999999999
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days. [1] Nice and quick. Next one: the book says the first review matters most. What shape does the curve have that makes that true?",
+          "ms": 3840,
+          "usage": {
+            "input_tokens": 12745,
+            "output_tokens": 235,
+            "cost_usd": 0.006767800000000001
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one from Chapter 1. Pick the two effects it covers on how to study (testing and spacing), and write from memory, no peeking. Then apply them to something you're learning right now. Say what you'd do differently this week.",
+          "ms": 4792,
+          "usage": {
+            "input_tokens": 12929,
+            "output_tokens": 290,
+            "cost_usd": 0.0073323
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "You've got half of it. Testing exposes gaps, and the book makes that point too: a quiz breaks the illusion at once, because either the answer comes or it doesn't [1].\n\nWhat's missing is that a test doesn't only measure, it also teaches. Each time you recall an idea, the path to it gets easier to find next time [2]. The other half is why rereading loses. It feels fluent, and that fluency fools you into thinking you know the page [3].\n\nHere's a follow-up. Suppose a friend rereads their notes three times and feels sure they know them. Using the fluency idea, what would you tell them is going wrong?",
+          "ms": 9584,
+          "usage": {
+            "input_tokens": 12871,
+            "output_tokens": 1128,
+            "cost_usd": 0.015702600000000004
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is *fluent*: the words look familiar, and that smooth feeling gets mistaken for knowing. Your chapter says it directly: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [1] Recognizing a page isn't the same as being able to pull the idea out on your own. A quiz exposes the gap right away, since \"either the answer comes, or it does not.\" [2] The numbers back this up: your retrieval notes list rereading at an effect size of 0.13 versus 0.61 for retrieval practice. [3]\n\nWant to try it? Close the chapter and tell me, from memory, why fluency is misleading.",
+          "ms": 6208,
+          "usage": {
+            "input_tokens": 12502,
+            "output_tokens": 660,
+            "cost_usd": 0.0109935
+          }
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, and stopping is a good call. Your sources even back it up: practice spread over days beats the same practice crammed into one night [1]. So calling it a day isn't a failure. It's how the spacing works. If you'd like a tiny finish first, one quick recall question (about two minutes) is enough, but resting is fine too.",
+          "ms": 4241,
+          "usage": {
+            "input_tokens": 12804,
+            "output_tokens": 301,
+            "cost_usd": 0.0074181
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-08T19:48:30.069Z",
+  "set": "717e44c6",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@6",
+      "passed": "12/12",
+      "accuracy": 1,
+      "ci95": [
+        0.7574992425007574,
+        1
+      ],
+      "errors": 0,
+      "wall_s": 20.9,
+      "cost_usd": 0.1145457,
+      "input_tokens": 155512,
+      "output_tokens": 6131,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's get you there without me handing it over. Think about the boxes: a card you get right moves along to a box that's reviewed less often. So what would the opposite move be for a card you miss, and how far would it go? Give me your best guess.",
+          "ms": 6993,
+          "usage": {
+            "input_tokens": 13482,
+            "output_tokens": 408,
+            "cost_usd": 0.0085676
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Here it is: a card you answer incorrectly goes back to the first box, so you review it again much sooner and more often [1]. Cards you get right move on to the next, less frequent box [2]. Each later box waits longer before you see its cards again [3], so the cards you miss stay in heavy rotation until you can recall them.",
+          "ms": 5355,
+          "usage": {
+            "input_tokens": 13535,
+            "output_tokens": 454,
+            "cost_usd": 0.0090329
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Not 22.04. That's two misses, so here's the answer: FSRS arrived in Anki **23.10**. Your Spaced repetition source says FSRS is \"available in Anki starting with release 23.10\" [1]. The release notes it points to are dated October 31, 2023, which fits the year.month numbering: 23 for 2023, 10 for October [2].\n\nA way to remember it: FSRS came in autumn 2023, so think \"23.10\".",
+          "ms": 8624,
+          "usage": {
+            "input_tokens": 13784,
+            "output_tokens": 730,
+            "cost_usd": 0.011833399999999999
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Good news: your \"Spaced repetition\" source covers this, so start there. Look at the Algorithms section, in the item that names FSRS (Free Spaced Repetition Scheduler). It says which software has it and from what point. What release number do you find? If you want a second check, the References section has an entry for Anki's release notes.",
+          "ms": 4569,
+          "usage": {
+            "input_tokens": 13595,
+            "output_tokens": 262,
+            "cost_usd": 0.0071267
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "No worries, start by reading the function. The book's `next_gap` says [1]: if you remembered, multiply the gap by 2.5, and if you didn't, go back to 1.\n\nHere's a similar case. Say the last gap was 10 days and you remembered. The \"remembered\" branch applies, so 10 × 2.5 = 25 days. If you'd forgotten, the answer would just be 1.\n\nNow try yours: the gap was 4 days and you remembered. Which branch applies, and what number do you get?",
+          "ms": 7044,
+          "usage": {
+            "input_tokens": 12654,
+            "output_tokens": 754,
+            "cost_usd": 0.011940899999999999
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Okay, first one, from \"A Small Book of Remembering\": according to the book, what is it that actually keeps a memory, and why does the book say the effort matters? Answer from memory, in your own words.",
+          "ms": 3715,
+          "usage": {
+            "input_tokens": 11316,
+            "output_tokens": 223,
+            "cost_usd": 0.006501000000000001
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table gives 25% at 7 days, which is closer to a quarter than a half [1]. About half is nearer the 1-day figure of 58%. The drop is steepest early and then flattens [2].\n\nNext question: the book says one review matters most. Which one, and why?",
+          "ms": 5964,
+          "usage": {
+            "input_tokens": 11817,
+            "output_tokens": 586,
+            "cost_usd": 0.0101772
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days. [1] Notice the drop from 58% at day 1 to 25% at day 7 is steep, while day 30 is only 21%. The book's point is that recall falls fast and then levels off, so the first review matters most. [2]\n\nNext question: why does that shape make the *first* review the most valuable one?",
+          "ms": 4204,
+          "usage": {
+            "input_tokens": 12996,
+            "output_tokens": 328,
+            "cost_usd": 0.007719
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one from Chapter 1. Close the chapter and write from memory: the three kinds of test it names, plus the spacing and interleaving ideas. Then pick one study habit you use now and say how you'd change it with these ideas. Write it here or in your note.",
+          "ms": 4119,
+          "usage": {
+            "input_tokens": 13455,
+            "output_tokens": 304,
+            "cost_usd": 0.0075288
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "That holds. Testing shows you what you don't know yet, and the chapter says nearly the same: \"either the answer comes, or it does not.\" [1] That's why rereading is the weaker choice. It feels fluent, and the fluency fools you into thinking you know the page.\n\nTwo things are missing:\n- **Testing also builds memory.** It isn't only a check. Each recall makes the path to the idea easier to find next time [2], so a test is also a way of learning.\n- **Why rereading misleads.** You gave the benefit of testing but not the cost of rereading. Rereading feels easy, so you don't notice the gaps.\n\nHere's a follow-up. Say you quiz yourself and get a card wrong. Why might that miss still help your memory more than rereading the answer would?",
+          "ms": 9185,
+          "usage": {
+            "input_tokens": 12997,
+            "output_tokens": 1145,
+            "cost_usd": 0.015893
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is fluent: the page looks familiar, and that ease gets mistaken for knowing it. Your chapter says it directly: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [1] Recognizing something isn't the same as being able to pull it out of memory. A quiz breaks the illusion because either the answer comes or it doesn't. [2] Your notes make the same point: a group that quizzes learns more than one that rereads, even when the rereading feels better. [3]",
+          "ms": 5836,
+          "usage": {
+            "input_tokens": 12746,
+            "output_tokens": 619,
+            "cost_usd": 0.010603999999999999
+          }
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, that's a real signal, not a failure. Stopping when you're tired is usually the right call, and your sources even back it up: practice spread over days beats the same practice crammed into one night. [1] So a short break today costs you less than it feels like. If you want a tiny finish, do one quick review card and call it done. Or just close the app and come back tomorrow. Which sounds better?",
+          "ms": 4415,
+          "usage": {
+            "input_tokens": 13135,
+            "output_tokens": 318,
+            "cost_usd": 0.0076212
+          }
+        }
+      ]
+    }
+  ]
+}
