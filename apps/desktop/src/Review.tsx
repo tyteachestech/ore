@@ -150,6 +150,12 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     setAsking(false);
   };
 
+  /** The next card, loaded while he answers this one, so a rating moves on without waiting for it. Only
+   *  a rating arms it (`submit`); anything else that moves the queue or changes a card (an undo, an edit,
+   *  a retire, a version dropped, Try again) drops it, and that card loads afresh. */
+  const ahead = useRef<{ id: string; card: Promise<CardFull>; armed: boolean } | null>(null);
+  const dropAhead = () => void (ahead.current = null);
+  const loadCard = (id: string) => ore<CardFull>("card", "show", id, "--review");
   // Each card: load the version to review (a remix in its turn, D66), reset the answer, start its clock.
   useEffect(() => {
     if (!entry) return;
@@ -157,7 +163,10 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     setCard(null);
     setError(null);
     reset();
-    ore<CardFull>("card", "show", entry.id, "--review").then(
+    // The card loaded ahead, if a rating just moved on to it; one whose early load failed loads again.
+    const early = ahead.current?.armed && ahead.current.id === entry.id ? ahead.current.card : undefined;
+    dropAhead();
+    (early ? early.catch(() => loadCard(entry.id)) : loadCard(entry.id)).then(
       (c) => {
         if (!live) return;
         setCard(c);
@@ -172,6 +181,15 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       live = false;
     };
   }, [entry, loadTry]);
+
+  // Once this card is on screen, the one after it loads.
+  const nextUp = queue?.[1]?.id;
+  useEffect(() => {
+    if (!card || card.id !== entry?.id || !nextUp || ahead.current?.id === nextUp) return;
+    const slot = { id: nextUp, card: loadCard(nextUp), armed: false };
+    slot.card.catch(() => ahead.current === slot && dropAhead());
+    ahead.current = slot;
+  }, [card, entry, nextUp]);
 
   useEffect(() => {
     if (paused) return;
@@ -380,6 +398,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
     if (rating > 1) setDone((n) => n + 1);
+    if (ahead.current) ahead.current.armed = true;
     advance(rating === 1);
     activeMs.current += Math.min(elapsed, ACTIVE_CAP_MS);
   };
@@ -388,6 +407,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
    *  opens the session again, back on that card (Anki's Undo after Congratulations). */
   const undoRating = async () => {
     if (!last || busy) return;
+    dropAhead();
     last.forget();
     setBusy(true);
     try {
@@ -425,6 +445,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   const retire = async () => {
     if (!card || busy) return;
+    dropAhead();
     setBusy(true);
     try {
       await ore("card", "retire", card.id);
@@ -435,6 +456,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         "info",
         () => {
           if (state === "retired") return;
+          dropAhead();
           ore("card", "restore", id, opt("state", state)).then(
             () => {
               retired.current.delete(id);
@@ -443,7 +465,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
             (e) => notify(errorText(e), "error"),
           );
         },
-        () => void ore("card", "retire", id).then(() => void retired.current.add(id), (e) => notify(errorText(e), "error")),
+        () => (dropAhead(), void ore("card", "retire", id).then(() => void retired.current.add(id), (e) => notify(errorText(e), "error"))),
       );
       advance(false);
     } catch (e) {
@@ -456,6 +478,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   /** B, Bad version (D66): drops the remix without logging a review and shows the original. */
   const badVersion = async () => {
     if (!card?.variant || busy) return;
+    dropAhead();
     setBusy(true);
     try {
       const { id, variant } = card;
@@ -467,8 +490,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       notify(
         "Dropped that version. Here’s the original.",
         "info",
-        () => void ore("variant", "restore", id, variant).catch((e) => notify(errorText(e), "error")),
-        () => void ore("variant", "reject", id, variant).catch((e) => notify(errorText(e), "error")),
+        () => (dropAhead(), void ore("variant", "restore", id, variant).catch((e) => notify(errorText(e), "error"))),
+        () => (dropAhead(), void ore("variant", "reject", id, variant).catch((e) => notify(errorText(e), "error"))),
       );
     } catch (e) {
       notify(errorText(e), "error");
@@ -488,6 +511,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
    *  ones back (and on screen, if it still is). */
   const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true) => {
     const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
+    dropAhead();
     const saved = await ore<CardFull>("card", "set", c.id, opt("question", question), opt("answer", answer), ...(rubric ?? []).map((p) => opt("point", p)), ...variantOpt(c));
     const s = now.current;
     setCard((cur) => (cur?.id === c.id ? saved : cur));

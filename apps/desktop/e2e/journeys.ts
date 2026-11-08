@@ -2303,6 +2303,28 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: the next card is loaded while he answers, so a rating moves straight on", async (page) => {
+  // Each card takes 1.2 s to load here: only one loaded ahead shows within half a second of the rating.
+  await page.addInitScript("window.__ORE_SLOW = { card: 1200 }");
+  await page.reload();
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const q = page.locator(".review-q");
+  await pick.or(q).first().waitFor();
+  if (await pick.isVisible()) await page.keyboard.press("Enter");
+  await q.waitFor({ timeout: 8000 });
+  const first = await q.innerText();
+  await page.waitForTimeout(1500);
+  await reveal(page);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  const t0 = Date.now();
+  await page.waitForFunction((first) => { const el = document.querySelector(".review-q"); return !!el && el.textContent !== first; }, first, { timeout: 8000 });
+  if (Date.now() - t0 > 900) throw new Error(`the next card took ${Date.now() - t0} ms after the rating: it wasn't loaded ahead`);
+  await page.getByRole("button", { name: "Undo last rating" }).click();
+  await until("Undo puts the first card back", async () => (await q.innerText()) === first);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
 journey("review: ⌘Z on the end screen takes the last rating back and returns to that card; ⇧⌘Z gives it again", async (page) => {
   await page.getByRole("button", { name: "Start review" }).click();
   const pick = page.getByRole("dialog", { name: "What to review" });
@@ -2862,15 +2884,15 @@ journey("finish quiz: while Check saves, his answer and how sure he is stay as s
 });
 
 journey("review: a card that fails to load offers Try again, focused, which loads it without losing the rating before it; Undo clears the error", async (page) => {
-  await startReview(page, null);
   const q = page.locator(".review-q");
   const session = page.locator(".review [role=progressbar]").first();
-  const first = await q.innerText();
+  // Every load of a card other than the first one shown fails: the next card loads while he answers
+  // this one, and again when it is due if that failed (and twice under React's dev StrictMode).
+  let firstId: string | undefined;
   const failNext = async () => {
-    let failed = 0;
     await page.route(/\/ore$/, async (route) => {
-      const body = route.request().postData() ?? "";
-      if (!body.includes('"show",') || !body.includes('"--review"') || failed++) return route.fallback();
+      const { args } = JSON.parse(route.request().postData() ?? "{}") as { args?: string[] };
+      if (args?.[0] !== "card" || args[1] !== "show" || args[3] !== "--review" || (firstId ??= args[2]) === args[2]) return route.fallback();
       await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify("Couldn’t read the card.") });
     });
   };
@@ -2878,18 +2900,21 @@ journey("review: a card that fails to load offers Try again, focused, which load
   const retry = page.getByRole("button", { name: "Try again" });
   // Enter on Undo takes the rating back (it is Undo's Enter, not Try again's): its card loads, and the
   // error goes with the card it was about.
-  await reveal(page);
   await failNext();
+  await startReview(page, null);
+  const first = await q.innerText();
+  await reveal(page);
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await error.waitFor();
   await page.unroute(/\/ore$/);
+  // The first card loads again on Undo; the next one, loaded ahead, fails again.
+  await failNext();
   await page.getByRole("button", { name: "Undo last rating" }).focus();
   await page.keyboard.press("Enter");
   await until("Undo puts the first card back", async () => (await q.isVisible()) && (await q.innerText()) === first);
   if (await error.count()) throw new Error("the load error stayed on the card Undo brought back");
   // Try again takes the focus, and Enter loads the card.
   await reveal(page);
-  await failNext();
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await error.waitFor();
   await page.unroute(/\/ore$/);

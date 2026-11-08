@@ -127,6 +127,21 @@ const steps: [string, (page: Page) => Promise<Result>][] = [
       await page.locator(".review-q").waitFor();
     });
   }],
+  // Real ratings: the scale-4 seed has ~50 cards due; reseed (delete $TMPDIR/ore-bench) once they run out.
+  ["review: rate 5 cards", async (page) => {
+    const q = page.locator(".review-q");
+    return measure(page, async () => {
+      for (let i = 0; i < 5 && (await q.isVisible()); i++) {
+        const was = await q.innerText();
+        // An Explain card shows its answer on No idea, a Fact card on how sure he is.
+        const noIdea = page.getByRole("button", { name: "No idea" });
+        await ((await noIdea.isVisible()) ? noIdea : page.getByRole("radio", { name: "Think so" }).first()).click();
+        await page.getByRole("button", { name: "Good", exact: true }).click();
+        // The next card, or the end of the session.
+        await page.waitForFunction((was) => { const el = document.querySelector(".review-q"); return el ? el.textContent !== was : !document.querySelector(".review"); }, was);
+      }
+    });
+  }],
 ];
 
 if (ONLY && !steps.some(([n]) => n.includes(ONLY))) {
