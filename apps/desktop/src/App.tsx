@@ -37,7 +37,7 @@ import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChip, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, type Entry, type FileKind } from "./paste";
-import { errorText, load, save, type Notify } from "./util";
+import { errorText, load, save } from "./util";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, PAGES, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
 
@@ -229,7 +229,6 @@ export function App() {
   /** A ⌘K match in a skill note: the words to find there, until the skill page has. */
   const [skillFind, setSkillFind] = useState<string | undefined>(undefined);
   const [finishing, setFinishing] = useState(false);
-  const [showCollected, setShowCollected] = useState(0);
   const [renameSource, setRenameSource] = useState(0);
   const readerActions = useRef<MenuAction[]>([]);
   const [readerPractice] = useState<PracticeRef>(() => ({ current: null, pending: null }));
@@ -1259,7 +1258,6 @@ export function App() {
   };
 
   const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
-  const target = openId ? (items ?? []).find((i) => i.id === openId) : current;
   const listPick = !openId && !onHome && keyed && !currentCourse ? current : null;
 
   /** Archives a source (hidden from lists and search, files and cards kept), with Undo. The row
@@ -2109,7 +2107,6 @@ export function App() {
             skills={skills}
             finishing={finishing}
             setFinishing={setFinishing}
-            showCollected={showCollected}
             renameSource={renameSource}
             actionsRef={readerActions}
             practiceRef={readerPractice}

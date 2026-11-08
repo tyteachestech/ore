@@ -7,7 +7,7 @@ import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
-import { ore, opt, SKILL_COLORS, type Skill, type SkillColor } from "./ore";
+import { ore, opt, type Skill, type SkillColor } from "./ore";
 import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
 
 /** How skill tags show in lists (Settings → General): icon and name, or the icon alone for a small

@@ -1,7 +1,7 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { doclingHome, doclingPath } from "./docling-path.ts";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 /** A box on a PDF page in points, measured from its bottom-left corner as pdf.js does. */

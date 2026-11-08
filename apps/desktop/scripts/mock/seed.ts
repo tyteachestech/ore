@@ -65,7 +65,7 @@ const a2 = await mk(agents, ["ai"]);
 mkdirSync(join(a2.dir, "assets"), { recursive: true });
 writeFileSync(join(a2.dir, "assets", "patterns.svg"), PATTERNS);
 const a3 = await mk(story, ["storytelling-writing"]);
-const a4 = await mk(article("A very long title about the neuroscience of habit formation and why cue-routine-reward loops are harder to break than to build", [["Loops", [para("Habits form when a cue reliably predicts a reward.")]]]), ["habits"]);
+await mk(article("A very long title about the neuroscience of habit formation and why cue-routine-reward loops are harder to break than to build", [["Loops", [para("Habits form when a cue reliably predicts a reward.")]]]), ["habits"]);
 const a5 = await mk(article("Notes on spaced repetition scheduling (FSRS)", [["Stability", [para("FSRS models stability and difficulty for each card.")]]]), ["learning"]);
 
 await updateItemMeta(lib, a1.meta.id, (m) => ({ ...m, prequestions: [

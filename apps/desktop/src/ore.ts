@@ -48,17 +48,6 @@ export const cancelOre = (job: string): Promise<void> => invoke<void>("ore_cance
  *  (a Markdown list), so free text always goes in this form. */
 export const opt = (name: string, value: string) => `--${name}=${value}`;
 
-/** Starts `ore <args>` in the background (long AI jobs); output goes to the library's .ore/logs/. */
-export async function oreDetached(...args: string[]): Promise<void> {
-  // Background jobs are AI work (enrich, remix), which runs on the Mac (D7).
-  if (PHONE) return;
-  try {
-    await invoke("ore_detached", { args });
-  } catch (e) {
-    throw new Error(typeof e === "string" ? e : String(e));
-  }
-}
-
 export type Status = "inbox" | "reading" | "done";
 /** The two source tabs (D28): To read holds inbox (not opened yet) and reading (started) sources. */
 export type Tab = "toread" | "done" | "archived";

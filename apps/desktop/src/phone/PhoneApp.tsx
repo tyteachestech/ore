@@ -303,7 +303,6 @@ export function PhoneApp() {
             onShowSide={(t) => (setSide(t), setNoting(true))}
             onCloseSide={() => setNoting(false)}
             onToggleSide={() => setNoting((v) => !v)}
-            showCollected={0}
             renameSource={0}
             actionsRef={actions}
             onArchive={(item) => void archive(item)}

@@ -6,7 +6,7 @@
 
 use serde_json::Value;
 use std::env;
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -200,30 +200,6 @@ fn run(args: Vec<String>, stdin: Option<String>, app: Option<AppHandle>, job: Op
     serde_json::from_slice(&out.stdout).map_err(|e| format!("unreadable output from ore {}: {e}", args.join(" ")))
 }
 
-/// Starts ore detached (long AI jobs such as `enrich <id>`), logging to the library's
-/// `.ore/logs/<args>.log` like the CLI's own background enrich.
-fn spawn(args: Vec<String>) -> Result<(), String> {
-    let (bin, path) = resolve()?;
-    let logs = library().join(".ore/logs");
-    let name: String = args.join("-").chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).collect();
-    let log = fs::create_dir_all(&logs)
-        .and_then(|_| OpenOptions::new().create(true).append(true).open(logs.join(format!("{name}.log"))));
-    let (stdout, stderr) = match log.and_then(|f| Ok((f.try_clone()?, f))) {
-        Ok((a, b)) => (Stdio::from(a), Stdio::from(b)),
-        Err(_) => (Stdio::null(), Stdio::null()),
-    };
-    let mut child = Command::new(&bin)
-        .args(&args)
-        .env("PATH", path)
-        .stdin(Stdio::null())
-        .stdout(stdout)
-        .stderr(stderr)
-        .spawn()
-        .map_err(|e| format!("could not run {}: {e}", bin.display()))?;
-    thread::spawn(move || child.wait()); // reap; the job outlives nothing but itself
-    Ok(())
-}
-
 /// Runs `ore <args> --json` off the main thread, with `stdin` piped in when given; returns parsed stdout or the CLI's error line.
 /// `job` names a run `ore_cancel` can stop.
 #[tauri::command]
@@ -238,12 +214,6 @@ fn ore_cancel(job: String) {
     if let Some(pid) = jobs().lock().unwrap().get(&job) {
         let _ = Command::new("kill").args(["-s", "TERM", "--", &format!("-{pid}")]).status();
     }
-}
-
-/// Fire-and-forget `ore <args>`; returns once the process has started.
-#[tauri::command]
-async fn ore_detached(args: Vec<String>) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || spawn(args)).await.map_err(|e| e.to_string())?
 }
 
 /// The daily reminder (D67) is a LaunchAgent that runs this binary with `--remind` at his time, so
@@ -742,7 +712,7 @@ fn main() {
                 .with_state_flags(StateFlags::all() & !StateFlags::VISIBLE)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![ore, ore_cancel, ore_detached, player_port, define, clipboard_count, clipboard_text, clipboard_files, set_reminder, login_item, quiz_hide, quiz_open_source, set_quiz_shortcut, set_tray, set_app_menu])
+        .invoke_handler(tauri::generate_handler![ore, ore_cancel, player_port, define, clipboard_count, clipboard_text, clipboard_files, set_reminder, login_item, quiz_hide, quiz_open_source, set_quiz_shortcut, set_tray, set_app_menu])
         .on_menu_event(|app, e| {
             let id = e.id().as_ref();
             if !id.starts_with("ore:") {
