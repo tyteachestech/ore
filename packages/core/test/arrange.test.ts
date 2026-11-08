@@ -54,4 +54,10 @@ describe("sidebar layout (arrangeSkills)", () => {
     await arrangeSkills(lib, layout);
     expect(readFileSync(paths.skills(lib), "utf8")).not.toMatch(/collection: .*Other/i);
   });
+
+  test("a collection set from the skill editor is saved tidied, as arrange and add save it", async () => {
+    const lib = await tempLibrary();
+    await setSkillLook(lib, "ai", { collection: "  Physics   Lab " });
+    expect(loadSkills(lib).skills.find((s) => s.id === "ai")?.collection).toBe("Physics Lab");
+  });
 });

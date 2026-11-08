@@ -214,13 +214,13 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
       node.set("name", name);
     }
     for (const key of ["icon", "color", "collection", "hook", "goal"] as const) {
-      const v = key === "hook" || key === "goal" ? look[key]?.trim().replace(/\s+/g, " ") : look[key]?.trim();
+      const raw = look[key];
+      const v = raw === undefined ? undefined : key === "collection" ? collectionName(raw) : key === "hook" || key === "goal" ? raw.trim().replace(/\s+/g, " ") : raw.trim();
       if (v === undefined) continue;
       if (key === "color" && v && !SkillColor.options.includes(v as SkillColor))
         throw new Error(`color must be one of ${SkillColor.options.join("|")}`);
       if (key === "icon" && v && !isSkillIcon(v)) throw new Error('icon must be one emoji or "mc:<name>"');
       if ((key === "hook" || key === "goal") && v.length > HOOK_MAX) throw new Error(`${key} must be at most ${HOOK_MAX} characters`);
-      if (key === "collection") collectionName(v);
       if (v) node.set(key, v);
       else node.delete(key);
     }
