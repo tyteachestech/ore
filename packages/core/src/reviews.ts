@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { appendJsonl, deviceLog, readJsonl, visible } from "./fsutil.ts";
@@ -54,10 +54,30 @@ export function reviewLogFiles(lib: Library): string[] {
 
 // All reviews, oldest first, without the ones taken back. The log is the source of truth for
 // scheduling. A review is named by its card and time, so one read twice (a conflicted copy) counts once.
+/** The last read, kept while no log file changed (the logs only grow): one command often reads them
+ *  several times (Home's Today, a skill page's stats), and 4,000 reviews take ~25 ms to parse.
+ *  Callers share its Review objects, so they read them and never change them. */
+let last: { key: string; reviews: Review[] } | null = null;
+
 export function readReviews(lib: Library): Review[] {
+  const files = reviewLogFiles(lib);
+  const key = [lib.root, ...files.map((f) => {
+    // A file a sync removes after the listing (a conflicted copy) reads as empty, as it did before.
+    try {
+      const s = statSync(f);
+      return `${f}|${s.mtimeMs}|${s.size}`;
+    } catch {
+      return `${f}|gone`;
+    }
+  })].join("\n");
+  if (last?.key !== key) last = { key, reviews: parseReviews(files) };
+  return [...last.reviews];
+}
+
+function parseReviews(files: string[]): Review[] {
   // A line that isn't a whole review or undo (a hand edit, a rating of 5, a state cut off) can't be
   // replayed, so it is skipped rather than stopping every screen; `ore doctor` names it.
-  const lines = reviewLogFiles(lib)
+  const lines = files
     .flatMap((f) => readJsonl<unknown>(f))
     .filter((l): l is Review | Undo => (l && typeof l === "object" && "undo" in l ? UndoSchema : Replayable).safeParse(l).success);
   const undone = new Set(lines.flatMap((l) => ("undo" in l ? [`${l.card}|${l.undo}`] : [])));

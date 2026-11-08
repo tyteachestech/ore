@@ -1,7 +1,7 @@
 import type { Grade } from "ts-fsrs";
 import { annotationRevs } from "./annotations.ts";
 import { findCard } from "./cards.ts";
-import { openIndex, type CardRow } from "./db.ts";
+import { openIndex, withIndex, type CardRow, type LibraryIndex } from "./db.ts";
 import { latestRevs } from "./fsutil.ts";
 import { itemDirs } from "./items.ts";
 import { localDay, nowIso } from "./ids.ts";
@@ -116,9 +116,8 @@ export interface QueueOptions {
 // session's pending relearn passes, in queue order. A draft waits until the day after it was
 // written, so its first review is spaced from the reading (D65). New drafts enter only while
 // today's goal has room after the due cards, up to `new_per_day` (D65).
-export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}): QueueEntry[] {
-  const index = openIndex(lib);
-  try {
+export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}, open?: LibraryIndex): QueueEntry[] {
+  return withIndex(lib, open, (index) => {
     const skills = loadSkills(lib).skills;
     const w = loadParams(lib);
     const items = new Map(index.items().map((i) => [i.id, i]));
@@ -177,9 +176,7 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
       }
     } else entries.push(...unseen.map((u) => u.entry));
     return orderQueue(entries);
-  } finally {
-    index.close();
-  }
+  });
 }
 
 export interface SkillStats {
@@ -207,9 +204,8 @@ function annotationNotes(lib: Library): Map<string, string> {
   return out;
 }
 
-export function libraryStats(lib: Library): { skills: SkillStats[]; total: Omit<SkillStats, "name" | "priority"> } {
-  const index = openIndex(lib);
-  try {
+export function libraryStats(lib: Library, open?: LibraryIndex): { skills: SkillStats[]; total: Omit<SkillStats, "name" | "priority"> } {
+  return withIndex(lib, open, (index) => {
     const items = index.items();
     const cards = index.cards();
     const reviews = readReviews(lib);
@@ -243,7 +239,5 @@ export function libraryStats(lib: Library): { skills: SkillStats[]; total: Omit<
     };
     const skills = loadSkills(lib).skills.map((s) => ({ skill: s.id, name: s.name, priority: s.priority, ...compute((xs) => xs.includes(s.id)) }));
     return { skills, total: { skill: "all", ...compute(() => true), session_starts: starts.size } };
-  } finally {
-    index.close();
-  }
+  });
 }

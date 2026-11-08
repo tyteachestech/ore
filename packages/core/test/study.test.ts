@@ -22,6 +22,25 @@ async function setup() {
 }
 
 describe("review loop", () => {
+  test("reads of the review log within one process see every new review, an undo and a hand edit", async () => {
+    // readReviews keeps its last parse while the log files are unchanged (one command reads them several times).
+    const { lib, a, b } = await setup();
+    const now = new Date(Date.now() + 864e5);
+    expect(readReviews(lib)).toEqual([]);
+    const r = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now });
+    expect(readReviews(lib).map((x) => x.card)).toEqual([a.meta.id]);
+    const mine = readReviews(lib);
+    mine.pop();
+    expect(readReviews(lib)).toHaveLength(1);
+    await recordReview(lib, b.meta.id, { rating: 2, confidence: 2, now });
+    expect(readReviews(lib).map((x) => x.card)).toEqual([a.meta.id, b.meta.id]);
+    await undoReview(lib, a.meta.id, r.ts);
+    expect(readReviews(lib).map((x) => x.card)).toEqual([b.meta.id]);
+    const log = readdirSync(paths.reviews(lib)).find((f) => f.endsWith(".jsonl"))!;
+    writeFileSync(join(paths.reviews(lib), log), "");
+    expect(readReviews(lib)).toEqual([]);
+  });
+
   test("draft → finishing review → live; log replays into the index; due respects schedule", async () => {
     const { lib, a, b } = await setup();
     const now = new Date(Date.now() + 864e5); // drafts wait a day (D65)

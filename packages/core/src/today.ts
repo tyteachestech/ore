@@ -1,4 +1,4 @@
-import { openIndex, type CardRow } from "./db.ts";
+import { openIndex, withIndex, type CardRow, type LibraryIndex } from "./db.ts";
 import type { Library } from "./library.ts";
 import { readReviews, type Review } from "./reviews.ts";
 import { readSessions } from "./sessions.ts";
@@ -121,27 +121,27 @@ export function today(lib: Library, now = new Date()): Today {
   const counts = (day: string) => !(s.weekdays_only && isWeekend(day));
   const metOn = (day: string) => counts(day) && (active(byDay.get(day) ?? []) >= goal || ((byDay.get(day)?.length ?? 0) > 0 && caughtUpDays.has(day)));
 
-  const queue = dueQueue(lib, now);
-  const day = localDay(now);
-  const done = byDay.get(day) ?? [];
-  const caughtUp = queue.length === 0;
-  const met = counts(day) && (active(done) >= goal || (done.length > 0 && caughtUp));
-
-  const monday = new Date(now);
-  monday.setHours(12, 0, 0, 0);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  const week = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    const date = localDay(d);
-    const status: DayStatus = !counts(date) ? "off" : (date === day ? met : metOn(date)) ? "met" : "open";
-    return { date, status, active_ms: active(byDay.get(date) ?? []) };
-  });
-  const daysMet = new Set([...byDay.keys()].filter((d) => d !== day && metOn(d)));
-  if (met) daysMet.add(day);
-
   const index = openIndex(lib);
   try {
+    const queue = dueQueue(lib, now, {}, index);
+    const day = localDay(now);
+    const done = byDay.get(day) ?? [];
+    const caughtUp = queue.length === 0;
+    const met = counts(day) && (active(done) >= goal || (done.length > 0 && caughtUp));
+
+    const monday = new Date(now);
+    monday.setHours(12, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const week = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const date = localDay(d);
+      const status: DayStatus = !counts(date) ? "off" : (date === day ? met : metOn(date)) ? "met" : "open";
+      return { date, status, active_ms: active(byDay.get(date) ?? []) };
+    });
+    const daysMet = new Set([...byDay.keys()].filter((d) => d !== day && metOn(d)));
+    if (met) daysMet.add(day);
+
     const cards = index.cards();
     const med = medians(reviews, new Map(cards.map((c) => [c.id, c.kind])));
     const estimate = queue.reduce((t, e) => t + med[e.kind], 0);
@@ -172,19 +172,13 @@ export function today(lib: Library, now = new Date()): Today {
 }
 
 /** A skill's strength from the library (for `ore stats --skill`). */
-export function skillStrength(lib: Library, skill: string, now = new Date()): Strength {
-  const index = openIndex(lib);
-  try {
-    return strength(index.cards(), readReviews(lib), skill, loadParams(lib), now);
-  } finally {
-    index.close();
-  }
+export function skillStrength(lib: Library, skill: string, now = new Date(), open?: LibraryIndex): Strength {
+  return withIndex(lib, open, (index) => strength(index.cards(), readReviews(lib), skill, loadParams(lib), now));
 }
 
 /** Solid memories of a skill at the end of each of the last `weeks` weeks, oldest first (D62's growth line). */
-export function skillGrowth(lib: Library, skill: string, now = new Date(), weeks = 12): { week_end: string; solid: number }[] {
-  const index = openIndex(lib);
-  try {
+export function skillGrowth(lib: Library, skill: string, now = new Date(), weeks = 12, open?: LibraryIndex): { week_end: string; solid: number }[] {
+  return withIndex(lib, open, (index) => {
     const ids = new Set(index.cards().filter((c) => c.state !== "retired" && c.skills.includes(skill)).map((c) => c.id));
     const reviews = readReviews(lib).filter((r) => ids.has(r.card));
     return Array.from({ length: weeks }, (_, i) => {
@@ -193,9 +187,7 @@ export function skillGrowth(lib: Library, skill: string, now = new Date(), weeks
       for (const r of reviews) if (new Date(r.ts) <= end) last.set(r.card, r);
       return { week_end: localDay(end), solid: [...last.values()].filter((r) => r.state_after.stability >= SOLID_DAYS).length };
     });
-  } finally {
-    index.close();
-  }
+  });
 }
 
 /** The day's one reminder (D67): only when a time is set, today counts, the goal is not met yet and
