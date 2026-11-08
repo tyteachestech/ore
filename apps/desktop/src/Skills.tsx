@@ -155,13 +155,18 @@ export const skillsFirst = (skills: Skill[], first: string[]): Skill[] => [
   ...skills.filter((k) => !first.includes(k.id)),
 ];
 
+/** The header over the skills in no collection, once there are collections. No collection takes its name. */
+export const UNGROUPED = "Other";
+/** Whether a collection name is the ungrouped skills' header, any case. */
+export const isUngroupedName = (name: string) => name.trim().toLowerCase() === UNGROUPED.toLowerCase();
+
 /** Sidebar groups: each collection in the order it first appears in skills.yaml, then the rest
  *  (`collection` is "" for those). */
 export function skillGroups(skills: Skill[]): { name: string; collection: string; skills: Skill[] }[] {
   const names = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
   const groups = names.map((name) => ({ name, collection: name, skills: skills.filter((s) => s.collection === name) }));
   const rest = skills.filter((s) => !s.collection);
-  if (rest.length || !names.length) groups.push({ name: names.length ? "Other" : "Skills", collection: "", skills: rest });
+  if (rest.length || !names.length) groups.push({ name: names.length ? UNGROUPED : "Skills", collection: "", skills: rest });
   return groups;
 }
 
@@ -401,7 +406,7 @@ function CollectionPicker({ value, collections, onPick }: { value: string; colle
                   {c === value && <Check />}
                 </Command.Item>
               ))}
-              {typed && !collections.some((c) => c.toLowerCase() === typed.toLowerCase()) && (
+              {typed && !isUngroupedName(typed) && !collections.some((c) => c.toLowerCase() === typed.toLowerCase()) && (
                 <Command.Item value={`create ${typed}`} onSelect={() => choose(typed)}>
                   <span className="sub">Create</span> {typed}
                 </Command.Item>

@@ -12,7 +12,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
 import { useSideCursor } from "./SideCursor";
 import { ore, opt, type Skill } from "./ore";
-import { layoutOf, skillGroups, type SkillLayout } from "./Skills";
+import { isUngroupedName, layoutOf, skillGroups, UNGROUPED, type SkillLayout } from "./Skills";
 import { errorText, load, save } from "./util";
 
 const CLOSED = "ore.side-closed";
@@ -80,7 +80,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const [naming, setNaming] = useState(false);
   const marked = skills.some((s) => s.icon || s.color);
   const base = draft ?? groups;
-  const freshGroup = fresh !== null && !base.some((g) => g.collection === fresh) ? { name: fresh || "Other", collection: fresh, skills: [] } : null;
+  const freshGroup = fresh !== null && !base.some((g) => g.collection === fresh) ? { name: fresh || UNGROUPED, collection: fresh, skills: [] } : null;
   const last = base.length - (base.at(-1)?.collection ? 0 : 1);
   const shown = freshGroup ? (fresh ? [...base.slice(0, last), freshGroup, ...base.slice(last)] : [...base, freshGroup]) : base;
   const named = groups.filter((g) => g.collection);
@@ -160,6 +160,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     setNaming(false);
     const v = name.trim().replace(/\s+/g, " ");
     if (!v) return;
+    // "Other" is where skills in no collection already go.
+    if (isUngroupedName(v)) return newSkill();
     const existing = groups.find((g) => g.collection.toLowerCase() === v.toLowerCase());
     if (!existing) setFresh(v);
     setAdding(existing?.name ?? v);
@@ -167,7 +169,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const newSkill = () => {
     const rest = groups.find((g) => !g.collection);
     if (!rest) setFresh("");
-    setAdding(rest?.name ?? "Other");
+    setAdding(rest?.name ?? UNGROUPED);
   };
   // Right-click on the sidebar around the rows, as on Finder's or Notion's sidebar.
   const spaceMenu: MenuAction[] = [
@@ -259,7 +261,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
               menu={g === freshGroup ? [] : groupMenu(g)}
               onToggle={() => toggle(g.name)}
               onAdd={() => setAdding(g.name)}
-              taken={(name) => groups.some((x) => x !== g && !!x.collection && x.collection.toLowerCase() === name.toLowerCase())}
+              taken={(name) => isUngroupedName(name) || groups.some((x) => x !== g && !!x.collection && x.collection.toLowerCase() === name.toLowerCase())}
               onRename={(name) => rename(g, name)}
               onCancelRename={() => setRenaming(null)}
             >

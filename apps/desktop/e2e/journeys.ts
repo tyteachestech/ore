@@ -1345,6 +1345,10 @@ journey("sidebar: renaming a collection to a name another one has is refused in 
   await page.keyboard.press("Enter");
   await page.getByRole("alert").filter({ hasText: "is taken" }).waitFor();
   await until("the field stays open", () => field.isVisible());
+  // "Other" names the skills in no collection: a collection by that name would be a second, twin header.
+  await field.fill("other");
+  await page.keyboard.press("Enter");
+  await page.getByRole("alert").filter({ hasText: "“other” is taken" }).waitFor();
   await field.fill("Making");
   await until("typing clears the refusal", async () => (await page.getByRole("alert").filter({ hasText: "is taken" }).count()) === 0);
   await page.keyboard.press("Escape");

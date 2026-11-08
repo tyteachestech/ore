@@ -290,7 +290,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
       {shown.length > 0 && today && (
         <section className="home-skill-col" aria-label="Skills">
           {skillGroups(shown).map((g) => (
-            <div key={g.name}>
+            <div key={g.collection}>
               <h2 className="home-h">{g.name}</h2>
               <div className="home-skills">
                 {g.skills.map((s) => (
