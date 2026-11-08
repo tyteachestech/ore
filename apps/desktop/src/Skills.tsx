@@ -397,7 +397,7 @@ function CollectionPicker({ value, collections, onPick }: { value: string; colle
             <Command.List>
               {collections.map((c) => (
                 <Command.Item key={c} value={c} onSelect={() => choose(c)}>
-                  {c}
+                  <span className="menu-label">{c}</span>
                   {c === value && <Check />}
                 </Command.Item>
               ))}

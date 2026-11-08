@@ -391,7 +391,8 @@ img.thumb { filter: brightness(0.86); }
 .popover.menu { width: 260px; border-radius: 10px; }
 .popover.menu [cmdk-list] { max-height: 240px; padding: 4px; }
 .popover.menu [cmdk-item] { height: 30px; }
-.popover.menu [cmdk-item] .check { margin-left: auto; color: var(--accent); }
+.popover.menu [cmdk-item] .check { flex: none; margin-left: auto; color: var(--accent); }
+.popover.menu [cmdk-item] .palette-icon { flex: none; }
 .popover.menu [cmdk-item].danger { color: var(--error); }
 .menu-input { width: 100%; height: 36px; padding: 0 12px; background: transparent; border: 0; border-bottom: 1px solid var(--border); }
 .menu-input::placeholder { color: var(--faint); }

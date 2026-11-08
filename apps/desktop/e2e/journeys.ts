@@ -3987,6 +3987,24 @@ journey("list: back from a source opened low in To read, its row is selected and
   if (!seen) throw new Error(`the selected row “${title}” is scrolled out of the list`);
 });
 
+journey("skill picker: a skill with a long name still shows its tick", async (page) => {
+  const long = "Quantum error correction for people who never took physics and want to read the papers anyway, slowly";
+  const k = (await ore("skills", "add", long)) as { id: string };
+  const item = ((await ore("ls")) as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!;
+  await ore("edit", item.id, "--skills", [...item.skills, k.id].join(","));
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.getByRole("button", { name: `Skills for ${TESTING}` }).click();
+    const tick = page.locator(".skill-picker").getByRole("option").filter({ has: page.locator(".menu-label", { hasText: long }) }).locator("svg.check");
+    const w = (await tick.boundingBox())?.width ?? 0;
+    if (w < 10) throw new Error(`the long skill's tick is ${w}px wide`);
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("skills", "rm", k.id);
+  }
+});
+
 // —— run ——
 
 let failed = 0;
