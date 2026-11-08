@@ -2562,3 +2562,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .qa-piece:hover { background: var(--bg-hover); }
 .qa-piece:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .qa-piece-edit { width: 100%; font-size: 13px; }
+
+/* Keyboard focus (WCAG 2.4.7): these controls share their hover fill with focus and once switched the outline off,
+   so Tab showed nothing a fill didn't already mean. They get the app's ring back; hover stays the fill alone. */
+:is(.home-gear, .review-passage figcaption button, .review-quotes button, .review-tools button, .ask-starters button, .cite, .tutor-sources,
+  .library-sources button, .settings-back, .tutor-chip button, .tutor-acts button, .tutor-quiz button, .picker-tabs button):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
