@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Boundary } from "./Boundary";
@@ -64,6 +64,8 @@ export function QuickQuiz() {
               setPick(null);
               setRun(++shows.current);
             }}
+            // A rating taken back or given again after this showing closed: the main window's Home reads today again.
+            onLogged={() => void emitTo("main", "ratings-changed").catch(() => {})}
             notify={notify}
           />
         </Boundary>

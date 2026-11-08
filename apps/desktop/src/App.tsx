@@ -580,8 +580,9 @@ export function App() {
       openSource(payload.item, payload.at ?? undefined);
     });
     const closed = listen("quiz-closed", () => setHomeTick((n) => n + 1));
+    const changed = listen("ratings-changed", () => setHomeTick((n) => n + 1));
     return () => {
-      for (const p of [opened, closed]) void p.then((un) => un());
+      for (const p of [opened, closed, changed]) void p.then((un) => un());
     };
   }, [openSource]);
 
