@@ -3,8 +3,9 @@ id: <id>
 type: article
 title: Mixing topics in practice
 author: Ada Learner
+published: 2025-03-04
 captured_at: <time>
-text_sha256: 81ade053c9dbac85f08a5ae12ca1dded23c6148f4a2ff7497bc9a84cb1f94e08
+text_sha256: d06f4c5d5451c248ac9a8a284ba54bd9c7f0d6447e0a2c6b13e83a9009f58321
 status: inbox
 skills: []
 topics: []
@@ -15,7 +16,7 @@ Practising one kind of problem at a time feels smooth, but a test mixes them, an
 
 In Japanese the idea is 間隔反復 (spaced repetition), and its root word is 記憶.
 
-The original study is in the appendix.
+[The original study](https://example.edu/interleaving)[^1] is in the appendix.
 
 # A mixed week
 
@@ -29,3 +30,5 @@ Scores on the mixed test:
 ![](assets/bae1c44904c6b66d.png)
 
 That's all for this week.
+
+[^1]: Rohrer and Taylor, 2007.

@@ -136,7 +136,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   }
   if (kind === "rtf") {
     const r = (await import("./rtf.ts")).rtfToDoc(bytes);
-    return { type: "article", title: r.title ?? fileStem(name), author: r.author, url, body: r.body, source: { ext: "rtf", data: bytes }, assets: r.assets };
+    return { type: "article", title: r.title ?? fileStem(name), author: r.author, published: r.published, url, body: r.body, source: { ext: "rtf", data: bytes }, assets: r.assets };
   }
   const text = decodeText(bytes);
   if (kind === "ipynb") {
@@ -324,12 +324,12 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
     const site = /^[\w-]+(\.[\w-]+)*\.[a-z]{2,}(\/|$)/i.test(input) && !kindOf(input.split("/")[0]!) ? ` For a web page, add its full link: https://${input}` : " Check the path, or drag the file in instead.";
     throw new Error(`There’s no file at ${path}.${site}`);
   }
+  // Finder's own files (.DS_Store, AppleDouble ._ copies) ride along when a folder's files are dropped.
+  if (/^(\.DS_Store|\._.*|Icon\r)$/.test(basename(path))) throw new Error(`“${basename(path)}” is a file Finder keeps for itself, not something to read. Add the file you meant instead.`);
   const exported = exportFirst(extname(path).slice(1).toLowerCase());
   if (exported) throw new Error(exported);
   const stat = statSync(path);
   if (stat.isDirectory()) throw new Error("That’s a folder. Open it and add the files inside instead.");
-  // Finder's own files (.DS_Store, AppleDouble ._ copies) ride along when a folder's files are dropped.
-  if (/^(\.DS_Store|\._.*|Icon\r)$/.test(basename(path))) throw new Error(`“${basename(path)}” is a file Finder keeps for itself, not something to read. Add the file you meant instead.`);
   const ext = extname(path).slice(1).toLowerCase();
   if (VIDEO_TYPES.includes(ext) && !opts.type) {
     // A lecture recording or a downloaded course video: heard from its sound where it lies, never
