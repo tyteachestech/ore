@@ -253,3 +253,18 @@ export function libraryStats(lib: Library, open?: LibraryIndex): { skills: Skill
     return { skills, total: { skill: "all", ...compute(() => true), session_starts: starts.size } };
   });
 }
+
+/** A card's reviews in time and where each rating would put the next one (D149): the dates the review
+ *  screen draws as a line of dots, so he sees the gaps widen while recall holds. Read from the log,
+ *  nothing new stored. `now` for tests. */
+export function cardHistory(lib: Library, cardRef: string, now = new Date()): { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string> } {
+  const card = findCard(lib, cardRef);
+  const retention = desiredRetention(card.meta.skills, loadSkills(lib).skills);
+  const w = loadParams(lib);
+  const prior = readReviews(lib).filter((r) => r.card === card.meta.id);
+  const before = replay(prior, retention, w) ?? emptyState(now);
+  const last = before.last_review ? new Date(before.last_review) : now;
+  const at = last > now ? last : now;
+  const due = (rating: 1 | 2 | 3 | 4) => nextState(before, at, rating, retention, w).due;
+  return { reviews: prior.map((r) => ({ ts: r.ts, rating: r.rating as 1 | 2 | 3 | 4 })), next: { 1: due(1), 2: due(2), 3: due(3), 4: due(4) } };
+}

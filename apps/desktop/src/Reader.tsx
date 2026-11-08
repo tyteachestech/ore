@@ -31,7 +31,7 @@ import { findChapterEnds, Margin, type ChapterEnd, type MarginHandle } from "./M
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
 import { QuestionsPanel } from "./Questions";
-import { Position } from "./Outline";
+import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, type Annotation, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
@@ -2827,6 +2827,8 @@ function ReaderView(p: Props & { reload: () => void }) {
       </div>
       {/* After the text, so Tab reaches the outline once the source's own head is behind him. */}
       {!closedBook && !video && !PHONE && <Position scroll={scrollRef} doc={docEl.current} ready={ready} onJump={markPlace} />}
+      {/* The phone has no room for the rail: the pill at the top says where he is and opens the sections (D152). */}
+      {!closedBook && !video && PHONE && <ReadingPill scroll={scrollRef} doc={docEl.current} ready={ready} onJump={markPlace} />}
       {tip && !popup && (
         // A preview stays on screen at a phone's width too. A highlight note's is at most six lines
         // (styles.css), above the pointer when there is no room below; a footnote's is whole, below its
@@ -2934,6 +2936,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       {p.finishing ? (
         <Finish
           doc={doc}
+          skills={p.skills}
           reached={Number(load(`ore.reached.${p.id}`)) || undefined}
           blocked={p.blocked}
           setReveal={setReveal}

@@ -16,7 +16,8 @@ import { ShortcutEditor } from "./Shortcuts";
 import { setStyleControls, STYLE_CONTROLS, useStyleControls, type StyleControls } from "./draw/quick";
 import { CHIP_LOOKS, chipLook, setChipLook, type ChipLook } from "./Skills";
 import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
-import { bigger, DEFAULT_SIZE, PAGES, setPage, setSize, setWidth, SIZES, smaller, useReading, WIDTHS, type Page, type Width } from "./reading";
+import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, SIZES, smaller, useReading, WIDTHS, type Font, type Page, type Width } from "./reading";
+import * as RadioGroup from "@radix-ui/react-radio-group";
 
 type Vendor = "claude" | "codex";
 type Review = { goal_minutes: number; weekdays_only: boolean; new_per_day: number; remix: boolean; plan: string; reminder: string };
@@ -152,7 +153,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     return change({ ...d, model: m }, () => ore("settings", opt("model", m)), record ? { message: "Changed the model", undo: () => setModel(was, false), redo: () => setModel(m, false) } : undefined);
   };
 
-  const { width, size, page } = useReading();
+  const { width, size, page, font } = useReading();
   const keys = useKeymap();
   const [tray, setTrayState] = useState(trayOn);
   const [chips, setChips] = useState(chipLook);
@@ -221,7 +222,10 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                   </div>
                 </Row>
                 <Row title="Reading page" text="A light page for reading by day. The rest of the app stays dark.">
-                  <Seg label="Reading page" value={page} options={PAGES} onChange={(v) => setPage(v as Page)} />
+                  <Previews label="Reading page" value={page} options={PAGES} onChange={(v) => setPage(v as Page)} render={(o) => <span className="preview-page" data-page={o.id}><i /><i /><i /></span>} />
+                </Row>
+                <Row title="Reading font" text="The face a source's text reads in.">
+                  <Previews label="Reading font" value={font} options={FONTS} onChange={(v) => setFont(v as Font)} render={(o) => <span className="preview-font" data-font={o.id}>Aa</span>} />
                 </Row>
               </Group>
               <Group title="Skills">
@@ -539,6 +543,21 @@ function SelectMenu({ label, value, options, disabled, onChange }: { label: stri
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+  );
+}
+
+/** A choice picked from small previews of itself (D151; Rare UI's theme selector): a radio group of cards, the
+ *  picked one ringed, arrows move and pick. */
+function Previews<T extends { id: string; label: string }>({ label, value, options, onChange, render }: { label: string; value: string; options: readonly T[]; onChange: (v: string) => void; render: (o: T) => ReactNode }) {
+  return (
+    <RadioGroup.Root className="previews" orientation="horizontal" loop aria-label={label} value={value} onValueChange={(v) => v && v !== value && onChange(v)}>
+      {options.map((o) => (
+        <RadioGroup.Item key={o.id} value={o.id} className="preview">
+          {render(o)}
+          <span className="preview-label">{o.label}</span>
+        </RadioGroup.Item>
+      ))}
+    </RadioGroup.Root>
   );
 }
 

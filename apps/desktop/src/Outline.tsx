@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { Arrow, ARROW_H, playHop, still } from "./SideCursor";
+import { PHONE } from "./ore";
+import { Trap } from "./Trap";
+import { useSwipeDown } from "./phone/sheet";
 
 /** Most lines the collapsed outline shows; deeper levels drop out until it fits. */
 const MAX_LINES = 40;
@@ -20,15 +23,13 @@ function outlineHeadings(doc: HTMLElement): Heading[] {
   return shown;
 }
 
-/** Position bar and floating outline (D45): how far down the source he is, and a Notion-style
- *  table of contents at the right edge. No percent, no time left (D27). */
-/** `onJump`: called before a jump, so ⌘[ can come back to where he was. */
-export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTMLDivElement | null>; doc: HTMLElement | null; ready: boolean; onJump?: () => void }) {
+type Place = { scroll: RefObject<HTMLDivElement | null>; doc: HTMLElement | null; ready: boolean; onJump?: () => void };
+
+/** How far down the source he is and which heading he is in, kept up as he scrolls. */
+function useReadingPlace({ scroll, doc, ready }: Place) {
   const [progress, setProgress] = useState(0);
   const [current, setCurrent] = useState(-1);
   const headings = useMemo(() => (ready && doc ? outlineHeadings(doc) : []), [ready, doc]);
-  const top = Math.min(...headings.map((h) => h.level));
-
   useEffect(() => {
     const el = scroll.current;
     if (!el || !ready) return;
@@ -57,6 +58,25 @@ export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTM
       window.removeEventListener("resize", onScroll);
     };
   }, [scroll, ready, headings]);
+  return { progress, current, headings };
+}
+
+/** Scrolls the pane so `h` sits just under its top; `onJump` first, so ⌘[ can come back. */
+function jumpTo(scroll: RefObject<HTMLDivElement | null>, h: Heading, onJump?: () => void) {
+  const el = scroll.current;
+  if (!el) return;
+  onJump?.();
+  el.scrollTop += h.el.getBoundingClientRect().top - el.getBoundingClientRect().top - 24;
+  el.focus({ preventScroll: true });
+}
+
+/** Position bar and floating outline (D45): how far down the source he is, and a Notion-style
+ *  table of contents at the right edge. No percent, no time left (D27). */
+/** `onJump`: called before a jump, so ⌘[ can come back to where he was. */
+export function Position(place: Place) {
+  const { scroll, onJump } = place;
+  const { progress, current, headings } = useReadingPlace(place);
+  const top = Math.min(...headings.map((h) => h.level));
 
   /** A long outline opens scrolled to where he is, as Notion's does. Not scrollIntoView: that would move the reader too. */
   const panel = useRef<HTMLDivElement>(null);
@@ -87,13 +107,7 @@ export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTM
     arrowY.current = y;
   }, [current, headings]);
 
-  const jump = (h: Heading) => {
-    const el = scroll.current;
-    if (!el) return;
-    onJump?.();
-    el.scrollTop += h.el.getBoundingClientRect().top - el.getBoundingClientRect().top - 24;
-    el.focus({ preventScroll: true });
-  };
+  const jump = (h: Heading) => jumpTo(scroll, h, onJump);
 
   // The Tab stop follows the arrows while he is in the outline; a jump or scroll hands it back to the heading he is in.
   const [stop, setStop] = useState<number | null>(null);
@@ -137,6 +151,51 @@ export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTM
             ))}
           </div>
         </nav>
+      )}
+    </>
+  );
+}
+
+/** The phone's reading pill (D152; Rare UI's scroll progress): where the rail doesn't fit, a small pill at
+ *  the top of the page with a ring that fills as he reads and the name of the section he is in. A tap
+ *  opens the sections as a bottom sheet; one jumps there; swipe down, a tap outside or Esc closes it.
+ *  The name crossfades when the section changes; nothing moves under reduced motion. */
+export function ReadingPill(place: Place) {
+  const { scroll, doc, onJump } = place;
+  const { progress, current, headings } = useReadingPlace(place);
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const close = () => setOpen(false);
+  useSwipeDown(box, close, PHONE && open);
+  useEffect(() => {
+    if (open) requestAnimationFrame(() => (box.current?.querySelector<HTMLElement>("button.on") ?? box.current?.querySelector<HTMLElement>("button"))?.focus());
+  }, [open]);
+  const name = headings[current]?.title ?? (headings.length ? doc?.querySelector("h1")?.textContent?.trim() ?? "" : "");
+  const r = 6, c = 2 * Math.PI * r;
+  return (
+    <>
+      <button className="read-pill" aria-label={`${name ? `In ${name}. ` : ""}Sections`} aria-haspopup={headings.length > 1 ? "dialog" : undefined} aria-expanded={headings.length > 1 ? open : undefined} disabled={headings.length < 2} onClick={() => setOpen(true)}>
+        <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx={8} cy={8} r={r} fill="none" stroke="var(--border)" strokeWidth={2} />
+          <circle cx={8} cy={8} r={r} fill="none" stroke="currentColor" strokeWidth={2} strokeDasharray={c} strokeDashoffset={c * (1 - progress)} transform="rotate(-90 8 8)" />
+        </svg>
+        {name && <span key={current} className="read-pill-name">{name}</span>}
+      </button>
+      {open && (
+        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+          <Trap>
+            <div ref={box} className="panel sheet sections-sheet" role="dialog" aria-modal="true" aria-label="Sections" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } }}>
+              <h2>Sections</h2>
+              <div className="pick-list">
+                {headings.map((h, i) => (
+                  <button key={i} className={`pick-row${i === current ? " on" : ""}`} aria-current={i === current ? "location" : undefined} style={{ paddingLeft: 12 + (h.level - Math.min(...headings.map((x) => x.level))) * 14 }} onClick={() => { close(); jumpTo(scroll, h, onJump); }}>
+                    <span className="name">{h.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Trap>
+        </div>
       )}
     </>
   );

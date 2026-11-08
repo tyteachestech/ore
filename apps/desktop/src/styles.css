@@ -2586,6 +2586,17 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor.float .tutor-head { top: 8px; right: 8px; }
 /* Under a reply: Show me (the hint ladder's last rung) and + Card (keep this idea in review). */
 .tutor-acts { display: flex; gap: 6px; margin-top: 10px; }
+/* Step track (D150): 4px marks on a 2px grid; a shown step is a 12px mark, the current one a 24px bar, the
+   rest 4px dots. A mark grows into the bar in one short ease-out (Rare UI's step player); none under reduced motion. */
+.step-track { display: flex; align-items: center; gap: 4px; height: 4px; margin: 12px 0 0; }
+.step-track > * { position: relative; height: 4px; border-radius: 1px; padding: 0; border: 0; }
+.step-track i { width: 4px; background: var(--border); }
+.step-track button { width: 12px; background: var(--muted); cursor: pointer; transition: width 150ms cubic-bezier(0.23, 1, 0.32, 1), background 150ms; }
+.step-track button::after { content: ""; position: absolute; inset: -8px -2px; } /* a hand-sized target on a 4px mark */
+.step-track button:hover { background: var(--text); }
+.step-track button.now { width: 24px; background: var(--text); }
+.step-track button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .step-track button { transition: none; } }
 .ask-text .tutor-steps { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 .tutor-steps li::marker { color: var(--faint); font-variant-numeric: tabular-nums; }
 .tutor-acts button { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); font-size: 12px; }
@@ -2606,3 +2617,87 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
    so Tab showed nothing a fill didn't already mean. They get the app's ring back; hover stays the fill alone. */
 :is(.home-gear, .review-passage figcaption button, .review-quotes button, .review-tools button, .ask-starters button, .cite, .tutor-sources,
   .library-sources button, .settings-back, .tutor-chip button, .tutor-acts button, .tutor-quiz button, .picker-tabs button):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* Timeline.tsx (D149): a card's reviews on a line above the ratings. A hairline, 8px dots in the rating's
+   colour at their time to scale, and a hollow dot where the rating under the pointer puts the next one.
+   Nothing moves: it shows on every card. */
+.timeline { position: relative; height: 10px; margin: 22px 4px 0; }
+.timeline::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 1px; background: var(--border); }
+.timeline i { position: absolute; top: 1px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--rate); }
+.timeline .next { background: var(--bg); box-shadow: inset 0 0 0 2px var(--rate); }
+.timeline .rate-1 { --rate: var(--c-red); }
+.timeline .rate-2 { --rate: var(--c-orange); }
+.timeline .rate-3 { --rate: var(--c-green); }
+.timeline .rate-4 { --rate: var(--c-blue); }
+.timeline + .review-rate { margin-top: 14px; }
+
+/* Settings › Reading previews (D151): a choice shown as small cards of itself. 64×44 cards 6px apart, the picked
+   one ringed in `focus`; arrows move and pick. A page card draws three text lines on its own page colour; a
+   font card sets "Aa" in the face. */
+.previews { display: flex; gap: 8px; }
+.preview { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--faint); font-size: 11px; cursor: pointer; }
+.preview:hover { color: var(--text); }
+.preview[data-state="checked"] { color: var(--text); }
+.preview > span:first-child { display: grid; place-items: center; width: 64px; height: 44px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; }
+.preview[data-state="checked"] > span:first-child { box-shadow: 0 0 0 2px var(--focus); border-color: transparent; }
+.preview:focus-visible { outline: none; }
+.preview:focus-visible > span:first-child { box-shadow: 0 0 0 2px var(--focus), 0 0 0 4px var(--bg); }
+.preview-page { gap: 4px; align-content: center; padding: 0 12px; }
+.preview-page[data-page="dark"] { background: var(--bg); }
+.preview-page[data-page="light"] { background: #f7f6f2; }
+.preview-page i { width: 100%; height: 2px; border-radius: 1px; background: var(--muted); }
+.preview-page i:last-child { width: 60%; justify-self: start; }
+.preview-page[data-page="light"] i { background: #8a8a86; }
+.preview-font { background: var(--bg); font-size: 20px; line-height: 1; color: var(--text); }
+.preview-font[data-font="charter"] { font-family: var(--font-serif); }
+.preview-font[data-font="geist"] { font-family: "Geist", var(--font); }
+
+/* Reading pill (D152, phone): where he is in the source, at the top of the page. 28px pill: a 16px ring that
+   fills as he reads and the section's name; a tap opens the sections as a bottom sheet. */
+.read-pill { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%; transform: translateX(-50%); z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: 70%; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
+.read-pill:disabled { padding-right: 6px; }
+.read-pill:active:not(:disabled) { background: var(--bg-hover); }
+.read-pill svg { flex: none; color: var(--text); }
+/* The text never ends under the pill. */
+.phone-reader .reader-pane:has(.read-pill) .doc { padding-bottom: 56px; }
+.read-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: pill-name 150ms ease-out both; }
+@keyframes pill-name { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .read-pill-name { animation: none; } }
+/* The sections sheet shares the phone's bottom-sheet look (ReviewPick). */
+.sheet { width: min(420px, 90vw); padding: 18px 10px 14px; outline: none; }
+.sheet h2 { margin: 0 12px 10px; font-family: var(--round); font-size: 17px; font-weight: 700; }
+.sheet .pick-row.on .name { color: var(--text); font-weight: 600; }
+.sheet .pick-row .name { color: var(--muted); font-weight: 500; }
+.phone .overlay:has(.sheet) { align-items: flex-end; padding: 0; }
+.phone .sheet { width: 100%; padding: 20px 8px max(16px, env(safe-area-inset-bottom, 0px)); border-width: 1px 0 0; border-radius: 16px 16px 0 0; }
+.phone .sheet::before { content: ""; display: block; width: 36px; height: 5px; margin: -12px auto 14px; background: var(--border); }
+/* Action sheet (D155, phone): the ⋯ menu as one sheet of 44pt rows; a submenu swaps in behind a back
+   row and the sheet's height eases to fit (Cult UI's family drawer). */
+.action-sheet .sheet-steps { overflow: hidden; transition: height 260ms cubic-bezier(0.23, 1, 0.32, 1); }
+.action-sheet .pick-list { max-height: 70vh; }
+.action-sheet .pick-row { width: 100%; font-size: 16px; }
+.action-sheet .pick-row .name { flex: 1; min-width: 0; color: inherit; font-weight: 500; }
+.action-sheet .pick-row.danger { color: var(--error); }
+.action-sheet .sheet-back { color: var(--muted); font-size: 14px; min-height: 36px; }
+.action-sheet .sheet-sep { height: 1px; margin: 6px 12px; background: var(--border); }
+.action-sheet .menu-caret { color: var(--faint); }
+@media (prefers-reduced-motion: reduce) { .action-sheet .sheet-steps { transition: none; } }
+
+/* Pixel burst (D153, Burst.tsx): 14 4px squares fly out from the finished badge's edge in the skill's colour, in
+   six hard frames over 600ms once the badge has popped, once. None under reduced motion. */
+.quiz-done-badge { position: relative; }
+.pixel-burst { position: absolute; inset: 0; pointer-events: none; }
+.pixel-burst i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: var(--skill, var(--c-green)); animation: pixel-burst 600ms steps(6, end) var(--d, 0ms) both; }
+@keyframes pixel-burst { from { transform: translate(var(--x0), var(--y0)); opacity: 1; } to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pixel-burst { display: none; } }
+
+/* Skill fan (D154, Home): a skill's next three due questions fan out under its tile while he hovers or focuses
+   it. Rows come from under the tile, one after another, 160ms ease-out each; none under reduced motion. A
+   row starts review on that skill. */
+.skill-fan { z-index: 30; display: flex; flex-direction: column; gap: 2px; width: var(--radix-hover-card-trigger-width); min-width: 210px; padding: 6px; border-radius: 10px; background: var(--bg-raised); border: 1px solid var(--border); box-shadow: var(--lift); }
+.skill-fan:empty { display: none; }
+.skill-fan-q { display: block; width: 100%; text-align: left; padding: 6px 8px; border-radius: 6px; font-size: 12px; line-height: 1.35; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: fan-out 160ms cubic-bezier(0.23, 1, 0.32, 1) calc(var(--i) * 30ms) both; }
+.skill-fan-q:hover { background: var(--bg-hover); }
+.skill-fan-q:focus-visible { outline: none; background: var(--bg-hover); box-shadow: inset 0 0 0 2px var(--focus); }
+@keyframes fan-out { from { transform: translateY(calc(var(--i) * -26px - 6px)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .skill-fan-q { animation: none; } }

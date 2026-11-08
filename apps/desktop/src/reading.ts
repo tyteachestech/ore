@@ -16,6 +16,13 @@ export const PAGES = [
 ] as const;
 export type Page = (typeof PAGES)[number]["id"];
 
+/** The face a source reads in (D151): Charter, the book serif, or Geist, the interface sans. */
+export const FONTS = [
+  { id: "charter", label: "Charter" },
+  { id: "geist", label: "Geist" },
+] as const;
+export type Font = (typeof FONTS)[number]["id"];
+
 /** Text sizes in px, Books-style steps: one at a time near the default, bigger jumps above it. */
 export const SIZES = [14, 15, 16, 17, 18, 20, 22, 24, 26] as const;
 export const DEFAULT_SIZE = 17;
@@ -27,7 +34,7 @@ export function stepSize(size: number, by: 1 | -1): number {
   return SIZES[Math.max(0, Math.min(SIZES.length - 1, i))]!;
 }
 
-type State = { width: Width; size: number; page: Page };
+type State = { width: Width; size: number; page: Page; font: Font };
 const root = document.documentElement;
 const pick = <T extends string>(key: string, ids: readonly { id: T }[], fallback: T): T => {
   const v = load(key);
@@ -38,6 +45,7 @@ let state: State = {
   width: pick("ore.width", WIDTHS, "medium"),
   size: (SIZES as readonly number[]).includes(storedSize) ? storedSize : DEFAULT_SIZE,
   page: pick("ore.page", PAGES, "dark"),
+  font: pick("ore.font", FONTS, "charter"),
 };
 const listeners = new Set<() => void>();
 const places = new Set<() => () => void>();
@@ -45,6 +53,7 @@ const places = new Set<() => () => void>();
 function paint() {
   root.dataset.width = state.width;
   root.dataset.page = state.page;
+  root.dataset.font = state.font;
   root.style.setProperty("--read-size", `${state.size}px`);
 }
 paint();
@@ -58,12 +67,14 @@ function set(next: Partial<State>) {
   save("ore.width", state.width);
   save("ore.size", String(state.size));
   save("ore.page", state.page);
+  save("ore.font", state.font);
   listeners.forEach((l) => l());
 }
 
 export const setWidth = (width: Width) => set({ width });
 export const setSize = (size: number) => set({ size });
 export const setPage = (page: Page) => set({ page });
+export const setFont = (font: Font) => set({ font });
 export const bigger = () => set({ size: stepSize(state.size, 1) });
 export const smaller = () => set({ size: stepSize(state.size, -1) });
 

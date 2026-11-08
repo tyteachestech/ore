@@ -288,7 +288,10 @@ export type CardFull = {
   in_head_ok?: boolean;
   /** A card from a line he typed (Card here, D99): the passages that answer it, found in the source. */
   evidence?: { exact: string; start: number; end: number }[];
+  /** Its reviews and where each rating puts the next one (D149); with --review only. */
+  history?: CardHistory;
 };
+export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string> };
 
 /** `ore grade`: a proposed rating (never logged by itself, D21) and one mark per rubric point, with the words
  *  of his answer that earned each covered one ("" for none; absent from a grade made before D141). */

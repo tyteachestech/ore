@@ -1,11 +1,12 @@
 import { GearSix } from "./icons";
-import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ComponentProps, type CSSProperties, type ReactNode } from "react";
 import { gemHint, GemRing, NearGoal } from "./Gem";
 import { Hint } from "./Hint";
 import { label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
-import { lessonsOf, levelProgress, nextLesson, ore, PHONE, touched, type Item, type Skill, type Today } from "./ore";
+import { lessonsOf, levelProgress, nextLesson, opt, ore, PHONE, touched, type DueEntry, type Item, type Skill, type Today } from "./ore";
+import * as HoverCard from "@radix-ui/react-hover-card";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
@@ -312,7 +313,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
               <div className="home-skills">
                 {g.skills.map((s) => (
                   <WithMenu key={s.id} actions={skillMenu ? () => skillMenu(s) : []}>
-                    <SkillTile skill={s} strength={today.skills.find((x) => x.skill === s.id)} onOpen={() => onOpenSkill(s.id)} more={skillMenu && <MoreButton label="Skill actions" actions={() => skillMenu(s)} hoverOnly />} />
+                    <SkillTile skill={s} strength={today.skills.find((x) => x.skill === s.id)} onOpen={() => onOpenSkill(s.id)} onStart={() => onReview([s.id])} more={skillMenu && <MoreButton label="Skill actions" actions={() => skillMenu(s)} hoverOnly />} />
                   </WithMenu>
                 ))}
               </div>
@@ -328,10 +329,13 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
 /** One skill's strength (D62, D63): its level, which never drops, and the way to the next one. */
 // The rest (ref and handlers) comes from the right-click menu's trigger.
 // A tile that opens on click, holding its ⋯ button, so not a <button> itself (as the reading rows).
-function SkillTile({ skill: s, strength: k, onOpen, more, ...trigger }: { skill: Skill; strength?: Today["skills"][number]; onOpen: () => void; more?: ReactNode } & ComponentProps<"div">) {
+function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }: { skill: Skill; strength?: Today["skills"][number]; onOpen: () => void; onStart: () => void; more?: ReactNode } & ComponentProps<"div">) {
   const lv = k?.level ?? 0;
   const p = levelProgress({ solid: k?.solid ?? 0, level: lv, next_level_at: k?.next_level_at ?? 5 });
-  return (
+  // Its next due questions fan out under the tile while he hovers or focuses it (D154), read once per visit.
+  const [fan, setFan] = useState<DueEntry[] | null>(null);
+  const due = k?.due ?? 0;
+  const tile = (
     <div {...trigger} className="home-skill" data-color={s.color} role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}>
       <span className="home-skill-top">
         <span className={`mark${s.icon && s.color ? " tile" : ""}`} data-color={s.color} aria-hidden="true">
@@ -357,6 +361,21 @@ function SkillTile({ skill: s, strength: k, onOpen, more, ...trigger }: { skill:
         </span>
       </Hint>
     </div>
+  );
+  if (!due || PHONE) return tile;
+  return (
+    <HoverCard.Root openDelay={300} closeDelay={150} onOpenChange={(open) => open && fan === null && ore<DueEntry[]>("due", opt("skill", s.id), opt("limit", "3")).then(setFan, () => setFan([]))}>
+      <HoverCard.Trigger asChild>{tile}</HoverCard.Trigger>
+      <HoverCard.Portal>
+        <HoverCard.Content className="skill-fan" side="bottom" align="start" sideOffset={6} collisionPadding={8} aria-label={`Next due in ${s.name}`}>
+          {(fan ?? []).map((c, i) => (
+            <button key={c.id} className="skill-fan-q" style={{ "--i": i } as CSSProperties} onClick={onStart}>
+              {c.question}
+            </button>
+          ))}
+        </HoverCard.Content>
+      </HoverCard.Portal>
+    </HoverCard.Root>
   );
 }
 
