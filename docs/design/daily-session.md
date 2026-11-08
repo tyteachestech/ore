@@ -34,7 +34,7 @@ With a backlog that never empties, the question is never "how do I finish?" but 
 
 Review comes before reading because it is the part that decays: a day without reading loses nothing, a day without review lets memories slip. Reading is where new cards come from, so the habit needs both.
 
-Open: whether the daily goal counts reading time too, or only review as today (asked 2026-11-08; recommended: review only, so a one-hour learner sets a 20-minute review goal and reads the rest).
+The daily goal counts review only (Tyler, 2026-11-08): review time is measured per card, reading time isn't, so a one-hour learner sets a 20-minute review goal and reads the rest.
 
 ## How cards fill a fixed block
 
