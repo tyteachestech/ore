@@ -197,7 +197,7 @@ describe("AI adapter", () => {
     expect(readTopic(lib, "agent-workflows")!.meta.status).toBe("active");
     const after = findItem(lib, item.meta.id).meta;
     expect(after.enriched_at).toBeDefined();
-    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@11" });
+    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@12" });
     const cards = listCards(lib);
     expect(cards).toHaveLength(1);
     expect(cards[0]!.meta).toMatchObject({ state: "draft", kind: "prompt", annotation: card.id, topics: ["agent-workflows"], ai: after.ai });
@@ -597,6 +597,43 @@ describe("AI adapter", () => {
     expect(needsEnrich(findItem(lib, id), listCards(lib))).toBe(false);
     expect((await enrichItem(lib, id)).skipped).toBeDefined();
     expect(calls()).toBe(3);
+  });
+
+  // The plan folds a highlight whose idea a prequestion already asks into that prequestion's prompt, so
+  // the idea comes back once (eval:questions found it asked twice): the prompt keeps the highlight.
+  test("a highlight folded into a prequestion's prompt is drafted, not drafted again", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });
+    const id = item.meta.id;
+    fakeClaude([enrichOut(["Why do agents differ?", "When is a workflow better?"])]);
+    await enrichItem(lib, id);
+    const key = addHighlight(findItem(lib, id), { exact: "Agents direct their own tool use.", intent: "card" });
+    const plain = addHighlight(findItem(lib, id), { exact: "Workflows follow predefined code paths.", intent: "keep" });
+    await setItemStatus(lib, id, "done");
+    fakeClaude([enrichOut(["X?", "Y?"], [{ ...preqDraft(1, "In LLM systems, why do agents differ from workflows?"), also: [key.id, plain.id] }, preqDraft(2, "In LLM systems, when is a workflow better than an agent?")])]);
+    await enrichItem(lib, id);
+    const first = listCards(lib).find((c) => c.meta.prequestion === 1)!;
+    expect(first.meta.also).toEqual([key.id, plain.id]);
+    expect(pendingHighlights(findItem(lib, id), listCards(lib))).toEqual([]);
+    expect(needsEnrich(findItem(lib, id), listCards(lib))).toBe(false);
+  });
+
+  // A mistyped id in `also` (eval:questions saw a whole enrich fail on one, twice) is dropped, not a failed run:
+  // the key point it should have named is still checked for a draft.
+  test("an unknown highlight id in also is dropped; an unknown annotation is still rejected", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });
+    const id = item.meta.id;
+    fakeClaude([enrichOut(["Why do agents differ?", "When is a workflow better?"])]);
+    await enrichItem(lib, id);
+    const key = addHighlight(findItem(lib, id), { exact: "Agents direct their own tool use.", intent: "card" });
+    fakeClaude([enrichOut(["X?", "Y?"], [{ ...draft(key.id), also: ["01NOPE"] }])]);
+    await enrichItem(lib, id);
+    expect(calls()).toBe(1);
+    expect(listCards(lib)[0]!.meta.also).toBeUndefined();
+    fakeClaude([enrichOut(["X?", "Y?"], [draft("01NOPE")]), enrichOut(["X?", "Y?"], [draft("01NOPE")])]);
+    addHighlight(findItem(lib, id), { exact: "Workflows follow predefined code paths.", intent: "card" });
+    await expect(enrichItem(lib, id)).rejects.toThrow(/unknown highlight ids: 01NOPE/);
   });
 
   test("enrich rejects prequestion drafts before the item is done", async () => {

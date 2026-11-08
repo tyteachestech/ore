@@ -750,7 +750,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     p.reload();
     p.onChanged();
     if (!r.changed) return p.notify("Found no tables or formulas to read in this PDF");
-    const step = () => void ore("reimport", id, "--undo").then(() => (p.reload(), p.onChanged()), (e) => p.notify(errorText(e), "error"));
+    const step = () => ore("reimport", id, "--undo").then(() => (p.reload(), p.onChanged()));
     p.notify("Read the tables and formulas into the text", "info", step, step);
   };
 
@@ -1394,13 +1394,15 @@ function ReaderView(p: Props & { reload: () => void }) {
     setAnns((l) => l.map((a) => (a.id === id ? { ...a, intent } : a)));
     const saved = realId(id);
     // On the history at once, so a ⌘Z right after the click takes this change back, not the step before it.
-    const to = (i: Intent) => () => void saved.then((rid) => setIntentOf(rid, i, false), () => {});
+    const to = (i: Intent) => () => saved.then((rid) => setIntentOf(rid, i, false));
     const forget = undoable && was && was !== intent ? p.notify(`Changed to ${LABEL[intent]}`, "quiet", to(was), to(intent)) : undefined;
     try {
       await annotate(await saved, "--intent", intent);
     } catch (e) {
       forget?.();
       setAnns((l) => l.map((a) => (a.id === id && was ? { ...a, intent: was } : a)));
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   }
@@ -1449,11 +1451,12 @@ function ReaderView(p: Props & { reload: () => void }) {
       setAnns((l) => l.map((a) => (a.id === rid ? { ...a, exact: s.exact, start: s.start, end: s.start + s.exact.length } : a)));
       setRepaint((n) => n + 1);
       setPopup((cur) => (cur?.id === rid ? null : cur));
-      annotate(rid, opt("exact", s.exact), "--start", String(s.start)).catch((e) => {
+      // Run only from the history, which says why if the write fails.
+      return annotate(rid, opt("exact", s.exact), "--start", String(s.start)).catch((e) => {
         ranges.current.set(rid, other.range);
         setAnns((l) => l.map((a) => (a.id === rid ? { ...a, exact: other.exact, start: other.start, end: other.start + other.exact.length } : a)));
         setRepaint((n) => n + 1);
-        p.notify(errorText(e), "error");
+        throw e;
       });
     };
     return { back: () => go(from, to), again: () => go(to, from) };
@@ -1505,9 +1508,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     try {
       const rid = await realId(id);
       await annotate(rid, opt("note", note));
-      if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => void setNoteOf(rid, was, false), () => void setNoteOf(rid, note, false));
+      if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {
       setAnns((l) => l.map((a) => (a.id === id ? { ...a, note: was } : a)));
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   }
@@ -2213,9 +2218,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     try {
       await inOrder(id, () => ore("edit", id, "--title", t));
       p.onChanged();
-      if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => void retitle(id, t, before, false), () => void retitle(id, before, t, false));
+      if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
     } catch (e) {
       setDoc((cur) => cur && cur.id === id ? { ...cur, title: before } : cur);
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   }
@@ -2227,13 +2234,15 @@ function ReaderView(p: Props & { reload: () => void }) {
     if ((a ?? "") === (before ?? "")) return;
     setDoc((cur) => cur && cur.id === id ? { ...cur, author: a } : cur);
     // On the history at once, so a quick ⌘Z takes it back; taken off again if the write fails.
-    const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => void reauthor(id, a, before, false), () => void reauthor(id, before, a, false)) : () => {};
+    const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => reauthor(id, a, before, false), () => reauthor(id, before, a, false)) : () => {};
     try {
       await inOrder(id, () => ore("edit", id, "--author", a ?? ""));
       p.onChanged();
     } catch (e) {
       forget();
       setDoc((cur) => cur && cur.id === id ? { ...cur, author: before } : cur);
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   }
@@ -2243,11 +2252,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   const reimport = async () => {
     if (!doc) return;
     const d = doc;
-    const swap = () =>
-      ore("reimport", d.id, "--undo").then(
-        () => (p.reload(), p.onChanged()),
-        (e) => p.notify(errorText(e), "error"),
-      );
+    // Run only from the history, which says so if it fails.
+    const swap = () => ore("reimport", d.id, "--undo").then(() => (p.reload(), p.onChanged()));
     p.notify(`Reimporting “${d.title}”…`, "progress");
     try {
       const r = await ore<{ changed: boolean; removed: unknown[] }>("reimport", d.id);
@@ -2256,23 +2262,25 @@ function ReaderView(p: Props & { reload: () => void }) {
       p.onChanged();
       const n = r.removed.length;
       const what = n ? `Reimported. ${n} ${n === 1 ? "highlight is" : "highlights are"} no longer in it, so ${n === 1 ? "it was" : "they were"} removed` : "Reimported with the latest text";
-      p.notify(what, "info", () => void swap(), () => void swap());
+      p.notify(what, "info", swap, swap);
     } catch (e) {
       p.notify(errorText(e, "reimport"), "error");
     }
   };
 
   /** Files the source under exactly `skills` (its cards follow), with Undo naming the one that changed. */
-  const fileUnder = async (skills: string[], changed?: Skill) => {
+  const fileUnder = async (skills: string[], changed?: Skill, fromHistory = false) => {
     if (!doc) return;
     const before = doc.skills;
     setDoc((cur) => cur && { ...cur, skills });
     try {
       await ore("edit", doc.id, "--skills", skills.join(","));
       p.onChanged();
-      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => void fileUnder(before), () => void fileUnder(skills));
+      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true), () => fileUnder(skills, undefined, true));
     } catch (e) {
       setDoc((cur) => cur && { ...cur, skills: unfile(cur.skills, skills, before) });
+      // From the history (undo or redo): it puts the step back and says why.
+      if (fromHistory) throw e;
       p.notify(errorText(e), "error");
     }
   };

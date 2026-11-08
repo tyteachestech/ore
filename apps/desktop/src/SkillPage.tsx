@@ -215,8 +215,10 @@ function BadgePicker({ skill, onChanged, notify }: { skill: Skill; onChanged: ()
     try {
       await ore("skills", "set", skill.id, opt(key, value));
       onChanged();
-      if (undoable && before !== value) notify(`Changed the ${key === "icon" ? "icon" : "colour"} of ${skill.name}`, "quiet", () => void set(key, before, false), () => void set(key, value, false));
+      if (undoable && before !== value) notify(`Changed the ${key === "icon" ? "icon" : "colour"} of ${skill.name}`, "quiet", () => set(key, before, false), () => set(key, value, false));
     } catch (e) {
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       notify(errorText(e), "error");
     }
   };
@@ -329,7 +331,7 @@ function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; last
     setDraft(null);
     const before = skill.goal ?? "";
     if (v === before) return;
-    const to = (goal: string) => () => void ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged, (e) => notify(errorText(e), "error"));
+    const to = (goal: string) => () => ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged);
     try {
       await ore("skills", "set", skill.id, opt("goal", v));
       onChanged();
@@ -592,7 +594,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
   const put = (id: string, patch: Partial<Try>) => setTs((l) => l && l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   type State = { status: "open" | "done"; reflection?: string };
   /** One write: checked off (with how it went, or none) or back to try; rolled back with an error toast. */
-  const write = async (t: Try, from: State, to: State) => {
+  const write = async (t: Try, from: State, to: State, fromHistory = false) => {
     put(t.id, to);
     try {
       // Back to try clears the reflection, so a state with an older one is two writes.
@@ -601,6 +603,8 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
       return true;
     } catch (e) {
       put(t.id, from);
+      // From the history (undo or redo): it puts the step back and says why.
+      if (fromHistory) throw e;
       notify(errorText(e), "error");
       return false;
     }
@@ -609,7 +613,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
   const change = async (t: Try, to: State, msg: string) => {
     const was = state(t);
     if (!(await write(t, was, to))) return false;
-    notify(msg, "quiet", () => void write(t, to, was), () => void write(t, was, to));
+    notify(msg, "quiet", () => write(t, to, was, true), () => write(t, was, to, true));
     return true;
   };
   const check = async (t: Try) => {
@@ -641,8 +645,8 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
     notify(
       "Removed",
       "info",
-      () => (back(), void ore("annotate", t.id, "--status", t.status).catch((e) => notify(errorText(e), "error"))),
-      () => (setTs((l) => l && l.filter((x) => x.id !== t.id)), void ore("annotate", t.id, "--status", "deleted").catch((e) => notify(errorText(e), "error"))),
+      () => (back(), ore("annotate", t.id, "--status", t.status)),
+      () => (setTs((l) => l && l.filter((x) => x.id !== t.id)), ore("annotate", t.id, "--status", "deleted")),
     );
   };
 
@@ -805,10 +809,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
       setAdded((a) => [...a, url]);
       // As adding from the bar: Undo archives what was just added, ⇧⌘Z brings it back.
       const keep = (on: boolean) =>
-        void ore("archive", r.id, ...(on ? ["--undo"] : [])).then(
-          () => (setAdded((a) => (on ? [...a, url] : a.filter((u) => u !== url))), onAdded(), onChanged()),
-          (e) => notify(errorText(e), "error"),
-        );
+        ore("archive", r.id, ...(on ? ["--undo"] : [])).then(() => (setAdded((a) => (on ? [...a, url] : a.filter((u) => u !== url))), onAdded(), onChanged()));
       // One already in the library stays: only what this added can be taken back.
       if (r.kept) notify(`“${r.title}” is already in your library`);
       else notify(`Added “${r.title}”`, "info", () => keep(false), () => keep(true));
