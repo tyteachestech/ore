@@ -273,6 +273,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
               </SortableContext>
               {adding === g.name && (
                 <NewSkill
+                  skills={skills}
                   collection={g.collection}
                   marked={marked}
                   onDone={(s) => {
@@ -461,13 +462,17 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
 
 /** Names a new skill in place, like a new page in Notion's sidebar: Enter creates it through
  *  `ore skills add`, Esc or clicking away drops the name (never saved on blur). */
-function NewSkill({ collection, marked, onDone }: { collection: string; marked: boolean; onDone: (s: Skill | null) => void }) {
+function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; collection: string; marked: boolean; onDone: (s: Skill | null) => void }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const create = async () => {
     if (!name.trim() || busy) return;
+    // A name he has is refused in place, as a taken collection name is, before the CLI's own refusal.
+    const n = name.trim().replace(/\s+/g, " ").toLowerCase();
+    const other = skills.find((s) => s.name.toLowerCase() === n);
+    if (other) return setError(`“${other.name}” is taken`);
     setBusy(true);
     try {
       onDone(await ore<Skill>("skills", "add", name, opt("collection", collection)));

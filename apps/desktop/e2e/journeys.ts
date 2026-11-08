@@ -1717,6 +1717,16 @@ journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette 
   await page.keyboard.press("Escape");
 });
 
+journey("sidebar: a new skill named like one he has is refused in place, in words, as a taken collection name is", async (page) => {
+  await page.locator(".side-section", { hasText: "Craft" }).hover();
+  await page.getByRole("button", { name: "New skill in Craft" }).click();
+  await page.keyboard.type("  learning  ");
+  await page.keyboard.press("Enter");
+  await until("it says the name is taken", async () => (await page.locator(".side-new-foot").innerText()) === "“Learning” is taken");
+  if (!(await page.getByLabel("New skill name").isVisible())) throw new Error("the field closed");
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);
