@@ -1,5 +1,5 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowUp, Check, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
+import { ArrowDown, ArrowUp, Check, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
 import { citeRuns, siteName } from "./cite-pills";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
@@ -191,7 +191,19 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   const quizSkills = typedSkills.length ? typedSkills : carriedSkills.length ? carriedSkills : (context?.skills ?? []);
   const matches = at ? mentionMatches(at.query, sources, skills, mentions.filter((m) => input.includes(`@${m.name}`))) : [];
   const field = useRef<HTMLTextAreaElement>(null);
-  const end = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
+  /** The log follows the end only while he is at it (ChatGPT, Claude): scrolled up to reread, a reply grows
+   *  below without moving what he is reading. `end` is the log's height when he was last at its end, so a
+   *  reply that just grew it still finds him there; `force` follows the next change whatever (he sent). */
+  const end = useRef(0);
+  const force = useRef(true);
+  /** Something new landed below while he was scrolled up: the pill that takes him there. */
+  const [below, setBelow] = useState(false);
+  const toEnd = () => {
+    const el = log.current;
+    if (el) end.current = el.scrollTop = el.scrollHeight;
+    setBelow(false);
+  };
   const busy = turns.some((t) => t.reply === undefined && !t.error);
   const { width, dragging, divider } = useSideWidth("ore.tutorwidth", 380, 300);
 
@@ -200,6 +212,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     const message = text.trim();
     if (!message || busy) return;
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
+    force.current = true; // what he sends, and its reply, he wants to see
     chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}) });
     if (typed) setDraft(() => ({ input: "", mentions: [] }));
     setAt(null);
@@ -230,8 +243,14 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     document.documentElement.style.setProperty("--tutor-w", `${width}px`);
     return () => void document.documentElement.style.removeProperty("--tutor-w");
   }, [width, docked]);
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
+  // Only the log scrolls, never the page under a floating tutor.
+  useLayoutEffect(() => {
+    const el = log.current;
+    if (!el) return;
+    const atEnd = force.current || !turns.length || el.scrollTop + el.clientHeight >= end.current - 24;
+    force.current = false;
+    if (atEnd) toEnd();
+    else setBelow(true);
   }, [turns]);
 
   return (
@@ -274,7 +293,15 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           </button>
         </Hint>
       </div>
-      <div className="tutor-turns" aria-live="polite">
+      <div
+        className="tutor-turns"
+        aria-live="polite"
+        ref={log}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 24) toEnd();
+        }}
+      >
         {turns.length === 0 && (
           <div className="ask-starters tutor-starters">
             {(context ? STARTERS_READING : STARTERS).map((s) => (
@@ -327,7 +354,14 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           </div>
           );
         })}
-        <div ref={end} />
+        {/* The log's foot: keeps the last turn (or the starters) a gap above the @ list. */}
+        <div />
+        {below && (
+          <button className="tutor-down" onClick={toEnd}>
+            <ArrowDown size={12} aria-hidden="true" />
+            New reply
+          </button>
+        )}
       </div>
       <div className="tutor-foot">
         {at && (

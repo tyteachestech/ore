@@ -452,6 +452,58 @@ journey("tutor streaming: the reply shows as it is written (markers wait for the
   await page.keyboard.press("Escape");
 });
 
+journey("tutor scroll: a reply streaming in while he reads higher up leaves his place and offers New reply, which takes him down; sending follows the end again", async (page) => {
+  let release = () => {};
+  let held = Promise.resolve();
+  let id = "";
+  const long = Array.from({ length: 30 }, (_, i) => `Line ${i + 1} of a long explanation about spacing and retrieval.`).join("\n\n");
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (!body.includes('"tutor",')) return route.fallback();
+    id = (JSON.parse(body).args as string[]).find((a) => a.startsWith("--stream="))!.slice(9);
+    await held;
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: long, citations: [], general: true, searched: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@6" } }) });
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const log = tutor.locator(".tutor-turns");
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    const gap = () => log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+    await field.fill("Explain spacing at length");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("Line 30 of a long explanation", { exact: false }).waitFor();
+    await until("the first reply is followed to its end", async () => (await gap()) < 24);
+    // The next reply streams while he scrolls up to reread the first.
+    held = new Promise<void>((r) => (release = r));
+    id = "";
+    await field.fill("And again");
+    await page.keyboard.press("Enter");
+    await until("the call carries its stream id", async () => !!id);
+    await log.evaluate((el) => (el.scrollTop = 0));
+    const emit = (p: object) => page.evaluate(([p]) => (window as any).__emit("ore-progress", p), [p] as const);
+    await emit({ stream: id, reply: long.slice(0, 400) });
+    await emit({ stream: id, reply: long.slice(0, 1200) });
+    const pill = tutor.getByRole("button", { name: "New reply" });
+    await pill.waitFor();
+    if ((await log.evaluate((el) => el.scrollTop)) !== 0) throw new Error("the streaming reply moved him off what he was reading");
+    release();
+    await until("the whole reply landed", async () => (await tutor.getByText("Line 30 of a long explanation", { exact: false }).count()) === 2);
+    if ((await log.evaluate((el) => el.scrollTop)) !== 0) throw new Error("the finished reply moved him");
+    await pill.click();
+    await until("New reply takes him to the end", async () => (await gap()) < 24);
+    await pill.waitFor({ state: "detached" });
+    // The page under the tutor never scrolled.
+    if ((await page.evaluate(() => document.scrollingElement?.scrollTop ?? 0)) !== 0) throw new Error("the page scrolled");
+  } finally {
+    release();
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("tutor @: typing @ lists skills and sources, Enter writes the name in, and the message goes out pointed at it", async (page) => {
   await page.keyboard.press("Meta+j");
   const field = page.getByRole("textbox", { name: "Message the tutor" });
