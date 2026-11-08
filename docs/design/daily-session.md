@@ -40,7 +40,7 @@ The daily goal counts review only (Tyler, 2026-11-08): review time is measured p
 
 The block is the daily goal in minutes (D60). Inside it:
 
-1. **New cards get a fixed share of every session, mixed in** (Tyler's pick, 2026-11-08, settling review-08 in `reviews/2026-11-08-stress-test.md`). About one card in five is new, whatever is due, so new material arrives every day. This replaces D65.2's "new only while the goal has room after due cards", which under a standing backlog let no new card in.
+1. **New cards get a fixed share of every session, mixed in** (Tyler's pick, 2026-11-08, settling review-08 in `reviews/2026-11-08-stress-test.md`; built in #171, its D-line amends D65.2). About one card in five is new, whatever is due, so new material arrives every day. This replaces D65.2's "new only while the goal has room after due cards", which under a standing backlog let no new card in.
 2. **The rest of the block takes the most valuable due cards, not the oldest.** The queue already ranks them by skill priority and how close each is to being forgotten (D22), interleaved across topics (D24). Cards at the bottom of the ranking wait, and waiting is cheap.
 3. **The session ends when the time is up**, not when the queue is empty. Keep going is there for a good day.
 4. **A card missed today comes back today** (review-07), so a miss is fixed while it is fresh.
