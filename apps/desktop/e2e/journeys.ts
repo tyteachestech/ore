@@ -263,6 +263,27 @@ journey("skill page: To read's and Questions' heads line up, caret over caret an
   if (new Set(xs.map((x) => x.join())).size !== 1) throw new Error(`heads don't line up: ${JSON.stringify(xs)}`);
 });
 
+journey("skill page Questions: each row is one Tab stop then its ⋯, and ↑ ↓ move between rows", async (page) => {
+  await page.getByRole("button", { name: /^Learning/ }).first().click();
+  for (const q of ["Does spacing help with skills, not just facts?", "How long should a quiz gap be?"]) {
+    await page.getByRole("button", { name: "Add a question" }).first().click();
+    await page.getByLabel("New question").fill(q);
+    await page.keyboard.press("Enter");
+    await page.locator(".question-quote", { hasText: q }).waitFor();
+  }
+  const rows = page.locator(".skill-col .question-quote");
+  if ((await rows.count()) < 2) throw new Error("fewer than two questions");
+  await rows.first().focus();
+  await page.keyboard.press("Tab");
+  const tabbed = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+  if (tabbed !== "Question actions") throw new Error(`Tab from a question landed on ${tabbed}, not its ⋯`);
+  await rows.first().focus();
+  await page.keyboard.press("ArrowDown");
+  if (!(await rows.nth(1).evaluate((b) => b === document.activeElement))) throw new Error("↓ didn't move to the next question");
+  await page.keyboard.press("ArrowUp");
+  if (!(await rows.first().evaluate((b) => b === document.activeElement))) throw new Error("↑ didn't move back");
+});
+
 journey("⌘K ↵ on Home starts review, never flips a display setting", async (page) => {
   await page.keyboard.press("Meta+k");
   await page.locator("[cmdk-item]").first().waitFor();
