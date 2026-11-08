@@ -4,7 +4,7 @@ import { writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { addSnippet, addSource, addText } from "../src/ingest/index.ts";
 import { vttToBody, vttWords, youtubeId } from "../src/ingest/youtube.ts";
-import { findItem, sourceFile } from "../src/items.ts";
+import { findItem, listItems, sourceFile } from "../src/items.ts";
 import { readAnnotations } from "../src/annotations.ts";
 import { sha256 } from "../src/fsutil.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -120,5 +120,15 @@ describe("ingest", () => {
     const b = await addText(lib, "x".repeat(100) + "\nmore");
     expect(b.meta.title).toBe("x".repeat(77) + "…");
     expect(addText(lib, "  \n ")).rejects.toThrow("text is empty");
+  });
+
+  test("the same text pasted again is the source already here, filed under the new skill too", async () => {
+    const lib = await tempLibrary();
+    const a = await addText(lib, "# Pasted twice\n\nThe very same paragraph, pasted again.");
+    const b = await addText(lib, "# Pasted twice\n\nThe very same paragraph, pasted again.\n", { skills: ["learning"] }); // a starter skill
+    expect(b.meta.id).toBe(a.meta.id);
+    expect(b).toMatchObject({ kept: true, filed: ["learning"] });
+    expect(listItems(lib).length).toBe(1);
+    expect(findItem(lib, a.meta.id).meta.skills).toEqual(["learning"]);
   });
 });

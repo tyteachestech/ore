@@ -433,12 +433,15 @@ async function tabDraft(tab: Tab, host: string): Promise<NewItem> {
 
 // Pasted text as a source: a Markdown item titled by its first heading, else its first line.
 // Pasted frontmatter (a copied Obsidian note) fills the title, author and date, as a .md file's does.
-export async function addText(lib: Library, text: string, opts: AddOptions = {}): Promise<Item> {
+// The same text pasted again (a retry after an add that looked failed) is the source already here, as a file's is.
+export async function addText(lib: Library, text: string, opts: AddOptions = {}): Promise<Item & Partial<Kept>> {
   const source = text.trim() + "\n";
   if (!source.trim()) throw new Error("text is empty");
   const md = markdownFile(source, "");
   const body = md.body.trim() + "\n";
   if (!body.trim()) throw new Error("text is empty: only frontmatter, no text to read");
+  const same = allItems(lib, { preview: true }).find((i) => i.meta.text_sha256 === sha256(body) && !i.meta.course);
+  if (same) return keep(lib, same, opts);
   const first = body.split("\n")[0]!.replace(/^#+\s*/, "");
   const title = md.title || (first.length > 80 ? first.slice(0, 77).trimEnd() + "…" : first);
   return createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: "md", data: source }, skills: opts.skills });
