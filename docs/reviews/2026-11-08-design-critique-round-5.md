@@ -30,7 +30,7 @@ Detector: 8 counted findings, none new against the baseline (Geist `@font-face`,
 - This PR: skill-page heads line up (To read's caret and icon with Questions'); Questions rows hover as one
   Linear row with ghost actions (no box on a box); a question highlight with no question typed shows its passage
   muted; Collected group labels in mono; no glow on the met ring; focus ring on Review's Open in source;
-  Settings hints wrap cleanly; the minus sprite matches the plus; DESIGN.md's colour rules match the app.
+  Settings hints wrap cleanly; DESIGN.md's colour rules match the app.
 
 ## Taste calls for Tyler
 1. Typing straight after highlighting writes the note (Notion's comment box), instead of Tab first.
@@ -47,3 +47,4 @@ Detector: 8 counted findings, none new against the baseline (Geist `@font-face`,
 - 73 `outline: none` overrides; a few leave only a `bg-hover` fill as focus.
 - The ⓘ and Questions-head dot sprites barely read at 20px (glyph cut out of a filled disc).
 - Add saves any text as a source; a bare domain could offer "Add as a link?".
+- Settings' text-size stepper pairs a round minus (a round icon by rule, `round-icons.test.ts`) with a bare plus.
