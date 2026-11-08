@@ -572,13 +572,14 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
 }
 
 /** To try (D127): techniques from his reading he planned to try on his own work. Checking one off asks
- *  how it went, in one line; that reflection becomes one Explain card at the next enrich. Hidden until
+ *  how it went, in one line; that reflection becomes one Explain card at the next enrich. A second line,
+ *  "Next time I'll…" (D148), keeps the round and puts the try back in To try with that plan. Hidden until
  *  he marks the first one (the reader's popup is where they start), and nothing counts them (D23). */
 function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pick<Question, "item" | "id">) => void; notify: Notify }) {
   const [ts, setTs] = useState<Try[] | null>(null);
-  const [showTried, setShowTried] = useState(false);
+  const [showUsed, setShowUsed] = useState(false);
   const [reflecting, setReflecting] = useState<string | null>(null);
-  // Tries he checked off while here stay in view under Tried, so what he wrote doesn't vanish (Things, Todoist).
+  // Tries he checked off while here stay in view under Used, so what he wrote doesn't vanish (Things, Todoist).
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => {
     let live = true;
@@ -592,14 +593,14 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
   }, [skill, notify]);
 
   const put = (id: string, patch: Partial<Try>) => setTs((l) => l && l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-  type State = { status: "open" | "done"; reflection?: string };
-  /** One write: checked off (with how it went, or none) or back to try; rolled back with an error toast. */
-  const write = async (t: Try, from: State, to: State, fromHistory = false) => {
+  /** One change to a try: what the row shows before and after, and the `ore tried` calls (their args
+   *  after the id) that write it and take it back. */
+  type Step = { from: Partial<Try>; to: Partial<Try>; do: string[][]; undo: string[][] };
+  /** Writes `to` at once, then the calls; a failure rolls the row back to `from` with an error toast. */
+  const write = async (t: Try, from: Partial<Try>, to: Partial<Try>, calls: string[][], fromHistory = false) => {
     put(t.id, to);
     try {
-      // Back to try clears the reflection, so a state with an older one is two writes.
-      if (to.status === "open" || (from.reflection && !to.reflection)) await ore("tried", t.id, "--undo");
-      if (to.status === "done") await ore("tried", t.id, ...(to.reflection ? [opt("text", to.reflection)] : []));
+      for (const c of calls) await ore("tried", t.id, ...c);
       return true;
     } catch (e) {
       put(t.id, from);
@@ -609,24 +610,37 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
       return false;
     }
   };
-  const state = (t: Try): State => ({ status: t.status === "done" ? "done" : "open", reflection: t.reflection });
-  const change = async (t: Try, to: State, msg: string) => {
-    const was = state(t);
-    if (!(await write(t, was, to))) return false;
-    notify(msg, "quiet", () => write(t, to, was, true), () => write(t, was, to, true));
+  const change = async (t: Try, step: Step, msg: string) => {
+    if (!(await write(t, step.from, step.to, step.do))) return false;
+    notify(msg, "quiet", () => write(t, step.to, step.from, step.undo, true), () => write(t, step.from, step.to, step.do, true));
     return true;
   };
+  /** The calls that take a tried try's reflection from `was` to `now` (none: back to try, then tried again). */
+  const setReflection = (was: string | undefined, now: string | undefined): string[][] => (now ? [[opt("text", now)]] : was ? [["--undo"], []] : []);
   const check = async (t: Try) => {
     const done = t.status !== "done";
-    if (!(await change(t, done ? { status: "done" } : { status: "open" }, done ? "Tried" : "Back to try"))) return;
+    const step: Step = done
+      ? { from: { status: "open", reflection: undefined }, to: { status: "done" }, do: [[]], undo: [["--undo"]] }
+      : { from: { status: "done", reflection: t.reflection }, to: { status: "open", reflection: undefined }, do: [["--undo"]], undo: setReflection(undefined, t.reflection).length ? setReflection(undefined, t.reflection) : [[]] };
+    if (!(await change(t, step, done ? "Tried" : "Back to try"))) return;
     setReflecting(done ? t.id : null);
     if (done) setRecent((r) => [...r, t.id]);
   };
-  /** Its draft goes once it is saved; a failed save opens the field again with every word. */
-  const reflect = async (t: Try, text: string) => {
+  /** How it went, and the next plan when he wrote one: the round moves into the record and the try is open
+   *  again with that plan. The draft goes once saved; a failed save opens the box again with every word. */
+  const reflect = async (t: Try, text: string, next: string) => {
     setReflecting(null);
-    if (!text || text === t.reflection) return void reflections.delete(t.id);
-    if (await change(t, { status: "done", reflection: text }, "Saved how it went · a card comes from it")) reflections.delete(t.id);
+    if (!next && (!text || text === t.reflection)) return void drafts.delete(t.id);
+    const step: Step = next
+      ? {
+          from: { status: "done", reflection: t.reflection, note: t.note, uses: t.uses },
+          to: { status: "open", reflection: undefined, note: next, uses: [...(t.uses ?? []), { ts: new Date().toISOString(), plan: t.note, reflection: text || undefined }] },
+          do: [[...(text ? [opt("text", text)] : []), opt("next", next)]],
+          undo: [["--undo"], ...setReflection(text || undefined, t.reflection)],
+        }
+      : { from: { reflection: t.reflection }, to: { reflection: text }, do: setReflection(t.reflection, text), undo: setReflection(text, t.reflection) };
+    const msg = next ? `Next try planned${text ? " · a card comes from how it went" : ""}` : "Saved how it went · a card comes from it";
+    if (await change(t, step, msg)) drafts.delete(t.id);
     else setReflecting(t.id);
   };
   const remove = async (t: Try) => {
@@ -652,60 +666,76 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
 
   if (!ts?.length) return null;
   const open = ts.filter((t) => t.status !== "done");
-  const tried = ts.filter((t) => t.status === "done");
-  const row = (t: Try) => (
-    <TryRow key={t.id} t={t} reflecting={reflecting === t.id} onCheck={() => void check(t)} onReflect={(on) => setReflecting(on ? t.id : null)} onSave={(text) => void reflect(t, text)} onPassage={() => onPassage(t)} onRemove={() => void remove(t)} />
+  // The record of use (D148): every idea he has tried, with each round's plan and how it went. An idea
+  // planned again is in both lists: its next plan above, its rounds so far here.
+  const used = ts.filter((t) => t.status === "done" || t.uses?.length);
+  const row = (t: Try, record = false) => (
+    <TryRow key={`${record ? "used-" : ""}${t.id}`} t={t} record={record} reflecting={reflecting === t.id} onCheck={() => void check(t)} onReflect={(on) => setReflecting(on ? t.id : null)} onSave={(text, next) => void reflect(t, text, next)} onPassage={() => onPassage(t)} onRemove={() => void remove(t)} />
   );
   return (
     <Fold id="tries" title="To try" icon={PixelTry} tone="apply" summary={open.length ? `${open.length} to try` : null} summaryFolded>
-      {open.map(row)}
+      {open.map((t) => row(t))}
       {!open.length && <p className="quiet">All tried. Mark a technique with Try it (4) while you read to plan the next one.</p>}
-      {tried.length > 0 && (
+      {used.length > 0 && (
         <>
-          <button className="answered-toggle" aria-expanded={showTried} onClick={() => setShowTried(!showTried)}>
-            {showTried ? "Hide tried" : `Tried (${tried.length})`}
+          <button className="answered-toggle" aria-expanded={showUsed} onClick={() => setShowUsed(!showUsed)}>
+            {showUsed ? "Hide used" : `Used (${used.length})`}
           </button>
-          {tried.filter((t) => showTried || recent.includes(t.id)).map(row)}
+          {used.filter((t) => showUsed || recent.includes(t.id)).map((t) => row(t, true))}
         </>
       )}
     </Fold>
   );
 }
 
-/** Unsent reflections, per try, kept when the field closes. */
-const reflections = new Map<string, string>();
+/** Unsent "How did it go?" boxes, per try, kept when the box closes. */
+const drafts = new Map<string, { text: string; next: string }>();
 
-function TryRow({ t, reflecting, onCheck, onReflect, onSave, onPassage, onRemove }: {
+/** A try: to try (its plan over the passage, a box to check), or in the record of use (`record`: each
+ *  round's plan and how it went; the box only while it is still tried and not planned again). */
+function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onPassage, onRemove }: {
   t: Try;
+  record?: boolean;
   reflecting: boolean;
   onCheck: () => void;
   onReflect: (on: boolean) => void;
-  onSave: (text: string) => void;
+  onSave: (text: string, next: string) => void;
   onPassage: () => void;
   onRemove: () => void;
 }) {
   const done = t.status === "done";
+  // Planned again: this row is its history, the open row above it is where he acts.
+  const history = record && !done;
   const actions: MenuAction[] = [
     { id: "open", label: "Open passage", run: onPassage },
-    { id: "check", label: done ? "Not tried yet" : "Mark tried", run: onCheck },
+    ...(history ? [] : [{ id: "check", label: done ? "Not tried yet" : "Mark tried", run: onCheck }]),
     ...(done ? [{ id: "reflect", label: t.reflection ? "Edit how it went…" : "How did it go…", run: () => onReflect(true) }] : []),
     { id: "delete", label: "Remove", danger: true, divider: true, run: onRemove },
   ];
   return (
     <WithMenu actions={actions}>
-      <div className={`try${done ? " done" : ""}`}>
-        <Hint text={done ? "Not tried yet" : "Mark tried"}>
-          <button className="try-check" role="checkbox" aria-checked={done} aria-label={done ? "Not tried yet" : "Mark tried"} onClick={onCheck}>
-            {done && <PixelTry size={12} aria-hidden="true" />}
-          </button>
-        </Hint>
+      <div className={`try${done ? " done" : ""}${history ? " history" : ""}`}>
+        {!history && (
+          <Hint text={done ? "Not tried yet" : "Mark tried"}>
+            <button className="try-check" role="checkbox" aria-checked={done} aria-label={done ? "Not tried yet" : "Mark tried"} onClick={onCheck}>
+              {done && <PixelTry size={12} aria-hidden="true" />}
+            </button>
+          </Hint>
+        )}
         <Hint text="Open this passage">
           <button className="question-quote try-quote" onClick={onPassage}>
-            {t.note && <span className="note">{t.note}</span>}
+            {!history && t.note && <span className="note">{t.note}</span>}
             <span className="exact">“{t.exact.replace(/\s+/g, " ").trim()}”</span>
             <span className="from">{t.item_title}</span>
           </button>
         </Hint>
+        {record &&
+          t.uses?.map((u, i) => (
+            <p key={i} className="try-use">
+              {u.plan && <span className="try-use-plan">{u.plan}</span>}
+              {u.reflection && <span className="try-use-went">{u.reflection}</span>}
+            </p>
+          ))}
         {done && t.reflection && !reflecting && (
           <Hint text="Edit how it went">
             <button className="try-reflection" onClick={() => onReflect(true)}>{t.reflection}</button>
@@ -714,40 +744,54 @@ function TryRow({ t, reflecting, onCheck, onReflect, onSave, onPassage, onRemove
         <div className="question-actions">
           <MoreButton label="Try actions" actions={actions} />
         </div>
-        {reflecting && <Reflect id={t.id} initial={t.reflection ?? ""} onSave={onSave} onClose={() => onReflect(false)} />}
+        {reflecting && !history && <Reflect id={t.id} initial={t.reflection ?? ""} onSave={onSave} onClose={() => onReflect(false)} />}
       </div>
     </WithMenu>
   );
 }
 
-/** "How did it go?" in one field (Linear's inline edit): Enter saves, Esc closes and keeps the draft;
- *  a blur keeps the field and what he typed. */
-function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string; onSave: (text: string) => void; onClose: () => void }) {
-  const [v, setV] = useState(() => reflections.get(id) ?? initial);
+/** "How did it go?" and "Next time I'll…" (Linear's inline edit): Enter in either saves both, Esc closes
+ *  and keeps the draft; a blur keeps the box and what he typed. The second line, when filled, is the
+ *  next try's plan (D148). */
+function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string; onSave: (text: string, next: string) => void; onClose: () => void }) {
+  const [v, setV] = useState(() => drafts.get(id)?.text ?? initial);
+  const [next, setNext] = useState(() => drafts.get(id)?.next ?? "");
   const field = useRef<HTMLTextAreaElement>(null);
   useFocusWhileMounted(field);
+  const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onSave(v.trim(), next.trim());
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+    }
+  };
   return (
     <div className="try-reflect">
       <Grow
         ref={field}
         className="field"
         aria-label="How did it go?"
-        placeholder="How did it go? What would you change next time?"
+        placeholder="How did it go?"
         value={v}
         onChange={(e) => {
           setV(e.target.value);
-          reflections.set(id, e.target.value);
+          drafts.set(id, { text: e.target.value, next });
         }}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            onSave(v.trim());
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            onClose();
-          }
+        onKeyDown={keys}
+      />
+      <Grow
+        className="field try-next"
+        aria-label="Next time I'll…"
+        placeholder="Next time I'll…"
+        value={next}
+        onChange={(e) => {
+          setNext(e.target.value);
+          drafts.set(id, { text: v, next: e.target.value });
         }}
+        onKeyDown={keys}
       />
     </div>
   );
