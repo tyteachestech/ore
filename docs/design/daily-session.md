@@ -68,7 +68,7 @@ Tyler wants the daily session to be something people get hooked on in a good way
 
 ## Ideas this frame suggests (not decided)
 
-Each needs Tyler's call before it is built. None touches FSRS math (D22).
+Each needs Tyler's call before it is built. None touches FSRS math (D22). `learning-system.md` marks which are safe to build now.
 
 1. **Drop the full due count from Home's hover hint** (D65.4). Under a standing backlog it only grows, and nothing in the session changes because of it (purpose rule). The slice in minutes already says what today asks.
 2. **Start on a likely win.** The first card of a session is one they will probably recall, so the first ten seconds feel good. Order within today's slice only.
@@ -81,3 +81,4 @@ Each needs Tyler's call before it is built. None touches FSRS math (D22).
 - `reviews/2026-11-08-stress-test.md`: review-07 and review-08, the calls that led here.
 - `research/brief-learning-science.md` §5 and §10: spacing costs and habit evidence.
 - `design/signature-style.md`: the calm feel (D129).
+- `design/learning-system.md` (#177): the whole learn-and-apply loop, and which of the rewards above are safe to tune now or likely to change once applying is built.
