@@ -15,7 +15,7 @@ export interface AgentTask<T> {
   input: unknown;
   files?: string[]; // absolute paths the agent should read
   schema: z.ZodType<T>;
-  check?: (data: T) => string | null; // semantic validation beyond the schema
+  check?: (data: T, web?: WebSeen) => string | null; // semantic validation beyond the schema
   web?: boolean; // allow web search/fetch
   cwd: string;
 }
@@ -30,12 +30,20 @@ export interface AgentResult<T> {
   data: T;
   ai: AiStamp;
   usage: Usage; // summed over retries
+  /** What its web searches and fetches returned, when the vendor reports it (claude does, codex doesn't). */
+  web?: WebSeen;
 }
+
+/** The pages a run's web searches and fetches returned, each with the text it came back in, so a web
+ *  citation can be checked as a library one is: its page must be one the search found, its quote words
+ *  returned with that page. */
+export interface WebSeen { searched: boolean; pages: { url: string; title: string; text: string }[] }
 
 interface RawRun {
   output: unknown; // parsed JSON (or a string to parse)
   model: string;
   usage: Usage;
+  web?: WebSeen;
 }
 
 const addUsage = (a: Usage, b: Usage): Usage => ({
@@ -137,14 +145,16 @@ export function vendorFailure(vendor: Vendor, r: Exec): Error {
   return new Error(`${vendor} failed (exit ${r.code})${msg ? `: ${msg}` : " with no output"}${signInHint(vendor, msg)}`);
 }
 
-/** A `claude -p --output-format json` run's result, or why it failed. */
-function claudeResult(r: Exec) {
+/** A `claude -p --output-format json` run's result (or, for a stream-json run, its last `result` event), or why it failed. */
+function claudeResult(r: Exec, events?: StreamEvent[]) {
   let out: ClaudeOut & { is_error?: boolean; result?: string; structured_output?: unknown; modelUsage?: Record<string, { outputTokens?: number }> };
   try {
-    out = JSON.parse(r.stdout);
+    out = events ? (events.findLast((e) => e.type === "result") as typeof out) : JSON.parse(r.stdout);
   } catch {
     throw vendorFailure("claude", r);
   }
+  // A stream that ends with no result: its last line is a raw event, so the reason is in stderr if anywhere.
+  if (!out) throw vendorFailure("claude", { ...r, stdout: "" });
   if (r.timedOut) throw vendorFailure("claude", r);
   if (out.is_error) {
     const msg = out.result ?? "unknown error";
@@ -158,9 +168,10 @@ async function runClaude(system: string, message: string, schema: object, task: 
   const bin = Bun.which("claude", { PATH: process.env.PATH ?? "" });
   if (!bin) throw new Error("Claude Code isn’t installed (no `claude` on PATH). Install it, or pick Codex in Settings → AI.");
   const tools = ["Read", "Grep", "Glob", ...(task.web ? ["WebSearch", "WebFetch"] : [])];
+  // A web task streams its events, so the pages its searches returned can be checked against its citations.
   const cmd = [
     bin, "-p", message,
-    "--output-format", "json",
+    "--output-format", task.web ? "stream-json" : "json", ...(task.web ? ["--verbose"] : []),
     "--json-schema", JSON.stringify(schema),
     "--system-prompt", system,
     "--tools", tools.join(","),
@@ -170,9 +181,77 @@ async function runClaude(system: string, message: string, schema: object, task: 
     "--no-session-persistence",
     ...(model ? ["--model", model] : []),
   ];
-  const out = claudeResult(await exec(cmd, task.cwd));
+  const r = await exec(cmd, task.cwd);
+  const events = task.web ? streamEvents(r.stdout) : undefined;
+  const out = claudeResult(r, events);
+  // The model that wrote the most is the one that ran, except on a web task, where the search's own
+  // helper model can write more: its stream's `system init` event names the model it ran on.
   const usage = Object.entries(out.modelUsage ?? {}).sort((a, b) => (b[1].outputTokens ?? 0) - (a[1].outputTokens ?? 0));
-  return { output: out.structured_output ?? out.result, model: usage[0]?.[0] ?? model ?? "claude-default", usage: claudeUsage(out) };
+  const ran = events?.find((e) => e.type === "system" && e.subtype === "init" && typeof e.model === "string")?.model as string | undefined;
+  return { output: out.structured_output ?? out.result, model: ran ?? usage[0]?.[0] ?? model ?? "claude-default", usage: claudeUsage(out), ...(events ? { web: webSeen(events) } : {}) };
+}
+
+type StreamEvent = { type?: string; subtype?: string; model?: unknown; message?: { content?: unknown }; tool_use_result?: unknown; [k: string]: unknown };
+const streamEvents = (stdout: string): StreamEvent[] =>
+  stdout.split("\n").flatMap((line) => {
+    try {
+      const e = JSON.parse(line);
+      return e && typeof e === "object" ? [e as StreamEvent] : [];
+    } catch {
+      return []; // not an event line
+    }
+  });
+
+export const isWebUrl = (s: unknown): s is string => typeof s === "string" && /^https?:\/\//i.test(s.trim());
+
+/** The pages a stream-json run's WebSearch and WebFetch calls returned, each with the text of the
+ *  results it came back in: a search's links (its summary's links too), and each URL fetched. A link
+ *  inside a fetched page is not a page it returned. */
+export function webSeen(events: StreamEvent[]): WebSeen {
+  const seen: WebSeen = { searched: false, pages: [] };
+  const add = (url: unknown, title: unknown, text: string) => {
+    if (!isWebUrl(url)) return;
+    const page = seen.pages.find((p) => samePage(p.url, url));
+    if (!page) seen.pages.push({ url: url.trim(), title: typeof title === "string" ? title : "", text });
+    else {
+      if (!page.text.includes(text)) page.text += `\n\n${text}`;
+      if (!page.title && typeof title === "string") page.title = title;
+    }
+  };
+  const calls = new Map<string, { name: string; url?: unknown }>(); // tool call id → which tool, and a fetch's URL
+  for (const e of events) {
+    const content = Array.isArray(e.message?.content) ? (e.message.content as Record<string, unknown>[]) : [];
+    if (e.type === "assistant")
+      for (const c of content)
+        if (c.type === "tool_use" && (c.name === "WebSearch" || c.name === "WebFetch")) {
+          seen.searched = true;
+          calls.set(String(c.id), { name: c.name, url: (c.input as { url?: unknown })?.url });
+        }
+    if (e.type !== "user") continue;
+    for (const c of content) {
+      const call = calls.get(String(c.tool_use_id));
+      if (c.type !== "tool_result" || c.is_error || !call) continue;
+      const text = typeof c.content === "string" ? c.content : Array.isArray(c.content) ? (c.content as { text?: unknown }[]).map((x) => (typeof x.text === "string" ? x.text : "")).join("\n") : "";
+      if (call.name === "WebFetch") {
+        add(call.url, "", text);
+        continue;
+      }
+      const results = (e.tool_use_result as { results?: { content?: unknown }[] } | undefined)?.results;
+      for (const r of Array.isArray(results) ? results : [])
+        for (const l of Array.isArray(r.content) ? (r.content as { url?: unknown; title?: unknown }[]) : []) add(l.url, l.title, text);
+      for (const m of text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/gi)) add(m[2], m[1], text);
+    }
+  }
+  return seen;
+}
+
+/** Two links to the same page: scheme, "www.", the host's case, a trailing slash and the #fragment don't count. */
+export function samePage(a: string, b: string): boolean {
+  const key = (u: string) => {
+    const m = u.trim().replace(/#.*$/, "").replace(/\/+$/, "").match(/^https?:\/\/(?:www\.)?([^/?]*)(.*)$/i);
+    return m ? `${m[1]!.toLowerCase()}${m[2]}` : u;
+  };
+  return key(a) === key(b);
 }
 
 function codexConfiguredModel(): string | undefined {
@@ -230,9 +309,9 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
     try {
       const parsed = task.schema.safeParse(parseOutput(raw.output));
       if (!parsed.success) throw new Error(parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
-      const problem = task.check?.(parsed.data);
+      const problem = task.check?.(parsed.data, raw.web);
       if (problem) throw new Error(problem);
-      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage };
+      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, ...(raw.web ? { web: raw.web } : {}) };
     } catch (e) {
       lastError = (e as Error).message;
       message = `${userMessage(task.input, task.files ?? [])}\n\nYour previous output was invalid: ${lastError}\nReturn only JSON that matches the schema.`;

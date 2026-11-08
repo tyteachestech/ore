@@ -1,6 +1,6 @@
 # Ask your library
 
-The tutor (D128, ⌘J) answers Tyler's questions from his own sources. Each claim carries a numbered citation; clicking it opens the source with the quoted passage marked. When his sources don't hold the answer, the reply is labelled "Not from your sources". `ore ask-library` is the same search with a stricter prompt that answers only from the library or says it can't.
+The tutor (D128, ⌘J) answers Tyler's questions from his own sources. Each claim carries a numbered citation; clicking it opens the source with the quoted passage marked. When his sources don't hold the answer, the reply says so, then searches the web for a specific fact and cites the pages the same way (D137; a click opens the page), or answers a general explanation from what it knows, labelled "Not from your sources". `ore ask-library` is the same search with a stricter prompt that answers only from the library or says it can't.
 
 ```bash
 bun run eval:ask                       # the tutor, Claude and Codex; spends AI usage, never in CI
@@ -12,7 +12,7 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 
 1. **Search** (`packages/core/src/ai/ask.ts`, `retrieve`). The question loses stop words and is cut to stems ("spacing" → "spac"). SQLite FTS5 ranks sources by BM25 (`db.ts`, `sourcesMatching`) and keeps the best six. Each is cut into paragraph passages under their headings, and passages are ranked by the rarer question words they hold, a small IDF score; title and heading words count half. Up to ten passages go to the AI, five at most from one source. The tutor puts the open source and anything he @-mentions first, then up to eight from the rest of the library (`tutorPassages`).
 2. **Answer**. The AI sees only the numbered passages and returns JSON: the reply with `[n]` markers, and per marker a passage id and an exact quote.
-3. **Check**. Every quote must be found in its passage (`locate`, the same fuzzy anchoring highlights use), every marker must have a citation, and an unknown passage is refused. A failed check goes back to the AI once with the reason.
+3. **Check**. Every quote must be found in its passage (`locate`, the same fuzzy anchoring highlights use), every marker must have a citation, and an unknown passage is refused. A web citation's URL must be one the search returned and its quote words the search returned: a web task runs `claude -p` with `--output-format stream-json`, whose events carry each WebSearch's links and text (`webSeen` in `adapter.ts`). A failed check goes back to the AI once with the reason.
 4. **Place**. Each quote is mapped to its character offsets in the source's `doc.md`. The citation opens the reader at `q:start:end`, which marks that range (`apps/desktop/e2e/journeys.ts`, "tutor citation").
 
 ## The eval
@@ -21,7 +21,9 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 - **Retrieval**, with no AI: do the passages from the expected sources that reach the AI hold the evidence and every part of the answer? CI checks this for all 20 questions on both chats (`packages/core/test/eval-ask.test.ts`), so a search change that loses evidence fails the build for free.
 - **Answer**: every pattern matches the reply.
 - **Citation**: every quote is really at its offsets in its source, and one comes from an expected source and holds the evidence.
-- **Says not there**: an absent question is right when the reply says the answer isn't from his sources: in words ("your sources don't give his birth year"), or, with no citation, by the "Not from your sources" label. It may cite what his sources do say nearby, but then it has to say so in words, or the citation reads as the answer's source. The report also counts how many then answer from general knowledge.
+- **Not in library**: an absent question is right when the reply says the answer isn't from his sources: in words ("your sources don't give his birth year"), or, with no passage cited, by the "Not from your sources" label or a web page's link. It may cite what his sources do say nearby, but then it has to say so in words, or the citation reads as the answer's source. Where the fact is settled (`outside` patterns: Ebbinghaus's birth year, the walrus operator's Python version), the answer from the web or general knowledge must also be right. The report counts how many cite the web and how many use general knowledge.
+- **Searched needlessly**: answerable questions where the tutor searched the web anyway. It should be 0: his library comes first, and a search adds about 5 seconds.
+- **Median reply**: the median time for an answerable question and for an absent one (which usually searches).
 - Answer and citation accuracy carry 95% intervals, as in the grading eval.
 
 ## Design decisions
@@ -36,7 +38,8 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 
 - 20 answerable questions over 11 docs; the set has no questions that need two sources combined, and no follow-up turns.
 - Answer patterns are regexes: a right answer in unexpected words can fail, and a wrong one that names the right terms can pass.
-- The tutor answers an absent question from general knowledge after saying so (D128); the eval counts that right and reports how often it happens. `ore ask-library` refuses instead.
+- The tutor answers an absent question from the web or general knowledge after saying so (D137); the eval counts that right when the answer is, and reports how often each happens. `ore ask-library` refuses instead.
+- A web quote is checked against what the search returned, which is the search tool's summary of the pages, not the page itself: it proves the link and words were really returned, not that the page says exactly that. Codex reports no search results, so its web links are only checked to be links.
 - "Says it in words" is a phrase match, not a judge: a refusal in unusual words can fail.
 - Two answer patterns were loosened after reading the 2026-11-08 misses, both cases a right answer the pattern was too literal for ("connects names to objects" for "mapping"; a citation of the 1880s sentence the name follows). Changing labels after looking at outputs is normal (criteria drift, Shankar et al.), but it means later runs, not that one, are the clean measure.
 
