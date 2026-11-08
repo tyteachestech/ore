@@ -124,9 +124,14 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const setRead = (post: FeedPost, on: boolean, toast = true) => {
     const put = (v: boolean) => setData((d) => d && { ...d, posts: d.posts.map((p) => (p.url === post.url ? { ...p, read: v } : p)) });
     put(on);
-    ore("feed", on ? "read" : "unread", post.url).then(
-      () => toast && notify(on ? "Marked read" : "Marked unread", "info", () => setRead(post, !on, false), () => setRead(post, on, false)),
-      (e) => (put(!on), notify(errorText(e), "error")),
+    // From the history (toast false), a failure goes back to it, which says why.
+    return ore("feed", on ? "read" : "unread", post.url).then(
+      () => void (toast && notify(on ? "Marked read" : "Marked unread", "info", () => setRead(post, !on, false), () => setRead(post, on, false))),
+      (e) => {
+        put(!on);
+        if (!toast) throw e;
+        notify(errorText(e), "error");
+      },
     );
   };
 
@@ -135,8 +140,8 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     setData((d) => d && { feeds: d.feeds.filter((x) => x.url !== f.url), posts: d.posts.filter((p) => p.feed !== f.url) });
     ore<{ feed: FeedInfo; at: number }>("feed", "unfollow", f.url).then(
       (r) => {
-        const back = () => void ore("feed", "restore", JSON.stringify(r.feed), "--at", String(r.at)).then(() => read(), (e) => notify(errorText(e), "error"));
-        notify(`Unfollowed ${f.title}`, "info", back, () => void ore("feed", "unfollow", f.url).then(() => read(), (e) => notify(errorText(e), "error")));
+        const back = () => ore("feed", "restore", JSON.stringify(r.feed), "--at", String(r.at)).then(() => read());
+        notify(`Unfollowed ${f.title}`, "info", back, () => ore("feed", "unfollow", f.url).then(() => read()));
       },
       (e) => (setData(before), notify(errorText(e), "error")),
     );
@@ -145,9 +150,14 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const arrange = (next: FeedInfo[], undoable = true) => {
     const before = data;
     setData((d) => d && { ...d, feeds: next });
-    ore("feed", "arrange", JSON.stringify(next.map((f) => f.url))).then(
-      () => undoable && before && notify("Reordered feeds", "quiet", () => arrange(before.feeds, false), () => arrange(next, false)),
-      (e) => (setData(before), notify(errorText(e), "error")),
+    // From the history (undoable false), a failure goes back to it, which says why.
+    return ore("feed", "arrange", JSON.stringify(next.map((f) => f.url))).then(
+      () => void (undoable && before && notify("Reordered feeds", "quiet", () => arrange(before.feeds, false), () => arrange(next, false))),
+      (e) => {
+        setData(before);
+        if (!undoable) throw e;
+        notify(errorText(e), "error");
+      },
     );
   };
   const move = (f: FeedInfo, by: -1 | 1) => {
@@ -164,18 +174,26 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     if (!t || t === before) return;
     const put = (name: string) => setData((d) => d && { feeds: d.feeds.map((x) => (x.url === f.url ? { ...x, title: name } : x)), posts: d.posts.map((p) => (p.feed === f.url ? { ...p, feed_title: name } : p)) });
     put(t);
-    ore("feed", "set", f.url, opt("name", t)).then(
-      () => undoable && notify(`Renamed to “${t}”`, "quiet", () => retitle(f, t, before, false), () => retitle(f, before, t, false)),
-      (e) => (put(before), notify(errorText(e), "error")),
+    return ore("feed", "set", f.url, opt("name", t)).then(
+      () => void (undoable && notify(`Renamed to “${t}”`, "quiet", () => retitle(f, t, before, false), () => retitle(f, before, t, false))),
+      (e) => {
+        put(before);
+        if (!undoable) throw e;
+        notify(errorText(e), "error");
+      },
     );
   };
 
   const refile = (f: FeedInfo, next: string[], before = f.skills, undoable = true) => {
     const put = (s: (now: string[]) => string[]) => setData((d) => d && { ...d, feeds: d.feeds.map((x) => (x.url === f.url ? { ...x, skills: s(x.skills) } : x)) });
     put(() => next);
-    ore("feed", "set", f.url, ...(next.length ? next.map((k) => opt("skill", k)) : [opt("skill", "")])).then(
-      () => undoable && notify(`Changed the skills for ${f.title}`, "quiet", () => refile(f, before, next, false), () => refile(f, next, before, false)),
-      (e) => (put((now) => unfile(now, next, before)), notify(errorText(e), "error")),
+    return ore("feed", "set", f.url, ...(next.length ? next.map((k) => opt("skill", k)) : [opt("skill", "")])).then(
+      () => void (undoable && notify(`Changed the skills for ${f.title}`, "quiet", () => refile(f, before, next, false), () => refile(f, next, before, false))),
+      (e) => {
+        put((now) => unfile(now, next, before));
+        if (!undoable) throw e;
+        notify(errorText(e), "error");
+      },
     );
   };
 
