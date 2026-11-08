@@ -144,14 +144,14 @@ export const PixelStack = sprite([
   "................",
 ]);
 
-/** Question: a question mark cut from a round coin (14 rows with short flat sides, so it doesn't read as clipped). */
+/** Question: a question mark cut from a round coin (14 rows with short flat sides, so it doesn't read as clipped); the hook is one open curve, no dot inside it, so it still reads as a ? at 20px. */
 export const PixelQuestion = sprite([
   "................",
   "......####......",
   "....########....",
-  "...##########...",
-  "..####....####..",
-  "..###..##..###..",
+  "...###....###...",
+  "..###......###..",
+  "..#######..###..",
   ".#######..#####.",
   ".######..######.",
   ".######..######.",
