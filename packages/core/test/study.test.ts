@@ -141,6 +141,47 @@ describe("review loop", () => {
     expect(endSession(lib).reviews).toBe(2);
   });
 
+  test("a miss keeps its relearn pass when the session ends right after it (the goal closed, or Esc then ⌘R)", async () => {
+    const { lib, a, b } = await setup();
+    const t0 = Date.now() + 864e5;
+    const at = (s: number) => new Date(t0 + s * 1000);
+    startSession(lib, at(0));
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 3, now: at(1) });
+    endSession(lib, at(2));
+    expect(dueQueue(lib, at(3)).find((e) => e.id === a.meta.id)?.relearn).toBe(true); // no session open
+    startSession(lib, at(4));
+    expect(dueQueue(lib, at(5)).at(-1)).toMatchObject({ id: a.meta.id, relearn: true }); // the next session owes it
+    await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(6) });
+    expect(dueQueue(lib, at(7)).some((e) => e.id === a.meta.id)).toBe(false); // once only
+    // A miss on its relearn pass waits for its FSRS date, and yesterday's miss is not today's to relearn.
+    await recordReview(lib, b.meta.id, { rating: 1, confidence: 3, now: at(8) });
+    await recordReview(lib, b.meta.id, { rating: 1, confidence: 3, now: at(9) });
+    expect(dueQueue(lib, at(10)).some((e) => e.id === b.meta.id)).toBe(false);
+    const { lib: lib2, a: c } = await setup();
+    await recordReview(lib2, c.meta.id, { rating: 1, confidence: 3, now: at(0) });
+    const tomorrow = new Date(t0 + 864e5);
+    expect(dueQueue(lib2, tomorrow).find((e) => e.id === c.meta.id)?.relearn ?? false).toBe(false);
+  });
+
+  test("a review on another device dated later than now (its clock ahead) doesn't block rating the card", async () => {
+    const { lib, a } = await setup();
+    const now = new Date(Date.now() + 864e5);
+    const was = process.env.ORE_DEVICE;
+    try {
+      process.env.ORE_DEVICE = "iphone";
+      const ahead = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: new Date(now.getTime() + 20 * 3600e3) });
+      process.env.ORE_DEVICE = "mac";
+      const r = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now });
+      expect(r.ts > ahead.ts).toBe(true); // logged after it, so replay and undo see it as the latest
+      expect(r.state_after.reps).toBe(2);
+      await undoReview(lib, a.meta.id, r.ts, now);
+      expect(readReviews(lib).map((x) => x.ts)).toEqual([ahead.ts]);
+    } finally {
+      if (was === undefined) delete process.env.ORE_DEVICE;
+      else process.env.ORE_DEVICE = was;
+    }
+  });
+
   test("unseen drafts from the most recently finished source come first", async () => {
     const { lib, item, a, b } = await setup();
     const { item: other } = await addSnippet(lib, { text: "Other source." });

@@ -130,7 +130,7 @@ Each device appends to its own file (`<device>` is `ORE_DEVICE` or the computer'
 ## 3. Scheduling
 - ts-fsrs, FSRS-6 defaults. Desired retention per card = max over its skills' priority (P1 0.92, P2 0.88, P3 0.80; D65).
 - Due queue: all cards with `due <= now` plus drafts never seen. Order: interleave topics round-robin; within a topic, sort by `priority_weight × (1 − retrievability)`; place `concept` items that share a topic adjacent; keep `definition` items from one source together. A draft first comes up the day after it was written; new drafts enter only while the daily goal has room after the due cards, up to `review.new_per_day` (D65).
-- A rating of 1 schedules one relearn pass later in the same session.
+- A rating of 1 schedules one relearn pass later in the same session, or the next one that day if the session ends first (the goal closing, D65).
 - Remixing (D66) changes how a card is asked, never when: one FSRS state per card. Variants start after two Good or Easy reviews of the original since the last miss and rotate variant, variant, original; a miss returns to the original; each variant is shown at most twice, never twice in a row.
 - Never compress intervals to catch up. Never alter stability/difficulty for priority.
 - Optimizer: `ore optimize` runs the ts-fsrs binding over the review log when ≥1,000 reviews exist; writes `skills.yaml`-adjacent `fsrs-params.json`; the daily catch-up runs it when the last fit is a month old (D95).
@@ -248,7 +248,7 @@ Coverage per content type, what each keeps and misses, and the plan (D96): `docs
 - Inbox watcher: dropped (D95).
 
 ### Implementation notes (v0, 2026-10-10)
-- FSRS-6 defaults with learning/relearning steps empty and fuzz off, so replay is deterministic; the single relearn pass (D21) comes from the queue within the open session, not from FSRS minute steps.
+- FSRS-6 defaults with learning/relearning steps empty and fuzz off, so replay is deterministic; the single relearn pass (D21) comes from the queue (owed by a card's only review today being a miss), not from FSRS minute steps.
 - Retention metric: rating 2 counts as a fail; "early" means reviewed on a calendar day before the due day; null below 10 qualifying reviews.
 - Web extraction runs Defuddle on linkedom (jsdom's selector engine rejected Defuddle's selectors); Readability fallback on the same DOM.
 - `ore highlight` retries matching with whitespace and Markdown emphasis ignored, so text copied from a rendered page matches the Markdown body.
