@@ -290,7 +290,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                     </span>
                   </Hint>
                   {/* On hover the ⋯ takes the meter's place, as on every other row (Linear). */}
-                  {sourceMenu && <MoreButton label="Source actions" actions={() => withRename(sourceMenu(i), i)} />}
+                  {sourceMenu && <MoreButton label="Source actions" actions={() => withRename(sourceMenu(i), i)} hoverOnly />}
                 </div>
                 </WithMenu>
               );
@@ -312,7 +312,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
               <div className="home-skills">
                 {g.skills.map((s) => (
                   <WithMenu key={s.id} actions={skillMenu ? () => skillMenu(s) : []}>
-                    <SkillTile skill={s} strength={today.skills.find((x) => x.skill === s.id)} onOpen={() => onOpenSkill(s.id)} more={skillMenu && <MoreButton label="Skill actions" actions={() => skillMenu(s)} />} />
+                    <SkillTile skill={s} strength={today.skills.find((x) => x.skill === s.id)} onOpen={() => onOpenSkill(s.id)} more={skillMenu && <MoreButton label="Skill actions" actions={() => skillMenu(s)} hoverOnly />} />
                   </WithMenu>
                 ))}
               </div>

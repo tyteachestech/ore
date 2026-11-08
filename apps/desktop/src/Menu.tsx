@@ -117,8 +117,22 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
   );
 }
 
+const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex="0"]';
+/** A ⋯ shown only on hover can't take focus back once its menu closes: it hides as the pointer leaves, and focus
+ *  falls to <body>. Its row takes it instead (Tyler, 2026-11-08): the row itself or the list holding it when they
+ *  take focus, else the row's main control. Only when focus would go back to the ⋯: a click that put it
+ *  somewhere else keeps it there. */
+function focusRow(e: Event, button: HTMLButtonElement | null) {
+  const active = document.activeElement;
+  if (!button || (active && active !== document.body && active !== button && !active.closest("[role=menu]"))) return;
+  let row: HTMLElement | null | undefined = button.parentElement?.closest<HTMLElement>(FOCUSABLE);
+  for (let up = button.parentElement; !row && up && up !== document.body; up = up.parentElement)
+    row = [...up.querySelectorAll<HTMLElement>(FOCUSABLE)].find((el) => el !== button && el.getClientRects().length > 0);
+  if (row) (e.preventDefault(), row.focus({ preventScroll: true }));
+}
+
 /** The ⋯ button that opens the same actions as right-click; shown on row hover. */
-export function MoreButton({ label, actions, className = "more", icon, hint = "More actions", open, onOpenChange, onPointerDown, align = "end", keepFocus, focusBack }: {
+export function MoreButton({ label, actions, className = "more", icon, hint = "More actions", open, onOpenChange, onPointerDown, align = "end", keepFocus, hoverOnly }: {
   label: string;
   actions: Actions;
   className?: string;
@@ -133,8 +147,8 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   align?: "start" | "end";
   /** Focus stays where the action put it (the note's text), not back on the button. */
   keepFocus?: boolean;
-  /** Where focus goes when the menu closes, for a button shown only on hover, which can't take it back (the sidebar's ⋯ gives it to its row). */
-  focusBack?: (button: HTMLButtonElement | null) => HTMLElement | null | undefined;
+  /** Shown only while its row is hovered: focus goes back to the row, not to it (`focusRow`). */
+  hoverOnly?: boolean;
 }) {
   const { later, pick, closed } = useLater();
   const self = useRef<HTMLButtonElement>(null);
@@ -152,11 +166,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
         <DropdownMenu.Trigger asChild>{button}</DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => {
-          const to = !keepFocus && focusBack?.(self.current);
-          if (to) (e.preventDefault(), to.focus({ preventScroll: true }));
-          closed(e, keepFocus);
-        }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (hoverOnly && !keepFocus && focusRow(e, self.current), closed(e, keepFocus))} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <DropdownMenu.Separator className="menu-sep" />}

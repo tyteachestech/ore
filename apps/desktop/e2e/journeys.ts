@@ -3773,6 +3773,22 @@ journey("sidebar: closing a hover-only ⋯ or + gives focus to its row, and ⇧�
   await until("⇧⌘S puts focus on the list", () => page.evaluate(() => document.activeElement?.classList.contains("list") === true));
   await page.keyboard.press("Shift+Meta+KeyS");
   await page.locator(".sidebar .side-item").first().waitFor();
+  // In a source there is no list: the text takes it.
+  await openSource(page, AGENTS);
+  await page.getByRole("button", { name: /^All sources/ }).focus();
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await until("⇧⌘S in a source puts focus on the text", () => page.evaluate(() => document.activeElement?.classList.contains("reader-scroll") === true));
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await page.locator(".sidebar .side-item").first().waitFor();
+  // Every hover-only ⋯ does the same, not only the sidebar's: Home's skill tiles.
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const tile = page.locator(".home-skill").first();
+  await tile.hover();
+  await tile.locator(".more").click();
+  await page.getByRole("menu").waitFor();
+  await page.mouse.move(0, 0);
+  await page.keyboard.press("Escape");
+  await until("Home's tile ⋯ gives focus to its tile", () => tile.evaluate((el) => el === document.activeElement));
 });
 
 journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
