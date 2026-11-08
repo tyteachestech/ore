@@ -1662,6 +1662,37 @@ journey("icon picker: it opens with the caret in Filter, so typing searches at o
   await typed();
 });
 
+journey("peeked sidebar: it stays while its own menu is open, and slides away once nothing holds it, after Esc from a new skill too", async (page) => {
+  const shown = () => page.locator(".sidebar").evaluate((s) => !(s as HTMLElement).hidden);
+  const peek = async () => {
+    await page.mouse.move(600, 400);
+    await page.mouse.move(1, 400, { steps: 5 });
+    await until("it peeks out", shown);
+  };
+  await page.getByRole("button", { name: "Hide sidebar" }).click();
+  await until("the sidebar hides", async () => !(await shown()));
+  await peek();
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
+  const menu = page.getByRole("menu");
+  const m = (await menu.boundingBox())!;
+  await page.mouse.move(m.x + m.width - 10, m.y + m.height - 6, { steps: 5 }); // off the sidebar
+  await page.waitForTimeout(900);
+  if (!(await shown())) throw new Error("the sidebar slid away under its own menu");
+  await page.keyboard.press("Escape");
+  await page.mouse.move(900, 400, { steps: 5 });
+  await until("it slides away once the menu is closed", async () => !(await shown()));
+  await peek();
+  await page.locator(".side-section", { hasText: "Life" }).hover();
+  await page.getByRole("button", { name: "New skill in Life" }).click();
+  await page.keyboard.type("Peek skill");
+  await page.mouse.move(900, 400, { steps: 5 });
+  await page.waitForTimeout(700);
+  if (!(await shown())) throw new Error("the sidebar slid away from the field he is typing in");
+  await page.keyboard.press("Escape");
+  await until("it slides away after Esc, with the pointer gone", async () => !(await shown()));
+  await page.getByRole("button", { name: "Show sidebar" }).click();
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);
