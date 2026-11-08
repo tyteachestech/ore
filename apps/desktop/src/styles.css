@@ -248,14 +248,14 @@ img.thumb { filter: brightness(0.86); }
 .row:has(> .row-main):not(.lesson) { height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
 .list .row:not(.lesson) .thumb { width: 64px; height: 36px; }
 .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-/* A skill page's list is Readwise Reader's (D130, Tyler's pick B of five): a 96×54 picture, the title, the
-   author and other skills, then the kind in the mono label style; the other skills stay since they only
-   show when there are any. A question mark at the row's right, centred, marks a source that may answer an
-   open question (D75); its hint lists them. */
-.skill-page .list .row:not(.lesson) .thumb { width: 96px; height: 54px; }
-.skill-page .row:has(> .row-main):not(.lesson) { min-height: 70px; gap: 12px; }
-.skill-page .row-main { gap: 2px; }
-.skill-page .row .title { font-weight: 500; }
+/* Source lists are Readwise Reader's (D130, Tyler's pick B of five; All sources too since D135): a 96×54
+   picture, the title, the author and other skills, then the kind in the mono label style; the other skills stay
+   since they only show when there are any. On a skill page a question mark at the row's right, centred, marks a
+   source that may answer an open question (D75); its hint lists them. */
+.list .row:not(.lesson):not(.post) .thumb { width: 96px; height: 54px; }
+.row:has(> .row-main):not(.lesson):not(.post) { min-height: 70px; gap: 12px; }
+.list .row:not(.post) .row-main { gap: 2px; }
+.list .row:not(.post) .title { font-weight: 500; }
 .row .kind-line { color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
 .row .row-q { flex: none; align-self: center; display: inline-flex; color: var(--question-solid); }
 .hint-q { display: flex; flex-direction: column; gap: 2px; }
@@ -1843,11 +1843,12 @@ button.home-plan:hover { color: var(--text); }
 .home-read .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-read .row-rename { flex: 1; min-width: 0; height: 26px; margin: 0 -6px; padding: 0 6px; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: inherit; color: var(--text); }
 .home-read .course-of { flex: none; max-width: 35%; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); }
-.seg-item { min-width: 28px; height: 22px; padding: 0 6px; border-radius: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.seg-item:hover { color: var(--text); }
-.seg-item[data-state="on"] { background: var(--bg-active); color: var(--text); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5); }
-.seg-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+/* Settings' segmented controls are the side panel's (D135): a track with a hairline edge, the chosen one a raised pill. */
+.seg { display: flex; align-items: center; gap: 2px; height: 32px; padding: 3px; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); }
+.seg-item { min-width: 28px; height: 24px; padding: 0 8px; border-radius: 6px; color: var(--faint); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.seg-item:hover:not(:disabled) { color: var(--text); }
+.seg-item[data-state="on"] { background: var(--bg-hover); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), var(--lift); }
+.seg-item:focus-visible { outline: none; color: var(--text); box-shadow: inset 0 0 0 2px var(--focus); }
 .switch { position: relative; width: 32px; height: 18px; flex: none; border-radius: 999px; background: var(--bg-active); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); transition: background-color 150ms; }
 .switch[data-state="checked"] { background: var(--c-green); }
 .switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
@@ -2171,7 +2172,7 @@ button.home-plan:hover { color: var(--text); }
 .settings-row-text > span, .settings-row-text > label { display: block; color: var(--text); font-weight: 500; }
 .settings-row-text p { margin: 2px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; text-wrap: pretty; }
 .settings-row-control { flex: none; display: flex; align-items: center; gap: 10px; max-width: 55%; min-width: 0; }
-.settings-row-control .seg-item { min-width: 34px; height: 24px; padding: 0 9px; }
+.settings-row-control .seg-item { min-width: 34px; padding: 0 9px; }
 .seg[data-disabled] { opacity: 0.5; }
 .seg-item:disabled { opacity: 0.4; }
 .seg-item svg { display: block; margin: 0 auto; }

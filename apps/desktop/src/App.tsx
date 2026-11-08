@@ -1739,7 +1739,7 @@ export function App() {
               </span>
             )}
             {/* A skill page's rows are Reader's (D130): a third line says what kind it is (its length joins once import records one). */}
-            {onSkillPage && !lesson && !snip && <span className="kind-line">{KIND[r.type] ?? r.type}</span>}
+            {!lesson && !snip && <span className="kind-line">{KIND[r.type] ?? r.type}</span>}
           </span>
         )}
         {onSkillPage && mayAnswer.has(r.id) && (

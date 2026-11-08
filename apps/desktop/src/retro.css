@@ -155,9 +155,7 @@
 .settings-group h2 { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .settings-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .settings-row { padding: 14px 0; }
-.settings-tab, .seg, .seg-item, .settings-btn { border-radius: 0; }
-.seg { background: transparent; border-color: var(--border); }
-.seg-item[data-state="on"] { box-shadow: none; }
+.settings-tab, .settings-btn { border-radius: 0; }
 .settings-sheet { border-radius: 0; border: 1px solid var(--border); }
 /* The shortcut list in Settings: groups are mono labels over a rule, the list sits on the page; the search stays a field. */
 .keys-editor.in-page .keys-head { border-radius: 0; }
