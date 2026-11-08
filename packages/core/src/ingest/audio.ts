@@ -16,13 +16,13 @@ type Progress = (done: number, label?: string) => void;
 
 /** The audio as WebVTT. `onProgress` gets 0..1 as it goes, and a line to show while the speech model
  *  downloads the first time. */
-export async function transcribe(data: Uint8Array, ext: string, onProgress?: Progress): Promise<string> {
+export async function transcribe(data: Uint8Array, ext: string, onProgress?: Progress, language?: string): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "ore-audio-"));
   madeThisRun(dir);
   try {
     const file = join(dir, `audio.${ext}`);
     writeFileSync(file, data);
-    return await transcribeFile(file, onProgress);
+    return await transcribeFile(file, onProgress, language);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -42,7 +42,7 @@ export async function transcribeFile(file: string, onProgress?: Progress, langua
       e.code === 3
         ? "Transcribing audio needs macOS 26 or later. If it has a transcript, copy it and paste it here instead."
         : e.code === 4
-          ? `Your Mac can’t transcribe speech in this language (${language}) yet. If it has a transcript, copy it and paste it here instead.`
+          ? `Your Mac can’t transcribe speech in this language${language ? ` (${language})` : ""} yet. If it has a transcript, copy it and paste it here instead.`
           : `Couldn’t transcribe the audio (${e.message.split("\n").pop()}). If it has a transcript, copy it and paste it here instead.`,
     );
   });
@@ -55,6 +55,38 @@ export interface Episode {
   title?: string;
   show?: string;
   published?: string;
+  /** The speech's language as the show's feed names it ("es-419"), so it is heard in it. */
+  language?: string;
+}
+
+/** A feed's or page's language tag in its usual spelling ("en-us" → "en-US"); none when it isn't one. */
+function languageTag(tag: string | undefined): string | undefined {
+  try {
+    return tag?.trim() ? Intl.getCanonicalLocales(tag.trim())[0] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const feedLanguage = (xml: string) => {
+  const tag = xml.match(/<(language|itunes:language)>([\s\S]*?)<\/\1>/i)?.[2];
+  return languageTag(tag && decodeXml(tag.trim()));
+};
+
+/** The language a show's feed names, read only as far as its channel's own tags: a long-running
+ *  show's feed can be many megabytes of episodes. */
+async function showLanguage(feed: string, fetcher: typeof fetch): Promise<string | undefined> {
+  const res = await fetcher(feed).catch(() => null);
+  if (!res?.ok || !res.body) return undefined;
+  const reader = res.body.getReader();
+  const text = new TextDecoder();
+  let head = "";
+  while (!/<\/(?:itunes:)?language>|<item\b/i.test(head) && head.length < 1_000_000) {
+    const { done, value } = await reader.read().catch(() => ({ done: true, value: undefined }));
+    if (done || !value) break;
+    head += text.decode(value, { stream: true });
+  }
+  void reader.cancel().catch(() => {});
+  return feedLanguage(head);
 }
 
 const APPLE = /^https?:\/\/podcasts\.apple\.com\/.*\/id(\d+)\b.*[?&]i=(\d+)/;
@@ -68,9 +100,12 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   if (apple) {
     // Apple's lookup finds episodes by their show (the path's id), not by the episode's own id.
     const res = await fetcher(`https://itunes.apple.com/lookup?id=${apple[1]}&entity=podcastEpisode&limit=200`).catch(() => null);
-    const hit = res?.ok ? ((await res.json()) as { results?: Record<string, string>[] }).results?.find((r) => String(r.trackId) === apple[2] && r.episodeUrl) : undefined;
+    const results = res?.ok ? (((await res.json()) as { results?: Record<string, string>[] }).results ?? []) : [];
+    const hit = results.find((r) => String(r.trackId) === apple[2] && r.episodeUrl);
     if (!hit) throw new Error("Couldn’t find that episode’s audio on Apple Podcasts (it may be older than the show’s last 200). Add the episode from the show’s own site instead.");
-    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate };
+    // The show's own feed names the language it speaks.
+    const feed = results.find((r) => r.feedUrl)?.feedUrl;
+    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, language: feed ? await showLanguage(feed, fetcher) : undefined };
   }
   const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
   const html = res?.ok ? await res.text() : "";
@@ -118,5 +153,5 @@ async function spotify(url: string, fetcher: typeof fetch): Promise<Episode> {
   const sameDay = published ? items.filter((i) => i.audio && i.day === published.slice(0, 10)) : [];
   const hit = items.find((i) => i.audio && words(i.title) === want) ?? (sameDay.length === 1 ? sameDay[0] : undefined);
   if (!hit?.audio) throw new Error(`Couldn’t find “${title}” in ${show}’s public feed: it may be only on Spotify. Find the episode on Apple Podcasts or the show’s site and add that link instead.`);
-  return { audio: decodeXml(hit.audio), title, show, published };
+  return { audio: decodeXml(hit.audio), title, show, published, language: feedLanguage(xml) };
 }

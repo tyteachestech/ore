@@ -48,6 +48,7 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "pdf-outline", add: join(FIX, "files/outline.pdf") }, // the PDF outline as chapters
   { name: "pdf-textbook", add: join(FIX, "files/textbook.pdf") }, // margin notes, numbered headings, lists
   { name: "pdf-figures", add: join(FIX, "files/figures.pdf") },
+  { name: "pdf-scripts", add: join(FIX, "files/scripts.pdf") }, // Russian, Greek, Japanese, Chinese, Arabic
   { name: "epub", add: join(FIX, "files/book.epub") }, // make-book-epub.ts
   { name: "word", add: join(FIX, "files/notes.docx") },
   { name: "powerpoint", add: join(FIX, "files/deck.pptx") },

@@ -38,6 +38,8 @@ export interface AddOptions {
   preview?: boolean;
   /** A PDF's tables and formulas as Docling read them (D125), swapped into pdf.js's text. */
   regions?: Region[];
+  /** The speech's language when the episode names it (its feed's), so it is heard in it. */
+  language?: string;
 }
 
 // The first `# ` heading outside fenced code (a `# comment` in a code block is no title).
@@ -103,7 +105,7 @@ const damaged = (what: string, app?: string) => (e: Error): never => {
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
   if (AUDIO_TYPES.includes(kind)) {
     // Speech to a timed transcript, read like a subtitle file's (D96).
-    const vtt = await (await import("./audio.ts")).transcribe(bytes, kind, opts.onProgress);
+    const vtt = await (await import("./audio.ts")).transcribe(bytes, kind, opts.onProgress, opts.language);
     // A podcast host's file name ("17456166-summer-shorts-…") as words, its id dropped.
     const title = fileStem(name).replace(/^\d{5,}[-_ ]+/, "").replace(/[-_]+/g, " ").trim() || fileStem(name);
     return { type: "article", title: title[0]!.toUpperCase() + title.slice(1), url, body: vttToBody(vtt), source: { ext: "vtt", data: vtt } };
@@ -198,7 +200,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
     const ep = await (await import("./audio.ts")).episode(url);
     const res = await get(ep.audio, new URL(ep.audio).host);
     const ext = kindOf(new URL(res.url || ep.audio).pathname, res.headers.get("content-type") ?? "") ?? "mp3";
-    const draft = await fromBytes(await readCapped(res), ext, ep.title ?? "Episode", url, url, opts);
+    const draft = await fromBytes(await readCapped(res), ext, ep.title ?? "Episode", url, url, { ...opts, language: ep.language ?? opts.language });
     return { ...draft, title: ep.title ?? draft.title, author: ep.show, published: ep.published };
   }
   if (VIDEO_SITE.test(url)) {
