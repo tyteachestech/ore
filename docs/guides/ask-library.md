@@ -21,7 +21,7 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 - **Retrieval**, with no AI: did a passage from an expected source holding the evidence reach the AI? CI checks this for all 20 questions on both chats (`packages/core/test/eval-ask.test.ts`), so a search change that loses evidence fails the build for free.
 - **Answer**: every pattern matches the reply.
 - **Citation**: every quote is really at its offsets in its source, and one comes from an expected source and holds the evidence.
-- **Says not there**: an absent question is right only when the reply cites nothing and is marked as not from his sources.
+- **Says not there**: an absent question is right only when the reply cites nothing and says so: labelled general knowledge, or a reply that names his sources or library (a plain refusal). An unlabelled answer with no citation fails.
 - Answer and citation accuracy carry 95% intervals, as in the grading eval.
 
 ## Design decisions

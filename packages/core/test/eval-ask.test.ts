@@ -6,14 +6,18 @@ import { findItem } from "../src/items.ts";
 import { addGolden, ask, loadAskCases, passagesFor, retrieved, scoreAnswer } from "../eval/ask.ts";
 import { tempLibrary } from "./helpers.ts";
 
-const savedPath = process.env.PATH;
-afterEach(() => { process.env.PATH = savedPath; delete process.env.ORE_AI; });
+const saved = { path: process.env.PATH, ai: process.env.ORE_AI };
+afterEach(() => {
+  process.env.PATH = saved.path;
+  if (saved.ai === undefined) delete process.env.ORE_AI;
+  else process.env.ORE_AI = saved.ai;
+});
 /** A fake `claude` that always gives this structured output. */
 function fakeClaude(out: unknown) {
   const dir = mkdtempSync(join(tmpdir(), "ore-fakebin-"));
   writeFileSync(join(dir, "claude"), `#!/usr/bin/env bun\nconsole.log(JSON.stringify({ is_error: false, structured_output: ${JSON.stringify(out)}, modelUsage: { "claude-fake-1": { outputTokens: 5 } } }));\n`);
   chmodSync(join(dir, "claude"), 0o755);
-  process.env.PATH = `${dir}:${savedPath}`;
+  process.env.PATH = `${dir}:${saved.path}`;
   process.env.ORE_AI = "claude";
 }
 
@@ -40,6 +44,11 @@ describe("ask-your-library eval", () => {
     const r = await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?");
     expect(r).toMatchObject({ found: false, outside: true, answer: "Ebbinghaus was born in 1850.", citations: [] });
     expect(r.ai?.prompt_version).toMatch(/^tutor@/);
+    // A plain refusal counts too; an unlabelled answer with no citation doesn't.
+    fakeClaude({ reply: "Your sources don't say when he was born.", citations: [], general: false, hint: false, exercise: null, card: null });
+    expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(true);
+    fakeClaude({ reply: "He was born in 1850.", citations: [], general: false, hint: false, exercise: null, card: null });
+    expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(false);
   });
 
   test("scoring: the answer must hold every pattern; a citation must be real and one must hold the evidence; an absent question must say so", async () => {

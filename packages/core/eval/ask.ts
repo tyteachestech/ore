@@ -50,7 +50,9 @@ export async function ask(lib: Library, chat: Chat, question: string) {
     return { found: r.found, answer: r.answer, citations: r.citations, outside: !r.found, ai: r.ai, usage: r.usage };
   }
   const r = await tutor(lib, question);
-  return { found: r.citations.length > 0, answer: r.reply, citations: r.citations, outside: r.general, ai: r.ai, usage: r.usage };
+  // Not from his sources: labelled general knowledge, or a reply that says his sources don't cover it.
+  const outside = r.general || /\b(sources?|library|notes)\b/i.test(r.reply);
+  return { found: r.citations.length > 0, answer: r.reply, citations: r.citations, outside, ai: r.ai, usage: r.usage };
 }
 
 /** The passages that chat would put in front of the AI for the question. */
@@ -89,8 +91,9 @@ export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", con
     const results = await pool(all, concurrency, async (c): Promise<AskResult> => {
       const start = performance.now();
       const isAbsent = !("answer" in c);
-      const got = isAbsent ? undefined : retrieved(c as AskCase, passagesFor(lib, chat, c.question), names);
+      let got: boolean | undefined;
       try {
+        got = isAbsent ? undefined : retrieved(c as AskCase, passagesFor(lib, chat, c.question), names);
         const r = await ask(lib, chat, c.question);
         if (r.ai) stamp = r.ai;
         return { id: c.id, absent: isAbsent, retrieved: got, found: r.found, answer: r.answer, cited: r.citations.map((x) => `${names.get(x.item)}: ${x.quote}`), ...scoreAnswer(c, r, names, body), ms: Math.round(performance.now() - start), usage: r.usage };
