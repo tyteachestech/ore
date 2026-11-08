@@ -42,10 +42,14 @@ export function addBig(root: string) {
   if (r.exitCode !== 0) throw new Error(`seed-big failed: ${r.stderr.toString().trim()}`);
 }
 
+/** Goldens of pages whose words rewrite-page.ts swapped for learning words at random: noise that
+ *  crowds out the real evidence, so they stay out of the eval's library. */
+const REWRITTEN = new Set(["web-hn-thread", "web-speakerdeck"]);
+
 /** Each golden doc.md as a source in the library; returns item id → golden name. */
 export async function addGolden(lib: Library, dir = GOLDEN): Promise<Map<string, string>> {
   const names = new Map<string, string>();
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".md") && !REWRITTEN.has(basename(f, ".md"))).sort()) {
     const { data, body } = parseFrontmatter<{ type?: string; title?: string; author?: string }>(readFileSync(join(dir, f), "utf8"));
     const type = ItemType.safeParse(data.type).data ?? "article";
     const item = await createItem(lib, { type, title: data.title ?? basename(f, ".md"), author: data.author, body });

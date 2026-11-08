@@ -1,7 +1,7 @@
 import { Readability } from "@mozilla/readability";
 import { Defuddle } from "defuddle/node";
 import { parseHTML } from "linkedom";
-import { cleanAuthor, cleanDate, FROM_TAB } from "./check.ts";
+import { cleanAuthor, cleanDate, escapeMarkdown, FROM_TAB } from "./check.ts";
 import { td } from "./markdown.ts";
 import { notionMarkdown } from "./rendered.ts";
 import { youtubeId } from "./youtube.ts";
@@ -219,6 +219,33 @@ function balanced(tex: string): boolean {
   return depth === 0;
 }
 
+/** Text as one Markdown paragraph that says what it says: no heading, list or quote from its first mark. */
+const paragraph = (s: string) =>
+  escapeMarkdown(s.replace(/\s+/g, " ").trim()).replace(/^(\d+)([.)])/, "$1\\$2").replace(/^([#>+=-])/, "\\$1");
+
+/** A Speaker Deck talk as its slides, the way PowerPoint's come in: each slide's picture, then its
+ *  words from the page's transcript (the site's reader would keep its other decks instead). */
+function speakerDeck(doc: Document, url: string): string | undefined {
+  if (!/^https?:\/\/(?:www\.)?speakerdeck\.com\/[^/]+\/[^/?#]+/.test(url)) return undefined;
+  const slides = [...doc.querySelectorAll("#transcript .slide-transcript")];
+  if (!slides.length) return undefined;
+  let about = doc.querySelector('meta[name="description"]')?.getAttribute("content") ?? "";
+  for (const s of doc.querySelectorAll('script[type="application/ld+json"]')) {
+    try {
+      const ld = JSON.parse(s.textContent ?? "") as { "@type"?: string; description?: string };
+      if (ld["@type"] === "PresentationDigitalDocument" && ld.description) about = ld.description;
+    } catch { /* another script's data */ }
+  }
+  const parts = about.trim() ? [paragraph(about)] : [];
+  slides.forEach((s, i) => {
+    const n = i + 1;
+    const image = s.querySelector("a[href]")?.getAttribute("href")?.match(/^https:\/\/[^\s()]+$/)?.[0];
+    const words = paragraph(s.textContent ?? "");
+    parts.push(`<!-- slide ${n} -->`, `## Slide ${n}`, ...(image ? [`![Slide ${n}](${image})`] : []), ...(words ? [words] : []));
+  });
+  return parts.join("\n\n");
+}
+
 /** A Hacker News thread as Defuddle's reader for it expects: names marked `.hnuser` (HN dropped the
  *  class, so every comment read as "[deleted]"), and no site after the title ("(example.com)").
  *  Returns the poster's name. */
@@ -245,10 +272,11 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);
     const poster = hackerNews(document as unknown as Document, url);
+    const deck = speakerDeck(document as unknown as Document, url);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
-    const markdown = inlineMath(htmlTables(r.content.trim()));
+    const markdown = deck ?? inlineMath(htmlTables(r.content.trim()));
     if (markdown.length > 200) {
       return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
     }

@@ -186,6 +186,24 @@ describe("import coverage: web pages", () => {
     expect(count(b, /^(?:> )+\*\*/gm)).toBe(24); // every comment
   });
 
+  test("slides online (Speaker Deck): every slide's picture and words, in order, not the site's other decks", async () => {
+    // speakerdeck.html: a real deck's page (2026), its words rewritten; the slides' words are in its transcript.
+    const url = "https://speakerdeck.com/jennybc/how-to-name-files";
+    const slides = "https://files.speakerdeck.com/presentations/5e4b07f0d9a94f8e9a29b902bad6ed0b";
+    serve({ [url]: { body: web("speakerdeck.html"), type: HTML }, [`${slides}/slide_0.jpg`]: { body: new Uint8Array(400).fill(7), type: "image/jpeg" } });
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "How to name files", author: "Jennifer (Jenny) Bryan", published: "2015-05-14" });
+    const b = item.body;
+    expect(b).toStartWith("Test-skill session recall index knowledge.");
+    expect(b).toMatch(/\n<!-- slide 1 -->\n\n## Slide 1\n\n!\[Slide 1\]\(assets\/\w+\.jpg\)\n\nsense learn teacher by Jenny Bryan for Understanding Teacher Strength\n/);
+    // A slide's words come in two parts on the page (its title link, then the rest): one paragraph here.
+    expect(b).toContain(`![Slide 3](${slides}/slide_2.jpg)\n\nelaboration.level Idea’s Knowledge Deck Lesson and Forgetting.step chunk 1.mind ﬁg 2.gap`);
+    expect(b).toContain("\n<!-- slide 27 -->\n");
+    expect(count(b, /^## Slide \d+$/gm)).toBe(27);
+    expect(b).not.toContain("More Decks");
+    expect(b).not.toContain("Other Decks");
+  });
+
   test("Wikipedia's formulas: the TeX its authors wrote, inline and on their own line", async () => {
     // wikipedia-math.html: "Forgetting curve" (CC BY-SA 4.0), whose formulas are MathML with their TeX in data-mw.
     const url = "https://en.wikipedia.org/wiki/Forgetting_curve";
