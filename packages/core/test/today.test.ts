@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { findCard, writeCardContent, writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
+import { setItemStatus } from "../src/items.ts";
 import { paths } from "../src/library.ts";
 import { endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
 import type { Review } from "../src/reviews.ts";
@@ -125,6 +126,48 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(dueQueue(lib, T())).toHaveLength(10);
     await setReviewSettings(lib, { new_per_day: 200 });
     expect(dueQueue(lib, T())).toHaveLength(20);
+  });
+
+  test("the relearn passes owed today come after the new cards, which take no place among them (D144, D21)", async () => {
+    const { lib, cards } = await library(12);
+    const day1 = T();
+    for (const c of cards.slice(0, 6)) await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: day1 });
+    const later = new Date(day1.getTime() + 90 * 864e5);
+    await recordReview(lib, cards[0]!.meta.id, { rating: 1, confidence: 3, now: later }); // a miss today owes one pass
+    const q = dueQueue(lib, new Date(later.getTime() + 60_000));
+    expect(q.map((e) => (e.relearn ? "R" : e.due === null ? "N" : "D")).join("")).toBe("DDDDNDNNNNNR");
+    expect(q.at(-1)!.id).toBe(cards[0]!.meta.id);
+  });
+
+  test("a draft written today takes no fifth place; it gets one tomorrow (D65, D144)", async () => {
+    const { lib, cards } = await library(6);
+    const past = new Date(Date.now() - 90 * 864e5);
+    for (const c of cards.slice(0, 5)) await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: past });
+    expect(dueQueue(lib).map((e) => e.due === null)).toEqual([false, false, false, false, false]);
+    expect(dueQueue(lib, T()).map((e) => e.due === null)).toEqual([false, false, false, false, true, false]);
+  });
+
+  test("the new cards' own order is the freshest finished source first (D60), under the skill filter too", async () => {
+    const { lib, item: a, cards } = await library(8);
+    const { item: b } = await addSnippet(lib, { text: "Interleaving beats blocking." });
+    const { item: c } = await addSnippet(lib, { text: "Testing beats rereading." });
+    const draftOn = (item: string, skills: string[], q: string) => writeNewCard(lib, { kind: "card", item, skills, topics: ["spacing"], content_type: "fact", question: q, answer: "A", rubric: [] });
+    const fromB = draftOn(b.meta.id, ["learning"], "B?");
+    const fromC = draftOn(c.meta.id, ["learning"], "C?");
+    const habit = draftOn(c.meta.id, ["habits"], "H?");
+    await setItemStatus(lib, a.meta.id, "done", "2026-01-01T00:00:00Z");
+    await setItemStatus(lib, b.meta.id, "done", "2026-03-01T00:00:00Z");
+    await setItemStatus(lib, c.meta.id, "done", "2026-02-01T00:00:00Z");
+    const day1 = T();
+    for (const card of cards) await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, now: day1 });
+    const later = new Date(day1.getTime() + 90 * 864e5);
+    const fresh = dueQueue(lib, later).filter((e) => e.due === null).map((e) => e.id);
+    expect(fresh).toEqual([fromB.meta.id, fromC.meta.id, habit.meta.id]);
+    // Only the picked skill's new cards take the fifth places; the other skill's wait for their own session.
+    const picked = dueQueue(lib, later, { skills: ["learning"] });
+    expect(picked.flatMap((e, i) => (e.due === null ? [i] : []))).toEqual([4, 9]);
+    expect(picked.filter((e) => e.due === null).map((e) => e.id)).toEqual([fromB.meta.id, fromC.meta.id]);
+    expect(dueQueue(lib, later, { skills: ["habits"] }).map((e) => e.id)).toEqual([habit.meta.id]);
   });
 
   test("--skill keeps only cards of the picked skills", async () => {
