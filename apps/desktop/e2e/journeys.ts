@@ -185,6 +185,18 @@ journey("PDF footnote: its mark shows the note on hover, and bold stays bold", a
   await page.locator(".tip.note").waitFor({ state: "detached" });
 });
 
+journey("footnote: a long note's hover preview shows all of it (only a highlight note's is cut to six lines)", async (page) => {
+  const note = "The note goes on at length, as a book's notes do, so the preview has to hold every line of it. ".repeat(9) + "The last words.";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# Notes at length\n\nA claim that needs a note.[^1] Then more text.\n\n[^1]: ${note}\n`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc a.fn").first().hover();
+  const tip = page.locator(".tip.note");
+  await tip.getByText("The last words.", { exact: false }).waitFor();
+  const cut = await tip.evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+  if (cut) throw new Error("the footnote's preview is cut short");
+});
+
 journey("PDF tables: read in the background after adding, Undo puts the lines back, one click reads them again", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill(join(FIXTURES, "tables.pdf"));

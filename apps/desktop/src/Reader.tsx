@@ -2685,13 +2685,14 @@ function ReaderView(p: Props & { reload: () => void }) {
         </div>
       </div>
       {tip && !popup && (
-        // A note's preview stays on screen at a phone's width too, and in the window: at most six lines
-        // (styles.css), above the pointer when there is no room below. Never over an open popup.
+        // A preview stays on screen at a phone's width too. A highlight note's is at most six lines
+        // (styles.css), above the pointer when there is no room below; a footnote's is whole, below its
+        // mark. Never over an open popup.
         <div
           className={tip.id.startsWith("fn:") ? "tip note" : "tip"}
           style={{
             left: Math.max(12, Math.min(tip.x + 12, innerWidth - Math.min(tip.id.startsWith("fn:") ? 360 : 320, innerWidth - 24) - 12)),
-            ...(tip.y + 18 + TIP_HEIGHT <= innerHeight ? { top: tip.y + 18 } : { bottom: innerHeight - tip.y + 10 }),
+            ...(tip.id.startsWith("fn:") || tip.y + 18 + TIP_HEIGHT <= innerHeight ? { top: tip.y + 18 } : { bottom: innerHeight - tip.y + 10 }),
           }}
         >
           {tip.text}
