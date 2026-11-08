@@ -1955,6 +1955,7 @@ export function App() {
     </>
   );
 
+  const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} />;
   return (
     <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
@@ -2013,15 +2014,19 @@ export function App() {
       />
 
       <main className="main">
-        {/* Add stays in sight on Home and All sources (Raindrop's + Add); a skill page has its own in Sources. */}
-        {!openId && !onSkillPage && (
+        {/* Add stays in sight on Home and All sources (Raindrop's + Add); a skill page has its own in Sources.
+            The tutor's ✦ sits in the title bar left of it, or of the reader's panel toggle (D136). */}
+        {!openId && !onSkillPage ? (
           <div className="main-tools">
+            {tutorButton}
             <Hint text="Add a link, file or text" keys="add">
               <button className="note-toggle" onClick={() => setAdding(true)}>
                 + Add
               </button>
             </Hint>
           </div>
+        ) : (
+          tutorButton
         )}
         <Boundary key={`${openId}-${skill}-${place}`} onBack={goHome}>
         {openId ? (
@@ -2124,7 +2129,6 @@ export function App() {
         )}
         </Boundary>
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
-        {!tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} />}
       </main>
       {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
         // The note takes the room while he writes; the tutor comes back with what he sent (D128.6).

@@ -452,12 +452,12 @@ function Answer({ text, citations, general, onOpen }: { text: string; citations:
   );
 }
 
-/** The bubble at the window's bottom right that opens the tutor. */
+/** The ✦ in the title bar that opens the tutor (D136): beside Add, or the reader's panel toggle. */
 export function TutorBubble({ onOpen }: { onOpen: () => void }) {
   return (
-    <Hint text="Tutor" keys="tutor" side="left">
+    <Hint text="Tutor" keys="tutor">
       <button className="tutor-bubble" aria-label="Open the tutor" onClick={onOpen}>
-        <Sparkle size={18} aria-hidden="true" />
+        <Sparkle size={16} aria-hidden="true" />
       </button>
     </Hint>
   );
