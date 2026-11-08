@@ -99,7 +99,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [error, setError] = useState<string | null>(null);
   /** Bumped by Try again after a card failed to load: loads the same card again, the session as it was. */
   const [loadTry, setLoadTry] = useState(0);
-  const retryLoad = () => setLoadTry((n) => n + 1);
+  /** Bumped by Try again after the session failed to start (`ore` down): starts it again. */
+  const [startTry, setStartTry] = useState(0);
+  const retryLoad = () => (queue ? setLoadTry : setStartTry)((n) => n + 1);
   const shownAt = useRef(Date.now());
   /** When the answer showed: a rating key right after it is the confidence key pressed twice. */
   const shownAnswerAt = useRef(0);
@@ -142,6 +144,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   useEffect(() => {
     let live = true;
+    setError(null);
     void (async () => {
       try {
         const started = ore<{ id: string }>("session", "start");
@@ -173,7 +176,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       if (s?.open) void ore("session", "end", s.id).catch(() => {});
       session.current = null;
     };
-  }, [pick]);
+  }, [pick, startTry]);
 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
   // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
@@ -700,7 +703,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       return;
     }
     if (!card) {
-      if (e.key === "Enter" && onSurface && error && entry) {
+      if (e.key === "Enter" && onSurface && error && (entry || !queue)) {
         e.preventDefault();
         retryLoad();
       }
@@ -812,7 +815,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         {error && (
           <p className="err">
             {error}
-            {entry && !card && (
+            {(!queue || (entry && !card)) && (
               <>
                 {" "}
                 <Hint text={<>Try again <kbd>↵</kbd></>}>

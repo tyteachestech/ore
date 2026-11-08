@@ -3552,6 +3552,20 @@ journey("finish quiz: while Check saves, his answer and how sure he is stay as s
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
+journey("review that can't start because ore failed offers Try again, focused, which starts it", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { due: "The `ore` command isn’t answering." }));
+  await page.getByRole("button", { name: "Start review" }).click();
+  await page.getByRole("dialog", { name: "What to review" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator(".review .err").filter({ hasText: "isn’t answering" }).waitFor();
+  const retry = page.locator(".review").getByRole("button", { name: "Try again" });
+  await until("Try again is focused", () => retry.evaluate((el) => el === document.activeElement));
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await page.keyboard.press("Enter");
+  await page.locator(".review-q").waitFor();
+  await page.keyboard.press("Escape");
+});
+
 journey("review: a card that fails to load offers Try again, focused, which loads it without losing the rating before it; Undo clears the error", async (page) => {
   const q = page.locator(".review-q");
   const session = page.locator(".review [role=progressbar]").first();
