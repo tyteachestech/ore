@@ -5,6 +5,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { still } from "./SideCursor";
 import { PixelKeep, PixelQuestion, PixelStar, PixelTry } from "./PixelIcon";
 import { INTENTS, PHONE, type Annotation, type Intent } from "./ore";
+import { passageText } from "./text";
 import { load, save } from "./util";
 
 // D118: one highlight; a key point (`card` in the files) is a highlight he marked to come back, and the AI
@@ -214,7 +215,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
       <WithMenu key={a.id} actions={actions && !PHONE ? () => actions(a) : []}>
         <div className="cp-line">
           <button className={`cp-row${a.point ? " point" : ""}`} onClick={() => onJump(a.id)}>
-            <span className="cp-text">{a.point || (a.note && a.intent !== "keep") ? a.note : a.exact}</span>
+            <span className="cp-text">{a.point || (a.note && a.intent !== "keep") ? a.note : passageText(a.exact)}</span>
             {t && <span className="cp-time">{t}</span>}
           </button>
           {actions && !PHONE && <MoreButton label="Highlight actions" actions={() => actions(a)} />}

@@ -80,9 +80,11 @@ function entity(ref: string): string | null {
   return named === false ? null : named;
 }
 
-/** Skeleton of Markdown source; `map[i]` is the source offset of skeleton char i. Syntax is looked
- *  for outside code only, so a `# comment`, `List<String>` or `echo $$` in code stays text. */
-export function sourceSkeleton(md: string): Skeleton {
+/** What of Markdown source shows on the page: `mask` 1 hides a character, `sub` gives one that shows
+ *  as other text (a character reference), `code` marks code. Syntax is looked for outside code only, so a
+ *  `# comment`, `List<String>` or `echo $$` in code stays text. Emphasis, code and link brackets are left
+ *  to the caller (the skeleton ignores them everywhere). */
+function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<number, string> } {
   const code = codeOf(md);
   // Code is blanked out (same length, lines kept), so the patterns below never match inside it.
   let prose = md;
@@ -125,6 +127,12 @@ export function sourceSkeleton(md: string): Skeleton {
     sub.set(m.index, text);
     mask.fill(1, m.index + 1, m.index + m[0].length);
   }
+  return { code, mask, sub };
+}
+
+/** Skeleton of Markdown source; `map[i]` is the source offset of skeleton char i. */
+export function sourceSkeleton(md: string): Skeleton {
+  const { mask, sub } = shown(md);
   const parts: string[] = [];
   const map: number[] = [];
   for (let i = 0; i < md.length; i++) {
@@ -137,6 +145,46 @@ export function sourceSkeleton(md: string): Skeleton {
     }
   }
   return { chars: parts.join(""), map };
+}
+
+/** A passage's Markdown as it reads on the page, on one line (a highlight in a list): `a [link](…)` is
+ *  "a link", `\#` "#", `**bold**` "bold"; code keeps every character. */
+export function passageText(md: string): string {
+  const { code, mask, sub } = shown(md);
+  const syntax = (i: number) => !mask[i] && code[i] !== 1 && md[i - 1] !== "\\";
+  // A closed pair of brackets that isn't a link's is text ("[1]"); one the passage's edge cuts off is a link's.
+  const text = new Set<number>();
+  const open: number[] = [];
+  for (let i = 0; i < md.length; i++) {
+    if (!syntax(i)) continue;
+    if (md[i] === "[") open.push(i);
+    else if (md[i] === "]" && open.length) {
+      const o = open.pop()!;
+      if (md[i + 1] !== "(" && md[i + 1] !== "[") text.add(o).add(i);
+    }
+  }
+  const word = (c: string | undefined) => !!c && /[\p{L}\p{N}]/u.test(c);
+  let out = "";
+  for (let i = 0; i < md.length; i++) {
+    if (mask[i]) continue;
+    const c = md[i]!;
+    if (syntax(i)) {
+      if (c === "`" || ((c === "[" || c === "]") && !text.has(i)) || (c === "~" && (md[i + 1] === "~" || md[i - 1] === "~"))) continue;
+      if (c === "*" || c === "_") {
+        // Emphasis: a run that touches a word on one side; an underscore inside a word is text.
+        let a = i;
+        let b = i;
+        while (md[a - 1] === c) a--;
+        while (md[b + 1] === c) b++;
+        const before = md[a - 1];
+        const after = md[b + 1];
+        const flanks = (!!before && !/\s/.test(before)) || (!!after && !/\s/.test(after));
+        if (flanks && !(c === "_" && word(before) && word(after))) continue;
+      }
+    }
+    out += sub.get(i) ?? c;
+  }
+  return out.replace(/\s+/g, " ").trim();
 }
 
 /** Skeleton of plain rendered text. */

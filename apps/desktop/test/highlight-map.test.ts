@@ -163,3 +163,15 @@ describe("golden imports: source and rendered skeletons agree", () => {
     });
   }
 });
+
+// Collected lists a highlight by its passage, which is Markdown source (reader-10): it reads as the page shows it.
+test("a passage reads as the page shows it, not as its Markdown", async () => {
+  const { passageText } = await import("../src/text");
+  expect(passageText("and a [link to the")).toBe("and a link to the");
+  expect(passageText("Generic types like `Map<Key>` show up in")).toBe("Generic types like Map<Key> show up in");
+  expect(passageText("Literal hash: \\# not a heading.")).toBe("Literal hash: # not a heading.");
+  expect(passageText("words**, _italic")).toBe("words, italic");
+  expect(passageText('see [the docs](https://x.y/a_(b) "T") and [1], ~~gone~~')).toBe("see the docs and [1], gone");
+  expect(passageText("scope_test and 5 * 3, Tom &amp; Jerry")).toBe("scope_test and 5 * 3, Tom & Jerry");
+  expect(passageText("- one\n- two `a*b_c`")).toBe("one two a*b_c");
+});
