@@ -3239,7 +3239,24 @@ journey("finish: drafting that fails after Done stays in front of “Finished”
   if (!front.includes("weren’t drafted")) throw new Error(`the toast in front is “${front}”, not the drafting failure`);
   // Try again is the only way back to the cards, so the failure stays until he acts on it.
   if (!(await failure.getByRole("button", { name: "Dismiss" }).count())) throw new Error("the drafting failure goes away by itself");
+  // A second source that fails too: one toast says both, and its Try again drafts both.
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Drafting that fails again\n\nAnother short page whose cards can't be drafted either.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("Another short page whose cards").waitFor();
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  const both = page.locator(".toast").filter({ hasText: "Cards for 2 sources weren’t drafted: Codex isn’t installed." });
+  await both.waitFor();
+  await page.waitForTimeout(300);
+  const failures = await page.locator(".toast").filter({ hasText: "weren’t drafted" }).count();
+  if (failures !== 1) throw new Error(`${failures} drafting failures stacked`);
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  const drafted: string[] = [];
+  page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["enrich"') && drafted.push(r.postData()!));
+  await both.getByRole("button", { name: "Try again" }).click();
+  await until("Try again drafts both", async () => drafted.length === 2);
 });
 
 journey("undo that fails: the toast says why, and ⌘Z tries the same step again", async (page) => {

@@ -39,6 +39,21 @@ const SURE = ["Guess", "Think so", "Sure"] as const;
 type Draft = { step: number; recall: string; answers: string[]; conf: (number | undefined)[]; use: string; leave: string; qs: Prequestion[] };
 const drafts = new Map<string, Draft>();
 
+/** Sources whose cards failed to draft, each with its retry: one toast says them all (the latest reason),
+ *  and its Try again drafts them all, so a second failure never hides the first one's way back. */
+const undrafted = new Map<string, { title: string; run: () => Promise<void> }>();
+function sayUndrafted(notify: Notify, why: string) {
+  const left = [...undrafted.values()];
+  if (!left.length) return;
+  const what = left.length === 1 ? `Cards for “${left[0]!.title}”` : `Cards for ${left.length} sources`;
+  const again = () => {
+    const runs = [...undrafted.values()];
+    undrafted.clear();
+    for (const r of runs) void r.run();
+  };
+  notify(`${what} weren’t drafted: ${why}`, "error", undefined, undefined, again, true, "drafting");
+}
+
 /** The finish step as a quiz panel beside the blurred source (D52 to D56): free recall first, then
  *  each prequestion is answered, rated for confidence and checked against its key points, with the
  *  source shown only after the attempt. */
@@ -151,8 +166,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     // Its Try again is the only way back to the cards, so the failure stays until he acts on it.
     const run = (): Promise<void> =>
       ore("enrich", doc.id).then(
-        () => {},
-        (e) => void back.then(() => notify(`Cards for “${doc.title}” weren’t drafted: ${errorText(e)}`, "error", undefined, undefined, () => void run(), true)),
+        () => void undrafted.delete(doc.id),
+        (e) => {
+          undrafted.set(doc.id, { title: doc.title, run });
+          void back.then(() => sayUndrafted(notify, errorText(e)));
+        },
       );
     if (feedbackRun.current) void feedbackRun.current.finally(run);
     else void run();
