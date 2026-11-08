@@ -1,10 +1,10 @@
-import { GraduationCap } from "./icons";
+import { GraduationCap, X } from "./icons";
 import { Command } from "cmdk";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SkillIcon } from "./IconPicker";
 import { isOther } from "../../../packages/core/src/collection-name";
 import { LABEL } from "./Collected";
-import { courseThumb, lessonsOf, nextLesson, ore, opt, type Intent, type Item, type SearchHit, type Skill } from "./ore";
+import { courseThumb, lessonsOf, nextLesson, ore, opt, PHONE, touched, type Intent, type Item, type SearchHit, type Skill } from "./ore";
 import { Thumb } from "./Thumb";
 import { errorText, useFocusWhileMounted } from "./util";
 
@@ -22,8 +22,8 @@ type Props = {
   onSkillNote: (id: string, words: string) => void;
   /** Opens a source; `at` is where to land in it (Reader's `jumpTo`). */
   onOpen: (item: string, at?: string) => void;
-  /** Ask your library: the query as a question to his sources. */
-  onAsk: (question: string) => void;
+  /** Ask your library: the query as a question to his sources. Left out on the phone (AI runs on the Mac). */
+  onAsk?: (question: string) => void;
   /** A skill made from the palette (New skill, New collection). */
   onCreated: (s: Skill) => void;
   onClose: () => void;
@@ -53,6 +53,8 @@ const TITLES = 8;
 export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, onCreated, onClose }: Props) {
   const [q, setQ] = useState("");
   const [page, setPage] = useState<Page | null>(null);
+  const byRecent = useMemo(() => [...items].sort((a, b) => touched(b).localeCompare(touched(a))), [items]);
+  const touchedAt = useMemo(() => new Map(items.map((i) => [i.id, touched(i)])), [items]);
   const [hits, setHits] = useState<Hit[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,7 +69,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
     if (page || query.length < 2) return setHits([]);
     let live = true;
     const t = setTimeout(() => {
-      ore<SearchHit[]>("search", query, "--limit", "20").then(
+      ore<SearchHit[]>("search", query, "--limit", PHONE ? "500" : "20").then(
         (rows) => {
           if (!live) return;
           // One row per match, each landing on its own place: the words in the text, a highlight's popup,
@@ -190,7 +192,8 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
               };
             }),
             // A lesson names its course, as on Home: "Skills" alone doesn't say which course it is from.
-            ...items.map((i) => ({ value: `source ${i.id}`, score: titleScore(i.title, query), label: sourceLabel(i), extra: i.course && <span className="sub course-of">{i.course.title}</span>, run: () => onOpen(i.id) })),
+            // Last touched first, so among equally good matches the one he had open lately leads (sort is stable).
+            ...byRecent.map((i) => ({ value: `source ${i.id}`, score: titleScore(i.title, query), label: sourceLabel(i), extra: i.course && <span className="sub course-of">{i.course.title}</span>, run: () => onOpen(i.id) })),
           ]
         : [],
       undefined,
@@ -229,7 +232,8 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
       // so a title match is never pushed down by a word deep in a long source.
       group(
         "In the text",
-        hits
+        // The phone's SQLite has no bm25 (phone/sqlite.ts), so its hits come last touched first.
+        (PHONE ? [...hits].sort((a, b) => (touchedAt.get(b.item ?? "") ?? "").localeCompare(touchedAt.get(a.item ?? "") ?? "")) : hits)
           .filter((h) => !h.item || !titled.has(h.item))
           .map((h) => ({
             value: h.key,
@@ -247,7 +251,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
         0.01,
       ),
       // Ask your library (Notion's "Ask AI" in search): first when the query reads as a question, else last.
-      group("Ask", query.length > 1 ? [{ value: "ask", label: <>Ask your library: “{query}”</>, run: () => onAsk(query) }] : [], asksQuestion(query) ? 2 : 0.005),
+      group("Ask", onAsk && query.length > 1 ? [{ value: "ask", label: <>Ask your library: “{query}”</>, run: () => onAsk(query) }] : [], asksQuestion(query) ? 2 : 0.005),
     ];
   }
   groups = groups.filter((g) => g.rows.length).sort((a, b) => b.score - a.score);
@@ -310,19 +314,27 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
           }
         }}
       >
-        <Command.Input
-          ref={inputRef}
-          className="panel-input"
-          value={q}
-          onValueChange={(v) => {
-            setQ(v);
-            setError(null);
-          }}
-          readOnly={busy}
-          placeholder={placeholder}
-          spellCheck={false}
-          autoComplete="off"
-        />
+        <div className="palette-field">
+          <Command.Input
+            ref={inputRef}
+            className="panel-input"
+            value={q}
+            onValueChange={(v) => {
+              setQ(v);
+              setError(null);
+            }}
+            readOnly={busy}
+            placeholder={placeholder}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          {/* The phone has no Esc to leave with, and the sheet fills the screen. */}
+          {PHONE && (
+            <button className="palette-close" aria-label="Close" onClick={onClose}>
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
+        </div>
         <Command.List>
           {!page && <Command.Empty>No matches</Command.Empty>}
           {groups.map((g) => (
