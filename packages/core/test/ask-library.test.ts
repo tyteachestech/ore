@@ -63,6 +63,38 @@ describe("Ask your library: retrieval", () => {
     expect(queryTerms("What happens to a card you get wrong in the Leitner boxes?")).toEqual(["happen", "card", "get", "wrong", "leitner", "box"]);
   });
 
+  test("a stem matches every form of the word: memories and memory, studying and study", () => {
+    expect(queryTerms("memories memory studying study studies")).toEqual(["memor", "stud"]);
+    expect(queryTerms("days day keys quizzing quiz stopped stop")).toEqual(["day", "key", "quiz", "stop"]);
+  });
+
+  test("a stem never gets so short it matches other words: carry stays off card, added off adaptive", () => {
+    expect(queryTerms("carry carries carried")).toEqual(["carr"]);
+    expect(queryTerms("added add")).toEqual(["add"]);
+    expect(queryTerms("very many only notes miss")).toEqual(["very", "many", "only", "note", "miss"]);
+  });
+
+  test("BM25: a short passage about the question beats a long one that mentions its words once, wherever it sits", async () => {
+    const lib = await tempLibrary();
+    const filler = Array.from({ length: 60 }, (_, i) => `Filler sentence ${i} about many other things entirely.`).join(" ");
+    const body = `## History
+
+The Leitner system and many other things. ${filler}
+
+## Origin
+
+The Leitner system was proposed by Sebastian Leitner, who wrote about the Leitner system in the 1970s.`;
+    await createItem(lib, { type: "article", title: "Boxes", body });
+    expect(retrieve(lib, "Who came up with the Leitner system?")[0]!.heading).toBe("Origin");
+  });
+
+  test("a long passage that names a word never scores below one that only sits under it in the title", async () => {
+    const lib = await tempLibrary();
+    const filler = (n: number) => Array.from({ length: n }, (_, i) => `Filler sentence ${i} about other things.`).join(" ");
+    await createItem(lib, { type: "article", title: "Leitner", body: `## B\n\nBoxes in Leitner order. ${filler(60)}\n\n## A\n\nBoxes are reviewed often. ${filler(60)}${Array.from({ length: 8 }, (_, i) => `\n\n## S${i}\n\nShort one.`).join("")}` });
+    expect(retrieve(lib, "Leitner boxes")[0]!.heading).toBe("B");
+  });
+
   test("a source splits into paragraphs under their headings, at their place in doc.md; page markers and bare images are left out", () => {
     const ps = splitPassages(LEITNER);
     expect(ps.map((p) => [p.heading, p.text.slice(0, 20)])).toEqual([["Boxes", "Intro line."], ["The Leitner system", "Cards you answer cor"], ["Sleep", "Consolidation happen"]]);

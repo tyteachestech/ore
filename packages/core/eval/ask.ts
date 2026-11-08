@@ -3,7 +3,7 @@
 // answer accuracy, citation accuracy and whether it says so when the library doesn't hold the answer.
 // It asks the tutor (D128), the chat the app ships; `--chat ask` asks `ore ask-library` instead. It
 // spends real AI usage, so it runs only by hand: `bun run eval:ask` (never in CI). Flags as for
-// eval:grade: --vendor claude|codex, --model <id>.
+// eval:grade: --vendor claude|codex, --model <id>; --library big adds seed-big's ~240 sources around the golden docs.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { z } from "zod";
@@ -15,16 +15,32 @@ import { createItem, findItem, ItemType } from "../src/items.ts";
 import type { Library } from "../src/library.ts";
 import { columns, costText, pct, pool, range, resultPath, setId, wilson, withVendor } from "./grade.ts";
 
-const Case = z.strictObject({ id: z.string(), question: z.string(), sources: z.array(z.string()).min(1), answer: z.array(z.string()).min(1), evidence: z.string() });
+// The harder set's extras: `earlier`, a conversation the question follows up; `reading`, the golden doc
+// open in the reader ("this"); `all_sources`, the answer needs every source in `sources`, each cited.
+const Case = z.strictObject({
+  id: z.string(), question: z.string(), sources: z.array(z.string()).min(1), answer: z.array(z.string()).min(1), evidence: z.string(),
+  group: z.enum(["paraphrase", "follow-up", "reading", "two-source"]).optional(),
+  earlier: z.array(z.strictObject({ message: z.string(), reply: z.string() })).optional(),
+  reading: z.string().optional(),
+  all_sources: z.boolean().optional(),
+});
 // `outside`: patterns the answer from outside his library (the web or general knowledge) must hold, when the fact is settled.
 const Absent = z.strictObject({ id: z.string(), question: z.string(), outside: z.array(z.string()).optional() });
 export type AskCase = z.infer<typeof Case>;
 
 export function loadAskCases(path = join(import.meta.dir, "ask-cases.json")) {
-  return z.object({ cases: z.array(Case), absent: z.array(Absent) }).parse(JSON.parse(readFileSync(path, "utf8")));
+  return z.object({ cases: z.array(Case), hard: z.array(Case.required({ group: true })), absent: z.array(Absent) }).parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
 export const GOLDEN = join(import.meta.dir, "../test/golden");
+/** A year of use, ~240 generated sources, many on the same topics as the golden docs (`--library big`). */
+const SEED_BIG = join(import.meta.dir, "../../../apps/desktop/scripts/mock/seed-big.ts");
+
+/** Fills a library with seed-big's ~240 sources, so the golden docs compete for the eight places a search keeps. */
+export function addBig(root: string) {
+  const r = Bun.spawnSync([process.execPath, SEED_BIG, root], { stdout: "ignore", stderr: "pipe" });
+  if (r.exitCode !== 0) throw new Error(`seed-big failed: ${r.stderr.toString().trim()}`);
+}
 
 /** Each golden doc.md as a source in the library; returns item id → golden name. */
 export async function addGolden(lib: Library, dir = GOLDEN): Promise<Map<string, string>> {
@@ -50,13 +66,17 @@ const NOT = String.raw`\b(?:don'?t|doesn'?t|do not|does not|isn'?t|aren'?t|no|no
  *  "that's not in your notes"). */
 export const saysNotThere = (reply: string) => new RegExp(`${NOT}[^]{0,80}?${WHERE}|${WHERE}[^]{0,80}?${NOT}`, "i").test(reply.replace(/[’‘]/g, "'"));
 
-/** Asks one chat a question the way the app does: the tutor with nothing open, or `ore ask-library`. */
-export async function ask(lib: Library, chat: Chat, question: string) {
+/** A question as the app would send it: what came before, and the source open in the reader. */
+export interface Asked { question: string; earlier?: { message: string; reply: string }[]; item?: string }
+
+/** Asks one chat a question the way the app does: the tutor with nothing open (or `item` open), or `ore ask-library`. */
+export async function ask(lib: Library, chat: Chat, q: string | Asked) {
+  const { question, earlier = [], item } = typeof q === "string" ? { question: q } : q;
   if (chat === "ask") {
-    const r = await askLibrary(lib, question);
+    const r = await askLibrary(lib, question, earlier.map((t) => ({ question: t.message, answer: t.reply })));
     return { found: r.found, answer: r.answer, citations: r.citations, web: [], outside: !r.found, general: false, searched: false, ai: r.ai, usage: r.usage };
   }
-  const r = await tutor(lib, question);
+  const r = await tutor(lib, question, { earlier, item });
   const citations = r.citations.filter((c): c is Citation => !("url" in c));
   const web = r.citations.filter((c): c is WebCitation => "url" in c);
   // Not from his sources: the reply says his sources don't hold it. With no passage cited, the "Not from
@@ -66,17 +86,32 @@ export async function ask(lib: Library, chat: Chat, question: string) {
   return { found: citations.length > 0, answer: r.reply, citations, web, outside, general: r.general, searched: r.searched, ai: r.ai, usage: r.usage };
 }
 
-/** The passages that chat would put in front of the AI for the question. */
-export const passagesFor = (lib: Library, chat: Chat, question: string): Passage[] => (chat === "ask" ? retrieve(lib, question) : tutorPassages(lib, question));
+/** The passages that chat would put in front of the AI for the question, with its follow-up and open source as the chat uses them. */
+export function passagesFor(lib: Library, chat: Chat, q: string | Asked): Passage[] {
+  const { question, earlier = [], item } = typeof q === "string" ? { question: q } : q;
+  return chat === "ask"
+    ? retrieve(lib, [...earlier.slice(-3).map((t) => t.message), question].join(" "))
+    : tutorPassages(lib, [...earlier.slice(-2).map((t) => t.message), question].join(" "), { item });
+}
+
+/** A case as the app would ask it: its golden `reading` doc is the open source. */
+export const asked = (c: AskCase | z.infer<typeof Absent>, names: Map<string, string>): Asked => {
+  const reading = "reading" in c && c.reading ? [...names].find(([, n]) => n === c.reading)?.[0] : undefined;
+  if ("reading" in c && c.reading && !reading) throw new Error(`${c.id}: no golden doc ${c.reading}`);
+  return { question: c.question, earlier: "earlier" in c ? c.earlier : undefined, item: reading };
+};
 
 /** Retrieval, before any AI: the passages from expected sources hold the evidence and every part of
- *  the answer (all three forms of a list, not just one). A miss here is the search's, not the model's. */
+ *  the answer (all three forms of a list, not just one), and a two-source question gets passages from
+ *  each. A miss here is the search's, not the model's. */
 export function retrieved(c: AskCase, ps: Passage[], names: Map<string, string>): boolean {
-  const text = ps.filter((p) => c.sources.includes(names.get(p.item) ?? "")).map((p) => p.text).join("\n\n");
+  const from = ps.filter((p) => c.sources.includes(names.get(p.item) ?? ""));
+  if (c.all_sources && !c.sources.every((s) => from.some((p) => names.get(p.item) === s))) return false;
+  const text = from.map((p) => p.text).join("\n\n");
   return [c.evidence, ...c.answer].every((r) => new RegExp(r, "i").test(text));
 }
 
-export interface AskResult { id: string; absent: boolean; retrieved?: boolean; found?: boolean; outside?: boolean; general?: boolean; searched?: boolean; answer?: string; cited?: string[]; answer_ok: boolean; citation_ok: boolean; ms: number; usage?: Usage | null; error?: string }
+export interface AskResult { id: string; group?: string; absent: boolean; retrieved?: boolean; found?: boolean; outside?: boolean; general?: boolean; searched?: boolean; answer?: string; cited?: string[]; answer_ok: boolean; citation_ok: boolean; ms: number; usage?: Usage | null; error?: string }
 
 /** Answer: every pattern matches. Citations: every quote is really where it says, and one is from an
  *  expected source and holds the evidence. An absent question is right when the reply says the answer
@@ -88,47 +123,58 @@ export function scoreAnswer(c: AskCase | z.infer<typeof Absent>, r: Answer, name
   if (!("answer" in c)) return { answer_ok: r.outside && (c.outside ?? []).every((p) => new RegExp(p, "i").test(r.answer)), citation_ok: real };
   const answer_ok = r.found && c.answer.every((p) => new RegExp(p, "i").test(r.answer));
   const hit = r.citations.some((x) => c.sources.includes(names.get(x.item) ?? "") && new RegExp(c.evidence, "i").test(x.quote));
-  return { answer_ok, citation_ok: r.found && r.citations.length > 0 && real && hit };
+  // A two-source answer cites each of them.
+  const each = !c.all_sources || c.sources.every((s) => r.citations.some((x) => names.get(x.item) === s));
+  return { answer_ok, citation_ok: r.found && r.citations.length > 0 && real && hit && each };
 }
 
-export interface AskRun { vendor: Vendor; chat: Chat; model: string; prompt_version: string; retrieval: string; answer_accuracy: number; answer_ci95: [number, number]; citation_accuracy: number; citation_ci95: [number, number]; says_absent: string; then_answers: number; web_cited: number; searched_needlessly: number; answered: string; cited: string; errors: number; wall_s: number; median_ms: { answerable: number; absent: number }; cost_usd?: number; input_tokens: number; output_tokens: number; cases: AskResult[] }
+export interface AskRun { vendor: Vendor; chat: Chat; library: "golden" | "big"; model: string; prompt_version: string; retrieval: string; answer_accuracy: number; answer_ci95: [number, number]; citation_accuracy: number; citation_ci95: [number, number]; says_absent: string; then_answers: number; web_cited: number; searched_needlessly: number; harder: { retrieval: string; answered: string; cited: string; groups: Record<string, { retrieval: string; answered: string; cited: string }> }; answered: string; cited: string; errors: number; wall_s: number; median_ms: { answerable: number; absent: number }; cost_usd?: number; input_tokens: number; output_tokens: number; cases: AskResult[] }
 
-export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", concurrency = 4): Promise<AskRun> {
-  const { cases, absent } = loadAskCases();
+export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", concurrency = 4, big = false): Promise<AskRun> {
+  const { cases, hard, absent } = loadAskCases();
   return withVendor(vendor, model, async (root) => {
     const lib = { root };
+    if (big) addBig(root);
     const names = await addGolden(lib);
     const bodies = new Map<string, string>();
     const body = (id: string) => bodies.get(id) ?? bodies.set(id, findItem(lib, id).body).get(id)!;
     let stamp = { model: model ?? "", prompt_version: "" };
     const t0 = performance.now();
-    const all = [...cases, ...absent];
+    // `ore ask-library` has no open source, so the questions about one ("how does this say…") are the tutor's only.
+    const all = [...cases, ...hard.filter((c) => chat === "tutor" || !c.reading), ...absent];
     const results = await pool(all, concurrency, async (c): Promise<AskResult> => {
       const start = performance.now();
       const isAbsent = !("answer" in c);
       let got: boolean | undefined;
       try {
-        got = isAbsent ? undefined : retrieved(c as AskCase, passagesFor(lib, chat, c.question), names);
-        const r = await ask(lib, chat, c.question);
+        got = isAbsent ? undefined : retrieved(c as AskCase, passagesFor(lib, chat, asked(c, names)), names);
+        const r = await ask(lib, chat, asked(c, names));
         if (r.ai) stamp = r.ai;
-        return { id: c.id, absent: isAbsent, retrieved: got, found: r.found, outside: r.outside, general: r.general, searched: r.searched, answer: r.answer, cited: [...r.citations.map((x) => `${names.get(x.item)}: ${x.quote}`), ...r.web.map((x) => `${x.url}: ${x.quote}`)], ...scoreAnswer(c, r, names, body), ms: Math.round(performance.now() - start), usage: r.usage };
+        return { id: c.id, ...("group" in c && c.group ? { group: c.group } : {}), absent: isAbsent, retrieved: got, found: r.found, outside: r.outside, general: r.general, searched: r.searched, answer: r.answer, cited: [...r.citations.map((x) => `${names.get(x.item)}: ${x.quote}`), ...r.web.map((x) => `${x.url}: ${x.quote}`)], ...scoreAnswer(c, r, names, body), ms: Math.round(performance.now() - start), usage: r.usage };
       } catch (e) {
-        return { id: c.id, absent: isAbsent, retrieved: got, answer_ok: false, citation_ok: false, ms: Math.round(performance.now() - start), error: (e as Error).message };
+        return { id: c.id, ...("group" in c && c.group ? { group: c.group } : {}), absent: isAbsent, retrieved: got, answer_ok: false, citation_ok: false, ms: Math.round(performance.now() - start), error: (e as Error).message };
       }
     });
-    const answerable = results.filter((r) => !r.absent);
-    const none = results.filter((r) => r.absent);
     const n = (xs: AskResult[], k: "answer_ok" | "citation_ok") => xs.filter((x) => x[k]).length;
+    // The 20 plain questions keep the headline numbers comparable across runs; the harder set is its own line.
+    const answerable = results.filter((r) => !r.absent && !r.group);
+    const harder = results.filter((r) => r.group);
+    const groups = Object.fromEntries([...new Set(harder.map((r) => r.group!))].map((g) => {
+      const xs = harder.filter((r) => r.group === g);
+      return [g, { retrieval: `${xs.filter((r) => r.retrieved).length}/${xs.length}`, answered: `${n(xs, "answer_ok")}/${xs.length}`, cited: `${n(xs, "citation_ok")}/${xs.length}` }];
+    }));
+    const none = results.filter((r) => r.absent);
     const costs = results.map((r) => r.usage?.cost_usd).filter((x): x is number => x !== undefined);
     const sum = (k: "input_tokens" | "output_tokens") => results.reduce((s, r) => s + (r.usage?.[k] ?? 0), 0);
     return {
-      vendor, chat, model: stamp.model || "(no run succeeded)", prompt_version: stamp.prompt_version,
+      vendor, chat, library: big ? "big" : "golden", model: stamp.model || "(no run succeeded)", prompt_version: stamp.prompt_version,
       retrieval: `${answerable.filter((r) => r.retrieved).length}/${answerable.length}`,
       answer_accuracy: n(answerable, "answer_ok") / answerable.length, answer_ci95: wilson(n(answerable, "answer_ok"), answerable.length),
       citation_accuracy: n(answerable, "citation_ok") / answerable.length, citation_ci95: wilson(n(answerable, "citation_ok"), answerable.length),
       answered: `${n(answerable, "answer_ok")}/${answerable.length}`, cited: `${n(answerable, "citation_ok")}/${answerable.length}`, says_absent: `${n(none, "answer_ok")}/${none.length}`, then_answers: none.filter((x) => x.general).length,
-      web_cited: none.filter((x) => x.cited?.some((q) => /^https?:/.test(q))).length, searched_needlessly: answerable.filter((x) => x.searched).length,
+      web_cited: none.filter((x) => x.cited?.some((q) => /^https?:/.test(q))).length, searched_needlessly: [...answerable, ...harder].filter((x) => x.searched).length,
       median_ms: { answerable: median(answerable.map((x) => x.ms)), absent: median(none.map((x) => x.ms)) },
+      harder: { retrieval: `${harder.filter((r) => r.retrieved).length}/${harder.length}`, answered: `${n(harder, "answer_ok")}/${harder.length}`, cited: `${n(harder, "citation_ok")}/${harder.length}`, groups },
       errors: results.filter((r) => r.error).length, wall_s: Math.round((performance.now() - t0) / 100) / 10,
       ...(costs.length ? { cost_usd: costs.reduce((a, b) => a + b, 0) } : {}), input_tokens: sum("input_tokens"), output_tokens: sum("output_tokens"),
       cases: results,
@@ -137,8 +183,8 @@ export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", con
 }
 
 export function askTable(runs: AskRun[]): string {
-  return columns(["vendor", "chat", "model", "retrieval", "answers", "citations", "not in library", "searched needlessly", "median reply", "cost", "time", "errors"], runs.map((r) => [
-    r.vendor, r.chat, r.model, r.retrieval, `${pct(r.answer_accuracy)} (${r.answered}, ${range(r.answer_ci95)})`, `${pct(r.citation_accuracy)} (${r.cited}, ${range(r.citation_ci95)})`,
+  return columns(["vendor", "chat", "model", "retrieval", "answers", "citations", "harder (retrieval, answers, citations)", "not in library", "searched needlessly", "median reply", "cost", "time", "errors"], runs.map((r) => [
+    r.vendor, r.library === "big" ? `${r.chat} (big)` : r.chat, r.model, r.retrieval, `${pct(r.answer_accuracy)} (${r.answered}, ${range(r.answer_ci95)})`, `${pct(r.citation_accuracy)} (${r.cited}, ${range(r.citation_ci95)})`, `${r.harder.retrieval}, ${r.harder.answered}, ${r.harder.cited}`,
     `${r.says_absent}${r.web_cited ? `, ${r.web_cited} cite the web` : ""}${r.then_answers ? `, ${r.then_answers} general knowledge` : ""}`, String(r.searched_needlessly),
     `${(r.median_ms.answerable / 1000).toFixed(1)}s / ${(r.median_ms.absent / 1000).toFixed(1)}s`, costText(r), `${r.wall_s}s`, String(r.errors),
   ]));
@@ -158,13 +204,16 @@ if (import.meta.main) {
   const model = args.includes("--model") ? args[args.indexOf("--model") + 1] : undefined;
   const chat = (args.includes("--chat") ? args[args.indexOf("--chat") + 1] : "tutor") as Chat;
   if (chat !== "tutor" && chat !== "ask") throw new Error("--chat must be tutor or ask");
+  const library = args.includes("--library") ? args[args.indexOf("--library") + 1] : "golden";
+  if (library !== "golden" && library !== "big") throw new Error("--library must be golden or big");
   const runs: AskRun[] = [];
   for (const v of pick) {
     console.error(`Asking the ${chat} with ${v}…`);
-    const r = await runAsk(v, model, chat);
+    const r = await runAsk(v, model, chat, 4, library === "big");
     for (const c of r.cases.filter((c) => !c.answer_ok || !c.citation_ok))
       console.error(`  miss ${c.id}: ${c.error ? `error: ${c.error}` : `${c.retrieved === false ? "retrieval " : ""}${c.answer_ok ? "" : "answer "}${c.citation_ok ? "" : "citation "}| ${c.answer?.slice(0, 160)} | ${c.cited?.join(" / ").slice(0, 160)}`}`);
     runs.push(r);
+    console.error(`  harder: ${Object.entries(r.harder.groups).map(([g, x]) => `${g} ${x.answered} answered, ${x.cited} cited`).join("; ")}`);
   }
   const dir = join(import.meta.dir, "results");
   mkdirSync(dir, { recursive: true });

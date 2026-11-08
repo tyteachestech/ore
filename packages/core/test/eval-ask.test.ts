@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findItem } from "../src/items.ts";
-import { addGolden, ask, loadAskCases, passagesFor, retrieved, saysNotThere, scoreAnswer } from "../eval/ask.ts";
+import { addBig, addGolden, ask, asked, loadAskCases, passagesFor, retrieved, saysNotThere, scoreAnswer } from "../eval/ask.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const saved = { path: process.env.PATH, ai: process.env.ORE_AI };
@@ -22,20 +22,39 @@ function fakeClaude(out: unknown, events: unknown[] = []) {
 }
 
 describe("ask-your-library eval", () => {
-  test("20 questions answered by the golden docs, 9 that none answer; ids unique, patterns valid", () => {
-    const { cases, absent } = loadAskCases();
+  test("20 questions answered by the golden docs, 14 harder ones, 9 that none answer; ids unique, patterns valid", () => {
+    const { cases, hard, absent } = loadAskCases();
     expect(cases).toHaveLength(20);
+    expect(hard).toHaveLength(14);
     expect(absent.length).toBeGreaterThanOrEqual(9);
-    expect(new Set([...cases, ...absent].map((c) => c.id)).size).toBe(cases.length + absent.length);
-    for (const c of cases) for (const p of [...c.answer, c.evidence]) expect(() => new RegExp(p)).not.toThrow();
+    expect(new Set([...cases, ...hard, ...absent].map((c) => c.id)).size).toBe(cases.length + hard.length + absent.length);
+    for (const c of [...cases, ...hard]) for (const p of [...c.answer, c.evidence]) expect(() => new RegExp(p)).not.toThrow();
+    for (const c of absent) for (const p of c.outside ?? []) expect(() => new RegExp(p)).not.toThrow();
   });
 
-  test("retrieval puts each question's evidence in front of the AI, for both chats (the eval then measures the AI, not the search)", async () => {
+  test("retrieval puts each question's evidence in front of the AI, for both chats, the harder set too: follow-ups, the open source, paraphrases (the eval then measures the AI, not the search)", async () => {
     const lib = await tempLibrary();
     const names = await addGolden(lib);
     for (const chat of ["tutor", "ask"] as const)
-      for (const c of loadAskCases().cases) expect({ chat, id: c.id, found: retrieved(c, passagesFor(lib, chat, c.question), names) }).toEqual({ chat, id: c.id, found: true });
+      for (const c of [...loadAskCases().cases, ...loadAskCases().hard].filter((c) => chat === "tutor" || !c.reading)) expect({ chat, id: c.id, found: retrieved(c, passagesFor(lib, chat, asked(c, names)), names) }).toEqual({ chat, id: c.id, found: true });
   });
+
+  test("a two-source question's retrieval needs passages from each source, not just the one that holds the words", async () => {
+    const lib = await tempLibrary();
+    const names = await addGolden(lib);
+    const c = loadAskCases().hard.find((x) => x.id === "two-retrieval-size")!;
+    const ps = passagesFor(lib, "tutor", asked(c, names));
+    expect(retrieved(c, ps, names)).toBe(true);
+    expect(retrieved(c, ps.filter((p) => names.get(p.item) !== c.sources[0]), names)).toBe(false);
+  });
+
+  test("at scale too: with ~240 other sources around them, many on the same topics, every question's evidence still reaches the AI", async () => {
+    const lib = await tempLibrary();
+    addBig(lib.root);
+    const names = await addGolden(lib);
+    for (const chat of ["tutor", "ask"] as const)
+      for (const c of [...loadAskCases().cases, ...loadAskCases().hard].filter((c) => chat === "tutor" || !c.reading)) expect({ chat, id: c.id, found: retrieved(c, passagesFor(lib, chat, asked(c, names)), names) }).toEqual({ chat, id: c.id, found: true });
+  }, 60_000);
 
   test("the tutor is asked as the app asks it; general knowledge with no citation reads as not from his sources", async () => {
     const lib = await tempLibrary();

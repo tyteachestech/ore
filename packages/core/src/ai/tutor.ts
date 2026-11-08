@@ -8,7 +8,7 @@ import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
 import type { Library } from "../library.ts";
 import { isWebUrl, runAgent, samePage, type Usage } from "./adapter.ts";
-import { plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
+import { PASSAGES, plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
 
 // The tutor (D128): the chat docked at the window's right, grown out of Ask your library. It answers
 // his own questions from his sources with citations; when they don't hold the answer it says so, then
@@ -74,8 +74,8 @@ export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {
     here.push(...ps);
   }
   const inSkills = focus.skills?.length ? listItems(lib).filter((i) => i.meta.skills.some((s) => focus.skills!.includes(s))).map((i) => i.meta.id) : undefined;
-  const rest = (inSkills ? (inSkills.length ? retrieve(lib, query, 10, inSkills) : []) : retrieve(lib, query, 8)).filter((p) => !focused.includes(p.item));
-  return [...here, ...rest].slice(0, Math.max(10, here.length)).map((p, i) => ({ ...p, id: `P${i + 1}` }));
+  const rest = (inSkills ? (inSkills.length ? retrieve(lib, query, PASSAGES, inSkills) : []) : retrieve(lib, query, PASSAGES)).filter((p) => !focused.includes(p.item));
+  return [...here, ...rest].slice(0, Math.max(PASSAGES, here.length)).map((p, i) => ({ ...p, id: `P${i + 1}` }));
 }
 
 /** The reply so far in a structured answer's half-written JSON (its `reply` string, unescaped), or null. */
