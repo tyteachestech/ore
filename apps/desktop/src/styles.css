@@ -1599,6 +1599,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .quiz-sure-miss { margin: 10px 0 0; color: color-mix(in srgb, var(--c-orange) 75%, white); font-size: 13px; }
 .quiz-mini { margin-top: 16px; color: var(--faint); font-size: 12px; }
 .quiz-yours { margin: 6px 0 0; padding-left: 10px; border-left: 2px solid var(--bg-active); color: var(--muted); white-space: pre-wrap; user-select: text; -webkit-user-select: text; max-height: 9em; overflow-y: auto; }
+.quiz-evidence { background: none; color: var(--text); text-decoration: underline 2px var(--c-green); text-underline-offset: 3px; }
 .quiz-points { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .quiz-points li { display: flex; align-items: flex-start; gap: 4px; border-radius: 8px; }
 .quiz-points li.on { background: color-mix(in srgb, var(--c-orange) 12%, transparent); }
