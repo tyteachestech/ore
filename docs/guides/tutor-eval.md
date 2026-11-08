@@ -5,12 +5,15 @@ The Ask eval (`ask-library.md`) checks that the tutor answers his questions righ
 ```bash
 bun run eval:tutor                      # Claude and Codex; spends AI usage, never in CI
 bun run eval:tutor --vendor claude --model claude-haiku-5-5
+bun run eval:tutor --vendor claude --runs 3   # each case three times: one pooled rate, and the cases that passed only some runs
 ```
 
 ## How it works
 
 - **Set** (`packages/core/eval/tutor-cases.json`): 13 single turns over the golden docs, some with the turns before (`earlier`) and a source open (`reading`). Each lists what its reply must do: be a hint or not, hold or withhold patterns (the answer he is meant to find), set an exercise or not, split a worked answer into steps (D142), ask him something, cite a passage, give no score, not search, stay short.
 - **Checks** are code (`failures` in `eval/tutor.ts`, tested in `test/eval-tutor.test.ts`): the `hint` and `exercise` flags the tutor returns, regexes on the reply, the citation count and whether it searched.
+- **Judge checks** (`judge` in a case) are what a regex can't see: "it doesn't tell him where a missed card goes, in any words". A judge model (`prompts/judge.md`, the same vendor and model as the run) reads the reply against each sentence and returns pass or fail with the reply's own words that decided it, saved as `evidence` beside the case. The idea is the grader in Anthropic's skill-creator evals: assertions about meaning, each with its evidence.
+- **Runs** (`--runs N`) repeat every case. The rate is pooled over all runs, and a case that passed only some of them is listed: that is noise in the tutor, and one run would have shown it as a pass or a miss.
 - **Report**: cases passed with a 95% interval, misses with the failed checks and the start of the reply, cost and time. Results in `packages/core/eval/results/tutor-<date>.json`.
 
 ## What the first runs found (2026-11-08, Sonnet 5.5)
@@ -18,9 +21,15 @@ bun run eval:tutor --vendor claude --model claude-haiku-5-5
 - 75% (9/12) on tutor@5. One real miss: after two wrong tries it gave a third hint instead of the answer, though the prompt said "or has tried twice". Two misses were the eval's: a worked example's own numbers matched the withheld answer, and "Explain …" after a question counted as not asking.
 - tutor@6 counts his attempts in `earlier` and gives the answer with why on the second wrong try, and makes Quiz me's feedback on a wrong answer the right answer, not another hint. Then 92% and 100% after fixing the eval's two patterns, and 12/12 twice more after the checks were tightened (word boundaries, a fraction isn't a score, a quoted question isn't asking) and rule 3 stopped claiming Quiz me's questions.
 
+## The judge (2026-11-08, tutor@7, Sonnet 5.5)
+
+- Five replies written to cheat the checks, each judged once: a hint that names the answer without its words ("right back at the very beginning of the boxes"), the Anki release spelled out ("twenty-three point ten"), his own case worked through ("4 days times 2.5 gives you ten days"), praise for a wrong answer, and feedback that skips what he got right. The judge caught all five, quoting the sentence that gave each away. The regexes alone pass the first three.
+- Then 3 runs of all 13 cases with the judge on: 39/39 (91–100%), no case passed only some runs, $0.87, 80 s.
+
 ## Limits
 
-- 12 cases, written for this eval; a pass is a regex and a flag, not a judgment of the teaching. A hint that gives the answer away in other words passes.
+- 13 cases, written for this eval. Five carry judge checks; the rest are still a regex and a flag, so a hint there that gives the answer away in other words passes.
+- The judge is the same model as the tutor it checks, so it shares its blind spots. Run it with another vendor (`--vendor codex`) for a second opinion.
 - One turn at a time from a fixed `earlier`: it doesn't follow a whole session.
 - No case yet for practice with no source open, @-mentions, or a diagram answer.
 
