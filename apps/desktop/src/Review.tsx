@@ -794,8 +794,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
 
   return (
-    // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it.
-    <Trap off={paused}>
+    // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it; the trap lets
+    // go while the palette or the shortcuts sheet is over it, or their field could never take focus (controls-08).
+    <Trap off={paused || under}>
     <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused}>
       <div className="review-head" data-tauri-drag-region>
         {quick ? (
