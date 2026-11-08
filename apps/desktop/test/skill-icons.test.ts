@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import auto from "../src/skill-icons.json";
 import { FIXES } from "../src/skill-icon-fixes";
 
@@ -17,4 +17,11 @@ test("hand fixes are 16x16 sprites of MingCute icons", () => {
     expect(rows.length).toBe(16);
     for (const r of rows) expect(r).toMatch(/^[#.]{16}$/);
   }
+});
+
+// A skill icon that is also a UI icon draws the same sprite, so the app has one compass, not two.
+test("skill icons with a UI twin match it", () => {
+  const ui = readFileSync(new URL("../src/icons.tsx", import.meta.url), "utf8");
+  const sprite = (name: string) => [...ui.match(new RegExp(`export const ${name} = sprite\\(\\[([\\s\\S]*?)\\]\\);`))![1]!.matchAll(/"([.#]{16})"/g)].map((m) => m[1]);
+  expect(FIXES.compass).toEqual(sprite("Compass"));
 });
