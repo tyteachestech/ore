@@ -73,7 +73,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const [quoteAt, setQuoteAt] = useState(0);
   /** The editor's text; `points` is an Explain card's key points, one a line. */
   const [draft, setDraft] = useState({ question: "", answer: "", points: "" });
-  const [busy, setBusy] = useState(false);
+  const [busy, showBusy] = useState(false);
+  /** `busy` as of now, for the guards: two keys in one task would both see the state before either set it. */
+  const busyNow = useRef(false);
+  const setBusy = (on: boolean) => {
+    busyNow.current = on;
+    showBusy(on);
+  };
   const [asking, setAsking] = useState(false);
   /** Each card's Ask chat, kept while he closes and reopens it. */
   const [asks, setAsks] = useState<Record<string, AskChat>>({});
@@ -345,7 +351,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   };
 
   const rate = async (rating: number) => {
-    if (!card || phase !== "checked" || busy) return;
+    if (!card || phase !== "checked" || busyNow.current) return;
     setBusy(true);
     let goalClosed = false;
     try {
@@ -406,7 +412,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   /** ⌘Z: takes back the last rating and shows that card again, unanswered. On the end screen it
    *  opens the session again, back on that card (Anki's Undo after Congratulations). */
   const undoRating = async () => {
-    if (!last || busy) return;
+    if (!last || busyNow.current) return;
     dropAhead();
     last.forget();
     setBusy(true);
@@ -435,7 +441,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   };
   // ⇧⌘Z right after ⌘Z: that card is showing again, so the rating goes in again and Review moves on.
   redoNow.current = (id, args, rating, elapsed, again) => {
-    if (end || busy || queue?.[0]?.id !== id) return false;
+    if (end || busyNow.current || queue?.[0]?.id !== id) return false;
     setBusy(true);
     submit(args, rating, elapsed, again)
       .catch((e) => notify(errorText(e), "error"))
@@ -444,7 +450,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   };
 
   const retire = async () => {
-    if (!card || busy) return;
+    if (!card || busyNow.current) return;
     dropAhead();
     setBusy(true);
     try {
@@ -477,7 +483,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   /** B, Bad version (D66): drops the remix without logging a review and shows the original. */
   const badVersion = async () => {
-    if (!card?.variant || busy) return;
+    if (!card?.variant || busyNow.current) return;
     dropAhead();
     setBusy(true);
     try {
@@ -543,7 +549,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const draftOk = !!draft.question.trim() && !!draft.answer.trim() && (card?.kind !== "prompt" || draftPoints.length > 0);
 
   const saveEdit = async () => {
-    if (!card || busy || !draftOk) return;
+    if (!card || busyNow.current || !draftOk) return;
     setBusy(true);
     try {
       await setText(card, draft.question, draft.answer, card.kind === "prompt" ? draftPoints : undefined);

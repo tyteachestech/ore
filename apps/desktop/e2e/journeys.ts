@@ -2634,6 +2634,41 @@ async function reveal(page: Page) {
   await page.waitForTimeout(300); // the passage loads after the answer, and a rating key right after it is ignored
 }
 
+/** Every `ore` call a page makes, in order, and the ratings it logged (to take back after the journey). */
+function oreCalls(page: Page) {
+  const calls: string[][] = [];
+  const rated: { card: string; ts: string }[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().endsWith("/ore")) calls.push((JSON.parse(r.postData() ?? "{}") as { args: string[] }).args);
+  });
+  page.on("response", async (r) => {
+    if (r.request().method() !== "POST" || !r.url().endsWith("/ore") || !r.ok()) return;
+    const args = (JSON.parse(r.request().postData() ?? "{}") as { args: string[] }).args;
+    if (args[0] === "review" && !args.some((a) => a.startsWith("--undo"))) rated.push(await r.json());
+  });
+  return { calls, rated, undoAll: async () => { for (const r of rated.splice(0).reverse()) await ore("review", r.card, `--undo=${r.ts}`).catch(() => {}); } };
+}
+
+journey("review: two rating keys in one task log one rating", async (page) => {
+  const app = oreCalls(page);
+  await startReview(page, null);
+  await reveal(page);
+  await page.evaluate(() => {
+    const at = document.querySelector(".review")!;
+    for (const code of ["Digit3", "Digit4"]) at.dispatchEvent(new KeyboardEvent("keydown", { code, key: code.slice(5), bubbles: true }));
+  });
+  await page.waitForTimeout(600);
+  try {
+    if (app.calls.filter((a) => a[0] === "review").length !== 1) throw new Error(`${app.calls.filter((a) => a[0] === "review").length} ratings logged`);
+  } finally {
+    await app.undoAll();
+  }
+  await page.keyboard.press("Escape");
+  await page.locator(".review-foot").getByRole("button", { name: "Done" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review picker: fresh numbers that drop the only ticked skill leave nothing to start", async (page) => {
   await page.getByRole("button", { name: "Start review" }).waitFor(); // Home has read today's numbers
   let release!: () => void;
