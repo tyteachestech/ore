@@ -835,7 +835,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
         // The passage it came from is in the hint and one click away; the row keeps to the question and its source.
         <Hint text={q.note ? `“${exact}”` : "Open this passage"}>
           <button className="question-quote" onClick={() => onQuestion(q)}>
-            <span className="note">{q.note || exact}</span>
+            <span className={q.note ? "note" : "note passage"}>{q.note || exact}</span>
             <span className="from">{q.item_title}</span>
           </button>
         </Hint>
