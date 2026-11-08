@@ -756,6 +756,42 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await page.keyboard.press("Escape");
 });
 
+journey("highlight: an edge he dragged is his, so Esc keeps the highlight and ⌘Z moves the edge back", async (page) => {
+  await openSource(page, AGENTS);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300);
+  await select(page, "Routing classifies an input");
+  await popup.waitFor();
+  await until("the highlight is saved", async () => (await kept()).includes("Routing classifies an input"));
+  const knob = (await page.locator(".grab-edge.end").boundingBox())!;
+  const to = (await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("specialised follow-up.");
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i + "specialised follow-up.".length - 1);
+      r.setEnd(n, i + "specialised follow-up.".length);
+      const b = r.getBoundingClientRect();
+      return { x: b.right - 1, y: b.top + b.height / 2 };
+    }
+  }))!;
+  await page.mouse.move(knob.x + knob.width / 2, knob.y + knob.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 8 });
+  await page.mouse.up();
+  const long = "Routing classifies an input and sends it to a specialised follow-up.";
+  await until("the edge moved", async () => (await kept()).includes(long));
+  await page.waitForTimeout(300); // the move is saved
+  await page.keyboard.press("Escape");
+  await popup.waitFor({ state: "hidden" });
+  await page.waitForTimeout(300);
+  if (!(await kept()).includes(long)) throw new Error(`Esc dropped the resized highlight: ${JSON.stringify(await kept())}`);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the edge back", async () => (await kept()).includes("Routing classifies an input"));
+});
+
 journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
   await openSource(page, AGENTS);
   const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");

@@ -1352,6 +1352,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
     const from: Span = { exact: a.exact, start: a.start, range: was };
     const to: Span = { exact: q.exact, start: q.start, range };
+    // Resized, it is a highlight he worked on: Esc now keeps it, as Enter does.
+    if (fresh.current === id) fresh.current = null;
     ranges.current.set(id, range);
     setAnns((l) => l.map((x) => (x.id === id ? { ...x, exact: q.exact, start: q.start, end: q.start + q.exact.length } : x)));
     setRepaint((n) => n + 1);
