@@ -118,12 +118,16 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   useEffect(() => {
     void (async () => {
       try {
+        // The queue loads beside the session's start (each `ore` call is a process of its own); today
+        // reads the session, so it waits for it.
+        const due = ore<DueEntry[]>("due", ...(pick ?? []).map((s) => opt("skill", s)));
+        due.catch(() => {});
         await ore("session", "start");
         const t = ore<Today>("today").then((t) => {
           before.current = t;
           setStart(t);
         }, () => {});
-        const q = await ore<DueEntry[]>("due", ...(pick ?? []).map((s) => opt("skill", s)));
+        const q = await due;
         // An empty queue ends the session at once, and why ("nothing due in the skills you picked",
         // new cards waiting) reads today: let it land first.
         if (!q.length) await t;
@@ -150,6 +154,16 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     setAsking(false);
   };
 
+  /** The next card, loaded while he answers this one, so a rating moves on without waiting for it. */
+  const ahead = useRef(new Map<string, Promise<CardFull>>());
+  const nextUp = queue?.[1]?.id;
+  useEffect(() => {
+    if (!card || !nextUp || ahead.current.has(nextUp)) return;
+    const p = ore<CardFull>("card", "show", nextUp, "--review");
+    p.catch(() => ahead.current.delete(nextUp));
+    ahead.current.set(nextUp, p);
+  }, [card, nextUp]);
+
   // Each card: load the version to review (a remix in its turn, D66), reset the answer, start its clock.
   useEffect(() => {
     if (!entry) return;
@@ -157,7 +171,12 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
     setCard(null);
     setError(null);
     reset();
-    ore<CardFull>("card", "show", entry.id, "--review").then(
+    // Loaded ahead once, used once: a card shown again (a miss, an undo) or a Try again loads afresh,
+    // and so does one whose early load failed.
+    const load = () => ore<CardFull>("card", "show", entry.id, "--review");
+    const early = loadTry ? undefined : ahead.current.get(entry.id);
+    ahead.current.delete(entry.id);
+    (early ? early.catch(load) : load()).then(
       (c) => {
         if (!live) return;
         setCard(c);

@@ -127,6 +127,18 @@ const steps: [string, (page: Page) => Promise<Result>][] = [
       await page.locator(".review-q").waitFor();
     });
   }],
+  ["review: rate 5 cards", async (page) => {
+    const q = page.locator(".review-q");
+    await page.getByRole("radio", { name: "Think so" }).first().waitFor();
+    return measure(page, async () => {
+      for (let i = 0; i < 5; i++) {
+        const was = await q.innerText();
+        await page.getByRole("radio", { name: "Think so" }).first().click();
+        await page.getByRole("button", { name: "Good", exact: true }).click();
+        await page.waitForFunction((was) => { const el = document.querySelector(".review-q"); return el && el.textContent !== was && document.querySelector("[role=radio]"); }, was);
+      }
+    });
+  }],
 ];
 
 if (ONLY && !steps.some(([n]) => n.includes(ONLY))) {
