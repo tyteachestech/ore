@@ -1,4 +1,4 @@
-import { CaretRight, Check, Collapse, Expand, Info as InfoIcon, Plus, Target, X } from "./icons";
+import { CaretRight, Check, Collapse, Expand, Plus, Target, X } from "./icons";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
@@ -44,17 +44,6 @@ type Props = {
   children: ReactNode;
 };
 
-
-/** An ⓘ that explains on hover, so the page itself carries no instructions. */
-function Info({ text }: { text: string }) {
-  return (
-    <Hint text={text}>
-      <button className="info" aria-label={text}>
-        <InfoIcon size={15} aria-hidden="true" />
-      </button>
-    </Hint>
-  );
-}
 
 /** A skill's page (D46): the D23 stats as chips in the header, then two equal columns that each
  *  scroll on their own, so a long note (D41) never buries his questions (D47) and sources. */
@@ -177,10 +166,9 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
             {warmUp && (
               <div className="warm-up">
                 <b>What do you already know about {skill.name}?</b>
-                <Info text="Warm up from memory, without looking. It becomes your note’s first draft, and recalling first makes it stick." />
-                <button className="pill-btn" onClick={() => setRecalling("warm")}>
-                  Start
-                </button>
+                <Hint text="Without looking. It becomes your note’s first draft, and recalling first makes it stick.">
+                  <button className="warm-start" onClick={() => setRecalling("warm")}>Start</button>
+                </Hint>
               </div>
             )}
             <NoteBody notes={notes} editorRef={editor} targets={targets} onOpen={onOpen} placeholder={notes.text === "" ? "Or just start writing. Type / for blocks." : "Type / for blocks, [[ to link."} />
