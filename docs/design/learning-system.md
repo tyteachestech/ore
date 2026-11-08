@@ -73,9 +73,9 @@ Stages 2 to 7 are the strongest part of Ore. The two gaps that would reshape rew
 
 ## Open questions for Tyler (round 1)
 
-1. **Have you checked off a try yet?** If not, the gap is B (it never comes back) before A. *Rec: build B first either way.*
-2. **Where does the one try line live?** Home under today's slice, or the end screen after the goal closes. *Rec: the end screen, when he has just finished and the next real task is ahead.*
-3. **Should using an idea count as progress?** *Rec: yes, but not in gems yet. A tried try shows on the skill page as "used"; decide the gem question after a few weeks of tries.*
+1. **Have you checked off a try yet?** If not, the gap is B (it never comes back) before A. *Rec: build B first either way.* **Tyler, 2026-11-08: not yet.** So B comes first.
+2. **Where does the one try line live?** Home under today's slice, or the end screen after the goal closes. *Rec: the end screen, when he has just finished and the next real task is ahead.* **Tyler, 2026-11-08: the end screen.**
+3. **Should using an idea count as progress?** An *idea* is one technique he marks Try it; *progress* is what Ore shows growing over weeks, today only gems (solid memories). Options: A memory only; B a record of use, each used idea one line on the skill page ("Open with the end result · used on 2 videos") with his reflections, no number; C used ideas feed gems or levels. *Rec: B now, decide C after a few weeks of real tries.* Open.
 
 ## Related
 
