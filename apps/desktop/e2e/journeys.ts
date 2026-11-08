@@ -2801,6 +2801,16 @@ journey("review: two rating keys in one task log one rating", async (page) => {
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: a card whose source was deleted says so where the passage would be", async (page) => {
+  await startReview(page, null);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: object }).__ORE_FAIL = { show: 'ore: no item matches "01M6Y78"' }));
+  await reveal(page);
+  await page.locator(".review-passage").getByText("Its source is no longer in the library.").waitFor();
+  if (await page.getByRole("button", { name: /Open in source/ }).count()) throw new Error("Open in source shows for a source that is gone");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review picker: fresh numbers that drop the only ticked skill leave nothing to start", async (page) => {
   await page.getByRole("button", { name: "Start review" }).waitFor(); // Home has read today's numbers
   let release!: () => void;

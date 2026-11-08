@@ -74,6 +74,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
    *  passage (one the tutor kept, or whose highlight is gone) has no quotes and opens the source at the top. */
   const [passage, setPassage] = useState<{ item: string; title: string; quotes: { text: string; at: string; time?: string }[] } | null>(null);
   const [quoteAt, setQuoteAt] = useState(0);
+  /** Why the passage can't show (its source deleted since the card was made), in its place. */
+  const [passageGone, setPassageGone] = useState<string | null>(null);
   /** The editor's text; `points` is an Explain card's key points, one a line. */
   const [draft, setDraft] = useState({ question: "", answer: "", points: "" });
   const [busy, showBusy] = useState(false);
@@ -188,6 +190,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setRemark(false);
     setInHead(false);
     setPassage(null);
+    setPassageGone(null);
     setAsking(false);
   };
 
@@ -283,7 +286,11 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         const a = c.annotation ? s.annotations.find((x) => x.id === c.annotation && x.status !== "deleted") : undefined;
         setPassage({ item: c.item, title: s.title, quotes: a ? [{ text: a.exact, at: a.id }] : [] });
       },
-      () => {},
+      (e) => {
+        if (at !== showing.current) return;
+        const why = errorText(e);
+        setPassageGone(/no item matches/.test(why) ? "Its source is no longer in the library." : `Couldn’t load its source. ${why}`);
+      },
     );
   };
 
@@ -942,6 +949,13 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                       >
                         Open in source <ArrowSquareOut size={12} aria-hidden="true" />
                       </button>
+                    </figcaption>
+                  </figure>
+                )}
+                {passageGone && (
+                  <figure className="review-passage">
+                    <figcaption>
+                      <span>{passageGone}</span>
                     </figcaption>
                   </figure>
                 )}
