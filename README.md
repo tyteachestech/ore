@@ -82,7 +82,7 @@ Without Apple secrets the build is signed ad hoc, and each friend clicks Open An
 packages/core    domain, storage, ingest, anchoring, scheduling, AI adapter and prompts
 packages/cli     the `ore` command-line tool (thin over core)
 apps/desktop     Tauri 2 + React app
-skills/ore      Claude Code skill: quizzing and library work from the terminal
+skills/ore       Claude Code skill: quizzing and library work from the terminal
 docs/            decisions, spec, research, design docs, reviews
 ```
 
@@ -115,16 +115,22 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`brief-notionrpg-engram.md`](docs/research/brief-notionrpg-engram.md) · [`brief-notetaking-notionrpg.md`](docs/research/brief-notetaking-notionrpg.md) | Tyler's earlier tools, and what carried over |
 | [`tp-learn-reference-map.md`](docs/research/tp-learn-reference-map.md) | Open-source projects studied as references |
 
-**Design docs** ([`docs/design/`](docs/design/)): proposals Tyler approved, with the reasoning.
+**Design docs** ([`docs/design/`](docs/design/), [index by area](docs/design/README.md)): proposals Tyler approved, with the reasoning.
 
 | Doc | Status |
 | --- | --- |
+| [`daily-session.md`](docs/design/daily-session.md) | Who Ore is for and the daily session: a 10 min to 1 hour habit over a due backlog that never empties (D144) |
+| [`learning-system.md`](docs/design/learning-system.md) | The learn-and-apply loop the science asks for, what Ore has of it, and which rewards are safe to tune (proposed) |
 | [`review-plan.md`](docs/design/review-plan.md) | Home, Review mode, daily goal, "Ask about this" chat, delight rules (D58 to D62, built) |
 | [`in-reader-quiz.md`](docs/design/in-reader-quiz.md) | The finish quiz with the blurred source (D52 to D57, built) |
 | [`questions-to-research.md`](docs/design/questions-to-research.md) | Answering questions in the reader's side panel and on the skill page, matched sources, Answered + card (D75, built) |
 | [`signature-style.md`](docs/design/signature-style.md) | The look being re-picked: Tyler's brief, picks so far, what it amends (in progress) |
 | [`remixing-cards.md`](docs/design/remixing-cards.md) | Fresh variants of known cards to build transfer (D66, built) |
 | [`courses-and-live-links.md`](docs/design/courses-and-live-links.md) | Courses as ordered lesson sources, and live links (D79 built; live links not now) |
+| [`key-points-and-stopping-early.md`](docs/design/key-points-and-stopping-early.md) | The Collected tab, Card here, and finishing a source before its end (D99, D100, built) |
+| [`side-quests.md`](docs/design/side-quests.md) | Marking a term you don't know yet and chasing it now or later (D97, built) |
+| [`skill-goals-and-parts.md`](docs/design/skill-goals-and-parts.md) | A goal per skill; parts deferred (D102, built) |
+| [`feeds-and-newsletters.md`](docs/design/feeds-and-newsletters.md) | The Feed: RSS and newsletters, posts saved only once highlighted (D107, built) |
 
 **Reviews** ([`docs/reviews/`](docs/reviews/)): audits of the app at a point in time. Some findings are fixed since.
 
@@ -138,13 +144,20 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`2026-10-26-motion-review.md`](docs/reviews/2026-10-26-motion-review.md) | Every animation against Emil Kowalski's standards |
 | [`2026-10-27-stress-test.md`](docs/reviews/2026-10-27-stress-test.md) | Stress test and foundation check after the iPhone build |
 | [`2026-10-28-import-coverage.md`](docs/reviews/2026-10-28-import-coverage.md) | What 53 real links and files keep and miss on import, and the plan to close the gaps |
-| [`2026-11-06-import-promise.md`](docs/reviews/2026-11-06-import-promise.md) | The core promise (D122) checked against today's import, with the gaps ranked |
+| [`2026-10-29-edge-cases.md`](docs/reviews/2026-10-29-edge-cases.md) | Edge cases: damaged and hand-edited files, fixed at the shared readers and writers |
+| [`2026-10-29-skill-goals-stress-test.md`](docs/reviews/2026-10-29-skill-goals-stress-test.md) | The skill goals and parts proposal walked through real use |
+| [`2026-11-01-bug-sweep.md`](docs/reviews/2026-11-01-bug-sweep.md) | Six parallel bug sweeps, every screen |
 | [`2026-11-02-science-pass.md`](docs/reviews/2026-11-02-science-pass.md) | Second science audit: new features, the draft pile, 8 ranked recommendations |
+| [`2026-11-06-import-promise.md`](docs/reviews/2026-11-06-import-promise.md) | The core promise (D122) checked against today's import, with the gaps ranked |
+| [`2026-11-06-notion-parity.md`](docs/reviews/2026-11-06-notion-parity.md) | The note editor checked block by block against Notion |
+| [`2026-11-08-design-critique-round-5.md`](docs/reviews/2026-11-08-design-critique-round-5.md) | UX critique round 5 (28/40) |
+| [`2026-11-08-shadcn-components.md`](docs/reviews/2026-11-08-shadcn-components.md) | shadcn-ecosystem components pitched for the learning loop, and which were picked (D141 to D143) |
+| [`2026-11-08-stress-test.md`](docs/reviews/2026-11-08-stress-test.md) | Six-area stress test: 84 findings, the PRs that fixed them, and the design calls (D144) |
 
 
 **Guidebooks** ([`docs/guidebooks/`](docs/guidebooks/)): four evidence-based books the research briefs draw on (Learning Science, Teaching, Gamification, UX and UI Design), each with its paper summaries and source lists.
 
-**Guides**: [`docs/guides/ai-user-testing.md`](docs/guides/ai-user-testing.md) (usability testing with an AI agent driving the app) and its [iPhone version](docs/guides/ai-user-testing-iphone.md), the AI evals ([grading](docs/guides/grading-eval.md), [Ask your library](docs/guides/ask-library.md), [tutor](docs/guides/tutor-eval.md)), [`skills/ore/README.md`](skills/ore/README.md) (the `/ore` Claude Code skill), [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md) (the mocked app for screenshots).
+**Guides**: [`docs/guides/ai-user-testing.md`](docs/guides/ai-user-testing.md) (usability testing with an AI agent driving the app) and its [iPhone version](docs/guides/ai-user-testing-iphone.md), the AI evals ([grading](docs/guides/grading-eval.md), [Ask your library](docs/guides/ask-library.md), [tutor](docs/guides/tutor-eval.md), [question quality](docs/guides/question-eval.md)), [`skills/ore/README.md`](skills/ore/README.md) (the `/ore` Claude Code skill), [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md) (the mocked app for screenshots).
 
 ## Contributing
 
