@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from "react";
+import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
@@ -247,8 +248,10 @@ export function App() {
     setTutorOpen(true);
   };
   const closeTutor = () => {
-    setTutorOpen(false);
-    tutorFrom.current?.focus?.();
+    const from = tutorFrom.current;
+    // The ✦ that opened it is hidden while the tutor is open: focus goes to the one that comes back.
+    flushSync(() => setTutorOpen(false));
+    (from?.isConnected ? from : from?.matches(".tutor-bubble") ? document.querySelector<HTMLElement>(".tutor-bubble") : null)?.focus?.();
   };
   const [adding, setAdding] = useState(false);
   const [help, setHelp] = useState(false);
@@ -310,14 +313,17 @@ export function App() {
         setSkills(all);
         setSkill((k) => (k && !all.some((s) => s.id === k) ? null : k));
       },
-      (e) => notify(errorText(e), "error"),
+      // Try again while `ore` is still down says so again in the same toast.
+      (e) => notify(errorText(e), "error", undefined, undefined, undefined, undefined, "skills"),
     );
   }, [notify]);
 
-  useEffect(() => {
+  /** Loads the sources and the skills, at launch and on a Try again after `ore` failed. */
+  const reload = useCallback(() => {
     void refresh();
     reloadSkills();
   }, [refresh, reloadSkills]);
+  useEffect(reload, [reload]);
 
   useEffect(() => save("ore.view", JSON.stringify({ status, skill })), [status, skill]);
 
@@ -1860,7 +1866,7 @@ export function App() {
         <div className="empty-state err" role="alert">
           <p>{listError}</p>
           {/* After he fixes it in Terminal, the list comes back without a relaunch. */}
-          <button className="pill-btn" onClick={() => void refresh()}>
+          <button className="pill-btn" onClick={reload}>
             Try again
           </button>
         </div>
@@ -2075,7 +2081,12 @@ export function App() {
             blocked={overlay}
             targets={targets}
             onOpenLink={openLink}
-            onBack={() => setOpenId(null)}
+            onBack={() => {
+              // Back on Home, focus goes to the source's Continue reading row, as the list's row keeps it.
+              const id = openId;
+              flushSync(() => setOpenId(null));
+              if (!onSkillPage && place === "home") document.querySelector<HTMLElement>(`.home-read[data-id="${id}"]`)?.focus();
+            }}
             onChanged={() => void refresh()}
             onSkillsChanged={reloadSkills}
             onDone={() => {
@@ -2126,6 +2137,7 @@ export function App() {
             sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => ({ ...a, hint: undefined }))}
             onRename={(i, t) => void retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
+            onRetry={reload}
             notify={notify}
           />
         ) : onFeed ? (

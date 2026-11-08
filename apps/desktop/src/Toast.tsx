@@ -21,6 +21,8 @@ type Toast = {
   done?: number;
   cancel?: () => void;
   settled?: "ok" | "bad";
+  /** At most one toast per slot: a new one replaces it. */
+  slot?: string;
 };
 type Shown = Omit<Toast, "id" | "settled">;
 
@@ -81,10 +83,12 @@ export function useToast() {
     [commit, arm],
   );
   const notify: Notify = useCallback(
-    (message, kind = "info", undo, redo, go, stay) => {
+    (message, kind = "info", undo, redo, go, stay, slot) => {
       const step = undo && { message, undo, redo };
       if (step) history.current.push(step);
-      if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go, stay: stay && !!go });
+      // A slot's new toast goes in front, in place of its last one.
+      if (slot && kind !== "quiet") commit(list.current.filter((x) => x.slot !== slot));
+      if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go, stay: stay && !!go, slot });
       return () => {
         if (!step) return;
         history.current.forget(step);

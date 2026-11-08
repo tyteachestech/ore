@@ -1,5 +1,6 @@
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
@@ -10,7 +11,7 @@ import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { ore, opt, PHONE, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today } from "./ore";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, type Notify } from "./util";
+import { errorText, focusPicked, type Notify } from "./util";
 import { Working } from "./Working";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
@@ -99,7 +100,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [error, setError] = useState<string | null>(null);
   /** Bumped by Try again after a card failed to load: loads the same card again, the session as it was. */
   const [loadTry, setLoadTry] = useState(0);
-  const retryLoad = () => setLoadTry((n) => n + 1);
+  /** Bumped by Try again after the session failed to start (`ore` down): starts it again. */
+  const [startTry, setStartTry] = useState(0);
+  const retryLoad = () => (queue ? setLoadTry : setStartTry)((n) => n + 1);
   const shownAt = useRef(Date.now());
   /** When the answer showed: a rating key right after it is the confidence key pressed twice. */
   const shownAnswerAt = useRef(0);
@@ -142,14 +145,18 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   useEffect(() => {
     let live = true;
+    setError(null);
     void (async () => {
       try {
-        const started = ore<{ id: string }>("session", "start");
-        sessionReady.current = started.catch(() => {});
-        const s = await started;
-        // Closed before the session began: it ends at once, as leaving would have ended it.
-        if (!live) return void ore("session", "end", s.id).catch(() => {});
-        session.current = { id: s.id, open: true };
+        // Try again after `due` failed keeps the session already started: a second would be left open.
+        if (!session.current?.open) {
+          const started = ore<{ id: string }>("session", "start");
+          sessionReady.current = started.catch(() => {});
+          const s = await started;
+          // Closed before the session began: it ends at once, as leaving would have ended it.
+          if (!live) return void ore("session", "end", s.id).catch(() => {});
+          session.current = { id: s.id, open: true };
+        }
         const t = ore<Today>("today").then((t) => {
           before.current = t;
           setStart(t);
@@ -167,12 +174,14 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     return () => {
       live = false;
       mounted.current = false;
-      // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
-      // this session ends, by its id, never another window's.
-      const s = session.current;
-      if (s?.open) void ore("session", "end", s.id).catch(() => {});
-      session.current = null;
     };
+  }, [pick, startTry]);
+  // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
+  // this session ends, by its id, never another window's. Try again keeps it.
+  useEffect(() => () => {
+    const s = session.current;
+    if (s?.open) void ore("session", "end", s.id).catch(() => {});
+    session.current = null;
   }, [pick]);
 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
@@ -700,7 +709,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       return;
     }
     if (!card) {
-      if (e.key === "Enter" && onSurface && error && entry) {
+      if (e.key === "Enter" && onSurface && error && (entry || !queue)) {
         e.preventDefault();
         retryLoad();
       }
@@ -812,7 +821,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         {error && (
           <p className="err">
             {error}
-            {entry && !card && (
+            {(!queue || (entry && !card)) && (
               <>
                 {" "}
                 <Hint text={<>Try again <kbd>↵</kbd></>}>
@@ -1111,16 +1120,17 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
 
 function Sure({ refEl, conf, onPick }: { refEl: React.RefObject<HTMLDivElement | null>; conf?: number; onPick: (n: number) => void }) {
   return (
-    <div className="quiz-sure" role="radiogroup" aria-labelledby="review-sure" ref={refEl}>
+    // One Tab stop, ← → between the three (Radix, as Settings' segmented rows); a click on the one picked picks it again.
+    <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="review-sure" ref={refEl} value={conf ? String(conf) : ""} onValueChange={(v) => onPick(v ? Number(v) : conf!)} onFocus={focusPicked}>
       {SURE.map((label, i) => (
         <Hint key={label} text={<>{label} <kbd>{i + 1}</kbd></>} side="top">
           {/* Keeps focus in the answer, so on iPhone the keyboard stays up and Check doesn't move under the finger. */}
-          <button role="radio" aria-checked={conf === i + 1} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i + 1)}>
+          <ToggleGroup.Item value={String(i + 1)} onMouseDown={(e) => e.preventDefault()}>
             {label}
-          </button>
+          </ToggleGroup.Item>
         </Hint>
       ))}
-    </div>
+    </ToggleGroup.Root>
   );
 }
 

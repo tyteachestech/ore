@@ -1,4 +1,5 @@
 import { CaretDown, CaretUp, Check, Circle, CircleHalf, MagnifyingGlass, X } from "./icons";
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { PixelStar } from "./PixelIcon";
@@ -6,7 +7,7 @@ import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
 import { stampBefore } from "./transcript";
-import { errorText, type Notify } from "./util";
+import { errorText, focusPicked, type Notify } from "./util";
 import { PixelSpin, useLate, Working } from "./Working";
 
 /** What Finish and ChapterRecall need from the source note: wait for a pending edit before the CLI
@@ -37,6 +38,21 @@ const SURE = ["Guess", "Think so", "Sure"] as const;
 // Typed text survives closing the panel (Esc) and reopening it while the reader stays open (D52).
 type Draft = { step: number; recall: string; answers: string[]; conf: (number | undefined)[]; use: string; leave: string; qs: Prequestion[] };
 const drafts = new Map<string, Draft>();
+
+/** Sources whose cards failed to draft, each with its retry: one toast says them all (the latest reason),
+ *  and its Try again drafts them all, so a second failure never hides the first one's way back. */
+const undrafted = new Map<string, { title: string; run: () => Promise<void> }>();
+function sayUndrafted(notify: Notify, why: string) {
+  const left = [...undrafted.values()];
+  if (!left.length) return;
+  const what = left.length === 1 ? `Cards for “${left[0]!.title}”` : `Cards for ${left.length} sources`;
+  const again = () => {
+    const runs = [...undrafted.values()];
+    undrafted.clear();
+    for (const r of runs) void r.run();
+  };
+  notify(`${what} weren’t drafted: ${why}`, "error", undefined, undefined, again, true, "drafting");
+}
 
 /** The finish step as a quiz panel beside the blurred source (D52 to D56): free recall first, then
  *  each prequestion is answered, rated for confidence and checked against its key points, with the
@@ -135,18 +151,26 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   useEffect(() => {
     moved.current = false;
     setAt(0);
-    if (isChecked || step > n) panel.current?.focus();
-    else field.current?.focus();
+    if (isChecked || step > n) return panel.current?.focus();
+    // A field holding what he wrote last time (finishing again) takes the caret at its end, as Notes does.
+    const f = field.current;
+    f?.focus();
+    f?.setSelectionRange(f.value.length, f.value.length);
   }, [step, isChecked]);
 
-  function enrich() {
+  /** `back`: settles once he is back from the panel; a failure says so only then, in front of "Finished …". */
+  function enrich(back: Promise<unknown>) {
     // Drafts review items from Card highlights and the prequestions (D19), after the recall
     // feedback so the prompts' rubrics include what he missed.
     // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
+    // Its Try again is the only way back to the cards, so the failure stays until he acts on it.
     const run = (): Promise<void> =>
       ore("enrich", doc.id).then(
-        () => {},
-        (e) => void notify(`Cards for “${doc.title}” weren’t drafted: ${errorText(e)}`, "error", undefined, undefined, () => void run()),
+        () => void undrafted.delete(doc.id),
+        (e) => {
+          undrafted.set(doc.id, { title: doc.title, run });
+          void back.then(() => sayUndrafted(notify, errorText(e)));
+        },
       );
     if (feedbackRun.current) void feedbackRun.current.finally(run);
     else void run();
@@ -239,13 +263,16 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       return;
     }
     drafts.delete(doc.id);
-    enrich();
+    // Drafting starts at once, so a window closed during the moment still drafts the cards.
+    let gone = () => {};
+    enrich(new Promise<void>((ok) => (gone = ok)));
     // Done on "Done with this source?": a second of "Source finished" before going back (D106).
     if (!marked) {
       setMoment(true);
       await new Promise((go) => setTimeout(go, 1100));
     }
     (then ?? onDone)();
+    gone();
   }
 
   /** Quizzed without finishing: the source stays in To read and nothing is drafted yet; the next
@@ -371,7 +398,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const got = cov?.filter(Boolean).length ?? 0;
   const verdict = !cov ? null : got === cov.length ? "yes" : got > 0 ? "part" : "no";
   // The AI step failed (its error shows below): stop saying it is still working.
-  const failed = !verdict && !!(q?.points ? checkError : pointsError);
+  const why = q?.points ? checkError : pointsError;
+  const failed = !verdict && !!why;
   // Still waiting on the AI: the badge spins, and past 5 s it says how long this takes.
   const waiting = isChecked && !verdict && !failed;
   const late = useLate(waiting);
@@ -433,15 +461,16 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <div className="quiz-label" id="quiz-sure">
             How sure are you?
           </div>
-          <div className="quiz-sure" role="radiogroup" aria-labelledby="quiz-sure">
+          {/* One Tab stop, ← → between the three, as Review's; picking the one picked clears it. */}
+          <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="quiz-sure" value={conf[qi] ? String(conf[qi]) : ""} onValueChange={(v) => pickSure(v ? Number(v) : conf[qi]!)} onFocus={focusPicked}>
             {SURE.map((label, i) => (
               <Hint key={label} text={<>{label} <kbd>{i + 1}</kbd></>} side="top">
-                <button role="radio" aria-checked={conf[qi] === i + 1} aria-disabled={busy || undefined} onClick={() => pickSure(i + 1)}>
+                <ToggleGroup.Item value={String(i + 1)} aria-disabled={busy || undefined}>
                   {label}
-                </button>
+                </ToggleGroup.Item>
               </Hint>
             ))}
-          </div>
+          </ToggleGroup.Root>
           <div className="quiz-grow" />
           <div className="quiz-foot">
             <Hint text="No idea" keys="no-idea" side="top">
@@ -474,7 +503,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                     : verdict === "no"
                       ? "Step through the passages below."
                       : failed
-                        ? "The source is open; compare your answer with it, or "
+                        ? // Why (Codex missing, Claude signed out), so he knows whether a retry can work, as Review says it.
+                          `${why}${/[.!?]$/.test(why!) ? "" : "."} The source is open; compare your answer with it, or `
                         : late
                           ? `${q.points ? "This can take about 20 seconds" : "This can take up to a minute"}. The source is open; have a look meanwhile.`
                           : "The source is open; have a look meanwhile."}
@@ -566,7 +596,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             <ul className="quiz-made-list">
               {recall.trim() && <li>Your recall, saved to the source note</li>}
               {!!made?.highlights && <li>{made.highlights} {made.highlights === 1 ? "highlight" : "highlights"}</li>}
-              {!!made?.questions && <li>{made.questions} {made.questions === 1 ? "question" : "questions"}, waiting on the skill page</li>}
+              {!!made?.questions && <li>{made.questions} {made.questions === 1 ? "question" : "questions"}, {doc.skills.length ? "waiting on the skill page" : "in Collected"}</li>}
             </ul>
           )}
           {typeof feedback === "string" && <p className="err">Recall feedback failed: {feedback}</p>}
