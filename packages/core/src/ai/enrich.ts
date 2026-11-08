@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 import { z } from "zod";
 import { readAnnotations, type Annotation } from "../annotations.ts";
+import { reflections } from "../tries.ts";
 import { locate } from "../anchoring.ts";
 import { listQuestions } from "../questions.ts";
 import { cardTextProblem, ContentType, CardKind, listCards, writeNewCard, type Card } from "../cards.ts";
@@ -57,7 +58,8 @@ export function pendingHighlights(item: Item, cards: Card[]): Annotation[] {
   const wanted = (a: Annotation) =>
     a.intent === "card" ||
     (a.intent === "question" && a.card && a.status === "done" && a.answers?.length) ||
-    (a.intent === "apply" && a.status === "done" && !!a.reflection) ||
+    // D146: a try re-planned with "Next time I'll…" is open again, but the round he wrote up still gets its card.
+    (a.intent === "apply" && reflections(a).length > 0) ||
     (a.intent === "keep" && item.meta.status === "done" && !planned.has(a.id));
   return readAnnotations(item).filter((a) => wanted(a) && !drafted.has(a.id));
 }
@@ -194,7 +196,7 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
         context: `${a.prefix}[[${a.exact}]]${a.suffix}`,
         answer: a.intent === "question" ? (a.answers ?? []).map((c) => c.text).join("\n") : null,
         point: a.point ?? false,
-        reflection: a.intent === "apply" ? (a.reflection ?? null) : null,
+        reflection: a.intent === "apply" ? reflections(a).join("\n") || null : null,
       })),
       open_questions: questions,
       notes,

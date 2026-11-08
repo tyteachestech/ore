@@ -3556,8 +3556,44 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   await Bun.sleep(500);
   await page.reload();
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
-  await page.locator(".answered-toggle", { hasText: "Tried" }).click();
+  await page.locator(".answered-toggle", { hasText: "Used" }).click();
   await saved.waitFor();
+  // D146: "Next time I'll…" plans the next try: the row is back in To try with that plan, and the round so far is its record under Used.
+  await saved.click();
+  await page.getByLabel("Next time I'll…").fill("Quiz myself before writing, too");
+  await page.keyboard.press("Enter");
+  const again = page.locator(".try:not(.history)").filter({ hasText: "Quiz myself before writing, too" });
+  await again.waitFor();
+  if ((await again.getByRole("checkbox", { name: "Mark tried" }).count()) !== 1) throw new Error("the re-planned try isn't open again");
+  const record = page.locator(".try.history").filter({ hasText: "Quiz myself before each edit session" });
+  await record.waitFor();
+  if (!(await record.innerText()).includes("Caught two gaps before recording")) throw new Error("the record lost how the first round went");
+  // ⌘Z takes the re-plan back: the round is tried again as it was. (A click first: after a reload the
+  // page has no keyboard focus in headless Chromium until something is clicked.)
+  await page.locator(".skill-page, main").first().click({ position: { x: 2, y: 2 } }).catch(() => {});
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the tried round back", async () => (await again.count()) === 0 && (await page.locator(".try.done").filter({ hasText: "Quiz myself before each edit session" }).count()) === 1);
+  await page.waitForTimeout(400);
+  const back = (await ore("tries")) as { note?: string; status: string; uses?: unknown[] }[];
+  const mine = back.find((t) => t.note === "Quiz myself before each edit session");
+  if (!mine || mine.status !== "done" || mine.uses?.length) throw new Error(`the library kept the re-plan: ${JSON.stringify(mine)}`);
+});
+
+journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D146)", async (page) => {
+  const calls = oreCalls(page);
+  await startReview(page, null);
+  await reveal(page);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Escape");
+  const line = page.locator(".review-try");
+  await line.waitFor();
+  if (!(await line.innerText()).includes("Outline Thursday's video on the spine before writing")) throw new Error(`the end screen shows the wrong try: ${await line.innerText()}`);
+  await line.click();
+  await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
+  await page.locator(".review").waitFor({ state: "detached" });
+  await calls.undoAll(); // the rating, for the journeys after this one
 });
 
 journey("archive a source from its row, then Undo from the toast", async (page) => {

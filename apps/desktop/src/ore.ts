@@ -162,6 +162,8 @@ export type Annotation = {
   point?: boolean;
   /** Apply (D127): how it went, written when he checked the try off. */
   reflection?: string;
+  /** Apply (D146): the rounds before this one, oldest first, each with his plan and how it went. */
+  uses?: { ts: string; plan?: string; reflection?: string }[];
 };
 
 /** `ore tries`: an Apply highlight (D127), a technique he plans to try on his own work; `note` is his

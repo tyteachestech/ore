@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { addHighlight, findAnnotation } from "../src/annotations.ts";
+import { addHighlight, findAnnotation, readAnnotations } from "../src/annotations.ts";
 import { pendingHighlights } from "../src/ai/enrich.ts";
 import { addText } from "../src/ingest/index.ts";
 import { findItem } from "../src/items.ts";
-import { listTries, markTried } from "../src/tries.ts";
+import { listTries, markTried, reflections } from "../src/tries.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const ARTICLE = "# Openings\n\nOpen on the moment of change, then rewind to how we got there.\n\nKeep the rest.\n";
@@ -50,5 +50,38 @@ describe("tries: Apply highlights checked off with how it went (D127)", () => {
     const src = await addText(lib, ARTICLE);
     const k = addHighlight(findItem(lib, src.meta.id), { exact: "Keep the rest.", intent: "keep" });
     await expect(markTried(lib, k.id, { reflection: "x" })).rejects.toThrow(/not a try/);
+  });
+
+  test("Next time I'll… closes the round and opens the try again with the new plan; one highlight per idea (D146)", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
+    const it = findItem(lib, src.meta.id);
+    const a = addHighlight(it, { exact: "Open on the moment of change", intent: "apply", note: "My next video's cold open" });
+    const pending = () => pendingHighlights(findItem(lib, src.meta.id), []).map((x) => x.id);
+
+    const { tried, card } = await markTried(lib, a.id, { reflection: "Hooked better; the rewind ran long.", next: "  Cut the rewind to one line  " });
+    expect(card).toBe(true);
+    expect(tried).toMatchObject({ status: "open", note: "Cut the rewind to one line", uses: [{ plan: "My next video's cold open", reflection: "Hooked better; the rewind ran long." }] });
+    expect(tried.reflection).toBeUndefined();
+    // Still the same highlight: the reader paints the passage once, and the record of use is one idea.
+    expect(readAnnotations(findItem(lib, src.meta.id)).filter((x) => x.intent === "apply").map((x) => x.id)).toEqual([a.id]);
+    // The round he wrote up still gets its card, and the card asks after every round's lesson.
+    expect(pending()).toEqual([a.id]);
+    expect(reflections(tried)).toEqual(["Hooked better; the rewind ran long."]);
+
+    // The second round: checked off, written up, re-planned again.
+    await markTried(lib, a.id, { reflection: "One line was enough." });
+    const third = (await markTried(lib, a.id, { reflection: "One line was enough.", next: "Try it on the podcast intro" })).tried;
+    expect(third.uses?.map((u) => u.plan)).toEqual(["My next video's cold open", "Cut the rewind to one line"]);
+    expect(reflections(third)).toEqual(["Hooked better; the rewind ran long.", "One line was enough."]);
+
+    // One step back: the re-plan is undone, the last round is tried again as it was; another step back puts it to try.
+    const back = (await markTried(lib, a.id, { undo: true })).tried;
+    expect(back).toMatchObject({ status: "done", note: "Cut the rewind to one line", reflection: "One line was enough." });
+    expect(back.uses?.length).toBe(1);
+    const open = (await markTried(lib, a.id, { undo: true })).tried;
+    expect(open).toMatchObject({ status: "open", note: "Cut the rewind to one line" });
+    expect(open.reflection).toBeUndefined();
+    expect(open.uses?.length).toBe(1);
   });
 });

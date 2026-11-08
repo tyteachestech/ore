@@ -294,6 +294,7 @@ export const itemCommands: Record<string, Command> = {
                 `${t.id}  ${t.status === "done" ? "tried " : "to try"}  ${t.item_title}`,
                 `    "${t.exact.replace(/\s+/g, " ")}"`,
                 ...(t.note ? [`    plan: ${t.note}`] : []),
+                ...(t.uses ?? []).map((u) => `    used: ${u.plan ?? "(no plan)"}${u.reflection ? ` → ${u.reflection}` : ""}`),
                 ...(t.reflection ? [`    how it went: ${t.reflection}`] : []),
               ].join("\n"),
             )
@@ -304,11 +305,11 @@ export const itemCommands: Record<string, Command> = {
   },
 
   tried: {
-    usage: '<try> [--text "<how it went>"] [--undo]   check off a try (D127); with --text, a card is drafted from how it went in the background; --undo puts it back to try',
-    options: { text: { type: "string" }, undo: { type: "boolean" } },
+    usage: '<try> [--text "<how it went>"] [--next "<plan>"] [--undo]   check off a try (D127); with --text, a card is drafted from how it went in the background; --next "Next time I\'ll…" (D146) keeps the round and opens the try again with that plan; --undo steps back',
+    options: { text: { type: "string" }, next: { type: "string" }, undo: { type: "boolean" } },
     async run([ref], f) {
       const lib = openLibrary();
-      const { tried, item, card } = await markTried(lib, need(ref, "<try>"), { reflection: str(f.text), undo: !!f.undo });
+      const { tried, item, card } = await markTried(lib, need(ref, "<try>"), { reflection: str(f.text), next: str(f.next), undo: !!f.undo });
       const enrich = card ? startEnrich(lib, item.meta.id) : "skipped";
       return { data: { ...tried, enrich }, text: `Try ${tried.id}: ${tried.status === "done" ? "tried" : "to try"}${card ? `; card draft ${enrich}` : ""}` };
     },
