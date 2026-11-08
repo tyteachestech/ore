@@ -268,7 +268,7 @@ export async function setItemStatus(lib: Library, id: string, status: ItemStatus
   return updateItemMeta(lib, id, (m) => ({
     ...m,
     status,
-    finished_at: status === "done" ? (finishedAt ?? (m.status === "done" && m.finished_at ? m.finished_at : nowIso())) : undefined,
+    finished_at: status === "done" ? (finishedAt !== undefined ? new Date(finishedAt).toISOString() : m.status === "done" && m.finished_at ? m.finished_at : nowIso()) : undefined,
   }));
 }
 

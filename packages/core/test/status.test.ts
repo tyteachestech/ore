@@ -18,6 +18,13 @@ describe("reading status", () => {
     expect((await setItemStatus(lib, id, "done")).finished_at).not.toBe("2026-11-01T09:00:00.000Z");
   });
 
+  test("a put-back finish date is stored as an ISO time in UTC, so finish dates sort as strings", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Any date shape." });
+    expect((await setItemStatus(lib, item.meta.id, "done", "2026-11-01T11:00:00+02:00")).finished_at).toBe("2026-11-01T09:00:00.000Z");
+    expect(findItem(lib, item.meta.id).meta.finished_at).toBe("2026-11-01T09:00:00.000Z");
+  });
+
   test("a finish date that isn't a date, or one on a source that isn't done, is refused", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Not a date." });
