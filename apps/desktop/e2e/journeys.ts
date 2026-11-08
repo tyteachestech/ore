@@ -2753,6 +2753,34 @@ journey("review: ⌘Z on Home after leaving takes the rating back, leaves the se
   await app.undoAll();
 });
 
+journey("review: a held ↵ rates the last card once and the end screen stays", async (page) => {
+  const app = oreCalls(page);
+  await startReview(page, /^\s*AI\b/);
+  await page.keyboard.press("2");
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await page.waitForTimeout(350);
+  const from = app.calls.length;
+  await page.keyboard.down("Enter");
+  for (let n = 0; n < 30; n++) {
+    await page.waitForTimeout(40);
+    await page.keyboard.down("Enter"); // held: each repeat comes with repeat: true
+  }
+  await page.keyboard.up("Enter");
+  const done = page.locator(".review-foot").getByRole("button", { name: "Done" });
+  await done.waitFor();
+  await page.waitForTimeout(300);
+  const later = app.calls.slice(from);
+  try {
+    if (!(await done.isVisible())) throw new Error("the end screen closed under the held ↵");
+    if (app.rated.length !== 1) throw new Error(`${app.rated.length} ratings`);
+    if (later.filter((a) => a[0] === "session" && a[1] === "start").length) throw new Error("the held ↵ started another session");
+  } finally {
+    await app.undoAll();
+  }
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: two rating keys in one task log one rating", async (page) => {
   const app = oreCalls(page);
   await startReview(page, null);

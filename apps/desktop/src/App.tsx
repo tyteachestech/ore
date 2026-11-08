@@ -2113,6 +2113,7 @@ export function App() {
             skills={skills}
             recent={recent}
             reload={homeTick}
+            blocked={overlay}
             onReview={startReview}
             onOpenSource={openSource}
             onOpenSkill={openSkill}

@@ -636,6 +636,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     // Enter on a focused control (Again, Edit card, Open in source, Undo) is that control's; Enter's
     // shortcuts below are for the Review surface itself.
     const onSurface = e.target === root.current || e.target === document.body;
+    // A held ↵ gave the last rating once; its repeats never press Done (focused) or Try again.
+    if ((end || !card) && e.key === "Enter" && e.repeat) return e.preventDefault();
     if (end) {
       if (e.key === "Enter" && onSurface) {
         e.preventDefault();

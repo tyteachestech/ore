@@ -20,7 +20,7 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 /** Home (D58): today's goal and what is due, the sources he is reading, and each skill's
  *  strength. Apple Fitness for the ring; Start review asks what to review (D80). */
-export function Home({ items, empty, skills, recent, reload, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, skillMenu, notify }: {
+export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, skillMenu, notify }: {
   items: Item[];
   /** The library has no sources yet (loaded, not loading): Home says how to add the first. */
   empty?: boolean;
@@ -28,6 +28,8 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
   recent: string[];
   /** Changes whenever Home should reload today's numbers (after a review). */
   reload: number;
+  /** Review or a sheet is open over Home: its keys are theirs, even while focus is still on the page. */
+  blocked?: boolean;
   onReview: (pick: string[] | null) => void;
   onOpenSource: (id: string) => void;
   onOpenSkill: (id: string) => void;
@@ -73,7 +75,8 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
   // ↵ starts review (D58, D80) unless focus is on something that takes Enter itself.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Enter" || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      // A held ↵ starts once: its repeats never reach a Review or picker opening under it.
+      if (e.key !== "Enter" || e.repeat || blocked || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       if ((e.target as HTMLElement).closest?.("button, a, input, textarea, [contenteditable='true'], [role='dialog']")) return;
       if (!canStart) return;
       e.preventDefault();
@@ -81,7 +84,7 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canStart, ask]);
+  }, [canStart, ask, blocked]);
 
   // Arrows move between skill tiles and Continue reading (Raycast's grid): ←→ in order, ↑↓ to the
   // nearest one in the row above or below. Nothing is selected until an arrow is pressed.
