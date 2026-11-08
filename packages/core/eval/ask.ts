@@ -44,7 +44,7 @@ export function addBig(root: string) {
 
 /** Goldens of pages whose words rewrite-page.ts swapped for learning words at random: noise that
  *  crowds out the real evidence, so they stay out of the eval's library. */
-const REWRITTEN = new Set(["web-hn-thread", "web-speakerdeck"]);
+export const REWRITTEN = new Set(["web-hn-thread", "web-speakerdeck"]);
 
 /** Each golden doc.md as a source in the library; returns item id → golden name. */
 export async function addGolden(lib: Library, dir = GOLDEN): Promise<Map<string, string>> {

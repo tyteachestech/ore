@@ -202,6 +202,12 @@ describe("import coverage: web pages", () => {
     expect(count(b, /^## Slide \d+$/gm)).toBe(27);
     expect(b).not.toContain("More Decks");
     expect(b).not.toContain("Other Decks");
+    // Served with no space between a slide's two parts, its words still don't run together.
+    const page = web("speakerdeck.html");
+    const tight = await htmlToDoc(page.replace(/<\/a>\s*<\/h3>\s*/g, "</a></h3>"), url);
+    expect(tight.markdown).toContain("chunk 1.mind ﬁg 2.gap");
+    // A talk without its slides' words is refused with how to get them, not saved as the site's other decks.
+    await expect(htmlToDoc(page.replace(/<div class="slide-transcript">/g, '<div class="other">'), url)).rejects.toThrow("Download its PDF");
   });
 
   test("Wikipedia's formulas: the TeX its authors wrote, inline and on their own line", async () => {

@@ -23,8 +23,9 @@ const CJK_START = new RegExp(`^[${CJK_SCRIPTS}\\u3000-\\u303f\\uff00-\\uffef]`, 
  *  sentence wraps, since those scripts put no space between words. */
 export const lineBreakSpace = (before: string, after: string): string => (CJK_END.test(before) && CJK_START.test(after) ? "" : " ");
 
-/** Text with Markdown's own characters escaped, so it reads as what it says. */
-export const escapeMarkdown = (s: string) => s.replace(/([\\`*_[\]<>])/g, "\\$1");
+/** Text with Markdown's own characters escaped, so it reads as what it says: a doubled `$` would
+ *  open math, a doubled `~` strikethrough or a code fence. */
+export const escapeMarkdown = (s: string) => s.replace(/([\\`*_[\]<>])/g, "\\$1").replace(/([$~])(?=\1)/g, "\\$1");
 
 /** The next step for a page only his browser can open (D96). */
 export const FROM_TAB = "add it from the browser (Browser tab in the add box, or `ore add --tab`)";

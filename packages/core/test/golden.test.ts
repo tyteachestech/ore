@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { REWRITTEN } from "../eval/ask.ts";
 import { addSource } from "../src/ingest/index.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -45,8 +46,9 @@ function serve(pages: Record<string, [file: string, type: string]>) {
 const HTML = "text/html; charset=utf-8";
 // Each golden doc is also a source in the Ask eval (eval/ask.ts): a new one on the same topic as a
 // question there can crowd out that question's evidence, so pick a fixture's subject apart from theirs.
-// A page whose words were rewritten (rewrite-page.ts) goes in REWRITTEN there instead.
-const CASES: { name: string; add: string; serve?: Record<string, [string, string]> }[] = [
+// A page whose markup is kept and words rewritten (rewrite-page.ts) is marked `rewritten`: its random
+// learning words would crowd out every question's evidence, so the eval leaves it out (REWRITTEN).
+const CASES: { name: string; add: string; serve?: Record<string, [string, string]>; rewritten?: true }[] = [
   { name: "pdf-hazards", add: join(FIX, "files/hazards.pdf") }, // footnotes, powers, hyphens, running heads
   { name: "pdf-outline", add: join(FIX, "files/outline.pdf") }, // the PDF outline as chapters
   { name: "pdf-textbook", add: join(FIX, "files/textbook.pdf") }, // margin notes, numbered headings, lists
@@ -63,10 +65,14 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "youtube-auto-captions", add: "https://www.youtube.com/watch?v=oreGolden01", serve: { "https://captions.test/talk.en.vtt": ["video/talk.en.vtt", "text/vtt"] } },
   // Wikipedia (CC BY-SA 4.0) and the Python docs (PSF License) may be shared.
   { name: "web-wikipedia", add: "https://en.wikipedia.org/wiki/Spaced_repetition", serve: { "https://en.wikipedia.org/wiki/Spaced_repetition": ["web/wikipedia.html", HTML] } },
-  { name: "web-hn-thread", add: "https://news.ycombinator.com/item?id=11408447", serve: { "https://news.ycombinator.com/item?id=11408447": ["web/hn-thread.html", HTML] } }, // markup kept, words rewritten
-  { name: "web-speakerdeck", add: "https://speakerdeck.com/jennybc/how-to-name-files", serve: { "https://speakerdeck.com/jennybc/how-to-name-files": ["web/speakerdeck.html", HTML] } }, // markup kept, words rewritten
+  { name: "web-hn-thread", add: "https://news.ycombinator.com/item?id=11408447", serve: { "https://news.ycombinator.com/item?id=11408447": ["web/hn-thread.html", HTML] }, rewritten: true },
+  { name: "web-speakerdeck", add: "https://speakerdeck.com/jennybc/how-to-name-files", serve: { "https://speakerdeck.com/jennybc/how-to-name-files": ["web/speakerdeck.html", HTML] }, rewritten: true },
   { name: "web-python-docs", add: "https://docs.python.org/3/tutorial/classes.html", serve: { "https://docs.python.org/3/tutorial/classes.html": ["web/docs-python.html", HTML] } },
 ];
+
+test("golden: the Ask eval leaves out exactly the pages whose words were rewritten", () => {
+  expect(CASES.filter((c) => c.rewritten).map((c) => c.name).sort()).toEqual([...REWRITTEN].sort());
+});
 
 for (const c of CASES)
   test(`golden: ${c.name}`, async () => {

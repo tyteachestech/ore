@@ -224,26 +224,34 @@ const paragraph = (s: string) =>
   escapeMarkdown(s.replace(/\s+/g, " ").trim()).replace(/^(\d+)([.)])/, "$1\\$2").replace(/^([#>+=-])/, "\\$1");
 
 /** A Speaker Deck talk as its slides, the way PowerPoint's come in: each slide's picture, then its
- *  words from the page's transcript (the site's reader would keep its other decks instead). */
-function speakerDeck(doc: Document, url: string): string | undefined {
+ *  words from the page's transcript (the site's reader keeps its other decks instead). A talk with
+ *  no transcript is refused with how to get its slides. */
+function speakerDeck(html: string, url: string): WebDoc | undefined {
   if (!/^https?:\/\/(?:www\.)?speakerdeck\.com\/[^/]+\/[^/?#]+/.test(url)) return undefined;
-  const slides = [...doc.querySelectorAll("#transcript .slide-transcript")];
-  if (!slides.length) return undefined;
-  let about = doc.querySelector('meta[name="description"]')?.getAttribute("content") ?? "";
+  const doc = parseHTML(html).document as unknown as Document;
+  let talk: { name?: string; description?: string; datePublished?: string; author?: { name?: string } } | undefined;
   for (const s of doc.querySelectorAll('script[type="application/ld+json"]')) {
     try {
-      const ld = JSON.parse(s.textContent ?? "") as { "@type"?: string; description?: string };
-      if (ld["@type"] === "PresentationDigitalDocument" && ld.description) about = ld.description;
+      const ld = JSON.parse(s.textContent ?? "") as typeof talk & { "@type"?: string };
+      if (ld?.["@type"] === "PresentationDigitalDocument") talk = ld;
     } catch { /* another script's data */ }
   }
-  const parts = about.trim() ? [paragraph(about)] : [];
+  if (!talk) return undefined; // a profile or a list of talks
+  const slides = [...doc.querySelectorAll("#transcript .slide-transcript")];
+  if (!slides.length) throw new Error("Speaker Deck hasn't shared this talk's slide text. Download its PDF from the talk's page (the download button under the slides), then add that file.");
+  const parts = talk.description?.trim() ? [paragraph(talk.description)] : [];
   slides.forEach((s, i) => {
     const n = i + 1;
     const image = s.querySelector("a[href]")?.getAttribute("href")?.match(/^https:\/\/[^\s()]+$/)?.[0];
-    const words = paragraph(s.textContent ?? "");
+    // Its words come in two parts, the title link and the rest, kept apart so they never run together.
+    const head = s.querySelector("h3");
+    const first = head?.textContent ?? "";
+    head?.remove();
+    const words = paragraph(`${first} ${s.textContent ?? ""}`);
     parts.push(`<!-- slide ${n} -->`, `## Slide ${n}`, ...(image ? [`![Slide ${n}](${image})`] : []), ...(words ? [words] : []));
   });
-  return parts.join("\n\n");
+  const title = talk.name?.trim() || doc.querySelector('meta[property="og:title"]')?.getAttribute("content")?.trim() || url;
+  return { title, author: cleanAuthor(talk.author?.name), published: cleanDate(talk.datePublished), markdown: parts.join("\n\n") + "\n" };
 }
 
 /** A Hacker News thread as Defuddle's reader for it expects: names marked `.hnuser` (HN dropped the
@@ -265,6 +273,8 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     const title = parseHTML(html).document.querySelector("title")?.textContent?.trim();
     return { title: title || url, markdown: notion };
   }
+  const deck = speakerDeck(html, url);
+  if (deck) return deck;
   try {
     const { document } = parseHTML(html);
     videoLinks(document as unknown as Document);
@@ -272,11 +282,10 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);
     const poster = hackerNews(document as unknown as Document, url);
-    const deck = speakerDeck(document as unknown as Document, url);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
-    const markdown = deck ?? inlineMath(htmlTables(r.content.trim()));
+    const markdown = inlineMath(htmlTables(r.content.trim()));
     if (markdown.length > 200) {
       return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
     }
