@@ -15,7 +15,7 @@ apps/desktop/public/excalidraw-assets/
 apps/desktop/.impeccable/
 apps/desktop/dist-phone/
 apps/phone/src-tauri/target/
-apps/phone/src-tauri/gen/schemas/
+apps/phone/src-tauri/gen/
 
 # The release build's bundled CLI (apps/desktop/scripts/bundle-cli.ts)
 apps/desktop/src-tauri/binaries/

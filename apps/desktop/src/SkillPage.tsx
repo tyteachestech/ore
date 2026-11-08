@@ -5,7 +5,7 @@ import { Grow } from "./Grow";
 import { useSplit } from "./split";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import * as Popover from "@radix-ui/react-popover";
-import { IconPicker, SkillIcon } from "./IconPicker";
+import { focusFilter, IconPicker, SkillIcon } from "./IconPicker";
 import { is, isNotes, label, useKeymap } from "./keys";
 import { clickBelow, LinkedFrom, NoteBody, useNotes } from "./Notes";
 import { FindBar, onceFound } from "./Find";
@@ -230,7 +230,7 @@ function BadgePicker({ skill, onChanged, notify }: { skill: Skill; onChanged: ()
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover" side="bottom" align="start" sideOffset={6} collisionPadding={12}>
+        <Popover.Content className="popover" side="bottom" align="start" sideOffset={6} collisionPadding={12} onOpenAutoFocus={focusFilter}>
           <IconPicker
             value={skill.icon}
             color={skill.color ?? ""}

@@ -46,6 +46,8 @@ const agents = article("Building Effective Agents", [
   ]],
   ["Patterns", [
     para("Prompt chaining decomposes a task into a sequence of steps, where each call processes the output of the previous one. Routing classifies an input and sends it to a specialised follow-up. Parallelisation runs subtasks at once and aggregates them."),
+    // A figure whose labels are small at column width, for figure zoom (e2e "figure zoom").
+    "![The workflow patterns, from simplest to most complex](assets/patterns.svg)",
     para("The orchestrator-workers pattern lets a central model break down a task, delegate to workers, and synthesise their results. Evaluator-optimiser loops have one call generate a response while another evaluates it and provides feedback."),
   ]],
 ]);
@@ -54,9 +56,14 @@ const story = article("The Story Spine", [
   ["The pattern", [para("Once upon a time there was ___. Every day, ___. One day ___. Because of that, ___. Because of that, ___. Until finally ___. And ever since then ___. The spine forces cause and effect, which is what separates a story from a list of events.")]],
 ]);
 
+// The figure in Building Effective Agents: its labels are small at the column's width (figure zoom).
+const PATTERNS = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300"><rect width="1200" height="300" fill="#f4f4f2"/><g font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#222" text-anchor="middle"><rect x="40" y="110" width="300" height="80" rx="10" fill="#fff" stroke="#999"/><text x="190" y="158">Prompt chaining</text><rect x="450" y="110" width="300" height="80" rx="10" fill="#fff" stroke="#999"/><text x="600" y="158">Routing</text><rect x="860" y="110" width="300" height="80" rx="10" fill="#fff" stroke="#999"/><text x="1010" y="158">Orchestrator-workers</text><path d="M340 150h110M750 150h110" stroke="#999" stroke-width="3"/><text x="600" y="250" font-size="16" fill="#666">Each step adds complexity: use the simplest pattern that works</text></g></svg>`;
+
 const mk = async (text: string, skills: string[]) => addText(lib, text, { skills });
 const a1 = await mk(retrieval, ["learning", "teaching"]);
 const a2 = await mk(agents, ["ai"]);
+mkdirSync(join(a2.dir, "assets"), { recursive: true });
+writeFileSync(join(a2.dir, "assets", "patterns.svg"), PATTERNS);
 const a3 = await mk(story, ["storytelling-writing"]);
 const a4 = await mk(article("A very long title about the neuroscience of habit formation and why cue-routine-reward loops are harder to break than to build", [["Loops", [para("Habits form when a cue reliably predicts a reward.")]]]), ["habits"]);
 const a5 = await mk(article("Notes on spaced repetition scheduling (FSRS)", [["Stability", [para("FSRS models stability and difficulty for each card.")]]]), ["learning"]);

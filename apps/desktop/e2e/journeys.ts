@@ -970,6 +970,38 @@ journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to t
   await until("then ⌘[ leaves the source, as before", async () => !(await page.locator(".doc").isVisible()));
 });
 
+journey("figure zoom: a click opens a figure to fill the window and keys don't reach the page behind; Esc, a click or a scroll puts it back (D143)", async (page) => {
+  await openSource(page, AGENTS);
+  const fig = page.locator(".doc img").first();
+  await fig.scrollIntoViewIfNeeded();
+  const small = (await fig.boundingBox())!;
+  const zoom = page.locator(".figure-zoom");
+  const big = page.locator(".figure-zoom.open img");
+  const shut = () => until("it is put back", async () => !(await zoom.count()) && (await fig.evaluate((i) => getComputedStyle(i).visibility)) === "visible");
+  await fig.click();
+  await big.waitFor();
+  await until("the figure grows to fill the window", async () => ((await big.boundingBox())?.width ?? 0) > small.width * 1.3);
+  // Keys stay with the figure: the page behind doesn't scroll, and Esc puts it back at once.
+  const top = await page.locator(".reader-scroll").evaluate((el) => el.scrollTop);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Escape");
+  await shut();
+  if ((await page.locator(".reader-scroll").evaluate((el) => el.scrollTop)) !== top) throw new Error("keys pressed over the figure scrolled the page behind");
+  if (!(await page.locator(".doc").isVisible())) throw new Error("Esc left the source as well as the figure");
+  // A click on it puts it back, and so does a scroll.
+  await fig.click();
+  await big.waitFor();
+  await page.waitForTimeout(300);
+  await zoom.click();
+  await shut();
+  await fig.click();
+  await big.waitFor();
+  await page.mouse.wheel(0, 200);
+  await shut();
+  if ((await page.locator(".reader-scroll").evaluate((el) => el.scrollTop)) !== top) throw new Error("the scroll that put the figure back moved the page too");
+});
+
 journey("highlight note: a long note's hover preview stays inside the window", async (page) => {
   await openSource(page, AGENTS);
   const popup = page.getByRole("dialog", { name: "Highlight" });
@@ -1563,6 +1595,233 @@ journey("shortcuts: resetting one to a default another command took since asks b
   // Put the keys back for the journeys after this one.
   await page.getByRole("button", { name: /^Reset Faster to / }).click();
   await until("Faster has ] again", async () => (await keysOf("Faster")).includes("]"));
+  await page.keyboard.press("Escape");
+});
+
+/** Walks a menu with ↓ to the item named `label` and picks it with ↵, as he does without the mouse. */
+async function pickWithKeys(page: Page, label: string) {
+  const at = () => page.evaluate(() => (document.activeElement?.getAttribute("role") === "menuitem" ? document.activeElement.textContent ?? "" : ""));
+  // Radix moves focus to the next item on a timer: each ↓ waits for its move, as a held key's repeat would.
+  for (let i = 0, now = await at(); i < 16 && !now.startsWith(label); i++) {
+    await page.keyboard.press("ArrowDown");
+    const was = now;
+    await until("↓ moves the focus", async () => (now = await at()) !== was, 1000).catch(() => {});
+  }
+  if (!(await at()).startsWith(label)) throw new Error(`no “${label}” in the menu (at “${await at()}”)`);
+  await page.keyboard.press("Enter");
+}
+
+const hasCaret = (page: Page, sel: string) => page.locator(sel).evaluate((el) => el === document.activeElement).catch(() => false);
+
+journey("row menu by keyboard: ↓ and ↵ stay in the menu, never move or open the list under it; Rename… opens the title in place", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".row");
+  await rows.nth(2).waitFor();
+  await rows.nth(1).click({ button: "right" });
+  await page.getByRole("menu").waitFor();
+  await pickWithKeys(page, "Rename…");
+  await until("the title field has the caret", () => hasCaret(page, ".row-rename"));
+  await page.waitForTimeout(300);
+  if (!(await hasCaret(page, ".row-rename"))) throw new Error("the title field lost the caret");
+  if (await page.locator(".doc-head").count()) throw new Error("↵ in the menu also opened a source");
+  if (await page.locator(".row[aria-selected=true]").count()) throw new Error("↓ in the menu moved the list's selection");
+  await page.keyboard.press("Escape");
+});
+
+journey("⋯ menus by keyboard: Edit author… and New skill open their field with the caret in it", async (page) => {
+  await openSource(page, AGENTS);
+  await page.getByRole("button", { name: "Source actions" }).click();
+  await pickWithKeys(page, "Edit author…");
+  await until("the author field has the caret", () => hasCaret(page, ".author-edit"));
+  await page.waitForTimeout(300);
+  if (!(await hasCaret(page, ".author-edit"))) throw new Error("the author field lost the caret");
+  await page.keyboard.press("Escape");
+  await page.locator(".side-head", { hasText: "Craft" }).hover();
+  await page.getByRole("button", { name: "Actions for Craft" }).click();
+  await pickWithKeys(page, "New skill");
+  const name = '[aria-label="New skill name"]';
+  await until("the new skill field has the caret", () => hasCaret(page, name));
+  await page.waitForTimeout(300);
+  if (!(await hasCaret(page, name))) throw new Error("the new skill field lost the caret");
+  await page.keyboard.press("Escape");
+});
+
+journey("sidebar: New collection “Other” names a skill among the ungrouped ones, in the sidebar and in ⌘K", async (page) => {
+  const box = (await page.locator(".sidebar").boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height - 20, { button: "right" });
+  await page.getByRole("menuitem", { name: "New collection" }).click();
+  await page.getByLabel("New collection name").fill("Other");
+  await page.keyboard.press("Enter");
+  await page.locator('.sidebar [role=group][aria-label="Other"]').getByLabel("New skill name").waitFor();
+  await page.keyboard.press("Escape");
+  // In ⌘K, naming it Other adds a skill to the skills in no collection, as an existing name joins that one.
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("New collection");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("other");
+  await page.getByRole("option", { name: "Add a skill to “Other”" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await until("one Other heading", async () => (await page.locator(".side-label-text").allInnerTexts()).filter((t) => /^other$/i.test(t)).length === 1);
+});
+
+journey("a row's ⋯ menu in a short window stays inside it, scrolling, as its right-click twin does", async (page) => {
+  await page.setViewportSize({ width: 900, height: 480 }); // Tauri's smallest window
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".row");
+  await rows.nth(2).waitFor();
+  const last = rows.last();
+  await last.scrollIntoViewIfNeeded();
+  await last.hover();
+  await last.getByRole("button", { name: /^Actions for/ }).click();
+  const menu = page.locator(".menu-list").last();
+  await menu.waitFor();
+  await page.waitForTimeout(200);
+  const box = (await menu.boundingBox())!;
+  if (box.y < 0 || box.y + box.height > 480) throw new Error(`the menu runs out of the window: top ${box.y}, bottom ${box.y + box.height}`);
+  await page.keyboard.press("Escape");
+});
+
+journey("icon picker: it opens with the caret in Filter, so typing searches at once (Notion), from Edit skill and the skill page", async (page) => {
+  const typed = async () => {
+    await page.locator(".picker-search").first().waitFor();
+    await page.keyboard.type("star");
+    await until("Filter has what he typed", async () => (await page.locator(".picker-search").first().inputValue()) === "star");
+    await page.keyboard.press("Escape");
+    await page.locator(".picker").waitFor({ state: "detached" });
+  };
+  // Habits has an icon, so its picker opens on Icons: ~1,700 pixel icons, drawn as they scroll into view.
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  await page.getByRole("dialog", { name: "Edit skill Habits" }).getByRole("button", { name: "Change icon" }).click();
+  await typed();
+  await page.keyboard.press("Escape");
+  await page.locator(".sidebar .side-item", { hasText: "Storytelling" }).first().click();
+  await page.locator(".skill-badge").click();
+  await typed();
+});
+
+journey("peeked sidebar: it stays while its own menu is open, and slides away once nothing holds it, after Esc from a new skill too", async (page) => {
+  const shown = () => page.locator(".sidebar").evaluate((s) => !(s as HTMLElement).hidden);
+  const peek = async () => {
+    await page.mouse.move(600, 400);
+    await page.mouse.move(1, 400, { steps: 5 });
+    await until("it peeks out", shown);
+  };
+  await page.getByRole("button", { name: "Hide sidebar" }).click();
+  await until("the sidebar hides", async () => !(await shown()));
+  await peek();
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
+  const menu = page.getByRole("menu");
+  const m = (await menu.boundingBox())!;
+  await page.mouse.move(m.x + m.width - 10, m.y + m.height - 6, { steps: 5 }); // off the sidebar
+  await page.waitForTimeout(900);
+  if (!(await shown())) throw new Error("the sidebar slid away under its own menu");
+  await page.keyboard.press("Escape");
+  await page.mouse.move(900, 400, { steps: 5 });
+  await until("it slides away once the menu is closed", async () => !(await shown()));
+  await peek();
+  await page.locator(".side-section", { hasText: "Life" }).hover();
+  await page.getByRole("button", { name: "New skill in Life" }).click();
+  await page.keyboard.type("Peek skill");
+  await page.mouse.move(900, 400, { steps: 5 });
+  await page.waitForTimeout(700);
+  if (!(await shown())) throw new Error("the sidebar slid away from the field he is typing in");
+  await page.keyboard.press("Escape");
+  await until("it slides away after Esc, with the pointer gone", async () => !(await shown()));
+  // A menu opened in the page doesn't hold it: only its own menus do.
+  await peek();
+  const row = page.locator(".home-read").first();
+  const r = (await row.boundingBox())!;
+  await page.mouse.move(r.x + 40, r.y + r.height / 2, { steps: 5 });
+  await row.click({ button: "right" });
+  await page.getByRole("menu").waitFor();
+  await until("it slides away under a menu of the page", async () => !(await shown()));
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Show sidebar" }).click();
+});
+
+journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette or the shortcuts sheet (Linear)", async (page) => {
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await page.keyboard.press("Meta+Comma");
+  await settings.waitFor();
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("dialog", { name: "Command palette" }).waitFor();
+  await settings.waitFor({ state: "detached" });
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+Comma");
+  await settings.waitFor();
+  await page.keyboard.press("Meta+Slash");
+  await page.getByRole("dialog", { name: "Keyboard shortcuts" }).waitFor();
+  await settings.waitFor({ state: "detached" });
+  await page.keyboard.press("Escape");
+  // While a shortcut is being recorded, ⌘K is the keys he is giving it.
+  await page.keyboard.press("Meta+Comma");
+  await settings.getByRole("tab", { name: "Keyboard shortcuts" }).click();
+  await settings.getByRole("button", { name: /^Rename source: .*Press to change$/ }).click();
+  await page.keyboard.press("Meta+k");
+  await settings.getByRole("alert").filter({ hasText: "Command palette" }).waitFor();
+  if (await page.getByRole("dialog", { name: "Command palette" }).count()) throw new Error("⌘K while recording opened the palette");
+  await page.keyboard.press("Escape");
+});
+
+journey("sidebar: a new skill named like one he has is refused in place, in words, as a taken collection name is", async (page) => {
+  await page.locator(".side-section", { hasText: "Craft" }).hover();
+  await page.getByRole("button", { name: "New skill in Craft" }).click();
+  await page.keyboard.type("  learning  ");
+  await page.keyboard.press("Enter");
+  await until("it says the name is taken", async () => (await page.locator(".side-new-foot").innerText()) === "“Learning” is taken");
+  if (!(await page.getByLabel("New skill name").isVisible())) throw new Error("the field closed");
+  await page.keyboard.press("Escape");
+});
+
+journey("Edit skill: the colours are one Tab stop, and ← → move and pick, as a radio group's do", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
+  const picked = () => dialog.locator(".swatch[aria-checked=true]").getAttribute("aria-label");
+  await dialog.getByRole("radio", { name: "No color" }).focus();
+  // Held as a finger holds it: Radix picks on the focus its roving focus moves a tick later, while the key is down.
+  await page.keyboard.press("ArrowRight", { delay: 50 });
+  await until("→ picks the next colour", async () => (await picked()) !== "No color");
+  const second = await picked();
+  if (!(await page.evaluate(() => document.activeElement?.getAttribute("aria-checked") === "true"))) throw new Error("focus did not move with the pick");
+  await page.keyboard.press("ArrowLeft", { delay: 50 });
+  await until("← goes back to No color", async () => (await picked()) === "No color");
+  await page.keyboard.press("Tab");
+  if (await page.evaluate(() => document.activeElement?.classList.contains("swatch"))) throw new Error(`Tab went to another swatch, not past the row (${second})`);
+  await page.keyboard.press("Escape");
+});
+
+journey("Settings: Esc in the review plan field drops the draft and keeps focus in Settings; the next Esc closes it", async (page) => {
+  await page.keyboard.press("Meta+Comma");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings.getByRole("tab", { name: "Review" }).click();
+  const plan = settings.getByLabel("After what do you review?");
+  const was = await plan.inputValue();
+  await plan.click();
+  await plan.fill("my coffee, half typed");
+  await page.keyboard.press("Escape");
+  await until("the draft is dropped", async () => (await plan.inputValue()) === was);
+  if (!(await settings.evaluate((s) => s.contains(document.activeElement)))) throw new Error("focus left Settings");
+  await page.keyboard.press("Escape");
+  await settings.waitFor({ state: "detached" });
+});
+
+journey("icon picker: ↓ past the rows drawn so far draws the next ones and keeps the picked icon in view", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  await page.getByRole("dialog", { name: "Edit skill Habits" }).getByRole("button", { name: "Change icon" }).click();
+  await page.locator(".picker-cell").nth(100).waitFor();
+  for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowDown"); // onto the first row not drawn yet
+  await until("the picked icon is in view", () =>
+    page.evaluate(() => {
+      const cell = document.querySelector(".picker-cell[data-active]")?.getBoundingClientRect();
+      const box = document.querySelector(".picker-scroll")!.getBoundingClientRect();
+      return !!cell && cell.top >= box.top - 1 && cell.bottom <= box.bottom + 1;
+    }),
+  );
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
 });
 
@@ -4280,6 +4539,42 @@ journey("prequestions: a source added with --no-enrich offers to write them, nev
     if (await page.getByText("Writing prequestions…").count()) throw new Error("it waits on an enrich nothing started");
   } finally {
     await ore("archive", made.id);
+  }
+});
+
+journey("stacked Undo: each ⌘Z's toast comes to the front and names the source it put back", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const titles = () => page.locator(".list .row .title").allInnerTexts();
+  await until("All sources lists three sources", async () => (await titles()).length >= 3);
+  const before = await titles();
+  await page.locator(".list").focus();
+  await page.keyboard.press("ArrowDown");
+  for (const t of before.slice(0, 3)) {
+    await page.keyboard.press("a");
+    await until(`“${t}” is archived`, async () => !(await titles()).includes(t));
+  }
+  const front = () => page.locator(".toasts .toast").last().locator(".toast-msg").innerText();
+  await page.keyboard.press("Meta+z");
+  await until("the first ⌘Z names the last one archived", async () => (await front()) === `Undone: Archived “${before[2]}”`);
+  await page.keyboard.press("Meta+z");
+  await until("the second ⌘Z's toast is in front, naming the one it put back", async () => (await front()) === `Undone: Archived “${before[1]}”`);
+  await page.keyboard.press("Meta+z");
+  await until("all three are back", async () => (await titles()).length === before.length);
+});
+
+journey("delete skill: with nothing to decide it deletes at once, and ⌘Z puts it back (no Are you sure)", async (page) => {
+  const k = (await ore("skills", "add", "Knot tying")) as { id: string };
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Knot tying" }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: /^Delete skill/ }).click();
+    await page.locator(".toast-msg", { hasText: "Deleted Knot tying" }).waitFor();
+    if (await page.getByRole("alertdialog").count()) throw new Error("a dialog asked first, though Undo can take it back");
+    await until("the skill leaves the sidebar", async () => (await page.locator(".sidebar .side-item", { hasText: "Knot tying" }).count()) === 0);
+    await page.keyboard.press("Meta+z");
+    await page.locator(".sidebar .side-item", { hasText: "Knot tying" }).first().waitFor();
+  } finally {
+    await ore("skills", "rm", k.id).catch(() => {});
   }
 });
 

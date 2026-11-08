@@ -1,3 +1,4 @@
+import * as RadioGroup from "@radix-ui/react-radio-group";
 import * as Tabs from "@radix-ui/react-tabs";
 import { defaultEmojiDataResolver, EmojiPicker } from "frimousse";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -45,6 +46,30 @@ function recents(): string[] {
 
 const random = <T,>(xs: T[]): T | undefined => xs[Math.floor(Math.random() * xs.length)];
 
+/** The popover's onOpenAutoFocus: the caret goes in Filter, so typing searches at once (Notion,
+ *  Linear). Left to Radix, focus lands on the first tab and the fields' autoFocus is lost. */
+export const focusFilter = (e: Event) => {
+  e.preventDefault();
+  (e.currentTarget as HTMLElement).querySelector<HTMLElement>(".picker-search")?.focus();
+};
+
+/** The skill colours as one radio group, as a macOS colour row: one Tab stop, ← → move and pick. */
+export function Swatches({ className, small, value, onPick }: { className: string; small?: boolean; value: SkillColor | ""; onPick: (color: SkillColor | "") => void }) {
+  return (
+    <RadioGroup.Root className={className} orientation="horizontal" loop aria-label="Color" value={value || "none"} onValueChange={(v) => onPick(v === "none" ? "" : (v as SkillColor))}>
+      {(["", ...SKILL_COLORS] as const).map((c) => (
+        // The hint sits on a wrapper: on the radio itself, its focus handler (which keeps a hint from
+        // showing on focus moved by code) would stop the pick that Radix makes as an arrow moves focus.
+        <Hint key={c || "none"} text={c ? c[0]!.toUpperCase() + c.slice(1) : "No color"}>
+          <span className="swatch-hint">
+            <RadioGroup.Item className={`swatch${small ? " small" : ""}`} value={c || "none"} data-color={c || undefined} aria-label={c || "No color"} />
+          </span>
+        </Hint>
+      ))}
+    </RadioGroup.Root>
+  );
+}
+
 /** Notion-style picker: Emoji and Icons tabs, search, recents, random, remove; icons take the skill color. */
 export function IconPicker({ value, color, onPick, onColor, onRemove }: {
   value?: string;
@@ -72,20 +97,7 @@ export function IconPicker({ value, color, onPick, onColor, onRemove }: {
           Remove
         </button>
       </div>
-      <div className="picker-colors" role="radiogroup" aria-label="Color">
-        {(["", ...SKILL_COLORS] as const).map((c) => (
-          <Hint key={c || "none"} text={c ? c[0]!.toUpperCase() + c.slice(1) : "No color"}>
-            <button
-              className="swatch small"
-              data-color={c || undefined}
-              role="radio"
-              aria-checked={color === c}
-              aria-label={c || "No color"}
-              onClick={() => onColor(c)}
-            />
-          </Hint>
-        ))}
-      </div>
+      <Swatches className="picker-colors" small value={color} onPick={onColor} />
       <Tabs.Content value="emoji" className="picker-body">
         <EmojiTab recent={recent.filter((r) => !isIcon(r))} onPick={pick} />
       </Tabs.Content>
@@ -168,6 +180,7 @@ const loadIcons = () =>
   ));
 
 const COLS = 12;
+const PAGE = COLS * 12;
 const label = (icon: string) => icon.slice(3).replaceAll(/[-_]/g, " ");
 
 function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillColor | ""; onPick: (icon: string) => void }) {
@@ -189,13 +202,22 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
       .map((x) => x.i);
   }, [all, query]);
   useEffect(() => setActive(0), [query]);
+  // The grid draws a page of rows at a time, more as it scrolls or the arrows go past them: each icon
+  // is an SVG mask of up to 256 dots, and drawing all ~1,700 at once held the page for seconds.
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [query]);
+  useEffect(() => void (active >= limit && setLimit(active + PAGE - (active % COLS))), [active, limit]);
+  const more = (el: HTMLElement) => el.scrollTop + el.clientHeight > el.scrollHeight - 200 && limit < shown.length && setLimit((l) => l + PAGE);
   // The arrows move the active cell; keep it in view as they leave the visible rows (not on hover).
   const scroll = useRef<HTMLDivElement>(null);
   const keyed = useRef(false);
+  // An arrow past the drawn rows lands on a cell that draws a render later, with the next page: scroll then.
   useEffect(() => {
-    if (keyed.current) scroll.current?.querySelector<HTMLElement>("[data-active]")?.scrollIntoView({ block: "nearest" });
+    const cell = keyed.current && scroll.current?.querySelector<HTMLElement>("[data-active]");
+    if (!cell) return;
+    cell.scrollIntoView({ block: "nearest" });
     keyed.current = false;
-  }, [active]);
+  }, [active, limit]);
 
   const onKey = (e: ReactKeyboardEvent) => {
     const move = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: COLS, ArrowUp: -COLS }[e.key];
@@ -218,7 +240,7 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
       aria-label={label(icon)}
       title={label(icon)}
       onClick={() => onPick(icon)}
-      onMouseEnter={() => i !== undefined && setActive(i)}
+      onMouseEnter={() => i !== undefined && ((keyed.current = false), setActive(i))}
     >
       <SkillIcon icon={icon} color={color} />
     </button>
@@ -234,7 +256,7 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
           </button>
         </Hint>
       </div>
-      <div className="picker-scroll" ref={scroll}>
+      <div className="picker-scroll" ref={scroll} onScroll={(e) => more(e.currentTarget)}>
         {!query && recent.length > 0 && (
           <div className="picker-section">
             <div className="picker-label">Recent</div>
@@ -246,7 +268,7 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
         ) : shown.length ? (
           <div className="picker-section">
             {!query && <div className="picker-label">Icons</div>}
-            <div className="picker-grid">{shown.map((i, n) => cell(`mc:${i.name}`, n))}</div>
+            <div className="picker-grid">{shown.slice(0, limit).map((i, n) => cell(`mc:${i.name}`, n))}</div>
           </div>
         ) : (
           <div className="picker-note">No icons found.</div>
