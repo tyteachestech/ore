@@ -15,7 +15,7 @@ import { withLock } from "../lock.ts";
 import { pendingNotes } from "../notes.ts";
 import { loadSkills, matchSkill } from "../skills.ts";
 import { ensureTopic, listTopics } from "../topics.ts";
-import { runAgent } from "./adapter.ts";
+import { runAgent, type Usage } from "./adapter.ts";
 import { anchorEvidence, finishScope } from "./check.ts";
 
 export const EnrichOutput = z.strictObject({
@@ -109,6 +109,8 @@ export interface EnrichResult {
   topics_created: string[];
   cards: { id: string; kind: string; content_type: string; question: string; answer: string; rubric: string[]; annotation?: string; from?: "notes" | "prequestion" | "tutor"; prequestion?: number }[];
   ai?: { vendor: string; model: string; prompt_version: string };
+  /** What the AI run spent (absent when nothing needed drafting). */
+  usage?: Usage;
 }
 
 const errorFile = (lib: Library, id: string) => join(paths.logs(lib), `enrich-${id}.error`);
@@ -178,7 +180,7 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
   const preqNs = preqs.map((p) => p.n);
   const questions = item.meta.enriched_at ? [] : openQuestions(lib, item);
   const questionIds = new Set(questions.map((q) => q.id));
-  const { data, ai } = await runAgent(lib, {
+  const { data, ai, usage } = await runAgent(lib, {
     prompt: "enrich",
     cwd: lib.root,
     files: [item.docPath],
@@ -308,6 +310,7 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
       topics_created: created,
       cards: cards.map((c) => ({ id: c.meta.id, kind: c.meta.kind, content_type: c.meta.content_type, question: c.question, answer: c.answer, rubric: c.rubric, annotation: c.meta.annotation, from: c.meta.from, prequestion: c.meta.prequestion })),
       ai,
+      usage,
     };
   });
 }

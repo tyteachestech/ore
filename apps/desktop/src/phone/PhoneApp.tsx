@@ -287,7 +287,7 @@ function SkillNote({ skill, notify }: { skill: string; notify: Notify }) {
   const editor = useRef<NoteEditorHandle>(null);
   return (
     <div className="phone-page phone-note">
-      <NoteBody notes={notes} editorRef={editor} targets={[]} onOpen={() => {}} placeholder="What you know so far. Type / for blocks." />
+      <NoteBody notes={notes} editorRef={editor} targets={[]} onOpen={() => {}} label="Skill note" placeholder="What you know so far. Type / for blocks." />
     </div>
   );
 }

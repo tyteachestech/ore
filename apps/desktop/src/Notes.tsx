@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as R
 import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/NoteEditor";
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
-import { ore, opt, type Backlink, type Notes } from "./ore";
+import { ore, opt, oreWith, type Backlink, type Notes } from "./ore";
 import { errorText, load, save, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
@@ -32,7 +32,7 @@ type MyNotes = {
   /** Takes the full text a CLI call returned (recall, chapter recall, append). */
   apply: (text: string) => void;
   /** Picks an image and copies it into images/ beside the note; its relative path, or null. */
-  attach: () => Promise<string | null>;
+  attach: (from?: string | { ext: string; data: string }) => Promise<string | null>;
   /** Reads the open editor's text now; NoteEditor sets it. */
   pull: { current: (() => string | null) | null };
   /** The CLI arguments that name this note (`<item>` or `--skill=<s>`), for `ore diagram`. */
@@ -142,11 +142,13 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     [apply, flush, key, notify, queue],
   );
 
-  const attach = useCallback(async () => {
-    const picked = await openDialog({ multiple: false, directory: false, filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg"] }] });
-    if (typeof picked !== "string") return null;
+  /** Copies an image beside the note: a file's path, a pasted one's bytes (base64), or one he picks. */
+  const attach = useCallback(async (from?: string | { ext: string; data: string }) => {
+    const picked = from ?? (await openDialog({ multiple: false, directory: false, filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg"] }] }));
+    if (!picked || Array.isArray(picked)) return null;
     try {
-      return (await ore<{ attached: string }>("notes", ...key.split(" "), opt("attach", picked))).attached;
+      const args = ["notes", ...key.split(" ")];
+      return (typeof picked === "string" ? await ore<{ attached: string }>(...args, opt("attach", picked)) : await oreWith<{ attached: string }>(picked.data, ...args, "--attach", "-", opt("ext", picked.ext))).attached;
     } catch (e) {
       notify(errorText(e), "error");
       return null;
@@ -214,12 +216,14 @@ type EditorProps = {
   targets: LinkTarget[];
   onOpen: (t: Omit<LinkTarget, "title">) => void;
   placeholder: string;
+  /** What VoiceOver calls the note ("Source note", "Skill note"). */
+  label: string;
   /** Keeps the caret for when this note opens again (NoteEditor's `place`). */
   place?: string;
 };
 
 /** The block editor over a loaded note; reloads when text arrives from outside it. */
-export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, place }: EditorProps) {
+export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, label, place }: EditorProps) {
   if (notes.error)
     return (
       <div className="empty-state err" role="alert">
@@ -245,6 +249,7 @@ export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, place
       noteArgs={notes.args}
       notify={notes.notify}
       placeholder={placeholder}
+      label={label}
       place={place}
     />
   );
@@ -369,7 +374,7 @@ export function SidePanel({ tab, onTab, bodyRef, onBodyMouseDown, children }: { 
 
 /** The source note tab: his note on this source, then what links to it. It keeps where it was scrolled and its
  *  caret, by source, for coming back from Collected, the docked tutor or another source (and a relaunch, for the scroll). */
-export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail, scroller }: Omit<EditorProps, "placeholder" | "place"> & { id: string; tail?: ReactNode; scroller: RefObject<HTMLDivElement | null> }) {
+export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail, scroller }: Omit<EditorProps, "placeholder" | "label" | "place"> & { id: string; tail?: ReactNode; scroller: RefObject<HTMLDivElement | null> }) {
   const target = useMemo(() => ({ item: id }), [id]);
   const key = `ore.sourcenote.scroll.${id}`;
   const loaded = notes.text !== null;
@@ -404,7 +409,7 @@ export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail, sc
   }, [loaded, key, scroller]);
   return (
     <>
-      <NoteBody notes={notes} editorRef={editorRef} targets={targets} onOpen={onOpen} place={`item:${id}`} placeholder="The big idea, and what it connects to… / for blocks, [[ to link." />
+      <NoteBody notes={notes} editorRef={editorRef} targets={targets} onOpen={onOpen} place={`item:${id}`} label="Source note" placeholder="The big idea, and what it connects to… / for blocks, [[ to link." />
       {tail}
       <LinkedFrom target={target} onOpen={onOpen} />
     </>

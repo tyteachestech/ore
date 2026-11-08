@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { openIndex } from "../src/db.ts";
 import { doctor } from "../src/doctor.ts";
 import { addSnippet } from "../src/ingest/index.ts";
@@ -96,5 +96,16 @@ describe("attachToNote (D38 images)", () => {
     expect(existsSync(join(lib.root, "skills/ai", s.attached))).toBe(true);
     writeFileSync(join(lib.root, "x.txt"), "no");
     expect(attachToNote(lib, a.id, join(lib.root, "x.txt"))).rejects.toThrow("attach an image");
+  });
+
+  test("a pasted image (bytes, no name) is saved as pasted.png, then pasted-2.png", async () => {
+    const { lib, a } = await setup();
+    const data = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const one = await attachToNote(lib, a.id, { ext: "png", data });
+    const two = await attachToNote(lib, a.id, { ext: ".PNG", data });
+    expect([one.attached, two.attached]).toEqual(["images/pasted.png", "images/pasted-2.png"]);
+    expect(readFileSync(join(lib.root, dirname(one.path), one.attached))).toEqual(Buffer.from(data));
+    expect(attachToNote(lib, a.id, { ext: "exe", data })).rejects.toThrow("attach an image");
+    expect(attachToNote(lib, a.id, { ext: "png", data: new Uint8Array() })).rejects.toThrow("empty");
   });
 });

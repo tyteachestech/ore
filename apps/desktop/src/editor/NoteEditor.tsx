@@ -25,12 +25,14 @@ import { lastPaint, paint } from "./colors";
 import { dateRows } from "./dates";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
-import { BlockHandle } from "./BlockHandle";
+import { BlockHandle, nearest, spot, type Spot } from "./BlockHandle";
+import { copiedFiles, pastesFiles } from "../copied";
+import { imageExt, noteImage } from "../paste";
 import { TableControls } from "./TableControls";
 import { KeyboardBar } from "./KeyboardBar";
 import { SelectionBar, type Sel } from "./SelectionBar";
 import { WithMenu, type MenuAction } from "../Menu";
-import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock, turnAtCaret, type Kind } from "./blockops";
+import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock, topGaps, turnAtCaret, type Kind } from "./blockops";
 import { is } from "../keys";
 
 /** What a link can point at (D39): a source, or a skill (its note, D41). */
@@ -108,12 +110,15 @@ type Props = {
   dir: string;
   targets: LinkTarget[];
   onOpen: (target: Omit<LinkTarget, "title">) => void;
-  /** Picks an image and copies it beside the note; resolves its relative path, or null. */
-  onAttach: () => Promise<string | null>;
+  /** Copies an image beside the note (a file's path, a pasted one's bytes in base64, or, with none,
+   *  one he picks); resolves its relative path, or null. */
+  onAttach: (from?: string | { ext: string; data: string }) => Promise<string | null>;
   /** The CLI arguments that name this note, for `ore diagram` (D40). */
   noteArgs: string[];
   notify: Notify;
   placeholder: string;
+  /** The editor's accessible name: its placeholder is drawn by CSS, so VoiceOver hears this instead. */
+  label: string;
   /** Set to a reader of the editor's text as of now, for a save that can't wait for its next change
    *  report (those come 200 ms after typing stops, and never when the editor closes first). */
   pull?: { current: (() => string | null) | null };
@@ -161,12 +166,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [index, setIndex] = useState(0);
   const [sel, setSel] = useState<Sel | null>(null);
   const [askLink, setAskLink] = useState(0);
+  /** Where images dragged in from Finder will land: a gap between the note's blocks. */
+  const [dropLine, setDropLine] = useState<{ x: number; y: number; w: number } | null>(null);
   const [emoji, setEmoji] = useState<EmojiEntry[] | null>(null);
   /** The diagram open in the overlay; `at` is where a new one goes once it has a drawing. */
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
   // The editor's plugins live as long as it does; they read the latest props, rows and menu
   // through this. The menu here is set as the caret moves, ahead of React's render.
-  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: { at: -1, ch: "" }, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), bar: false, renames: new Set() });
+  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: { at: -1, ch: "" }, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), bar: false, putImages: async () => {}, renames: new Set() });
 
   /** The format bar's selection; `live.current.bar` says whether it is up, for ⌘K. */
   const showSel = (s: Sel | null) => {
@@ -272,10 +279,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, showSel)]), imageView(live), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, showSel)]), imagePaste(live), imageView(live), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
+      e.action((ctx) => {
+        const dom = ctx.get(editorViewCtx).dom;
+        dom.setAttribute("aria-label", live.current.p.label);
+        dom.setAttribute("aria-multiline", "true");
+      });
       base = markdownOf(e);
       const b = base;
       if (live.current.p.pull) live.current.p.pull.current = read = () => keepUnedited(original, b, markdownOf(e));
@@ -447,12 +459,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         names: ["img", "picture", "photo"],
         run: () => {
           clear(menu);
-          void live.current.p.onAttach().then((src) => {
-            const v = view();
-            if (!src || !v) return;
-            v.dispatch(v.state.tr.replaceSelectionWith(imageSchema.type(ctxOf(editor.current!)).create({ src, alt: "" })));
-            v.focus();
-          });
+          void live.current.putImages([undefined]);
         },
       },
       {
@@ -573,6 +580,67 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     ];
   };
 
+  /** Images pasted, dropped or picked, as in Notion: each is copied beside the note (`undefined`: he
+   *  picks one), then put in at the caret, or, dropped, on a line of its own before the note's `before`th
+   *  block (counted at the time, so typing during the copy never puts it inside a line). One editor
+   *  step each, so ⌘Z takes it out again. */
+  live.current.putImages = async (files, before) => {
+    for (const f of files) {
+      const src = await live.current.p.onAttach(f);
+      const v = view();
+      if (!src || !v) continue;
+      const img = imageSchema.type(ctxOf(editor.current!)).create({ src, alt: "" });
+      if (before === undefined) {
+        v.dispatch(v.state.tr.replaceSelectionWith(img).scrollIntoView());
+      } else {
+        const doc = v.state.doc;
+        let at = 0;
+        for (let i = 0; i < Math.min(before, doc.childCount); i++) at += doc.child(i).nodeSize;
+        const tr = v.state.tr.insert(at, v.state.schema.nodes.paragraph!.create(null, img));
+        before++;
+        v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + img.nodeSize + 1)).scrollIntoView());
+      }
+      v.focus();
+    }
+  };
+
+  // Images dragged in from Finder: the webview gets no DOM drag events for files, so the app's drop
+  // handler finds the note under the pointer and tells it (App.tsx). A line shows the gap they land
+  // in; the gaps are measured once per drag, as a block's drag does.
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    let spots: Spot[] | null = null;
+    const spotAt = (x: number, y: number) => {
+      const v = view();
+      if (!v) return null;
+      spots ??= topGaps(v.state.doc).map((g) => spot(v, g));
+      return nearest(spots, x, y);
+    };
+    const drag = (e: Event) => {
+      const at = (e as CustomEvent<{ x: number; y: number } | null>).detail;
+      if (!at) spots = null;
+      const s = at && spotAt(at.x, at.y);
+      const h = el.getBoundingClientRect();
+      const line = s ? { x: s.left - h.left, y: s.y - h.top - 1, w: s.right - s.left } : null;
+      setDropLine((was) => (was && line && was.x === line.x && was.y === line.y && was.w === line.w ? was : line));
+    };
+    const drop = (e: Event) => {
+      const d = (e as CustomEvent<{ paths: string[]; x: number; y: number }>).detail;
+      const s = spotAt(d.x, d.y);
+      spots = null;
+      setDropLine(null);
+      const v = view();
+      void live.current.putImages(d.paths, s && v ? topGaps(v.state.doc).findIndex((g) => g.pos === s.gap.pos) : undefined);
+    };
+    el.addEventListener("ore-image-drag", drag);
+    el.addEventListener("ore-image-drop", drop);
+    return () => {
+      el.removeEventListener("ore-image-drag", drag);
+      el.removeEventListener("ore-image-drop", drop);
+    };
+  }, []);
+
   return (
     <div
       ref={host}
@@ -596,6 +664,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <WithMenu actions={diagramActions}>
         <div ref={root} onContextMenuCapture={(e) => (rightClicked.current = (e.target as HTMLElement).closest?.(".note-diagram") ?? null)} />
       </WithMenu>
+      {dropLine && <div className="block-drop" style={{ left: dropLine.x, top: dropLine.y, width: dropLine.w }} />}
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
       {PHONE && <KeyboardBar view={view} targets={p.targets} />}
@@ -643,12 +712,62 @@ type Live = {
     /** Opens the format bar's web link field on the selected text (⌘K), while the bar is up (`bar`). */
     askLink: () => void;
     bar: boolean;
+    /** Puts images in: see `putImages`. */
+    putImages: (files: (string | { ext: string; data: string } | undefined)[], before?: number) => Promise<void>;
     /** Diagram renames made in this editor, as "from to", both ways, for ⌘Z and ⇧⌘Z to follow. */
     renames: Set<string>;
   };
 };
 
 const ctxOf = (e: Editor) => e.ctx;
+
+/** A pasted screenshot or copied image goes into the note, as in Notion, not into the library as a
+ *  source. A file copied in Finder pastes only its name, so its path comes from the Mac's pasteboard
+ *  (another kind of file still pastes its name); copied HTML with a picture in it pastes as HTML. */
+function imagePaste(live: Live) {
+  const bytes = (f: File) =>
+    new Promise<{ ext: string; data: string }>((ok, fail) => {
+      const r = new FileReader();
+      r.onload = () => ok({ ext: imageExt(f.type), data: String(r.result).replace(/^data:[^,]*,/, "") });
+      r.onerror = () => fail(r.error);
+      r.readAsDataURL(f);
+    });
+  return $prose(
+    () =>
+      new Plugin({
+        props: {
+          // Before the editor's own paste handling (Milkdown's would paste a copied file's name as text).
+          handleDOMEvents: { paste: (view, e) => {
+            const d = e.clipboardData;
+            if (!d || !pastesFiles(d) || view.state.selection.$from.parent.type.spec.code) return false;
+            const text = d.getData("text/plain").trim();
+            const files = [...d.files].filter((f) => f.type.startsWith("image/") && f.size > 0);
+            // Words copied with a picture paste as words; an image alone (a screenshot, Copy Image's
+            // bare <img>, a Finder copy that names it) pastes as the image.
+            const words = !!d.getData("text/html").replace(/<[^>]*>/g, "").trim() || (!!text && !text.split("\n").every((l) => /^[^/]+\.[a-z0-9]{1,5}$/i.test(l))); // not a copied file's names
+            if (words) return false;
+            e.preventDefault();
+            if (files.length) {
+              Promise.all(files.map(bytes)).then(
+                (list) => live.current.putImages(list),
+                (err) => live.current.p.notify(errorText(err), "error"),
+              );
+              return true;
+            }
+            void copiedFiles().then((list) => {
+              const paths = list.flatMap((x) => (x.kind === "file" ? [x.path] : []));
+              const images = paths.filter(noteImage);
+              if (!images.length && text) return void view.dispatch(view.state.tr.insertText(text)); // another kind of file: its name, as before
+              if (images.length) void live.current.putImages(images);
+              if (images.length < paths.length) live.current.p.notify("Only images go in a note. To read a file, add it with ⌘O.", "error");
+              else if (!paths.length) live.current.p.notify("Couldn't read the copied file. Drag it in instead.", "error");
+            });
+            return true;
+          } },
+        },
+      }),
+  );
+}
 
 /** Opens the `/` and `[[` menus from the text before the caret, drives them from the keyboard,
  *  and opens links on click. */

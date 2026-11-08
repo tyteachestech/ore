@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative } from "node:path";
 import { diff3Merge } from "node-diff3";
 import { sha256, writeAtomic } from "./fsutil.ts";
@@ -167,19 +167,22 @@ export async function appendNote(lib: Library, ref: NoteRef, text: string, headi
 
 // Copy an image into images/ beside the note (D38); returns its path relative to notes.md,
 // for a Markdown image link. The note text itself is not changed.
-export async function attachToNote(lib: Library, ref: NoteRef, file: string): Promise<NotesResult & { attached: string }> {
-  if (!existsSync(file)) throw new Error(`no file at ${file}`);
-  const ext = extname(file).toLowerCase();
+export async function attachToNote(lib: Library, ref: NoteRef, file: string | { ext: string; data: Uint8Array }): Promise<NotesResult & { attached: string }> {
+  if (typeof file === "string" && !existsSync(file)) throw new Error(`no file at ${file}`);
+  const ext = typeof file === "string" ? extname(file).toLowerCase() : `.${file.ext.toLowerCase().replace(/^\./, "")}`;
   if (![".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext)) throw new Error("attach an image (png, jpg, gif, webp, svg)");
+  if (typeof file !== "string" && !file.data.length) throw new Error("the image is empty");
   return withLock(paths.lock(lib), () => {
     const f = noteFile(lib, ref);
     const dir = join(dirname(f.path), "images");
     mkdirSync(dir, { recursive: true });
-    const stem = slugify(basename(file, extname(file)));
+    // A pasted image has no name of its own: "pasted", as Notion's "image.png".
+    const stem = typeof file === "string" ? slugify(basename(file, extname(file))) : "pasted";
     const taken = new Set(readdirSync(dir));
     let name = `${stem}${ext}`;
     for (let n = 2; taken.has(name); n++) name = `${stem}-${n}${ext}`;
-    copyFileSync(file, join(dir, name));
+    if (typeof file === "string") copyFileSync(file, join(dir, name));
+    else writeFileSync(join(dir, name), file.data);
     return { ...result(lib, f, read(f.path)), attached: `images/${name}` };
   });
 }

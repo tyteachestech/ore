@@ -107,3 +107,9 @@ export function copiedWhat(e: Entry): string {
   if (/\.pdf(?:[?#]|$)/i.test(e.url)) return "PDF";
   return "link";
 }
+
+/** An image a note can hold (`ore notes --attach`); other pictures are added as sources, for their text. */
+export const noteImage = (path: string) => /\.(png|jpe?g|gif|webp|svg)$/i.test(path);
+
+/** The file extension for a pasted image's type (`image/jpeg` → `jpg`), as `ore notes --attach - --ext` takes it. */
+export const imageExt = (mime: string) => (mime.split("/")[1] ?? "").replace("jpeg", "jpg").replace(/\+xml$/, "");
