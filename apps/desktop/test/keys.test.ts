@@ -24,6 +24,18 @@ describe("shortcut editor (Settings › Keyboard shortcuts)", () => {
     expect(clash("d-select", "Meta+KeyK")).toBeNull();
   });
 
+  test("Review's own keys clash only with the keys that work in Review", () => {
+    resetKeys();
+    // Edit card's E works only on a card in Review, where Rename source's keys are off.
+    expect(clash("rename", "KeyE")).toBeNull();
+    expect(clash("edit-card", "KeyR")).toBeNull();
+    // Inside Review they still meet each other, ⌘↵, the passage arrows' keys and the system-wide quick quiz.
+    expect(clash("edit-card", "KeyB")?.id).toBe("bad-version");
+    expect(clash("edit-card", "Meta+Enter")?.id).toBe("finish");
+    expect(clash("finish", "KeyE")?.id).toBe("edit-card");
+    expect(clash("ask", "Ctrl+Alt+KeyQ")?.id).toBe("quick-quiz");
+  });
+
   test("any shortcut can be removed, and a menu click still runs it", () => {
     resetKeys();
     expect(rebind("palette", "")).toBeNull();
@@ -52,4 +64,49 @@ describe("shortcut editor (Settings › Keyboard shortcuts)", () => {
     expect(rebind("palette", "KeyK")).toBe("Needs ⌘, ⌃ or ⌥");
     expect(rebind("archive", "Escape")).toBe("Esc is reserved");
   });
+
+  test("the Mac's own keys and the app's fixed ones are refused, so a global shortcut never takes paste or select-all from a field", () => {
+    resetKeys();
+    expect(rebind("palette", "Meta+KeyA")).toBe("⌘A is the Mac's Select All");
+    expect(rebind("palette", "Meta+KeyV")).toBe("⌘V is the Mac's Paste");
+    expect(rebind("add", "Shift+Meta+KeyZ")).toBe("⇧⌘Z is the Mac's Redo");
+    expect(rebind("add", "Meta+KeyQ")).toBe("⌘Q is the Mac's Quit");
+    expect(rebind("rename", "Meta+KeyG")).toBe("⌘G is Find's next match");
+    expect(rebind("rename", "Shift+Meta+KeyN")).toBe("⇧⌘N is Toggle source note");
+    expect(isCustom("palette") || isCustom("add") || isCustom("rename")).toBe(false);
+    // Their own defaults stay theirs, and the diagram's ⌘G is its Group.
+    expect(rebind("undo", "Meta+KeyZ")).toBeNull();
+    expect(rebind("d-all", "Meta+KeyA")).toBeNull();
+    expect(rebind("d-group", "Meta+KeyG")).toBeNull();
+  });
+});
+
+describe("shortcut editor: Review's keys", () => {
+  test("Undo and Redo work in Review too, so Review's own keys meet them", () => {
+    resetKeys();
+    expect(clash("undo", "KeyE")?.id).toBe("edit-card");
+    expect(clash("edit-card", "Meta+KeyZ")?.id).toBe("undo");
+  });
+
+  test("Review's rating and confidence digits are taken for every key that works in Review", () => {
+    resetKeys();
+    expect(rebind("edit-card", "Digit1")).toBe("1 rates the card in Review");
+    expect(rebind("ask", "Digit4")).toBe("4 rates the card in Review");
+    expect(rebind("undo", "Digit2")).toBe("2 rates the card in Review");
+    expect(isCustom("edit-card") || isCustom("ask") || isCustom("undo")).toBe(false);
+    expect(rebind("edit-card", "Digit5")).toBeNull();
+    resetKeys();
+  });
+});
+
+test("a saved shortcut the rules now refuse is dropped when the keymap loads", async () => {
+  (globalThis as Record<string, unknown>).localStorage = w.localStorage;
+  w.localStorage.setItem("ore.keys", JSON.stringify({ palette: "Meta+KeyA", "edit-card": "Digit1", add: "Meta+KeyY", gone: "Meta+KeyU" }));
+  const fresh = (await import("../src/keys.ts?stored")) as typeof import("../src/keys");
+  expect(fresh.is(press("Meta+KeyA"), "palette")).toBe(false);
+  expect(fresh.is(press("Meta+KeyK"), "palette")).toBe(true);
+  expect(fresh.is(press("KeyE"), "edit-card")).toBe(true);
+  expect(fresh.is(press("Meta+KeyY"), "add")).toBe(true);
+  expect(Object.keys(fresh.saved())).toEqual(["add"]);
+  delete (globalThis as Record<string, unknown>).localStorage;
 });

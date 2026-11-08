@@ -6,9 +6,21 @@ import { Hint } from "./Hint";
 import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
 
-// After the menu closes and hands focus back to its trigger, so a dialog the action opens keeps focus.
-const later = (run: () => void) => () => setTimeout(run, 0);
-const pick = (b: MenuAction) => (b.keep ? (e: Event) => (e.preventDefault(), b.run()) : later(b.run));
+/** A picked action runs once the menu has closed and handed focus back (its onCloseAutoFocus), so a
+ *  field or dialog the action opens keeps the caret: run on a timer, it raced Radix's own focus return,
+ *  which took the caret from a field picked with ↵ and its blur closed it again. */
+function useLater() {
+  const pending = useRef<(() => void) | null>(null);
+  const later = (run: () => void) => () => void (pending.current = run);
+  const pick = (b: MenuAction) => (b.keep ? (e: Event) => (e.preventDefault(), b.run()) : later(b.run));
+  const closed = (e: Event, keepFocus?: boolean) => {
+    if (keepFocus) e.preventDefault();
+    const run = pending.current;
+    pending.current = null;
+    if (run) setTimeout(run, 0);
+  };
+  return { later, pick, closed };
+}
 
 /** One action on an object; `hint` is its shortcut, shown at the right like a macOS menu. */
 export type MenuAction = {
@@ -50,6 +62,7 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
   // Right-click in a field or on selected text inside the object gets the Mac's own text menu
   // (Copy, Paste, Look Up), not the object's: decided on the press, before the menu event.
   const [native, setNative] = useState(false);
+  const { later, pick, closed } = useLater();
   // A row not on screen yet can't be right-clicked; its menu comes with it when it scrolls in.
   if (useLite() || (Array.isArray(actions) && !actions.length)) return children; // or no menu to open (the phone's title)
   return (
@@ -58,7 +71,7 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => keepFocus && e.preventDefault()}>
+        <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus)} onKeyDown={(e) => e.stopPropagation()}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <ContextMenu.Separator className="menu-sep" />}
@@ -121,6 +134,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   /** Focus stays where the action put it (the note's text), not back on the button. */
   keepFocus?: boolean;
 }) {
+  const { later, pick, closed } = useLater();
   // Off screen in a long list (Lite.tsx): the same button as the trigger renders, its menu and hint once it scrolls in.
   const lite = useLite() && !open;
   const button = (
@@ -135,7 +149,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
         <DropdownMenu.Trigger asChild>{button}</DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => keepFocus && e.preventDefault()} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus)} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <DropdownMenu.Separator className="menu-sep" />}

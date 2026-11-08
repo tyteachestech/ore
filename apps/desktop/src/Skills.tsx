@@ -3,9 +3,10 @@ import { Command } from "cmdk";
 import { CaretDown, Check as CheckIcon, Plus } from "./icons";
 import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type KeyboardEvent as ReactKeyboardEvent, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
+import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { Trap } from "./Trap";
-import { IconPicker, SkillIcon } from "./IconPicker";
+import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
 import { ore, opt, SKILL_COLORS, type Skill, type SkillColor } from "./ore";
 import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
 
@@ -157,8 +158,6 @@ export const skillsFirst = (skills: Skill[], first: string[]): Skill[] => [
 
 /** The header over the skills in no collection, once there are collections. No collection takes its name. */
 export const UNGROUPED = "Other";
-/** Whether a collection name is the ungrouped skills' header, any case. */
-export const isUngroupedName = (name: string) => name.trim().toLowerCase() === UNGROUPED.toLowerCase();
 
 /** Sidebar groups: each collection in the order it first appears in skills.yaml, then the rest
  *  (`collection` is "" for those). */
@@ -323,7 +322,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
               </Popover.Trigger>
             </Hint>
             <Popover.Portal>
-              <Popover.Content className="popover" side="bottom" align="start" sideOffset={6} collisionPadding={12}>
+              <Popover.Content className="popover" side="bottom" align="start" sideOffset={6} collisionPadding={12} onOpenAutoFocus={focusFilter}>
                 <IconPicker
                   value={look.icon}
                   color={look.color}
@@ -342,22 +341,9 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
           </Popover.Root>
           <SkillName skill={skill} as="h2" editing={rename} inputRef={nameRef} onRenamed={onSaved} onEnter={onClose} notify={notify} />
         </div>
-        <div className="look-row" role="radiogroup" aria-label="Color">
+        <div className="look-row">
           <span>Color</span>
-          <span className="swatches">
-            {(["", ...SKILL_COLORS] as const).map((c) => (
-              <Hint key={c || "none"} text={c ? c[0]!.toUpperCase() + c.slice(1) : "No color"}>
-                <button
-                  className="swatch"
-                  data-color={c || undefined}
-                  role="radio"
-                  aria-checked={look.color === c}
-                  aria-label={c || "No color"}
-                  onClick={() => void set("color", c)}
-                />
-              </Hint>
-            ))}
-          </span>
+          <Swatches className="swatches" value={look.color} onPick={(c) => void set("color", c)} />
         </div>
         <div className="look-row">
           <span>Collection</span>
@@ -406,7 +392,7 @@ function CollectionPicker({ value, collections, onPick }: { value: string; colle
                   {c === value && <Check />}
                 </Command.Item>
               ))}
-              {typed && !isUngroupedName(typed) && !collections.some((c) => c.toLowerCase() === typed.toLowerCase()) && (
+              {typed && !isOther(typed) && !collections.some((c) => c.toLowerCase() === typed.toLowerCase()) && (
                 <Command.Item value={`create ${typed}`} onSelect={() => choose(typed)}>
                   <span className="sub">Create</span> {typed}
                 </Command.Item>
@@ -440,8 +426,8 @@ export function skillMade(skill: Skill, notify: Notify, onChanged: () => void, o
 
 const Check = () => <CheckIcon className="check" size={12} aria-hidden="true" />;
 
-/** Deleting a skill asks what happens to its sources (Tyler's call): kept by default, untagged, or
- *  archived when filed nowhere else. Cards always stay and keep reviewing. Enter deletes, Esc cancels. */
+/** Deleting a skill whose sources are filed nowhere else asks what happens to them (Tyler's call):
+ *  kept by default, untagged, or archived. With nothing to ask it deletes at once, with Undo. Cards always stay and keep reviewing. Enter deletes, Esc cancels. */
 export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   skill: Skill;
   /** Its sources, how many are filed under no other skill, and its archived ones (the delete takes it off them too). */
@@ -456,7 +442,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   const keepRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const choice = sources.all > 0 && sources.only > 0;
-  useFocusWhileMounted(choice ? keepRef : panelRef);
+  useFocusWhileMounted(keepRef);
   const n = (k: number) => `${k} source${k === 1 ? "" : "s"}`;
   const alsoArchived = sources.archived ? ` (and ${sources.archived} archived)` : "";
 
@@ -479,6 +465,16 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
       setBusy(false);
     }
   };
+
+  // Nothing to decide (no source would be left in no skill): it goes at once, with Undo, as every
+  // other delete does. The dialog is only for the Keep or Archive choice.
+  const once = useRef(false);
+  useEffect(() => {
+    if (choice || once.current) return;
+    once.current = true;
+    void remove();
+  }, []);
+  if (!choice) return null;
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onDone(false)}>
@@ -518,9 +514,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
               </span>
             </label>
           </fieldset>
-        ) : (
-          <p className="quiet">{sources.all ? `Its ${n(sources.all)}${alsoArchived} stay under their other skills.` : sources.archived ? `Only ${n(sources.archived)} in Archived are filed under it.` : "No sources are filed under it."}</p>
-        )}
+        ) : null}
         <p className="quiet">Its cards stay and keep coming up in review.</p>
         <div className="skill-edit-foot">
           <span className="right">

@@ -192,7 +192,8 @@ function read(): Record<string, Combo> {
   }
 }
 
-let overrides = read();
+// Read at the end of this module (`kept`), once the rules a saved shortcut must still pass are defined.
+let overrides: Record<string, Combo> = {};
 let keymap = build();
 const listeners = new Set<() => void>();
 
@@ -259,20 +260,41 @@ export function label(combo: Combo): string {
   return MODS.filter((m) => parts.includes(m)).map((m) => SYMBOL[m]).join("") + key;
 }
 
+/** The Mac's own keys (its Edit menu, Quit, Hide): a global shortcut on one would take it from every
+ *  text field, so only the command whose default it is may have it (Raycast refuses them too). */
+const MAC: Record<Combo, string> = {
+  "Meta+KeyA": "Select All", "Meta+KeyC": "Copy", "Meta+KeyX": "Cut", "Meta+KeyV": "Paste", "Meta+KeyZ": "Undo", "Shift+Meta+KeyZ": "Redo",
+  "Meta+KeyQ": "Quit", "Meta+KeyW": "Close Window", "Meta+KeyH": "Hide", "Alt+Meta+KeyH": "Hide Others", "Meta+KeyM": "Minimize",
+};
+/** Fixed keys outside the diagram (FIXED, and the source note's old ⇧⌘N that `isNotes` still takes). */
+const APP: Record<Combo, string> = { "Meta+KeyG": "Find's next match", "Shift+Meta+KeyG": "Find's previous match", "Shift+Meta+KeyN": "Toggle source note" };
+
 /** Why `combo` can't go on `id` at all, or null. "" leaves it not assigned (ChatGPT's "Not assigned"). */
 export function invalid(id: KeyId, combo: Combo): string | null {
   const b = DEFAULTS.find((x) => x.id === id)!;
   if ("global" in b && combo !== "" && b.global && !/(Ctrl|Alt|Meta)\+/.test(combo)) return "Needs ⌘, ⌃ or ⌥";
-  if (combo !== b.combo && (combo === "Escape" || combo === "Enter" || combo.startsWith("Arrow"))) return `${label(combo)} is reserved`;
+  if (combo === b.combo) return null;
+  if (combo === "Escape" || combo === "Enter" || combo.startsWith("Arrow")) return `${label(combo)} is reserved`;
+  if (MAC[combo]) return `${label(combo)} is the Mac's ${MAC[combo]}`;
+  if (APP[combo] && !("scope" in b)) return `${label(combo)} is ${APP[combo]}`;
+  // Review's fixed 1–4 (the rating, and 1–3 for how sure) go before any binding there.
+  if (/^Digit[1-4]$/.test(combo) && (IN_REVIEW.has(id) || IN_REVIEW_TOO.has(id))) return `${label(combo)} rates the card in Review`;
   return null;
 }
 
-/** The binding that already has `combo` where `id` works (the app, or the diagram editor), if any. */
+/** Review's own commands: they work only in Review, where the app's other keys are off (App.tsx). */
+export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["no-idea", "in-head", "edit-card", "retire-card", "ask", "bad-version"]);
+/** App keys that work in Review too (⌘↵, the passage arrows, Undo and Redo, by its button and the toast), and the quick quiz, which works from any app. */
+const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-next", "passage-prev", "undo", "redo", "quick-quiz"]);
+
+/** The binding that already has `combo` where `id` works (the app, Review, or the diagram editor), if any. */
 export function clash(id: KeyId, combo: Combo): (Binding & { id: KeyId }) | null {
   if (!combo) return null;
-  const scope = (x: Binding) => x.scope ?? "app";
+  const scope = (x: Binding) => x.scope ?? (IN_REVIEW.has(x.id) ? "review" : "app");
+  const meet = (x: Binding, y: Binding) =>
+    scope(x) === scope(y) || (scope(x) !== "diagram" && scope(y) !== "diagram" && (IN_REVIEW_TOO.has(x.id) || IN_REVIEW_TOO.has(y.id)));
   const b = DEFAULTS.find((x) => x.id === id)!;
-  return DEFAULTS.find((x) => x.id !== id && scope(x) === scope(b) && keymap[x.id] === combo) ?? null;
+  return DEFAULTS.find((x) => x.id !== id && meet(x, b) && keymap[x.id] === combo) ?? null;
 }
 
 const put = (next: Record<string, Combo>, id: KeyId, combo: Combo) => {
@@ -305,3 +327,11 @@ export const restore = (o: Record<string, Combo>) => commit({ ...o });
 
 export const isCustom = (id: KeyId) => id in overrides;
 export const defaultOf = (id: KeyId): Combo => DEFAULTS.find((x) => x.id === id)!.combo;
+
+/** The saved shortcuts the rules still allow: one saved before a key was reserved (the palette on ⌘A)
+ *  or for a command since removed is dropped, and that command gets its default back. */
+function kept(saved: Record<string, Combo>): Record<string, Combo> {
+  return Object.fromEntries(Object.entries(saved).filter(([id, combo]) => typeof combo === "string" && DEFAULTS.some((b) => b.id === id) && !invalid(id as KeyId, combo)));
+}
+overrides = kept(read());
+keymap = build();
