@@ -20,7 +20,8 @@ import { usePeek } from "../Peek";
 import { errorText, type Notify } from "../util";
 import { calloutSchema, diagramName, toggleSchema, toggleSummarySchema } from "./blocks";
 import { board, sizeOf, withSize, type Size } from "./board";
-import { createEditor, markdownOf, menuTrigger } from "./editor";
+import { createEditor, markdownOf, menuTrigger, slashMatch } from "./editor";
+import { lastPaint, paint } from "./colors";
 import { dateRows } from "./dates";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
@@ -126,7 +127,8 @@ const DiagramEditor = lazy(() => import("../Diagram"));
 const SAVED = "ore:diagram-saved";
 
 type Menu = { kind: "slash" | "link" | "emoji" | "date"; query: string; from: number; to: number; x: number; y: number };
-type Row = { label: string; sub?: string; emoji?: string; run: () => void };
+/** `names`: what Notion also takes after `/` for it (`/h1`, `/#`, `/hr`). */
+type Row = { label: string; sub?: string; emoji?: string; names?: string[]; run: () => void };
 
 const LINK_URL = /^ore:(item|skill)\/(.+)$/;
 
@@ -158,12 +160,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [menu, setMenu] = useState<Menu | null>(null);
   const [index, setIndex] = useState(0);
   const [sel, setSel] = useState<Sel | null>(null);
+  const [askLink, setAskLink] = useState(0);
   const [emoji, setEmoji] = useState<EmojiEntry[] | null>(null);
   /** The diagram open in the overlay; `at` is where a new one goes once it has a drawing. */
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
   // The editor's plugins live as long as it does; they read the latest props, rows and menu
   // through this. The menu here is set as the caret moves, ahead of React's render.
-  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: -1, added: null, draw: (name) => setDrawing({ name }), renames: new Set() });
+  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: -1, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), renames: new Set() });
 
   // Creation is async: a focus asked for before the editor exists (opening the source note) waits for it.
   const wantFocus = useRef(false);
@@ -387,15 +390,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       else there();
     };
     const all: Row[] = [
-      { label: "Text", run: turn("text", call(turnIntoTextCommand.key)) },
-      { label: "Heading 1", sub: "#", run: turn("h1", call(wrapInHeadingCommand.key, 1)) },
-      { label: "Heading 2", sub: "##", run: turn("h2", call(wrapInHeadingCommand.key, 2)) },
-      { label: "Heading 3", sub: "###", run: turn("h3", call(wrapInHeadingCommand.key, 3)) },
-      { label: "Bulleted list", sub: "-", run: turn("bullet", call(wrapInBulletListCommand.key)) },
-      { label: "Numbered list", sub: "1.", run: turn("number", call(wrapInOrderedListCommand.key)) },
+      { label: "Text", names: ["plain"], run: turn("text", call(turnIntoTextCommand.key)) },
+      { label: "Heading 1", sub: "#", names: ["h1", "#"], run: turn("h1", call(wrapInHeadingCommand.key, 1)) },
+      { label: "Heading 2", sub: "##", names: ["h2", "##"], run: turn("h2", call(wrapInHeadingCommand.key, 2)) },
+      { label: "Heading 3", sub: "###", names: ["h3", "###"], run: turn("h3", call(wrapInHeadingCommand.key, 3)) },
+      { label: "Bulleted list", sub: "-", names: ["ul"], run: turn("bullet", call(wrapInBulletListCommand.key)) },
+      { label: "Numbered list", sub: "1.", names: ["ol"], run: turn("number", call(wrapInOrderedListCommand.key)) },
       {
         label: "To-do list",
         sub: "[ ]",
+        names: ["check", "checkbox", "task"],
         run: turn("todo", () => {
           call(wrapInBulletListCommand.key)();
           const v = view();
@@ -431,9 +435,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       })),
       { label: "Table", sub: "| |", run: cmd(insertTableCommand.key, { row: 3, col: 3 }) },
       { label: "Code", sub: "```", run: turn("code", call(createCodeBlockCommand.key)) },
-      { label: "Divider", sub: "---", run: cmd(insertHrCommand.key) },
+      { label: "Divider", sub: "---", names: ["hr", "line"], run: cmd(insertHrCommand.key) },
       {
         label: "Image",
+        names: ["img", "picture", "photo"],
         run: () => {
           clear(menu);
           void live.current.p.onAttach().then((src) => {
@@ -463,8 +468,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           if (v) v.dispatch(v.state.tr.insertText("[["));
         },
       },
+      {
+        label: "Date",
+        sub: "@",
+        run: () => {
+          const v = clear(menu);
+          if (v) v.dispatch(v.state.tr.insertText("@"));
+        },
+      },
     ];
-    return all.filter((r) => !q || r.label.toLowerCase().replace(/[^a-z0-9]/g, "").includes(q.replace(/[^a-z0-9]/g, "")));
+    return all.filter((r) => slashMatch(r.label, r.names ?? [], q));
   };
   const rows = rowsFor(menu);
   /** Selects the row under a pointer that moved. A menu that opens under a resting pointer keeps
@@ -580,7 +593,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
       {PHONE && <KeyboardBar view={view} targets={p.targets} />}
-      {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} />}
+      {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} askLink={askLink} />}
       {menu && ((menu.kind !== "emoji" && menu.kind !== "date") || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
@@ -620,6 +633,8 @@ type Live = {
     /** The line the + just added (`made`) or reused, while its / menu is open. */
     added: { at: number; made: boolean } | null;
     draw: (name: string) => void;
+    /** Opens the format bar's web link field on the selected text (⌘K). */
+    askLink: () => void;
     /** Diagram renames made in this editor, as "from to", both ways, for ⌘Z and ⇧⌘Z to follow. */
     renames: Set<string>;
   };
@@ -645,6 +660,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
     const t = menuTrigger($from.parent.textBetween(0, $from.parentOffset, undefined, "￼"));
     if (!t) {
       live.current.added = null;
+      live.current.dismissed = -1; // the / Esc closed is gone: a new one opens the menu again (Notion)
       return show(null);
     }
     const { kind, query, typed } = t;
@@ -662,7 +678,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             const { menu, index } = live.current;
             const rows = live.current.rowsFor(menu);
             const { $from } = view.state.selection;
-            if (!menu && e.key === "Enter" && $from.parent.type.name === "toggle_summary") {
+            if (!menu && e.key === "Enter" && !e.metaKey && !e.ctrlKey && $from.parent.type.name === "toggle_summary") {
               // Enter in a toggle's title goes to its first line.
               view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve($from.after() + 1))));
               return true;
@@ -694,6 +710,20 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
               const fmt = is(e, "note-bold") ? marks.strong : is(e, "note-italic") ? marks.emphasis : is(e, "note-underline") ? marks.ore_underline : is(e, "note-strike") ? marks.strike_through : is(e, "note-code") ? marks.inlineCode : null;
               if (fmt) {
                 toggleMark(fmt)(view.state, view.dispatch);
+                return true;
+              }
+              // With words selected, ⌘K links them and ⌘⇧H gives them the last colour, as in Notion;
+              // with none, ⌘K stays the palette.
+              const words = view.state.selection instanceof TextSelection && !view.state.selection.empty;
+              if (words && !PHONE && is(e, "palette")) {
+                live.current.askLink();
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+              }
+              const last = lastPaint();
+              if (is(e, "note-last-color")) {
+                if (words && last) view.dispatch(paint(view.state, view.state.selection.from, view.state.selection.to, last));
                 return true;
               }
               const up = is(e, "block-up");

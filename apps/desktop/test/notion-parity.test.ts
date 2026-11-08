@@ -49,7 +49,7 @@ function type(v: View, text: string) {
 }
 
 /** Runs the steps on `md`; the saved Markdown, and each key's handled flag (false: the browser's own). */
-async function run(md: string, steps: Step[], probe?: (state: import("@milkdown/kit/prose/state").EditorState) => string | null) {
+async function run(md: string, steps: Step[], probe?: (state: import("@milkdown/kit/prose/state").EditorState, view: View) => string | null) {
   const root = document.createElement("div");
   document.body.appendChild(root);
   const marks = [...md.matchAll(/[‸‹›]/g)];
@@ -87,7 +87,7 @@ async function run(md: string, steps: Step[], probe?: (state: import("@milkdown/
         else v.pasteText(s.paste, e as never);
       }
     }
-    if (probe) hint = probe(v.state);
+    if (probe) hint = probe(v.state, v);
   });
   const out = ed.markdownOf(editor);
   editor.destroy();
@@ -359,5 +359,32 @@ describe("empty blocks", () => {
     expect(await h("Text with words‸")).toBeNull();
     // An empty note has its own placeholder.
     expect(await h("‸")).toBeNull();
+  });
+});
+
+describe("toggles open and close from the keyboard (Notion)", () => {
+  const TWO = "<details><summary>One‸</summary>\n\nfirst\n\n</details>\n\n<details><summary>Two</summary>\n\nsecond\n\n</details>";
+  /** The toggles' titles, a closed one in brackets, and the line the caret is on. */
+  const shown = (state: import("@milkdown/kit/prose/state").EditorState, v: View) =>
+    [...v.dom.querySelectorAll(".toggle")].map((t) => (t.classList.contains("closed") ? `[${t.firstElementChild?.textContent}]` : t.firstElementChild?.textContent)).join(" ") +
+    ` | ${state.selection.$from.parent.textContent}`;
+  const fold = async (start: string, ...steps: Step[]) => (await run(start, steps, shown)).hint;
+
+  test("⌘Enter in a toggle's title closes it, and again opens it", async () => {
+    expect(await fold(TWO, "{Mod-Enter}")).toBe("[One] Two | One");
+    expect(await fold(TWO, "{Mod-Enter}", "{Mod-Enter}")).toBe("One Two | One");
+    // In the body it is not the toggle's key: the line stays as it was.
+    expect(await fold(TWO.replace("One‸", "One").replace("first", "fi‸rst"), "{Mod-Enter}")).toBe("One Two | first");
+  });
+
+  test("⌘Enter still ticks a to-do", async () => {
+    expect(await md("- [ ] a‸", "{Mod-Enter}")).toBe("- [x] a");
+  });
+
+  test("⌘⌥T closes every toggle, then opens them all; a caret in a closed body goes up to its title", async () => {
+    expect(await fold(TWO, "{Mod-Alt-t}")).toBe("[One] [Two] | One");
+    expect(await fold(TWO, "{Mod-Alt-t}", "{Mod-Alt-t}")).toBe("One Two | One");
+    expect(await fold(TWO, "{Mod-Enter}", "{Mod-Alt-t}")).toBe("[One] [Two] | One");
+    expect(await fold(TWO.replace("One‸", "One").replace("second", "sec‸ond"), "{Mod-Alt-t}")).toBe("[One] [Two] | Two");
   });
 });

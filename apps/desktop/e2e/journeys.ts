@@ -1348,6 +1348,44 @@ journey("note shortcuts as in Notion: # in a numbered item makes a heading; Mark
   await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
 });
 
+journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words, ⌘↵ closes a toggle", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("/h1", { delay: 20 });
+  await until("/h1 offers Heading 1 alone", async () => (await rows()).join() === "Heading 1");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("/", { delay: 20 });
+  await until("a new / opens the menu again", async () => (await rows()).length > 5);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("Read the guide", { delay: 10 });
+  await page.keyboard.press("Shift+Home");
+  await page.waitForTimeout(150); // the editor takes the selection a moment after the page shows it
+  await page.keyboard.press("Meta+k"); // the palette's key, in the note with words selected
+  await page.getByPlaceholder("Paste a link").waitFor();
+  await page.keyboard.type("example.com/guide");
+  await page.keyboard.press("Enter");
+  await until("the words link to it", async () => (await pm.locator('a[href="https://example.com/guide"]').innerText().catch(() => "")) === "Read the guide");
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("> Why", { delay: 20 });
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Because", { delay: 10 });
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await until("the toggle closes", async () => (await page.locator(".note-editor .toggle.closed").count()) === 1);
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await until("and opens", async () => (await page.locator(".note-editor .toggle.closed").count()) === 0);
+});
+
 journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
   const cells = () => page.locator(".note-editor .note-table tr").evaluateAll((rs) => rs.map((r) => [...r.children].map((c) => c.textContent ?? "")));
   await openSource(page, AGENTS);

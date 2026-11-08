@@ -192,6 +192,37 @@ const tick: Command = (state, dispatch) => {
   return true;
 };
 
+/** ⌘Enter in a toggle's title opens or closes it, as in Notion. Open or closed is the view's, never saved. */
+const fold: Command = (state, _dispatch, view) => {
+  const $c = state.selection.$from;
+  if ($c.parent.type.name !== "toggle_summary" || !view) return false;
+  (view.nodeDOM($c.before(-1)) as HTMLElement | null)?.classList.toggle("closed");
+  return true;
+};
+
+/** ⌘⌥T closes every toggle in the note, or opens them all when all are closed (Notion). A caret in a
+ *  body it closes goes up to the end of that toggle's title, so typing never lands in hidden text. */
+const foldAll: Command = (state, dispatch, view) => {
+  if (!view) return false;
+  const all: { pos: number; dom: HTMLElement }[] = [];
+  state.doc.descendants((n, pos) => {
+    const dom = n.type.name === "toggle" ? (view.nodeDOM(pos) as HTMLElement | null) : null;
+    if (dom) all.push({ pos, dom });
+  });
+  if (!all.length) return false;
+  const close = all.some((t) => !t.dom.classList.contains("closed"));
+  for (const t of all) t.dom.classList.toggle("closed", close);
+  const $c = state.selection.$from;
+  if (close)
+    for (let d = 1; d < $c.depth; d++) {
+      const n = $c.node(d);
+      if (n.type.name !== "toggle") continue;
+      if (!($c.depth === d + 1 && $c.index(d) === 0)) dispatch?.(state.tr.setSelection(TextSelection.create(state.doc, $c.start(d) + n.firstChild!.nodeSize - 1)));
+      break;
+    }
+  return true;
+};
+
 /** Tab in a code block indents the line. */
 const tabInCode: Command = (state, dispatch) => {
   if (!state.selection.$from.parent.type.spec.code) return false;
@@ -250,7 +281,8 @@ export const notionKeys = $prose(() =>
   keymap({
     Backspace: backspace,
     Enter: (state, dispatch) => enterInQuote(state, dispatch) || enterInTodo(state, dispatch),
-    "Mod-Enter": tick,
+    "Mod-Enter": (state, dispatch, view) => fold(state, dispatch, view) || tick(state, dispatch),
+    "Mod-Alt-t": foldAll,
     Tab: (state, dispatch) => tabInCode(state, dispatch) || nest(state, dispatch),
     "Shift-Tab": unnest,
     "Mod-z": undoInputRule,

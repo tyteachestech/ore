@@ -2,13 +2,13 @@ import type { MarkType } from "@milkdown/kit/prose/model";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Hint } from "../Hint";
 import { CaretDown, LinkSimple } from "../icons";
 import type { LinkTarget } from "./NoteEditor";
 import { MoreButton } from "../Menu";
 import { blockAt, kindOf, KINDS, turnInto } from "./blockops";
-import { COLORS, type Color } from "./colors";
+import { COLORS, paint, type Color } from "./colors";
 
 /** Where the selection is, relative to the note: the bar sits above its first line. */
 export type Sel = { from: number; to: number; x: number; y: number };
@@ -17,7 +17,7 @@ const NAMES: Record<Color, string> = { gray: "Gray", red: "Red", orange: "Orange
 
 /** Notion's bar over selected text: Turn into, bold, italic, underline, strikethrough, code, a web link, a
  *  link to a source or skill note ([[ ]], D39), and colour. Each is one editor step (⌘Z). */
-export function SelectionBar({ view, sel, targets, onDone, docked }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void; /** In the iPhone's keyboard bar, not over the text: iOS puts its Copy bar there. */ docked?: boolean }) {
+export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0 }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void; /** In the iPhone's keyboard bar, not over the text: iOS puts its Copy bar there. */ docked?: boolean; /** Goes up each time ⌘K asks for a web link on the selection (Notion). */ askLink?: number }) {
   const v = view();
   if (!v) return null;
   const { schema, doc } = v.state;
@@ -70,7 +70,7 @@ export function SelectionBar({ view, sel, targets, onDone, docked }: { view: () 
       <Hint text="Strikethrough" keys="note-strike">{mark("Strikethrough", schema.marks.strike_through, <s>S</s>)}</Hint>
       <Hint text="Code" keys="note-code">{mark("Code", schema.marks.inlineCode, <span className="mono">{"</>"}</span>)}</Hint>
       <span className="sel-sep" />
-      <WebLink v={v} sel={sel} />
+      <WebLink v={v} sel={sel} ask={askLink} />
       <PageLink v={v} sel={sel} targets={targets} />
       <span className="sel-sep" />
       <Colors v={v} sel={sel} />
@@ -79,7 +79,7 @@ export function SelectionBar({ view, sel, targets, onDone, docked }: { view: () 
 }
 
 /** A web link on the selection: paste or type the address, Enter applies it, Esc cancels. */
-function WebLink({ v, sel }: { v: EditorView; sel: Sel }) {
+function WebLink({ v, sel, ask }: { v: EditorView; sel: Sel; ask: number }) {
   const t = v.state.schema.marks.link!;
   const now = (() => {
     let href = "";
@@ -88,6 +88,13 @@ function WebLink({ v, sel }: { v: EditorView; sel: Sel }) {
   })();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState(now);
+  const asked = useRef(ask);
+  useEffect(() => {
+    if (ask === asked.current) return;
+    asked.current = ask;
+    setUrl(now);
+    setOpen(true);
+  }, [ask, now]);
   const ok = /^https?:\/\/\S+\.\S+/i.test(url.trim()) || /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(url.trim());
   const apply = () => {
     if (!ok) return;
@@ -98,7 +105,7 @@ function WebLink({ v, sel }: { v: EditorView; sel: Sel }) {
   };
   return (
     <Popover.Root open={open} onOpenChange={(o) => (setOpen(o), o && setUrl(now))}>
-      <Hint text="Link">
+      <Hint text="Link" keys="palette">
         <Popover.Trigger asChild>
           <button className={now ? "on" : ""} aria-label="Link" onMouseDown={(e) => e.preventDefault()}>
             <LinkSimple size={16} aria-hidden="true" />
@@ -174,8 +181,7 @@ function Colors({ v, sel }: { v: EditorView; sel: Sel }) {
   const { ore_text_color: text, ore_highlight: back } = v.state.schema.marks;
   const [open, setOpen] = useState(false);
   const set = (t: MarkType, color: Color | null) => {
-    const tr = v.state.tr.removeMark(sel.from, sel.to, t);
-    if (color) tr.addMark(sel.from, sel.to, t.create({ color: t === back && color === "yellow" ? null : color }));
+    const tr = paint(v.state, sel.from, sel.to, { on: t === back ? "back" : "text", color });
     setOpen(false);
     v.focus();
     v.dispatch(tr);

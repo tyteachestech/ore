@@ -1,3 +1,4 @@
+import type { EditorState, Transaction } from "@milkdown/kit/prose/state";
 import { $markSchema, $remark } from "@milkdown/kit/utils";
 
 // Text colours and highlights in a note (Tyler, 2026-11-06), stored as inline HTML that GitHub and
@@ -9,6 +10,22 @@ import { $markSchema, $remark } from "@milkdown/kit/utils";
 export const COLORS = ["gray", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink"] as const;
 export type Color = (typeof COLORS)[number];
 const valid = (c: string | undefined): c is Color => !!c && (COLORS as readonly string[]).includes(c);
+
+/** A text colour (`text`) or a highlight (`back`); null takes it off. */
+export type Paint = { on: "text" | "back"; color: Color | null };
+let last: Paint | null = null;
+
+/** Puts a colour on from–to, replacing the one there; remembered for ⌘⇧H (Notion's last colour). A
+ *  yellow highlight is a bare `<mark>`. */
+export function paint(state: EditorState, from: number, to: number, p: Paint): Transaction {
+  const t = state.schema.marks[p.on === "text" ? "ore_text_color" : "ore_highlight"]!;
+  last = p;
+  const tr = state.tr.removeMark(from, to, t);
+  return p.color ? tr.addMark(from, to, t.create({ color: p.on === "back" && p.color === "yellow" ? null : p.color })) : tr;
+}
+
+/** The colour last put on with `paint`, if any. */
+export const lastPaint = () => last;
 
 type Tag = "mark" | "span" | "u";
 type MdNode = { type: string; value?: string; children?: MdNode[]; tag?: Tag; color?: string | null };

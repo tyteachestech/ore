@@ -78,6 +78,7 @@ const DEFAULTS = [
   { id: "note-underline", label: "Underline", group: "Notes", combo: "Meta+KeyU" },
   { id: "note-strike", label: "Strikethrough", group: "Notes", combo: "Shift+Meta+KeyX" },
   { id: "note-code", label: "Inline code", group: "Notes", combo: "Meta+KeyE" },
+  { id: "note-last-color", label: "Last text colour or highlight", group: "Notes", combo: "Shift+Meta+KeyH" },
   { id: "cut-text", label: "Remove the selected text (from a heading: its section)", group: "Highlight", combo: "Shift+Backspace" },
   // The diagram editor (D103) owns the keyboard while it is open, so its keys only clash with each other.
   // Tools take Excalidraw's letters and numbers, so his muscle memory carries over.

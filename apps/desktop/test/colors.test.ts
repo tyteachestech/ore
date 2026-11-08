@@ -54,4 +54,21 @@ describe("text colours and highlights (Tyler 2026-11-06)", () => {
     });
     expect(ed.markdownOf(editor)).toBe("Some <mark data-color=\"green\">words</mark> <span data-color=\"purple\">here</span>.\n");
   });
+
+  test("the colour last picked goes on the next words the same way (⌘⇧H, Notion); a yellow highlight is a bare mark", async () => {
+    const c = await import("../src/editor/colors");
+    const { editor } = await open("Some words here.\n");
+    editor.action((ctx) => {
+      const v = ctx.get(core.editorViewCtx);
+      v.dispatch(c.paint(v.state, 6, 11, { on: "back", color: "yellow" }));
+      v.dispatch(c.paint(v.state, 12, 16, c.lastPaint()!));
+    });
+    expect(ed.markdownOf(editor)).toBe("Some <mark>words</mark> <mark>here</mark>.\n");
+    editor.action((ctx) => {
+      const v = ctx.get(core.editorViewCtx);
+      v.dispatch(c.paint(v.state, 6, 11, { on: "back", color: null }));
+    });
+    expect(c.lastPaint()).toEqual({ on: "back", color: null });
+    expect(ed.markdownOf(editor)).toBe("Some words <mark>here</mark>.\n");
+  });
 });
