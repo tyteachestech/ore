@@ -135,8 +135,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   useEffect(() => {
     moved.current = false;
     setAt(0);
-    if (isChecked || step > n) panel.current?.focus();
-    else field.current?.focus();
+    if (isChecked || step > n) return panel.current?.focus();
+    // A field holding what he wrote last time (finishing again) takes the caret at its end, as Notes does.
+    const f = field.current;
+    f?.focus();
+    f?.setSelectionRange(f.value.length, f.value.length);
   }, [step, isChecked]);
 
   function enrich() {

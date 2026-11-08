@@ -3103,6 +3103,35 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   }, AGENTS);
 });
 
+journey("finish again: the recall box holds the last recall with the caret at its end, and the note holds it once", async (page) => {
+  const title = "Recall twice";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# ${title}\n\nA page to finish twice, adding to the recall the second time.`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A page to finish twice").waitFor();
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByLabel("Free recall").fill("FIRST recall text.");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Keep reading" }).click();
+  await page.reload();
+  await page.locator(".side-item").first().waitFor();
+  await openSource(page, title);
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  const box = page.getByLabel("Free recall");
+  await until("the box holds the last recall", async () => (await box.inputValue()) === "FIRST recall text.");
+  const caret = await box.evaluate((el: HTMLTextAreaElement) => [el.selectionStart, el.value.length]);
+  if (caret[0] !== caret[1]) throw new Error(`the caret is at ${caret[0]} of ${caret[1]}, not at the end`);
+  await page.keyboard.type(" SECOND.");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Keep reading" }).waitFor();
+  const note = await page.evaluate(async (title) => {
+    const ore = (args: string[]) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args });
+    const items = (await ore(["ls"])) as { id: string; title: string }[];
+    return ((await ore(["notes", items.find((i) => i.title === title)!.id])) as { text: string }).text;
+  }, title);
+  if (note.trim() !== "## Recall\n\nFIRST recall text. SECOND.") throw new Error(`the note is ${JSON.stringify(note)}`);
+});
+
 journey("ore down at launch: Home's Try again brings back the skills and the sources too", async (page) => {
   const skillRows = page.locator(".side-item:not(.side-main)");
   await skillRows.first().waitFor();

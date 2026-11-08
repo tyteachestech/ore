@@ -28,9 +28,18 @@ export function pendingNotes(item: Item): string | null {
 // Append rule shared by recall, chapter recall and `ore notes --append`:
 // skip text already present verbatim; else add it at the end of the
 // `## <heading>` block, or under a new heading at the end.
-export function appendNoteText(current: string, text: string, heading: string): string {
+// `grows`: the text this one was written from (his earlier recall, which the quiz opens holding). When
+// the new text still holds it and the note has it as a paragraph of its own, the new text takes its place.
+export function appendNoteText(current: string, text: string, heading: string, grows?: string): string {
   const t = text.trim();
   if (current.includes(t)) return current;
+  const was = grows?.trim();
+  if (was && t.includes(was)) {
+    for (let at = current.lastIndexOf(was); at >= 0; at = at ? current.lastIndexOf(was, at - 1) : -1) {
+      const end = at + was.length;
+      if ((at === 0 || current.slice(0, at).endsWith("\n\n")) && /^(\n\n|\n?$)/.test(current.slice(end))) return current.slice(0, at) + t + current.slice(end);
+    }
+  }
   const h = `## ${heading.trim()}`;
   const lines = current.split("\n");
   // Headings in fenced code are code: a recall never lands inside a code block.
@@ -139,7 +148,7 @@ export async function setNotes(lib: Library, ref: NoteRef, text: string, base?: 
   });
 }
 
-export async function appendNote(lib: Library, ref: NoteRef, text: string, heading: string): Promise<NotesResult> {
+export async function appendNote(lib: Library, ref: NoteRef, text: string, heading: string, grows?: string): Promise<NotesResult> {
   if (!text.trim()) throw new Error("note text is empty");
   // An agent may pass the heading as Markdown ("## Recall"); it is written as one.
   heading = heading.trim().replace(/^#+\s*/, "");
@@ -147,7 +156,7 @@ export async function appendNote(lib: Library, ref: NoteRef, text: string, headi
   return withLock(paths.lock(lib), () => {
     const f = noteFile(lib, ref);
     const current = read(f.path);
-    const next = appendNoteText(current, text, heading);
+    const next = appendNoteText(current, text, heading, grows);
     if (next !== current) writeAtomic(f.path, next);
     return result(lib, f, next);
   });
@@ -177,8 +186,10 @@ export async function attachToNote(lib: Library, ref: NoteRef, file: string): Pr
 export async function setRecall(lib: Library, ref: string, text: string) {
   const t = text.trim();
   if (!t) throw new Error("recall text is empty");
-  const meta = await updateItemMeta(lib, ref, (m) => ({ ...m, recall: { text: t, at: nowIso() } }));
-  const notes = await appendNote(lib, meta.id, t, "Recall");
+  let was: string | undefined;
+  const meta = await updateItemMeta(lib, ref, (m) => ((was = m.recall?.text), { ...m, recall: { text: t, at: nowIso() } }));
+  // Finishing again, the quiz opens holding his earlier recall: what he adds to it replaces it in the note.
+  const notes = await appendNote(lib, meta.id, t, "Recall", was);
   return { item: meta.id, recall: { text: meta.recall!.text!, at: meta.recall!.at! }, notes: notes.text };
 }
 
