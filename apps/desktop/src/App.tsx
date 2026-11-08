@@ -29,6 +29,7 @@ import { Feed, feedProof, type FeedPost, type FoundFeed } from "./Feed";
 import { dueSkills, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { Review } from "./Review";
 import { useToast } from "./Toast";
+import { lineAfter, lineKey, type Line } from "./lines";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
@@ -69,19 +70,8 @@ type CourseAdd = {
 /** A source that was in the library already: what adding it again did. */
 type Kept = { kept: true; filed: string[]; restored: boolean };
 
-/** A line of a source list: a source, or a course (D79) standing for its lessons, listed under it when open. */
-type Line = { kind: "item"; item: Item; lesson?: boolean } | { kind: "course"; id: string; title: string; url?: string; lessons: Item[]; next: Item | null; open: boolean };
-const lineKey = (l: Line) => (l.kind === "item" ? l.item.id : `course:${l.id}`);
 /** `ore status` args to `to`: back to Done (an Undo), a source keeps the finish date it had. */
 const back = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
-/** The row of `now` that came after `key` in `was` (else the nearest before it), for a row that left the list. */
-const lineAfter = (was: Line[], now: Line[], key: string): Line | undefined => {
-  const at = was.findIndex((l) => lineKey(l) === key);
-  if (at < 0) return undefined;
-  const here = new Map(now.map((l) => [lineKey(l), l]));
-  for (const l of [...was.slice(at + 1), ...was.slice(0, at).reverse()]) if (here.has(lineKey(l))) return here.get(lineKey(l));
-  return undefined;
-};
 const lessonFirst = (l: Extract<Line, { kind: "course" }>) => l.next ?? l.lessons[0]!;
 
 /** Which sources the list shows, as the list's title (Linear's view menu): To read, Done, and
