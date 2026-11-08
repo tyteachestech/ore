@@ -756,6 +756,41 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await page.keyboard.press("Escape");
 });
 
+journey("highlight: a triple click keeps the paragraph as one step, so one ⌘Z takes it all back", async (page) => {
+  await openSource(page, TESTING);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300);
+  const at = (await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("Rereading, by contrast");
+      if (i < 0) continue;
+      n.parentElement!.scrollIntoView({ block: "center" });
+      const r = document.createRange();
+      r.setStart(n, i + 2);
+      r.setEnd(n, i + 3);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + 1, y: b.top + b.height / 2 };
+    }
+  }))!;
+  const writes: string[] = [];
+  page.on("request", (r) => void (/"(?:highlight|annotate)"/.test(r.postData() ?? "") && writes.push(r.postData()!)));
+  await page.mouse.click(at.x, at.y, { clickCount: 3 });
+  await popup.waitFor();
+  await until("the paragraph is highlighted", async () => (await kept()).some((t) => t.startsWith("Rereading, by contrast") && t.includes("weaker results.")));
+  // Not the double click's word first, then grown to the paragraph: two steps for one act.
+  if (writes.length !== 1) throw new Error(`a triple click wrote ${writes.length} times: ${writes.join(" | ")}`);
+  await page.keyboard.press("Enter");
+  await popup.waitFor({ state: "hidden" });
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("one ⌘Z leaves nothing of it highlighted", async () => !(await kept()).some((t) => t.includes("Rereading")));
+  await page.waitForTimeout(800); // the undo's writes are back
+  const left = await kept();
+  if (left.some((t) => t.includes("Rereading"))) throw new Error(`one ⌘Z left ${JSON.stringify(left)}`);
+});
+
 journey("highlight: an edge he dragged is his, so Esc keeps the highlight and ⌘Z moves the edge back", async (page) => {
   await openSource(page, AGENTS);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));

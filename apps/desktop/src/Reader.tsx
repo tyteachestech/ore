@@ -1844,6 +1844,12 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
 
   const onMouseDown = (e: MouseEvent) => {
+    // A click that is not the third of a triple: the double-clicked word is kept now.
+    const word = wordWait.current;
+    if (word && e.detail !== 3) {
+      dropWord();
+      word.keep();
+    }
     setFocus(null); // the mouse takes over from the keyboard focus
     if (popup && !popupRef.current?.contains(e.target as Node)) {
       keepNote();
@@ -1889,6 +1895,14 @@ function ReaderView(p: Props & { reload: () => void }) {
     followLink(a.getAttribute("href")!, a);
   };
 
+  // A double click's word waits out the Mac's double-click time (0.5 s by default): a third click
+  // makes it the paragraph, one highlight and one step, as Books acts on the final selection.
+  const wordWait = useRef<{ timer: number; keep: () => void } | null>(null);
+  const dropWord = () => {
+    if (wordWait.current) clearTimeout(wordWait.current.timer);
+    wordWait.current = null;
+  };
+  useEffect(() => dropWord, []);
   const onMouseUp = (e: MouseEvent) => {
     const el = docEl.current;
     if (!ready || !el || closedBook || popupRef.current?.contains(e.target as Node) || lookupRef.current?.contains(e.target as Node)) return;
@@ -1896,14 +1910,24 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (e.button !== 0 || e.ctrlKey) return;
     const stamp = video && (e.target as HTMLElement).closest?.<HTMLElement>(".ts");
     if (stamp) return seekTo(Number(stamp.dataset.t), true);
+    dropWord();
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.rangeCount) {
       const r = sel.getRangeAt(0);
       if (el.contains(r.startContainer) && el.contains(r.endContainer)) {
         const up = sel.focusNode === r.startContainer && sel.focusOffset === r.startOffset;
-        // Whole words, unless he held ⌥ for part of one.
-        highlightRange(r.cloneRange(), undefined, { x: e.clientX, y: e.clientY, up }, !e.altKey);
-        setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
+        const range = r.cloneRange();
+        const aim = { x: e.clientX, y: e.clientY, up };
+        const exact = e.altKey;
+        const keep = () => {
+          // Whole words, unless he held ⌥ for part of one.
+          highlightRange(range, undefined, aim, !exact);
+          setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
+        };
+        if (e.detail === 2) {
+          const timer = window.setTimeout(() => (dropWord(), keep()), 500);
+          wordWait.current = { timer, keep };
+        } else keep();
       }
       return;
     }
