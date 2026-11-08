@@ -6,6 +6,7 @@ import { isOther } from "../../../packages/core/src/collection-name";
 import { LABEL } from "./Collected";
 import { courseThumb, lessonsOf, nextLesson, ore, opt, PHONE, touched, type Intent, type Item, type SearchHit, type Skill } from "./ore";
 import { Thumb } from "./Thumb";
+import { useSwipeDown } from "./phone/sheet";
 import { errorText, useFocusWhileMounted } from "./util";
 
 export type Action = { id: string; label: string; hint?: string; keywords?: string[]; run: () => void };
@@ -65,6 +66,8 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   const [numbers, setNumbers] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   useFocusWhileMounted(inputRef);
+  const sheet = useRef<HTMLDivElement>(null);
+  useSwipeDown(sheet, onClose, PHONE);
 
   useEffect(() => {
     const query = q.trim();
@@ -289,6 +292,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Command
+        ref={sheet}
         className="panel"
         label="Command palette"
         shouldFilter={false}

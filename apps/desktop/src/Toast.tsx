@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { PHONE } from "./ore";
 import { History, type Step } from "./history";
 import { CHECK, CROSS, PixelSpin, Sprite } from "./Working";
 import { Hint } from "./Hint";
@@ -178,10 +179,10 @@ export function useToast() {
       ref={box}
       aria-live="polite"
       className={`toasts${fanned ? " fan" : ""}`}
-      onMouseEnter={() => (setFanned(true), hold())}
-      onMouseLeave={() => (setFanned(false), release())}
-      onFocus={hold}
-      onBlur={release}
+      onMouseEnter={PHONE ? undefined : () => (setFanned(true), hold())}
+      onMouseLeave={PHONE ? undefined : () => (setFanned(false), release())}
+      onFocus={PHONE ? undefined : hold}
+      onBlur={PHONE ? undefined : release}
     >
       {toasts.map((t) => (
         <div key={t.id} className="toast" data-kind={t.kind} role={t.kind === "error" ? "alert" : undefined}>

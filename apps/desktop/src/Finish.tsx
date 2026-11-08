@@ -5,7 +5,7 @@ import { Grow } from "./Grow";
 import { PixelStar } from "./PixelIcon";
 import { Hint } from "./Hint";
 import { is } from "./keys";
-import { ore, opt, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
+import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
 import { stampBefore } from "./transcript";
 import { errorText, focusPicked, type Notify } from "./util";
 import { PixelSpin, useLate, Working } from "./Working";
@@ -172,6 +172,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           void back.then(() => sayUndrafted(notify, errorText(e)));
         },
       );
+    if (PHONE) return; // Cards are drafted on the Mac (D78.3); said once in the panel, not as a failure.
     if (feedbackRun.current) void feedbackRun.current.finally(run);
     else void run();
   }
@@ -213,7 +214,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       if (left === null) return;
       if (recall.trim()) {
         onNotes((await ore<{ notes: string }>("recall", doc.id, opt("text", recall.trim()))).notes);
-        feedbackRun.current = ore<Feedback>("recall", doc.id, "--feedback").then(setFeedback, (e) => setFeedback(errorText(e)));
+        // Feedback on the recall is AI, which the phone can't run (D78.3): nothing to wait for or fail.
+        if (!PHONE) feedbackRun.current = ore<Feedback>("recall", doc.id, "--feedback").then(setFeedback, (e) => setFeedback(errorText(e)));
       }
       setStep(1);
     } catch (e) {
@@ -494,7 +496,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
               {verdict === "yes" ? <Check size={16} weight="bold" /> : verdict === "part" ? <CircleHalf size={16} weight="fill" /> : waiting ? <PixelSpin /> : <MagnifyingGlass size={15} weight="bold" />}
             </span>
             <div>
-              <b>{verdict === "yes" ? "You got it" : verdict === "part" ? "Partly there" : verdict === "no" ? "Not yet. Here’s where it is" : failed ? "Couldn’t check this one" : q.points ? "Checking your answer…" : "Finding the key points…"}</b>
+              <b>{verdict === "yes" ? "You got it" : verdict === "part" ? "Partly there" : verdict === "no" ? "Not yet. Here’s where it is" : failed ? (PHONE ? "Not checked here" : "Couldn’t check this one") : q.points ? "Checking your answer…" : "Finding the key points…"}</b>
               <span>
                 {verdict === "yes"
                   ? "Every key point is in your answer."
@@ -502,13 +504,16 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                     ? `${cov!.length - got === 1 ? "One point is" : "A few points are"} worth a second look.`
                     : verdict === "no"
                       ? "Step through the passages below."
-                      : failed
+                      : failed && PHONE
+                        ? // The phone can't run the AI that checks (D78.3); a retry would fail the same way, as Review says it.
+                          "Checking answers runs on your Mac for now. Compare your answer with the source when you’re back in it."
+                        : failed
                         ? // Why (Codex missing, Claude signed out), so he knows whether a retry can work, as Review says it.
                           `${why}${/[.!?]$/.test(why!) ? "" : "."} The source is open; compare your answer with it, or `
                         : late
                           ? `${q.points ? "This can take about 20 seconds" : "This can take up to a minute"}. The source is open; have a look meanwhile.`
                           : "The source is open; have a look meanwhile."}
-                {failed && (
+                {failed && !PHONE && (
                   <>
                     <button className="link" onClick={retry}>
                       try again
