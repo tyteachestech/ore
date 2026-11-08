@@ -451,6 +451,8 @@ function Row({ title, text, htmlFor, children }: { title: string; text: string; 
 function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) => void }) {
   const [text, setText] = useState(plan);
   useEffect(() => setText(plan), [plan]);
+  // Leaving the field hands focus to the sheet, not the page under it, so the next Esc closes Settings.
+  const done = (field: HTMLElement) => field.closest<HTMLElement>(".settings-sheet")?.focus();
   return (
     <span className="settings-plan">
       After
@@ -468,12 +470,12 @@ function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) => void
             const v = text.trim().replace(/[.,;]+$/, "");
             setText(v);
             if (v !== plan) onSave(v);
-            e.currentTarget.blur();
+            done(e.currentTarget);
           } else if (e.key === "Escape") {
             e.preventDefault();
             e.stopPropagation();
             setText(plan);
-            e.currentTarget.blur();
+            done(e.currentTarget);
           }
         }}
       />

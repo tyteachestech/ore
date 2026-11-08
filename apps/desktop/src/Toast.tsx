@@ -109,10 +109,20 @@ export function useToast() {
     held.current = false;
     for (const t of list.current) arm(t, 3000);
   };
-  const undone = useCallback((step: Step) => show({ message: `Undone: ${step.message}`, kind: "info", offer: step.redo ? "redo" : undefined, step }, (x) => x.step === step), [show]);
-  const redone = useCallback((step: Step) => show({ message: step.message, kind: "info", offer: "undo", step }, (x) => x.step === step), [show]);
-  failed.current = (step, e, what) =>
-    show({ message: `Couldn’t ${what} “${step.message}”: ${errorText(e)}`, kind: "error" }, (x) => x.step === step);
+  /** A step's toast turns into what ⌘Z or ⇧⌘Z did, brought to the front: a run of ⌘Z otherwise
+   *  rewrites a toast behind the front one, which still names the step before. */
+  const again = useCallback(
+    (t: Shown, step: Step) => {
+      const ts = list.current;
+      const i = ts.findIndex((x) => x.step === step);
+      if (i >= 0 && i < ts.length - 1) commit([...ts.slice(0, i), ...ts.slice(i + 1), ts[i]!]);
+      show(t, (x) => x.step === step);
+    },
+    [show, commit],
+  );
+  const undone = useCallback((step: Step) => again({ message: `Undone: ${step.message}`, kind: "info", offer: step.redo ? "redo" : undefined, step }, step), [again]);
+  const redone = useCallback((step: Step) => again({ message: step.message, kind: "info", offer: "undo", step }, step), [again]);
+  failed.current = (step, e, what) => again({ message: `Couldn’t ${what} “${step.message}”: ${errorText(e)}`, kind: "error" }, step);
   const undo = useCallback(() => {
     const step = history.current.undo();
     if (step) undone(step);

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { BINDINGS, comboOf, type Combo, type CommandEvent, type KeyId } from "./keys";
+import { BINDINGS, comboOf, IN_REVIEW, type Combo, type CommandEvent, type KeyId } from "./keys";
 
 // The Mac menu bar (Apple's apps, Things): every command with its shortcut, built from the keymap
 // so a rebinding updates the menu too, and found by name from Help ▸ Search. A menu click replays
@@ -23,8 +23,7 @@ const MENUS: Spec[] = [
   { title: "Help", role: "help", items: ["shortcuts"] },
 ];
 
-/** Review's own commands only work in Review; the rest of that menu works everywhere. */
-const IN_REVIEW = new Set<KeyId>(["no-idea", "in-head", "edit-card", "retire-card", "ask", "bad-version"]);
+// Review's own commands (IN_REVIEW) only work in Review; the rest of that menu works everywhere.
 
 /** Menu wording where the keymap's label is written for the shortcuts sheet. */
 const LABEL: Partial<Record<KeyId, string>> = {

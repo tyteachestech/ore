@@ -3,6 +3,7 @@ import type * as YAMLLib from "yaml";
 import { z } from "zod";
 import { listCards, writeCardMeta } from "./cards.ts";
 import { parseYaml, stringifyFrontmatter, loadYaml } from "./frontmatter.ts";
+import { isOther, tidyCollection } from "./collection-name.ts";
 import { writeAtomic } from "./fsutil.ts";
 import { allItems, findItem, ItemMetaSchema, updateItemMeta, type ItemMeta } from "./items.ts";
 import { nowIso, slugify } from "./ids.ts";
@@ -88,7 +89,11 @@ export function loadSkills(lib: Library): SkillsFile {
     const why = loadYaml().parseDocument(text).errors[0]?.message.split("\n")[0]?.replace(/:$/, "") ?? "it isn’t valid YAML";
     throw new Error(`skills.yaml in your library has a typo: ${why}. Fix it in a text editor.`);
   }
-  return parseSkillsFile(data).file;
+  const { file } = parseSkillsFile(data);
+  // A collection named Other, saved before it was refused, reads as none: its skills join Other, and
+  // the next arrange writes them so.
+  for (const s of file.skills) if (s.collection !== undefined && isOther(s.collection)) delete s.collection;
+  return file;
 }
 
 /** What `loadSkills` had to leave out of skills.yaml to read it, for `ore doctor`. */
@@ -209,7 +214,8 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
       node.set("name", name);
     }
     for (const key of ["icon", "color", "collection", "hook", "goal"] as const) {
-      const v = key === "hook" || key === "goal" ? look[key]?.trim().replace(/\s+/g, " ") : look[key]?.trim();
+      const raw = look[key];
+      const v = raw === undefined ? undefined : key === "collection" ? collectionName(raw) : key === "hook" || key === "goal" ? raw.trim().replace(/\s+/g, " ") : raw.trim();
       if (v === undefined) continue;
       if (key === "color" && v && !SkillColor.options.includes(v as SkillColor))
         throw new Error(`color must be one of ${SkillColor.options.join("|")}`);
@@ -222,6 +228,13 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     return skill;
   });
+}
+
+// A collection's name as saved; a collection named Other would show as a second Other (collection-name.ts).
+function collectionName(name: string): string {
+  const c = tidyCollection(name);
+  if (isOther(c)) throw new Error(`"${c}" is the name of the skills in no collection`);
+  return c;
 }
 
 // The sidebar's layout: collections in order, each with its skills in order ("" holds the skills in
@@ -242,7 +255,7 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
     const names = new Set<string>();
     const order: YAMLLib.YAMLMap[] = [];
     for (const g of layout) {
-      const c = g.collection.trim().replace(/\s+/g, " ");
+      const c = collectionName(g.collection);
       if (c && names.has(c.toLowerCase())) throw new Error(`collection "${c}" is listed twice`);
       names.add(c.toLowerCase());
       for (const id of g.skills) {
@@ -273,7 +286,7 @@ export async function addSkill(lib: Library, name: string, collection = ""): Pro
     const existing = skills.find((s) => sameName(s.name, n));
     if (existing) throw new Error(`skill "${existing.name}" already exists`);
     const id = newSkillId(skills, n);
-    const c = collection.trim();
+    const c = collectionName(collection);
     const skill: Skill = { id, name: n, priority: DEFAULT_PRIORITY, ...(c ? { collection: c } : {}) };
     (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
