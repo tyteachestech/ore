@@ -1678,7 +1678,7 @@ export function App() {
         dragged={dragged}
         role="option"
         aria-selected={on || sel}
-        className={`row${lesson ? " lesson" : ""}${on ? " on" : ""}${sel ? " sel" : ""}${r.status === "inbox" ? " unopened" : ""}${lesson && r.status === "done" ? " finished" : ""}${r.pinned_at ? " pinned" : ""}${snip ? " hit" : ""}`}
+        className={`row${lesson ? " lesson" : ""}${on ? " on" : ""}${sel ? " sel" : ""}${lesson && r.status === "done" ? " finished" : ""}${r.pinned_at ? " pinned" : ""}${snip ? " hit" : ""}`}
         onClick={(e) => (e.shiftKey ? live.current.pickRange(r.id) : e.metaKey ? live.current.pickToggle(r.id) : live.current.openSource(r.id))}
       >
         {/* A lesson (D79): its number in the course, and a check once done, where a source has its picture. */}
@@ -1727,11 +1727,6 @@ export function App() {
           <span className="row-main">
             <span className="row-line">
               <span className="title">{r.title}</span>
-              {r.has_notes && (
-                <Hint text="Has a source note">
-                  <span className="has-note" role="img" aria-label="Has a source note" />
-                </Hint>
-              )}
             </span>
             {snip ? (
               <span className="snip">{snippet(snip, q)}</span>
@@ -1744,7 +1739,7 @@ export function App() {
               </span>
             )}
             {/* A skill page's rows are Reader's (D130): a third line says what kind it is (its length joins once import records one). */}
-            {onSkillPage && !lesson && !snip && <span className="kind-line">{KIND[r.type] ?? r.type}</span>}
+            {!lesson && !snip && <span className="kind-line">{KIND[r.type] ?? r.type}</span>}
           </span>
         )}
         {onSkillPage && mayAnswer.has(r.id) && (
@@ -1776,7 +1771,7 @@ export function App() {
         role="option"
         aria-selected={on}
         aria-expanded={c.open}
-        className={`row course${on ? " on" : ""}${started ? "" : " unopened"}`}
+        className={`row course${on ? " on" : ""}`}
         onClick={() => openSource(lessonFirst(c).id)}
       >
         <Hint text={c.open ? "Hide lessons" : "Show lessons"}>
@@ -1990,8 +1985,6 @@ export function App() {
       {collapsed && <div className="side-edge" aria-hidden="true" onMouseEnter={peekIn} onMouseLeave={() => !peek && clearTimeout(peekTimer.current)} />}
       <Sidebar
         skills={skills}
-        items={items ?? []}
-        status={status}
         skill={sideSkill}
         within={!!openItem}
         home={onHome}

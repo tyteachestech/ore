@@ -11,7 +11,7 @@ import { Hint } from "./Hint";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
 import { useSideCursor } from "./SideCursor";
-import { ore, opt, tabCount, type Item, type Skill, type Tab } from "./ore";
+import { ore, opt, type Skill } from "./ore";
 import { layoutOf, skillGroups, type SkillLayout } from "./Skills";
 import { errorText, load, save } from "./util";
 
@@ -40,10 +40,8 @@ const SETTLE: DropAnimation = { duration: 180, easing: "cubic-bezier(0.2, 0, 0, 
  *  where it will land and the other rows slide aside; a skill drops into, out of and within any
  *  collection. Icons sit bare (Dia, Notion); the open skill's row takes its color, as Dia tints a space,
  *  and holds a fainter tint while one of its sources is open. */
-export function Sidebar({ skills, items, status, skill, within, home, onHome, feed, onFeed, hidden, peek, drop, onPointer, onOpen, menu, onCreated, onArrange, onDeleteCollection }: {
+export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hidden, peek, drop, onPointer, onOpen, menu, onCreated, onArrange, onDeleteCollection }: {
   skills: Skill[];
-  items: Item[];
-  status: Tab;
   skill: string | null;
   /** A source is open: the selected row is where it sits, so it takes a quieter tint than its own page. */
   within: boolean;
@@ -81,10 +79,6 @@ export function Sidebar({ skills, items, status, skill, within, home, onHome, fe
   const [fresh, setFresh] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
   const marked = skills.some((s) => s.icon || s.color);
-  // Sources in the list's tab. Home has no list, and its chips count cards due, so there the
-  // skill counts would be a third, unexplained number for the same skill: they stay hidden.
-  const count = (id?: string) => (home && id ? "" : tabCount(items.filter((i) => !id || i.skills.includes(id)), status) || "");
-  const counted = (n: number | string) => (n ? `${n} ${n === 1 ? "source" : "sources"} ${status === "done" ? "done" : "to read"}` : "");
   const base = draft ?? groups;
   const freshGroup = fresh !== null && !base.some((g) => g.collection === fresh) ? { name: fresh || "Other", collection: fresh, skills: [] } : null;
   const last = base.length - (base.at(-1)?.collection ? 0 : 1);
@@ -251,7 +245,6 @@ export function Sidebar({ skills, items, status, skill, within, home, onHome, fe
           </span>
         )}
         <span className="label">All sources</span>
-        <Count n={count()} text={counted(count())} />
       </button>
       <DndContext sensors={sensors} collisionDetection={collide} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
         <SortableContext items={shown.map((g) => groupId(g.collection))} strategy={verticalListSortingStrategy}>
@@ -273,7 +266,7 @@ export function Sidebar({ skills, items, status, skill, within, home, onHome, fe
               <SortableContext items={g.skills.map((s) => s.id)} strategy={verticalListSortingStrategy}>
                 {isOpen(g) &&
                   g.skills.map((s) => (
-                    <SkillRow key={s.id} s={s} on={skill === s.id} drop={drop === s.id} marked={marked} count={count(s.id)} countText={counted(count(s.id))} onOpen={onOpen} menu={menu(s)} />
+                    <SkillRow key={s.id} s={s} on={skill === s.id} drop={drop === s.id} marked={marked} onOpen={onOpen} menu={menu(s)} />
                   ))}
               </SortableContext>
               {adding === g.name && (
@@ -300,11 +293,11 @@ export function Sidebar({ skills, items, status, skill, within, home, onHome, fe
                   <span className="side-label"><span className="side-label-text">{lifted.name}</span></span>
                 </div>
                 {isOpen(lifted) &&
-                  lifted.skills.map((s) => <SkillFace key={s.id} s={s} marked={marked} count={count(s.id)} />)}
+                  lifted.skills.map((s) => <SkillFace key={s.id} s={s} marked={marked} />)}
               </div>
             ) : lifted ? (
               <div className="side-item on side-lifted" data-color={lifted.color}>
-                <SkillFace s={lifted} marked={marked} count={count(lifted.id)} />
+                <SkillFace s={lifted} marked={marked} />
               </div>
             ) : null}
           </DragOverlay>,
@@ -415,7 +408,7 @@ function RenameField({ value, label = "Collection name", placeholder, taken, onS
   );
 }
 
-function SkillFace({ s, marked, count }: { s: Skill; marked: boolean; count: number | string }) {
+function SkillFace({ s, marked }: { s: Skill; marked: boolean }) {
   return (
     <span className="side-main">
       {marked && (
@@ -424,23 +417,16 @@ function SkillFace({ s, marked, count }: { s: Skill; marked: boolean; count: num
         </span>
       )}
       <span className="label">{s.name}</span>
-      <span className="count">{count}</span>
     </span>
   );
 }
 
 /** One skill: a click opens its page; a drag (past 4 px) lifts it, leaving a slot where it will land. */
-function Count({ n, text }: { n: number | string; text: string }) {
-  return <span className="count" aria-label={text || undefined}>{n}</span>;
-}
-
-function SkillRow({ s, on, drop, marked, count, countText, onOpen, menu }: {
+function SkillRow({ s, on, drop, marked, onOpen, menu }: {
   s: Skill;
   on: boolean;
   drop: boolean;
   marked: boolean;
-  count: number | string;
-  countText: string;
   onOpen: (id: string) => void;
   menu: MenuAction[];
 }) {
@@ -461,7 +447,6 @@ function SkillRow({ s, on, drop, marked, count, countText, onOpen, menu }: {
             </span>
           )}
           <span className="label">{s.name}</span>
-          <Count n={count} text={countText} />
         </button>
         <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} />
       </div>

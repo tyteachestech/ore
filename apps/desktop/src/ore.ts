@@ -146,18 +146,6 @@ export const titleMatches = (i: Item, q: string): boolean => {
 };
 /** The lesson to open next: the first one not done (null when all are). */
 export const nextLesson = (lessons: Item[]): Item | null => lessons.find((l) => l.status !== "done") ?? null;
-/** How many rows a tab lists: a course counts once, in To read while any lesson is left, in Done once all are. */
-export function tabCount(items: Item[], tab: Tab): number {
-  const courses = new Map<string, boolean>();
-  let n = 0;
-  for (const i of items) {
-    if (!i.course) n += Number(inTab(i.status, tab));
-    else courses.set(i.course.id, (courses.get(i.course.id) ?? false) || i.status !== "done");
-  }
-  for (const left of courses.values()) n += Number(tab !== "archived" && left === (tab === "toread"));
-  return n;
-}
-
 /** EPUB chapter recall (D18); `n` is the number in the body's `<!-- chapter N -->` marker. */
 export type ChapterRecall = { n: number; text: string; at: string; feedback?: ChapterFeedback };
 /** `section_lines`: one line on his section lines (D32), null when he wrote none in that range. */

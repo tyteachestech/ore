@@ -448,8 +448,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   const row = (q: Question) => {
     const match = q.matches.find((m) => m.item === item);
     const done = q.status === "done";
-    const fromHere = q.answers.filter((c) => c.item === item).length;
-    // The same actions as the links under it, in the ⋯ and right-click menus; delete last (as on the skill page).
+    // One line, as Collected's other rows (D134): what it can do is in the ⋯ and right-click menus (links under it on the phone); delete last.
     const actions: MenuAction[] = [
       ...(done ? [] : [{ id: "answer", label: "Answer…", run: () => setOpen(q.id) }]),
       ...(match?.quote ? [{ id: "jump", label: "Jump to the passage", run: () => onJumpQuote({ quote: match.quote!, start: match.start }) }] : []),
@@ -468,24 +467,26 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
           </button>
           {!PHONE && <MoreButton label="Question actions" actions={actions} />}
         </div>
-        <div className="qp-sub">
-          {match?.quote && (
-            <button className="qp-link" onClick={() => onJumpQuote({ quote: match.quote!, start: match.start })}>
-              Jump to the passage
-            </button>
-          )}
-          {q.here === "from" && (
-            <button className="qp-link" onClick={() => onJumpHighlight(q.id)}>
-              Asked here
-            </button>
-          )}
-          {q.answers.length > 0 && <span>{fromHere ? `${q.answers.length} in your answer, ${fromHere} from here` : `${q.answers.length} in your answer`}</span>}
-          {match && !done && (
-            <button className="qp-link quiet" onClick={() => void dismiss(q)}>
-              Not answered here
-            </button>
-          )}
-        </div>
+        {PHONE && (
+          // The phone has no ⋯ or right-click menu here, so its actions stay as links under the question.
+          <div className="qp-sub">
+            {match?.quote && (
+              <button className="qp-link" onClick={() => onJumpQuote({ quote: match.quote!, start: match.start })}>
+                Jump to the passage
+              </button>
+            )}
+            {q.here === "from" && (
+              <button className="qp-link" onClick={() => onJumpHighlight(q.id)}>
+                Asked here
+              </button>
+            )}
+            {match && !done && (
+              <button className="qp-link quiet" onClick={() => void dismiss(q)}>
+                Not answered here
+              </button>
+            )}
+          </div>
+        )}
         {open === q.id && (
           <AnswerBox
             q={q}
