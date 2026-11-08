@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as R
 import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/NoteEditor";
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
-import { ore, opt, type Backlink, type Notes } from "./ore";
+import { ore, opt, oreWith, type Backlink, type Notes } from "./ore";
 import { errorText, load, save, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
@@ -32,7 +32,7 @@ type MyNotes = {
   /** Takes the full text a CLI call returned (recall, chapter recall, append). */
   apply: (text: string) => void;
   /** Picks an image and copies it into images/ beside the note; its relative path, or null. */
-  attach: () => Promise<string | null>;
+  attach: (from?: string | { ext: string; data: string }) => Promise<string | null>;
   /** Reads the open editor's text now; NoteEditor sets it. */
   pull: { current: (() => string | null) | null };
   /** The CLI arguments that name this note (`<item>` or `--skill=<s>`), for `ore diagram`. */
@@ -142,11 +142,13 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     [apply, flush, key, notify, queue],
   );
 
-  const attach = useCallback(async () => {
-    const picked = await openDialog({ multiple: false, directory: false, filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg"] }] });
-    if (typeof picked !== "string") return null;
+  /** Copies an image beside the note: a file's path, a pasted one's bytes (base64), or one he picks. */
+  const attach = useCallback(async (from?: string | { ext: string; data: string }) => {
+    const picked = from ?? (await openDialog({ multiple: false, directory: false, filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg"] }] }));
+    if (!picked || Array.isArray(picked)) return null;
     try {
-      return (await ore<{ attached: string }>("notes", ...key.split(" "), opt("attach", picked))).attached;
+      const args = ["notes", ...key.split(" ")];
+      return (typeof picked === "string" ? await ore<{ attached: string }>(...args, opt("attach", picked)) : await oreWith<{ attached: string }>(picked.data, ...args, "--attach", "-", opt("ext", picked.ext))).attached;
     } catch (e) {
       notify(errorText(e), "error");
       return null;

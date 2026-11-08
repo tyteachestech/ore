@@ -325,8 +325,8 @@ export const itemCommands: Record<string, Command> = {
   },
 
   notes: {
-    usage: '<item> | --skill <s>  [--set "<text>" [--base "<text it was edited from>"] | --append "<text>" --heading "<h>" | --attach <image>]   Source note (notes.md) or a skill note: print, replace (with --base, merges changes made to the file since), append under a heading (skipped if already present), or copy an image into images/ beside it',
-    options: { skill: { type: "string" }, set: { type: "string" }, append: { type: "string" }, heading: { type: "string" }, attach: { type: "string" }, base: { type: "string" } },
+    usage: '<item> | --skill <s>  [--set "<text>" [--base "<text it was edited from>"] | --append "<text>" --heading "<h>" | --attach <image> | --attach - --ext <png|jpg|…>]   Source note (notes.md) or a skill note: print, replace (with --base, merges changes made to the file since), append under a heading (skipped if already present), or copy an image into images/ beside it (--attach -: the image bytes in base64 on stdin, as pasted)',
+    options: { skill: { type: "string" }, set: { type: "string" }, append: { type: "string" }, heading: { type: "string" }, attach: { type: "string" }, ext: { type: "string" }, base: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
       const skill = str(f.skill);
@@ -336,7 +336,8 @@ export const itemCommands: Record<string, Command> = {
       if ((f.heading !== undefined) !== (f.append !== undefined)) throw new Error("--append and --heading go together");
       if (f.base !== undefined && f.set === undefined) throw new Error("--base goes with --set");
       if (f.attach !== undefined) {
-        const r = await attachToNote(lib, note, need(str(f.attach), "--attach"));
+        const path = need(str(f.attach), "--attach");
+        const r = await attachToNote(lib, note, path === "-" ? { ext: need(str(f.ext), "--ext"), data: Buffer.from(await readStdin(), "base64") } : path);
         return { data: r, text: `Copied to ${r.attached} (beside ${r.path})` };
       }
       const r0 =

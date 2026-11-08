@@ -7,7 +7,7 @@ import { MoreButton, WithMenu, type MenuAction } from "../Menu";
 import { blockAt, BlockSelection, duplicate, gaps, kindOf, KINDS, moveBy, moveTo, remove, selectBlocks, selectedBlock, turnInto, type Block, type Gap } from "./blockops";
 
 type Line = { x: number; y: number; w: number };
-type Spot = { gap: Gap; y: number; left: number; right: number };
+export type Spot = { gap: Gap; y: number; left: number; right: number };
 
 /** Notion's ⋮⋮ beside the block under the pointer: drag it to move the block (a line shows where it
  *  lands, Esc cancels), click it or right-click it for the block's menu (Turn into, Duplicate, Move,
@@ -186,7 +186,7 @@ function place(v: EditorView, host: HTMLElement, b: Block) {
 }
 
 /** A gap's line: halfway between the blocks on either side, as wide as the list or note it is in. */
-function spot(v: EditorView, gap: Gap): Spot {
+export function spot(v: EditorView, gap: Gap): Spot {
   const $p = v.state.doc.resolve(gap.pos);
   const rect = (pos: number) => (v.nodeDOM(pos) as HTMLElement).getBoundingClientRect();
   const before = $p.nodeBefore ? rect(gap.pos - $p.nodeBefore.nodeSize) : null;
@@ -199,7 +199,7 @@ function spot(v: EditorView, gap: Gap): Spot {
 
 /** The gap nearest the pointer; of gaps at about the same height, the deepest one left of the pointer
  *  (Notion's indent by moving right). */
-function nearest(spots: Spot[], x: number, y: number): Spot | null {
+export function nearest(spots: Spot[], x: number, y: number): Spot | null {
   if (!spots.length) return null;
   const best = Math.min(...spots.map((s) => Math.abs(s.y - y)));
   const close = spots.filter((s) => Math.abs(s.y - y) <= best + 8);
