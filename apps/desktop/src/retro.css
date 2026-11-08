@@ -87,8 +87,6 @@
 .skill-note { padding: 0; }
 .skill-col { gap: 36px; }
 .skill-card .card-head { box-sizing: content-box; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
-.warm-up { background: transparent; padding: 0; gap: 14px; margin-bottom: 14px; }
-.warm-up b { font-size: 17px; font-weight: 600; }
 
 /* Home is an open page (Style rules: one level of boxes): sections are a label over a rule, skills are rows. */
 .home-today, .home-cont, .home-skill { border-radius: 0; box-shadow: none; background: transparent; border: 0; }

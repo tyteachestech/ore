@@ -1343,13 +1343,11 @@ button.skill-badge:hover { filter: brightness(1.2); }
 .skill-badge .initial { font-size: 20px; font-weight: 700; color: var(--skill); }
 .icon-btn { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); }
 .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
-/* A tinted band inside the note card, not a card of its own. */
-.warm-up {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 18px; padding: 16px 18px; border-radius: 8px;
-  background: color-mix(in srgb, var(--skill) 10%, transparent);
-}
-.warm-up b { flex: 1 1 160px; min-width: 0; font-size: 15px; }
-.warm-up .info { margin-left: -10px; }
+/* D132: one quiet line (Linear), no band: the question in muted, a small bordered Start whose hint carries the why. */
+.warm-up { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.warm-up b { flex: 1 1 160px; min-width: 0; font-size: 14px; font-weight: 500; color: var(--muted); }
+.warm-start { flex: none; height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); color: var(--text); font-size: 12px; font-weight: 500; }
+.warm-start:hover { background: var(--bg-hover); }
 /* The one playful button: a raised pill in the skill's color, Duolingo-style. */
 .pill-btn {
   flex: none; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; border-radius: 999px;
@@ -1359,8 +1357,6 @@ button.skill-badge:hover { filter: brightness(1.2); }
 .pill-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 color-mix(in srgb, var(--skill) 55%, #000); }
 .pill-btn:disabled { opacity: 0.45; }
 .pill-btn kbd { background: transparent; color: inherit; border-color: rgba(13, 17, 23, 0.3); }
-.info { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 2px; border-radius: 50%; color: var(--faint); vertical-align: middle; }
-.info:hover { color: var(--text); background: var(--bg-hover); }
 .ask { padding: 4px 8px 8px; }
 .ask .field { width: 100%; height: 32px; padding: 0 10px; }
 .ask-err { margin-top: 4px; color: var(--error); font-size: 12px; }
