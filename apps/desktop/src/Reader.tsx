@@ -1572,6 +1572,24 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   }
 
+  // Typing with the highlight popup open writes its note, as Notion's comment box does (Tyler, 2026-11-08): the
+  // first letter moves focus into the note and lands there. Caught first, so no single-letter shortcut (C, Q, N…)
+  // sees it. 1–4 still set the type, and Tab, Backspace, Enter and Esc keep their meaning.
+  useEffect(() => {
+    if (!popup || PHONE) return;
+    const onKey = (e: KeyboardEvent) => {
+      const note = noteRef.current;
+      const t = e.target as HTMLElement;
+      if (p.blocked || !note || t === note || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.key.length !== 1 || e.key === " ") return;
+      if (INTENTS.some((i) => is(e, i))) return;
+      e.stopImmediatePropagation();
+      note.focus();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [popup, p.blocked]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (p.blocked || closedBook) return;
