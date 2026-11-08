@@ -1361,14 +1361,17 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
     const from: Span = { exact: a.exact, start: a.start, range: was };
     const to: Span = { exact: q.exact, start: q.start, range };
-    // Resized, it is a highlight he worked on: Esc now keeps it, as Enter does.
-    if (fresh.current === id) fresh.current = null;
+    // Resized, it is a highlight he worked on: Esc now keeps it, as Enter does. A move that fails puts
+    // the edge back, and the highlight is untouched again.
+    const wasFresh = fresh.current === id;
+    if (wasFresh) fresh.current = null;
+    let rid: string | undefined;
     ranges.current.set(id, range);
     setAnns((l) => l.map((x) => (x.id === id ? { ...x, exact: q.exact, start: q.start, end: q.start + q.exact.length } : x)));
     setRepaint((n) => n + 1);
     openPopup(id, range, note);
     try {
-      const rid = await realId(id);
+      rid = await realId(id);
       await annotate(rid, opt("exact", q.exact), "--start", String(q.start));
       const s = spanStep(rid, from, to);
       p.notify("Moved the highlight’s edge", "quiet", s.back, s.again);
@@ -1377,6 +1380,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       setAnns((l) => l.map((x) => (x.id === id ? { ...x, exact: from.exact, start: from.start, end: from.start + from.exact.length } : x)));
       setRepaint((n) => n + 1);
       setPopup((cur) => (cur?.id === id ? { ...cur, ...popupAt(was) } : cur));
+      if (wasFresh && fresh.current === null) fresh.current = rid ?? id;
       p.notify(placeError(e), "error");
     }
   }

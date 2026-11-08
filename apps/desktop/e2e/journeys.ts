@@ -928,6 +928,29 @@ journey("highlight: a triple click whose selection runs past the text keeps the 
   await until("the word is highlighted", async () => (await kept()).includes("Decades"));
 });
 
+journey("highlight: an edge move that fails to save leaves it untouched, so Esc still drops it", async (page) => {
+  await openSource(page, AGENTS);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  const fail = (on: boolean) => page.evaluate((on) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = on ? { annotate: "The library is busy." } : {}), on);
+  await page.waitForTimeout(300);
+  await select(page, "Agents are systems where the model"); // a passage no other journey highlights
+  await popup.waitFor();
+  await until("the highlight is saved", async () => (await kept()).includes("Agents are systems where the model"));
+  const knob = (await page.locator(".grab-edge.end").boundingBox())!;
+  const to = await pointAt(page, "tool usage");
+  await fail(true);
+  await page.mouse.move(knob.x + knob.width / 2, knob.y + knob.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 8 });
+  await page.mouse.up();
+  await until("the move fails and says so", async () => (await page.locator(".toast").allInnerTexts()).some((t) => t.includes("The library is busy.")));
+  await fail(false);
+  await until("the edge is back where it was", async () => (await kept()).includes("Agents are systems where the model"));
+  await page.keyboard.press("Escape");
+  await until("Esc drops the untouched highlight", async () => !(await kept()).some((t) => t.startsWith("Agents are systems")));
+});
+
 journey("highlight: an edge he dragged is his, so Esc keeps the highlight and ⌘Z moves the edge back", async (page) => {
   await openSource(page, AGENTS);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
