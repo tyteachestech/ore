@@ -4024,6 +4024,29 @@ journey("reader toolbar at a narrow window: it never covers the sidebar toggle o
   }
 });
 
+journey("⌘K: the skill named what he typed is the top row, above a source that starts with it; accents and emoji find titles", async (page) => {
+  const add = (text: string) =>
+    fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich"], stdin: text }) }).then((r) => r.json()) as Promise<{ id: string }>;
+  const made = [await add("# Teaching kids to read\n\nPhonics first, then whole words."), await add("# Résumé café 🔥\n\nA title with accents and an emoji.")];
+  try {
+    await page.reload();
+    await page.locator(".side-item").first().waitFor();
+    const top = async (query: string) => {
+      await page.keyboard.press("Meta+k");
+      await page.locator("[cmdk-input]").fill(query);
+      await page.waitForTimeout(400);
+      const row = (await page.locator("[cmdk-item][data-selected=true]").innerText()).trim();
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      return row;
+    };
+    if ((await top("teaching")) !== "Teaching") throw new Error(`“teaching” selects “${await top("teaching")}”, not the skill`);
+    for (const q of ["cafe", "resume", "🔥"]) if (!(await top(q)).includes("Résumé café 🔥")) throw new Error(`“${q}” selects “${await top(q)}”`);
+  } finally {
+    for (const m of made) await ore("archive", m.id);
+  }
+});
+
 // —— run ——
 
 let failed = 0;
