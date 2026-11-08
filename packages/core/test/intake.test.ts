@@ -186,6 +186,17 @@ describe("import coverage: web pages", () => {
     expect(count(b, /^(?:> )+\*\*/gm)).toBe(24); // every comment
   });
 
+  test("Wikipedia's formulas: the TeX its authors wrote, inline and on their own line", async () => {
+    // wikipedia-math.html: "Forgetting curve" (CC BY-SA 4.0), whose formulas are MathML with their TeX in data-mw.
+    const url = "https://en.wikipedia.org/wiki/Forgetting_curve";
+    serve({ [url]: { body: web("wikipedia-math.html"), type: HTML } });
+    const b = (await addSource(await tempLibrary(), url)).body;
+    expect(b).toContain("\n$$\nb = \\frac{100k}{(\\log(t))^c +k}\n$$\n");
+    expect(b).toContain("\n$$\nR = e^{-\\frac{t}{S}},\n$$\n");
+    expect(b).toContain("Here, $$b$$ represents 'Savings'");
+    expect(b).not.toContain("\\left(\\right.");
+  });
+
   test("nbviewer and Google links point at what to read", () => {
     expect(rewrite("https://nbviewer.org/github/jakevdp/PythonDataScienceHandbook/blob/master/notebooks/a.ipynb")).toMatchObject({ kind: "fetch", url: "https://raw.githubusercontent.com/jakevdp/PythonDataScienceHandbook/master/notebooks/a.ipynb" });
     expect(rewrite("https://docs.google.com/document/d/abc_123/edit?usp=sharing")).toEqual({ kind: "fetch", url: "https://docs.google.com/document/d/abc_123/export?format=docx" });

@@ -180,6 +180,25 @@ function paperAuthors(doc: Document): string | undefined {
   return names.length === 1 ? names[0] : names.length === 2 ? names.join(" and ") : `${names[0]} et al.`;
 }
 
+/** Wikipedia's formulas as the TeX their authors wrote (each one's annotation), not TeX rebuilt from
+ *  its MathML, which comes out as `\left(\right. log \left(t\right)`. */
+function wikiMath(doc: Document) {
+  for (const el of doc.querySelectorAll(".mwe-math-element")) {
+    // Today's pages carry it in the element's own data (`body.extsrc`); older ones in an annotation.
+    let raw = el.querySelector('annotation[encoding="application/x-tex"]')?.textContent ?? el.querySelector("img")?.getAttribute("alt") ?? "";
+    try {
+      raw = (JSON.parse(el.getAttribute("data-mw") ?? "{}") as { body?: { extsrc?: string } }).body?.extsrc ?? raw;
+    } catch { /* not Wikipedia's data after all */ }
+    const tex = raw.trim().replace(/^\{\\displaystyle\s*([\s\S]*)\}$/, "$1").trim();
+    if (!tex) continue;
+    const math = doc.createElement("span");
+    const block = el.classList.contains("mwe-math-element-block") || el.getAttribute("display") === "block";
+    math.className = block ? "math math-display" : "math math-inline";
+    math.setAttribute("data-latex", tex);
+    el.replaceWith(math);
+  }
+}
+
 /** A Hacker News thread as Defuddle's reader for it expects: names marked `.hnuser` (HN dropped the
  *  class, so every comment read as "[deleted]"), and no site after the title ("(example.com)").
  *  Returns the poster's name. */
@@ -202,6 +221,7 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     videoLinks(document as unknown as Document);
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
+    wikiMath(document as unknown as Document);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document) ?? hackerNews(document as unknown as Document, url);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
