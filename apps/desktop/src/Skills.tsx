@@ -155,13 +155,18 @@ export const skillsFirst = (skills: Skill[], first: string[]): Skill[] => [
   ...skills.filter((k) => !first.includes(k.id)),
 ];
 
+/** The header over the skills in no collection, once there are collections. No collection takes its name. */
+export const UNGROUPED = "Other";
+/** Whether a collection name is the ungrouped skills' header, any case. */
+export const isUngroupedName = (name: string) => name.trim().toLowerCase() === UNGROUPED.toLowerCase();
+
 /** Sidebar groups: each collection in the order it first appears in skills.yaml, then the rest
  *  (`collection` is "" for those). */
 export function skillGroups(skills: Skill[]): { name: string; collection: string; skills: Skill[] }[] {
   const names = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
   const groups = names.map((name) => ({ name, collection: name, skills: skills.filter((s) => s.collection === name) }));
   const rest = skills.filter((s) => !s.collection);
-  if (rest.length || !names.length) groups.push({ name: names.length ? "Other" : "Skills", collection: "", skills: rest });
+  if (rest.length || !names.length) groups.push({ name: names.length ? UNGROUPED : "Skills", collection: "", skills: rest });
   return groups;
 }
 
@@ -397,11 +402,11 @@ function CollectionPicker({ value, collections, onPick }: { value: string; colle
             <Command.List>
               {collections.map((c) => (
                 <Command.Item key={c} value={c} onSelect={() => choose(c)}>
-                  {c}
+                  <span className="menu-label">{c}</span>
                   {c === value && <Check />}
                 </Command.Item>
               ))}
-              {typed && !collections.some((c) => c.toLowerCase() === typed.toLowerCase()) && (
+              {typed && !isUngroupedName(typed) && !collections.some((c) => c.toLowerCase() === typed.toLowerCase()) && (
                 <Command.Item value={`create ${typed}`} onSelect={() => choose(typed)}>
                   <span className="sub">Create</span> {typed}
                 </Command.Item>
@@ -439,8 +444,8 @@ const Check = () => <CheckIcon className="check" size={12} aria-hidden="true" />
  *  archived when filed nowhere else. Cards always stay and keep reviewing. Enter deletes, Esc cancels. */
 export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   skill: Skill;
-  /** Its sources, and how many are filed under no other skill. */
-  sources: { all: number; only: number };
+  /** Its sources, how many are filed under no other skill, and its archived ones (the delete takes it off them too). */
+  sources: { all: number; only: number; archived: number };
   onDone: (deleted: boolean) => void;
   /** Undo or redo changed the library after the dialog closed. */
   onChanged: () => void;
@@ -453,6 +458,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   const choice = sources.all > 0 && sources.only > 0;
   useFocusWhileMounted(choice ? keepRef : panelRef);
   const n = (k: number) => `${k} source${k === 1 ? "" : "s"}`;
+  const alsoArchived = sources.archived ? ` (and ${sources.archived} archived)` : "";
 
   const remove = async () => {
     if (busy) return;
@@ -496,7 +502,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
         <h2>Delete {skill.name}?</h2>
         {choice ? (
           <fieldset className="delete-choice">
-            <legend>Its {n(sources.all)}</legend>
+            <legend>Its {n(sources.all)}{alsoArchived}</legend>
             <label>
               <input ref={keepRef} type="radio" name="sources" checked={!archive} onChange={() => setArchive(false)} />
               <span>
@@ -513,7 +519,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
             </label>
           </fieldset>
         ) : (
-          <p className="quiet">{sources.all ? `Its ${n(sources.all)} stay under their other skills.` : "No sources are filed under it."}</p>
+          <p className="quiet">{sources.all ? `Its ${n(sources.all)}${alsoArchived} stay under their other skills.` : sources.archived ? `Only ${n(sources.archived)} in Archived are filed under it.` : "No sources are filed under it."}</p>
         )}
         <p className="quiet">Its cards stay and keep coming up in review.</p>
         <div className="skill-edit-foot">

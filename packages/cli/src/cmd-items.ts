@@ -11,7 +11,7 @@ import {
   cutText,
   restoreCut,
   redoCut,
-  enrichError, type Item, type Library,
+  enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
   appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter,
@@ -23,11 +23,9 @@ import { startEnrich, startEnrichMany, startTables } from "./background.ts";
 
 const INTENTS = Intent.options;
 
-/** `enrich_error`: why background enrich failed, for a source it never enriched (the reader shows it at once). */
-const enrichFailure = (lib: Library, i: Item) => {
-  const why = i.meta.enriched_at ? null : enrichError(lib, i.meta.id);
-  return why ? { enrich_error: why } : {};
-};
+/** `enrich_error`: why background enrich failed, for a source it never enriched (the reader shows it at once);
+ *  `enrich_skipped`: it was added with no enrich on its way, so nothing is writing its prequestions. */
+const enrichFailure = (logs: ReturnType<typeof enrichLogs>, i: Item) => (i.meta.enriched_at ? {} : logs(i.meta.id));
 
 function annotationLine(a: AnchoredAnnotation): string {
   const where = a.anchor ? `${a.anchor.start}-${a.anchor.end}${a.anchor.method === "position" ? "" : ` (${a.anchor.method})`}` : "ORPHANED";
@@ -60,6 +58,7 @@ export const itemCommands: Record<string, Command> = {
         const r = await addCourse(lib, plan, { skills: strs(f.skill), onLesson: (done, of, t) => progress(done, of, plan.title, `Adding lesson ${done + 1} of ${of}: ${t}`) });
         // One background run enriches the lessons in course order, so the AI isn't asked 14 things at once.
         const enrich = f["no-enrich"] ? "skipped" : startEnrichMany(lib, r.added.map((i) => i.meta.id));
+        if (f["no-enrich"]) for (const i of r.added) markEnrichSkipped(lib, i.meta.id);
         const lessons = r.added.map((i) => ({ id: i.meta.id, title: i.meta.title, type: i.meta.type, part: i.meta.course!.part }));
         const filled = r.filled.map((i) => ({ id: i.meta.id, title: i.meta.title, part: i.meta.course!.part }));
         const failed = r.failed.map((x) => `  lesson ${x.part} (${x.title}): ${x.error}`);
@@ -80,6 +79,7 @@ export const itemCommands: Record<string, Command> = {
       if (f.for) await matchQuestion(lib, item.meta.id, str(f.for)!);
       const kept = !!item.kept;
       const enrich = f["no-enrich"] || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
+      if (f["no-enrich"] && !kept) markEnrichSkipped(lib, item.meta.id);
       // A PDF's tables and formulas are read after it is added, once the optional reader is installed (D125).
       if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
       const path = relative(lib.root, item.docPath);
@@ -135,6 +135,7 @@ export const itemCommands: Record<string, Command> = {
         text, url: str(f.url), app: str(f.app), intent: oneOf(f.intent, INTENTS, "intent"), note: str(f.note), skills: strs(f.skill),
       });
       const enrich = f["no-enrich"] ? "skipped" : startEnrich(lib, item.meta.id);
+      if (f["no-enrich"]) markEnrichSkipped(lib, item.meta.id);
       return {
         data: { id: item.meta.id, title: item.meta.title, path: relative(lib.root, item.docPath), annotation, enrich },
         text: `Snippet ${item.meta.id} (${annotation.intent}) — annotation ${annotation.id}; enrichment ${enrich}`,
@@ -151,7 +152,8 @@ export const itemCommands: Record<string, Command> = {
       const items = listItems(lib, { archived: !!f.archived }).filter(
         (i) => !isQuestionOnly(i) && (!status || i.meta.status === status) && (!f.skill || i.meta.skills.includes(f.skill as string)) && (!f.topic || i.meta.topics.includes(f.topic as string)),
       );
-      const data = items.map((i) => ({ ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, has_notes: readNotes(i).trim() !== "", ...enrichFailure(lib, i) }));
+      const logs = enrichLogs(lib);
+      const data = items.map((i) => ({ ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, has_notes: readNotes(i).trim() !== "", ...enrichFailure(logs, i) }));
       const text = items.length
         ? table(items.map((i) => [i.meta.id, i.meta.status, i.meta.type, i.meta.enriched_at ? "enriched" : "-", i.meta.title]))
         : f.archived ? "No archived sources." : status || f.skill || f.topic ? "No sources match."
@@ -190,7 +192,7 @@ export const itemCommands: Record<string, Command> = {
       const item = findItem(lib, need(ref, "<item>"));
       const annotations = anchorAnnotations(item);
       const data = {
-        ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(lib, item), ...tablesState(lib, item),
+        ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(enrichLogs(lib), item), ...tablesState(lib, item),
         body: item.body, annotations,
         ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
       };
@@ -401,12 +403,13 @@ export const itemCommands: Record<string, Command> = {
   },
 
   status: {
-    usage: "<item> inbox|reading|done   set reading status (done records finished_at)",
-    async run([ref, status]) {
+    usage: "<item> inbox|reading|done [--at <iso>]   set reading status (done records finished_at; --at puts back an earlier one)",
+    options: { at: { type: "string" } },
+    async run([ref, status], f) {
       const lib = openLibrary();
       const id = findItem(lib, need(ref, "<item>")).meta.id;
       const s = need(oneOf(status, ItemStatus.options, "<status>"), "<status> (inbox|reading|done)");
-      const meta = await setItemStatus(lib, id, s);
+      const meta = await setItemStatus(lib, id, s, str(f.at));
       return { data: meta, text: `${meta.title}: ${meta.status}` };
     },
   },

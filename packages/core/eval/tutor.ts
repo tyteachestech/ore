@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import type { Usage, Vendor } from "../src/ai/adapter.ts";
-import { tutor } from "../src/ai/tutor.ts";
+import { tutor, withSteps } from "../src/ai/tutor.ts";
 import { addGolden } from "./ask.ts";
 import { columns, costText, pct, pool, range, resultPath, setId, wilson, withVendor } from "./grade.ts";
 
@@ -16,6 +16,8 @@ const Expect = z.strictObject({
   gives: z.array(z.string()).optional(),
   withholds: z.array(z.string()).optional(),
   exercise: z.boolean().optional(),
+  /** A worked answer split into steps he reveals one at a time (D142). */
+  steps: z.boolean().optional(),
   asks: z.boolean().optional(),
   cites: z.boolean().optional(),
   no_score: z.boolean().optional(),
@@ -32,7 +34,7 @@ export type TutorCase = z.infer<typeof TutorCase>;
 export const loadTutorCases = (path = join(import.meta.dir, "tutor-cases.json")) => z.object({ cases: z.array(TutorCase) }).parse(JSON.parse(readFileSync(path, "utf8"))).cases;
 
 /** What a reply did, for the checks. */
-export interface Reply { reply: string; hint: boolean; exercise: boolean; cited: number; searched: boolean }
+export interface Reply { reply: string; hint: boolean; exercise: boolean; steps: number; cited: number; searched: boolean }
 
 // A score, grade or rating of his answer ("7/10", "8 out of 10", "B+", "you scored"): he rates his own
 // cards (D21). A fraction from the material ("about 1/4 is left") is not one.
@@ -45,6 +47,7 @@ export function failures(e: z.infer<typeof Expect>, r: Reply): string[] {
   for (const p of e.gives ?? []) if (!new RegExp(p, "i").test(r.reply)) out.push(`no /${p}/`);
   for (const p of e.withholds ?? []) if (new RegExp(p, "i").test(r.reply)) out.push(`gave /${p}/`);
   if (e.exercise !== undefined && r.exercise !== e.exercise) out.push(e.exercise ? "no exercise" : "an exercise");
+  if (e.steps !== undefined && r.steps > 0 !== e.steps) out.push(e.steps ? "no steps" : "steps");
   // Asks: it puts a question to him ("Is that a sign of weak minds? Explain…" counts).
   // A question mark inside a quote ("you said … 'how much is recalled?'") isn't one put to him.
   if (e.asks && !r.reply.replace(/"[^"\n]*"|“[^”\n]*”/g, "").includes("?")) out.push("doesn't ask");
@@ -71,8 +74,8 @@ export function runTutorEval(vendor: Vendor, model?: string, concurrency = 4) {
         if (c.reading && !id(c.reading)) throw new Error(`${c.id}: no golden doc ${c.reading}`);
         const r = await tutor(lib, c.message, { earlier: c.earlier ?? [], item: c.reading ? id(c.reading) : undefined });
         stamp = r.ai;
-        const failed = failures(c.expect, { reply: r.reply, hint: r.hint, exercise: !!r.exercise, cited: r.citations.length, searched: r.searched });
-        return { id: c.id, ok: !failed.length, failed, reply: r.reply, ms: Math.round(performance.now() - start), usage: r.usage };
+        const failed = failures(c.expect, { reply: withSteps(r), hint: r.hint, exercise: !!r.exercise, steps: r.steps.length, cited: r.citations.length, searched: r.searched });
+        return { id: c.id, ok: !failed.length, failed, reply: withSteps(r), ms: Math.round(performance.now() - start), usage: r.usage };
       } catch (e) {
         return { id: c.id, ok: false, failed: ["error"], ms: Math.round(performance.now() - start), error: (e as Error).message };
       }

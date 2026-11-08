@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { failures, loadTutorCases } from "../eval/tutor.ts";
+import { withSteps } from "../src/ai/tutor.ts";
 
-const reply = (over: object = {}) => ({ reply: "Think about which box the hard cards go to?", hint: true, exercise: false, cited: 0, searched: false, ...over });
+const reply = (over: object = {}) => ({ reply: "Think about which box the hard cards go to?", hint: true, exercise: false, steps: 0, cited: 0, searched: false, ...over });
 
 describe("tutor pedagogy eval", () => {
   test("cases load with unique ids and valid patterns; each checks something", () => {
@@ -19,6 +20,16 @@ describe("tutor pedagogy eval", () => {
     expect(failures(e, reply())).toEqual([]);
     expect(failures(e, reply({ reply: "It goes back to the first box." }))).toEqual(["gave /first (box|group)/"]);
     expect(failures(e, reply({ hint: false, searched: true }))).toEqual(["not a hint", "searched the web"]);
+  });
+
+  test("a worked answer is checked with its steps, where Show me puts the answer (D142)", () => {
+    const show = loadTutorCases().find((c) => c.id === "flashcard-show-me")!.expect;
+    const said = withSteps({ reply: "Here's how it works.", steps: ["A card you miss drops a box.", "It goes back to the first box [1]."] });
+    expect(said).toBe("Here's how it works.\n1. A card you miss drops a box.\n2. It goes back to the first box [1].");
+    expect(failures(show, reply({ reply: said, hint: false, cited: 1 }))).toEqual([]);
+    const worked = loadTutorCases().find((c) => c.id === "worked-example-show-me")!.expect;
+    expect(failures(worked, reply({ reply: withSteps({ reply: "Here's the working.", steps: ["You remembered it, so the gap is multiplied: 4 × 2.5.", "That makes the next gap 10 days."] }), hint: false, steps: 2 }))).toEqual([]);
+    expect(failures(worked, reply({ reply: "The next gap is 10 days.", hint: false }))).toEqual(["no steps"]);
   });
 
   test("feedback must ask him something and never score him; a worked example's own numbers aren't the answer", () => {
