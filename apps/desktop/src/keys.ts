@@ -259,11 +259,23 @@ export function label(combo: Combo): string {
   return MODS.filter((m) => parts.includes(m)).map((m) => SYMBOL[m]).join("") + key;
 }
 
+/** The Mac's own keys (its Edit menu, Quit, Hide): a global shortcut on one would take it from every
+ *  text field, so only the command whose default it is may have it (Raycast refuses them too). */
+const MAC: Record<Combo, string> = {
+  "Meta+KeyA": "Select All", "Meta+KeyC": "Copy", "Meta+KeyX": "Cut", "Meta+KeyV": "Paste", "Meta+KeyZ": "Undo", "Shift+Meta+KeyZ": "Redo",
+  "Meta+KeyQ": "Quit", "Meta+KeyW": "Close Window", "Meta+KeyH": "Hide", "Alt+Meta+KeyH": "Hide Others", "Meta+KeyM": "Minimize",
+};
+/** Fixed keys outside the diagram (FIXED, and the source note's old ⇧⌘N that `isNotes` still takes). */
+const APP: Record<Combo, string> = { "Meta+KeyG": "Find's next match", "Shift+Meta+KeyG": "Find's previous match", "Shift+Meta+KeyN": "Toggle source note" };
+
 /** Why `combo` can't go on `id` at all, or null. "" leaves it not assigned (ChatGPT's "Not assigned"). */
 export function invalid(id: KeyId, combo: Combo): string | null {
   const b = DEFAULTS.find((x) => x.id === id)!;
   if ("global" in b && combo !== "" && b.global && !/(Ctrl|Alt|Meta)\+/.test(combo)) return "Needs ⌘, ⌃ or ⌥";
-  if (combo !== b.combo && (combo === "Escape" || combo === "Enter" || combo.startsWith("Arrow"))) return `${label(combo)} is reserved`;
+  if (combo === b.combo) return null;
+  if (combo === "Escape" || combo === "Enter" || combo.startsWith("Arrow")) return `${label(combo)} is reserved`;
+  if (MAC[combo]) return `${label(combo)} is the Mac's ${MAC[combo]}`;
+  if (APP[combo] && !("scope" in b)) return `${label(combo)} is ${APP[combo]}`;
   return null;
 }
 

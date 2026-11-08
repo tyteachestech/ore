@@ -52,4 +52,19 @@ describe("shortcut editor (Settings › Keyboard shortcuts)", () => {
     expect(rebind("palette", "KeyK")).toBe("Needs ⌘, ⌃ or ⌥");
     expect(rebind("archive", "Escape")).toBe("Esc is reserved");
   });
+
+  test("the Mac's own keys and the app's fixed ones are refused, so a global shortcut never takes paste or select-all from a field", () => {
+    resetKeys();
+    expect(rebind("palette", "Meta+KeyA")).toBe("⌘A is the Mac's Select All");
+    expect(rebind("palette", "Meta+KeyV")).toBe("⌘V is the Mac's Paste");
+    expect(rebind("add", "Shift+Meta+KeyZ")).toBe("⇧⌘Z is the Mac's Redo");
+    expect(rebind("add", "Meta+KeyQ")).toBe("⌘Q is the Mac's Quit");
+    expect(rebind("rename", "Meta+KeyG")).toBe("⌘G is Find's next match");
+    expect(rebind("rename", "Shift+Meta+KeyN")).toBe("⇧⌘N is Toggle source note");
+    expect(isCustom("palette") || isCustom("add") || isCustom("rename")).toBe(false);
+    // Their own defaults stay theirs, and the diagram's ⌘G is its Group.
+    expect(rebind("undo", "Meta+KeyZ")).toBeNull();
+    expect(rebind("d-all", "Meta+KeyA")).toBeNull();
+    expect(rebind("d-group", "Meta+KeyG")).toBeNull();
+  });
 });
