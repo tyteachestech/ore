@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { readAnnotations, type Annotation } from "../annotations.ts";
@@ -129,7 +129,20 @@ export function markEnrichSkipped(lib: Library, id: string): void {
   mkdirSync(paths.logs(lib), { recursive: true });
   writeFileSync(skipFile(lib, id), "");
 }
-export const enrichSkipped = (lib: Library, id: string): boolean => existsSync(skipFile(lib, id));
+/** What the logs say of each source's last enrich, from one read of the logs folder: `ore ls` asks it of
+ *  every source not enriched, and a file check each was one more disk call per source. */
+export function enrichLogs(lib: Library): (id: string) => { enrich_error?: string; enrich_skipped?: true } {
+  let names: Set<string>;
+  try {
+    names = new Set(readdirSync(paths.logs(lib)));
+  } catch {
+    names = new Set();
+  }
+  return (id) => {
+    const why = names.has(`enrich-${id}.error`) ? enrichError(lib, id) : null;
+    return why ? { enrich_error: why } : names.has(`enrich-${id}.skipped`) ? { enrich_skipped: true } : {};
+  };
+}
 
 export async function enrichItem(lib: Library, ref: string): Promise<EnrichResult> {
   const id = findItem(lib, ref).meta.id;

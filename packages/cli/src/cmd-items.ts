@@ -11,7 +11,7 @@ import {
   cutText,
   restoreCut,
   redoCut,
-  enrichError, enrichSkipped, markEnrichSkipped, type Item, type Library,
+  enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
   appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter,
@@ -25,11 +25,7 @@ const INTENTS = Intent.options;
 
 /** `enrich_error`: why background enrich failed, for a source it never enriched (the reader shows it at once);
  *  `enrich_skipped`: it was added with no enrich on its way, so nothing is writing its prequestions. */
-const enrichFailure = (lib: Library, i: Item) => {
-  if (i.meta.enriched_at) return {};
-  const why = enrichError(lib, i.meta.id);
-  return why ? { enrich_error: why } : enrichSkipped(lib, i.meta.id) ? { enrich_skipped: true } : {};
-};
+const enrichFailure = (logs: ReturnType<typeof enrichLogs>, i: Item) => (i.meta.enriched_at ? {} : logs(i.meta.id));
 
 function annotationLine(a: AnchoredAnnotation): string {
   const where = a.anchor ? `${a.anchor.start}-${a.anchor.end}${a.anchor.method === "position" ? "" : ` (${a.anchor.method})`}` : "ORPHANED";
@@ -156,7 +152,8 @@ export const itemCommands: Record<string, Command> = {
       const items = listItems(lib, { archived: !!f.archived }).filter(
         (i) => !isQuestionOnly(i) && (!status || i.meta.status === status) && (!f.skill || i.meta.skills.includes(f.skill as string)) && (!f.topic || i.meta.topics.includes(f.topic as string)),
       );
-      const data = items.map((i) => ({ ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, has_notes: readNotes(i).trim() !== "", ...enrichFailure(lib, i) }));
+      const logs = enrichLogs(lib);
+      const data = items.map((i) => ({ ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, has_notes: readNotes(i).trim() !== "", ...enrichFailure(logs, i) }));
       const text = items.length
         ? table(items.map((i) => [i.meta.id, i.meta.status, i.meta.type, i.meta.enriched_at ? "enriched" : "-", i.meta.title]))
         : f.archived ? "No archived sources." : status || f.skill || f.topic ? "No sources match."
@@ -195,7 +192,7 @@ export const itemCommands: Record<string, Command> = {
       const item = findItem(lib, need(ref, "<item>"));
       const annotations = anchorAnnotations(item);
       const data = {
-        ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(lib, item), ...tablesState(lib, item),
+        ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(enrichLogs(lib), item), ...tablesState(lib, item),
         body: item.body, annotations,
         ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
       };
