@@ -2482,12 +2482,16 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-chip button { flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 4px; color: var(--faint); }
 .tutor-chip button:hover, .tutor-chip button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
 .tutor-general { margin: 6px 0 0; font: 600 10px/1.4 var(--mono); letter-spacing: 0.06em; color: var(--faint); }
+/* The tutor's ✦ in the title bar (D136), drawn as the panel toggles: left of Add on Home and All sources (in
+   .main-tools), left of the reader's panel toggle, or alone at the top right. */
 .tutor-bubble {
-  position: absolute; right: 20px; bottom: 20px; z-index: 6; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--bg-raised); border: 1px solid var(--border); color: var(--muted); box-shadow: var(--float);
+  position: fixed; top: 7px; right: 12px; z-index: 6;
+  width: 26px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--faint);
 }
-.tutor-bubble:hover { color: var(--text); background: var(--bg-hover); }
-.tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.main-tools .tutor-bubble { position: static; }
+.app:has(.panel-toggle) .tutor-bubble { right: 44px; }
+.tutor-bubble:hover { background: var(--bg-hover); color: var(--muted); }
+.tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .app.tutoring .panel-toggle { right: calc(12px + var(--tutor-w, 0px)); }
 .tutor .ask-input .field { display: block; }
 .tutor-foot { position: relative; }

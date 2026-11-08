@@ -288,6 +288,23 @@ journey("highlight popup open: typing writes the note, and no letter runs a shor
   if (after !== words + "2") throw new Error(`a 2 typed after the note became “${after}”`);
 });
 
+journey("tutor button: it sits in the title bar on every screen, beside Add or the panel toggle, never over the page", async (page) => {
+  const button = page.getByRole("button", { name: "Open the tutor" });
+  const check = async (where: string, beside: string) => {
+    const b = (await button.boundingBox())!;
+    if (b.y + b.height > 38) throw new Error(`${where}: the tutor button sits at y ${b.y}, below the title bar`);
+    const n = (await page.locator(beside).first().boundingBox())!;
+    if (b.x + b.width > n.x || Math.abs(b.y + b.height / 2 - (n.y + n.height / 2)) > 1) throw new Error(`${where}: the tutor button is not just left of ${beside}`);
+  };
+  await check("Home", ".main-tools .note-toggle");
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.locator(".skill-page").waitFor();
+  const b = (await button.boundingBox())!;
+  if (b.y + b.height > 38) throw new Error(`skill page: the tutor button sits at y ${b.y}, below the title bar`);
+  await openSource(page, TESTING);
+  await check("reader", ".panel-toggle");
+});
+
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
   await openSource(page, TESTING);
   await page.keyboard.press("Meta+j");
