@@ -81,9 +81,16 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [busy, showBusy] = useState(false);
   /** `busy` as of now, for the guards: two keys in one task would both see the state before either set it. */
   const busyNow = useRef(false);
+  /** Runs once Review is idle again, after it has closed (when no effect will run it). */
+  const whenIdle = useRef<(() => void) | null>(null);
   const setBusy = (on: boolean) => {
     busyNow.current = on;
     showBusy(on);
+    const f = !on && whenIdle.current;
+    if (f) {
+      whenIdle.current = null;
+      setTimeout(f);
+    }
   };
   const [asking, setAsking] = useState(false);
   /** Each card's Ask chat, kept while he closes and reopens it. */
@@ -270,22 +277,35 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     } finally {
       setBusy(false);
     }
-  }, [busy, notify, onClose, queue, quick, pick]);
+  }, [notify, onClose, queue, quick, pick]);
 
   useEffect(() => {
     // The quick quiz with nothing due says so and waits for Esc instead of closing under his hand.
     if (queue && !queue.length && !end && !(quick && !reviewed.current)) void finish();
   }, [queue, end, finish, quick]);
 
-  /** ⌘Z pressed while a rating saved or the session wrapped up: it goes to the history once that is done,
-   *  so it takes back the newest step (that rating), never an older card's step meanwhile. */
-  const undoWaiting = useRef<KeyboardEventInit | null>(null);
+  /** ⌘Z presses while a rating saved or the session wrapped up: they go to the history once that is
+   *  done, so they take back the newest steps (that rating first), never an older card's meanwhile. */
+  const undosWaiting = useRef<{ n: number; key: KeyboardEventInit }>({ n: 0, key: {} });
+  const sendUndos = () => {
+    const w = undosWaiting.current;
+    const n = w.n;
+    w.n = 0;
+    // While the first is taken back Review is busy again, so the rest queue up anew and wait their turn.
+    for (let i = 0; i < n; i++) document.body.dispatchEvent(new KeyboardEvent("keydown", { ...w.key, bubbles: true, cancelable: true }));
+  };
   useEffect(() => {
-    const w = undoWaiting.current;
-    if (busy || busyNow.current || !w) return;
-    undoWaiting.current = null;
-    document.body.dispatchEvent(new KeyboardEvent("keydown", { ...w, bubbles: true, cancelable: true }));
+    if (!busy && !busyNow.current && undosWaiting.current.n) sendUndos();
   }, [busy]);
+  // Closed with presses still waiting (a click away from the quick quiz): the history still gets them.
+  useEffect(
+    () => () => {
+      if (!undosWaiting.current.n) return;
+      if (busyNow.current) whenIdle.current = sendUndos;
+      else setTimeout(sendUndos);
+    },
+    [],
+  );
 
   /** The passage the card came from, shown only after the answer (D59). */
   const loadPassage = (c: CardFull) => {
@@ -459,8 +479,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
           if (!(mounted.current && undoNow.current(ts))) ore("review", id, opt("undo", ts)).then(() => onLogged?.(), (e) => notify(errorText(e), "error"));
         },
         () => {
+          // Given again after Review closed: its session has ended, so the rating goes in with none.
           if (!(mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })))
-            ore<{ ts: string }>("review", ...args).then((x) => (setTs(x.ts), onLogged?.()), (e) => notify(errorText(e), "error"));
+            ore<{ ts: string }>("review", ...args.filter((a) => !a.startsWith("--session="))).then((x) => (setTs(x.ts), onLogged?.()), (e) => notify(errorText(e), "error"));
         },
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
@@ -644,7 +665,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       // The step it should take back isn't on the history yet (or is being taken back): it waits.
       e.preventDefault();
       e.stopPropagation();
-      undoWaiting.current = { code: e.code, key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey };
+      undosWaiting.current.n++;
+      undosWaiting.current.key = { code: e.code, key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey };
       return;
     }
     if (e.key === "Escape") {

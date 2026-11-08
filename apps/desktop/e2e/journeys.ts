@@ -2768,7 +2768,65 @@ journey("review: ⌘Z on Home after leaving takes the rating back, leaves the se
   await page.waitForTimeout(300);
   if (after().some((a) => a[0] === "session")) throw new Error(`⌘Z on Home touched the ended session: ${JSON.stringify(after().filter((a) => a[0] === "session"))}`);
   app.rated.pop();
+  // ⇧⌘Z gives it again, in no session: the one it was given in has ended.
+  const redoFrom = app.calls.length;
+  await page.keyboard.press("Shift+Meta+z");
+  await until("⇧⌘Z rates it again", async () => app.rated.length === 2);
+  const redo = app.calls.slice(redoFrom).find((a) => a[0] === "review")!;
   await app.undoAll();
+  if (redo.some((x) => x.startsWith("--session="))) throw new Error(`the rating given again went into the ended session: ${redo.join(" ")}`);
+});
+
+journey("review: ⌘Z pressed twice while a rating saves takes back both newest ratings, and one pressed as the quick quiz closes still lands", async (page) => {
+  const app = oreCalls(page);
+  await page.addInitScript("window.__ORE_SLOW = { review: 700 }");
+  await page.reload();
+  await page.locator(".side-item").first().waitFor();
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  const undone = () => app.calls.filter((a) => a[0] === "review" && a.some((x) => x.startsWith("--undo"))).map((a) => a.find((x) => x.startsWith("--undo"))!.slice(7));
+  const first = await q.innerText();
+  try {
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the first rating is logged", async () => app.rated.length === 1);
+    await until("the next card shows", async () => (await q.count()) > 0 && !(await page.getByRole("button", { name: "Good", exact: true }).isVisible()));
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await page.waitForTimeout(100);
+    await page.keyboard.press("Meta+z");
+    await page.keyboard.press("Meta+z");
+    await until("both ratings are taken back, newest first", async () => undone().length === 2, 8000);
+    if (undone().join() !== [app.rated[1]!.ts, app.rated[0]!.ts].join()) throw new Error(`took back ${undone().join()}, not ${app.rated.map((r) => r.ts).reverse().join()}`);
+    await until("back on the first card", async () => (await q.count()) > 0 && (await q.innerText()) === first);
+    app.rated.splice(0);
+  } finally {
+    await app.undoAll();
+  }
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  // The quick quiz put away while its rating saves, with ⌘Z pressed: the rating is still taken back.
+  const quiz = await openQuiz();
+  await quiz.addInitScript("window.__ORE_SLOW = { review: 700 }");
+  await quiz.reload();
+  await quiz.locator(".quick").waitFor({ state: "attached" });
+  await quiz.waitForTimeout(300);
+  const inQuiz = oreCalls(quiz);
+  try {
+    await emit(quiz, "quiz-open");
+    await quiz.locator(".review-q").waitFor();
+    await reveal(quiz);
+    await quiz.getByRole("button", { name: "Good", exact: true }).click();
+    await quiz.waitForTimeout(100);
+    await quiz.keyboard.press("Meta+z");
+    await emit(quiz, "quiz-away");
+    await until("the quiz's rating is logged", async () => inQuiz.rated.length === 1);
+    await until("and taken back", async () => inQuiz.calls.some((a) => a[0] === "review" && a.includes(`--undo=${inQuiz.rated[0]!.ts}`)), 6000);
+    inQuiz.rated.splice(0);
+  } finally {
+    await inQuiz.undoAll();
+    await quiz.close();
+  }
 });
 
 journey("review: a held ↵ rates the last card once and the end screen stays", async (page) => {
