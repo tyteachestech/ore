@@ -1,4 +1,4 @@
-import { CaretRight, Collapse, Expand, Info as InfoIcon, Plus, Target, X } from "./icons";
+import { CaretRight, Check, Collapse, Expand, Info as InfoIcon, Plus, Target, X } from "./icons";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
@@ -833,17 +833,21 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   return (
     <WithMenu actions={actions}>
     <div className={`question${done ? " done" : ""}`}>
+      {/* D131: the question is the row; a circle at the left is Answered (Things), as a try's box is Tried. */}
+      <Hint text={done ? "Reopen" : "Mark answered"}>
+        <button className="q-check" role="checkbox" aria-checked={done} aria-label={done ? "Reopen" : "Mark answered"} onClick={() => onStatus(q, done ? "open" : "done")}>
+          {done && <Check size={12} aria-hidden="true" />}
+        </button>
+      </Hint>
       {own ? (
         <button className="question-quote" onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
-          <PixelQuestion className="question-mark" aria-hidden="true" />
-          <span className="exact">{exact}</span>
+          <span className="note">{exact}</span>
         </button>
       ) : (
-        <Hint text="Open this passage">
+        // The passage it came from is in the hint and one click away; the row keeps to the question and its source.
+        <Hint text={q.note ? `“${exact}”` : "Open this passage"}>
           <button className="question-quote" onClick={() => onQuestion(q)}>
-            <PixelQuestion className="question-mark" aria-hidden="true" />
-            <span className="exact">“{exact}”</span>
-            {q.note && <span className="note">{q.note}</span>}
+            <span className="note">{q.note || exact}</span>
             <span className="from">{q.item_title}</span>
           </button>
         </Hint>
@@ -864,15 +868,10 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
         </ul>
       )}
       {maybe.length > 0 && !done && (
-        <div className="question-maybe">
-          {maybe.map((m) => (
-            <Hint key={m.item} text={m.quote ? `May answer it: “${m.quote}”` : "Added for this question"}>
-              <button className="question-src chip" onClick={() => onOpenSource(m.item)}>
-                {m.quote ? "May answer it" : "To read"} · {m.title}
-              </button>
-            </Hint>
-          ))}
-        </div>
+        // A purple square at the right: a source that may answer it; the hint names them, a click opens the first.
+        <Hint text={<span className="hint-lines">{maybe.map((m) => <span key={m.item}>{m.quote ? "May answer it" : "To read"} · {m.title}</span>)}</span>} side="left">
+          <button className="q-lead" aria-label={`Open ${maybe[0]!.title}, which may answer it`} onClick={() => onOpenSource(maybe[0]!.item)} />
+        </Hint>
       )}
       <div className="question-actions">
         {!done && (
