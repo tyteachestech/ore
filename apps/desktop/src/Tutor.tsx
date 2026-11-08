@@ -119,8 +119,8 @@ export function useTutorChat(notify: Notify) {
       notify(
         "Card added",
         "quiet",
-        () => void ore("card", "retire", c.id).then(() => mark(undefined), (e) => notify(errorText(e), "error")),
-        () => void ore("card", "restore", c.id, "--state=draft").then(() => mark(c.id), (e) => notify(errorText(e), "error")),
+        () => ore("card", "retire", c.id).then(() => mark(undefined)),
+        () => ore("card", "restore", c.id, "--state=draft").then(() => mark(c.id)),
       );
     } catch (e) {
       mark(undefined);
