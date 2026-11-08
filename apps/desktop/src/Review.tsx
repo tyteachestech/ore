@@ -63,6 +63,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [conf, setConf] = useState<number | undefined>();
   const [askSure, setAskSure] = useState(false);
   const [grade, setGrade] = useState<Grade | null>(null);
+  /** The key point under the pointer, and the one whose mark has focus: its evidence is marked in his answer (D141). */
+  const [hoverPoint, setHoverPoint] = useState<number | null>(null);
+  const [focusPoint, setFocusPoint] = useState<number | null>(null);
   const [gradeError, setGradeError] = useState<string | null>(null);
   /** One per key point: got, missed, or not marked yet (an in-head answer starts unmarked, D68). */
   const [marks, setMarks] = useState<(boolean | undefined)[] | null>(null);
@@ -208,6 +211,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setConf(undefined);
     setAskSure(false);
     setGrade(null);
+    setHoverPoint(null);
+    setFocusPoint(null);
     setGradeError(null);
     setMarks(null);
     setRemark(false);
@@ -414,6 +419,12 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       failed(e instanceof TypeError || e instanceof SyntaxError ? "Couldn’t check this one: got an unexpected reply." : `Couldn’t check this one. ${why}${/[.!?]$/.test(why) ? "" : "."}`);
     }
   };
+
+  /** His words that earned key point i, as the grader quoted them; none once he marks it missed. A grade
+   *  is dropped when the key points change, so its evidence always lines up with them. */
+  const quoteFor = (i: number) => (marks?.[i] && grade?.evidence?.[i]) || "";
+  const shown = hoverPoint ?? focusPoint;
+  const shownQuote = shown === null ? "" : quoteFor(shown);
 
   /** The rating to highlight: the AI's, or (once he flips a mark) one that follows his marks. Never logged by itself (D21). */
   const suggested = ((): number | undefined => {
@@ -918,7 +929,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                 {card.kind === "prompt" && !inHead && (
                   <>
                     <div className="quiz-kicker">Your answer</div>
-                    <p className="quiz-yours">{answer.trim() || <span className="quiz-faint">No idea</span>}</p>
+                    <p className="quiz-yours">{answer.trim() ? <Evidence answer={answer.trim()} quote={shownQuote} /> : <span className="quiz-faint">No idea</span>}</p>
                   </>
                 )}
                 <div className="quiz-kicker">Answer</div>
@@ -929,14 +940,17 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                     <ul className="quiz-points">
                       {card.rubric.map((p, i) => {
                         const mark = marks?.[i];
+                        const quote = quoteFor(i);
                         return (
-                          <li key={i} className={mark === false ? "missed" : mark ? "got" : ""}>
+                          <li key={i} className={mark === false ? "missed" : mark ? "got" : ""} onMouseEnter={() => setHoverPoint(i)} onMouseLeave={() => setHoverPoint(null)}>
                             {marks ? (
                               <Hint text={mark ? "Mark as missed" : "Mark as got"}>
                                 <button
                                   className="quiz-mark"
+                                  onFocus={() => setFocusPoint(i)}
+                                  onBlur={() => setFocusPoint(null)}
                                   aria-pressed={mark}
-                                  aria-label={mark ? `Got: ${p}. Mark as missed` : mark === false ? `Missed: ${p}. Mark as got` : `${p}. Mark as got`}
+                                  aria-label={mark ? `Got: ${p}${quote ? `, from “${quote}”` : ""}. Mark as missed` : mark === false ? `Missed: ${p}. Mark as got` : `${p}. Mark as got`}
                                   onClick={() => (setRemark(false), setMarks((m) => m!.map((x, j) => (j === i ? !x : x))))}
                                 >
                                   {mark ? <Check size={14} weight="bold" /> : <Circle size={14} weight="bold" />}
@@ -1245,5 +1259,29 @@ function EndScreen({ end, skills, quick, onDone, onAgain }: { end: End; skills: 
         </Hint>
       </div>
     </div>
+  );
+}
+
+/** His answer with the words that earned the key point under the pointer underlined (D141): the grader's
+ *  quote, found as he wrote it. A quote that isn't there (an edited answer) marks nothing. */
+function Evidence({ answer, quote }: { answer: string; quote: string }) {
+  const ref = useRef<HTMLElement>(null);
+  const at = quote ? answer.indexOf(quote) : -1;
+  // The answer box scrolls past nine lines: bring the words into it, scrolling only that box, so the
+  // page never moves the key point out from under the pointer.
+  useEffect(() => {
+    const m = ref.current, box = m?.parentElement;
+    if (!m || !box) return;
+    const top = m.offsetTop - box.offsetTop, bottom = top + m.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = top;
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
+  }, [quote]);
+  if (at < 0) return <>{answer}</>;
+  return (
+    <>
+      {answer.slice(0, at)}
+      <mark ref={ref} className="quiz-evidence">{quote}</mark>
+      {answer.slice(at + quote.length)}
+    </>
   );
 }

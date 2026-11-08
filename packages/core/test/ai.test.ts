@@ -81,7 +81,7 @@ describe("AI adapter", () => {
     fakeClaude([{ rating: 9 }, { rating: 3 }]);
     const r = await runAgent(lib, { prompt: "grade", cwd: lib.root, schema: Schema, input: {} });
     expect(r.data.rating).toBe(3);
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "grade@2" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "grade@3" });
     expect(calls()).toBe(2);
     const second = JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n")[1]!) as string[];
     expect(second[1]).toContain("previous output was invalid");
