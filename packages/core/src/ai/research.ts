@@ -19,8 +19,6 @@ export const ResearchOutput = z.strictObject({
     .min(3)
     .max(5),
 });
-export type ResearchSource = z.infer<typeof ResearchOutput>["sources"][number];
-
 // D17, D75: a question → 3–5 sources, returned for him to pick from; nothing is ingested or written.
 export async function research(lib: Library, ref: string) {
   const { item, annotation } = findAnnotation(lib, ref);

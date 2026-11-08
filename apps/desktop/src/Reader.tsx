@@ -230,8 +230,6 @@ type Props = {
   onCloseSide: () => void;
   /** Shows or hides the side panel on the tab it last showed. */
   onToggleSide: () => void;
-  /** Bumped by the ⌘K "Collected highlights" command to open the list (D64). */
-  showCollected: number;
   /** Bumped by the ⌘K "Rename source" command to edit the title in place. */
   renameSource: number;
   /** The open source's actions, read by ⌘K so it lists the same ones as the ⋯ menu. */
@@ -295,11 +293,6 @@ function ReaderView(p: Props & { reload: () => void }) {
   const focusAdd = useRef(false);
   const [addAsk, setAddAsk] = useState(0);
   const [ask, setAsk] = useState(0);
-  const askedCollected = useRef(p.showCollected);
-  useEffect(() => {
-    if (p.showCollected !== askedCollected.current) p.onShowSide("questions", true);
-    askedCollected.current = p.showCollected;
-  }, [p.showCollected]);
   const [renaming, setRenaming] = useState(false);
   const [authoring, setAuthoring] = useState(false);
   const askedRename = useRef(p.renameSource);

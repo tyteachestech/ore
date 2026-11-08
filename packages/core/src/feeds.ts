@@ -59,7 +59,6 @@ function readCache(lib: Library): Cache {
 // ---- Reading feeds
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
-const FEED_TYPE = /(rss|atom)\+xml|application\/(?:feed\+)?json|text\/xml|application\/xml/;
 const isFeedText = (text: string) => /^\s*(?:<\?xml[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*|<\?xml-stylesheet[^>]*>\s*)*<(?:rss|feed|rdf:RDF)\b/.test(text.slice(0, 3000));
 const host = (url: string) => new URL(url).host.replace(/^www\./, "");
 

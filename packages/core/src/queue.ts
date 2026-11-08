@@ -38,14 +38,21 @@ function unitKey(e: QueueEntry): string {
 
 function orderGroup(entries: QueueEntry[]): QueueEntry[] {
   const units = new Map<string, QueueEntry[]>();
-  for (const e of entries) units.set(unitKey(e), [...(units.get(unitKey(e)) ?? []), e]);
+  for (const e of entries) {
+    const k = unitKey(e);
+    const u = units.get(k);
+    if (u) u.push(e);
+    else units.set(k, [e]);
+  }
   const sortedUnits = [...units.values()].map((u) => u.sort(compare)).sort((a, b) => compare(a[0]!, b[0]!));
 
   // Round-robin over topics: each turn serves the next unit of each topic.
   const byTopic = new Map<string, QueueEntry[][]>();
   for (const u of sortedUnits) {
     const t = primaryTopic(u[0]!);
-    byTopic.set(t, [...(byTopic.get(t) ?? []), u]);
+    const lane = byTopic.get(t);
+    if (lane) lane.push(u);
+    else byTopic.set(t, [u]);
   }
   const lanes = [...byTopic.values()];
   const out: QueueEntry[] = [];

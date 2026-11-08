@@ -1,7 +1,6 @@
-import type { Grade } from "ts-fsrs";
 import { annotationRevs } from "./annotations.ts";
 import { findCard } from "./cards.ts";
-import { openIndex, withIndex, type CardRow, type LibraryIndex } from "./db.ts";
+import { withIndex, type CardRow, type LibraryIndex } from "./db.ts";
 import { latestRevs } from "./fsutil.ts";
 import { itemDirs } from "./items.ts";
 import { localDay, nowIso } from "./ids.ts";
