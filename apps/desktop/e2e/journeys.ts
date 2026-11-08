@@ -1693,6 +1693,30 @@ journey("peeked sidebar: it stays while its own menu is open, and slides away on
   await page.getByRole("button", { name: "Show sidebar" }).click();
 });
 
+journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette or the shortcuts sheet (Linear)", async (page) => {
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await page.keyboard.press("Meta+Comma");
+  await settings.waitFor();
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("dialog", { name: "Command palette" }).waitFor();
+  await settings.waitFor({ state: "detached" });
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+Comma");
+  await settings.waitFor();
+  await page.keyboard.press("Meta+Slash");
+  await page.getByRole("dialog", { name: "Keyboard shortcuts" }).waitFor();
+  await settings.waitFor({ state: "detached" });
+  await page.keyboard.press("Escape");
+  // While a shortcut is being recorded, ⌘K is the keys he is giving it.
+  await page.keyboard.press("Meta+Comma");
+  await settings.getByRole("tab", { name: "Keyboard shortcuts" }).click();
+  await settings.getByRole("button", { name: /^Rename source: .*Press to change$/ }).click();
+  await page.keyboard.press("Meta+k");
+  await settings.getByRole("alert").filter({ hasText: "Command palette" }).waitFor();
+  if (await page.getByRole("dialog", { name: "Command palette" }).count()) throw new Error("⌘K while recording opened the palette");
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);

@@ -874,7 +874,11 @@ export function App() {
         setDeleting(null);
         return settings ? closeSettings() : setSettings({});
       }
-      if (settings) return; // Settings handles its own keys
+      if (settings) {
+        // Settings handles its own keys; ⌘K and ⌘/ still work over it, leaving it (Linear).
+        if (!is(e, "palette") && !is(e, "shortcuts")) return;
+        closeSettings();
+      }
       const close = () => {
         e.preventDefault();
         setPalette(false);
