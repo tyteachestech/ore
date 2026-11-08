@@ -3194,6 +3194,11 @@ journey("ore down at launch: Home's Try again brings back the skills and the sou
   await page.reload();
   const retry = page.locator(".home-today").getByRole("button", { name: "Try again" });
   await retry.waitFor();
+  // Still down: each Try again says so again in the same toast, not one more each press.
+  for (let n = 0; n < 3; n++) await retry.click();
+  await page.waitForTimeout(300);
+  const said = await page.locator(".toast").filter({ hasText: "isn’t installed" }).count();
+  if (said > 1) throw new Error(`${said} toasts say the same failure`);
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
   await retry.click();
   await page.locator(".home-goal").waitFor();

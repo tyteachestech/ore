@@ -10,7 +10,8 @@ import { useEffect, type RefObject } from "react";
  *  (a selection he dropped with Esc). */
 /** `show`: the toast's one action: Show on a result, Try again on an error. */
 /** `stay`: an error toast that stays until its Try again is pressed or its × dismisses it, for a failure only that toast can recover. */
-export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => void, redo?: () => void, show?: () => void, stay?: boolean) => () => void;
+/** `slot`: one toast at a time for it; a new one takes the place of the one showing (a retry that failed again). */
+export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => void, redo?: () => void, show?: () => void, stay?: boolean, slot?: string) => () => void;
 
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never
  *  reaches the UI as "Cannot read properties of null". */

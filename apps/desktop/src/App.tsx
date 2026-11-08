@@ -313,7 +313,8 @@ export function App() {
         setSkills(all);
         setSkill((k) => (k && !all.some((s) => s.id === k) ? null : k));
       },
-      (e) => notify(errorText(e), "error"),
+      // Try again while `ore` is still down says so again in the same toast.
+      (e) => notify(errorText(e), "error", undefined, undefined, undefined, undefined, "skills"),
     );
   }, [notify]);
 
