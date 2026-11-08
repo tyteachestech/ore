@@ -16,10 +16,12 @@ const FIXTURES = join(import.meta.dir, "../../../packages/core/test/fixtures/int
 const PORT = Number(process.env.ORE_E2E_PORT ?? 1450);
 const BRIDGE = process.env.E2E_URL ? Number(process.env.E2E_BRIDGE ?? 1421) : Number(process.env.ORE_E2E_MOCK_PORT ?? 1451);
 const only = process.argv[2];
+/** The seeded library (or, against a mock already running, $ORE_LIBRARY): for state no `ore` command makes. */
+let LIB = process.env.ORE_LIBRARY ?? "";
 
 async function start(): Promise<{ url: string; stop: () => void }> {
   if (process.env.E2E_URL) return { url: process.env.E2E_URL, stop: () => {} };
-  const lib = mkdtempSync(join(tmpdir(), "ore-e2e-"));
+  const lib = (LIB = mkdtempSync(join(tmpdir(), "ore-e2e-")));
   await $`bun ${join(MOCK, "seed.ts")} ${lib}`.quiet();
   // The table and formula reader (D125) stands in as a script that writes Docling's saved reading of tables.pdf.
   const docling = join(lib, ".ore", "docling");
@@ -4656,6 +4658,63 @@ journey("reader toolbar: Collected goes back to a chip per type when a type goes
     await page.getByRole("menuitemcheckbox", { name: "Highlight" }).dispatchEvent("click");
     await until("three types fit again: a chip per type", async () => !(await one()) && (await page.locator(".reader-tools .collected-chip.keep").count()) === 1);
   } finally {
+    await ore("archive", made.id);
+  }
+});
+
+journey("course: a rename from its menu goes on the history; ⌘Z puts the old name back, ⇧⌘Z renames it again", async (page) => {
+  // A course needs a course site to add; two sources made its lessons stand in.
+  if (!LIB) throw new Error("this journey edits the library: set ORE_LIBRARY to the running mock's");
+  // Core by path, so the desktop's typecheck doesn't take in core's sources.
+  const { updateItemMeta } = (await import(join(import.meta.dir, "../../../packages/core/src/items.ts"))) as { updateItemMeta: (lib: { root: string }, id: string, patch: (m: object) => object) => Promise<unknown> };
+  const made = await Promise.all(["One", "Two"].map((n) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: `# Lesson ${n}\n\nA lesson.` }) }).then((r) => r.json() as Promise<{ id: string }>)));
+  for (const [i, m] of made.entries()) await updateItemMeta({ root: LIB }, m.id, (x) => ({ ...x, course: { id: "spacing-course", title: "Spacing course", part: i + 1 } }));
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const row = page.locator(".list .row.course");
+    await row.filter({ hasText: "Spacing course" }).waitFor();
+    await row.filter({ hasText: "Spacing course" }).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Rename…" }).click();
+    await page.locator(".list .row.course").getByLabel("Title").fill("Spacing, renamed");
+    await page.keyboard.press("Enter");
+    await row.filter({ hasText: "Spacing, renamed" }).waitFor();
+    await page.waitForTimeout(300); // the write lands, then its step is on the history
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z puts the old name back", async () => (await row.filter({ hasText: "Spacing course" }).count()) === 1);
+    await page.keyboard.press("Meta+Shift+z");
+    await until("⇧⌘Z renames it again", async () => (await row.filter({ hasText: "Spacing, renamed" }).count()) === 1);
+  } finally {
+    for (const m of made) await ore("archive", m.id).catch(() => {});
+  }
+});
+
+journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the suggestion returns) and Dismiss", async (page) => {
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Why sleep consolidates memory\n\nSleep replays the day." }) }).then((r) => r.json())) as { id: string };
+  // Undo of a dismiss puts a suggestion on it, as enrich would.
+  await ore("suggested-skill", made.id, "undo", JSON.stringify({ suggestion: { name: "Sleep Science", hook: "Rest that helps you learn" } }));
+  try {
+    await page.reload();
+    await openSource(page, "Why sleep consolidates memory");
+    const chip = page.locator(".chip.suggested");
+    const skill = page.locator(".sidebar .side-item", { hasText: "Sleep Science" });
+    await chip.getByRole("button", { name: "+ Sleep Science" }).click();
+    await skill.waitFor();
+    await until("the chip goes", async () => (await chip.count()) === 0);
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes the new skill away and brings the suggestion back", async () => (await skill.count()) === 0 && (await chip.count()) === 1);
+    await page.keyboard.press("Meta+Shift+z");
+    await until("⇧⌘Z accepts it again", async () => (await skill.count()) === 1 && (await chip.count()) === 0);
+    await page.keyboard.press("Meta+z");
+    await until("back to the suggestion", async () => (await chip.count()) === 1);
+    await chip.getByRole("button", { name: "Dismiss suggested skill Sleep Science" }).click();
+    await until("Dismiss takes the chip away", async () => (await chip.count()) === 0);
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings the dismissed suggestion back", async () => (await chip.count()) === 1);
+  } finally {
+    await ore("skills", "rm", "sleep-science").catch(() => {});
     await ore("archive", made.id);
   }
 });
