@@ -1140,10 +1140,13 @@ export function App() {
     // The same element serves every tab: a list never scrolled (or left at the top) starts at the top.
     const want = listScrolls()[scrollAt] ?? 0;
     el.scrollTop = want;
+    // The row he has selected stays in view (Finder, Raindrop), though opening it moved it up (D110).
+    const sel = keyed && found ? document.getElementById(`row-${lineKey(found)}`) : null;
+    sel?.scrollIntoView({ block: "nearest" });
     // What sits below the list (a skill page's questions) loads after it, so the place may not exist
     // yet: keep putting it back as the content grows, until it fits or he scrolls himself. Until then
     // a scroll is ours, clamped short, and saving it would lose his place.
-    let pending = el.scrollTop < want - 1;
+    let pending = !sel && el.scrollTop < want - 1;
     const settle = () => {
       if (!pending) return;
       el.scrollTop = want;

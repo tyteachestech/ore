@@ -3966,6 +3966,27 @@ journey("Done: Move to To read and ⌘Z puts the source back in Done with the fi
   if (now?.finished_at !== was.finished_at) throw new Error(`finish date ${was.finished_at} became ${now?.finished_at}`);
 });
 
+journey("list: back from a source opened low in To read, its row is selected and in view, though opening moved it up", async (page) => {
+  await page.setViewportSize({ width: 1280, height: 220 });
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".list .row").nth(2).waitFor();
+  await page.locator(".list").focus();
+  for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowDown");
+  const title = await page.locator(".list .row[aria-selected=true] .title").innerText();
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head").filter({ hasText: title }).waitFor();
+  await page.waitForTimeout(800);
+  await page.keyboard.press("Escape");
+  const row = page.locator(".list .row[aria-selected=true]");
+  await until(`“${title}” is selected again`, async () => (await row.locator(".title").innerText()) === title);
+  await page.waitForTimeout(300);
+  const seen = await row.evaluate((r) => {
+    const a = r.getBoundingClientRect(), b = r.closest(".list")!.getBoundingClientRect();
+    return a.top >= b.top - 1 && a.bottom <= b.bottom + 1;
+  });
+  if (!seen) throw new Error(`the selected row “${title}” is scrolled out of the list`);
+});
+
 // —— run ——
 
 let failed = 0;
