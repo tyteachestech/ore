@@ -9,7 +9,7 @@ on:
     paths: [apps/desktop/**, packages/**, package.json, bun.lock, tsconfig.json, .github/workflows/bench.yml]
 concurrency:
   group: bench-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   bench:
     runs-on: ubuntu-latest
