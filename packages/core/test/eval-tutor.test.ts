@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { failures, loadTutorCases } from "../eval/tutor.ts";
+import { failures, loadTutorCases, summary, type TutorResult } from "../eval/tutor.ts";
 import { withSteps } from "../src/ai/tutor.ts";
 
 const reply = (over: object = {}) => ({ reply: "Think about which box the hard cards go to?", hint: true, exercise: false, steps: 0, cited: 0, searched: false, ...over });
@@ -50,5 +50,16 @@ describe("tutor pedagogy eval", () => {
     const worked = loadTutorCases().find((c) => c.id === "no-idea-worked-example")!.expect;
     expect(failures(worked, reply({ reply: "Try this 10-second check on a gap of 2 days first." }))).toEqual([]);
     expect(failures(worked, reply({ reply: "So you'd wait 10 days next." })).length).toBe(1);
+  });
+
+  test("repeated runs pool into one rate and name the cases that passed only some runs", () => {
+    const r = (id: string, ok: boolean): TutorResult => ({ id, ok, failed: ok ? [] : ["x"], ms: 1 });
+    const s = summary([[r("a", true), r("b", true)], [r("a", true), r("b", false)], [r("a", true), r("b", true)]]);
+    expect(s).toMatchObject({ passed: "5/6", flaky: ["b 2/3"] });
+    expect(summary([[r("a", false)]]).flaky).toEqual([]);
+  });
+
+  test("judge checks are sentences about the reply", () => {
+    for (const c of loadTutorCases()) for (const j of c.expect.judge ?? []) expect(j).toMatch(/^It .+\.$/);
   });
 });

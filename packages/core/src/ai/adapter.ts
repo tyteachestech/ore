@@ -48,7 +48,7 @@ interface RawRun {
   web?: WebSeen;
 }
 
-const addUsage = (a: Usage, b: Usage): Usage => ({
+export const addUsage = (a: Usage, b: Usage): Usage => ({
   input_tokens: a.input_tokens + b.input_tokens,
   output_tokens: a.output_tokens + b.output_tokens,
   ...(a.cost_usd !== undefined || b.cost_usd !== undefined ? { cost_usd: (a.cost_usd ?? 0) + (b.cost_usd ?? 0) } : {}),
