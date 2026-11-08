@@ -1,6 +1,6 @@
 import { CaretRight, Check, Collapse, Expand, Plus, Target, X } from "./icons";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { useSplit } from "./split";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
@@ -748,6 +748,15 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
 /** Open questions shown before "Show all", so Sources stays in view below them. */
 const QUESTION_CAP = 5;
 
+/** ↑ ↓ move between the questions in this section, as in any list here; Enter or a click opens one. */
+function moveRow(e: ReactKeyboardEvent<HTMLButtonElement>) {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  const rows = [...(e.currentTarget.closest(".fold-body")?.querySelectorAll<HTMLButtonElement>(".question-quote") ?? [])];
+  const next = rows[rows.indexOf(e.currentTarget) + (e.key === "ArrowDown" ? 1 : -1)];
+  e.preventDefault();
+  next?.focus();
+}
+
 function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, onRemove, onChanged, notify }: {
   q: Question;
   skill: string;
@@ -808,8 +817,10 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   };
 
   // The same actions as the hover buttons, in the ⋯ and right-click menus; delete last (AGENTS.md).
+  // The row is one Tab stop and the ⋯ the next (Linear): the hover buttons are only for the pointer.
   const actions: MenuAction[] = [
     ...(own ? [] : [{ id: "open", label: "Open passage", run: () => onQuestion(q) }]),
+    ...(maybe.length && !done ? [{ id: "lead", label: `Open “${maybe[0]!.title}”`, run: () => onOpenSource(maybe[0]!.item) }] : []),
     ...(done ? [] : [
       { id: "answer", label: "Answer…", run: () => setAnswering(true) },
       { id: "research", label: "Begin research", run: () => void research() },
@@ -823,18 +834,18 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
     <div className={`question${done ? " done" : ""}`}>
       {/* D131: the question is the row; a circle at the left is Answered (Things), as a try's box is Tried. */}
       <Hint text={done ? "Reopen" : "Mark answered"}>
-        <button className="q-check" role="checkbox" aria-checked={done} aria-label={done ? "Reopen" : "Mark answered"} onClick={() => onStatus(q, done ? "open" : "done")}>
+        <button className="q-check" tabIndex={-1} role="checkbox" aria-checked={done} aria-label={done ? "Reopen" : "Mark answered"} onClick={() => onStatus(q, done ? "open" : "done")}>
           {done && <Check size={12} aria-hidden="true" />}
         </button>
       </Hint>
       {own ? (
-        <button className="question-quote" onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
+        <button className="question-quote" onKeyDown={moveRow} onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
           <span className="note">{exact}</span>
         </button>
       ) : (
         // The passage it came from is in the hint and one click away; the row keeps to the question and its source.
         <Hint text={q.note ? `“${exact}”` : "Open this passage"}>
-          <button className="question-quote" onClick={() => onQuestion(q)}>
+          <button className="question-quote" onKeyDown={moveRow} onClick={() => onQuestion(q)}>
             <span className={q.note ? "note" : "note passage"}>{q.note || exact}</span>
             <span className="from">{q.item_title}</span>
           </button>
@@ -858,21 +869,21 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
       {maybe.length > 0 && !done && (
         // A purple square at the right: a source that may answer it; the hint names them, a click opens the first.
         <Hint text={<span className="hint-lines">{maybe.map((m) => <span key={m.item}>{m.quote ? "May answer it" : "To read"} · {m.title}</span>)}</span>} side="left">
-          <button className="q-lead" aria-label={`Open ${maybe[0]!.title}, which may answer it`} onClick={() => onOpenSource(maybe[0]!.item)} />
+          <button className="q-lead" tabIndex={-1} aria-label={`Open ${maybe[0]!.title}, which may answer it`} onClick={() => onOpenSource(maybe[0]!.item)} />
         </Hint>
       )}
       <div className="question-actions">
         {!done && (
           <>
-            <button onClick={() => setAnswering(!answering)} aria-expanded={answering}>
+            <button tabIndex={-1} onClick={() => setAnswering(!answering)} aria-expanded={answering}>
               Answer
             </button>
-            <button onClick={() => void research()} disabled={busy}>
+            <button tabIndex={-1} onClick={() => void research()} disabled={busy}>
               {busy ? <Working label="Finding sources…" /> : "Begin research"}
             </button>
           </>
         )}
-        {done && <button onClick={() => onStatus(q, "open")}>Reopen</button>}
+        {done && <button tabIndex={-1} onClick={() => onStatus(q, "open")}>Reopen</button>}
         <MoreButton label="Question actions" actions={actions} />
       </div>
       {answering && (

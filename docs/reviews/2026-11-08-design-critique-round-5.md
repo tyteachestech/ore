@@ -43,7 +43,7 @@ Detector: 8 counted findings, none new against the baseline (Geist `@font-face`,
 8. Settings uses a third segmented-control style; switch it to the one picked for the panel and popup.
 
 ## Still open
-- Questions on the skill page take five Tab stops per row and no ↑↓.
+- ~~Questions on the skill page take five Tab stops per row and no ↑↓.~~ Done: the row then its ⋯, ↑ ↓ between rows.
 - 73 `outline: none` overrides; a few leave only a `bg-hover` fill as focus.
 - ~~The ⓘ and Questions-head dot sprites barely read at 20px (glyph cut out of a filled disc).~~ Done: the ? hook is one open curve with no dot inside it; the ⓘ sprite was unused and is gone.
 - ~~Add saves any text as a source; a bare domain could offer "Add as a link?".~~ Done: a bare domain is a link (Link · site shows before ↵), a file or code name stays text.
