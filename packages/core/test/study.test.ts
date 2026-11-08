@@ -193,10 +193,18 @@ describe("review loop", () => {
       const ahead = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: new Date(now.getTime() + 20 * 3600e3) });
       process.env.ORE_DEVICE = "mac";
       const r = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now });
-      expect(r.ts > ahead.ts).toBe(true); // logged after it, so replay and undo see it as the latest
+      // Logged when he rated it, never at the other clock's time (which can be tomorrow, for the day's goal).
+      expect(r.ts).toBe(now.toISOString());
       expect(r.state_after.reps).toBe(2);
-      await undoReview(lib, a.meta.id, r.ts, now);
+      // ⌘Z right after takes back the rating he just gave, though the phone's is dated later.
+      await undoReview(lib, a.meta.id, r.ts, new Date(now.getTime() + 1000));
       expect(readReviews(lib).map((x) => x.ts)).toEqual([ahead.ts]);
+      // Read back in time order, the log still replays: the index has the card, from both reviews.
+      const again = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: new Date(now.getTime() + 2000) });
+      const idx = openIndex(lib);
+      expect(idx.cards().find((c) => c.id === a.meta.id)?.fsrs?.reps).toBe(2);
+      idx.close();
+      expect(again.ts < ahead.ts).toBe(true);
     } finally {
       if (was === undefined) delete process.env.ORE_DEVICE;
       else process.env.ORE_DEVICE = was;

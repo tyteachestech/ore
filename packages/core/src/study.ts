@@ -50,13 +50,12 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
     const retention = desiredRetention(card.meta.skills, loadSkills(lib).skills);
     const w = loadParams(lib);
     const prior = readReviews(lib).filter((r) => r.card === card.meta.id);
-    // A review synced from a device whose clock ran ahead can be dated after now: this one is logged just
-    // after it, so FSRS never sees time run backwards, replay keeps the order he rated in, and ⌘Z finds it.
-    const latest = prior.length ? Date.parse(prior.at(-1)!.ts) : -Infinity;
-    const asked = input.now ?? new Date();
-    const now = asked.getTime() > latest ? asked : new Date(latest + 1);
+    const now = input.now ?? new Date();
     const before = replay(prior, retention, w) ?? emptyState(now);
-    const after = nextState(before, now, input.rating, retention, w);
+    // A review synced from a device whose clock ran ahead can be dated after now. The review is logged
+    // now; FSRS counts the time since that one as none, rather than refusing time that runs backwards.
+    const last = before.last_review ? new Date(before.last_review) : now;
+    const after = nextState(before, last > now ? last : now, input.rating, retention, w);
     // A draft's first review finishes it; it counts as live from then on (the index reads that from the
     // log), so the card file is only written when its text changes.
     const finishing = card.meta.state === "draft" && prior.length === 0;
@@ -84,11 +83,13 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
 
 // Take back a mis-tapped rating: the card's latest review only, so replay stays true. The log gets an
 // undo record rather than losing the line; a draft whose finishing review is taken back is a draft again.
+// A review dated after now (another device's clock ahead) was not given since, so it doesn't stand in the way.
 export async function undoReview(lib: Library, cardRef: string, ts: string, now = new Date()): Promise<void> {
   return withLock(paths.lock(lib), () => {
     const card = findCard(lib, cardRef);
-    const latest = readReviews(lib).filter((r) => r.card === card.meta.id).at(-1);
-    if (!latest || latest.ts !== ts) throw new Error(`the review at ${ts} is not ${card.meta.id}'s latest`);
+    const own = readReviews(lib).filter((r) => r.card === card.meta.id);
+    const since = own.filter((r) => r.ts > ts && Date.parse(r.ts) <= now.getTime());
+    if (!own.some((r) => r.ts === ts) || since.length) throw new Error(`the review at ${ts} is not ${card.meta.id}'s latest`);
     appendUndo(lib, { ts: nowIso(now), card: card.meta.id, undo: ts });
   });
 }
