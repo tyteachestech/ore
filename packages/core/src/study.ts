@@ -47,12 +47,15 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
   return withLock(paths.lock(lib), () => {
     const card = findCard(lib, cardRef);
     if (card.meta.state === "retired") throw new Error(`card ${card.meta.id} is retired`);
-    const now = input.now ?? new Date();
     const retention = desiredRetention(card.meta.skills, loadSkills(lib).skills);
     const w = loadParams(lib);
     const prior = readReviews(lib).filter((r) => r.card === card.meta.id);
+    const now = input.now ?? new Date();
     const before = replay(prior, retention, w) ?? emptyState(now);
-    const after = nextState(before, now, input.rating, retention, w);
+    // A review synced from a device whose clock ran ahead can be dated after now. The review is logged
+    // now; FSRS counts the time since that one as none, rather than refusing time that runs backwards.
+    const last = before.last_review ? new Date(before.last_review) : now;
+    const after = nextState(before, last > now ? last : now, input.rating, retention, w);
     // A draft's first review finishes it; it counts as live from then on (the index reads that from the
     // log), so the card file is only written when its text changes.
     const finishing = card.meta.state === "draft" && prior.length === 0;
@@ -80,11 +83,13 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
 
 // Take back a mis-tapped rating: the card's latest review only, so replay stays true. The log gets an
 // undo record rather than losing the line; a draft whose finishing review is taken back is a draft again.
+// A review dated after now (another device's clock ahead) was not given since, so it doesn't stand in the way.
 export async function undoReview(lib: Library, cardRef: string, ts: string, now = new Date()): Promise<void> {
   return withLock(paths.lock(lib), () => {
     const card = findCard(lib, cardRef);
-    const latest = readReviews(lib).filter((r) => r.card === card.meta.id).at(-1);
-    if (!latest || latest.ts !== ts) throw new Error(`the review at ${ts} is not ${card.meta.id}'s latest`);
+    const own = readReviews(lib).filter((r) => r.card === card.meta.id);
+    const since = own.filter((r) => r.ts > ts && Date.parse(r.ts) <= now.getTime());
+    if (!own.some((r) => r.ts === ts) || since.length) throw new Error(`the review at ${ts} is not ${card.meta.id}'s latest`);
     appendUndo(lib, { ts: nowIso(now), card: card.meta.id, undo: ts });
   });
 }
@@ -112,8 +117,8 @@ export interface QueueOptions {
   newLimit?: boolean;
 }
 
-// Due queue (SPEC §3): live cards due now, unseen drafts (freshest source first, D60), and this
-// session's pending relearn passes, in queue order. A draft waits until the day after it was
+// Due queue (SPEC §3): live cards due now, unseen drafts (freshest source first, D60), and today's
+// pending relearn passes, in queue order. A draft waits until the day after it was
 // written, so its first review is spaced from the reading (D65). New drafts enter only while
 // today's goal has room after the due cards, up to `new_per_day` (D65).
 export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}): QueueEntry[] {
@@ -122,12 +127,20 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const skills = loadSkills(lib).skills;
     const w = loadParams(lib);
     const items = new Map(index.items().map((i) => [i.id, i]));
-    const session = openSessionId(lib);
     const reviews = readReviews(lib);
-    const inSession = new Map<string, Review[]>();
-    if (session) for (const r of reviews) if (r.session === session) inSession.set(r.card, [...(inSession.get(r.card) ?? []), r]);
     const today = localDay(now);
     const doneToday = reviews.filter((r) => localDay(r.ts) === today);
+    // Relearn passes are owed for misses today, or since the open session began if that was earlier (a
+    // session running past midnight).
+    const session = openSessionId(lib);
+    const began = session ? readSessions(lib).find((s) => s.type === "start" && s.id === session)?.ts : undefined;
+    const ownToday = new Map<string, Review[]>();
+    for (const r of reviews) {
+      if (localDay(r.ts) !== today && !(began && r.ts >= began)) continue;
+      const own = ownToday.get(r.card);
+      if (own) own.push(r);
+      else ownToday.set(r.card, [r]);
+    }
     const settings = reviewSettings(lib);
     const limit = opts.newLimit !== false;
     const newLeft = limit ? Math.max(0, settings.new_per_day - doneToday.filter((r) => r.finishing).length) : Infinity;
@@ -139,7 +152,9 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     for (const c of cards) {
       if (c.state === "retired") continue;
       if (picked && !c.skills.some((s) => picked.has(s))) continue;
-      const own = inSession.get(c.id) ?? [];
+      // A miss today owes one relearn pass (D21) until he answers the card again, in this session or a
+      // later one today: the session ending as the goal closes (D65), or Esc then ⌘R, doesn't drop it.
+      const own = ownToday.get(c.id) ?? [];
       const relearn = own.length === 1 && own[0]!.rating === 1;
       const due = c.fsrs ? new Date(c.fsrs.due) <= now : true;
       if (!due && !relearn) continue;

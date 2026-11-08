@@ -9,7 +9,7 @@ export const GradeOutput = z.strictObject({
   gaps: z.array(z.string()),
   feedback: z.string(),
   covered: z.array(z.boolean()), // one per rubric point, in order (D59); empty without a rubric
-  evidence: z.array(z.string()), // one per rubric point: his words that state it, "" when not covered (D140)
+  evidence: z.array(z.string()), // one per rubric point: his words that state it, "" when not covered (D141)
 });
 
 /** Folds case, curly quotes and runs of whitespace, keeping a map back to the original offsets. */
@@ -31,7 +31,7 @@ function fold(s: string): { text: string; at: number[] } {
 }
 
 /** The words of `answer` that `quote` copies, as `answer` spells them, or "" when it doesn't copy any:
- *  the grader's quote may differ in case, quotes or spacing, never in words (D140). */
+ *  the grader's quote may differ in case, quotes or spacing, never in words (D141). */
 export function quoteIn(answer: string, quote: string): string {
   const q = fold(quote.replace(/^(?:\s|…|\.\.\.)+|(?:\s|…|\.\.\.)+$/g, "")).text;
   if (!q) return "";

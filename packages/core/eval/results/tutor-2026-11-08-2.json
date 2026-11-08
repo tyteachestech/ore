@@ -1,0 +1,172 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-08T18:42:18.832Z",
+  "set": "271d4fda",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@6",
+      "passed": "11/12",
+      "accuracy": 0.9166666666666666,
+      "ci95": [
+        0.6461140782014047,
+        0.9851352905492264
+      ],
+      "errors": 0,
+      "wall_s": 20.9,
+      "cost_usd": 0.3659936,
+      "input_tokens": 151074,
+      "output_tokens": 6164,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's see if you can get it yourself first. Think of the Leitner system as a row of boxes, where each box is reviewed less often than the one before. A correct answer moves the card along that row. What do you think a wrong answer does to the card's place in the row? Your \"Spaced repetition\" source has a \"Paper flash cards\" section if you want to check.",
+          "ms": 8519,
+          "usage": {
+            "input_tokens": 13010,
+            "output_tokens": 505,
+            "cost_usd": 0.049949
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "It goes back to the first box. In the Leitner system, a card you miss returns to the first box for more aggressive review [1]. A card you get right moves up to the next box, which is reviewed less often [2]. Each later box waits longer before you see its cards again, so missed cards come back often until you can recall them.",
+          "ms": 4961,
+          "usage": {
+            "input_tokens": 13060,
+            "output_tokens": 325,
+            "cost_usd": 0.048349
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. That's two misses, so here's the answer: FSRS arrived in Anki **release 23.10**, so the year was 2023, not 2022. Your sources say FSRS \"is available in Anki starting with release 23.10\" [1]. The reference list dates that release to October 31, 2023, which matches the year.month naming [2].\n\nYour 22.04 was close in format, just a year and a half early. A handy hook is that 23.10 means 2023, October.",
+          "ms": 10091,
+          "usage": {
+            "input_tokens": 13268,
+            "output_tokens": 899,
+            "cost_usd": 0.054921
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Look in your \"Spaced repetition\" source, under the **Algorithms** heading. FSRS is listed there, next to the SSP-MMC family, and the same line says when Anki picked it up. Find that line and tell me what you read. The release is a version number, so it's the \"23.something\" kind of thing.",
+          "ms": 7287,
+          "usage": {
+            "input_tokens": 13082,
+            "output_tokens": 479,
+            "cost_usd": 0.049977
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "No stress, this one is just reading a tiny function. Start with the book's code [1]: it has two branches, one for when you remembered and one for when you didn't. Which branch applies to you here, and what does it do to `gap`? Plug in 4 and tell me what comes out.",
+          "ms": 4624,
+          "usage": {
+            "input_tokens": 12592,
+            "output_tokens": 278,
+            "cost_usd": 0.019225700000000002
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Okay, first one, from the book you're reading: according to the forgetting curve, when does recall drop fastest, and which review matters most because of that?",
+          "ms": 3608,
+          "usage": {
+            "input_tokens": 11004,
+            "output_tokens": 206,
+            "cost_usd": 0.0121537
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": false,
+          "failed": [
+            "no /25 ?%|a quarter/",
+            "doesn't ask"
+          ],
+          "reply": "Not quite. Half is closer to the first day than the seventh. The book says \"Recall drops fast at first and then levels off\" [1], so by day 7 it has fallen well below that. Check the table under the curve and try again with the number for day 7.",
+          "ms": 7790,
+          "usage": {
+            "input_tokens": 11503,
+            "output_tokens": 632,
+            "cost_usd": 0.0184097
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days [1]. Notice the shape too: it falls from 58% at day 1 to 25% at day 7, then only to 21% by day 30 [2]. Next question: why does the book say the first review matters most?",
+          "ms": 3882,
+          "usage": {
+            "input_tokens": 12685,
+            "output_tokens": 297,
+            "cost_usd": 0.0197877
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one from Chapter 1. Close the chapter and write from memory: name the kinds of testing and the two scheduling ideas it covers, then pick one and say how you'd use it in something you're learning right now. Write it in the chat or in your note.",
+          "ms": 4195,
+          "usage": {
+            "input_tokens": 12868,
+            "output_tokens": 289,
+            "cost_usd": 0.020439699999999998
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "You've got the diagnostic half: testing shows you what you don't know yet. That matches the book, where a quiz \"breaks the illusion at once\" [1].\n\nYour answer is missing two points:\n- **Testing also builds memory.** Recalling an idea does more than measure it. \"Each time we recall an idea, the path to it gets easier to find the next time.\" [2]\n- **Rereading hides gaps.** It feels easy, so you think you know the page. \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [3]\n\nFollow-up: if testing both reveals gaps and strengthens memory, which of the two matters more when you've just read a chapter and feel confident?",
+          "ms": 9886,
+          "usage": {
+            "input_tokens": 12811,
+            "output_tokens": 1248,
+            "cost_usd": 0.0298017
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is easy, and your brain reads easy as \"known.\" Your chapter says it directly: rereading feels fluent, and that fluency fools you into thinking you know the page [1]. Recognizing words you've just seen is a different skill from pulling the idea out on your own. A quiz breaks the illusion at once: either the answer comes, or it does not [2]. That's why the chapter's remedy is retrieval, pulling an idea out of memory instead of reading it again [3].\n\nQuick check: next time you finish a page, what could you write down from it with the page closed?",
+          "ms": 6410,
+          "usage": {
+            "input_tokens": 12443,
+            "output_tokens": 677,
+            "cost_usd": 0.0226197
+          }
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, stopping when you're tired is a legitimate move, not a failure. Your own sources even lean that way: practice spread over days beats the same practice crammed into one night [1]. So calling it here and coming back tomorrow is the spacing effect working for you. If you want one tiny thing before you go, try saying aloud the one idea you remember from today, with no peeking. Or just close the book. Which sounds better?",
+          "ms": 4521,
+          "usage": {
+            "input_tokens": 12748,
+            "output_tokens": 329,
+            "cost_usd": 0.020359699999999998
+          }
+        }
+      ]
+    }
+  ]
+}

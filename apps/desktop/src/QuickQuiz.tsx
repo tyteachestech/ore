@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Boundary } from "./Boundary";
 import { loadPick } from "./ReviewPick";
-import { loadSkills, ore, type Skill } from "./ore";
+import { loadSkills, type Skill } from "./ore";
 import { Review } from "./Review";
 import { useToast } from "./Toast";
 
@@ -19,13 +19,14 @@ export function QuickQuiz() {
   const { notify, clear, view } = useToast();
   const runRef = useRef(run);
   runRef.current = run;
+  /** Showings so far: a showing right after putting it away (both in one task) still mounts a fresh Review. */
+  const shows = useRef(0);
 
   /** `back`: hand focus back to the app he was in (he dismissed it). */
   const close = useCallback((back: boolean) => {
     if (!runRef.current) return;
+    // Review ends its own session, by its id, as it closes.
     setRun(0);
-    // Review ends its own session on Esc and Done; this covers a click elsewhere. A second end just fails.
-    void ore("session", "end").catch(() => {});
     void invoke("quiz_hide", { back });
   }, []);
 
@@ -34,7 +35,7 @@ export function QuickQuiz() {
       clear();
       loadSkills().then(setSkills, () => {});
       setPick(loadPick());
-      setRun((n) => n + 1);
+      setRun(++shows.current);
     });
     // The shortcut again while it shows: put it away, as Esc does.
     const away = listen("quiz-away", () => close(true));
@@ -61,8 +62,10 @@ export function QuickQuiz() {
               if (!again) return close(true);
               // Keep going reviews every skill, as in the main window: the end screen counts all that is due.
               setPick(null);
-              setRun((n) => n + 1);
+              setRun(++shows.current);
             }}
+            // A rating taken back or given again after this showing closed: the main window's Home reads today again.
+            onLogged={() => void emitTo("main", "ratings-changed").catch(() => {})}
             notify={notify}
           />
         </Boundary>

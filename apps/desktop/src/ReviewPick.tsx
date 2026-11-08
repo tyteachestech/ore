@@ -90,7 +90,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
     } else if ((e.key === "Enter" && !e.metaKey && !e.altKey && !e.shiftKey && !e.ctrlKey) || is(e.nativeEvent, "review")) {
       e.preventDefault();
       e.stopPropagation(); // the app's own ⌘R and Home's ↵ must not start a second review
-      start();
+      if (!e.repeat) start(); // a held ↵ starts once, and never toggles the focused row
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       const down = e.key === "ArrowDown";

@@ -7,7 +7,7 @@ import { writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { tempLibrary } from "./helpers.ts";
 
-// D140: the grader quotes the words of his answer that earned each key point, so Review can show them.
+// D141: the grader quotes the words of his answer that earned each key point, so Review can show them.
 describe("quoteIn", () => {
   const answer = "Spacing works because some  forgetting makes\nretrieval “effortful”, which strengthens it.";
   test("finds the quote as he spelled it, across case, curly quotes and spacing", () => {

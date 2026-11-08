@@ -1,0 +1,169 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-08T19:48:04.675Z",
+  "set": "717e44c6",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@6",
+      "passed": "12/12",
+      "accuracy": 1,
+      "ci95": [
+        0.7574992425007574,
+        1
+      ],
+      "errors": 0,
+      "wall_s": 21.3,
+      "cost_usd": 0.3777971999999999,
+      "input_tokens": 155489,
+      "output_tokens": 6037,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's see if you can get this one yourself. Picture the Leitner box with its groups, each one reviewed less often than the one before. A card you get right moves along that line, so where do you think a missed card ends up? Take a guess, and if you're stuck, say so and I'll narrow it down.",
+          "ms": 7450,
+          "usage": {
+            "input_tokens": 13481,
+            "output_tokens": 442,
+            "cost_usd": 0.051203
+          }
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "The card goes back to the first box. In the Leitner system, a card you miss is sent back to the first group [1], so you see it again soon, while cards you get right move on to boxes you visit less often [2]. The idea is that the cards you know least get the most review.",
+          "ms": 4785,
+          "usage": {
+            "input_tokens": 13531,
+            "output_tokens": 303,
+            "cost_usd": 0.050012999999999995
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Not 22.04. That's your second miss, so here's the answer: FSRS arrived in Anki with release **23.10**. Your Spaced repetition source says FSRS is \"available in Anki starting with release 23.10\" [1]. The references back this up, since they cite the \"Anki Release 23.10\" notes dated October 31, 2023 [2].\n\nYou were close on the format. The year was 2023, and the 10 means October.",
+          "ms": 8343,
+          "usage": {
+            "input_tokens": 13778,
+            "output_tokens": 656,
+            "cost_usd": 0.054530999999999996
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Good one to work out. Start in your \"Spaced repetition\" source, under the Algorithms section. Look at the list of algorithm families and find the one named FSRS. The line about it says where it's available and from which release. Which version number does it give for Anki?",
+          "ms": 4910,
+          "usage": {
+            "input_tokens": 13593,
+            "output_tokens": 239,
+            "cost_usd": 0.049621000000000005
+          }
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "Start with the function. It takes the last gap and whether you remembered, and returns the next gap. [1]\n\nHere's a similar case. Say the last gap was 2 days and you remembered. `remembered` is true, so the first branch runs: 2 × 2.5 = 5 days. If you had forgotten, the `else` branch would give 1 day, whatever the old gap was.\n\nNow try yours with the same steps. Which branch runs when you remembered a gap of 4 days, and what does it return?",
+          "ms": 6998,
+          "usage": {
+            "input_tokens": 12655,
+            "output_tokens": 755,
+            "cost_usd": 0.023674399999999998
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start with the first chapter. In \"A Small Book of Remembering\", why is it that most of what we read is gone within a week? Say it in your own words.",
+          "ms": 3526,
+          "usage": {
+            "input_tokens": 11315,
+            "output_tokens": 209,
+            "cost_usd": 0.0128544
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table says 25% is recalled at 7 days, so about a quarter, not half [1]. The 58% figure is day 1. The drop is steep at first, then it flattens, which is why the book says the first review matters most [2].\n\nNext question: according to the book, what is the name for the effect where calling a memory back, rather than rereading it, keeps it?",
+          "ms": 6041,
+          "usage": {
+            "input_tokens": 11813,
+            "output_tokens": 594,
+            "cost_usd": 0.018696400000000002
+          }
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days. [1] Worth noticing the shape: 58% at day 1, 25% at day 7, then only 21% at day 30. That's the \"drops fast, then levels off\" pattern, which is why the book says the first review matters most. [2]\n\nNext one: why does the book's idea of testing yourself beat rereading, even when rereading feels better?",
+          "ms": 4283,
+          "usage": {
+            "input_tokens": 12997,
+            "output_tokens": 340,
+            "cost_usd": 0.020892400000000002
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one for Chapter 1. Write it from memory, no peeking: explain why rereading feels productive but loses to testing, and why spacing your practice over days helps. Then say what you'd change in how you study something this week.",
+          "ms": 4410,
+          "usage": {
+            "input_tokens": 13451,
+            "output_tokens": 310,
+            "cost_usd": 0.0224084
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "You've got the diagnostic half: a test shows you where the gaps are. That matches the book, which says a quiz \"breaks the illusion at once: either the answer comes, or it does not\" [1].\n\nTwo things are missing:\n- **Retrieval also builds memory.** Recalling isn't only a measurement. \"Each time we recall an idea, the path to it gets easier to find the next time.\" [2]\n- **Why rereading misleads.** It feels easy, and the ease is the trap: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [3]\n\nHere's a follow-up. Suppose a friend rereads their notes three times and feels sure they know them. What would you tell them to do tonight, and why would it work better?",
+          "ms": 9516,
+          "usage": {
+            "input_tokens": 12998,
+            "output_tokens": 1250,
+            "cost_usd": 0.029996400000000003
+          }
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is easy, and easy feels like knowing. Your chapter says it \"feels fluent, and that fluency fools us into thinking we know the page.\" [1] The words look familiar, so your brain reads that familiarity as \"I've got this.\" But recognizing a page in front of you isn't the same as pulling the idea out with the page closed.\n\nA quiz breaks the illusion: \"either the answer comes, or it does not.\" [2] Your notes make the same point: a study group that quizzes each other learns more than one that rereads, \"even when the rereading feels better.\" [3]\n\nWant to try it? Close the chapter and tell me, from memory, why rereading fools us.",
+          "ms": 6157,
+          "usage": {
+            "input_tokens": 12743,
+            "output_tokens": 669,
+            "cost_usd": 0.023166399999999997
+          }
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, that's a real signal, not a flaw. Stopping when you're tired is fine, and a short break or sleep will do more for what you've already read than pushing on. If you want one tiny thing before you go, say \"quiz me\" and I'll ask a single easy question. Otherwise, call it a day. Want that one question, or are you done?",
+          "ms": 4199,
+          "usage": {
+            "input_tokens": 13134,
+            "output_tokens": 270,
+            "cost_usd": 0.0207404
+          }
+        }
+      ]
+    }
+  ]
+}

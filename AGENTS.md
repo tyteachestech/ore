@@ -65,13 +65,14 @@ bun run golden:update       # rewrite test/golden/*.md (whole doc.md per sample 
 bun run eval:grade          # grading eval: Ore's grader on 20 labeled cards (packages/core/eval/grade-cases.json) with Claude and Codex; prints accuracy with its 95% interval, false passes and fails, cost, time, saves packages/core/eval/results/grade-<date>.json. Spends AI usage: run by hand, never in CI. How it works and how to grow it: docs/guides/grading-eval.md
 bun run eval:mine           # prints real reviews where Tyler's rating and the grader's fell on different sides, as candidate golden cases (read-only, no AI)
 bun run eval:ask            # Ask-your-library eval: the tutor (what the app ships; --chat ask for `ore ask-library`) on 20 questions over the golden docs (packages/core/eval/ask-cases.json), 14 harder ones (paraphrase, follow-up, open source, two sources) and 9 they don't answer (web or general knowledge, D137); retrieval, answer and citation accuracy per vendor; --library big adds ~240 seed-big sources around them; saved to packages/core/eval/results/ask-<date>.json. Spends AI usage: by hand only. Guide: docs/guides/ask-library.md
+bun run eval:tutor          # tutor pedagogy eval: 12 turns over the golden docs (packages/core/eval/tutor-cases.json) checking hints before answers, the answer on "show me" or two tries, Quiz me's corrective feedback with no score, Practice's exercise, no needless web search. Spends AI usage: by hand only. Guide: docs/guides/tutor-eval.md
 bun run bench               # speed: the built app on a 950-source library (seed-big ×4), ms until each screen settles, `ore` calls and long tasks; put before/after in a speed PR (--only <step>, --calls, --compiled)
 bun run e2e                 # end-to-end journeys in a browser on a seeded mock library (apps/desktop/e2e); add one when a UI bug slipped past the unit tests
 bun link                    # from packages/cli: puts `ore` on PATH (~/.bun/bin/ore), pointing at this checkout
 ore --help                  # CLI reference; every command accepts --json
 ORE_LIBRARY=/tmp/lib ore init   # scratch library for manual testing; never test against ~/Ore
-bun run app:install         # from ~/Developer/ore on master (the live checkout): builds the Tauri app and replaces /Applications/Ore.app; dev: `cd apps/desktop && ORE_LIBRARY=/tmp/lib bun run tauri dev` (Cargo target in ~/Library/Caches/ore)
-git config core.hooksPath .githooks   # once per clone: a commit or pull on master touching apps/desktop/ reinstalls the app in the background (log: ~/Library/Caches/ore/app-install.log)
+bun run app:install         # from ~/Developer/ore on master (the live checkout): builds the Tauri app with its own compiled `ore` (D30) and replaces /Applications/Ore.app; dev: `cd apps/desktop && ORE_LIBRARY=/tmp/lib bun run tauri dev` (Cargo target in ~/Library/Caches/ore)
+git config core.hooksPath .githooks   # once per clone: a commit or pull on master touching apps/desktop/ or packages/ (its compiled `ore`) reinstalls the app in the background (log: ~/Library/Caches/ore/app-install.log)
 ```
 AI vendor for enrichment and grading: `ai:` in the library's `skills.yaml` (`claude` or `codex`), `ORE_AI` overrides; its model: `models:` there (Settings › AI › Model, D116), `ORE_AI_MODEL` overrides. Background enrich logs: `<library>/.ore/logs/`.
 

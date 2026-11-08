@@ -296,7 +296,7 @@ export type CardFull = {
 };
 
 /** `ore grade`: a proposed rating (never logged by itself, D21) and one mark per rubric point, with the words
- *  of his answer that earned each covered one ("" for none; absent from a grade made before D140). */
+ *  of his answer that earned each covered one ("" for none; absent from a grade made before D141). */
 export type Grade = { rating: 1 | 2 | 3 | 4; gaps: string[]; feedback: string; covered: boolean[]; evidence?: string[] };
 
 /** `ore session end` (D62). */

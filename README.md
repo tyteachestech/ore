@@ -63,7 +63,7 @@ Pick the AI vendor with `ai: claude` or `ai: codex` in the library's `skills.yam
 
 ## Releasing
 
-Push a version tag and GitHub builds the app and attaches `Ore-<version>.dmg` to a release (`.github/workflows/release.yml`): set `version` in `apps/desktop/src-tauri/tauri.conf.json`, then `git tag v0.1.0 && git push origin v0.1.0`. **Actions › release › Run workflow** builds one to try without releasing. The release app carries its own `ore` (a compiled single file, `apps/desktop/scripts/bundle-cli.ts`), so it needs no Bun or checkout; a linked checkout's `ore` still wins on a developer's Mac.
+Push a version tag and GitHub builds the app and attaches `Ore-<version>.dmg` to a release (`.github/workflows/release.yml`): set `version` in `apps/desktop/src-tauri/tauri.conf.json`, then `git tag v0.1.0 && git push origin v0.1.0`. **Actions › release › Run workflow** builds one to try without releasing. The release app carries its own `ore` (a compiled single file, `apps/desktop/scripts/bundle-cli.ts`), so it needs no Bun or checkout. `app:install` builds the same way, so an installed app runs its compiled `ore` too; `tauri dev` runs the linked checkout's.
 
 Without Apple secrets the build is signed ad hoc, and each friend clicks Open Anyway once (step 2 above). To sign and notarize it so it opens with no warning, add these repository secrets (Settings › Secrets and variables › Actions); the next tag uses them:
 
