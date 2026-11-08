@@ -99,6 +99,17 @@ function snapshot(): Record<string, string> {
   return out;
 }
 
+// The core imports its prompts, the library's AGENTS.md and its Swift helpers as text (`with { type: "text" }`),
+// which Bun understands and Vite doesn't.
+const textImports: Plugin = {
+  name: "text-imports",
+  enforce: "pre",
+  load(id) {
+    if (!/\.(md|swift)$/.test(id)) return;
+    return { code: `export default ${JSON.stringify(readFileSync(id, "utf8"))};`, moduleType: "js" };
+  },
+};
+
 // Tauri expects a fixed dev port and no screen clearing (it prints its own logs).
 // The icon picker's data ships with the app, so it works offline: Emojibase for emoji, MingCute's icons (pixelSkillIcons),
 // and Phosphor's for icons picked before MingCute (still drawn, no longer offered).
@@ -108,7 +119,7 @@ export default defineConfig({
     tailwindcss(),
     mingcuteList,
     pixelSkillIcons,
-    ...(PHONE ? [phoneLibrary] : []),
+    ...(PHONE ? [phoneLibrary, textImports] : []),
     viteStaticCopy({
       targets: [
         { src: "node_modules/emojibase-data/en/{data,messages}.json", dest: "emojibase/en", rename: { stripBase: true } },
