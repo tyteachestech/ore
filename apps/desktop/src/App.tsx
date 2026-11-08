@@ -765,13 +765,14 @@ export function App() {
   }, []);
   const peekOut = useCallback(() => clearTimeout(peekTimer.current), []);
   // Out, it goes once nothing has held it for 300 ms: the pointer on it, the edge or the toggle, a field
-  // in it, or one of its menus (portaled outside it). Looked at on a timer, not on mouseleave: Esc from
-  // its field, or closing a menu, moves no pointer, so no leave event would come.
+  // in it, or one of its menus (portaled outside it, so its trigger in the sidebar, open, stands for it).
+  // Looked at on a timer, not on mouseleave: Esc from its field, or closing a menu, moves no pointer, so
+  // no leave event would come.
   useEffect(() => {
     if (!peek) return;
     let held = performance.now();
     const look = window.setInterval(() => {
-      if (document.querySelector(".sidebar:hover, .side-edge:hover, .side-toggle:hover, .menu-list") || document.activeElement?.closest(".sidebar input")) held = performance.now();
+      if (document.querySelector(".sidebar:hover, .side-edge:hover, .side-toggle:hover, .sidebar[data-state=open], .sidebar [data-state=open]") || document.activeElement?.closest(".sidebar input")) held = performance.now();
       else if (performance.now() - held >= 300) setPeek(false);
     }, 100);
     return () => clearInterval(look);

@@ -1692,6 +1692,15 @@ journey("peeked sidebar: it stays while its own menu is open, and slides away on
   if (!(await shown())) throw new Error("the sidebar slid away from the field he is typing in");
   await page.keyboard.press("Escape");
   await until("it slides away after Esc, with the pointer gone", async () => !(await shown()));
+  // A menu opened in the page doesn't hold it: only its own menus do.
+  await peek();
+  const row = page.locator(".home-read").first();
+  const r = (await row.boundingBox())!;
+  await page.mouse.move(r.x + 40, r.y + r.height / 2, { steps: 5 });
+  await row.click({ button: "right" });
+  await page.getByRole("menu").waitFor();
+  await until("it slides away under a menu of the page", async () => !(await shown()));
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Show sidebar" }).click();
 });
 
