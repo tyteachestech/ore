@@ -92,6 +92,12 @@ function noteText(mark: Element): string {
   return (block.textContent ?? "").slice((back.textContent ?? "").length).replace(/^[:\s]+/, "").trim();
 }
 
+/** A highlight the core couldn't place: its "text not found in item <id>" gives him nothing to do. */
+const placeError = (e: unknown) => {
+  const why = errorText(e);
+  return /text not found in item/.test(why) ? "Couldn’t highlight across that part. Try starting or ending it on a nearby word." : why;
+};
+
 const components: Components = {
   a: ({ href, children }) => {
     const fn = href?.match(/^#fn(ref)?-(.+)$/);
@@ -1187,7 +1193,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         ranges.current.delete(tmp);
         setAnns((l) => l.filter((a) => a.id !== tmp));
         setPopup((cur) => (cur?.id === tmp ? null : cur));
-        p.notify(errorText(e), "error");
+        p.notify(placeError(e), "error");
       },
     );
   }
@@ -1368,7 +1374,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       setAnns((l) => l.map((x) => (x.id === id ? { ...x, exact: from.exact, start: from.start, end: from.start + from.exact.length } : x)));
       setRepaint((n) => n + 1);
       setPopup((cur) => (cur?.id === id ? { ...cur, ...popupAt(was) } : cur));
-      p.notify(errorText(e), "error");
+      p.notify(placeError(e), "error");
     }
   }
 

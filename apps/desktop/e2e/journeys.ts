@@ -791,6 +791,17 @@ journey("highlight: a triple click keeps the paragraph as one step, so one ⌘Z 
   if (left.some((t) => t.includes("Rereading"))) throw new Error(`one ⌘Z left ${JSON.stringify(left)}`);
 });
 
+journey("highlight: one the core can't place says what to do, not “text not found in item <id>”", async (page) => {
+  await openSource(page, TESTING);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { highlight: 'ore: text not found in item 01M6Y59CWZB27HBM869RVJPBGR: "Tom & Jerry"' }));
+  await page.waitForTimeout(300);
+  await select(page, "Each successful retrieval changes the memory itself.");
+  await until("an error toast", async () => (await page.locator(".toast").allInnerTexts()).some((t) => t.includes("Couldn’t highlight")));
+  const toast = (await page.locator(".toast").allInnerTexts()).join(" ");
+  if (/01M6Y|text not found/.test(toast)) throw new Error(`the toast shows the core's words: ${toast}`);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+});
+
 journey("highlight: an edge he dragged is his, so Esc keeps the highlight and ⌘Z moves the edge back", async (page) => {
   await openSource(page, AGENTS);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
