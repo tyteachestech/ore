@@ -5,7 +5,7 @@ import { Hint } from "./Hint";
 import { label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
-import { lessonsOf, levelProgress, nextLesson, ore, type Item, type Skill, type Today } from "./ore";
+import { lessonsOf, levelProgress, nextLesson, ore, touched, type Item, type Skill, type Today } from "./ore";
 import { minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
 import { SkillChip, skillGroups, SkillPicker } from "./Skills";
@@ -20,6 +20,23 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 /** Home (D58): today's goal and what is due, the sources he is reading, and each skill's
  *  strength. Apple Fitness for the ring; Start review asks what to review (D80). */
+/** Continue reading: what he opened last first. This Mac's own list of what it opened (`recent`, the
+ *  newest first) leads, then every source in reading by when the files say it was last opened (D110),
+ *  so a fresh install or the other Mac doesn't fall back to title order. A lesson he opened stands for
+ *  its course (D79): the lesson to read next, once, even when the one he opened is done. */
+export function continueReading(items: Item[], recent: string[]): Item[] {
+  const byTouch = items.filter((i) => i.status === "reading").sort((a, b) => (touched(b) > touched(a) ? 1 : touched(b) < touched(a) ? -1 : 0));
+  return [
+    ...new Set(
+      [...recent, ...byTouch.map((i) => i.id)].flatMap((id) => {
+        const i = items.find((x) => x.id === id);
+        const up = i?.course ? nextLesson(lessonsOf(items, i.course.id)) : i?.status === "reading" ? i : null;
+        return up ? [up] : [];
+      }),
+    ),
+  ];
+}
+
 export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, skillMenu, onRetry, notify }: {
   items: Item[];
   /** The library has no sources yet (loaded, not loading): Home says how to add the first. */
@@ -125,17 +142,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   /** Skills with sources or cards; empty ones stay in the sidebar only. */
   const shown = skills.filter((s) => items.some((i) => i.skills.includes(s.id)) || today?.skills.some((x) => x.skill === s.id && (x.due || x.solid)));
 
-  // A lesson he opened stands for its course (D79): the lesson to read next, once, even when the one he
-  // opened is done.
-  const reading = [
-    ...new Set(
-      [...recent, ...items.filter((i) => i.status === "reading").map((i) => i.id)].flatMap((id) => {
-        const i = items.find((x) => x.id === id);
-        const up = i?.course ? nextLesson(lessonsOf(items, i.course.id)) : i?.status === "reading" ? i : null;
-        return up ? [up] : [];
-      }),
-    ),
-  ].slice(0, 5);
+  const reading = continueReading(items, recent).slice(0, 5);
 
   const split = useSplit("ore.home-split", 1 / 3);
   const two = reading.length > 0 && shown.length > 0 && !!today;
