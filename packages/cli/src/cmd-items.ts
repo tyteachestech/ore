@@ -12,7 +12,7 @@ import {
   restoreCut,
   redoCut,
   enrichLogs, markEnrichSkipped, type Item, type Library,
-  acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType,
+  acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
   appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter,
   type AnchoredAnnotation, type AnnotationPatch,
@@ -557,11 +557,15 @@ export const itemCommands: Record<string, Command> = {
   },
 
   "suggested-skill": {
-    usage: "<item> accept|dismiss   accept creates the skill enrich suggested (if new, at P2) and files the item, its cards and topics under it",
-    async run([ref, action]) {
+    usage: "<item> accept|dismiss|undo <json>   accept creates the skill enrich suggested (if new, at P2) and files the item, its cards and topics under it; undo takes back an accept (its `undo`) or a dismiss ({\"suggestion\":…})",
+    async run([ref, action, json]) {
       const lib = openLibrary();
       need(ref, "<item>");
-      const a = need(oneOf(action, ["accept", "dismiss"] as const, "<action>"), "accept|dismiss");
+      const a = need(oneOf(action, ["accept", "dismiss", "undo"] as const, "<action>"), "accept|dismiss|undo");
+      if (a === "undo") {
+        const meta = await undoSuggestedSkill(lib, need(ref, "<item>"), JSON.parse(need(json, "<json>")));
+        return { data: meta, text: `${meta.title}: suggests ${meta.suggested_skill!.name} again` };
+      }
       if (a === "dismiss") {
         const meta = await dismissSuggestedSkill(lib, need(ref, "<item>"));
         return { data: meta, text: `${meta.title}: suggestion dismissed` };

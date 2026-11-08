@@ -129,7 +129,7 @@ Each device appends to its own file (`<device>` is `ORE_DEVICE` or the computer'
 
 ## 3. Scheduling
 - ts-fsrs, FSRS-6 defaults. Desired retention per card = max over its skills' priority (P1 0.92, P2 0.88, P3 0.80; D65).
-- Due queue: all cards with `due <= now` plus drafts never seen. Order: interleave topics round-robin; within a topic, sort by `priority_weight × (1 − retrievability)`; place `concept` items that share a topic adjacent; keep `definition` items from one source together. A draft first comes up the day after it was written; new drafts enter only while the daily goal has room after the due cards, up to `review.new_per_day` (D65).
+- Due queue: all cards with `due <= now` plus drafts never seen. Drafts take every fifth place while due cards last (D144). Order of the due cards: interleave topics round-robin; within a topic, sort by `priority_weight × (1 − retrievability)`; place `concept` items that share a topic adjacent; keep `definition` items from one source together. A draft first comes up the day after it was written; new drafts enter only while the daily goal has room after the due cards, up to `review.new_per_day` (D65).
 - A rating of 1 schedules one relearn pass later in the same session, or the next one that day if the session ends first (the goal closing, D65).
 - Remixing (D66) changes how a card is asked, never when: one FSRS state per card. Variants start after two Good or Easy reviews of the original since the last miss and rotate variant, variant, original; a miss returns to the original; each variant is shown at most twice, never twice in a row.
 - Never compress intervals to catch up. Never alter stability/difficulty for priority.
@@ -177,7 +177,7 @@ ore skills set <skill> [--name n] [--icon emoji|mc:name] [--color gray|red|orang
 ore skills add <name> [--collection c]   new skill at P2 (the sidebar's + on a section header); refuses a name that matches an existing skill
 ore skills arrange '<layout json>'   the sidebar in one write: [{"collection":"Work","skills":["ai",...]},{"collection":"","skills":[...]}], every skill exactly once; sorts skills.yaml into that order (a collection sits where its first skill is) and sets or clears each collection. Drag, Move to, renaming, reordering or deleting a collection, and their Undo all use it
 ore skills rm <skill> [--archive]      delete a skill: drops it from skills.yaml and untags its sources, cards and topics (cards keep reviewing, the skill note stays on disk); --archive also archives sources filed only under it
-ore suggested-skill <item> accept|dismiss   accept creates the suggested skill (P2) if new and files the item, its cards and topics under it
+ore suggested-skill <item> accept|dismiss|undo <json>   accept creates the suggested skill (P2) if new and files the item, its cards and topics under it; undo takes back an accept (its `undo` record) or a dismiss
 ore enrich [item...|--all-pending]    runs AI (several items one after another): prequestions, skills, topics, card/prompt drafts from Card highlights, changed the source note and, once the item is done, its prequestions
 ore research <question>               AI finds 3–5 sources for one of his questions and prints them; writes nothing (D95); `ore add <url> --for <q>` any
 ore explain <item> --exact "<term>" [--start N]   AI explains a term in its paragraph and in general (Explain, D97); writes nothing
@@ -186,7 +186,7 @@ ore key-points <item>                 AI: 2–4 key points per prequestion with 
 ore check <item> <n> [--covered 1,0,1]   AI marks which key points his closed-book answer covers (D56); --covered stores his own marks instead
 ore cards [--state] [--item] [--skill]
 ore card show|edit|set|retire|restore <id> [--review] [--variant v] [--question] [--answer] [--point]... [--state draft|live]   set replaces the question, answer or key points (--point per point, in order: an Explain card's whole rubric, one line each, at least one), meta kept (D59), or the variant's with --variant (its points one for one); restore undoes a retire; show --review returns the version to review now: a variant in its turn, as kind prompt with its question, answer and rubric plus `variant` and `original` (D66); for the original, `in_head_ok` (D68)
-ore due [--limit N] [--skill s]...    ordered queue as above; unseen drafts written before today, in the goal time the due cards leave and up to `review.new_per_day` a day (D60, D65), freshest source first; --skill keeps cards of those skills (D58)
+ore due [--limit N] [--skill s]...    ordered queue as above; unseen drafts written before today take every fifth place while due cards last, up to `review.new_per_day` a day (D60, D65, D144), freshest source first; --skill keeps cards of those skills (D58)
 ore review <card> --rating 1-4 --confidence 1-3 [--answer] [--ai-rating] [--elapsed-ms] [--finishing] [--session id] [--variant v] [--in-head]   → {card, ts, rating, due_next, state_after, finishing, session?}; then writes variants ahead in the background when the card needs them (D66)
 ore review <card> --undo <ts>         takes back the card's latest review (ts from its output) by appending an undo line
 ore remix [<card>...] [--pending]     write variants ahead (D66): two ready per remixable card; also run in the background at session start
