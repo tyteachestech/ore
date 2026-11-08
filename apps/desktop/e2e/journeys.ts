@@ -246,7 +246,8 @@ journey("⌘K ↵ on Home starts review, never flips a display setting", async (
   await page.keyboard.press("Meta+k");
   await page.locator("[cmdk-item]").first().waitFor();
   await page.keyboard.press("Enter");
-  await page.getByRole("dialog", { name: "What to review" }).waitFor();
+  // The picker, or straight into review when he picked "everything" before.
+  await page.getByRole("dialog", { name: "What to review" }).or(page.locator(".review")).first().waitFor();
 });
 
 journey("highlight popup open: typing letters doesn't start Listen or open the original", async (page) => {
