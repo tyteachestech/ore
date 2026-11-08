@@ -6,11 +6,12 @@ The tutor (D128, ⌘J) answers Tyler's questions from his own sources. Each clai
 bun run eval:ask                       # the tutor, Claude and Codex; spends AI usage, never in CI
 bun run eval:ask --chat ask            # ore ask-library instead
 bun run eval:ask --vendor claude --model claude-haiku-5-5
+bun run eval:ask --vendor claude --library big   # with ~240 generated sources around the golden docs
 ```
 
 ## How it works
 
-1. **Search** (`packages/core/src/ai/ask.ts`, `retrieve`). The question loses stop words and is cut to stems ("spacing" → "spac"). SQLite FTS5 ranks sources by BM25 (`db.ts`, `sourcesMatching`) and keeps the best six. Each is cut into paragraph passages under their headings, and passages are ranked by the rarer question words they hold, a small IDF score; title and heading words count half. Up to ten passages go to the AI, five at most from one source. The tutor puts the open source and anything he @-mentions first, then up to eight from the rest of the library (`tutorPassages`).
+1. **Search** (`packages/core/src/ai/ask.ts`, `retrieve`). The question loses stop words and is cut to stems ("spacing" → "spac", "memories" and "memory" → "memor", "quizzing" → "quiz"), matched as prefixes. SQLite FTS5 ranks sources by BM25 (`db.ts`, `sourcesMatching`) and keeps the best six. Each is cut into paragraph passages under their headings, and passages are ranked by BM25 again (k1 1.2, b 0.75): a rarer word counts more, a word said again counts for less each time, and a long passage's matches count for less than a short one's. Title and heading words count half. Up to 14 passages go to the AI, five at most from one source (10 lost three questions' evidence in a 250-source library). The tutor puts the open source and anything he @-mentions first, then up to 12 from the rest of the library (`tutorPassages`).
 2. **Answer**. The AI sees only the numbered passages and returns JSON: the reply with `[n]` markers, and per marker a passage id and an exact quote.
 3. **Check**. Every quote must be found in its passage (`locate`, the same fuzzy anchoring highlights use), every marker must have a citation, and an unknown passage is refused. A web citation's URL must be one the search returned and its quote words the search returned: a web task runs `claude -p` with `--output-format stream-json`, whose events carry each WebSearch's links and text (`webSeen` in `adapter.ts`). A failed check goes back to the AI once with the reason.
 4. **Stream** (D138). While the AI writes, the reply so far goes to the app as it comes, so the first words show in about 2 seconds; its markers wait for the citations, which come with the checked answer.
@@ -19,7 +20,8 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 ## The eval
 
 - **Set** (`packages/core/eval/ask-cases.json`): the golden sample docs (`packages/core/test/golden`: Wikipedia, Python docs, a textbook PDF, EPUB, Word, slides, a notebook, a YouTube transcript) imported into a scratch library. 20 questions they answer, each with answer patterns, the sources that hold it and an evidence pattern. 9 they don't: two off-topic, seven near misses where the person or topic is there but the fact isn't (Ebbinghaus's birth year, FSRS's default retention next to an unrelated "90%").
-- **Retrieval**, with no AI: do the passages from the expected sources that reach the AI hold the evidence and every part of the answer? CI checks this for all 20 questions on both chats (`packages/core/test/eval-ask.test.ts`), so a search change that loses evidence fails the build for free.
+- **Harder set** (`hard`, 14, scored on its own line so the headline numbers stay comparable): paraphrases that share few words with their passage ("what happens overnight that helps memories stick?" against "consolidation happens during sleep"), follow-ups that need the turn before ("who came up with it?"), questions about the open source ("how does this say to fight it?"), and two-source questions whose answer must cite both.
+- **Retrieval**, with no AI: do the passages from the expected sources that reach the AI hold the evidence and every part of the answer? CI checks this for all 34 questions on both chats, in the golden library and again with seed-big's ~240 sources around it (`--library big` runs the whole eval that way) (`packages/core/test/eval-ask.test.ts`), so a search change that loses evidence fails the build for free.
 - **Answer**: every pattern matches the reply.
 - **Citation**: every quote is really at its offsets in its source, and one comes from an expected source and holds the evidence.
 - **Not in library**: an absent question is right when the reply says the answer isn't from his sources: in words ("your sources don't give his birth year"), or, with no passage cited, by the "Not from your sources" label or a web page's link. It may cite what his sources do say nearby, but then it has to say so in words, or the citation reads as the answer's source. Where the fact is settled (`outside` patterns: Ebbinghaus's birth year, the walrus operator's Python version), the answer from the web or general knowledge must also be right. The report counts how many cite the web and how many use general knowledge.
@@ -37,7 +39,7 @@ bun run eval:ask --vendor claude --model claude-haiku-5-5
 
 ## Limits
 
-- 20 answerable questions over 11 docs; the set has no questions that need two sources combined, and no follow-up turns.
+- 34 answerable questions over 11 docs, all written for this eval; the paraphrases were written knowing the passages, so they are milder than his real questions. At scale the distractors are seed-big's generated sources, which repeat their topic's words more than real writing does; a real library of his would be the better test.
 - Answer patterns are regexes: a right answer in unexpected words can fail, and a wrong one that names the right terms can pass.
 - The tutor answers an absent question from the web or general knowledge after saying so (D137); the eval counts that right when the answer is, and reports how often each happens. `ore ask-library` refuses instead.
 - A web quote is checked against what the search returned, which is the search tool's summary of the pages, not the page itself: it proves the link and words were really returned, not that the page says exactly that. Codex reports no search results, so its web links are only checked to be links.

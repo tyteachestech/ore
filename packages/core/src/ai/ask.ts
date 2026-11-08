@@ -16,7 +16,18 @@ export function queryTerms(text: string): string[] {
   const words = (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => w.length > 1 && !STOP.has(w));
   return [...new Set(words.map(stem))];
 }
-const stem = (w: string) => w.replace(/(?<=\p{L}{3})(ing|ed|es|ly|s)$/u, "");
+/** A word cut to a stem matched as a prefix: "memories" and "memory" become "memor", "studying" and
+ *  "study" "stud", "quizzing" "quiz", "boxes" "box", while "notes" stays "note" (not "not"). */
+export function stem(w: string): string {
+  const cut = w.replace(/(?<=\p{L}{3})(?:ies|ied|ying|ing|ed|ly|y)$/u, "");
+  // A doubled last letter left by -ing or -ed goes back to one (quizz, stopp), except ll and ss (call, miss).
+  if (cut !== w) return cut.replace(/([b-df-hj-km-rt-z])\1$/u, "$1");
+  return w.replace(/(?<=\p{L}{2}(?:s|x|z|ch|sh))es$/u, "").replace(/(?<=\p{L}{3}[^s])s$/u, "");
+}
+
+/** How many passages go to the AI: 14 kept every question's evidence in a 250-source library, where 10
+ *  lost three to sources that repeat the question's words (about 1.5k more input tokens a turn). */
+export const PASSAGES = 14;
 
 export interface Passage { id: string; item: string; title: string; heading: string; text: string; start: number; end: number }
 
@@ -48,7 +59,7 @@ export function splitPassages(body: string): Omit<Passage, "id" | "item" | "titl
 /** The passages most likely to answer the question: up to `max` in all, at most five per source.
  *  `only` searches that one source (no cap per source) or those sources instead of the whole library
  *  (the tutor's "this source", or the sources he @-mentioned). */
-export function retrieve(lib: Library, question: string, max = 10, only?: string | string[]): Passage[] {
+export function retrieve(lib: Library, question: string, max = PASSAGES, only?: string | string[]): Passage[] {
   const terms = queryTerms(question);
   if (!terms.length) return [];
   let ids: string[] = only === undefined ? [] : [only].flat();
@@ -61,20 +72,33 @@ export function retrieve(lib: Library, question: string, max = 10, only?: string
     }
   }
   // Link targets and footnote marks aren't words he reads; the title and heading count half.
-  const words = (s: string) => new Set(s.replace(/\]\([^)]*\)|\[\^\d+\]/g, " ").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
-  const cands: (Passage & { body: Set<string>; around: Set<string>; note: boolean })[] = [];
+  const tokens = (s: string) => s.replace(/\]\([^)]*\)|\[\^\d+\]/g, " ").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  const words = (s: string) => new Set(tokens(s));
+  const cands: (Passage & { body: Set<string>; tf: Map<string, number>; len: number; around: Set<string>; note: boolean })[] = [];
   for (const id of ids) {
     let item;
     try { item = findItem(lib, id); } catch { continue; } // gone since the index was built
-    for (const p of splitPassages(item.body))
-      cands.push({ ...p, id: "", item: item.meta.id, title: item.meta.title, body: words(p.text), around: words(`${item.meta.title} ${p.heading}`), note: p.text.startsWith("[^") });
+    for (const p of splitPassages(item.body)) {
+      const ts = tokens(p.text);
+      const tf = new Map(terms.map((t) => [t, ts.filter((w) => w.startsWith(t)).length]));
+      cands.push({ ...p, id: "", item: item.meta.id, title: item.meta.title, body: new Set(ts), tf, len: ts.length, around: words(`${item.meta.title} ${p.heading}`), note: p.text.startsWith("[^") });
+    }
   }
   const has = (ws: Set<string>, t: string) => [...ws].some((w) => w.startsWith(t));
-  const idf = new Map(terms.map((t) => [t, Math.log(1 + cands.length / (1 + cands.filter((c) => has(c.body, t)).length))]));
+  const idf = new Map(terms.map((t) => [t, Math.log(1 + cands.length / (1 + cands.filter((c) => c.tf.get(t)).length))]));
+  // BM25 over passages: a word said again counts for less each time, and a long passage's matches count
+  // for less than a short one's, so a passage about the question beats a long one that mentions it once.
+  const avg = cands.reduce((s, c) => s + c.len, 0) / (cands.length || 1);
+  const k1 = 1.2;
+  const b = 0.75;
+  const bm25 = (c: (typeof cands)[number], t: string) => {
+    const f = c.tf.get(t)!;
+    return f ? (f * (k1 + 1)) / (f + k1 * (1 - b + (b * c.len) / avg)) : has(c.around, t) ? 0.5 : 0;
+  };
   const scored = cands
     // A footnote (often a reference list entry) counts half.
-    .map((c) => ({ c, score: (c.note ? 0.5 : 1) * terms.reduce((s, t) => s + idf.get(t)! * (has(c.body, t) ? 1 : has(c.around, t) ? 0.5 : 0), 0) }))
-    .filter((x) => x.score > 0 && terms.some((t) => has(x.c.body, t)))
+    .map((c) => ({ c, score: (c.note ? 0.5 : 1) * terms.reduce((s, t) => s + idf.get(t)! * bm25(c, t), 0) }))
+    .filter((x) => x.score > 0 && terms.some((t) => x.c.tf.get(t)))
     .sort((a, b) => b.score - a.score);
   const per = new Map<string, number>();
   const out: Passage[] = [];

@@ -63,6 +63,24 @@ describe("Ask your library: retrieval", () => {
     expect(queryTerms("What happens to a card you get wrong in the Leitner boxes?")).toEqual(["happen", "card", "get", "wrong", "leitner", "box"]);
   });
 
+  test("a stem matches every form of the word: memories and memory, studying and study", () => {
+    expect(queryTerms("memories memory studying study studies")).toEqual(["memor", "stud"]);
+  });
+
+  test("BM25: a short passage about the question beats a long one that mentions its words once, wherever it sits", async () => {
+    const lib = await tempLibrary();
+    const filler = Array.from({ length: 60 }, (_, i) => `Filler sentence ${i} about many other things entirely.`).join(" ");
+    const body = `## History
+
+The Leitner system and many other things. ${filler}
+
+## Origin
+
+The Leitner system was proposed by Sebastian Leitner, who wrote about the Leitner system in the 1970s.`;
+    await createItem(lib, { type: "article", title: "Boxes", body });
+    expect(retrieve(lib, "Who came up with the Leitner system?")[0]!.heading).toBe("Origin");
+  });
+
   test("a source splits into paragraphs under their headings, at their place in doc.md; page markers and bare images are left out", () => {
     const ps = splitPassages(LEITNER);
     expect(ps.map((p) => [p.heading, p.text.slice(0, 20)])).toEqual([["Boxes", "Intro line."], ["The Leitner system", "Cards you answer cor"], ["Sleep", "Consolidation happen"]]);
