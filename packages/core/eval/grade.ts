@@ -1,6 +1,7 @@
 // Grading eval: runs Ore's grader on the golden cards in grade-cases.json with each AI vendor and
 // scores it against the labels. It spends real AI usage, so it runs only by hand: `bun run eval:grade`
 // (never in CI). Flags: --vendor claude|codex (repeatable, default both), --model <id> (with one vendor).
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,6 +19,7 @@ const Case = z.strictObject({
   rubric: z.array(z.string()),
   answer: z.string(),
   label: z.enum(["right", "wrong"]),
+  why: z.string().min(1), // the label's reason, so a disputed label can be argued with
 });
 export type Case = z.infer<typeof Case>;
 
@@ -25,13 +27,27 @@ export function loadCases(path = join(import.meta.dir, "grade-cases.json")): Cas
   return z.object({ cases: z.array(Case) }).parse(JSON.parse(readFileSync(path, "utf8"))).cases;
 }
 
+/** A short fingerprint of the case set, saved with each result: scores from different sets don't compare. */
+export const setId = (cases: unknown[]) => createHash("sha256").update(JSON.stringify(cases)).digest("hex").slice(0, 8);
+
 /** Good or Easy counts as right; Again or Hard as wrong. */
 export const verdict = (rating: number) => (rating >= 3 ? "right" : "wrong");
 
-export interface CaseResult { id: string; level: Case["level"]; label: Case["label"]; rating?: number; got?: "right" | "wrong"; correct: boolean; ms: number; usage?: Usage; error?: string }
-export interface VendorRun { vendor: Vendor; model: string; prompt_version: string; accuracy: number; correct: number; total: number; by_level: Record<string, string>; errors: number; wall_s: number; cost_usd?: number; input_tokens: number; output_tokens: number; cases: CaseResult[] }
+export interface CaseResult { id: string; level: Case["level"]; label: Case["label"]; rating?: number; got?: "right" | "wrong"; correct: boolean; feedback?: string; ms: number; usage?: Usage; error?: string }
+export interface VendorRun { vendor: Vendor; model: string; prompt_version: string; accuracy: number; ci95: [number, number]; correct: number; total: number; false_pass: number; false_fail: number; by_level: Record<string, string>; errors: number; wall_s: number; cost_usd?: number; input_tokens: number; output_tokens: number; cases: CaseResult[] }
 
-/** Scores one vendor's results: an error counts as a miss. */
+/** The 95% Wilson interval for k right out of n: with 20 cases one miss moves accuracy 5 points, so a
+ *  score is only as sharp as this range (20/20 means at least 84%). */
+export function wilson(k: number, n: number, z = 1.96): [number, number] {
+  if (!n) return [0, 1];
+  const p = k / n, d = 1 + (z * z) / n;
+  const mid = (p + (z * z) / (2 * n)) / d, half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d;
+  return [Math.max(0, mid - half), Math.min(1, mid + half)];
+}
+
+/** Scores one vendor's results: an error counts as a miss. A false pass (a wrong answer graded right)
+ *  is the costly miss: the card is scheduled far out while he doesn't know it. A false fail brings it
+ *  back too soon. */
 export function score(vendor: Vendor, model: string, prompt_version: string, cases: CaseResult[], wall_s: number): VendorRun {
   const correct = cases.filter((c) => c.correct).length;
   const by_level: Record<string, string> = {};
@@ -43,7 +59,10 @@ export function score(vendor: Vendor, model: string, prompt_version: string, cas
   const sum = (k: "input_tokens" | "output_tokens") => cases.reduce((n, c) => n + (c.usage?.[k] ?? 0), 0);
   return {
     vendor, model, prompt_version,
-    accuracy: cases.length ? correct / cases.length : 0, correct, total: cases.length, by_level,
+    accuracy: cases.length ? correct / cases.length : 0, ci95: wilson(correct, cases.length), correct, total: cases.length,
+    false_pass: cases.filter((c) => c.label === "wrong" && c.got === "right").length,
+    false_fail: cases.filter((c) => c.label === "right" && c.got === "wrong").length,
+    by_level,
     errors: cases.filter((c) => c.error).length, wall_s,
     ...(costs.length ? { cost_usd: costs.reduce((a, b) => a + b, 0) } : {}),
     input_tokens: sum("input_tokens"), output_tokens: sum("output_tokens"),
@@ -89,7 +108,7 @@ export function runVendor(vendor: Vendor, cases: Case[], model?: string, concurr
         const r = await gradeShown({ root }, { kind: c.kind, question: c.question, model_answer: c.model_answer, rubric: c.rubric }, c.answer);
         stamp = r.ai;
         const got = verdict(r.data.rating);
-        return { ...base, rating: r.data.rating, got, correct: got === c.label, ms: Math.round(performance.now() - start), usage: r.usage };
+        return { ...base, rating: r.data.rating, got, correct: got === c.label, feedback: [...r.data.gaps, r.data.feedback].join(" "), ms: Math.round(performance.now() - start), usage: r.usage };
       } catch (e) {
         return { ...base, correct: false, ms: Math.round(performance.now() - start), error: (e as Error).message };
       }
@@ -108,12 +127,13 @@ export function resultPath(dir: string, now = new Date(), name = "grade"): strin
 }
 
 export const pct = (x: number) => `${Math.round(x * 100)}%`;
+export const range = ([lo, hi]: [number, number]) => `${Math.round(lo * 100)}–${Math.round(hi * 100)}%`;
 export const costText = (r: { cost_usd?: number; input_tokens: number; output_tokens: number }) =>
   r.cost_usd === undefined ? `${r.input_tokens + r.output_tokens} tokens` : `$${r.cost_usd.toFixed(3)}`;
 
 export function table(runs: VendorRun[]): string {
-  return columns(["vendor", "model", "accuracy", "by level", "cost", "time", "errors"], runs.map((r) => [
-    r.vendor, r.model, `${pct(r.accuracy)} (${r.correct}/${r.total})`,
+  return columns(["vendor", "model", "accuracy", "95% CI", "false pass", "false fail", "by level", "cost", "time", "errors"], runs.map((r) => [
+    r.vendor, r.model, `${pct(r.accuracy)} (${r.correct}/${r.total})`, range(r.ci95), String(r.false_pass), String(r.false_fail),
     Object.entries(r.by_level).map(([k, v]) => `${k} ${v}`).join(", "),
     costText(r), `${r.wall_s}s`, String(r.errors),
   ]));
@@ -136,13 +156,17 @@ if (import.meta.main) {
   for (const v of pick) {
     console.error(`Grading ${cases.length} cards with ${v}…`);
     const r = await runVendor(v, cases, args.includes("--model") ? model : undefined);
-    for (const c of r.cases.filter((c) => !c.correct)) console.error(`  miss ${c.id}: labeled ${c.label}, ${c.error ? `error: ${c.error}` : `rated ${c.rating}`}`);
+    // Each miss with the label's reason and the grader's, to read side by side (error analysis).
+    for (const c of r.cases.filter((c) => !c.correct)) {
+      console.error(`  miss ${c.id}: labeled ${c.label}, ${c.error ? `error: ${c.error}` : `rated ${c.rating}`}`);
+      console.error(`    label: ${cases.find((x) => x.id === c.id)!.why}${c.feedback ? `\n    grader: ${c.feedback}` : ""}`);
+    }
     runs.push(r);
   }
   const dir = join(import.meta.dir, "results");
   mkdirSync(dir, { recursive: true });
   const out = resultPath(dir);
-  writeFileSync(out, JSON.stringify({ eval: "grade", date: new Date().toISOString(), cases: cases.length, runs }, null, 2) + "\n");
+  writeFileSync(out, JSON.stringify({ eval: "grade", date: new Date().toISOString(), cases: cases.length, set: setId(cases), runs }, null, 2) + "\n");
   console.log(table(runs));
   console.log(`\nSaved ${out}`);
 }

@@ -3,7 +3,12 @@ import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { codexUsage } from "../src/ai/adapter.ts";
-import { loadCases, resultPath, runVendor, table, verdict } from "../eval/grade.ts";
+import { writeNewCard } from "../src/cards.ts";
+import { addSnippet } from "../src/ingest/index.ts";
+import { recordReview } from "../src/study.ts";
+import { loadCases, resultPath, runVendor, setId, table, verdict, wilson } from "../eval/grade.ts";
+import { disagreements } from "../eval/mine.ts";
+import { tempLibrary } from "./helpers.ts";
 
 // A fake `claude` that rates each answer by a word in it, and reports usage the way `claude -p` does.
 let binDir = "";
@@ -15,7 +20,7 @@ beforeEach(() => {
 const msg = process.argv[process.argv.indexOf("-p") + 1];
 const input = JSON.parse(msg.slice(msg.indexOf("{")));
 if (input.answer === "boom") { console.log(JSON.stringify({ is_error: true, result: "Not logged in" })); process.exit(0); }
-const rating = /Canberra|CO2/.test(input.answer) ? 3 : 1;
+const rating = /Canberra|spread|Sydney/.test(input.answer) ? 3 : 1;
 console.log(JSON.stringify({ is_error: false, structured_output: { rating, gaps: [], feedback: "ok", covered: input.rubric.map(() => true) },
   total_cost_usd: 0.002, usage: { input_tokens: 100, cache_read_input_tokens: 50, output_tokens: 20 }, modelUsage: { "claude-fake-1": { outputTokens: 20 } } }));
 `);
@@ -24,12 +29,17 @@ console.log(JSON.stringify({ is_error: false, structured_output: { rating, gaps:
 afterEach(() => { process.env.PATH = savedPath; });
 
 describe("grading eval", () => {
-  test("the golden set is 20 labeled cards: half right, half wrong, every level, unique ids", () => {
+  test("the golden set is 20 labeled cards with reasons: half right, half wrong, every level, unique ids", () => {
     const cases = loadCases();
     expect(cases).toHaveLength(20);
     expect(new Set(cases.map((c) => c.id)).size).toBe(20);
     expect(cases.filter((c) => c.label === "right")).toHaveLength(10);
-    for (const lvl of ["easy", "partial", "tricky"]) expect(cases.filter((c) => c.level === lvl).length).toBeGreaterThanOrEqual(5);
+    for (const lvl of ["easy", "partial", "tricky"]) expect(cases.filter((c) => c.level === lvl).length).toBeGreaterThanOrEqual(4);
+    for (const lvl of ["partial", "tricky"]) { // the hard levels test both ways of failing
+      expect(cases.some((c) => c.level === lvl && c.label === "right")).toBe(true);
+      expect(cases.some((c) => c.level === lvl && c.label === "wrong")).toBe(true);
+    }
+    expect(setId(cases)).toMatch(/^[0-9a-f]{8}$/);
     for (const c of cases) if (c.kind === "prompt") expect(c.rubric.length).toBeGreaterThan(0);
   });
 
@@ -38,21 +48,46 @@ describe("grading eval", () => {
   });
 
   test("runs the real grader on each card and scores it, with cost, tokens and time; a failed run is a miss", async () => {
-    const cases = loadCases().filter((c) => c.level === "easy").slice(0, 4); // Canberra, Sydney, no idea, CO2
+    const cases = loadCases().filter((c) => c.level === "easy"); // Canberra, Sydney, no idea, spread out
+    expect(cases.map((c) => c.answer.split(" ")[0])).toEqual(["Canberra", "Sydney", "no", "If"]);
     cases.push({ ...cases[0]!, id: "fails", answer: "boom" });
     const r = await runVendor("claude", cases);
     expect(r.model).toBe("claude-fake-1");
     expect(r.prompt_version).toBe("grade@2");
     expect(r.cases.map((c) => [c.id, c.got, c.correct])).toEqual([
-      ["easy-capital", "right", true], ["easy-capital-wrong", "wrong", true], ["easy-blank", "wrong", true], ["easy-photosynthesis", "right", true], ["fails", undefined, false],
+      ["easy-capital", "right", true], ["easy-capital-wrong", "right", false], ["easy-blank", "wrong", true], ["easy-spacing", "right", true], ["fails", undefined, false],
     ]);
     expect(r.cases[4]!.error).toContain("Not logged in");
-    expect([r.correct, r.total, r.accuracy, r.errors]).toEqual([4, 5, 0.8, 1]);
-    expect(r.by_level).toEqual({ easy: "4/5" });
+    expect(r.cases[0]!.feedback).toBe("ok"); // kept for reading the misses
+    expect([r.correct, r.total, r.accuracy, r.errors]).toEqual([3, 5, 0.6, 1]);
+    // Sydney graded right is a false pass; the failed run is an error, not a false fail.
+    expect([r.false_pass, r.false_fail]).toEqual([1, 0]);
+    expect(r.by_level).toEqual({ easy: "3/5" });
     expect(r.cost_usd).toBeCloseTo(0.008);
     expect([r.input_tokens, r.output_tokens]).toEqual([600, 80]);
     expect(process.env.ORE_AI).toBeUndefined(); // the vendor pick doesn't leak out of the run
-    expect(table([r])).toContain("80% (4/5)");
+    expect(table([r])).toContain("60% (3/5)");
+    expect(table([r])).toContain("23–88%");
+  });
+
+  test("accuracy carries its 95% Wilson interval: 20/20 is only known to be at least 84%", () => {
+    expect(wilson(20, 20).map((x) => Math.round(x * 100))).toEqual([84, 100]);
+    expect(wilson(18, 20).map((x) => Math.round(x * 100))).toEqual([70, 97]);
+    expect(wilson(0, 0)).toEqual([0, 1]);
+  });
+
+  test("eval:mine turns real reviews where Tyler overrode the grader across the line into labeled candidates", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval practice strengthens memory." });
+    const card = writeNewCard(lib, { kind: "prompt", item: item.meta.id, skills: ["learning"], topics: [], content_type: "concept", question: "Why does testing help?", answer: "Retrieval strengthens memory.", rubric: ["Retrieval strengthens memory"] });
+    const at = (d: number) => new Date(Date.parse("2026-11-01T12:00:00Z") + d * 864e5);
+    await recordReview(lib, card.meta.id, { rating: 3, ai_rating: 2, confidence: 2, answer: "pulling it out makes it stick", now: at(1) }); // disagree: he passed it
+    await recordReview(lib, card.meta.id, { rating: 4, ai_rating: 3, confidence: 3, answer: "it strengthens memory", now: at(5) }); // same side
+    await recordReview(lib, card.meta.id, { rating: 1, ai_rating: 4, confidence: 1, now: at(9) }); // no typed answer
+    const found = disagreements(lib);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ kind: "prompt", question: "Why does testing help?", rubric: ["Retrieval strengthens memory"], answer: "pulling it out makes it stick", label: "right", level: "tricky" });
+    expect(found[0]!.why).toContain("the grader proposed 2, Tyler recorded 3");
   });
 
   test("codex usage is summed from its turn.completed events", () => {
