@@ -339,6 +339,18 @@ journey("⌘K ↵ on Home starts review, never flips a display setting", async (
   await page.getByRole("dialog", { name: "What to review" }).or(page.locator(".review")).first().waitFor();
 });
 
+journey("⌘K → All sources from Home puts focus on the list, so ↓ and ↵ work at once (as Feed and a skill page do)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("All sources");
+  await page.locator("[cmdk-item]").filter({ hasText: /^All sources/ }).first().waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator("main [role=listbox]").waitFor();
+  await until("the list has focus", () => page.evaluate(() => !!document.activeElement?.closest("main [role=listbox]")));
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head").waitFor();
+});
+
 journey("highlight popup open: typing writes the note, and no letter runs a shortcut (L, O, C, Q, N)", async (page) => {
   await openSource(page, TESTING);
   await select(page, "Each successful retrieval changes the memory itself");
