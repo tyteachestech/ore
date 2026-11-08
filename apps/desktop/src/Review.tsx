@@ -110,6 +110,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   /** This window's session, named by id in every call: the main window and the quick quiz can each have
    *  one open (D76), and the last one started is not always this one. `open`: not ended yet. */
   const session = useRef<{ id: string; open: boolean } | null>(null);
+  /** Settles once this showing's `session start` has: a rating waits for it, so it never goes in unnamed. */
+  const sessionReady = useRef<Promise<unknown>>(Promise.resolve());
   /** False once Review has closed: ⌘Z and ⇧⌘Z on a rating from it then only change the log. */
   const mounted = useRef(false);
   /** Active time in this session, to end it when today's goal closes (D65). */
@@ -142,7 +144,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     let live = true;
     void (async () => {
       try {
-        const s = await ore<{ id: string }>("session", "start");
+        const started = ore<{ id: string }>("session", "start");
+        sessionReady.current = started.catch(() => {});
+        const s = await started;
         // Closed before the session began: it ends at once, as leaving would have ended it.
         if (!live) return void ore("session", "end", s.id).catch(() => {});
         session.current = { id: s.id, open: true };
@@ -435,6 +439,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     let goalClosed = false;
     try {
       const elapsed = Date.now() - shownAt.current;
+      await sessionReady.current;
       const args = [
         card.id,
         opt("rating", String(rating)),
