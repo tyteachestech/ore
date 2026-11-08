@@ -50,9 +50,9 @@ export const studyCommands: Record<string, Command> = {
       if (sub === "show") {
         const c = findCard(lib, id);
         const v = f.review ? reviewVersion(lib, c) : f.variant ? findVariant(lib, c.meta.id, str(f.variant)!) : null;
-        if (v) return { data: variantJson(lib, c, v), text: `${relative(lib.root, c.path)} · variant ${v.id} (${v.type})\n\n${v.question}\n---\n${v.answer}\n${v.rubric.map((p) => `- ${p}`).join("\n")}` };
+        if (v) return { data: { ...variantJson(lib, c, v), ...(f.review ? { history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)} · variant ${v.id} (${v.type})\n\n${v.question}\n---\n${v.answer}\n${v.rubric.map((p) => `- ${p}`).join("\n")}` };
         // in_head_ok: review may offer "In my head" on this Explain card (D68); history: its reviews and
-        // where each rating puts the next (D147).
+        // where each rating puts the next (D149).
         return { data: { ...cardJson(lib, c), ...(f.review ? { in_head_ok: inHeadOk(lib, c), history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)}\n\n${readFileSync(c.path, "utf8")}` };
       }
       if (sub === "edit") {

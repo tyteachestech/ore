@@ -2652,7 +2652,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .preview-font[data-font="charter"] { font-family: var(--font-serif); }
 .preview-font[data-font="geist"] { font-family: "Geist", var(--font); }
 
-/* Reading pill (D152, phone): where he is in the source, at the top of the page. 28px pill: a 16px ring that
+/* Reading pill (D152, phone): where he is in the source, at the foot of the page. 28px pill: a 16px ring that
    fills as he reads and the section's name; a tap opens the sections as a bottom sheet. */
 .read-pill { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%; transform: translateX(-50%); z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: 70%; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
 .read-pill:disabled { padding-right: 6px; }

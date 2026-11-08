@@ -163,7 +163,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
     </button>
   );
   if (lite) return button;
-  if (PHONE) return <ActionSheet label={label} actions={actions} className={className} icon={icon} onOpenChange={onOpenChange} />;
+  if (PHONE) return <ActionSheet label={label} actions={actions} className={className} icon={icon} open={open} onOpenChange={onOpenChange} onPointerDown={onPointerDown} keepFocus={keepFocus} />;
   return (
     <DropdownMenu.Root modal={false} open={open} onOpenChange={onOpenChange}>
       <Hint text={hint}>
@@ -220,8 +220,12 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
  *  action sheets): the actions as 44pt rows, and a submenu ("Skills") swaps into the same sheet behind a
  *  back row, the sheet's height easing between the two, instead of a menu over a menu. Shortcuts stay off
  *  it. A pick closes the sheet and runs; a `keep` tick stays. Swipe down, a tap outside or Esc closes it. */
-function ActionSheet({ label, actions, className, icon, onOpenChange }: { label: string; actions: Actions; className: string; icon?: ReactNode; onOpenChange?: (open: boolean) => void }) {
-  const [open, setOpen] = useState(false);
+function ActionSheet({ label, actions, className, icon, open: controlled, onOpenChange, onPointerDown, keepFocus }: { label: string; actions: Actions; className: string; icon?: ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void; onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void; keepFocus?: boolean }) {
+  const [own, setOwn] = useState(false);
+  const open = controlled ?? own;
+  // The press that opens it keeps focus where it is (a note's text under the keyboard bar), as Radix's
+  // trigger does; an owner that preventDefault()s the press keeps it from opening (the drag handle).
+  const held = useRef(false);
   const [stepId, setStepId] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -229,10 +233,10 @@ function ActionSheet({ label, actions, className, icon, onOpenChange }: { label:
   const back = useRef<HTMLElement | null>(null);
   const show = (on: boolean) => {
     if (on) back.current = document.activeElement as HTMLElement | null;
-    setOpen(on);
+    setOwn(on);
     if (!on) {
       setStepId(null);
-      back.current?.focus?.();
+      if (!keepFocus) back.current?.focus?.();
     }
     onOpenChange?.(on);
   };
@@ -256,7 +260,7 @@ function ActionSheet({ label, actions, className, icon, onOpenChange }: { label:
   };
   return (
     <>
-      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={(e) => (e.stopPropagation(), show(true))} onPointerDown={(e) => e.stopPropagation()}>
+      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; e.preventDefault(); e.stopPropagation(); }}>
         {icon ?? <DotsThree size={16} aria-hidden="true" />}
       </button>
       {open && (
@@ -274,7 +278,7 @@ function ActionSheet({ label, actions, className, icon, onOpenChange }: { label:
                   {rows.map((a) => (
                     <Fragment key={a.id}>
                       {a.divider && !step && <div className="sheet-sep" role="separator" />}
-                      <button className={`pick-row${a.danger ? " danger" : ""}`} role={a.checked === undefined ? undefined : "menuitemcheckbox"} aria-checked={a.checked} onClick={() => pick(a)}>
+                      <button className={`pick-row${a.danger ? " danger" : ""}`} role={a.checked === undefined ? undefined : "checkbox"} aria-checked={a.checked} onClick={() => pick(a)}>
                         {step && <span className="menu-tick">{a.checked && <Check size={12} weight="bold" />}</span>}
                         {a.icon}
                         <span className="name">{a.label}</span>

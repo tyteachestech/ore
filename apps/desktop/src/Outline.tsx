@@ -157,7 +157,7 @@ export function Position(place: Place) {
 }
 
 /** The phone's reading pill (D152; Rare UI's scroll progress): where the rail doesn't fit, a small pill at
- *  the top of the page with a ring that fills as he reads and the name of the section he is in. A tap
+ *  the foot of the page with a ring that fills as he reads and the name of the section he is in. A tap
  *  opens the sections as a bottom sheet; one jumps there; swipe down, a tap outside or Esc closes it.
  *  The name crossfades when the section changes; nothing moves under reduced motion. */
 export function ReadingPill(place: Place) {
@@ -172,6 +172,7 @@ export function ReadingPill(place: Place) {
   }, [open]);
   const name = headings[current]?.title ?? (headings.length ? doc?.querySelector("h1")?.textContent?.trim() ?? "" : "");
   const r = 6, c = 2 * Math.PI * r;
+  const top = Math.min(...headings.map((x) => x.level));
   return (
     <>
       <button className="read-pill" aria-label={`${name ? `In ${name}. ` : ""}Sections`} aria-haspopup={headings.length > 1 ? "dialog" : undefined} aria-expanded={headings.length > 1 ? open : undefined} disabled={headings.length < 2} onClick={() => setOpen(true)}>
@@ -188,7 +189,7 @@ export function ReadingPill(place: Place) {
               <h2>Sections</h2>
               <div className="pick-list">
                 {headings.map((h, i) => (
-                  <button key={i} className={`pick-row${i === current ? " on" : ""}`} aria-current={i === current ? "location" : undefined} style={{ paddingLeft: 12 + (h.level - Math.min(...headings.map((x) => x.level))) * 14 }} onClick={() => { close(); jumpTo(scroll, h, onJump); }}>
+                  <button key={i} className={`pick-row${i === current ? " on" : ""}`} aria-current={i === current ? "location" : undefined} style={{ paddingLeft: 12 + (h.level - top) * 14 }} onClick={() => { close(); jumpTo(scroll, h, onJump); }}>
                     <span className="name">{h.title}</span>
                   </button>
                 ))}

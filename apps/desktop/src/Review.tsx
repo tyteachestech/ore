@@ -230,6 +230,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setPassage(null);
     setPassageGone(null);
     setAsking(false);
+    setPreview(undefined);
   };
 
   /** The next card, loaded while he answers this one, so a rating moves on without waiting for it. Only
