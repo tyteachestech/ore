@@ -1,5 +1,5 @@
-# Every PR and every push to master: typecheck, all tests, the desktop build, the end-to-end journeys, and the
-# speed benchmark against its baseline (a step 1.5× slower fails).
+# Every PR and every push to master: typecheck, all tests, the desktop build, and the end-to-end journeys.
+# The speed benchmark is bench.yml.
 name: test
 on:
   pull_request:
@@ -38,15 +38,3 @@ jobs:
         with:
           name: e2e-screenshots
           path: /tmp/ore-e2e-*.png
-  bench:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
-      - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps chromium
-      # The compiled CLI, as the installed app runs it (D30); the baseline was recorded on this runner type.
-      - run: bun run bench --compiled --check apps/desktop/scripts/bench-baseline.json

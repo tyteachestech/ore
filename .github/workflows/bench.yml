@@ -1,0 +1,29 @@
+# The speed benchmark against its baseline (bun run bench --check): a step 1.5× slower fails. Only for changes
+# that can make the app slower: docs and evals skip it.
+name: bench
+on:
+  pull_request:
+    paths: [apps/desktop/**, packages/**, package.json, bun.lock, tsconfig.json, .github/workflows/bench.yml]
+  push:
+    branches: [master]
+    paths: [apps/desktop/**, packages/**, package.json, bun.lock, tsconfig.json, .github/workflows/bench.yml]
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+      # The compiled CLI, as the installed app runs it (D30); the baseline was recorded on this runner type.
+      # A shared runner busy with other jobs can slow one pass, so a slow step fails only when a second pass
+      # is slow too: a real regression is slow both times.
+      - run: |
+          bun run bench --compiled --check apps/desktop/scripts/bench-baseline.json ||
+            { echo "::warning::slow on the first pass; running it again"; bun run bench --compiled --no-build --check apps/desktop/scripts/bench-baseline.json; }
