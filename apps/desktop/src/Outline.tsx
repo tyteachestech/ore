@@ -95,6 +95,9 @@ export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTM
     el.focus({ preventScroll: true });
   };
 
+  // The Tab stop follows the arrows while he is in the outline; a jump or scroll hands it back to the heading he is in.
+  const [stop, setStop] = useState<number | null>(null);
+  useEffect(() => setStop(null), [current]);
   const onKey = (e: ReactKeyboardEvent) => {
     const all = [...(panel.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
     const at = all.indexOf(document.activeElement as HTMLButtonElement);
@@ -117,7 +120,7 @@ export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTM
         </div>
       )}
       {headings.length > 1 && (
-        <nav className="outline" aria-label="Outline" onMouseEnter={reveal} onFocus={reveal}>
+        <nav className="outline" aria-label="Outline" onMouseEnter={reveal} onFocus={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && reveal()}>
           <div className="outline-lines" ref={lines} aria-hidden="true" style={{ "--n": headings.length } as CSSProperties}>
             {headings.map((h, i) => (
               <span key={i} className={i === current ? "on" : i < current ? "past" : undefined} style={{ width: 16 - (h.level - top) * 4 }} />
@@ -128,7 +131,7 @@ export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTM
               (a macOS sidebar's outline). Tab onto it opens it, as hovering does. */}
           <div className="outline-panel" ref={panel} onKeyDown={onKey}>
             {headings.map((h, i) => (
-              <button key={i} className={i === current ? "on" : undefined} tabIndex={i === Math.max(0, current) ? 0 : -1} style={{ paddingLeft: 10 + (h.level - top) * 12 }} onClick={() => jump(h)}>
+              <button key={i} className={i === current ? "on" : undefined} tabIndex={i === (stop ?? Math.max(0, current)) ? 0 : -1} onFocus={() => setStop(i)} style={{ paddingLeft: 10 + (h.level - top) * 12 }} onClick={() => jump(h)}>
                 {h.title}
               </button>
             ))}

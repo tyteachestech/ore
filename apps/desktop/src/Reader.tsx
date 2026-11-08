@@ -303,7 +303,6 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [renaming, setRenaming] = useState(false);
   const [authoring, setAuthoring] = useState(false);
   const authorRef = useRef<HTMLButtonElement>(null);
-  useFocusBack(authoring, authorRef);
   const askedRename = useRef(p.renameSource);
   useEffect(() => {
     if (p.renameSource !== askedRename.current) setRenaming(true);
@@ -330,6 +329,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [reveal, setReveal] = useState<Reveal>(null);
   const hidden = (closedBook && !reveal) || hideSource;
   const scrollRef = useRef<HTMLDivElement>(null);
+  useFocusBack(authoring, authorRef, scrollRef);
   const readerRef = useRef<HTMLDivElement>(null);
   /** ⌘F: open with the bump that refocuses it; the query stays for the next ⌘F, as in Safari. `note`:
    *  opened by ⌘K on a match in the source note, so it searches only there. */

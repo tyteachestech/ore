@@ -65,8 +65,9 @@ if (typeof window !== "undefined") {
 /** When an in-place editor (the author, a skill's goal, a new question) closes from the keyboard,
  *  Enter or Esc, focus goes back to the button that opened it, so the next Tab carries on from there
  *  rather than from the top of the window. The button and the field often swap, so `ref` points at
- *  the button rendered after it closes. A click away leaves focus where the click put it. */
-export function useFocusBack(editing: boolean, ref: RefObject<HTMLElement | null>): void {
+ *  the button rendered after it closes; `fallback` takes it when that button is gone (an author just
+ *  cleared). A click away leaves focus where the click put it. */
+export function useFocusBack(editing: boolean, ref: RefObject<HTMLElement | null>, fallback?: RefObject<HTMLElement | null>): void {
   const was = useRef(editing);
   useEffect(() => {
     const closed = was.current && !editing && byKeys;
@@ -74,10 +75,10 @@ export function useFocusBack(editing: boolean, ref: RefObject<HTMLElement | null
     if (!closed) return;
     // After the key's own events: a button focused during Enter's keydown would take its keypress as a click and open the field again.
     const t = setTimeout(() => {
-      if (!document.activeElement || document.activeElement === document.body) ref.current?.focus({ preventScroll: true });
+      if (!document.activeElement || document.activeElement === document.body) (ref.current ?? fallback?.current)?.focus({ preventScroll: true });
     });
     return () => clearTimeout(t);
-  }, [editing, ref]);
+  }, [editing, ref, fallback]);
 }
 
 const writing = new Map<string, Promise<unknown>>();

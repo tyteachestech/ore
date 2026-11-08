@@ -172,7 +172,7 @@ export function useToast() {
   });
 
   // Always mounted, even empty, so VoiceOver reads each toast as it comes: a live region that appears with its words often
-  // stays silent. An error is an alert of its own.
+  // stays silent. An error is an alert: the nearest live region decides, so it is read once, at once.
   const view = (
     <div
       ref={box}

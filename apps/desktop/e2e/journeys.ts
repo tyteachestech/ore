@@ -3586,6 +3586,9 @@ journey("outline: Tab after the source's head opens it on the current heading, �
   await until("the outline shows", async () => (await page.locator(".outline-panel").evaluate((el) => getComputedStyle(el).opacity)) === "1");
   await page.keyboard.press("ArrowDown");
   await until("↓ moves to the next heading", async () => (await focused()) === "Patterns");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab");
+  await until("⇧Tab back comes to the heading the arrows left it on", async () => (await focused()) === "Patterns");
   const before = await page.locator(".reader-scroll").evaluate((el) => el.scrollTop);
   await page.keyboard.press("Enter");
   await until("Enter jumps there and hands the text the focus", () => page.locator(".reader-scroll").evaluate((el, before) => el === document.activeElement && el.scrollTop > before, before));
