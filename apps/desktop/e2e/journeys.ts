@@ -3103,6 +3103,22 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   }, AGENTS);
 });
 
+journey("ore down at launch: Home's Try again brings back the skills and the sources too", async (page) => {
+  const skillRows = page.locator(".side-item:not(.side-main)");
+  await skillRows.first().waitFor();
+  const skills = await skillRows.count();
+  await page.addInitScript(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { ls: "The `ore` command isn’t installed.", skills: "The `ore` command isn’t installed.", today: "The `ore` command isn’t installed." }));
+  await page.reload();
+  const retry = page.locator(".home-today").getByRole("button", { name: "Try again" });
+  await retry.waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await retry.click();
+  await page.locator(".home-goal").waitFor();
+  await until("the sidebar lists the skills again", async () => (await skillRows.count()) === skills);
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".row").filter({ hasText: TESTING }).first().waitFor();
+});
+
 journey("finish: drafting that fails after Done stays in front of “Finished” until he acts on it", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# Drafting that fails\n\nA short page whose cards can't be drafted, because the AI is down.");

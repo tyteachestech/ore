@@ -20,7 +20,7 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 /** Home (D58): today's goal and what is due, the sources he is reading, and each skill's
  *  strength. Apple Fitness for the ring; Start review asks what to review (D80). */
-export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, skillMenu, notify }: {
+export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, skillMenu, onRetry, notify }: {
   items: Item[];
   /** The library has no sources yet (loaded, not loading): Home says how to add the first. */
   empty?: boolean;
@@ -44,6 +44,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   /** Saves a source's title, typed in place on its row from Rename…. */
   onRename?: (item: Item, title: string) => void;
   skillMenu?: (skill: Skill) => MenuAction[];
+  /** Try again also reloads what failed with today's numbers: the sources and the skills. */
+  onRetry?: () => void;
   notify: Notify;
 }) {
   const keys = useKeymap();
@@ -144,7 +146,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
           <div role="alert">
             <p className="err">{error}</p>
             {/* The first screen: once he fixes what it names (the `ore` command, Bun), it comes back without a relaunch. */}
-            <button className="pill-btn" onClick={refresh}>
+            <button className="pill-btn" onClick={() => (refresh(), onRetry?.())}>
               Try again
             </button>
           </div>

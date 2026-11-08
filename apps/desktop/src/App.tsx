@@ -314,10 +314,12 @@ export function App() {
     );
   }, [notify]);
 
-  useEffect(() => {
+  /** Loads the sources and the skills, at launch and on a Try again after `ore` failed. */
+  const reload = useCallback(() => {
     void refresh();
     reloadSkills();
   }, [refresh, reloadSkills]);
+  useEffect(reload, [reload]);
 
   useEffect(() => save("ore.view", JSON.stringify({ status, skill })), [status, skill]);
 
@@ -1860,7 +1862,7 @@ export function App() {
         <div className="empty-state err" role="alert">
           <p>{listError}</p>
           {/* After he fixes it in Terminal, the list comes back without a relaunch. */}
-          <button className="pill-btn" onClick={() => void refresh()}>
+          <button className="pill-btn" onClick={reload}>
             Try again
           </button>
         </div>
@@ -2126,6 +2128,7 @@ export function App() {
             sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => ({ ...a, hint: undefined }))}
             onRename={(i, t) => void retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
+            onRetry={reload}
             notify={notify}
           />
         ) : onFeed ? (
