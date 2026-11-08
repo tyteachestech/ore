@@ -19,6 +19,7 @@ import { Settings, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
+import { OnScreen } from "./Lite";
 import { citeSources, copyCited } from "./cite";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Boundary } from "./Boundary";
@@ -1660,12 +1661,14 @@ export function App() {
     const sel = picked.includes(r.id);
     const dragged = rowDrag?.many ? rowDrag.many.some((i) => i.id === r.id) : rowDrag?.item.id === r.id && !rowDrag.course;
     const pickN = sel ? many.length : 0;
+    // Off screen, a row's menus and hints wait until it scrolls in (Lite.tsx): a long list opens at once.
     return (
-      <Same
-        key={r.id}
-        deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, pickFor === r.id, skills, skill, onSkillPage, details, mayAnswer.get(r.id)]}
-        render={() => rowView(r, lesson, snip, on, sel, pickN, dragged)}
-      />
+      <OnScreen key={r.id} id={`row-${r.id}`} full={on || renamingRow === r.id || pickFor === r.id}>
+        <Same
+          deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, pickFor === r.id, skills, skill, onSkillPage, details, mayAnswer.get(r.id)]}
+          render={() => rowView(r, lesson, snip, on, sel, pickN, dragged)}
+        />
+      </OnScreen>
     );
   };
   const rowView = (r: Item, lesson: boolean, snip: string | undefined, on: boolean, sel: boolean, pickN: number, dragged: boolean) => {

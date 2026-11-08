@@ -3,6 +3,7 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Fragment, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
+import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
 
 // After the menu closes and hands focus back to its trigger, so a dialog the action opens keeps focus.
@@ -49,7 +50,8 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
   // Right-click in a field or on selected text inside the object gets the Mac's own text menu
   // (Copy, Paste, Look Up), not the object's: decided on the press, before the menu event.
   const [native, setNative] = useState(false);
-  if (Array.isArray(actions) && !actions.length) return children; // no menu to open (the phone's title)
+  // A row not on screen yet can't be right-clicked; its menu comes with it when it scrolls in.
+  if (useLite() || (Array.isArray(actions) && !actions.length)) return children; // or no menu to open (the phone's title)
   return (
     <ContextMenu.Root onOpenChange={(open) => open && (opened.current = performance.now())}>
       <ContextMenu.Trigger asChild disabled={native} onPointerDownCapture={(e) => setNative(nativeMenu(e.target, getSelection()))}>
@@ -119,14 +121,18 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   /** Focus stays where the action put it (the note's text), not back on the button. */
   keepFocus?: boolean;
 }) {
+  // Off screen in a long list (Lite.tsx): the same button as the trigger renders, its menu and hint once it scrolls in.
+  const lite = useLite() && !open;
+  const button = (
+    <button {...(lite && { type: "button", "aria-haspopup": "menu", "aria-expanded": false })} className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => (onPointerDown?.(e), e.stopPropagation())}>
+      {icon ?? <DotsThree size={16} aria-hidden="true" />}
+    </button>
+  );
+  if (lite) return button;
   return (
     <DropdownMenu.Root modal={false} open={open} onOpenChange={onOpenChange}>
       <Hint text={hint}>
-        <DropdownMenu.Trigger asChild>
-          <button className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => (onPointerDown?.(e), e.stopPropagation())}>
-            {icon ?? <DotsThree size={16} aria-hidden="true" />}
-          </button>
-        </DropdownMenu.Trigger>
+        <DropdownMenu.Trigger asChild>{button}</DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => keepFocus && e.preventDefault()} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>

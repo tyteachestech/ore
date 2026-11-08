@@ -1,5 +1,6 @@
 // Seeds a "matured" scratch library: a year of use, ~240 sources over 14 skills, months of reviews.
 // For seeing where views break at scale: bun seed-big.ts <root>
+// ORE_SEED_SCALE=4 multiplies the sources (and so highlights, cards, reviews) and adds a ~1.5 MB book (bench.ts).
 // All text is generated here (no copyrighted full texts); titles read like real ones so rows have real lengths.
 import { addMess } from "./mess.ts";
 import { writeFileSync } from "node:fs";
@@ -97,6 +98,7 @@ const body = (title: string, topic: string, n: number) => {
 };
 
 const ids = Object.keys(TOPICS);
+const SCALE = Number(process.env.ORE_SEED_SCALE ?? 1);
 // Uneven weights: a few skills carry most of the library, as in real use.
 const WEIGHT: Record<string, number> = { ai: 40, learning: 38, teaching: 22, "creator-business": 20, "storytelling-writing": 16, creativity: 8, "distributed-systems": 18, habits: 10, "focus-attention": 9, "self-regulation-motivation": 6, spanish: 22, piano: 10, "personal-finance": 12, stoicism: 7 };
 const seen = new Set<string>();
@@ -104,10 +106,10 @@ const made: { id: string; skills: string[]; status: string; topic: string; body:
 const AUTHORS = ["Ana Ruiz", "J. Chen", "Maya Patel", "Sam Okafor", "Lena Fischer", "", ""];
 
 for (const skill of ids)
-  for (let k = 0; k < WEIGHT[skill]!; k++) {
+  for (let k = 0; k < WEIGHT[skill]! * SCALE; k++) {
     const topic = pick(TOPICS[skill]!);
     let title = pick(FRAMES)(topic);
-    if (seen.has(title)) title = `${title} (part ${k})`;
+    for (let n = k; seen.has(title); n += ids.length) title = `${title.replace(/ \(part \d+\)$/, "")} (part ${n})`;
     seen.add(title);
     const type = typeOf();
     // 1 in 6 also goes under a second skill; 1 in 25 has no skill (All sources only).
@@ -149,6 +151,24 @@ for (const skill of ids)
       if (rnd() < 0.3) writeFileSync(join(item.dir, "notes.md"), `## Big idea\n\n${pick(SENT)(topic)}\n\n- ${pick(SENT)(topic)}\n`);
     }
   }
+
+// A long book at scale: ~1.5 MB of text under 40 chapters, read halfway, with 200 highlights.
+if (SCALE > 1) {
+  const title = "The Complete Book of Learning: Memory, Practice and Mastery";
+  const chapters = Array.from({ length: 40 }, (_, c) => `## Chapter ${c + 1}\n\n${body(`Part ${c + 1}`, pick(TOPICS.learning!), 60).replace(/^# .*\n\n/, "").replace(/^## /gm, "### ")}`);
+  const text = `# ${title}\n\n${chapters.join("\n\n")}\n`;
+  const item = await createItem(lib, { type: "epub", title, body: text, skills: ["learning"], author: "Ana Ruiz" });
+  await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, captured_at: ago(20), status: "reading" }));
+  const live = { ...item, body: text };
+  const sentences = [...new Set(text.split("\n").filter((l) => l && !l.startsWith("#")).flatMap((p) => p.split(/(?<=\.) /)))];
+  // Spread over the first half, each a whole sentence found from its own place on.
+  for (let h = 0; h < 200; h++) {
+    const exact = sentences[Math.floor(rnd() * sentences.length)]!;
+    const at = text.indexOf(exact, Math.floor((h / 200) * text.length * 0.5));
+    if (at >= 0) addHighlight(live, { exact, intent: pick(["keep", "keep", "card", "question"]), start: at, note: rnd() < 0.2 ? "Does this hold for kids?" : undefined });
+  }
+  made.push({ id: item.meta.id, skills: ["learning"], status: "reading", topic: "Spaced repetition", body: text, captured: 20 });
+}
 
 // Cards on finished and started sources; reviews replayed in time order over the months since.
 const reviews: { at: number; card: string; rating: 1 | 2 | 3 | 4 }[] = [];
