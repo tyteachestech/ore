@@ -18,6 +18,9 @@ const day = () => new Date().toLocaleDateString("sv-SE");
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
+/** The Continue reading row a source was opened from: back on Home (Esc from the reader), focus returns to it. */
+let openedFrom: string | null = null;
+
 /** Home (D58): today's goal and what is due, the sources he is reading, and each skill's
  *  strength. Apple Fitness for the ring; Start review asks what to review (D80). */
 export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, skillMenu, onRetry, notify }: {
@@ -67,6 +70,17 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
     );
   }, []);
   useEffect(refresh, [refresh, reload]);
+
+  const openRow = (id: string) => {
+    openedFrom = id;
+    onOpenSource(id);
+  };
+  // Only when focus was dropped with the reader: a click elsewhere (the sidebar's Home) keeps its own.
+  useEffect(() => {
+    const id = openedFrom;
+    openedFrom = null;
+    if (id && (!document.activeElement || document.activeElement === document.body)) document.querySelector<HTMLElement>(`.home-read[data-id="${id}"]`)?.focus();
+  }, []);
 
   const [picking, setPicking] = useState(false);
   /** Start review shows once the skill list has loaded too: a click before it would start every skill unasked. */
@@ -232,7 +246,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
               return (
                 // A row that opens on click, holding the skill picker's own button, so not a <button> itself.
                 <WithMenu key={i.id} actions={sourceMenu ? () => withRename(sourceMenu(i), i) : []}>
-                <div className="home-read" role="button" tabIndex={0} onClick={() => onOpenSource(i.id)} onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpenSource(i.id))}>
+                <div className="home-read" data-id={i.id} role="button" tabIndex={0} onClick={() => openRow(i.id)} onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openRow(i.id))}>
                   <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
                     <input

@@ -3132,6 +3132,23 @@ journey("finish again: the recall box holds the last recall with the caret at it
   if (note.trim() !== "## Recall\n\nFIRST recall text. SECOND.") throw new Error(`the note is ${JSON.stringify(note)}`);
 });
 
+journey("focus comes back to what opened it: the tutor's ✦ after Esc, and a Continue reading row after Esc from its source", async (page) => {
+  const on = (sel: string) => page.evaluate((sel) => !!document.activeElement?.matches(sel), sel);
+  await page.locator(".tutor-bubble").focus();
+  await page.keyboard.press("Enter");
+  await page.locator(".tutor textarea, .tutor [contenteditable=true]").first().waitFor();
+  await page.keyboard.press("Escape");
+  await until("focus is back on the ✦", () => on(".tutor-bubble"));
+  const row = page.locator(".home-read").first();
+  await row.focus();
+  const title = (await row.innerText()).split("\n")[0]!;
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".home-read").first().waitFor();
+  await until(`focus is back on “${title}”`, async () => (await on(".home-read")) && (await page.evaluate(() => (document.activeElement as HTMLElement).innerText.split("\n")[0])) === title);
+});
+
 journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
   const plus = page.getByRole("button", { name: "New skill", exact: true });
   await plus.hover();

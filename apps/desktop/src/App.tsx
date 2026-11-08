@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from "react";
+import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
@@ -247,8 +248,10 @@ export function App() {
     setTutorOpen(true);
   };
   const closeTutor = () => {
-    setTutorOpen(false);
-    tutorFrom.current?.focus?.();
+    const from = tutorFrom.current;
+    // The ✦ that opened it is hidden while the tutor is open: focus goes to the one that comes back.
+    flushSync(() => setTutorOpen(false));
+    (from?.isConnected ? from : from?.matches(".tutor-bubble") ? document.querySelector<HTMLElement>(".tutor-bubble") : null)?.focus?.();
   };
   const [adding, setAdding] = useState(false);
   const [help, setHelp] = useState(false);
