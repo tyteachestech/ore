@@ -21,7 +21,7 @@ const msg = process.argv[process.argv.indexOf("-p") + 1];
 const input = JSON.parse(msg.slice(msg.indexOf("{")));
 if (input.answer === "boom") { console.log(JSON.stringify({ is_error: true, result: "Not logged in" })); process.exit(0); }
 const rating = /Canberra|spread|Sydney/.test(input.answer) ? 3 : 1;
-console.log(JSON.stringify({ is_error: false, structured_output: { rating, gaps: [], feedback: "ok", covered: input.rubric.map(() => true) },
+console.log(JSON.stringify({ is_error: false, structured_output: { rating, gaps: [], feedback: "ok", covered: input.rubric.map(() => true), evidence: input.rubric.map(() => "") },
   total_cost_usd: 0.002, usage: { input_tokens: 100, cache_read_input_tokens: 50, output_tokens: 20 }, modelUsage: { "claude-fake-1": { outputTokens: 20 } } }));
 `);
   chmodSync(join(binDir, "claude"), 0o755);
@@ -55,7 +55,7 @@ describe("grading eval", () => {
     const cases = [mk("easy-capital", "Canberra", "right"), mk("easy-capital-wrong", "Sydney", "wrong"), mk("easy-blank", "no idea", "wrong"), mk("easy-spacing", "Canberra, I think", "right"), mk("fails", "boom", "right")];
     const r = await runVendor("claude", cases);
     expect(r.model).toBe("claude-fake-1");
-    expect(r.prompt_version).toBe("grade@2");
+    expect(r.prompt_version).toBe("grade@3");
     expect(r.cases.map((c) => [c.id, c.got, c.correct])).toEqual([
       ["easy-capital", "right", true], ["easy-capital-wrong", "right", false], ["easy-blank", "wrong", true], ["easy-spacing", "right", true], ["fails", undefined, false],
     ]);

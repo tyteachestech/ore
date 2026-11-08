@@ -3230,6 +3230,36 @@ journey("review: changing an Explain card's key points after it was checked keep
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: hovering or focusing a key point he got underlines the words of his answer that earned it; a missed one, or one he marks missed, underlines nothing (D140)", async (page) => {
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ rating: 2, gaps: [], feedback: "", covered: [true, false], evidence: ["feels like knowing", ""] }) });
+  });
+  await startReview(page, /Teaching/);
+  await page.getByRole("textbox", { name: "Your answer" }).fill("Fluency feels like knowing, so you overrate yourself");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const points = page.locator(".quiz-points li");
+  const mark = page.locator(".quiz-yours .quiz-evidence");
+  await until("the AI marked the first point", async () => (await page.locator(".quiz-points li.got").count()) === 1);
+  await page.unroute(/\/ore$/);
+  if (await mark.count()) throw new Error("words are underlined before he points at a key point");
+  await points.nth(0).hover();
+  await until("the first point's words are underlined", async () => (await mark.count()) === 1 && (await mark.innerText()) === "feels like knowing");
+  await points.nth(1).hover();
+  await until("a missed point underlines nothing", async () => (await mark.count()) === 0);
+  // The keyboard reaches it too: focus on the point's mark shows its words, and VoiceOver hears them.
+  await points.nth(0).locator(".quiz-mark").focus();
+  await until("focus underlines the words", async () => (await mark.count()) === 1);
+  const label = await points.nth(0).locator(".quiz-mark").getAttribute("aria-label");
+  if (!label?.includes("from “feels like knowing”")) throw new Error(`the mark's label doesn't say his words: ${label}`);
+  // Marked missed, the point no longer claims his words.
+  await page.keyboard.press("Enter");
+  await until("a point he marks missed underlines nothing", async () => (await mark.count()) === 0);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: while a card edit saves, the editor is read-only and Esc waits, so the saved words are the ones shown", async (page) => {
   await startReview(page, /Teaching/);
   await reveal(page);

@@ -9,7 +9,34 @@ export const GradeOutput = z.strictObject({
   gaps: z.array(z.string()),
   feedback: z.string(),
   covered: z.array(z.boolean()), // one per rubric point, in order (D59); empty without a rubric
+  evidence: z.array(z.string()), // one per rubric point: his words that state it, "" when not covered (D140)
 });
+
+/** Folds case, curly quotes and runs of whitespace, keeping a map back to the original offsets. */
+function fold(s: string): { text: string; at: number[] } {
+  let text = "";
+  const at: number[] = [];
+  for (let i = 0; i < s.length; i++) {
+    let c = s[i]!.toLowerCase().replace(/[‘’]/, "'").replace(/[“”]/, '"');
+    if (/\s/.test(c)) {
+      if (text.endsWith(" ")) continue;
+      c = " ";
+    }
+    text += c;
+    at.push(i);
+  }
+  return { text, at };
+}
+
+/** The words of `answer` that `quote` copies, as `answer` spells them, or "" when it doesn't copy any:
+ *  the grader's quote may differ in case, quotes or spacing, never in words (D140). */
+export function quoteIn(answer: string, quote: string): string {
+  const q = fold(quote.replace(/^(?:\s|…|\.\.\.)+|(?:\s|…|\.\.\.)+$/g, "")).text;
+  if (!q) return "";
+  const a = fold(answer);
+  const i = a.text.indexOf(q);
+  return i < 0 ? "" : answer.slice(a.at[i], a.at[i + q.length - 1]! + 1);
+}
 
 /** What the grader sees of a card: the question, its model answer and rubric. */
 export interface Shown { kind: string; question: string; model_answer: string; rubric: string[] }
@@ -37,5 +64,7 @@ export function shownFor(lib: Library, cardRef: string, variantRef?: string): Sh
 export async function gradeAnswer(lib: Library, cardRef: string, answer: string, variantRef?: string) {
   const { card, ...shown } = shownFor(lib, cardRef, variantRef);
   const { data, ai } = await gradeShown(lib, shown, answer);
-  return { card, ...data, ai };
+  // Only words he wrote, for a point marked covered: a quote it can't find in his answer is dropped.
+  const evidence = shown.rubric.map((_, i) => (data.covered[i] ? quoteIn(answer, data.evidence[i] ?? "") : ""));
+  return { card, ...data, evidence, ai };
 }
