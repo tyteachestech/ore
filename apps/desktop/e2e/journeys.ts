@@ -3959,6 +3959,26 @@ journey("list archive: A selects the row after the archived one, so a second A a
   for (const t of before) if (!(await titles()).includes(t)) throw new Error(`“${t}” did not come back`);
 });
 
+journey("list archive Undo selects the source it put back, as Finder does, though the row was never selected", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const titles = () => page.locator(".list .row .title").allInnerTexts();
+  const selected = () => page.locator(".list .row[aria-selected=true] .title").innerText();
+  await until("All sources lists three sources", async () => (await titles()).length >= 3);
+  const before = await titles();
+  // Nothing picked: the first row stands for the selection. Archive the third from its menu.
+  const row = page.locator(".list .row").filter({ has: page.locator(".title", { hasText: before[2]! }) }).first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Archive/ }).click();
+  await until("the row leaves the list", async () => !(await titles()).includes(before[2]!));
+  await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
+  await until("Undo brings it back", async () => (await titles()).includes(before[2]!));
+  // The first ↓ shows the selection where it is.
+  await page.locator(".list").focus();
+  await page.keyboard.press("ArrowDown");
+  await until(`“${before[2]}” is selected, not “${before[0]}”`, async () => (await selected()) === before[2]);
+  await until("the library has it back", async () => ((await ore("ls")) as { title: string }[]).some((i) => i.title === before[2]));
+});
+
 journey("Done: Move to To read and ⌘Z puts the source back in Done with the finish date it had", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   await page.keyboard.press("Meta+2");

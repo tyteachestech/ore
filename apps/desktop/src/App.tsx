@@ -1258,12 +1258,11 @@ export function App() {
     const save = (on: boolean) => queue(() => ore("archive", item.id, ...(on ? [] : ["--undo"])));
     mark(archived);
     if (archived && openId === item.id) setOpenId(null);
-    const was = cursor;
     // Returns the write, so an undo that fails says so and stays undoable (history.ts).
     const apply = (on: boolean) => {
       mark(on);
-      // Undo puts the selection back where it was, as Finder selects what it puts back.
-      if (on !== archived) setCursor(was);
+      // Undo selects the source it put back, as Finder selects what it puts back.
+      if (on !== archived) setCursor(item.id);
       return save(on).then(refresh, (e) => {
         void refresh();
         throw e;
@@ -1365,6 +1364,7 @@ export function App() {
     const queue = inOrder();
     const apply = (on: boolean) => {
       if (on) setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
+      else setCursor(`course:${c.id}`);
       queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"]))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
     };
     notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
