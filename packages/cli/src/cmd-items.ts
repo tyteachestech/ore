@@ -401,12 +401,13 @@ export const itemCommands: Record<string, Command> = {
   },
 
   status: {
-    usage: "<item> inbox|reading|done   set reading status (done records finished_at)",
-    async run([ref, status]) {
+    usage: "<item> inbox|reading|done [--at <iso>]   set reading status (done records finished_at; --at puts back an earlier one)",
+    options: { at: { type: "string" } },
+    async run([ref, status], f) {
       const lib = openLibrary();
       const id = findItem(lib, need(ref, "<item>")).meta.id;
       const s = need(oneOf(status, ItemStatus.options, "<status>"), "<status> (inbox|reading|done)");
-      const meta = await setItemStatus(lib, id, s);
+      const meta = await setItemStatus(lib, id, s, str(f.at));
       return { data: meta, text: `${meta.title}: ${meta.status}` };
     },
   },

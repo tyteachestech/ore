@@ -72,6 +72,8 @@ type Kept = { kept: true; filed: string[]; restored: boolean };
 /** A line of a source list: a source, or a course (D79) standing for its lessons, listed under it when open. */
 type Line = { kind: "item"; item: Item; lesson?: boolean } | { kind: "course"; id: string; title: string; url?: string; lessons: Item[]; next: Item | null; open: boolean };
 const lineKey = (l: Line) => (l.kind === "item" ? l.item.id : `course:${l.id}`);
+/** `ore status` args to `to`: back to Done (an Undo), a source keeps the finish date it had. */
+const back = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
 /** The row of `now` that came after `key` in `was` (else the nearest before it), for a row that left the list. */
 const lineAfter = (was: Line[], now: Line[], key: string): Line | undefined => {
   const at = was.findIndex((l) => lineKey(l) === key);
@@ -1414,7 +1416,7 @@ export function App() {
   const archiveMany = () => batch(`Archived ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null);
   const restoreMany = () => batch(`Restored ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])));
   const moveMany = (to: Item["status"]) =>
-    batch(`Moved ${sourcesN(many.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, f ? to : i.status), (i) => ({ ...i, status: to }));
+    batch(`Moved ${sourcesN(many.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }));
   const fileMany = (k: Skill, on: boolean) => {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
     batch(
@@ -1454,7 +1456,7 @@ export function App() {
   const moveSource = useCallback(
     async (item: Item, to: Item["status"], undoable = true) => {
       try {
-        await ore("status", item.id, to);
+        await ore("status", item.id, ...back(item, to));
         await refresh();
         if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => void moveSource(item, item.status, false), () => void moveSource(item, to, false));
       } catch (e) {

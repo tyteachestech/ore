@@ -3949,6 +3949,23 @@ journey("list archive: A selects the row after the archived one, so a second A a
   for (const t of before) if (!(await titles()).includes(t)) throw new Error(`“${t}” did not come back`);
 });
 
+journey("Done: Move to To read and ⌘Z puts the source back in Done with the finish date it had", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.keyboard.press("Meta+2");
+  const row = page.locator(".list .row").first();
+  const title = await row.locator(".title").innerText();
+  const finished = async () => ((await ore("ls")) as { title: string; status: string; finished_at?: string }[]).find((i) => i.title === title);
+  const was = await finished();
+  if (was?.status !== "done" || !was.finished_at) throw new Error(`“${title}” is not done with a finish date`);
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Move to To read" }).click();
+  await until("it left Done", async () => (await finished())?.status === "reading");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back in Done", async () => (await finished())?.status === "done");
+  const now = await finished();
+  if (now?.finished_at !== was.finished_at) throw new Error(`finish date ${was.finished_at} became ${now?.finished_at}`);
+});
+
 // —— run ——
 
 let failed = 0;

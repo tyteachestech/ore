@@ -261,11 +261,14 @@ export async function updateItemMeta(lib: Library, id: string, patch: (m: ItemMe
   });
 }
 
-export async function setItemStatus(lib: Library, id: string, status: ItemStatus): Promise<ItemMeta> {
+/** Done stamps when it was finished; `finishedAt` puts back the stamp it had, for an Undo of a move out of Done. */
+export async function setItemStatus(lib: Library, id: string, status: ItemStatus, finishedAt?: string): Promise<ItemMeta> {
+  if (finishedAt !== undefined && status !== "done") throw new Error("a finish date goes only with done");
+  if (finishedAt !== undefined && Number.isNaN(Date.parse(finishedAt))) throw new Error(`not a date: ${finishedAt}`);
   return updateItemMeta(lib, id, (m) => ({
     ...m,
     status,
-    finished_at: status === "done" ? (m.status === "done" && m.finished_at ? m.finished_at : nowIso()) : undefined,
+    finished_at: status === "done" ? (finishedAt ?? (m.status === "done" && m.finished_at ? m.finished_at : nowIso())) : undefined,
   }));
 }
 
