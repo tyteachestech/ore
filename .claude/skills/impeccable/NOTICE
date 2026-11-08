@@ -1,0 +1,6 @@
+Impeccable (https://github.com/pbakaus/impeccable), version 0.1.16 of its scripts,
+is copied here under the Apache License 2.0 (see LICENSE in this folder).
+It is not part of Ore's AGPL-licensed code; Ore uses it only as a design-review tool.
+
+scripts/modern-screenshot.umd.js is modern-screenshot
+(https://github.com/qq15725/modern-screenshot), MIT License.
