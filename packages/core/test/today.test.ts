@@ -107,16 +107,24 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(dueQueue(lib, T())).toHaveLength(2);
   });
 
-  test("new drafts fill only the goal time the due cards leave (D65)", async () => {
-    const { lib, item } = await library(20);
+  test("over a backlog of due cards, every fifth card is new, up to new_per_day (D144)", async () => {
+    const { lib, cards } = await library(40);
+    const day1 = T();
+    for (const c of cards.slice(0, 30)) await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: day1 });
+    const later = new Date(day1.getTime() + 90 * 864e5); // all 30 are overdue: a backlog far past the goal
+    const q = dueQueue(lib, later);
+    const fresh = q.flatMap((e, i) => (e.due === null ? [i] : []));
+    expect(fresh).toEqual([4, 9, 14, 19, 24, 29, 34, 37, 38, 39]); // 1 in 5 while due cards last, then the rest of the 10
+    await setReviewSettings(lib, { new_per_day: 2 });
+    expect(dueQueue(lib, later).filter((e) => e.due === null)).toHaveLength(2);
+  });
+
+  test("with nothing due, new drafts come up to new_per_day, whatever the goal (D144)", async () => {
+    const { lib } = await library(20);
     await setReviewSettings(lib, { goal_minutes: 1 });
-    expect(dueQueue(lib, T())).toHaveLength(3); // 60 s of 20 s Fact cards
-    writeNewCard(lib, { kind: "prompt", item: item.meta.id, skills: ["learning"], topics: [], content_type: "concept", question: "Why?", answer: "A", rubric: ["a", "b"] });
-    await setReviewSettings(lib, { goal_minutes: 10, new_per_day: 200 });
-    const at = T();
-    expect(dueQueue(lib, at)).toHaveLength(21); // 20 × 20 s + 90 s fit in 10 minutes
-    await setReviewSettings(lib, { goal_minutes: 5 });
-    expect(dueQueue(lib, at)).toHaveLength(15); // 300 s of 20 s cards, the 90 s prompt waits
+    expect(dueQueue(lib, T())).toHaveLength(10);
+    await setReviewSettings(lib, { new_per_day: 200 });
+    expect(dueQueue(lib, T())).toHaveLength(20);
   });
 
   test("--skill keeps only cards of the picked skills", async () => {
