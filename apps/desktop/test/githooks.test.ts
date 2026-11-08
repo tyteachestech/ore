@@ -10,7 +10,8 @@ const tmp = mkdtempSync(join(tmpdir(), "ore-hooks-"));
 const marker = join(tmp, "installed");
 const bin = join(tmp, "bin");
 mkdirSync(bin);
-writeFileSync(join(bin, "bun"), `#!/bin/sh\necho "$(git rev-parse --abbrev-ref HEAD)" >> "${marker}"\n`);
+// A fake bun: `bun install` notes that dependencies came first; `bun run app:install` records the branch built.
+writeFileSync(join(bin, "bun"), `#!/bin/sh\nif [ "$1" = install ]; then touch "${marker}.deps"; else [ -e "${marker}.deps" ] && echo "$(git rev-parse --abbrev-ref HEAD)" >> "${marker}"; fi\n`);
 chmodSync(join(bin, "bun"), 0o755);
 const env = { ...process.env, HOME: tmp, PATH: `${bin}:${process.env.PATH}`, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 
@@ -33,6 +34,7 @@ async function installs(): Promise<string> {
   await Bun.sleep(100);
   const out = existsSync(marker) ? (await Bun.file(marker).text()).trim() : "";
   rmSync(marker, { force: true });
+  rmSync(`${marker}.deps`, { force: true });
   return out;
 }
 
@@ -47,7 +49,7 @@ git(repo, "config", "core.hooksPath", hooks);
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
 describe("app reinstall hooks", () => {
-  test("a commit on master touching apps/desktop reinstalls", async () => {
+  test("a commit on master touching apps/desktop installs dependencies, then reinstalls", async () => {
     commit(repo, "apps/desktop/a.ts");
     expect(await installs()).toBe("master");
   });
