@@ -39,12 +39,19 @@ bun run eval:mine                     # real reviews where Tyler and the grader 
 
 ## Learn more
 
-The few sources worth reading, in order:
+The few sources worth reading. Newest first; the 2023–24 ones are still where the field's terms come from.
 
-1. Hamel Husain, [Using LLM-as-a-Judge for Evaluation: A Complete Guide](https://hamel.dev/blog/posts/llm-judge/) (2024). The practical method: pass/fail labels with a written critique, report true positive and true negative rates rather than raw agreement, split labels into a set you tune on and one you don't, and expect to need about 100 examples per failure mode.
-2. Hamel Husain, [Your AI Product Needs Evals](https://hamel.dev/blog/posts/evals/) (2024). Why evals come before prompt tweaking, and the loop: look at real outputs, name the failures, turn them into tests.
-3. Eugene Yan, [Evaluating the Effectiveness of LLM-Evaluators (aka LLM-as-Judge)](https://eugeneyan.com/writing/llm-evaluators/) (2024). A survey of the research: compare against a string-match baseline, use Cohen's kappa or classification metrics, prefer binary outputs.
-4. Zheng et al., [Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685) (NeurIPS 2023). The paper that named LLM judges' biases (position, verbosity, self-preference); the length and confident-but-false cases here test the verbosity one.
-5. Shankar et al., [Who Validates the Validators?](https://arxiv.org/abs/2404.12272) (UIST 2024). "Criteria drift": people only settle what counts as right by grading real outputs, which is why the labels carry reasons and the set grows from real reviews.
-6. Evan Miller, [Adding Error Bars to Evals](https://arxiv.org/abs/2411.00640) (2024). Treat an eval as an experiment: report uncertainty, compare models on the same questions, plan how many questions you need.
-7. Anthropic, [Define success criteria and build evaluations](https://platform.claude.com/docs/en/test-and-evaluate/develop-tests). The vendor's own guide: code-based grading where you can, LLM grading with a detailed rubric where you can't, and check the grader before trusting it.
+**2025–2026**
+
+1. Shreya Shankar and Hamel Husain, [AI Evals: Everything You Need to Know](https://hamel.dev/blog/posts/evals-faq/) (Sept 2026), and their book [Evals for AI Engineers](https://www.oreilly.com/library/view/evals-for-ai/9798341660717/) (O'Reilly, Oct 2026). The current practitioner's method: error analysis by hand first, one judge per failure mode, check the judge's true positive and true negative rates on held-out labels, Cohen's kappa over percent agreement, and 100 to 200 labeled examples per failure mode.
+2. Cong et al., [Estimating LLM Grading Ability and Response Difficulty in Automatic Short Answer Grading via Item Response Theory](https://arxiv.org/abs/2605.00238) (preprint, May 2026). The closest study to this eval: grading short answers against a reference. Models with the same overall score differ in how fast they fail as answers get harder, and errors cluster on partly-correct answers. That is why this eval reports by level.
+3. Norman, Rivera and Hughes, [Reliability without Validity](https://arxiv.org/abs/2606.19544) (preprint, June 2026). A large study of LLM judges: chance-corrected agreement (kappa) runs 33 to 41 points below raw agreement, judge rankings shift by up to 14 places between benchmarks, and a judge can be consistent yet biased. Test the judge on your own task, not a leaderboard.
+4. Choi et al., [Diagnosing the Reliability of LLM-as-a-Judge via Item Response Theory](https://arxiv.org/abs/2602.00521) (ICML 2026). Reliability has two parts: consistency when the prompt varies, and agreement with people. This eval measures the second; repeated runs would measure the first.
+5. Nkoyo et al., [Advances in Auto-Grading with Large Language Models](https://aclanthology.org/2025.bea-1.35.pdf) (BEA workshop at ACL 2025). A survey of 30 auto-grading studies. A useful bar: on 1,710 school short answers GPT-4 reached kappa 0.70 against teachers, where teachers agreed with each other at 0.75; question-specific rubrics cut grade inflation.
+
+**Foundations (2023–2024)**
+
+6. Hamel Husain, [Using LLM-as-a-Judge for Evaluation: A Complete Guide](https://hamel.dev/blog/posts/llm-judge/) (2024). Pass/fail labels with a written critique, a set you tune on and one you don't.
+7. Zheng et al., [Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685) (NeurIPS 2023). The paper that named LLM judges' biases (position, verbosity, self-preference); the length and confident-but-false cases here test the verbosity one.
+8. Shankar et al., [Who Validates the Validators?](https://arxiv.org/abs/2404.12272) (UIST 2024). "Criteria drift": people only settle what counts as right by grading real outputs, which is why the labels carry reasons and the set grows from real reviews.
+9. Evan Miller, [Adding Error Bars to Evals](https://arxiv.org/abs/2411.00640) (2024). Treat an eval as an experiment: report uncertainty and plan how many questions you need.
