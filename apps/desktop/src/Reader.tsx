@@ -1582,7 +1582,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       const t = e.target as HTMLElement;
       if (p.blocked || !note || t === note || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.key.length !== 1 || e.key === " ") return;
-      if (INTENTS.some((i) => is(e, i))) return;
+      if (!note.value && INTENTS.some((i) => is(e, i))) return;
       e.stopImmediatePropagation();
       note.focus();
     };

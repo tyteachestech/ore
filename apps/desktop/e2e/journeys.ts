@@ -281,6 +281,11 @@ journey("highlight popup open: typing writes the note, and no letter runs a shor
   const opened = ((await page.evaluate(() => (window as any).__calls)) as string[]).filter((c) => c.includes("opener"));
   if (opened.length) throw new Error(`O opened the original: ${opened}`);
   if (!(await popup.isVisible())) throw new Error("a letter closed the popup");
+  // Once the note has words, a digit is text even if focus went back to the page (D133: 1–4 set the type only while it is empty).
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("2");
+  const after = await note.inputValue();
+  if (after !== words + "2") throw new Error(`a 2 typed after the note became “${after}”`);
 });
 
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
