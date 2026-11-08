@@ -239,14 +239,14 @@ export const studyCommands: Record<string, Command> = {
     async run([sub, id]) {
       const lib = openLibrary();
       if (sub === "start") {
-        const r = startSession(lib);
+        const r = await startSession(lib);
         // Catch up on variants missed while the Mac slept (D8); this session shows the originals.
         startRemix(lib, cardsToRemix(lib, listCards(lib)));
         startCatchUp(lib);
         return { data: { id: r.id, ts: r.ts }, text: `Session ${r.id} started` };
       }
       if (sub === "end") {
-        const r = endSession(lib, new Date(), dueQueue(lib).length === 0, id);
+        const r = await endSession(lib, new Date(), dueQueue(lib).length === 0, id);
         snapshot(lib, { force: true });
         // Calibration on the week's first end screen only, never during a card (D69).
         const cal = (r.reviews ?? 0) > 0 && firstEndThisWeek(lib) ? calibration(readReviews(lib)) : null;
@@ -254,7 +254,7 @@ export const studyCommands: Record<string, Command> = {
         return { data, text: `Session ${r.id} ended (${r.reviews} reviews, ${r.kept} kept, ${r.rescued} rescued)` };
       }
       if (sub === "reopen") {
-        reopenSession(lib, need(id, "<id>"));
+        await reopenSession(lib, need(id, "<id>"));
         return { data: { id }, text: `Session ${id} reopened` };
       }
       throw new Error("usage: ore session start|end [<id>]|reopen <id>");

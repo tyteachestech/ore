@@ -64,7 +64,7 @@ describe("review loop", () => {
     const { lib, a, b } = await setup();
     const t0 = Date.now() + 864e5;
     const at = (s: number) => new Date(t0 + s * 1000);
-    startSession(lib);
+    await startSession(lib);
     const rb = await recordReview(lib, b.meta.id, { rating: 3, confidence: 2, now: at(0) });
     const miss = await recordReview(lib, a.meta.id, { rating: 1, confidence: 3, now: at(1) });
     const pass = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(2) });
@@ -113,17 +113,17 @@ describe("review loop", () => {
 
   test("a rating taken back on the end screen reopens its session; the next end's receipt replaces the first", async () => {
     const { lib, a, b } = await setup();
-    const s = startSession(lib);
+    const s = await startSession(lib);
     await recordReview(lib, a.meta.id, { rating: 3, confidence: 2 });
     const second = await recordReview(lib, b.meta.id, { rating: 3, confidence: 2 });
-    expect(endSession(lib, new Date(Date.now() + 1000)).reviews).toBe(2);
-    expect(() => reopenSession(lib, "nope")).toThrow(/no session/);
+    expect((await endSession(lib, new Date(Date.now() + 1000))).reviews).toBe(2);
+    await expect(reopenSession(lib, "nope")).rejects.toThrow(/no session/);
     await undoReview(lib, b.meta.id, second.ts);
-    reopenSession(lib, s.id);
+    await reopenSession(lib, s.id);
     await Bun.sleep(5); // an undo names its review by time; the next one is never in the same millisecond
     const again = await recordReview(lib, b.meta.id, { rating: 4, confidence: 3 });
     expect(again.session).toBe(s.id);
-    endSession(lib, new Date(Date.now() + 2000));
+    await endSession(lib, new Date(Date.now() + 2000));
     const ends = readSessions(lib).filter((r) => r.type === "end" && r.id === s.id);
     expect(ends).toHaveLength(1);
     expect(ends[0]!.reviews).toBe(2);
@@ -131,25 +131,25 @@ describe("review loop", () => {
 
   test("a miss in an open session queues one relearn pass, accepted twice in one session", async () => {
     const { lib, a } = await setup();
-    const s = startSession(lib);
+    const s = await startSession(lib);
     const miss = await recordReview(lib, a.meta.id, { rating: 1, confidence: 3 });
     expect(miss.session).toBe(s.id);
     const q = dueQueue(lib);
     expect(q.at(-1)).toMatchObject({ id: a.meta.id, relearn: true });
     await recordReview(lib, a.meta.id, { rating: 3, confidence: 2 });
     expect(dueQueue(lib).some((e) => e.id === a.meta.id)).toBe(false);
-    expect(endSession(lib).reviews).toBe(2);
+    expect((await endSession(lib)).reviews).toBe(2);
   });
 
   test("a miss keeps its relearn pass when the session ends right after it (the goal closed, or Esc then ⌘R)", async () => {
     const { lib, a, b } = await setup();
     const t0 = Date.now() + 864e5;
     const at = (s: number) => new Date(t0 + s * 1000);
-    startSession(lib, at(0));
+    await startSession(lib, at(0));
     await recordReview(lib, a.meta.id, { rating: 1, confidence: 3, now: at(1) });
-    endSession(lib, at(2));
+    await endSession(lib, at(2));
     expect(dueQueue(lib, at(3)).find((e) => e.id === a.meta.id)?.relearn).toBe(true); // no session open
-    startSession(lib, at(4));
+    await startSession(lib, at(4));
     expect(dueQueue(lib, at(5)).at(-1)).toMatchObject({ id: a.meta.id, relearn: true }); // the next session owes it
     await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(6) });
     expect(dueQueue(lib, at(7)).some((e) => e.id === a.meta.id)).toBe(false); // once only
@@ -165,22 +165,22 @@ describe("review loop", () => {
 
   test("two windows' sessions overlap: each logs and ends its own, by id", async () => {
     const { lib, a, b } = await setup();
-    const main = startSession(lib);
+    const main = await startSession(lib);
     await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, session: main.id });
-    const quiz = startSession(lib); // the quick quiz shows while the main window reviews
+    const quiz = await startSession(lib); // the quick quiz shows while the main window reviews
     await recordReview(lib, b.meta.id, { rating: 3, confidence: 2, session: quiz.id });
-    expect(endSession(lib, new Date(Date.now() + 1000), false, quiz.id)).toMatchObject({ id: quiz.id, reviews: 1 });
+    expect(await endSession(lib, new Date(Date.now() + 1000), false, quiz.id)).toMatchObject({ id: quiz.id, reviews: 1 });
     await Bun.sleep(5);
     const next = await recordReview(lib, b.meta.id, { rating: 1, confidence: 2, session: main.id });
     expect(next.session).toBe(main.id);
-    expect(endSession(lib, new Date(Date.now() + 2000), false, main.id)).toMatchObject({ id: main.id, reviews: 2 });
-    expect(() => endSession(lib, new Date(), false, "nope")).toThrow(/no session/);
+    expect(await endSession(lib, new Date(Date.now() + 2000), false, main.id)).toMatchObject({ id: main.id, reviews: 2 });
+    await expect(endSession(lib, new Date(), false, "nope")).rejects.toThrow(/no session/);
     // Ending one session by id leaves another one's open file alone.
-    const open = startSession(lib);
-    endSession(lib, new Date(Date.now() + 3000), false, main.id);
+    const open = await startSession(lib);
+    await endSession(lib, new Date(Date.now() + 3000), false, main.id);
     expect(openSessionId(lib)).toBe(open.id);
     // Reopening a session (⌘Z on its end screen) while another window's is open doesn't fail.
-    expect(() => reopenSession(lib, main.id)).not.toThrow();
+    await reopenSession(lib, main.id); // no throw
     expect(openSessionId(lib)).toBe(open.id);
   });
 
