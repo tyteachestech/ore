@@ -192,7 +192,8 @@ function read(): Record<string, Combo> {
   }
 }
 
-let overrides = read();
+// Read at the end of this module (`kept`), once the rules a saved shortcut must still pass are defined.
+let overrides: Record<string, Combo> = {};
 let keymap = build();
 const listeners = new Set<() => void>();
 
@@ -326,3 +327,11 @@ export const restore = (o: Record<string, Combo>) => commit({ ...o });
 
 export const isCustom = (id: KeyId) => id in overrides;
 export const defaultOf = (id: KeyId): Combo => DEFAULTS.find((x) => x.id === id)!.combo;
+
+/** The saved shortcuts the rules still allow: one saved before a key was reserved (the palette on ⌘A)
+ *  or for a command since removed is dropped, and that command gets its default back. */
+function kept(saved: Record<string, Combo>): Record<string, Combo> {
+  return Object.fromEntries(Object.entries(saved).filter(([id, combo]) => typeof combo === "string" && DEFAULTS.some((b) => b.id === id) && !invalid(id as KeyId, combo)));
+}
+overrides = kept(read());
+keymap = build();

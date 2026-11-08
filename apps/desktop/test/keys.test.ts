@@ -98,3 +98,15 @@ describe("shortcut editor: Review's keys", () => {
     resetKeys();
   });
 });
+
+test("a saved shortcut the rules now refuse is dropped when the keymap loads", async () => {
+  (globalThis as Record<string, unknown>).localStorage = w.localStorage;
+  w.localStorage.setItem("ore.keys", JSON.stringify({ palette: "Meta+KeyA", "edit-card": "Digit1", add: "Meta+KeyY", gone: "Meta+KeyU" }));
+  const fresh = (await import("../src/keys.ts?stored")) as typeof import("../src/keys");
+  expect(fresh.is(press("Meta+KeyA"), "palette")).toBe(false);
+  expect(fresh.is(press("Meta+KeyK"), "palette")).toBe(true);
+  expect(fresh.is(press("KeyE"), "edit-card")).toBe(true);
+  expect(fresh.is(press("Meta+KeyY"), "add")).toBe(true);
+  expect(Object.keys(fresh.saved())).toEqual(["add"]);
+  delete (globalThis as Record<string, unknown>).localStorage;
+});
