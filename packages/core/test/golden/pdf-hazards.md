@@ -2,7 +2,6 @@
 id: <id>
 type: pdf
 title: How Memory Works
-author: anonymous
 captured_at: <time>
 text_sha256: c3ce0588d400c471e4d4b55218c0b03ad20c5b4530fbab23b989f933e7ea260e
 status: inbox

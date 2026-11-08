@@ -240,6 +240,7 @@ describe("import coverage: junk is refused with the next step", () => {
     expect(cleanAuthor("the end, you’ll be able to")).toBeUndefined();
     expect(cleanAuthor("AK, AM, BH, CM, CD")).toBeUndefined();
     expect(cleanAuthor("Ashish Vaswani, Noam Shazeer")).toBe("Ashish Vaswani, Noam Shazeer");
+    expect(cleanAuthor("Microsoft Office User")).toBeUndefined();
     expect(cleanDate("2026-10-26, 2026-10-21, 2026-10-19")).toBeUndefined();
     expect(cleanDate("Elapsed00:00")).toBeUndefined();
     expect(cleanDate("1 month ago")).toBeUndefined();
@@ -1002,6 +1003,11 @@ describe("import coverage: the grid's small holes", () => {
     const f = join(mkdtempSync(join(tmpdir(), "ore-pdfa-")), "figures.pdf");
     writeFileSync(f, readFileSync(join(FIX, "files", "figures.pdf")));
     expect((await addSource(await tempLibrary(), f)).meta.author).toBe("Ada Lovelace");
+  });
+
+  test("PDF: a tool's default name is not its author", async () => {
+    // hazards.pdf was made with ReportLab, which signs every file "anonymous".
+    expect((await addSource(await tempLibrary(), file("hazards.pdf"))).meta.author).toBeUndefined();
   });
 
   test("a damaged EPUB, Word or PowerPoint file says to download it again", async () => {

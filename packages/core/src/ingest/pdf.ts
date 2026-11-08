@@ -3,7 +3,7 @@ import * as pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { cleanTitle, lineBreakSpace } from "./check.ts";
+import { cleanTitle, fileAuthor, lineBreakSpace } from "./check.ts";
 import type { Box, Region } from "./docling.ts";
 import { pageFigures, png } from "./pdf-figures.ts";
 
@@ -387,7 +387,7 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
   // The Info dictionary's Author, else the XMP creator list many publishers fill instead.
   const xmp = meta?.metadata?.get("dc:creator") as string | string[] | undefined;
   const author = info.Author?.trim() || [xmp ?? []].flat().map((a) => String(a).trim()).filter(Boolean).join(", ");
-  return { title: info.Title?.trim() || undefined, author: author || undefined };
+  return { title: info.Title?.trim() || undefined, author: fileAuthor(author) };
 }
 
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it
