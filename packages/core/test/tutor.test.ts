@@ -147,6 +147,23 @@ describe("tutor: the web", () => {
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("is not a page your web search returned");
   });
 
+  test("a quote is checked against its own page's results, and a link inside a fetched page isn't a page it returned", async () => {
+    const { lib } = await library();
+    const blog = { url: "https://blog.example.com/ebbinghaus", title: "A blog" };
+    const web = [
+      ...searched([BRIT], "Hermann Ebbinghaus was born on January 24, 1850."),
+      { type: "assistant", message: { content: [{ type: "tool_use", id: "t2", name: "WebFetch", input: { url: blog.url } }] } },
+      { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t2", content: "He was born in Barmen. More at [an archive](https://archive.example.org/eb)." }] } },
+    ];
+    const reply = (passage: string, quote: string) => ({ web, out: { reply: "Born in Barmen [1].", citations: [{ passage, quote }], general: false, hint: false, exercise: null, card: null } });
+    fakeClaude([reply(BRIT.url, "He was born in Barmen."), reply("https://archive.example.org/eb", "He was born in Barmen.")]);
+    await expect(tutor(lib, "Where was Ebbinghaus born?")).rejects.toThrow("is not a page your web search returned (it returned https://www.britannica.com/biography/Hermann-Ebbinghaus, https://blog.example.com/ebbinghaus)");
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("is not in what the web search returned for https://www.britannica.com");
+    // The fetched page itself is citable, by its site alone: it has no title here.
+    fakeClaude([reply(blog.url, "He was born in Barmen.")]);
+    expect((await tutor(lib, "Where was Ebbinghaus born?")).citations[0]).toMatchObject({ url: blog.url, title: "", site: "blog.example.com" });
+  });
+
   test("a web citation with no search at all is refused: the link would be made up", async () => {
     const { lib } = await library();
     const out = { reply: "Born in 1850 [1].", citations: [{ passage: BRIT.url, quote: "born in 1850" }], general: false, hint: false, exercise: null, card: null };

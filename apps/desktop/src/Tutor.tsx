@@ -429,7 +429,7 @@ function Answer({ text, citations, general, onOpen, onLink }: { text: string; ci
           a: ({ href, children }) => {
             const c = href?.startsWith("#cite-") ? citations.find((x) => x.n === Number(href.slice(6))) : undefined;
             return c ? (
-              <button className="cite" aria-label={`Source ${c.n}: ${c.title}${"url" in c ? ` (${c.site})` : ""}`} onClick={() => open(c)}>{c.n}</button>
+              <button className="cite" aria-label={`Source ${c.n}: ${"url" in c ? (c.title ? `${c.title} (${c.site})` : c.site) : c.title}`} onClick={() => open(c)}>{c.n}</button>
             ) : (
               <span>{children}</span>
             );
@@ -448,7 +448,7 @@ function Answer({ text, citations, general, onOpen, onLink }: { text: string; ci
                 <span className="library-src">
                   <span className="library-title">
                     {/* A page leads with its site, so a long title can't hide that it is from the web (Perplexity). */}
-                    {"url" in c && <span className="sub">{c.site} · </span>}
+                    {"url" in c && <span className="sub">{c.site}{c.title && " · "}</span>}
                     {c.title}
                     {!("url" in c) && c.heading && <span className="sub"> › {c.heading}</span>}
                   </span>

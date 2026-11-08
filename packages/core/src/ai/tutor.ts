@@ -7,7 +7,7 @@ import { withLock } from "../lock.ts";
 import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
 import type { Library } from "../library.ts";
-import { runAgent, samePage, type Usage } from "./adapter.ts";
+import { isWebUrl, runAgent, samePage, type Usage } from "./adapter.ts";
 import { plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
 
 // The tutor (D128): the chat docked at the window's right, grown out of Ask your library. It answers
@@ -97,11 +97,15 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
     input: { message: m, earlier: recent, ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
     check: (d, seen) => {
       for (const c of d.citations) {
-        if (isUrl(c.passage)) {
-          if (!URL.canParse(c.passage)) return `${c.passage} is not a link`;
+        if (isWebUrl(c.passage)) {
+          if (!URL.canParse(c.passage.trim())) return `${c.passage} is not a link`;
           // Claude reports what its searches returned, so a web citation is checked as a passage is; codex doesn't.
-          if (seen && !seen.pages.some((p) => samePage(p.url, c.passage))) return `${c.passage} is not a page your web search returned: cite one it returned, or a passage`;
-          if (seen && !locate(seen.text, c.quote)) return `the quote "${c.quote}" is not in what the web search returned: copy its exact words`;
+          if (!seen) continue;
+          const page = seen.pages.find((p) => samePage(p.url, c.passage));
+          // The retry is a fresh run that can't see this one's results, so the reason lists them.
+          const returned = seen.pages.slice(0, 8).map((p) => p.url).join(", ") || "none: search first";
+          if (!page) return `${c.passage} is not a page your web search returned (it returned ${returned}): cite one of those, or a passage`;
+          if (!locate(page.text, c.quote)) return `the quote "${c.quote}" is not in what the web search returned for ${page.url}: copy its exact words`;
           continue;
         }
         const p = byId.get(c.passage);
@@ -116,13 +120,13 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
     },
   });
   const citations: (Citation | WebCitation)[] = data.citations.map((c, i) => {
-    if (isUrl(c.passage)) {
+    if (isWebUrl(c.passage)) {
       const page = web?.pages.find((p) => samePage(p.url, c.passage));
-      const url = page?.url ?? c.passage;
-      const site = new URL(url).hostname.replace(/^www\./, "");
-      const at = web ? locate(web.text, c.quote) : null;
-      const quote = at ? web!.text.slice(at.start, at.end) : c.quote;
-      return { n: i + 1, url, title: page?.title || site, site, quote, text: plainText(quote) };
+      const url = page?.url ?? c.passage.trim();
+      const at = page ? locate(page.text, c.quote) : null;
+      const quote = at ? page!.text.slice(at.start, at.end) : c.quote;
+      // A fetched page has no title of its own here: "" (the app shows its site alone).
+      return { n: i + 1, url, title: page?.title ?? "", site: new URL(url).hostname.replace(/^www\./, ""), quote, text: plainText(quote) };
     }
     const p = byId.get(c.passage)!;
     const at = locate(p.text, c.quote)!;
@@ -131,8 +135,6 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
   });
   return { message: m, reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
 }
-
-const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
 
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the
  *  source it came from (the first one cited, else the one he was reading) and takes that source's

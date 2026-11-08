@@ -116,7 +116,7 @@ export const aiCommands: Record<string, Command> = {
         try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply}]"); }
       }
       const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill) });
-      const text = [r.reply, ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title} (${c.site}): "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
+      const text = [r.reply, ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
       return { data: r, text };
     },
   },

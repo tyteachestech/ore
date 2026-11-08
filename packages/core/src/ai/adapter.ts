@@ -34,9 +34,10 @@ export interface AgentResult<T> {
   web?: WebSeen;
 }
 
-/** The pages a run's web searches and fetches returned, and their text, so a web citation can be
- *  checked as a library one is: its page must be one the search found, its quote words it returned. */
-export interface WebSeen { searched: boolean; pages: { url: string; title: string }[]; text: string }
+/** The pages a run's web searches and fetches returned, each with the text it came back in, so a web
+ *  citation can be checked as a library one is: its page must be one the search found, its quote words
+ *  returned with that page. */
+export interface WebSeen { searched: boolean; pages: { url: string; title: string; text: string }[] }
 
 interface RawRun {
   output: unknown; // parsed JSON (or a string to parse)
@@ -144,25 +145,16 @@ export function vendorFailure(vendor: Vendor, r: Exec): Error {
   return new Error(`${vendor} failed (exit ${r.code})${msg ? `: ${msg}` : " with no output"}${signInHint(vendor, msg)}`);
 }
 
-/** The `result` event that ends a stream-json run (it carries what `--output-format json` prints). */
-function lastResult(stdout: string) {
-  for (const line of stdout.trim().split("\n").reverse()) {
-    try {
-      const e = JSON.parse(line);
-      if (e?.type === "result") return e;
-    } catch { /* not an event line */ }
-  }
-  throw new Error("no result event");
-}
-
-/** A `claude -p --output-format json` run's result (or a `stream-json` run's last line), or why it failed. */
-function claudeResult(r: Exec, stream = false) {
+/** A `claude -p --output-format json` run's result (or, for a stream-json run, its last `result` event), or why it failed. */
+function claudeResult(r: Exec, events?: StreamEvent[]) {
   let out: ClaudeOut & { is_error?: boolean; result?: string; structured_output?: unknown; modelUsage?: Record<string, { outputTokens?: number }> };
   try {
-    out = stream ? lastResult(r.stdout) : JSON.parse(r.stdout);
+    out = events ? (events.findLast((e) => e.type === "result") as typeof out) : JSON.parse(r.stdout);
   } catch {
     throw vendorFailure("claude", r);
   }
+  // A stream that ends with no result: its last line is a raw event, so the reason is in stderr if anywhere.
+  if (!out) throw vendorFailure("claude", { ...r, stdout: "" });
   if (r.timedOut) throw vendorFailure("claude", r);
   if (out.is_error) {
     const msg = out.result ?? "unknown error";
@@ -190,61 +182,75 @@ async function runClaude(system: string, message: string, schema: object, task: 
     ...(model ? ["--model", model] : []),
   ];
   const r = await exec(cmd, task.cwd);
-  const out = claudeResult(r, task.web);
+  const events = task.web ? streamEvents(r.stdout) : undefined;
+  const out = claudeResult(r, events);
   // The model that wrote the most is the one that ran, except on a web task, where the search's own
-  // helper model can write more: its stream names the model it ran on.
+  // helper model can write more: its stream's `system init` event names the model it ran on.
   const usage = Object.entries(out.modelUsage ?? {}).sort((a, b) => (b[1].outputTokens ?? 0) - (a[1].outputTokens ?? 0));
-  const ran = task.web ? streamModel(r.stdout) : undefined;
-  return { output: out.structured_output ?? out.result, model: ran ?? usage[0]?.[0] ?? model ?? "claude-default", usage: claudeUsage(out), ...(task.web ? { web: webSeen(r.stdout) } : {}) };
+  const ran = events?.find((e) => e.type === "system" && e.subtype === "init" && typeof e.model === "string")?.model as string | undefined;
+  return { output: out.structured_output ?? out.result, model: ran ?? usage[0]?.[0] ?? model ?? "claude-default", usage: claudeUsage(out), ...(events ? { web: webSeen(events) } : {}) };
 }
 
-/** The model a stream-json run ran on, from its opening `system init` event. */
-function streamModel(stdout: string): string | undefined {
-  for (const line of stdout.split("\n")) {
+type StreamEvent = { type?: string; subtype?: string; model?: unknown; message?: { content?: unknown }; tool_use_result?: unknown; [k: string]: unknown };
+const streamEvents = (stdout: string): StreamEvent[] =>
+  stdout.split("\n").flatMap((line) => {
     try {
       const e = JSON.parse(line);
-      if (e?.type === "system" && e.subtype === "init" && typeof e.model === "string") return e.model;
-    } catch { /* not an event line */ }
-  }
-  return undefined;
-}
+      return e && typeof e === "object" ? [e as StreamEvent] : [];
+    } catch {
+      return []; // not an event line
+    }
+  });
 
-/** The pages and text a `claude -p --output-format stream-json` run's WebSearch and WebFetch calls
- *  returned: each search's links (title and URL), each fetched URL, and every result's text. */
-export function webSeen(stdout: string): WebSeen {
-  const seen: WebSeen = { searched: false, pages: [], text: "" };
-  const add = (url: unknown, title: unknown) => {
-    if (typeof url === "string" && /^https?:\/\//.test(url) && !seen.pages.some((p) => samePage(p.url, url))) seen.pages.push({ url, title: typeof title === "string" ? title : "" });
+export const isWebUrl = (s: unknown): s is string => typeof s === "string" && /^https?:\/\//i.test(s.trim());
+
+/** The pages a stream-json run's WebSearch and WebFetch calls returned, each with the text of the
+ *  results it came back in: a search's links (its summary's links too), and each URL fetched. A link
+ *  inside a fetched page is not a page it returned. */
+export function webSeen(events: StreamEvent[]): WebSeen {
+  const seen: WebSeen = { searched: false, pages: [] };
+  const add = (url: unknown, title: unknown, text: string) => {
+    if (!isWebUrl(url)) return;
+    const page = seen.pages.find((p) => samePage(p.url, url));
+    if (!page) seen.pages.push({ url: url.trim(), title: typeof title === "string" ? title : "", text });
+    else {
+      if (!page.text.includes(text)) page.text += `\n\n${text}`;
+      if (!page.title && typeof title === "string") page.title = title;
+    }
   };
-  const fetches = new Map<string, unknown>(); // a fetch's call id → its URL, citable once it returned
-  for (const line of stdout.split("\n")) {
-    let e: { type?: string; message?: { content?: unknown }; tool_use_result?: unknown };
-    try { e = JSON.parse(line); } catch { continue; }
+  const calls = new Map<string, { name: string; url?: unknown }>(); // tool call id → which tool, and a fetch's URL
+  for (const e of events) {
     const content = Array.isArray(e.message?.content) ? (e.message.content as Record<string, unknown>[]) : [];
     if (e.type === "assistant")
       for (const c of content)
         if (c.type === "tool_use" && (c.name === "WebSearch" || c.name === "WebFetch")) {
           seen.searched = true;
-          if (c.name === "WebFetch") fetches.set(String(c.id), (c.input as { url?: unknown })?.url);
+          calls.set(String(c.id), { name: c.name, url: (c.input as { url?: unknown })?.url });
         }
     if (e.type !== "user") continue;
     for (const c of content) {
-      if (c.type !== "tool_result" || c.is_error) continue;
+      const call = calls.get(String(c.tool_use_id));
+      if (c.type !== "tool_result" || c.is_error || !call) continue;
       const text = typeof c.content === "string" ? c.content : Array.isArray(c.content) ? (c.content as { text?: unknown }[]).map((x) => (typeof x.text === "string" ? x.text : "")).join("\n") : "";
-      seen.text += `${text}\n\n`;
-      add(fetches.get(String(c.tool_use_id)), "");
-      for (const m of text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g)) add(m[2], m[1]);
+      if (call.name === "WebFetch") {
+        add(call.url, "", text);
+        continue;
+      }
+      const results = (e.tool_use_result as { results?: { content?: unknown }[] } | undefined)?.results;
+      for (const r of Array.isArray(results) ? results : [])
+        for (const l of Array.isArray(r.content) ? (r.content as { url?: unknown; title?: unknown }[]) : []) add(l.url, l.title, text);
+      for (const m of text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/gi)) add(m[2], m[1], text);
     }
-    const results = (e.tool_use_result as { results?: { content?: unknown }[] } | undefined)?.results;
-    for (const r of Array.isArray(results) ? results : [])
-      for (const l of Array.isArray(r.content) ? (r.content as { url?: unknown; title?: unknown }[]) : []) add(l.url, l.title);
   }
   return seen;
 }
 
-/** Two links to the same page: scheme, "www.", a trailing slash and the #fragment don't count. */
+/** Two links to the same page: scheme, "www.", the host's case, a trailing slash and the #fragment don't count. */
 export function samePage(a: string, b: string): boolean {
-  const key = (u: string) => u.trim().replace(/#.*$/, "").replace(/^https?:\/\/(www\.)?/i, "").replace(/\/+$/, "").toLowerCase();
+  const key = (u: string) => {
+    const m = u.trim().replace(/#.*$/, "").replace(/\/+$/, "").match(/^https?:\/\/(?:www\.)?([^/?]*)(.*)$/i);
+    return m ? `${m[1]!.toLowerCase()}${m[2]}` : u;
+  };
   return key(a) === key(b);
 }
 
