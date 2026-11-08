@@ -4098,6 +4098,20 @@ journey("toast: a long title is clipped to two lines, not a wall of text over th
   }
 });
 
+journey("sidebar: scrolled to the end, its rows stop under the title bar, never behind the toggle and Back", async (page) => {
+  await page.setViewportSize({ width: 1280, height: 260 });
+  const side = page.locator(".sidebar");
+  await side.locator(".side-item", { hasText: "Habits" }).waitFor({ state: "attached" });
+  // The strip left of the sidebar toggle, under the title bar: what it shows at the top of the list is
+  // the plain sidebar, and scrolled to the end it must show the same, with no row showing through.
+  const strip = { x: 8, y: 2, width: 64, height: 30 };
+  await side.evaluate((s) => (s.scrollTop = 0));
+  const clear = await page.screenshot({ clip: strip });
+  if (!(await side.evaluate((s) => ((s.scrollTop = s.scrollHeight), s.scrollTop > 0)))) throw new Error("the sidebar didn't scroll at this height");
+  await page.waitForTimeout(100);
+  if (!clear.equals(await page.screenshot({ clip: strip }))) throw new Error("sidebar rows show under the title bar");
+});
+
 // —— run ——
 
 let failed = 0;

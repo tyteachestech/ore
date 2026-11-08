@@ -120,6 +120,12 @@ kbd {
   overflow-y: auto;
   overscroll-behavior: none;
 }
+/* The title bar's strip stays the sidebar's colour as it scrolls (Notion, Linear): rows stop under it,
+   never showing through the traffic lights, the sidebar toggle and Back. */
+.sidebar:not(.peek)::before {
+  content: ""; position: sticky; top: calc(-1 * (var(--titlebar) + 6px)); z-index: 2; display: block;
+  height: var(--titlebar); margin: calc(-1 * (var(--titlebar) + 6px)) -8px 6px; background: var(--bg-side);
+}
 /* Collapsed: a strip on the left edge floats the sidebar out over the content (Notion, Arc). */
 .side-edge { position: fixed; top: var(--titlebar); bottom: 0; left: 0; width: 10px; z-index: 4; }
 .sidebar.peek {
