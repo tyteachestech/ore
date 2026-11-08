@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { addHighlight } from "../src/annotations.ts";
 import { arrangeFeeds, clearPreviews, closePost, feedView, findFeed, followFeed, listFeeds, markRead, openPost, parseFeed, refreshFeeds, restoreFeed, unfollowFeed } from "../src/feeds.ts";
 import { addSource } from "../src/ingest/index.ts";
@@ -49,6 +51,9 @@ function serve(down = new Set<string>()) {
     "https://howiai.example.com/": [`<html><body>No feed link here</body></html>`, "text/html"],
     "https://howiai.example.com/feed": [RSS, "application/rss+xml"],
     "https://nofeed.example.com/": ["<html><body>Just a page</body></html>", "text/html"],
+    // A Wikipedia article names the wiki's feed of recent edits, which answers.
+    "https://en.wikipedia.org/wiki/Spaced_repetition": [readFileSync(join(import.meta.dir, "fixtures/intake/web/wikipedia.html"), "utf8"), "text/html"],
+    "https://en.wikipedia.org/w/index.php?title=Special:RecentChanges&feed=atom": [ATOM, "application/atom+xml"],
   };
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input);
@@ -86,6 +91,11 @@ describe("reading feeds", () => {
     expect((await findFeed("https://simonwillison.net/atom/everything/")).title).toBe("Simon Willison's Weblog");
     expect((await findFeed("https://howiai.example.com/")).url).toBe("https://howiai.example.com/feed");
     expect(findFeed("https://nofeed.example.com/")).rejects.toThrow(/kill-the-newsletter/);
+  });
+
+  test("a wiki article has nothing to follow: the feed it names lists the wiki's edits, not posts", async () => {
+    serve();
+    await expect(findFeed("https://en.wikipedia.org/wiki/Spaced_repetition")).rejects.toThrow("a wiki's feeds list its edits");
   });
 });
 

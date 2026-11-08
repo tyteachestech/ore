@@ -6,6 +6,8 @@
 // Each step reports the wall time until the screen is settled: no `ore` call in flight and no long task for 300 ms.
 // Numbers are medians across rounds; `calls` is how many `ore` commands the step ran, `cli` the slowest one,
 // `long` the main thread's long tasks (ms). --calls lists each call's start and length; --compiled runs a compiled CLI.
+//   --check bench-baseline.json   fails when a step's median is over 1.5× its baseline (+150 ms, so a short step's
+//   jitter doesn't trip it), or a step fails; CI runs this. Without the file it prints one to save from that machine.
 import { chromium, type Page } from "playwright";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,6 +19,7 @@ const MOCK = join(APP, "scripts/mock");
 const arg = (name: string) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined);
 const ROUNDS = Number(arg("--rounds") ?? 3);
 const ONLY = arg("--only");
+const CHECK = arg("--check");
 const PORT = 1460, BRIDGE = 1461;
 
 const lib = process.env.BENCH_LIB ?? join(tmpdir(), "ore-bench");
@@ -150,6 +153,7 @@ if (ONLY && !steps.some(([n]) => n.includes(ONLY))) {
   throw new Error(`no step matches --only ${ONLY}: ${steps.map(([n]) => n).join(", ")}`);
 }
 const runs = new Map<string, Result[]>();
+const failed: string[] = [];
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 try {
   browser = await chromium.launch();
@@ -168,6 +172,7 @@ try {
         if (!ONLY || name.includes(ONLY)) runs.set(name, [...(runs.get(name) ?? []), res]);
       } catch (e) {
         console.error(`${name}: ${(e as Error).message.split("\n")[0]}`);
+        failed.push(name);
       }
     }
     await page.close();
@@ -185,4 +190,21 @@ for (const [name, rs] of runs) {
   console.log(`${name.padEnd(28)} ${String(m("ms")).padStart(6)} ${String(m("calls")).padStart(6)} ${String(m("cli")).padStart(6)} ${String(m("long")).padStart(6)}  ${rs.at(-1)!.slowest ?? ""}`);
   // --calls: when each `ore` call of the last round started (ms into the step) and how long it took.
   if (process.argv.includes("--calls")) for (const l of rs.at(-1)!.log ?? []) console.log(`    ${l}`);
+}
+
+if (CHECK) {
+  const medians = Object.fromEntries([...runs].map(([name, rs]) => [name, median(rs.map((r) => r.ms))]));
+  if (!existsSync(CHECK)) {
+    console.log(`\nno baseline at ${CHECK}; this machine's, to save there:\n${JSON.stringify(medians, null, 2)}`);
+  } else {
+    const base: Record<string, number> = await Bun.file(CHECK).json();
+    const slow = Object.entries(base).flatMap(([name, ms]) => {
+      const now = medians[name];
+      return now !== undefined && now > Math.max(ms * 1.5, ms + 150) ? [`${name}: ${now} ms, baseline ${ms}`] : [];
+    });
+    const missing = Object.keys(base).filter((n) => !(n in medians) && !failed.includes(n));
+    for (const l of [...failed.map((n) => `${n}: failed`), ...slow, ...missing.map((n) => `${n}: not run`)]) console.error(`✗ ${l}`);
+    if (failed.length || slow.length || missing.length) process.exit(1);
+    console.log(`\nevery step within 1.5× of ${CHECK}`);
+  }
 }
