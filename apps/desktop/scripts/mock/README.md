@@ -10,7 +10,7 @@ cd apps/desktop && bun run dev &                               # vite on :1420
 ```
 
 In Playwright, before `goto("http://localhost:1420/")`: `await page.addInitScript({ path: "apps/desktop/scripts/mock/tauri.js" })`
-(set `window.__ORE_BRIDGE = <port>` in an earlier init script for a second bridge). AI commands return null, so AI results don’t render, unless the bridge runs with `ORE_MOCK_AI=<dir>`: then `<dir>/<command>.json` (`explain.json`, `research.json`…) answers that command, after 600 ms or `ORE_MOCK_DELAY` ms (set it long to look at a wait).
+(set `window.__ORE_BRIDGE = <port>` in an earlier init script for a second bridge). AI commands return null, so AI results don’t render, unless the bridge runs with `ORE_MOCK_AI=<dir>`: then `<dir>/<command>.json` (`explain.json`, `research.json`…) answers that command, after 600 ms or `ORE_MOCK_DELAY` ms (set it long to look at a wait). Background enrichment after an add is off (it would run the real `claude` or `codex` CLI and spend usage); `ORE_MOCK_ENRICH=1` turns it on.
 
 Every seed ends with `addMess` (`mess.ts`): `.DS_Store`, `._` files, `Icon\r`, a stray `.txt` and an empty
 folder, as Finder leaves them in a real library. Code that walks the library must skip them.

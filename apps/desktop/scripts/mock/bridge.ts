@@ -29,7 +29,9 @@ Bun.serve({
       if (canned && (await canned.exists())) return new Promise((ok) => setTimeout(async () => ok(new Response(await canned.text(), { headers: h })), Number(process.env.ORE_MOCK_DELAY ?? 600)));
       return new Response(JSON.stringify(null), { headers: h });
     }
-    const p = Bun.spawn(["bun", CLI, ...args, "--json"], { stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
+    // No background enrichment unless ORE_MOCK_ENRICH=1: `ore add` would start the real claude or codex CLI and spend real usage.
+    const env = { ...process.env, ORE_NO_ENRICH: process.env.ORE_MOCK_ENRICH ? "" : "1" };
+    const p = Bun.spawn(["bun", CLI, ...args, "--json"], { env, stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
     if (job) jobs.set(job, p);
     const [out, err, code] = [await new Response(p.stdout).text(), await new Response(p.stderr).text(), await p.exited];
     if (job) jobs.delete(job);
