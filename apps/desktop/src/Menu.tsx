@@ -118,7 +118,7 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
 }
 
 /** The ⋯ button that opens the same actions as right-click; shown on row hover. */
-export function MoreButton({ label, actions, className = "more", icon, hint = "More actions", open, onOpenChange, onPointerDown, align = "end", keepFocus }: {
+export function MoreButton({ label, actions, className = "more", icon, hint = "More actions", open, onOpenChange, onPointerDown, align = "end", keepFocus, focusBack }: {
   label: string;
   actions: Actions;
   className?: string;
@@ -133,12 +133,15 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   align?: "start" | "end";
   /** Focus stays where the action put it (the note's text), not back on the button. */
   keepFocus?: boolean;
+  /** Where focus goes when the menu closes, for a button shown only on hover, which can't take it back (the sidebar's ⋯ gives it to its row). */
+  focusBack?: (button: HTMLButtonElement | null) => HTMLElement | null | undefined;
 }) {
   const { later, pick, closed } = useLater();
+  const self = useRef<HTMLButtonElement>(null);
   // Off screen in a long list (Lite.tsx): the same button as the trigger renders, its menu and hint once it scrolls in.
   const lite = useLite() && !open;
   const button = (
-    <button {...(lite && { type: "button", "aria-haspopup": "menu", "aria-expanded": false })} className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => (onPointerDown?.(e), e.stopPropagation())}>
+    <button ref={self} {...(lite && { type: "button", "aria-haspopup": "menu", "aria-expanded": false })} className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => (onPointerDown?.(e), e.stopPropagation())}>
       {icon ?? <DotsThree size={16} aria-hidden="true" />}
     </button>
   );
@@ -149,7 +152,11 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
         <DropdownMenu.Trigger asChild>{button}</DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus)} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => {
+          const to = !keepFocus && focusBack?.(self.current);
+          if (to) (e.preventDefault(), to.focus({ preventScroll: true }));
+          closed(e, keepFocus);
+        }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <DropdownMenu.Separator className="menu-sep" />}

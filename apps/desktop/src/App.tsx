@@ -829,12 +829,14 @@ export function App() {
   const toggleSidebar = useCallback(() => {
     clearTimeout(peekTimer.current);
     setPeek(false);
+    // Hidden with focus in it: focus goes to the view's list, where it has one (Tyler, 2026-11-08), not into the hidden sidebar.
+    if (!collapsed && document.activeElement?.closest(".sidebar")) setTimeout(() => listRef.current?.focus({ preventScroll: true }));
     if (autoHide && !hideSidebar) return setShowAnyway((v) => !v);
     setHideSidebar((v) => {
       save("ore.sidebar", v ? "open" : "collapsed");
       return !v;
     });
-  }, [autoHide, hideSidebar]);
+  }, [autoHide, hideSidebar, collapsed]);
 
   /** Back from Settings; Home re-reads the goal it may have changed. */
   const closeSettings = useCallback(() => {

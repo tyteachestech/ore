@@ -358,7 +358,7 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, taken, 
           )}
           {!renaming && (
             <span className="side-head-tools" onPointerDown={(e) => e.stopPropagation()}>
-              {group.collection && <MoreButton className="side-tool" label={`Actions for ${group.name}`} actions={menu} />}
+              {group.collection && <MoreButton className="side-tool" label={`Actions for ${group.name}`} actions={menu} focusBack={headOf} />}
               <Hint text={label}>
                 <button className="side-tool" aria-label={label} onClick={onAdd}>
                   <Plus size={13} weight="bold" aria-hidden="true" />
@@ -428,6 +428,10 @@ function SkillFace({ s, marked }: { s: Skill; marked: boolean }) {
   );
 }
 
+// The ⋯ and + show only on hover, so focus that would go back to them goes to their row: the skill, or the collection's name.
+const rowOf = (b: HTMLElement | null) => b?.closest(".side-item")?.querySelector<HTMLElement>(".side-main");
+const headOf = (b: HTMLElement | null) => b?.closest(".side-section")?.querySelector<HTMLElement>(".side-label");
+
 /** One skill: a click opens its page; a drag (past 4 px) lifts it, leaving a slot where it will land. */
 function SkillRow({ s, on, drop, marked, onOpen, menu }: {
   s: Skill;
@@ -455,7 +459,7 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
           )}
           <span className="label">{s.name}</span>
         </button>
-        <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} />
+        <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} focusBack={rowOf} />
       </div>
     </WithMenu>
   );
@@ -512,7 +516,10 @@ function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; col
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 e.stopPropagation();
+                // Focus goes to the collection's name, since the + that opened this shows only on hover.
+                const head = headOf(e.currentTarget);
                 onDone(null);
+                setTimeout(() => (!document.activeElement || document.activeElement === document.body) && head?.focus({ preventScroll: true }));
               }
             }}
           />
