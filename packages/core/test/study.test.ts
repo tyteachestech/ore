@@ -7,7 +7,7 @@ import { openIndex, rebuildIndex } from "../src/db.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
 import { readReviews } from "../src/reviews.ts";
-import { endSession, readSessions, reopenSession, startSession } from "../src/sessions.ts";
+import { endSession, openSessionId, readSessions, reopenSession, startSession } from "../src/sessions.ts";
 import { paths } from "../src/library.ts";
 import { setReviewSettings } from "../src/skills.ts";
 import { dueQueue, libraryStats, recordReview, undoReview } from "../src/study.ts";
@@ -161,6 +161,27 @@ describe("review loop", () => {
     await recordReview(lib2, c.meta.id, { rating: 1, confidence: 3, now: at(0) });
     const tomorrow = new Date(t0 + 864e5);
     expect(dueQueue(lib2, tomorrow).find((e) => e.id === c.meta.id)?.relearn ?? false).toBe(false);
+  });
+
+  test("two windows' sessions overlap: each logs and ends its own, by id", async () => {
+    const { lib, a, b } = await setup();
+    const main = startSession(lib);
+    await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, session: main.id });
+    const quiz = startSession(lib); // the quick quiz shows while the main window reviews
+    await recordReview(lib, b.meta.id, { rating: 3, confidence: 2, session: quiz.id });
+    expect(endSession(lib, new Date(Date.now() + 1000), false, quiz.id)).toMatchObject({ id: quiz.id, reviews: 1 });
+    await Bun.sleep(5);
+    const next = await recordReview(lib, b.meta.id, { rating: 1, confidence: 2, session: main.id });
+    expect(next.session).toBe(main.id);
+    expect(endSession(lib, new Date(Date.now() + 2000), false, main.id)).toMatchObject({ id: main.id, reviews: 2 });
+    expect(() => endSession(lib, new Date(), false, "nope")).toThrow(/no session/);
+    // Ending one session by id leaves another one's open file alone.
+    const open = startSession(lib);
+    endSession(lib, new Date(Date.now() + 3000), false, main.id);
+    expect(openSessionId(lib)).toBe(open.id);
+    // Reopening a session (⌘Z on its end screen) while another window's is open doesn't fail.
+    expect(() => reopenSession(lib, main.id)).not.toThrow();
+    expect(openSessionId(lib)).toBe(open.id);
   });
 
   test("a review on another device dated later than now (its clock ahead) doesn't block rating the card", async () => {

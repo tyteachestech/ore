@@ -2649,6 +2649,110 @@ function oreCalls(page: Page) {
   return { calls, rated, undoAll: async () => { for (const r of rated.splice(0).reverse()) await ore("review", r.card, `--undo=${r.ts}`).catch(() => {}); } };
 }
 
+/** The quick quiz window (D76), as a second page on the same library; `quiz-open` shows it. */
+async function openQuiz(): Promise<Page> {
+  const quiz = await browser.newPage({ viewport: { width: 680, height: 520 } });
+  quiz.setDefaultTimeout(8000);
+  quiz.on("pageerror", (e) => errors.push(e.message));
+  await quiz.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}; window.__ORE_LABEL = "quiz"`);
+  await quiz.addInitScript({ path: join(MOCK, "tauri.js") });
+  await quiz.goto(url);
+  await quiz.locator(".quick").waitFor({ state: "attached" });
+  await quiz.waitForTimeout(300); // its event listeners register
+  return quiz;
+}
+const emit = (page: Page, event: string) => page.evaluate((e) => (window as unknown as { __emit: (e: string) => void }).__emit(e), event);
+
+journey("review: the quick quiz during a review keeps its own session; the card it rated drops out, and the review still ends on its end screen", async (page) => {
+  const main = oreCalls(page);
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  await reveal(page);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await until("the next card shows", async () => main.rated.length === 1 && (await q.count()) > 0);
+  const quiz = await openQuiz();
+  const inQuiz = oreCalls(quiz);
+  try {
+    await emit(quiz, "quiz-open");
+    await quiz.locator(".review-q").waitFor();
+    const asked = await quiz.locator(".review-q").innerText();
+    if ((await q.innerText()) !== asked) throw new Error(`the quiz asked another card than the one on screen: ${asked}`);
+    await reveal(quiz);
+    await quiz.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the quiz logs it", async () => inQuiz.rated.length === 1);
+    await quiz.keyboard.press("Escape");
+    await quiz.locator(".review").waitFor({ state: "detached" });
+    await emit(page, "quiz-closed");
+    await until("the card the quiz rated leaves the main window", async () => (await q.count()) > 0 && (await q.innerText()) !== asked);
+    await reveal(page);
+    await page.getByRole("button", { name: "Again", exact: true }).click();
+    await until("the miss is logged", async () => main.rated.length === 2);
+    await page.keyboard.press("Escape");
+    await page.locator(".review-foot").getByRole("button", { name: "Done" }).waitFor();
+    const sessions = new Set(main.calls.filter((a) => a[0] === "review").map((a) => a.find((x) => x.startsWith("--session="))));
+    if (sessions.size !== 1 || sessions.has(undefined)) throw new Error(`the main window's ratings went to sessions ${[...sessions].join(", ")}`);
+  } finally {
+    await quiz.close();
+    await main.undoAll();
+    await inQuiz.undoAll();
+  }
+  await page.keyboard.press("Enter");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("quick quiz: put away and shown again in one go, it shows afresh with its own session; Esc closes quietly", async (page) => {
+  const quiz = await openQuiz();
+  const calls = oreCalls(quiz);
+  try {
+    await emit(quiz, "quiz-open");
+    await quiz.locator(".review-q").waitFor();
+    // The shortcut twice at once: put away and shown again in one task.
+    await quiz.evaluate(() => {
+      const w = window as unknown as { __emit: (e: string) => void };
+      w.__emit("quiz-away");
+      w.__emit("quiz-open");
+    });
+    await quiz.locator(".review-q").waitFor();
+    await reveal(quiz);
+    await quiz.getByRole("button", { name: "Again", exact: true }).click();
+    await until("the miss is logged", async () => calls.rated.length === 1);
+    await quiz.keyboard.press("Escape");
+    await quiz.locator(".review").waitFor({ state: "detached" });
+    await quiz.waitForTimeout(400);
+    const shown = await quiz.locator(".quick").innerText();
+    if (shown.trim()) throw new Error(`Esc left: ${shown}`);
+  } finally {
+    await calls.undoAll();
+    await quiz.close();
+  }
+  await page.getByRole("button", { name: "Start review" }).waitFor();
+});
+
+journey("review: ⌘Z on Home after leaving takes the rating back, leaves the session ended, and Home reads its numbers again", async (page) => {
+  const app = oreCalls(page);
+  await startReview(page, null);
+  for (let n = 0; n < 2; n++) {
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the rating is logged", async () => app.rated.length === n + 1);
+  }
+  await page.keyboard.press("Escape");
+  const done = page.locator(".review-foot").getByRole("button", { name: "Done" });
+  await done.waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator(".review").waitFor({ state: "detached" });
+  await page.waitForTimeout(300);
+  const from = app.calls.length;
+  await page.keyboard.press("Meta+z");
+  const after = () => app.calls.slice(from);
+  await until("⌘Z takes the rating back", async () => after().some((a) => a[0] === "review" && a.some((x) => x.startsWith("--undo"))));
+  await until("Home reads today again", async () => after().some((a) => a[0] === "today"));
+  await page.waitForTimeout(300);
+  if (after().some((a) => a[0] === "session")) throw new Error(`⌘Z on Home touched the ended session: ${JSON.stringify(after().filter((a) => a[0] === "session"))}`);
+  app.rated.pop();
+  await app.undoAll();
+});
+
 journey("review: two rating keys in one task log one rating", async (page) => {
   const app = oreCalls(page);
   await startReview(page, null);

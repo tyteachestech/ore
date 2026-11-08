@@ -2162,6 +2162,7 @@ export function App() {
             openSource(item, at);
           }}
           onClose={endReview}
+          onLogged={() => setHomeTick((n) => n + 1)}
           notify={notify}
         />
         </Boundary>

@@ -235,7 +235,7 @@ export const studyCommands: Record<string, Command> = {
   },
 
   session: {
-    usage: "start|end|reopen <id>         review session receipts; reopen: an ended session again (an undo on its end screen)",
+    usage: "start|end [<id>]|reopen <id>  review session receipts; end: that session (the last one started by default); reopen: an ended session again (an undo on its end screen)",
     async run([sub, id]) {
       const lib = openLibrary();
       if (sub === "start") {
@@ -246,7 +246,7 @@ export const studyCommands: Record<string, Command> = {
         return { data: { id: r.id, ts: r.ts }, text: `Session ${r.id} started` };
       }
       if (sub === "end") {
-        const r = endSession(lib, new Date(), dueQueue(lib).length === 0);
+        const r = endSession(lib, new Date(), dueQueue(lib).length === 0, id);
         snapshot(lib, { force: true });
         // Calibration on the week's first end screen only, never during a card (D69).
         const cal = (r.reviews ?? 0) > 0 && firstEndThisWeek(lib) ? calibration(readReviews(lib)) : null;
@@ -257,7 +257,7 @@ export const studyCommands: Record<string, Command> = {
         reopenSession(lib, need(id, "<id>"));
         return { data: { id }, text: `Session ${id} reopened` };
       }
-      throw new Error("usage: ore session start|end|reopen <id>");
+      throw new Error("usage: ore session start|end [<id>]|reopen <id>");
     },
   },
 

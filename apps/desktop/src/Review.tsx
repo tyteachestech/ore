@@ -1,4 +1,5 @@
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, PencilSimple, ThumbsDown, Trash, X } from "./icons";
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
@@ -40,7 +41,7 @@ const drafts = new Map<string, { text: string; conf?: number }>();
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-export function Review({ pick, skills, onOpenSource, onClose, notify, quick = false, paused = false }: {
+export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Hidden while he reads the source a card opened; it waits on that card, its keys off. */
@@ -48,6 +49,8 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   skills: Skill[];
   onOpenSource: (item: string, at?: string) => void;
   onClose: (again?: boolean) => void;
+  /** A rating taken back (⌘Z) or given again after Review closed: today's numbers changed. */
+  onLogged?: () => void;
   notify: Notify;
   quick?: boolean;
 }) {
@@ -95,6 +98,11 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const sureRef = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const reviewed = useRef(0);
+  /** This window's session, named by id in every call: the main window and the quick quiz can each have
+   *  one open (D76), and the last one started is not always this one. `open`: not ended yet. */
+  const session = useRef<{ id: string; open: boolean } | null>(null);
+  /** False once Review has closed: ⌘Z and ⇧⌘Z on a rating from it then only change the log. */
+  const mounted = useRef(false);
   /** Active time in this session, to end it when today's goal closes (D65). */
   const activeMs = useRef(0);
   const before = useRef<Today | null>(null);
@@ -122,9 +130,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
   const entry = queue?.[0];
 
   useEffect(() => {
+    let live = true;
     void (async () => {
       try {
-        await ore("session", "start");
+        const s = await ore<{ id: string }>("session", "start");
+        // Closed before the session began: it ends at once, as leaving would have ended it.
+        if (!live) return void ore("session", "end", s.id).catch(() => {});
+        session.current = { id: s.id, open: true };
         const t = ore<Today>("today").then((t) => {
           before.current = t;
           setStart(t);
@@ -138,7 +150,30 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         setError(errorText(e));
       }
     })();
+    mounted.current = true;
+    return () => {
+      live = false;
+      mounted.current = false;
+      // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
+      // this session ends, by its id, never another window's.
+      const s = session.current;
+      if (s?.open) void ore("session", "end", s.id).catch(() => {});
+      session.current = null;
+    };
   }, [pick]);
+
+  // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
+  // comes up twice.
+  useEffect(() => {
+    if (quick || PHONE) return;
+    const un = listen("quiz-closed", () => {
+      ore<DueEntry[]>("due", ...(pick ?? []).map((s) => opt("skill", s))).then((fresh) => {
+        const due = new Set(fresh.map((e) => e.id));
+        setQueue((q) => q && (q.every((e) => due.has(e.id)) ? q : q.filter((e) => due.has(e.id))));
+      }, () => {});
+    });
+    return () => void un.then((f) => f());
+  }, [quick, pick]);
 
   /** A fresh start on a card: no answer, no marks, its clock not yet started. */
   const reset = () => {
@@ -205,10 +240,14 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
 
   /** Ends the session; `endScreen` shows the end screen if he rated anything (never on leaving the quick quiz). */
   const finish = useCallback(async (endScreen = true) => {
-    if (busy) return;
+    if (busyNow.current) return;
+    const s = session.current;
+    // Left before the session began: closing ends it once it has.
+    if (!s?.open) return onClose();
     setBusy(true);
     try {
-      const session = await ore<SessionEnd>("session", "end");
+      const receipt = await ore<SessionEnd>("session", "end", s.id);
+      s.open = false;
       if (reviewed.current && !endScreen) return onClose();
       if (!reviewed.current) {
         if (quick) return onClose();
@@ -218,7 +257,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         notify(nothingDue(before.current, pick));
         return onClose();
       }
-      setEnd({ session, today: await ore<Today>("today"), before: before.current });
+      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
@@ -365,6 +404,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
         opt("elapsed-ms", String(elapsed)),
         ...variantOpt(card),
         ...(inHead ? ["--in-head"] : []),
+        ...(session.current ? [opt("session", session.current.id)] : []),
       ];
       await submit(args, rating, elapsed);
       drafts.delete(card.id);
@@ -394,12 +434,13 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       notify(
         "Rating",
         "quiet",
+        // With Review closed, only the log changes (its session stays ended), and Home reads its numbers again.
         () => {
-          if (!undoNow.current(ts)) ore("review", id, opt("undo", ts)).catch((e) => notify(errorText(e), "error"));
+          if (!(mounted.current && undoNow.current(ts))) ore("review", id, opt("undo", ts)).then(() => onLogged?.(), (e) => notify(errorText(e), "error"));
         },
         () => {
-          if (!redoNow.current(id, args, rating, elapsed, { forget, setTs }))
-            ore<{ ts: string }>("review", ...args).then((x) => setTs(x.ts), (e) => notify(errorText(e), "error"));
+          if (!(mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })))
+            ore<{ ts: string }>("review", ...args).then((x) => (setTs(x.ts), onLogged?.()), (e) => notify(errorText(e), "error"));
         },
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
@@ -420,6 +461,7 @@ export function Review({ pick, skills, onOpenSource, onClose, notify, quick = fa
       await ore("review", last.card, opt("undo", last.ts));
       if (end) {
         await ore("session", "reopen", end.session.id);
+        if (session.current) session.current.open = true;
         setEnd(null);
       }
       reviewed.current--;
