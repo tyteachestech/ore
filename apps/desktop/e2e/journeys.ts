@@ -671,11 +671,11 @@ journey("tutor pending: closing mid-reply asks once; a new chat keeps its own re
   const fresh = tutor.getByRole("button", { name: "New chat" });
   await field.fill("First question");
   await page.keyboard.press("Enter");
-  await tutor.getByText("Thinking…").waitFor();
+  await tutor.getByText("Reading your sources…").waitFor();
   await page.keyboard.press("Escape");
   await until("Esc closes it", async () => (await tutor.count()) === 0);
   await page.keyboard.press("Meta+j");
-  await tutor.getByText("Thinking…").waitFor();
+  await tutor.getByText("Reading your sources…").waitFor();
   await page.waitForTimeout(400);
   if (asked.length !== 1) throw new Error(`reopening asked again: ${asked.length} requests`);
   // A new chat while it thinks: its own question gets its own reply.

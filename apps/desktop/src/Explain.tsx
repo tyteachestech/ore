@@ -226,7 +226,7 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
             <Sparkle size={11} aria-hidden="true" /> Here
           </div>
           {gloss === undefined ? (
-            <p className="loading lookup-body"><Working label="Explaining…" slow="This can take about 20 seconds." /></p>
+            <p className="loading lookup-body"><Working stage="write" label="Explaining…" slow="This can take about 20 seconds." /></p>
           ) : "error" in gloss ? (
             <p className="lookup-body none">
               {gloss.error}{" "}
@@ -278,7 +278,7 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
             </span>
           </div>
           {found === undefined ? (
-            <p className="loading lookup-body"><Working label="Finding sources…">It takes up to a minute. Your question is saved, so you can keep reading.</Working></p>
+            <p className="loading lookup-body"><Working stage="search" label="Finding sources…">It takes up to a minute. Your question is saved, so you can keep reading.</Working></p>
           ) : "error" in found ? (
             <p className="lookup-body none">
               {found.error} Your question is saved under Questions.{" "}
