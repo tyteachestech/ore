@@ -1,8 +1,8 @@
 import type { SVGProps } from "react";
-import { pixels } from "./icons";
+import { dots, spriteSize } from "./icons";
 
 // Highlight-type and section icons, drawn like the UI icons in icons.tsx: 16-grid sprites after MingCute's filled set,
-// in the current colour, at 16px (32px at 24 and up) so every pixel lands on whole device pixels on a Retina screen.
+// in the current colour, each pixel a round dot, a quarter bigger than asked (20px for 16, 40px at 24 and up).
 
 type Props = Omit<SVGProps<SVGSVGElement>, "ref"> & { size?: number; weight?: string };
 
@@ -13,11 +13,11 @@ export const outline = (rows: readonly string[]) =>
   );
 
 const sprite = (rows: readonly string[]) => {
-  const d = pixels(rows), line = pixels(outline(rows));
+  const d = dots(rows), line = dots(outline(rows));
   return function PixelIcon({ size = 16, weight, ...rest }: Props) {
-    const px = size >= 24 ? 32 : 16;
+    const px = spriteSize(size);
     return (
-      <svg width={px} height={px} viewBox="0 0 16 16" shapeRendering="crispEdges" fill="currentColor" {...rest}>
+      <svg width={px} height={px} viewBox="0 0 16 16" fill="currentColor" data-sprite="" {...rest}>
         <path d={weight === "regular" ? line : d} />
       </svg>
     );

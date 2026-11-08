@@ -189,10 +189,11 @@ kbd {
 .skill-icon { display: inline-block; flex: none; width: 1em; height: 1em; line-height: 1; vertical-align: -0.125em; }
 .skill-icon.emoji { width: auto; text-align: center; font-family: "Apple Color Emoji", var(--font); }
 .skill-icon.glyph { background: var(--skill, var(--muted)); mask: center / contain no-repeat; -webkit-mask: center / contain no-repeat; }
-/* A skill's MingCute icon is a 16-grid sprite (pixelSkillIcons in vite.config.ts): drawn at 16px, or 32px in the big
-   tiles, so each pixel lands on whole device pixels, as the UI icons do (icons.tsx). */
-.skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
-:is(.skill-badge, .icon-button) .skill-icon.glyph { width: 32px; height: 32px; -webkit-mask-size: 32px; mask-size: 32px; }
+/* A skill's MingCute icon is a 16-grid dot sprite (pixelSkillIcons in vite.config.ts): drawn at 20px, or 40px in the big
+   tiles, a quarter over the UI icons' asked sizes, as icons.tsx draws them. */
+.skill-icon.glyph { width: 20px; height: 20px; -webkit-mask-size: 20px; mask-size: 20px; }
+:is(.skill-badge, .icon-button) .skill-icon.glyph { width: 40px; height: 40px; -webkit-mask-size: 40px; mask-size: 40px; }
+.chip .skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; } /* an 18px chip */
 .skill-icon.dot { width: 0.5em; height: 0.5em; border-radius: 50%; vertical-align: 0.1em; background: var(--skill, var(--faint)); opacity: var(--dot-opacity, 1); }
 .skill-icon.dot:not([data-color]) { --dot-opacity: 0.45; }
 .mark .skill-icon { font-size: 15px; }
