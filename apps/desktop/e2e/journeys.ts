@@ -185,6 +185,18 @@ journey("PDF footnote: its mark shows the note on hover, and bold stays bold", a
   await page.locator(".tip.note").waitFor({ state: "detached" });
 });
 
+journey("footnote: a long note's hover preview shows all of it (only a highlight note's is cut to six lines)", async (page) => {
+  const note = "The note goes on at length, as a book's notes do, so the preview has to hold every line of it. ".repeat(9) + "The last words.";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# Notes at length\n\nA claim that needs a note.[^1] Then more text.\n\n[^1]: ${note}\n`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc a.fn").first().hover();
+  const tip = page.locator(".tip.note");
+  await tip.getByText("The last words.", { exact: false }).waitFor();
+  const cut = await tip.evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+  if (cut) throw new Error("the footnote's preview is cut short");
+});
+
 journey("PDF tables: read in the background after adding, Undo puts the lines back, one click reads them again", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill(join(FIXTURES, "tables.pdf"));
@@ -767,6 +779,225 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await page.keyboard.press("Escape");
 });
 
+journey("highlight: a triple click keeps the paragraph as one step, so one ⌘Z takes it all back", async (page) => {
+  await openSource(page, TESTING);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300);
+  const at = (await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("Rereading, by contrast");
+      if (i < 0) continue;
+      n.parentElement!.scrollIntoView({ block: "center" });
+      const r = document.createRange();
+      r.setStart(n, i + 2);
+      r.setEnd(n, i + 3);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + 1, y: b.top + b.height / 2 };
+    }
+  }))!;
+  const writes: string[] = [];
+  page.on("request", (r) => void (/"(?:highlight|annotate)"/.test(r.postData() ?? "") && writes.push(r.postData()!)));
+  await page.mouse.click(at.x, at.y, { clickCount: 3 });
+  await popup.waitFor();
+  await until("the paragraph is highlighted", async () => (await kept()).some((t) => t.startsWith("Rereading, by contrast") && t.includes("weaker results.")));
+  // Not the double click's word first, then grown to the paragraph: two steps for one act.
+  if (writes.length !== 1) throw new Error(`a triple click wrote ${writes.length} times: ${writes.join(" | ")}`);
+  await page.keyboard.press("Enter");
+  await popup.waitFor({ state: "hidden" });
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("one ⌘Z leaves nothing of it highlighted", async () => !(await kept()).some((t) => t.includes("Rereading")));
+  await page.waitForTimeout(800); // the undo's writes are back
+  const left = await kept();
+  if (left.some((t) => t.includes("Rereading"))) throw new Error(`one ⌘Z left ${JSON.stringify(left)}`);
+});
+
+journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to the jump again, before leaving the source", async (page) => {
+  const part = (n: number) => `## Part ${n}\n\n` + `Part ${n} says one thing at length, so the source runs long enough to scroll. `.repeat(12);
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# A long read in parts\n\n${Array.from({ length: 10 }, (_, i) => part(i + 1)).join("\n\n")}`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("Part 1 says one thing").first().waitFor();
+  await page.waitForTimeout(500);
+  const top = () => page.evaluate(() => Math.round(document.querySelector(".reader-scroll")?.scrollTop ?? -1000));
+  const from = await top();
+  await page.locator("nav.outline").hover();
+  await page.locator(".outline-panel button").filter({ hasText: "Part 9" }).click();
+  await until("the outline jumps", async () => (await top()) > from + 400);
+  const jumped = await top();
+  await page.mouse.move(640, 400);
+  await page.keyboard.press("Meta+BracketLeft");
+  await until("⌘[ goes back to where he was", async () => Math.abs((await top()) - from) < 4);
+  if (!(await page.locator(".doc").isVisible())) throw new Error("⌘[ left the source");
+  await page.keyboard.press("Meta+BracketRight");
+  await until("⌘] goes to the jump again", async () => Math.abs((await top()) - jumped) < 4);
+  await page.keyboard.press("Meta+BracketLeft");
+  await page.keyboard.press("Meta+BracketLeft");
+  await until("then ⌘[ leaves the source, as before", async () => !(await page.locator(".doc").isVisible()));
+});
+
+journey("highlight note: a long note's hover preview stays inside the window", async (page) => {
+  await openSource(page, AGENTS);
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300);
+  await select(page, "Evaluator-optimiser loops");
+  await popup.waitFor();
+  await popup.getByLabel("Note").fill("A long thought about this loop, written out at length. ".repeat(55));
+  await page.keyboard.press("Escape");
+  await popup.waitFor({ state: "hidden" });
+  await page.waitForTimeout(400);
+  // Hover near the right edge and low in the window, where an unclamped preview runs off both.
+  const at = (await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("Evaluator-optimiser loops");
+      if (i < 0) continue;
+      const scroll = document.querySelector(".reader-scroll")!;
+      const r0 = document.createRange();
+      r0.setStart(n, i);
+      r0.setEnd(n, i + 1);
+      scroll.scrollTop += r0.getBoundingClientRect().top - (innerHeight - 120);
+      const r = document.createRange();
+      r.setStart(n, i + 10);
+      r.setEnd(n, i + 11);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + 1, y: b.top + b.height / 2 };
+    }
+  }))!;
+  await page.mouse.move(at.x - 5, at.y);
+  await page.mouse.move(at.x, at.y);
+  const tip = page.locator(".tip");
+  await tip.waitFor();
+  const box = (await tip.boundingBox())!;
+  const view = page.viewportSize()!;
+  if (box.y < 0 || box.y + box.height > view.height || box.x + box.width > view.width) throw new Error(`the preview runs off the window: ${JSON.stringify(box)}`);
+});
+
+journey("highlight: one the core can't place says what to do, not “text not found in item <id>”", async (page) => {
+  await openSource(page, TESTING);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { highlight: 'ore: text not found in item 01M6Y59CWZB27HBM869RVJPBGR: "Tom & Jerry"' }));
+  await page.waitForTimeout(300);
+  await select(page, "Space the tests out, mix topics together"); // a passage no other journey highlights
+  await until("an error toast", async () => (await page.locator(".toast").allInnerTexts()).some((t) => t.includes("Couldn’t highlight")));
+  const toast = (await page.locator(".toast").allInnerTexts()).join(" ");
+  if (/01M6Y|text not found/.test(toast)) throw new Error(`the toast shows the core's words: ${toast}`);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+});
+
+/** The middle of a phrase in the reader, scrolled into view. */
+async function pointAt(page: Page, phrase: string) {
+  return (await page.evaluate((phrase) => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf(phrase);
+      if (i < 0) continue;
+      n.parentElement!.scrollIntoView({ block: "center" });
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + phrase.length);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    }
+  }, phrase))!;
+}
+
+journey("highlight: a drag that starts right after a double click keeps both, the word without a popup", async (page) => {
+  await openSource(page, TESTING);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
+  await page.waitForTimeout(300);
+  const word = await pointAt(page, "laboratory");
+  await page.mouse.dblclick(word.x, word.y);
+  await select(page, "Free recall, short-answer questions"); // within the double-click time
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await until("the drag's passage is highlighted, its popup open", async () => (await active()).startsWith("Free recall, short-answer questions"));
+  await until("the word is kept too", async () => (await kept()).includes("laboratory"));
+});
+
+journey("highlight: a triple click whose selection runs past the text keeps the double click's word", async (page) => {
+  await openSource(page, TESTING);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  await page.waitForTimeout(300);
+  const word = await pointAt(page, "Decades");
+  await page.mouse.dblclick(word.x, word.y);
+  // WebKit's triple click on the last paragraph selects past the end of the text: the reader can't
+  // highlight that, so the word he double-clicked stays his.
+  await page.evaluate(({ x, y }) => {
+    const p = document.elementFromPoint(x, y)!.closest("p")!;
+    const r = document.createRange();
+    r.setStart(p, 0);
+    r.setEnd(document.body, document.body.childNodes.length);
+    const sel = getSelection()!;
+    sel.removeAllRanges();
+    for (const type of ["mousedown", "mouseup"]) {
+      if (type === "mouseup") sel.addRange(r);
+      p.dispatchEvent(new MouseEvent(type, { bubbles: true, detail: 3, button: 0, clientX: x, clientY: y }));
+    }
+  }, word);
+  await until("the word is highlighted", async () => (await kept()).includes("Decades"));
+});
+
+journey("highlight: an edge move that fails to save leaves it untouched, so Esc still drops it", async (page) => {
+  await openSource(page, AGENTS);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  const fail = (on: boolean) => page.evaluate((on) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = on ? { annotate: "The library is busy." } : {}), on);
+  await page.waitForTimeout(300);
+  await select(page, "Agents are systems where the model"); // a passage no other journey highlights
+  await popup.waitFor();
+  await until("the highlight is saved", async () => (await kept()).includes("Agents are systems where the model"));
+  const knob = (await page.locator(".grab-edge.end").boundingBox())!;
+  const to = await pointAt(page, "tool usage");
+  await fail(true);
+  await page.mouse.move(knob.x + knob.width / 2, knob.y + knob.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 8 });
+  await page.mouse.up();
+  await until("the move fails and says so", async () => (await page.locator(".toast").allInnerTexts()).some((t) => t.includes("The library is busy.")));
+  await fail(false);
+  await until("the edge is back where it was", async () => (await kept()).includes("Agents are systems where the model"));
+  await page.keyboard.press("Escape");
+  await until("Esc drops the untouched highlight", async () => !(await kept()).some((t) => t.startsWith("Agents are systems")));
+});
+
+journey("highlight: an edge he dragged is his, so Esc keeps the highlight and ⌘Z moves the edge back", async (page) => {
+  await openSource(page, AGENTS);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300);
+  await select(page, "That might mean not building"); // a passage no other journey highlights
+  await popup.waitFor();
+  await until("the highlight is saved", async () => (await kept()).includes("That might mean not building"));
+  const knob = (await page.locator(".grab-edge.end").boundingBox())!;
+  const to = (await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("is often enough.");
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i + "is often enough.".length - 1);
+      r.setEnd(n, i + "is often enough.".length);
+      const b = r.getBoundingClientRect();
+      return { x: b.right - 1, y: b.top + b.height / 2 };
+    }
+  }))!;
+  await page.mouse.move(knob.x + knob.width / 2, knob.y + knob.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 8 });
+  await page.mouse.up();
+  const long = "That might mean not building an agent at all: a single call with retrieval and good examples is often enough.";
+  await until("the edge moved", async () => (await kept()).includes(long));
+  await page.waitForTimeout(300); // the move is saved
+  await page.keyboard.press("Escape");
+  await popup.waitFor({ state: "hidden" });
+  await page.waitForTimeout(300);
+  if (!(await kept()).includes(long)) throw new Error(`Esc dropped the resized highlight: ${JSON.stringify(await kept())}`);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the edge back", async () => (await kept()).includes("That might mean not building"));
+});
+
 journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
   await openSource(page, AGENTS);
   const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
@@ -1083,6 +1314,9 @@ journey("source title: one click renames it in place, Enter saves, Esc keeps the
 });
 
 journey("Home: Continue reading rows rename from their menu, in place; Esc keeps the title, ⌘Z takes it back", async (page) => {
+  // Opened last, so sources other journeys added and opened don't push it off the list.
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
   const row = page.locator(".home-read").filter({ hasText: "The Testing Effect" }).first();
   await row.waitFor();
   const title = () => row.locator(".title").innerText();

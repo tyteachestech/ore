@@ -20,7 +20,7 @@ import { Grow } from "./Grow";
 import { Hint } from "./Hint";
 import { Thumb } from "./Thumb";
 import { SkillIcon } from "./IconPicker";
-import { is, isLoose, label, useKeymap } from "./keys";
+import { inTextField, is, isLoose, label, useKeymap } from "./keys";
 import { bigger, keepPlace, placeOf, smaller } from "./reading";
 import { againIn, define, lookable, wordAt } from "./lookup";
 import { Explain } from "./Explain";
@@ -34,7 +34,7 @@ import { Position } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, type Annotation, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
-import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
+import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
@@ -91,6 +91,15 @@ function noteText(mark: Element): string {
   if (!back || !block) return "";
   return (block.textContent ?? "").slice((back.textContent ?? "").length).replace(/^[:\s]+/, "").trim();
 }
+
+/** The tallest a hover preview gets (`.tip`, six lines), to keep it in the window. */
+const TIP_HEIGHT = 140;
+
+/** A highlight the core couldn't place: its "text not found in item <id>" gives him nothing to do. */
+const placeError = (e: unknown) => {
+  const why = errorText(e);
+  return /text not found in item/.test(why) ? "Couldn’t highlight across that part. Try starting or ending it on a nearby word." : why;
+};
 
 const components: Components = {
   a: ({ href, children }) => {
@@ -671,11 +680,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   // Paint highlights with the CSS Custom Highlight API; the Markdown DOM is never mutated.
   useEffect(() => {
     const index = idx.current;
-    if (!ready || !index || body === undefined) return;
+    if (!ready || !index || body === undefined || !src) return;
     const map = ranges.current;
     for (const a of anns) {
       if (map.has(a.id)) continue;
-      const r = rangeFor(index, { ...a, start: a.anchor?.start ?? a.start }, body.length);
+      const r = rangeFor(index, src, body, { ...a, start: a.anchor?.start ?? a.start });
       if (r) map.set(a.id, r);
     }
     const by: Record<Intent, Range[]> = { keep: [], card: [], question: [], apply: [] };
@@ -702,7 +711,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     else CSS.highlights.delete("hl-active");
     // `q:start:end` is a quote a card points to (D99), not a highlight.
     const q = p.jumpTo?.match(/^q:(\d+):(\d+)$/);
-    const jump = jumped.current ? undefined : q ? rangeFor(index, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }, body.length) : p.jumpTo && map.get(p.jumpTo);
+    const jump = jumped.current ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }) : p.jumpTo && map.get(p.jumpTo);
     const el = scrollRef.current;
     if (jump && el) {
       jumped.current = true;
@@ -752,8 +761,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     CSS.highlights.delete("hl-evidence");
     CSS.highlights.delete("hl-evidence-on");
     setEvidence([]);
-    if (!reveal || !ready || !index || !el || body === undefined) return;
-    const rs = reveal.quotes.map((q) => rangeFor(index, q, body.length));
+    if (!reveal || !ready || !index || !el || body === undefined || !src) return;
+    const rs = reveal.quotes.map((q) => rangeFor(index, src, body, q));
     setEvidence(rs);
     const cur = rs[reveal.at];
     CSS.highlights.set("hl-evidence", new Highlight(...rs.filter((r, i): r is Range => !!r && i !== reveal.at)));
@@ -1031,8 +1040,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   function jumpToQuote(m: { quote: string; start?: number }) {
     const el = scrollRef.current;
     const index = idx.current;
-    if (!el || !index || body === undefined) return;
-    const r = rangeFor(index, { exact: m.quote, prefix: "", suffix: "", start: m.start ?? 0 }, body.length);
+    if (!el || !index || body === undefined || !src) return;
+    const r = rangeFor(index, src, body, { exact: m.quote, prefix: "", suffix: "", start: m.start ?? 0 });
     if (!r) return p.notify("Couldn’t find that passage in the text any more.", "error");
     toThird(r, "smooth");
     CSS.highlights.set("hl-evidence-on", new Highlight(r));
@@ -1142,7 +1151,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!text.trim()) return;
     const q = sourceQuote(src, doc.body, index, range);
     const args = ["highlight", p.id, opt("exact", q?.exact ?? text.trim()), "--intent", intent];
-    if (q) args.push("--start", String(q.start));
+    // Never without a place: the core saves the match nearest it, not the first one in the source.
+    args.push("--start", String(q ? q.start : sourceHint(src, index, range)));
     const tmp = `pending-${Date.now()}`;
     const promise = ore<Annotation>(...args);
     pending.current.set(tmp, promise);
@@ -1186,17 +1196,17 @@ function ReaderView(p: Props & { reload: () => void }) {
         ranges.current.delete(tmp);
         setAnns((l) => l.filter((a) => a.id !== tmp));
         setPopup((cur) => (cur?.id === tmp ? null : cur));
-        p.notify(errorText(e), "error");
+        p.notify(placeError(e), "error");
       },
     );
   }
 
   /** A passage chosen with the mouse or the keyboard: inside a highlight he already made, that one opens
    *  (with the type he keyed) instead of stacking a second; otherwise it becomes a new highlight. */
+  const holderOf = (r: Range) =>
+    [...ranges.current].find(([, h]) => h.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, r) >= 0);
   function highlightRange(r: Range, intent?: Intent, aim?: Aim, snap = false) {
-    const inside = [...ranges.current].find(
-      ([, h]) => h.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, r) >= 0,
-    );
+    const inside = holderOf(r);
     if (inside) {
       fresh.current = null;
       openPopup(inside[0], inside[1], annsRef.current.find((a) => a.id === inside[0])?.note ?? "", aim);
@@ -1351,12 +1361,17 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
     const from: Span = { exact: a.exact, start: a.start, range: was };
     const to: Span = { exact: q.exact, start: q.start, range };
+    // Resized, it is a highlight he worked on: Esc now keeps it, as Enter does. A move that fails puts
+    // the edge back, and the highlight is untouched again.
+    const wasFresh = fresh.current === id;
+    if (wasFresh) fresh.current = null;
+    let rid: string | undefined;
     ranges.current.set(id, range);
     setAnns((l) => l.map((x) => (x.id === id ? { ...x, exact: q.exact, start: q.start, end: q.start + q.exact.length } : x)));
     setRepaint((n) => n + 1);
     openPopup(id, range, note);
     try {
-      const rid = await realId(id);
+      rid = await realId(id);
       await annotate(rid, opt("exact", q.exact), "--start", String(q.start));
       const s = spanStep(rid, from, to);
       p.notify("Moved the highlight’s edge", "quiet", s.back, s.again);
@@ -1365,7 +1380,8 @@ function ReaderView(p: Props & { reload: () => void }) {
       setAnns((l) => l.map((x) => (x.id === id ? { ...x, exact: from.exact, start: from.start, end: from.start + from.exact.length } : x)));
       setRepaint((n) => n + 1);
       setPopup((cur) => (cur?.id === id ? { ...cur, ...popupAt(was) } : cur));
-      p.notify(errorText(e), "error");
+      if (wasFresh && fresh.current === null) fresh.current = rid ?? id;
+      p.notify(placeError(e), "error");
     }
   }
 
@@ -1841,6 +1857,13 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
 
   const onMouseDown = (e: MouseEvent) => {
+    // A click that is not the third of a triple: the double-clicked word is kept now, quietly (no popup,
+    // and the selection this click starts is left alone).
+    const word = wordWait.current;
+    if (word && e.detail !== 3) {
+      dropWord();
+      word.quiet();
+    }
     setFocus(null); // the mouse takes over from the keyboard focus
     if (popup && !popupRef.current?.contains(e.target as Node)) {
       keepNote();
@@ -1870,7 +1893,10 @@ function ReaderView(p: Props & { reload: () => void }) {
       // number, a note back to the last mark before it.
       const byId = (from && (id.startsWith("fnref-") ? ids.findLast((n) => n.compareDocumentPosition(from) & Node.DOCUMENT_POSITION_FOLLOWING) : noteFor(from))) || ids[0];
       const heading = !byId && el ? Array.from(el.querySelectorAll("h1, h2, h3, h4, h5, h6")).find((h) => slug(h.textContent ?? "") === slug(dec(id))) : undefined;
-      if (byId || heading) return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
+      if (byId || heading) {
+        markPlace();
+        return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
+      }
       return p.notify(`That part of the page wasn’t saved with it.${doc?.url && doc.type !== "snippet" ? " Reimport the source from its ⋯ menu to fetch it again." : ""}`, "error");
     }
     if (/^(?:https?|mailto):/i.test(href)) return void openUrl(href).catch((e) => p.notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
@@ -1886,6 +1912,40 @@ function ReaderView(p: Props & { reload: () => void }) {
     followLink(a.getAttribute("href")!, a);
   };
 
+  // A jump inside the source (the outline, a footnote, a heading link) keeps where he was: ⌘[ goes back
+  // there and ⌘] to the jump again before they leave the source, as Safari's anchor history and Books'
+  // Back to page do. Caught first, so the app's view history only takes over once these run out.
+  const places = useRef<{ back: number[]; fwd: number[] }>({ back: [], fwd: [] });
+  const markPlace = () => {
+    const el = scrollRef.current;
+    if (el) places.current = { back: [...places.current.back, el.scrollTop], fwd: [] };
+  };
+  useEffect(() => {
+    places.current = { back: [], fwd: [] };
+    const onKey = (e: KeyboardEvent) => {
+      const by = is(e, "nav-back") ? "back" : is(e, "nav-forward") ? "fwd" : null;
+      const el = scrollRef.current;
+      // Only from the text: in a diagram beside it ⌘[ is Send backward.
+      const t = e.target as Node;
+      if (!by || !el || inTextField(e) || (t !== document.body && !el.contains(t)) || !places.current[by].length) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const other = by === "back" ? "fwd" : "back";
+      places.current[other].push(el.scrollTop);
+      el.scrollTop = places.current[by].pop()!;
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [p.id]);
+
+  // A double click's word waits out the Mac's double-click time (0.5 s by default): a third click
+  // makes it the paragraph, one highlight and one step, as Books acts on the final selection.
+  const wordWait = useRef<{ timer: number; quiet: () => void } | null>(null);
+  const dropWord = () => {
+    if (wordWait.current) clearTimeout(wordWait.current.timer);
+    wordWait.current = null;
+  };
+  useEffect(() => dropWord, []);
   const onMouseUp = (e: MouseEvent) => {
     const el = docEl.current;
     if (!ready || !el || closedBook || popupRef.current?.contains(e.target as Node) || lookupRef.current?.contains(e.target as Node)) return;
@@ -1897,10 +1957,23 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (sel && !sel.isCollapsed && sel.rangeCount) {
       const r = sel.getRangeAt(0);
       if (el.contains(r.startContainer) && el.contains(r.endContainer)) {
+        // The paragraph replaces a double click's word only now that it will be highlighted: a triple
+        // click whose selection runs past the text (the last paragraph, in WebKit) keeps the word.
+        dropWord();
         const up = sel.focusNode === r.startContainer && sel.focusOffset === r.startOffset;
-        // Whole words, unless he held ⌥ for part of one.
-        highlightRange(r.cloneRange(), undefined, { x: e.clientX, y: e.clientY, up }, !e.altKey);
-        setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
+        const range = r.cloneRange();
+        const aim = { x: e.clientX, y: e.clientY, up };
+        const exact = e.altKey;
+        const keep = () => {
+          // Whole words, unless he held ⌥ for part of one.
+          highlightRange(range, undefined, aim, !exact);
+          setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
+        };
+        if (e.detail === 2) {
+          const timer = window.setTimeout(() => (dropWord(), keep()), 500);
+          const quiet = () => void (holderOf(range) || createHighlight(exact ? range : snapRange(range), "keep", undefined, false));
+          wordWait.current = { timer, quiet };
+        } else keep();
       }
       return;
     }
@@ -2261,7 +2334,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   return (
     <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}`} ref={readerRef}>
       <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
-      {!closedBook && !video && !PHONE && <Position scroll={scrollRef} doc={docEl.current} ready={ready} />}
+      {!closedBook && !video && !PHONE && <Position scroll={scrollRef} doc={docEl.current} ready={ready} onJump={markPlace} />}
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
         <Hint text="Back to the passage you left" keys="nav-back" side="top">
@@ -2619,9 +2692,17 @@ function ReaderView(p: Props & { reload: () => void }) {
           )}
         </div>
       </div>
-      {tip && (
-        // A note's preview stays on screen at a phone's width too.
-        <div className={tip.id.startsWith("fn:") ? "tip note" : "tip"} style={{ left: tip.id.startsWith("fn:") ? Math.max(12, Math.min(tip.x + 12, innerWidth - Math.min(360, innerWidth - 24) - 12)) : tip.x + 12, top: tip.y + 18 }}>
+      {tip && !popup && (
+        // A preview stays on screen at a phone's width too. A highlight note's is at most six lines
+        // (styles.css), above the pointer when there is no room below; a footnote's is whole, below its
+        // mark. Never over an open popup.
+        <div
+          className={tip.id.startsWith("fn:") ? "tip note" : "tip"}
+          style={{
+            left: Math.max(12, Math.min(tip.x + 12, innerWidth - Math.min(tip.id.startsWith("fn:") ? 360 : 320, innerWidth - 24) - 12)),
+            ...(tip.id.startsWith("fn:") || tip.y + 18 + TIP_HEIGHT <= innerHeight ? { top: tip.y + 18 } : { bottom: innerHeight - tip.y + 10 }),
+          }}
+        >
           {tip.text}
         </div>
       )}

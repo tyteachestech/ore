@@ -5,6 +5,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { still } from "./SideCursor";
 import { PixelKeep, PixelQuestion, PixelStar, PixelTry } from "./PixelIcon";
 import { INTENTS, PHONE, type Annotation, type Intent } from "./ore";
+import { passageText } from "./text";
 import { load, save } from "./util";
 
 // D118: one highlight; a key point (`card` in the files) is a highlight he marked to come back, and the AI
@@ -162,6 +163,13 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
   /** A row's ⋯ and right-click menu: the popup's actions, without opening the passage. */
   actions?: (a: Annotation) => MenuAction[];
 }) {
+  // A row's passage as the page shows it, worked out once per passage, not on every render.
+  const shownText = useRef(new Map<string, string>());
+  const passage = (exact: string) => {
+    let t = shownText.current.get(exact);
+    if (t === undefined) shownText.current.set(exact, (t = passageText(exact)));
+    return t;
+  };
   const [shut, setShut] = useState<Set<string>>(() => new Set((load("ore.collected.shut") ?? "keep").split(",").filter(Boolean)));
   const toggle = (g: string) =>
     setShut((cur) => {
@@ -214,7 +222,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
       <WithMenu key={a.id} actions={actions && !PHONE ? () => actions(a) : []}>
         <div className="cp-line">
           <button className={`cp-row${a.point ? " point" : ""}`} onClick={() => onJump(a.id)}>
-            <span className="cp-text">{a.point || (a.note && a.intent !== "keep") ? a.note : a.exact}</span>
+            <span className="cp-text">{a.point || (a.note && a.intent !== "keep") ? a.note : passage(a.exact)}</span>
             {t && <span className="cp-time">{t}</span>}
           </button>
           {actions && !PHONE && <MoreButton label="Highlight actions" actions={() => actions(a)} />}

@@ -15,12 +15,12 @@ The agent drives the real app on your Mac. It must never touch `~/Ore`. The inst
 # 2. Fresh test library (same realistic data the screenshot harness uses):
 rm -rf ~/ore-test && cd ~/Developer/ore && bun apps/desktop/scripts/mock/seed.ts ~/ore-test
 # 3. Launch the app against it:
-ORE_LIBRARY=~/ore-test /Applications/Ore.app/Contents/MacOS/ore &
+open -n -a /Applications/Ore.app --env ORE_LIBRARY="$HOME/ore-test"
 ```
 
 Check: the sidebar shows a skill called "Distributed Systems and Consensus Protocols for Very Large Clusters". That skill exists only in the seed, so it proves you're on the test library. Re-run step 2 and 3 between personas for a clean slate. When done, ⌘Q and reopen the app normally.
 
-AI features (prequestions, quiz checking, card grading, Ask) will use your Claude or Codex plan as usual. Prefix step 3 with `ORE_NO_ENRICH=1` if you'd rather skip background enrichment.
+AI features (prequestions, quiz checking, card grading, Ask) will use your Claude or Codex plan as usual. Add `--env ORE_NO_ENRICH=1` to step 3 if you'd rather skip background enrichment.
 
 Grant ChatGPT computer-use access to **Ore only** (plus a browser if you want it to copy an article URL). Not Terminal, not Finder.
 
