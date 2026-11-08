@@ -11,7 +11,7 @@ import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { xlsxToDoc } from "../src/ingest/sheets.ts";
 import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
-import { inlineMath } from "../src/ingest/web.ts";
+import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
 import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
 import { strToU8, zipSync } from "fflate";
@@ -171,6 +171,112 @@ describe("import coverage: web pages", () => {
     expect(item.meta.title).toBe("ts-fsrs");
     expect(item.body).toContain("```");
     expect(count(item.body, /^#{1,6} /gm)).toBeGreaterThanOrEqual(5);
+  });
+
+  test("a forum thread (Hacker News): its title, poster and date, every comment under its author, replies nested", async () => {
+    // hn-thread.html: a real thread's markup (2026), its words, names and links rewritten; HN no longer marks names with .hnuser.
+    const url = "https://news.ycombinator.com/item?id=11408447";
+    serve({ [url]: { body: web("hn-thread.html"), type: HTML } });
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "Spaced repetition and practice", author: "spaced", published: "2016-04-01" });
+    const b = item.body;
+    expect(b).toStartWith("[https://example.com/srspractice/](https://example.com/srspractice/)\n\n---\n\n## Comments\n\n> **generation** · [2016-04-01](https://news.ycombinator.com/item?id=11408947)\n");
+    expect(b).toContain("> > **feedback** · [2016-04-01](https://news.ycombinator.com/item?id=11409221)");
+    expect(b).not.toContain("[deleted]");
+    expect(count(b, /^(?:> )+\*\*/gm)).toBe(24); // every comment
+  });
+
+  test("a forum topic (Discourse): the first post as its text, then every reply under its author, quotes kept", async () => {
+    // discourse-topic.html: a real topic's page (2026), its words and names rewritten; what search engines are served.
+    const url = "https://meta.discourse.org/t/discourse-new-user-guide/96331";
+    serve({ [url]: { body: web("discourse-topic.html"), type: HTML } });
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "Understanding Discourse for new users", author: "Discourse", published: "2018-09-07T13:52:59+00:00" });
+    const b = item.body;
+    expect(b).toStartWith("> This model chunk the interleaving reading");
+    expect(b).toContain("\n## Card Pause Mind by Discourse\n");
+    expect(b).toContain("---\n\n## Comments\n\n> **Fact** · [2025-01-14](https://meta.discourse.org/t/understanding-discourse-for-new-users/96331/131)\n> \n> > Discourse:\n> > \n> > Generation at the spaced of the OP");
+    expect(b).toContain("> **reading** · [2025-09-18](https://meta.discourse.org/t/understanding-discourse-for-new-users/96331/134)");
+    expect(count(b, /^> \*\*/gm)).toBe(2); // every reply
+    expect(b).toContain("> [![Knowledge_20250114_094145_Example](https://global.discourse-cdn.com/meta/optimized/4X/d/2/0/d202079c06ae53472d1dd6ac81330cd400643737_2_690x226.jpeg)]");
+    expect(b).not.toContain("Likes");
+  });
+
+  test("a Discourse topic's corners: later pages, a page that won't load, link previews, dates, a link partway in", async () => {
+    const post = (n: number, who: string, html: string) =>
+      `<div class="topic-body crawler-post"><span itemprop="author"><span itemprop="name">${who}</span></span><time datetime="2025-01-0${n}T10:00:00Z"></time><span itemprop="position">${n}</span><div class="post" itemprop="text">${html}</div><span class="post-likes">3 Likes</span></div>`;
+    const page = (posts: string, next?: number) =>
+      `<html><head><meta name="generator" content="Discourse 2026.11.0"><meta property="og:title" content="Spacing questions"><link rel="canonical" href="https://forum.test/t/spacing/7">${next ? `<link rel="next" href="/t/spacing/7?page=${next}">` : ""}</head><body>${posts}</body></html>`;
+    const first = post(1, "josé", `<p>${"How far apart should reviews be when the test is a month away? ".repeat(5)}</p>`);
+    const preview = `<aside class="onebox" data-onebox-src="https://example.com/spacing"><header class="source">example.com</header><article class="onebox-body"><h3><a href="https://example.com/spacing">The spacing effect</a></h3><p>A summary.</p></article></aside>`;
+    const when = `<span class="discourse-local-date" data-date="2025-01-09" data-email-preview="Thursday, January 9, 2025 10:00 AM UTC">2025-01-09T10:00:00Z</span>`;
+    const quoted = `<aside class="quote" data-username="ada" data-topic="3"><div class="title"><img class="avatar" src="https://forum.test/a.png"> <a href="https://forum.test/t/other/3/2">ada:</a></div><blockquote><p>Space them out.</p></blockquote></aside>`;
+    serve({
+      "https://forum.test/t/spacing/7?page=2": { body: page(post(3, "lin", `<p>Read this: ${when}.</p>`), 3), type: HTML },
+    });
+    const b = (await htmlToDoc(page(first + post(2, "ada", quoted + preview)), "https://forum.test/t/spacing/7")).markdown;
+    expect(b).toContain("> **ada** · [2025-01-02](https://forum.test/t/spacing/7/2)\n> \n> > [ada](https://forum.test/t/other/3/2):\n> > \n> > Space them out.\n> \n> [The spacing effect](https://example.com/spacing)");
+    expect(b).not.toContain("page=2"); // no next page on the first one: nothing more to read
+    const paged = (await htmlToDoc(page(first + post(2, "ada", "<p>Space them out.</p>"), 2), "https://forum.test/t/spacing/7"));
+    expect(paged.author).toBe("josé");
+    expect(paged.markdown).toContain("> **lin** · [2025-01-03](https://forum.test/t/spacing/7/3)\n> \n> Read this: Thursday, January 9, 2025 10:00 AM UTC.");
+    // Page 3 won't load: the doc says where the rest are rather than ending as if whole.
+    expect(paged.markdown).toEndWith("Later replies aren't here: [read them on the forum](https://forum.test/t/spacing/7?page=3)\n");
+    expect(paged.markdown).not.toContain("Likes");
+    await expect(htmlToDoc(page(post(21, "lin", `<p>${"A reply far down the topic. ".repeat(10)}</p>`)), "https://forum.test/t/spacing/7/21")).rejects.toThrow("Add the topic from its start instead: https://forum.test/t/spacing/7");
+  });
+
+  test("slides online (Speaker Deck): every slide's picture and words, in order, not the site's other decks", async () => {
+    // speakerdeck.html: a real deck's page (2026), its words rewritten; the slides' words are in its transcript.
+    const url = "https://speakerdeck.com/jennybc/how-to-name-files";
+    const slides = "https://files.speakerdeck.com/presentations/5e4b07f0d9a94f8e9a29b902bad6ed0b";
+    serve({ [url]: { body: web("speakerdeck.html"), type: HTML }, [`${slides}/slide_0.jpg`]: { body: new Uint8Array(400).fill(7), type: "image/jpeg" } });
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "How to name files", author: "Jennifer (Jenny) Bryan", published: "2015-05-14" });
+    const b = item.body;
+    expect(b).toStartWith("Test-skill session recall index knowledge.");
+    expect(b).toMatch(/\n<!-- slide 1 -->\n\n## Slide 1\n\n!\[Slide 1\]\(assets\/\w+\.jpg\)\n\nsense learn teacher by Jenny Bryan for Understanding Teacher Strength\n/);
+    // A slide's words come in two parts on the page (its title link, then the rest): one paragraph here.
+    expect(b).toContain(`![Slide 3](${slides}/slide_2.jpg)\n\nelaboration.level Idea’s Knowledge Deck Lesson and Forgetting.step chunk 1.mind ﬁg 2.gap`);
+    expect(b).toContain("\n<!-- slide 27 -->\n");
+    expect(count(b, /^## Slide \d+$/gm)).toBe(27);
+    expect(b).not.toContain("More Decks");
+    expect(b).not.toContain("Other Decks");
+    // Served with no space between a slide's two parts, its words still don't run together.
+    const page = web("speakerdeck.html");
+    const tight = await htmlToDoc(page.replace(/<\/a>\s*<\/h3>\s*/g, "</a></h3>"), url);
+    expect(tight.markdown).toContain("chunk 1.mind ﬁg 2.gap");
+    // A talk without its slides' words is refused with how to get them, not saved as the site's other decks.
+    await expect(htmlToDoc(page.replace(/<div class="slide-transcript">/g, '<div class="other">'), url)).rejects.toThrow("Download its PDF");
+  });
+
+  test("Wikipedia's formulas: the TeX its authors wrote, inline and on their own line", async () => {
+    // wikipedia-math.html: "Forgetting curve" (CC BY-SA 4.0), whose formulas are MathML with their TeX in data-mw.
+    const url = "https://en.wikipedia.org/wiki/Forgetting_curve";
+    serve({ [url]: { body: web("wikipedia-math.html"), type: HTML } });
+    const b = (await addSource(await tempLibrary(), url)).body;
+    expect(b).toContain("\n$$\nb = \\frac{100k}{(\\log(t))^c +k}\n$$\n");
+    expect(b).toContain("\n$$\nR = e^{-\\frac{t}{S}},\n$$\n");
+    expect(b).toContain("Here, $$b$$ represents 'Savings'");
+    expect(b).not.toContain("\\left(\\right.");
+  });
+
+  test("Wikipedia's formula corners: indented on its own, older pages, chemistry, a page of stories", async () => {
+    const words = `<p>${"Words about memory and forgetting that fill out the page. ".repeat(10)}</p>`;
+    const page = (body: string) => `<html><head><title>T</title></head><body><article><h1>T</h1>${words}${body}${words}</article></body></html>`;
+    // An indented formula (`:<math>`) is all its line holds; an older page marks a display one inside it.
+    const today = `<dl><dd><math class="mwe-math-element mwe-math-element-block" data-mw='{"name":"math","body":{"extsrc":"x^2"}}'><annotation encoding="application/x-tex">{\\displaystyle x^2}</annotation></math></dd></dl>`;
+    const older = `<dl><dd><span class="mwe-math-element"><math display="block"><annotation encoding="application/x-tex">{\\displaystyle y^{3}}</annotation></math><img class="mwe-math-fallback-image-display" alt="{\\displaystyle y^{3}}"></span></dd></dl>`;
+    // <chem>'s own data lacks its \ce{}; two groups side by side keep both braces.
+    const chem = `<p>Water is <span class="mwe-math-element" data-mw='{"name":"chem","body":{"extsrc":"H2O"}}'><annotation encoding="application/x-tex">{\\displaystyle \\ce{H2O}}</annotation></span> here, and <span class="mwe-math-element"><annotation encoding="application/x-tex">{\\displaystyle a}{b}</annotation></span> is two groups.</p>`;
+    const b = (await htmlToDoc(page(today + older + chem), "https://en.wikipedia.org/wiki/T")).markdown;
+    expect(b).toContain("\n$$\nx^2\n$$\n");
+    expect(b).toContain("\n$$\ny^{3}\n$$\n");
+    expect(b).toContain("Water is $$\\ce{H2O}$$ here");
+    expect(b).toContain("$${\\displaystyle a}{b}$$ is two groups");
+    // Hacker News' front page has a poster on every row: the page has no one author.
+    const stories = `<table><tr><td class="subline">by <a href="user?id=someone">someone</a></td></tr></table>`;
+    expect((await htmlToDoc(page(stories), "https://news.ycombinator.com/news")).author).toBeUndefined();
   });
 
   test("nbviewer and Google links point at what to read", () => {
@@ -425,15 +531,15 @@ describe("import coverage: files", () => {
         "",
         "| Word | Meaning | Example | Added | Reviews |",
         "| --- | --- | --- | --- | --- |",
-        '| olvidar | to forget | Sin repasar, "olvidamos" rápido. | 2025-03-04 | 3 |',
-        "| recordar | to remember, to recall | Recordar es practicar \\| de verdad. | 2025-03-05 | 5 |",
-        "| repasar | to review |  | 2025-03-06 | 8 |",
+        '| cocinar | to cook | Sin sal, "cocinamos" mal. | 2025-03-04 | 3 |',
+        "| hornear | to bake, to roast | Hornear es esperar \\| de verdad. | 2025-03-05 | 5 |",
+        "| hervir | to boil |  | 2025-03-06 | 8 |",
         "",
         "## Grammar",
         "",
         "| Rule | Example |",
         "| --- | --- |",
-        "| Ser for what something is | La memoria es frágil. |",
+        "| Ser for what something is | La sopa es rica. |",
         "| Estar for how it is now | Estoy cansado. |",
         "",
       ].join("\n"),
@@ -465,9 +571,9 @@ describe("import coverage: files", () => {
     // Markdown's own characters in a cell.
     const csv = await addSource(await tempLibrary(), file("verbs.csv"));
     expect(csv.meta.title).toBe("verbs");
-    expect(csv.body).toBe('| word | meaning | note |\n| --- | --- | --- |\n| olvidar | to forget, lose | irregular? no, regular |\n| recordar | to remember to recall | o → ue: "recuerdo" |\n| \\*soler\\* | to usually do | \\<always\\> \\[with\\] an infinitive |\n');
-    writeFileSync(join(d, "es.csv"), "palabra;significado\nolvidar;to forget, lose\n");
-    expect((await addSource(await tempLibrary(), join(d, "es.csv"))).body).toBe("| palabra | significado |\n| --- | --- |\n| olvidar | to forget, lose |\n");
+    expect(csv.body).toBe('| word | meaning | note |\n| --- | --- | --- |\n| cocinar | to cook, prepare | irregular? no, regular |\n| hornear | to bake to roast | regular: "horneo" |\n| \\*soler\\* | to usually do | \\<always\\> \\[with\\] an infinitive |\n');
+    writeFileSync(join(d, "es.csv"), "palabra;significado\ncocinar;to cook, prepare\n");
+    expect((await addSource(await tempLibrary(), join(d, "es.csv"))).body).toBe("| palabra | significado |\n| --- | --- |\n| cocinar | to cook, prepare |\n");
     writeFileSync(join(d, "terms.tsv"), "term\tdefinition\nspacing\treviews spread over days\n");
     expect((await addSource(await tempLibrary(), join(d, "terms.tsv"))).body).toContain("| spacing | reviews spread over days |");
     writeFileSync(join(d, "empty.csv"), "\n\n");
@@ -856,9 +962,9 @@ describe("import coverage: text recognition", () => {
     expect(item.body).toContain("## The testing effect\n\nRetrieving a memory makes it stronger than reading it again. Quiz yourself before you feel ready.");
   });
 
-  test("a scanned PDF is read page by page", async () => {
+  test("a scanned PDF is read page by page, titled by its first heading", async () => {
     const item = await addSource(await tempLibrary(), file("scan.pdf"));
-    expect(item.meta.type).toBe("pdf");
+    expect(item.meta).toMatchObject({ type: "pdf", title: "The testing effect" });
     expect(item.body).toStartWith("<!-- page 1 -->\n\n## The testing effect\n\nRetrieving a memory");
   });
 
