@@ -516,7 +516,7 @@ journey("tutor scroll: a reply streaming in while he reads higher up leaves his 
     if (!body.includes('"tutor",')) return route.fallback();
     id = (JSON.parse(body).args as string[]).find((a) => a.startsWith("--stream="))!.slice(9);
     await held;
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: long, citations: [], general: true, searched: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@7" } }) });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: long, citations: [], general: true, searched: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@8" } }) });
   });
   try {
     await page.keyboard.press("Meta+j");
@@ -723,7 +723,7 @@ journey("tutor steps: Show me's worked answer shows one step at a time, Next ste
     { reply: "Think about what the tested group did.", citations: [], general: false, hint: true, steps: [], exercise: null, card: null },
     { reply: "Here's the working.", citations: [], general: false, hint: false, steps, exercise: null, card: null },
     { reply: "Step 2 is the testing effect.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null },
-  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@7" } }));
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@8" } }));
   const bodies: string[] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
