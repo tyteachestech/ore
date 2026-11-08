@@ -1397,10 +1397,19 @@ journey("note format bar: select words, highlight them blue from the bar, and it
 
 journey("diagram: draws beside the source, and a new one stays linked when the panel switches tab", async (page) => {
   await openSource(page, AGENTS);
+  if (!(await page.locator(".mynotes").count())) await page.keyboard.press("n");
   const note = page.locator(".note-editor [contenteditable=true]").first();
+  await note.waitFor();
+  // Earlier journeys leave this note with a toggle and a table in it, where a click on the text and ⌘↓ can
+  // land in a cell. A press on the empty space under the note puts the caret at its end, outside them.
   // Typed into the reader instead, "/diagram" would run its keys (A archives the source).
-  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
-  await page.keyboard.press("Meta+ArrowDown");
+  const panel = page.locator(".mynotes-text");
+  await until("the caret is at the note's end, outside any table", async () => {
+    await panel.evaluate((e) => (e.scrollTop = e.scrollHeight));
+    const box = (await panel.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height - 10);
+    return note.evaluate((e) => e.contains(document.activeElement) && !getSelection()?.anchorNode?.parentElement?.closest("table"));
+  });
   await page.keyboard.press("Enter");
   await page.keyboard.type("/diagram");
   await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
