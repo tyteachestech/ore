@@ -3132,6 +3132,15 @@ journey("finish again: the recall box holds the last recall with the caret at it
   if (note.trim() !== "## Recall\n\nFIRST recall text. SECOND.") throw new Error(`the note is ${JSON.stringify(note)}`);
 });
 
+journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
+  const plus = page.getByRole("button", { name: "New skill", exact: true });
+  await plus.hover();
+  // A click's checks, without the click: an aria-disabled ancestor makes it "not enabled".
+  await plus.click({ trial: true, timeout: 2000 });
+  const dimmed = await page.evaluate(() => [...document.querySelectorAll(".side-head")].filter((h) => h.closest("[aria-disabled=true]")).length);
+  if (dimmed) throw new Error(`${dimmed} section header(s) read as disabled`);
+});
+
 journey("finish: a question on a source with no skill is pointed to Collected, not a skill page", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# No skill yet\n\nA first source, filed under no skill, with one passage worth asking about.");

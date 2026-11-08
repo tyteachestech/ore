@@ -329,7 +329,10 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, taken, 
     id: groupId(group.collection),
     disabled: { draggable: !group.collection, droppable: false },
   });
-  const { role: _role, tabIndex: _tab, ...a11y } = attributes;
+  // The header holds buttons, so it is no control itself: the group with no collection can't be dragged,
+  // and dnd-kit's aria-disabled on it would read its New skill and toggle as dimmed.
+  const { role: _role, tabIndex: _tab, "aria-disabled": _off, ...drag } = attributes;
+  const a11y = group.collection ? drag : {};
   const label = group.collection ? `New skill in ${group.name}` : "New skill";
   return (
     <div
