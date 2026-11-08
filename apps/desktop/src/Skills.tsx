@@ -292,9 +292,11 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
       await ore("skills", "set", skill.id, opt(key, value));
       onSaved();
       const what = { icon: "icon", color: "colour", collection: "collection" }[key];
-      if (undoable && before[key] !== value) notify(`Changed the ${what} of ${skill.name}`, "quiet", () => void set(key, before[key], false), () => void set(key, value, false));
+      if (undoable && before[key] !== value) notify(`Changed the ${what} of ${skill.name}`, "quiet", () => set(key, before[key], false), () => set(key, value, false));
     } catch (e) {
       setLook(before);
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       notify(errorText(e), "error");
     }
   };
@@ -414,13 +416,16 @@ function CollectionPicker({ value, collections, onPick }: { value: string; colle
  *  since), redo puts it back with all of that. `onGone` leaves its page if he is on it. */
 export function skillMade(skill: Skill, notify: Notify, onChanged: () => void, onGone?: (id: string) => void) {
   let removed: unknown = null;
-  const fail = (e: unknown) => (notify(errorText(e), "error"), onChanged());
+  // The history puts a failed step back and says why; the screens reload either way.
+  const fail = (e: unknown) => {
+    onChanged();
+    throw e;
+  };
   notify(
     `Created skill ${skill.name}`,
     "quiet",
-    () =>
-      void ore<{ removed: unknown }>("skills", "rm", skill.id).then((r) => ((removed = r.removed), onGone?.(skill.id), onChanged()), fail),
-    () => void (removed ? ore("skills", "restore", JSON.stringify(removed)) : Promise.resolve()).then(onChanged, fail),
+    () => ore<{ removed: unknown }>("skills", "rm", skill.id).then((r) => ((removed = r.removed), onGone?.(skill.id), onChanged()), fail),
+    () => (removed ? ore("skills", "restore", JSON.stringify(removed)) : Promise.resolve()).then(onChanged, fail),
   );
 }
 
@@ -452,12 +457,16 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
     try {
       const rm = () => ore<{ removed: unknown }>("skills", "rm", skill.id, ...(archive ? ["--archive"] : []));
       let { removed } = await rm();
-      const fail = (e: unknown) => (notify(errorText(e), "error"), onChanged());
+      // The history puts a failed step back and says why; the screens reload either way.
+      const fail = (e: unknown) => {
+        onChanged();
+        throw e;
+      };
       notify(
         `Deleted ${skill.name}`,
         "info",
-        () => void ore("skills", "restore", JSON.stringify(removed)).then(onChanged, fail),
-        () => void rm().then((r) => ((removed = r.removed), onChanged()), fail),
+        () => ore("skills", "restore", JSON.stringify(removed)).then(onChanged, fail),
+        () => rm().then((r) => ((removed = r.removed), onChanged()), fail),
       );
       onDone(true);
     } catch (e) {

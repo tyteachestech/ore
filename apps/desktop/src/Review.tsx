@@ -138,8 +138,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const retired = useRef(new Set<string>());
   /** Ratings go on the app history (⌘Z) with every other step; while Review is open, taking back its
    *  newest rating also shows that card again. */
-  const undoNow = useRef<(ts: string) => boolean>(() => false);
-  const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: () => void; setTs: (ts: string) => void }) => boolean>(() => false);
+  /** The history's undo and redo of a rating while Review shows it: the write's promise, or null when it isn't Review's to do. */
+  const undoNow = useRef<(ts: string) => Promise<void> | null>(() => null);
+  const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: () => void; setTs: (ts: string) => void }) => Promise<void> | null>(() => null);
   /** Counts card showings, so a grade or passage that lands after he moved on is dropped, not shown on the next card. */
   const showing = useRef(0);
   /** Counts grading runs, so a grade still on its way when the key points change is dropped. */
@@ -506,12 +507,14 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         "quiet",
         // With Review closed, only the log changes (its session stays ended), and Home reads its numbers again.
         () => {
-          if (!(mounted.current && undoNow.current(ts))) ore("review", id, opt("undo", ts)).then(() => onLogged?.(), (e) => notify(errorText(e), "error"));
+          return (mounted.current && undoNow.current(ts)) || ore("review", id, opt("undo", ts)).then(() => onLogged?.());
         },
         () => {
           // Given again after Review closed: its session has ended, so the rating goes in with none.
-          if (!(mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })))
-            ore<{ ts: string }>("review", ...args.filter((a) => !a.startsWith("--session="))).then((x) => (setTs(x.ts), onLogged?.()), (e) => notify(errorText(e), "error"));
+          return (
+            (mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })) ||
+            ore<{ ts: string }>("review", ...args.filter((a) => !a.startsWith("--session="))).then((x) => (setTs(x.ts), onLogged?.()))
+          );
         },
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
@@ -523,7 +526,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   /** ⌘Z: takes back the last rating and shows that card again, unanswered. On the end screen it
    *  opens the session again, back on that card (Anki's Undo after Congratulations). */
-  const undoRating = async () => {
+  const undoRating = async (fromHistory = false) => {
     if (!last || busyNow.current) return;
     dropAhead();
     last.forget();
@@ -541,25 +544,20 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       setQueue(last.queue.filter((e) => !retired.current.has(e.id)));
       setUndos((u) => u.slice(0, -1));
     } catch (e) {
+      // From the history (⌘Z): it puts the step back and says why.
+      if (fromHistory) throw e;
       notify(errorText(e), "error");
     } finally {
       setBusy(false);
     }
   };
 
-  undoNow.current = (ts) => {
-    if (last?.ts !== ts) return false;
-    void undoRating();
-    return true;
-  };
+  undoNow.current = (ts) => (last?.ts === ts ? undoRating(true) : null);
   // ⇧⌘Z right after ⌘Z: that card is showing again, so the rating goes in again and Review moves on.
   redoNow.current = (id, args, rating, elapsed, again) => {
-    if (end || busyNow.current || queue?.[0]?.id !== id) return false;
+    if (end || busyNow.current || queue?.[0]?.id !== id) return null;
     setBusy(true);
-    submit(args, rating, elapsed, again)
-      .catch((e) => notify(errorText(e), "error"))
-      .finally(() => setBusy(false));
-    return true;
+    return submit(args, rating, elapsed, again).finally(() => setBusy(false));
   };
 
   const retire = async () => {
@@ -576,15 +574,12 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         () => {
           if (state === "retired") return;
           dropAhead();
-          ore("card", "restore", id, opt("state", state)).then(
-            () => {
-              retired.current.delete(id);
-              notify("Card restored. It comes back in a later review.");
-            },
-            (e) => notify(errorText(e), "error"),
-          );
+          return ore("card", "restore", id, opt("state", state)).then(() => {
+            retired.current.delete(id);
+            notify("Card restored. It comes back in a later review.");
+          });
         },
-        () => (dropAhead(), void ore("card", "retire", id).then(() => void retired.current.add(id), (e) => notify(errorText(e), "error"))),
+        () => (dropAhead(), ore("card", "retire", id).then(() => void retired.current.add(id))),
       );
       advance(false);
     } catch (e) {
@@ -609,8 +604,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       notify(
         "Dropped that version. Here’s the original.",
         "info",
-        () => (dropAhead(), void ore("variant", "restore", id, variant).catch((e) => notify(errorText(e), "error"))),
-        () => (dropAhead(), void ore("variant", "reject", id, variant).catch((e) => notify(errorText(e), "error"))),
+        () => (dropAhead(), ore("variant", "restore", id, variant)),
+        () => (dropAhead(), ore("variant", "reject", id, variant)),
       );
     } catch (e) {
       notify(errorText(e), "error");
@@ -653,7 +648,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       setDraft(loaded.current);
     }
     if (undoable) {
-      const put = (w: typeof was) => () => void setText(c, w.question, w.answer, w.rubric, false).catch((e) => notify(errorText(e), "error"));
+      const put = (w: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false);
       notify("Card edit", "quiet", put(was), put({ question, answer, rubric }));
     }
   };
