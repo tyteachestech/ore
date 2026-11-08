@@ -1466,9 +1466,30 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 /* The same pixel ? as the Questions header, on the first line's midline. */
 .question-quote .question-mark { position: absolute; left: 10px; top: 10px; color: var(--question-solid); }
 .question-actions { padding-left: 26px; }
-/* In the panel a question is one compact row; its actions appear on hover, Linear-style. */
-.skill-col.side .question { position: relative; }
-.skill-col.side .question-actions { position: absolute; top: 4px; right: 4px; margin: 0; padding: 2px; border-radius: 6px; background: var(--bg-raised); border: 1px solid var(--border); visibility: hidden; }
+/* In the panel a question is one compact row (D131, Tyler's pick A of five with E's circle): a purple circle at the
+   left is Answered; the question one line, its source under it; a purple square at the right says a source may answer
+   it; its actions appear on hover at the bottom right, Linear-style. */
+.skill-col.side .question { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 0; }
+.skill-col.side .question > :not(.q-check) { grid-column: 2; }
+.skill-col.side .question + .question { box-shadow: inset 0 1px 0 var(--border); }
+.q-check { grid-row: 1; align-self: start; margin: 10px 0 0 6px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid var(--question-solid); color: var(--question-solid); }
+.q-check:hover { background: var(--question); }
+.q-check:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.question.done .q-check { border-color: transparent; }
+.question.done .q-check svg { animation: try-pop 180ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+@media (prefers-reduced-motion: reduce) { .question.done .q-check svg { animation: none; } }
+.skill-col.side .question-quote { display: flex; flex-direction: column; gap: 2px; padding: 6px 36px 6px 8px; }
+.skill-col.side .question-quote .note { margin: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-col.side .question-quote .from { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-col.side .question.done .question-quote .note { text-decoration: line-through; }
+.q-lead { position: absolute; right: 8px; top: 9px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; }
+.q-lead::before { content: ""; width: 8px; height: 8px; background: var(--question-solid); }
+.q-lead:hover { background: var(--bg-hover); }
+.q-lead:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.hint-lines { display: flex; flex-direction: column; gap: 2px; }
+/* The hover actions stop short of the lead mark, so it stays under the pointer. */
+.skill-col.side .question:has(.q-lead) .question-actions { right: 32px; }
+.skill-col.side .question-actions { position: absolute; top: 50%; translate: 0 -50%; right: 4px; margin: 0; padding: 2px; border-radius: 6px; background: var(--bg-raised); border: 1px solid var(--border); visibility: hidden; }
 .skill-col.side .question:hover .question-actions, .skill-col.side .question:focus-within .question-actions { visibility: visible; }
 .skill-col.side .question-actions button { border-color: transparent; }
 .question-quote:hover { background: var(--bg-hover); }
