@@ -230,7 +230,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   const host = new URL(url).host;
   // An arXiv paper with no HTML version (older ones) is read from its PDF.
   // A Google Doc or deck that isn't shared answers its export link with a sign-in page or an error.
-  const google = rw?.url.startsWith("https://docs.google.com/") ? `That Google ${rw.url.includes("/presentation/") ? "Slides deck" : "Doc"} isn’t shared publicly, so Ore can’t download it. In Google, choose Share › Anyone with the link, then add it again; or open it in your browser and ${FROM_TAB}.` : null;
+  const google = rw?.url.startsWith("https://docs.google.com/") ? `That Google ${rw.url.includes("/presentation/") ? "Slides deck" : rw.url.includes("/spreadsheets/") ? "Sheet" : "Doc"} isn’t shared publicly, so Ore can’t download it. In Google, choose Share › Anyone with the link, then add it again; or open it in your browser and ${FROM_TAB}.` : null;
   const res = await get(rw?.url ?? url, host).catch((e) => {
     if (google) throw new Error(google);
     return rw?.url.startsWith("https://arxiv.org/html/") ? get(rw.url.replace("/html/", "/pdf/"), host) : Promise.reject(e);

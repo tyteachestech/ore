@@ -23,6 +23,9 @@ const CJK_START = new RegExp(`^[${CJK_SCRIPTS}\\u3000-\\u303f\\uff00-\\uffef]`, 
  *  sentence wraps, since those scripts put no space between words. */
 export const lineBreakSpace = (before: string, after: string): string => (CJK_END.test(before) && CJK_START.test(after) ? "" : " ");
 
+/** Text with Markdown's own characters escaped, so it reads as what it says. */
+export const escapeMarkdown = (s: string) => s.replace(/([\\`*_[\]<>])/g, "\\$1");
+
 /** The next step for a page only his browser can open (D96). */
 export const FROM_TAB = "add it from the browser (Browser tab in the add box, or `ore add --tab`)";
 
@@ -43,7 +46,7 @@ export function refusal(title: string, markdown: string, host: string): string |
 
 /** A file's author unless it is only a tool's or a template's default name ("anonymous" is ReportLab's). */
 export const fileAuthor = (a: string | undefined): string | undefined =>
-  a?.trim() && !/^(python-(docx|pptx)|microsoft office user|windows user|user|owner|author|unknown|anonymous|administrator|admin)$/i.test(a.trim()) ? a.trim() : undefined;
+  a?.trim() && !/^(python-(docx|pptx)|openpyxl|microsoft office user|windows user|user|owner|author|unknown|anonymous|administrator|admin)$/i.test(a.trim()) ? a.trim() : undefined;
 
 /** An author as a page names one, or undefined when it isn't a name: a sentence fragment, a list of initials, a long blurb. */
 export function cleanAuthor(a: string | undefined): string | undefined {
@@ -62,7 +65,7 @@ export function cleanTitle(t: string | undefined, { numbers = false } = {}): str
   const s = t?.replace(/\s+/g, " ").trim();
   if (!s) return undefined;
   if (numbers && /^\d+$/.test(s)) return s;
-  const junk = /^(?:\d+|[\w.-]+\.(?:docx?|pptx?|pdf|dvi|ps|tex|indd|md|txt|pages|key)|microsoft (?:word|powerpoint) - .*|powerpoint presentation|untitled(?:[ -]+(?:document|presentation|deck|\d+))*|(?:new )?(?:document|presentation|slide)\s*\d*)$/i;
+  const junk = /^(?:\d+|[\w.-]+\.(?:docx?|pptx?|pdf|dvi|ps|tex|indd|md|txt|pages|key|xlsx?|csv|numbers)|book\s*\d+|sheet\s*\d+|microsoft (?:word|powerpoint) - .*|powerpoint presentation|untitled(?:[ -]+(?:document|presentation|deck|\d+))*|(?:new )?(?:document|presentation|slide)\s*\d*)$/i;
   return junk.test(s) ? undefined : s;
 }
 

@@ -18,11 +18,11 @@ export interface OfficeDoc {
   assets?: Asset[];
 }
 
-const xmlText = (s: string) =>
+export const xmlText = (s: string) =>
   s.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 
-/** Title and author from docProps/core.xml, which both formats carry. */
-function coreProps(files: Record<string, Uint8Array>): { title?: string; author?: string } {
+/** Title and author from docProps/core.xml, which Word, PowerPoint and Excel files all carry. */
+export function coreProps(files: Record<string, Uint8Array>): { title?: string; author?: string } {
   const core = files["docProps/core.xml"] ? strFromU8(files["docProps/core.xml"]) : "";
   const tag = (t: string) => xmlText(core.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`))?.[1] ?? "").trim() || undefined;
   // A tool's or a template's default name is not the author, nor Word's "Document1" the title.

@@ -57,6 +57,7 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "rtf-textedit", add: join(FIX, "files/textedit.rtf") },
   { name: "rtf-word", add: join(FIX, "files/word.rtf") },
   { name: "excel", add: join(FIX, "files/vocab.xlsx") },
+  { name: "csv", add: join(FIX, "files/verbs.csv") },
   { name: "notebook", add: join(FIX, "files/numpy.ipynb") },
   { name: "youtube-auto-captions", add: "https://www.youtube.com/watch?v=oreGolden01", serve: { "https://captions.test/talk.en.vtt": ["video/talk.en.vtt", "text/vtt"] } },
   // Wikipedia (CC BY-SA 4.0) and the Python docs (PSF License) may be shared.
