@@ -52,7 +52,7 @@ describe("course links (D79)", () => {
 });
 
 test("fileKind names what a dropped file becomes", () => {
-  expect(["/a/b.PDF", "/a/b.epub", "/a/b.md", "/a/b.txt", "/a/b.htm", "/a/b.docx", "/a/b.pptx", "/a/b.rtf", "/a/b.ipynb", "/a/b.png", "/a/b.MOV", "/a/noext"].map(fileKind)).toEqual(["pdf", "book", "note", "note", "page", "note", "page", "note", "note", "image", "video", null]);
+  expect(["/a/b.PDF", "/a/b.epub", "/a/b.md", "/a/b.txt", "/a/b.htm", "/a/b.docx", "/a/b.pptx", "/a/b.rtf", "/a/b.csv", "/a/b.ipynb", "/a/b.png", "/a/b.MOV", "/a/noext"].map(fileKind)).toEqual(["pdf", "book", "note", "note", "page", "note", "page", "note", "note", "note", "image", "video", null]);
 });
 
 describe("copied link offered in the add box", () => {

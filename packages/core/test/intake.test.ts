@@ -411,6 +411,48 @@ describe("import coverage: files", () => {
     expect(rtf("5*3 and 2*4 are [products]\\par - 5 degrees\\par {\\b bold}{\\b\\i both}{\\i it}\\par")).toBe("5\\*3 and 2\\*4 are \\[products\\]\n\n\\- 5 degrees\n\n**bold*both****it*\n");
   });
 
+  test("Excel: each sheet a table under its name, dates as dates, formulas' values, its title and author", async () => {
+    const item = await addSource(await tempLibrary(), file("vocab.xlsx"));
+    expect(item.meta).toMatchObject({ type: "article", title: "Spanish vocabulary", author: "Ada Learner" });
+    expect(item.body).toBe(
+      [
+        "## Spanish",
+        "",
+        "| Word | Meaning | Example | Added | Reviews |",
+        "| --- | --- | --- | --- | --- |",
+        '| olvidar | to forget | Sin repasar, "olvidamos" rápido. | 2025-03-04 | 3 |',
+        "| recordar | to remember, to recall | Recordar es practicar \\| de verdad. | 2025-03-05 | 5 |",
+        "| repasar | to review |  | 2025-03-06 | 8 |",
+        "",
+        "## Grammar",
+        "",
+        "| Rule | Example |",
+        "| --- | --- |",
+        "| Ser for what something is | La memoria es frágil. |",
+        "| Estar for how it is now | Estoy cansado. |",
+        "",
+      ].join("\n"),
+    );
+    expect(existsSync(join(item.dir, "source.xlsx"))).toBe(true);
+  });
+
+  test("CSV and TSV: a table, quotes, commas and line breaks inside cells, Excel's semicolons", async () => {
+    const d = mkdtempSync(join(tmpdir(), "ore-csv-"));
+    writeFileSync(join(d, "Spanish verbs.csv"), '\uFEFFword,meaning,note\r\nolvidar,to forget,"irregular? no, regular"\r\nrecordar,"to remember\nto recall","o → ue: ""recuerdo"""\r\n\r\n');
+    const csv = await addSource(await tempLibrary(), join(d, "Spanish verbs.csv"));
+    expect(csv.meta.title).toBe("Spanish verbs");
+    expect(csv.body).toBe('| word | meaning | note |\n| --- | --- | --- |\n| olvidar | to forget | irregular? no, regular |\n| recordar | to remember to recall | o → ue: "recuerdo" |\n');
+    writeFileSync(join(d, "es.csv"), "palabra;significado\nolvidar;to forget, lose\n");
+    expect((await addSource(await tempLibrary(), join(d, "es.csv"))).body).toBe("| palabra | significado |\n| --- | --- |\n| olvidar | to forget, lose |\n");
+    writeFileSync(join(d, "terms.tsv"), "term\tdefinition\nspacing\treviews spread over days\n");
+    expect((await addSource(await tempLibrary(), join(d, "terms.tsv"))).body).toContain("| spacing | reviews spread over days |");
+    writeFileSync(join(d, "empty.csv"), "\n\n");
+    await expect(addSource(await tempLibrary(), join(d, "empty.csv"))).rejects.toThrow(/no rows/);
+    // A dataset is not something to read, and half of one would be worse.
+    writeFileSync(join(d, "data.csv"), "id,value\n" + "1,2\n".repeat(6000));
+    await expect(addSource(await tempLibrary(), join(d, "data.csv"))).rejects.toThrow(/6,001 rows, too many to read/);
+  });
+
   test("a damaged or empty RTF file says so", async () => {
     const d = mkdtempSync(join(tmpdir(), "ore-rtf-"));
     writeFileSync(join(d, "cut.rtf"), new Uint8Array(readFileSync(file("deck.pptx")).subarray(0, 300)));
@@ -1074,7 +1116,7 @@ describe("import coverage: the grid's small holes", () => {
   test("a damaged EPUB, Word or PowerPoint file says to download it again", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ore-broken-"));
     const cut = new Uint8Array(readFileSync(join(FIX, "files", "deck.pptx")).subarray(0, 600));
-    for (const [name, what] of [["book.epub", "EPUB"], ["notes.docx", "Word"], ["deck.pptx", "PowerPoint"]] as const) {
+    for (const [name, what] of [["book.epub", "EPUB"], ["notes.docx", "Word"], ["deck.pptx", "PowerPoint"], ["vocab.xlsx", "Excel"]] as const) {
       writeFileSync(join(dir, name), cut);
       await expect(addSource(await tempLibrary(), join(dir, name))).rejects.toThrow(new RegExp(`That ${what} file is damaged or only partly downloaded\\. Download it again`));
     }
