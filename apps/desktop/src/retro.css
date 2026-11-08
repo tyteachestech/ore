@@ -205,23 +205,17 @@
 @keyframes roll-out-down { to { transform: translateY(100%); } }
 @keyframes roll-in-down { from { transform: translateY(-100%); } }
 
-/* The highlight popup (round 3, Tyler 2026-11-07): a soft raised sheet with a 2px edge in the picked type's colour.
-   The types are a row of small mono tabs; the picked one sits on a grey key with only its icon in colour (option B:
-   "the underline feels cheap"). The note field and the tools column lose their frames. */
-.popup { --on: var(--keep-solid); border: 0; border-radius: 10px; padding: 8px 6px 8px 12px; overflow: hidden; width: 340px; }
-.popup:has(.intents .intent.card.on) { --on: var(--card-solid); }
-.popup:has(.intents .intent.question.on) { --on: var(--question-solid); }
-.popup:has(.intents .intent.apply.on) { --on: var(--apply-solid); }
-.popup:has(.intents)::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--on); opacity: 0.8; }
-.intents { gap: 2px; margin: 0 0 6px -4px; }
-.intents .intent { flex: none; padding: 0 9px; height: 28px; border-radius: 6px; font: 11px/16px var(--mono); letter-spacing: 0.02em; color: var(--faint); gap: 6px; }
-.intents .intent svg { color: currentColor; }
-.intents .intent:hover { background: var(--bg-hover); color: var(--text); }
-.intents .intent.on { background: var(--bg-active); color: var(--text); }
-.intents .intent.on svg { color: var(--hue); }
-.popup .field { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 2px 4px; }
+/* The highlight popup (Tyler's pick E of five structures, 2026-11-08, after round 3's grey key): the types are one
+   segmented control (shadcn Tabs, as the reader's side panel) over the note: a ground track with a border edge, the
+   picked type a raised pill with its icon in colour. The note field and the tools column keep no frames. */
+.popup { border: 1px solid var(--border); border-radius: 10px; padding: 8px; width: 360px; }
+.intents { height: 32px; gap: 0; margin: 0 0 8px; padding: 3px; align-items: center; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+.intents .intent { flex: 1; height: 24px; padding: 0 10px; border-radius: 6px; font: 500 12px var(--font); letter-spacing: 0; color: var(--faint); gap: 5px; }
+.intents .intent:hover { background: none; color: var(--text); }
+.intents .intent.on { color: var(--text); background: var(--bg-hover); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), var(--lift); }
+.popup .field { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 4px 8px; }
 .popup .field:focus { box-shadow: none; }
-.popup-tools { border-left: 0; padding-left: 2px; }
+.popup-tools { align-self: end; border-left: 0; padding-left: 4px; gap: 2px; }
 .popup-tools .intent { color: var(--faint); border-radius: 6px; }
 .popup-tools .intent:hover { color: var(--text); background: var(--bg-hover); }
 
