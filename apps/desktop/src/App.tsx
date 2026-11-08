@@ -763,12 +763,27 @@ export function App() {
     clearTimeout(peekTimer.current);
     peekTimer.current = window.setTimeout(() => setPeek(true), 200);
   }, []);
-  const peekOut = useCallback(() => {
-    clearTimeout(peekTimer.current);
-    peekTimer.current = window.setTimeout(() => {
-      if (!document.activeElement?.closest(".sidebar input")) setPeek(false);
-    }, 300);
-  }, []);
+  const peekOut = useCallback(() => clearTimeout(peekTimer.current), []);
+  // Out, it goes 300 ms after anything that can let it go, unless something still holds it: the pointer
+  // on it, the edge or the toggle, a field in it, or one of its menus (portaled outside it, so its
+  // trigger in the sidebar, open, stands for it). Not on the sidebar's mouseleave alone: the pointer on
+  // one of its menus has left it, and Esc from its field or a menu, or a pick, moves no pointer.
+  useEffect(() => {
+    if (!peek) return;
+    let t = 0;
+    const held = () =>
+      !!(document.querySelector(".sidebar:hover, .side-edge:hover, .side-toggle:hover, .sidebar[data-state=open], .sidebar [data-state=open]") || document.activeElement?.closest(".sidebar input"));
+    const look = () => {
+      clearTimeout(t);
+      t = window.setTimeout(() => !held() && setPeek(false), 300);
+    };
+    const events = ["pointerout", "pointerup", "keyup", "focusout"] as const;
+    for (const e of events) document.addEventListener(e, look);
+    return () => {
+      clearTimeout(t);
+      for (const e of events) document.removeEventListener(e, look);
+    };
+  }, [peek]);
 
   // In a narrow window, a source with its note open hides the sidebar so the column keeps its measure
   // (D27), as Notion does; it comes back when the window widens or the note closes. ⌘\ still shows it.
@@ -867,7 +882,11 @@ export function App() {
         setDeleting(null);
         return settings ? closeSettings() : setSettings({});
       }
-      if (settings) return; // Settings handles its own keys
+      if (settings) {
+        // Settings handles its own keys; ⌘K and ⌘/ still work over it, leaving it (Linear).
+        if (!is(e, "palette") && !is(e, "shortcuts")) return;
+        closeSettings();
+      }
       const close = () => {
         e.preventDefault();
         setPalette(false);
