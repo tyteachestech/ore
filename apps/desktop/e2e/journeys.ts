@@ -4051,6 +4051,33 @@ journey("⌘K: the skill named what he typed is the top row, above a source that
   }
 });
 
+journey("long skill names: a row's chips each end in an ellipsis inside the row, and the reader's wrap, so nothing scrolls sideways", async (page) => {
+  const names = ["Quantum chromodynamics and the strong force, from first principles", "Storytelling for engineers who write design docs nobody reads"];
+  const made = [] as { id: string }[];
+  for (const n of names) made.push((await ore("skills", "add", n)) as { id: string });
+  const item = ((await ore("ls")) as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!;
+  await ore("edit", item.id, "--skills", [...made.map((k) => k.id), ...item.skills].join(","));
+  try {
+    await page.setViewportSize({ width: 720, height: 700 });
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const row = page.locator(".list .row").filter({ hasText: TESTING }).first();
+    await row.locator(".chip").first().waitFor();
+    const cut = await row.evaluate((r) => {
+      const box = r.querySelector(".chips-button")!.getBoundingClientRect();
+      return [...r.querySelectorAll(".chips-button .chip")].filter((c) => c.getBoundingClientRect().right > box.right + 0.5).length;
+    });
+    if (cut) throw new Error(`${cut} chip(s) sliced at the row's edge`);
+    await row.locator(".title").click();
+    await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+    await page.waitForTimeout(300);
+    const wide = await page.locator(".reader-scroll").evaluate((s) => s.scrollWidth - s.clientWidth);
+    if (wide > 0) throw new Error(`the reader scrolls ${wide}px sideways`);
+  } finally {
+    for (const k of made) await ore("skills", "rm", k.id);
+  }
+});
+
 // —— run ——
 
 let failed = 0;

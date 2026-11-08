@@ -268,7 +268,10 @@ img.thumb { filter: brightness(0.86); }
 .row-line .by { flex: 0 1 auto; max-width: 24ch; min-width: 0; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-line .by.from-site { font-style: italic; }
 .row-line .chips-button + .course-next::before, .row-line .by + .chips-add + .course-next::before { content: "·"; margin-right: 6px; color: var(--faint); font-size: 12px; }
-.row-line .chips { flex-wrap: nowrap; }
+/* Chips that don't fit end in an ellipsis, each, never sliced at the row's edge. */
+.row-line .chips { flex-wrap: nowrap; min-width: 0; }
+.row-line .chips .chip { min-width: 0; }
+.chip .icon { flex: none; }
 .row .snip { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .snip mark { background: var(--keep); color: var(--text); border-radius: 2px; }
 .show-all { margin: 2px 0 0; padding: 4px 8px; border-radius: 6px; color: var(--muted); font-size: 13px; }
@@ -567,6 +570,7 @@ img.thumb { filter: brightness(0.86); }
 .doc-head .chips { margin-bottom: 16px; align-items: center; }
 /* In the byline a skill reads as words with its icon, like the date beside it (Reeder's byline), not a boxed tag;
    hover shows it is the skill picker. */
+.doc-head .chips-button { flex-wrap: wrap; }
 .doc-head .chips-button .chip { height: 22px; padding: 0 5px; font-size: 13px; color: var(--muted); background: none; box-shadow: none; border-radius: 4px; }
 .doc-head .chips-button:hover .chip, .doc-head .chips-button[aria-expanded="true"] .chip { filter: none; background: var(--bg-hover); color: var(--text); }
 /* A lesson's place in its course (D79), above the title: course name (its lessons), "Lesson 3 of 14", ‹ ›. */
