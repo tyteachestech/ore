@@ -1448,6 +1448,27 @@ journey("note images: a pasted screenshot and an image dropped from Finder go in
   if (await page.locator(".toast", { hasText: "Added" }).count()) throw new Error("an image was added as a source");
 });
 
+journey("note equations: /equation opens a TeX field that draws as he types; ↵ closes it and it is still drawn after a reload", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Area grows as /equation", { delay: 20 });
+  await page.locator(".note-menu-row.on", { hasText: "Inline equation" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.getByLabel("Equation (TeX)").waitFor();
+  await page.keyboard.type("\\pi r^2");
+  await until("it draws as he types", async () => (await pm.locator(".note-math .katex annotation").last().textContent()) === "\\pi r^2");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type(" here");
+  await until("the field closes and he types after it", async () => !(await page.getByLabel("Equation (TeX)").count()) && (await pm.locator("p", { has: page.locator(".note-math") }).last().evaluate((p) => p.lastChild?.textContent)) === " here");
+  await page.waitForTimeout(600); // the note saves after a pause
+  await page.reload();
+  await openSource(page, AGENTS);
+  await until("still drawn after a reload", async () => (await pm.locator(".note-math .katex annotation").last().textContent().catch(() => "")) === "\\pi r^2");
+});
+
 journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words, ⌘↵ closes a toggle", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);

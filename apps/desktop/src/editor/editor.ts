@@ -13,6 +13,7 @@ import { highlightSchema, remarkColors, stringifyColor, textColorSchema, underli
 import { blockSelPlugin } from "./blocksel";
 import { tablePlugin, tableView } from "./tables";
 import { emojiTrigger } from "./emoji";
+import { mathBlockSchema, mathInlineSchema, mathRule, remarkNoteMath } from "./math";
 import { emptyHints, foldPlugin, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
@@ -28,6 +29,7 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     })
     .use(remarkBlocks)
     .use(remarkColors)
+    .use(remarkNoteMath)
     // Before the keymaps, so selected blocks get their keys first.
     .use(blockSelPlugin)
     .use(tablePlugin)
@@ -39,8 +41,9 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(commonmark.filter((p) => !remarkPreserveEmptyLinePlugin.includes(p)))
     .use(gfm)
     .use(tableView)
-    .use([toggleSummarySchema, toggleSchema, calloutSchema, highlightSchema, textColorSchema, underlineSchema].flat())
+    .use([toggleSummarySchema, toggleSchema, calloutSchema, highlightSchema, textColorSchema, underlineSchema, mathInlineSchema, mathBlockSchema].flat())
     .use(taskRule)
+    .use(mathRule)
     .use(history)
     .use(listener)
     .use(emptyHints)

@@ -22,6 +22,8 @@ import { calloutSchema, diagramName, toggleSchema, toggleSummarySchema } from ".
 import { board, sizeOf, withSize, type Size } from "./board";
 import { createEditor, markdownOf, menuTrigger, slashMatch } from "./editor";
 import { lastPaint, paint } from "./colors";
+import { mathBlockSchema, mathInlineSchema, mathViews } from "./math";
+import * as Popover from "@radix-ui/react-popover";
 import { dateRows } from "./dates";
 import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
@@ -166,6 +168,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [index, setIndex] = useState(0);
   const [sel, setSel] = useState<Sel | null>(null);
   const [askLink, setAskLink] = useState(0);
+  /** The equation open for editing: where it is, and where its field goes. */
+  const [math, setMath] = useState<{ pos: number; x: number; y: number; w: number; h: number } | null>(null);
   /** Where images dragged in from Finder will land: a gap between the note's blocks. */
   const [dropLine, setDropLine] = useState<{ x: number; y: number; w: number } | null>(null);
   const [emoji, setEmoji] = useState<EmojiEntry[] | null>(null);
@@ -173,7 +177,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
   // The editor's plugins live as long as it does; they read the latest props, rows and menu
   // through this. The menu here is set as the caret moves, ahead of React's render.
-  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: { at: -1, ch: "" }, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), bar: false, putImages: async () => {}, renames: new Set() });
+  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: { at: -1, ch: "" }, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), bar: false, putImages: async () => {}, editMath: () => {}, renames: new Set() });
 
   /** The format bar's selection; `live.current.bar` says whether it is up, for ⌘K. */
   const showSel = (s: Sel | null) => {
@@ -279,7 +283,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, showSel)]), imagePaste(live), imageView(live), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, showSel)]), imagePaste(live), imageView(live), ...mathViews((pos) => live.current.editMath(pos)), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
@@ -453,6 +457,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       })),
       { label: "Table", sub: "| |", run: cmd(insertTableCommand.key, { row: 3, col: 3 }) },
       { label: "Code", sub: "```", run: turn("code", call(createCodeBlockCommand.key)) },
+      {
+        label: "Inline equation",
+        sub: "$$",
+        names: ["equation", "tex"],
+        run: () => {
+          const v = clear(menu);
+          if (!v) return;
+          const at = v.state.selection.from;
+          v.dispatch(v.state.tr.replaceSelectionWith(mathInlineSchema.type(ctxOf(editor.current!)).create()));
+          live.current.editMath(at);
+        },
+      },
+      {
+        label: "Block equation",
+        names: ["math", "latex", "equation"],
+        run: () => {
+          const v = clear(menu);
+          if (!v) return;
+          const { $from } = v.state.selection;
+          const node = mathBlockSchema.type(ctxOf(editor.current!)).create();
+          // On an empty line of its own it takes the line; anywhere else (a list, a table) it goes below the block.
+          const empty = $from.depth === 1 && $from.parent.type.name === "paragraph" && !$from.parent.content.size;
+          const at = empty ? $from.before() : $from.after(1);
+          v.dispatch(empty ? v.state.tr.replaceWith(at, $from.after(), node) : v.state.tr.insert(at, node));
+          live.current.editMath(at);
+        },
+      },
       { label: "Divider", sub: "---", names: ["hr", "line"], run: cmd(insertHrCommand.key) },
       {
         label: "Image",
@@ -580,6 +611,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     ];
   };
 
+  live.current.editMath = (pos) => {
+    const v = view();
+    const dom = v?.nodeDOM(pos) as HTMLElement | null;
+    const h = host.current?.getBoundingClientRect();
+    if (!v || !dom?.getBoundingClientRect || !h) return;
+    const r = dom.getBoundingClientRect();
+    setMath({ pos, x: r.left - h.left, y: r.top - h.top, w: r.width, h: r.height });
+  };
+
   /** Images pasted, dropped or picked, as in Notion: each is copied beside the note (`undefined`: he
    *  picks one), then put in at the caret, or, dropped, on a line of its own before the note's `before`th
    *  block (counted at the time, so typing during the copy never puts it inside a line). One editor
@@ -664,6 +704,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <WithMenu actions={diagramActions}>
         <div ref={root} onContextMenuCapture={(e) => (rightClicked.current = (e.target as HTMLElement).closest?.(".note-diagram") ?? null)} />
       </WithMenu>
+      {math && <MathField key={math.pos} at={math} view={view} onClose={() => setMath(null)} />}
       {dropLine && <div className="block-drop" style={{ left: dropLine.x, top: dropLine.y, width: dropLine.w }} />}
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
@@ -712,6 +753,8 @@ type Live = {
     /** Opens the format bar's web link field on the selected text (⌘K), while the bar is up (`bar`). */
     askLink: () => void;
     bar: boolean;
+    /** Opens the equation at `pos` for editing. */
+    editMath: (pos: number) => void;
     /** Puts images in: see `putImages`. */
     putImages: (files: (string | { ext: string; data: string } | undefined)[], before?: number) => Promise<void>;
     /** Diagram renames made in this editor, as "from to", both ways, for ⌘Z and ⇧⌘Z to follow. */
@@ -814,6 +857,10 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             }
             const sel = view.state.selection;
             const drawn = sel instanceof NodeSelection && sel.node.type.name === "image" ? diagramName(String(sel.node.attrs.src)) : null;
+            if (!menu && e.key === "Enter" && sel instanceof NodeSelection && sel.node.type.name.startsWith("math_")) {
+              live.current.editMath(sel.from); // ↵ on a selected equation opens it, as a click does
+              return true;
+            }
             if (!menu && e.key === "Enter" && drawn) {
               live.current.draw(drawn); // ↵ on a selected diagram opens it (D40)
               return true;
@@ -1156,3 +1203,71 @@ const toggleView = $view(toggleSchema.node, () => (node) => {
   const ignoreMutation = (m: ViewMutationRecord) => (m.type === "attributes" && m.target === dom) || m.target === caret || caret.contains(m.target as Node);
   return { dom, contentDOM: content, ignoreMutation };
 });
+
+/** Notion's equation field, under the equation it edits: the TeX, drawn live as he types (each change is
+ *  an editor step, grouped by the editor's history). ↵ or a click away closes it (⇧↵ breaks the line
+ *  in a block equation); one left empty is taken out. */
+function MathField({ at, view, onClose }: { at: { pos: number; x: number; y: number; w: number; h: number }; view: () => EditorView | undefined; onClose: () => void }) {
+  const node = () => {
+    const v = view();
+    const n = v?.state.doc.nodeAt(at.pos);
+    return v && n?.type.name.startsWith("math_") ? { v, n } : null;
+  };
+  const [tex, setTex] = useState(() => String(node()?.n.attrs.value ?? ""));
+  // The equation grows as it draws: the field stays under it.
+  const [box, setBox] = useState(at);
+  const done = useRef(false);
+  const block = node()?.n.type.name === "math_block";
+  const set = (t: string) => {
+    setTex(t);
+    const h = node();
+    if (!h) return;
+    h.v.dispatch(h.v.state.tr.setNodeMarkup(at.pos, undefined, { value: t }));
+    const r = (h.v.nodeDOM(at.pos) as HTMLElement | null)?.getBoundingClientRect();
+    if (r) setBox((b) => ({ ...b, w: r.width, h: r.height }));
+  };
+  const close = () => {
+    if (done.current) return; // focusing the note below fires the popover's own dismiss again
+    done.current = true;
+    onClose();
+    const h = node();
+    if (!h) return;
+    const { v, n } = h;
+    const kept = !!n.attrs.value.trim();
+    const { paragraph } = v.state.schema.nodes;
+    // An empty equation goes; one that was the note's only block leaves an empty line, as a note always has one.
+    const tr = kept ? v.state.tr : v.state.doc.childCount === 1 && n.isBlock ? v.state.tr.replaceWith(at.pos, at.pos + n.nodeSize, paragraph!.create()) : v.state.tr.delete(at.pos, at.pos + n.nodeSize);
+    const after = kept ? at.pos + n.nodeSize : at.pos;
+    // A block equation at the end of the note gets a line below it to go on writing (Notion).
+    if (kept && n.isBlock && !tr.doc.resolve(after).nodeAfter) tr.insert(after, paragraph!.create());
+    v.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(after + (kept || !n.isBlock ? 0 : 1), tr.doc.content.size)))));
+    v.focus();
+  };
+  return (
+    <Popover.Root open onOpenChange={(o) => !o && close()}>
+      <Popover.Anchor asChild>
+        <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, pointerEvents: "none" }} />
+      </Popover.Anchor>
+      <Popover.Portal>
+        <Popover.Content className="popover sel-pop math-field" side="bottom" align="start" sideOffset={6} collisionPadding={8} onCloseAutoFocus={(e) => e.preventDefault()}>
+          <textarea
+            className="menu-input mono"
+            aria-label="Equation (TeX)"
+            placeholder="E = mc^2"
+            rows={block ? 3 : 1}
+            value={tex}
+            autoFocus
+            spellCheck={false}
+            onChange={(e) => set(block ? e.target.value : e.target.value.replace(/\n/g, " "))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !(block && e.shiftKey)) {
+                e.preventDefault();
+                close();
+              }
+            }}
+          />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
