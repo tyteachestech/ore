@@ -376,7 +376,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const got = cov?.filter(Boolean).length ?? 0;
   const verdict = !cov ? null : got === cov.length ? "yes" : got > 0 ? "part" : "no";
   // The AI step failed (its error shows below): stop saying it is still working.
-  const failed = !verdict && !!(q?.points ? checkError : pointsError);
+  const why = q?.points ? checkError : pointsError;
+  const failed = !verdict && !!why;
   // Still waiting on the AI: the badge spins, and past 5 s it says how long this takes.
   const waiting = isChecked && !verdict && !failed;
   const late = useLate(waiting);
@@ -479,7 +480,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                     : verdict === "no"
                       ? "Step through the passages below."
                       : failed
-                        ? "The source is open; compare your answer with it, or "
+                        ? // Why (Codex missing, Claude signed out), so he knows whether a retry can work, as Review says it.
+                          `${why}${/[.!?]$/.test(why!) ? "" : "."} The source is open; compare your answer with it, or `
                         : late
                           ? `${q.points ? "This can take about 20 seconds" : "This can take up to a minute"}. The source is open; have a look meanwhile.`
                           : "The source is open; have a look meanwhile."}

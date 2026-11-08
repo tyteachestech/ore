@@ -3230,6 +3230,23 @@ journey("quiz check: one click makes a passage a key point, and marks a highligh
   await until("⌘Z takes the mark back", async () => (await count("card")) === card0 + 1 && (await count("keep")) === keep0);
 });
 
+journey("quiz check that fails says why, as Review does, with try again", async (page) => {
+  await openSource(page, TESTING);
+  const why = "Codex isn’t installed (no `codex` on PATH). Install it, or pick Claude in Settings → AI.";
+  await page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { "key-points": why, check: why }), why);
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip to questions" }).click();
+  await page.getByLabel("Your answer").fill("It feels familiar");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const verdict = page.locator(".quiz-verdict").filter({ hasText: "Couldn’t check this one" });
+  await verdict.waitFor();
+  if (!(await verdict.innerText()).includes(why)) throw new Error(`no reason: “${await verdict.innerText()}”`);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await verdict.getByRole("button", { name: "try again" }).click();
+  await page.locator(".quiz-verdict").filter({ hasNotText: "Couldn’t check this one" }).waitFor();
+  await page.getByRole("button", { name: "Close quiz" }).click();
+});
+
 // Last: its question highlight would change the lists the question journeys read.
 journey("settle: closing a typed highlight lifts the popup away, pops its mark and glows once, then leaves nothing behind", async (page) => {
   await openSource(page, TESTING);
