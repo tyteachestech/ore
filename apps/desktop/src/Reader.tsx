@@ -2,6 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Children, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -336,6 +337,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   // chip per type, then one chip for all, then none (the side panel's Collected tab lists them all).
   const [tools, setTools] = useState<HTMLDivElement | null>(null);
   const [fit, setFit] = useState<Fit>("all");
+  // Which types have chips, and how wide each count is: a change measures the chips again from the top.
+  const chipSet = INTENTS.map((i) => {
+    const n = anns.filter((a) => a.intent === i && visible(a)).length;
+    return n ? String(n).length : 0;
+  }).join();
   useLayoutEffect(() => {
     const pane = tools?.offsetParent;
     if (PHONE || !tools || !pane) return;
@@ -352,13 +358,14 @@ function ReaderView(p: Props & { reload: () => void }) {
       const room = box.right - left - rest;
       // A width not measured yet (0) is tried, then measured.
       now = widths.all <= room ? "all" : widths.one <= room ? "one" : "none";
-      setFit(now);
+      // Before the frame paints, so a toolbar too wide for its room never shows for a frame.
+      flushSync(() => setFit(now));
     };
     const ro = new ResizeObserver(measure);
     ro.observe(tools);
     ro.observe(pane);
     return () => ro.disconnect();
-  }, [tools]);
+  }, [tools, chipSet]);
   // The reading focus (Readwise Reader): blocks from `anchor` to `head`, moved with ↑ ↓ and widened with ⇧.
   const [focus, setFocus] = useState<{ anchor: HTMLElement; head: HTMLElement } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);

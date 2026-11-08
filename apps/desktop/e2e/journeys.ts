@@ -4175,6 +4175,44 @@ journey("list: an archive whose save hangs never freezes the list; a read starte
   }
 });
 
+journey("reader toolbar: Collected goes back to a chip per type when a type goes and they fit again", async (page) => {
+  const title = "Four kinds of highlight";
+  const lines = ["Spacing beats massing for long-term retention.", "Retrieval changes the memory it retrieves.", "Why does a delay make recall stronger?", "Quiz yourself before rereading tomorrow."];
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich"], stdin: `# ${title}\n\n${lines.join(" ")}` }) }).then((r) => r.json())) as { id: string };
+  const kinds = ["keep", "card", "question"];
+  for (const [i, k] of kinds.entries()) await ore("highlight", made.id, "--exact", lines[i]!, "--intent", k);
+  const one = () => page.locator(".reader-tools .collected-chip.all").count().then((n) => n > 0);
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.locator(".list .row .title").filter({ hasText: title }).first().click();
+    await page.locator(".reader-tools .collected-chip.question").waitFor();
+    // The narrowest window where a chip per type still fits, three types in.
+    let width = 1280;
+    for (; width > 720; width -= 8) {
+      await page.setViewportSize({ width: width - 8, height: 700 });
+      await page.waitForTimeout(80);
+      if (await one()) break;
+    }
+    await page.setViewportSize({ width, height: 700 });
+    await until("three chips at that width", async () => !(await one()));
+    await ore("highlight", made.id, "--exact", lines[3]!, "--intent", "apply");
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.locator(".list .row .title").filter({ hasText: title }).first().click();
+    await until("four types don't fit: one chip", one);
+    await page.getByRole("tab", { name: "Collected" }).click();
+    const toggle = page.locator(".cp-head.apply .cp-toggle");
+    if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+    await page.locator(".cp-head.apply ~ .cp-line").filter({ hasText: "Quiz yourself before rereading" }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Type" }).hover();
+    await page.getByRole("menuitemcheckbox", { name: "Highlight" }).dispatchEvent("click");
+    await until("three types fit again: a chip per type", async () => !(await one()) && (await page.locator(".reader-tools .collected-chip.keep").count()) === 1);
+  } finally {
+    await ore("archive", made.id);
+  }
+});
+
 // —— run ——
 
 let failed = 0;
