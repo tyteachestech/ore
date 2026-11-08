@@ -26,5 +26,5 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 - A mascot later; sound after the look.
 
 ## Built
-2026-11-08, PR #114: segmented control for the side panel tabs (A) and the highlight popup's types (E); dot icons (E). Process: `/mnt/project-files/board/` (board.md, one round folder per element).
+2026-11-08, PR #114: segmented control for the side panel tabs (A) and the highlight popup's types (E); dot icons (E). Process: `/mnt/project-files/board/` (board.md, one round folder per element). Home and the skill page layouts stayed as they were (Tyler, after seeing them at a year's scale). Module rounds followed: the skill page's reading list is Reader's with a question mark for sources that may answer an open question (D130, `toread-round-1/`).
 D129 (amends D101 and D105): palette, OpenTUI Mono, sentence case, pixel MingCute icons and the grey-key popup (PR #84); Settle in its own PR.
