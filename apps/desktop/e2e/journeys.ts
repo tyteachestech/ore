@@ -2700,6 +2700,24 @@ journey("review: the quick quiz during a review keeps its own session; the card 
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: when the quick quiz closes, a new card it didn't rate stays, even with the day's new cards used up", async (page) => {
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  await page.locator(".review-new").first().waitFor(); // the first card is the day's new draft
+  const draft = await q.innerText();
+  const goal = (await ore("today")) as { new_per_day: number };
+  await ore("goal", "--new-per-day=0");
+  try {
+    await emit(page, "quiz-closed");
+    await page.waitForTimeout(1200);
+    if ((await q.innerText()) !== draft) throw new Error("the new card on screen went when the quiz closed");
+  } finally {
+    await ore("goal", `--new-per-day=${goal.new_per_day}`);
+  }
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("quick quiz: put away and shown again in one go, it shows afresh with its own session; Esc closes quietly", async (page) => {
   const quiz = await openQuiz();
   const calls = oreCalls(quiz);

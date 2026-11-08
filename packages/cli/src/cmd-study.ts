@@ -86,12 +86,12 @@ export const studyCommands: Record<string, Command> = {
   },
 
   due: {
-    usage: "[--limit N] [--skill s]...    ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills",
-    options: { limit: { type: "string" }, skill: { type: "string", multiple: true } },
+    usage: "[--limit N] [--skill s]... [--all]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills; --all: every unseen draft, past the day's new-card limits",
+    options: { limit: { type: "string" }, skill: { type: "string", multiple: true }, all: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
       const picked = strs(f.skill);
-      const all = dueQueue(lib, new Date(), { skills: picked.length ? picked : undefined });
+      const all = dueQueue(lib, new Date(), { skills: picked.length ? picked : undefined, newLimit: !f.all });
       const limit = int(f.limit, "limit");
       if (limit !== undefined && limit < 0) throw new Error("--limit must be 0 or more"); // slice(0, -1) would drop the last
       const q = limit === undefined ? all : all.slice(0, limit);

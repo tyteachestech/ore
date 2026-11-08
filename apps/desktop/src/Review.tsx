@@ -165,13 +165,16 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   }, [pick]);
 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
-  // comes up twice.
+  // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
+  // goes only if he hasn't started on it.
   useEffect(() => {
     if (quick || PHONE) return;
     const un = listen("quiz-closed", () => {
-      ore<DueEntry[]>("due", ...(pick ?? []).map((s) => opt("skill", s))).then((fresh) => {
+      ore<DueEntry[]>("due", "--all", ...(pick ?? []).map((s) => opt("skill", s))).then((fresh) => {
         const due = new Set(fresh.map((e) => e.id));
-        setQueue((q) => q && (q.every((e) => due.has(e.id)) ? q : q.filter((e) => due.has(e.id))));
+        const s = now.current;
+        const started = s.phase !== "answer" || !!s.answer.trim();
+        setQueue((q) => q && (q.every((e) => due.has(e.id)) ? q : q.filter((e, i) => due.has(e.id) || (i === 0 && started))));
       }, () => {});
     });
     return () => void un.then((f) => f());
