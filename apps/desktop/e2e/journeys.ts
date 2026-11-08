@@ -4151,6 +4151,30 @@ journey("delete skill: the dialog counts its archived sources too, since the del
   }
 });
 
+journey("list: an archive whose save hangs never freezes the list; a read started after it still lands", async (page) => {
+  type W = { __ORE_SLOW?: Record<string, number> };
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.evaluate(() => void ((window as unknown as W).__ORE_SLOW = { archive: 20000 }));
+  const row = page.locator(".list .row").filter({ hasText: AGENTS }).first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: /^Archive/ }).click();
+  await until("the row leaves at once", async () => !(await row.isVisible()));
+  // Added outside the app while the archive's answer hangs: opening a source reads the list again.
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich"], stdin: "# Added while a save hangs\n\nThe list still reads." }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.locator(".list .row .title").filter({ hasText: TESTING }).first().click();
+    await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+    await page.waitForTimeout(1200);
+    await page.keyboard.press("Escape");
+    await page.locator(".list .row").filter({ hasText: "Added while a save hangs" }).first().waitFor({ timeout: 4000 });
+    if (await row.isVisible()) throw new Error("the archived row came back while its save hung");
+  } finally {
+    await page.evaluate(() => void ((window as unknown as W).__ORE_SLOW = {}));
+    await ore("archive", made.id);
+    await ore("archive", ((await ore("ls", "--archived")) as { id: string; title: string }[]).find((i) => i.title === AGENTS)!.id, "--undo");
+  }
+});
+
 // —— run ——
 
 let failed = 0;

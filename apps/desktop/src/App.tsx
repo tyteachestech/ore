@@ -303,10 +303,11 @@ export function App() {
 
   // Only the newest list read lands: an older one answering late would put back what came after it.
   const reads = useRef(0);
-  // Nor one that lands while a row's optimistic write is still saving: it would put the row back (a
-  // second A then archives it again). Each write reads the list again once it settles.
+  // Nor one that began before a row's optimistic write: it would put the row back (a second A then
+  // archives it again). Each write reads the list again once it settles; a read begun after it lands,
+  // so a write that hangs never freezes the list.
   const writes = useRef(0);
-  const writing = <T,>(p: Promise<T>) => (writes.current++, p.finally(() => writes.current--));
+  const writing = <T,>(p: Promise<T>) => (writes.current++, p);
   /** One action's writes, one after another: an Undo pressed while its archive still saves waits for it,
    *  or the two `ore` runs race and the archive can land last, leaving it archived. */
   const inOrder = () => {
@@ -319,9 +320,10 @@ export function App() {
   };
   const refresh = useCallback(async () => {
     const n = ++reads.current;
+    const w = writes.current;
     try {
       const [all, gone] = await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
-      if (n !== reads.current || writes.current) return;
+      if (n !== reads.current || w !== writes.current) return;
       setItems(all);
       setArchived(gone);
       setListError(null);
