@@ -154,11 +154,26 @@ describe("note editor (D38)", () => {
     expect(ed.menuTrigger("/")).toEqual({ kind: "slash", query: "", typed: 1 });
     expect(ed.menuTrigger("Some text /hea")).toEqual({ kind: "slash", query: "hea", typed: 4 });
     expect(ed.menuTrigger("￼/diagram")).toEqual({ kind: "slash", query: "diagram", typed: 8 });
+    expect(ed.menuTrigger("/##")).toEqual({ kind: "slash", query: "##", typed: 3 });
     expect(ed.menuTrigger("a/b")).toBeNull();
     expect(ed.menuTrigger("https://x")).toBeNull();
     expect(ed.menuTrigger("See [[mak")).toEqual({ kind: "link", query: "mak", typed: 5 });
     expect(ed.menuTrigger("Nice :fir")).toEqual({ kind: "emoji", query: "fir", typed: 4 });
     expect(ed.menuTrigger("at 10:30")).toBeNull();
+  });
+
+  test("/ finds a block by part of its name or by the name Notion takes for it (/h1, /#, /todo, /hr)", async () => {
+    const m = ed.slashMatch;
+    expect(m("Heading 1", ["h1", "#"], "h1")).toBe(true);
+    expect(m("Heading 2", ["h2", "##"], "h1")).toBe(false);
+    expect(m("Heading 2", ["h2", "##"], "##")).toBe(true);
+    expect(m("Heading 1", ["h1", "#"], "##")).toBe(false);
+    expect(m("To-do list", [], "todo")).toBe(true);
+    expect(m("To-do list", ["check", "checkbox"], "check")).toBe(true);
+    expect(m("Divider", ["hr", "line"], "hr")).toBe(true);
+    expect(m("Toggle heading 2", [], "toggleheading2")).toBe(true);
+    expect(m("Image", ["img"], "")).toBe(true);
+    expect(m("Image", ["img"], "zz")).toBe(false);
   });
 
   test("new toggles and callouts serialize to Markdown that loads back as the same blocks", async () => {

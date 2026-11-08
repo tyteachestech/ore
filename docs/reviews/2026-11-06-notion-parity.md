@@ -74,6 +74,20 @@ the e2e journey "note shortcuts as in Notion". Before = on master before this pa
 Copying from a note now puts Markdown on the clipboard as its text, so a copy pasted into Claude or ChatGPT
 keeps its headings and lists.
 
+## Second pass (2026-11-08), against Notion's own shortcut list
+
+| Behaviour (notion.com/help/keyboard-shortcuts) | Before | Now |
+| --- | --- | --- |
+| `/h1` `/h2` `/h3`, `/#` `/##` `/###`, `/plain`, `/check`, `/hr`, `/img` find their block | fail (only words of the label) | fixed |
+| `/date` | missing | added: opens the `@` dates |
+| A `/` closed with Esc, then deleted, opens the menu again when typed anew | fail (stayed closed at that spot) | fixed |
+| ⌘K with words selected adds a link (no selection: the palette, as Notion's search) | fail (the palette) | fixed |
+| ⌘Enter in a toggle's title opens or closes it (still ticks a to-do) | fail (moved into the body) | fixed |
+| ⌘⌥T closes every toggle, or opens them all | missing | added |
+| ⌘⇧H puts the last text colour or highlight on the selection | missing | added |
+
+Left out: ⌘/ (Ore's shortcut list) and `/color` names (the format bar's colour menu does it).
+
 ## Already covered elsewhere
 
 Esc block selection, ⌘A twice, ⌘D, ⌘⇧↑↓, ⋮⋮ drag and Turn into (`blockops.test.ts`); `[[` links, `/`,

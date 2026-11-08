@@ -7,7 +7,6 @@ import { BINDINGS } from "../src/keys";
 // that binding, through <Hint keys=…> or an inline label(keys.<id>). A binding with no on-screen
 // control is listed here with the reason; add a control's hint instead whenever one exists.
 const NO_CONTROL: Record<string, string> = {
-  palette: "opens the palette, which shows every other action's binding",
   "go-toread": "label(keys[v.key]) in the sources view menu (ViewMenu, TABS)",
   "go-done": "label(keys[v.key]) in the sources view menu (ViewMenu, TABS)",
   questions: "opens the Collected tab with the open passage as his answer's quote; the tab itself shows C (collected)",
@@ -19,6 +18,7 @@ const NO_CONTROL: Record<string, string> = {
   "block-up": "label(keymap[\"block-up\"]) beside Move up in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
   "block-down": "label(keymap[\"block-down\"]) beside Move down in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
   "block-duplicate": "label(keymap[\"block-duplicate\"]) beside Duplicate in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
+  "note-last-color": "puts the colour last picked in the format bar's colour menu on the selection again; nothing on screen to press",
   "quick-quiz": "system-wide (D76): registered with macOS, works in any app; shown and set in Settings › Review › Quick quiz",
 };
 
