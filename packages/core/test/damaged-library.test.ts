@@ -154,4 +154,35 @@ describe("a damaged library", () => {
     writeFileSync(join(paths.sessions(lib), "2026-11.jsonl"), '{"id":"S1","ts":"2026-11-0');
     expect((await doctor(lib)).issues.some((i) => i.path.startsWith("sessions/") && i.message.includes("cut off"))).toBe(true);
   });
+
+  test("doctor calls the renamed folder the copy, never the one Ore shows", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval practice beats rereading." });
+    cpSync(item.dir, join(dirname(item.dir), "aaa renamed"), { recursive: true });
+    const copy = (await doctor(lib)).issues.find((i) => i.message.startsWith("a copy of"));
+    expect(copy?.path).toContain("aaa renamed");
+  });
+
+  test("a folder whose ore init was cut off before skills.yaml can be set up again", async () => {
+    const lib = await tempLibrary();
+    rmSync(paths.skills(lib));
+    expect(() => openLibrary(lib.root)).toThrow(/^no library at/);
+  });
+
+  test("a damaged index is rebuilt by reindex", async () => {
+    const lib = await tempLibrary();
+    await addSnippet(lib, { text: "Spacing beats massing." });
+    openIndex(lib).close();
+    writeFileSync(paths.index(lib), "not a database at all, just junk bytes ".repeat(200));
+    for (const f of [`${paths.index(lib)}-wal`, `${paths.index(lib)}-shm`]) rmSync(f, { force: true });
+    expect(rebuildIndex(lib).errors).toEqual([]);
+  });
+
+  test("a review line from an older build without confidence still counts", async () => {
+    const lib = await tempLibrary();
+    const state = { due: "2026-11-01T00:00:00.000Z", stability: 1, difficulty: 5, elapsed_days: 0, scheduled_days: 1, reps: 1, lapses: 0, state: 2 };
+    mkdirSync(paths.reviews(lib), { recursive: true });
+    writeFileSync(join(paths.reviews(lib), "2026-11.jsonl"), JSON.stringify({ ts: "2026-11-01T10:00:00.000Z", card: "C1", rating: 3, state_before: state, state_after: state }) + "\n");
+    expect(readReviews(lib).length).toBe(1);
+  });
 });

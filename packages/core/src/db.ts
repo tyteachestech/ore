@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { annotationsPath, readAnnotations } from "./annotations.ts";
 import { errorLine, logFiles, subdirs, visible } from "./fsutil.ts";
@@ -330,11 +330,20 @@ export function openIndex(lib: Library): LibraryIndex {
 export function rebuildIndex(lib: Library): SyncReport {
   // Emptied in place, not deleted: unlinking the file from under another `ore` that has it open fails that one
   // with "disk I/O error". With no files known, the sync indexes everything again.
-  const db = openDb(lib);
-  db.transaction(() => {
-    for (const t of ["files", "items", "cards", "card_state", "fts"]) db.run(`delete from ${t}`);
-  })();
-  db.close();
+  try {
+    const db = openDb(lib);
+    try {
+      db.transaction(() => {
+        for (const t of ["files", "items", "cards", "card_state", "fts"]) db.run(`delete from ${t}`);
+      })();
+    } finally {
+      db.close();
+    }
+  } catch {
+    // An index too damaged to open ("database disk image is malformed") is deleted and built from scratch.
+    const path = paths.index(lib);
+    for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) unlinkSync(f);
+  }
   const { index, report } = syncIndex(lib);
   index.close();
   return report;

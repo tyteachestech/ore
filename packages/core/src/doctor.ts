@@ -67,7 +67,8 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
   };
 
   const items = new Map<string, Item>();
-  for (const dir of itemDirs(lib)) {
+  // Folders named as Ore names them first, so a copy is the one called a copy (Ore shows the other, oncePerId).
+  for (const dir of itemDirs(lib).sort((a, b) => Number(!ID_END.test(a)) - Number(!ID_END.test(b)))) {
     const doc = join(dir, "doc.md");
     let item: Item;
     try {
@@ -78,7 +79,7 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     }
     const twin = items.get(item.meta.id);
     if (twin) {
-      // iCloud's "… 2" or Finder's "… copy": Ore shows the folder it read first.
+      // iCloud's "… 2" or Finder's "… copy".
       add("error", doc, `a copy of ${rel(twin.dir)} (same id); Ore shows that one, so delete this copy once you've checked nothing in it is newer`);
       continue;
     }

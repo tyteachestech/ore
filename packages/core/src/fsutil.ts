@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, basename, join } from "node:path";
 import { slugify } from "./ids.ts";
@@ -29,10 +29,16 @@ export function appendJsonl(path: string, record: object): void {
 
 function endsOpen(path: string): boolean {
   if (!existsSync(path)) return false;
-  // The whole file, not its last byte: the iPhone build's fs stand-in has no file handles, and a log is
-  // a month's or one source's lines, which every reader reads whole anyway.
-  const text = readFileSync(path, "utf8");
-  return text.length > 0 && !text.endsWith("\n");
+  const size = statSync(path).size;
+  if (!size) return false;
+  const fd = openSync(path, "r");
+  try {
+    const last = new Uint8Array(1);
+    readSync(fd, last, 0, 1, size - 1);
+    return last[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export interface JsonlLine<T> {
@@ -105,7 +111,8 @@ export function errorLine(e: unknown): string {
   // A folder or file he (or a sync) made read-only: say where and what to check, not the raw EACCES with a temp name.
   const code = (e as { code?: string } | null)?.code;
   const path = (e as { path?: string } | null)?.path;
-  if ((code === "EACCES" || code === "EPERM") && path) return `Ore doesn’t have permission to use ${dirname(path)}: check its permissions in Finder › Get Info (Sharing & Permissions)`;
+  // A temp file of an atomic write names its folder; anything else names itself.
+  if ((code === "EACCES" || code === "EPERM") && path) return `Ore doesn’t have permission to use ${/\.tmp$/.test(path) ? dirname(path) : path}: check its permissions in Finder › Get Info (Sharing & Permissions)`;
   return (e instanceof Error ? e.message : String(e)).split("\n")[0]!;
 }
 

@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -17,7 +17,8 @@ export function openLibrary(explicit?: string): Library {
   if (!existsSync(join(root, "skills.yaml"))) {
     // A library that lost only its skills.yaml (iCloud hasn't downloaded it, a sync renamed it "skills 2.yaml")
     // must not read as "no library": the app answers that with `ore init`, which would write a fresh one over his.
-    if (["items", "cards", "reviews", ".git"].some((d) => existsSync(join(root, d)))) {
+    // Folders that hold something, so an `ore init` cut off before it wrote skills.yaml can still run again.
+    if (existsSync(join(root, ".skills.yaml.icloud")) || ["items", "cards", "reviews"].some((d) => existsSync(join(root, d)) && readdirSync(join(root, d)).some((n) => !n.startsWith(".")))) {
       const why = existsSync(join(root, ".skills.yaml.icloud"))
         ? "iCloud hasn't downloaded it yet: open the folder in Finder to download it"
         : "put it back (a synced copy may be named “skills 2.yaml”), or restore it from the library's history";

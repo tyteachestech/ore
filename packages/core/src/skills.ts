@@ -110,13 +110,14 @@ function parseSkillsFile(data: unknown): { file: SkillsFile; dropped: string[] }
     const [top, n, field] = issue.path;
     const skill = top === "skills" && typeof n === "number" ? ((copy.skills as Record<string, unknown>[])[n] as Record<string, unknown> | undefined) : undefined;
     if (skill && typeof field === "string" && LENIENT.has(field)) {
+      if (field === "priority" ? skill.priority === DEFAULT_PRIORITY : !(field in skill)) continue; // one field, several issues
       dropped.push(`skill "${String(skill.name ?? skill.id ?? Number(n) + 1)}" has ${field} ${JSON.stringify(skill[field])}, which Ore can't use, so ${field === "priority" ? `${DEFAULT_PRIORITY} is used` : "it is left out"}`);
       if (field === "priority") skill.priority = DEFAULT_PRIORITY;
       else delete skill[field];
-    } else if ((top === "review" || top === "models") && typeof n === "string" && copy[top] && typeof copy[top] === "object") {
+    } else if ((top === "review" || top === "models") && typeof n === "string" && copy[top] && typeof copy[top] === "object" && n in (copy[top] as object)) {
       dropped.push(`${top}.${n} is ${JSON.stringify((copy[top] as Record<string, unknown>)[n])}, which Ore can't use, so the default is used`);
       delete (copy[top] as Record<string, unknown>)[n];
-    } else if (top === "ai" && issue.path.length === 1) {
+    } else if (top === "ai" && issue.path.length === 1 && "ai" in copy) {
       dropped.push(`ai is ${JSON.stringify(copy.ai)} (claude or codex), so claude is used`);
       delete copy.ai;
     }

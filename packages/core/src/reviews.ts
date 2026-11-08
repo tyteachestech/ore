@@ -40,6 +40,10 @@ export type Review = z.infer<typeof ReviewSchema>;
 export const UndoSchema = z.object({ ts: z.string(), card: z.string(), undo: z.string() });
 export type Undo = z.infer<typeof UndoSchema>;
 
+// What a review line needs to be replayed: looser than ReviewSchema, so a line from an older build still counts,
+// but a rating outside 1–4 or a missing state (which stopped every screen) doesn't.
+const Replayable = z.object({ ts: z.string(), card: z.string(), rating: z.number().int().min(1).max(4), state_before: z.object({}), state_after: z.object({}) });
+
 /** The month logs: `2026-10.jsonl` from before, one per device (`2026-10.<device>.jsonl`), and any
  *  conflicted copy a synced folder made. */
 export function reviewLogFiles(lib: Library): string[] {
@@ -55,10 +59,7 @@ export function readReviews(lib: Library): Review[] {
   // replayed, so it is skipped rather than stopping every screen; `ore doctor` names it.
   const lines = reviewLogFiles(lib)
     .flatMap((f) => readJsonl<unknown>(f))
-    .flatMap((l): (Review | Undo)[] => {
-      const r = (l && typeof l === "object" && "undo" in l ? UndoSchema : ReviewSchema).safeParse(l);
-      return r.success ? [r.data] : [];
-    });
+    .filter((l): l is Review | Undo => (l && typeof l === "object" && "undo" in l ? UndoSchema : Replayable).safeParse(l).success);
   const undone = new Set(lines.flatMap((l) => ("undo" in l ? [`${l.card}|${l.undo}`] : [])));
   const seen = new Set<string>();
   return lines
