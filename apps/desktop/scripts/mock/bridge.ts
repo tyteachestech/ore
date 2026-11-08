@@ -2,6 +2,8 @@
 // POST /ore {args, stdin, job} -> runs the real ore CLI against $ORE_LIBRARY, returns its JSON (or 500 with the error line).
 // POST /cancel {job} stops that run with SIGTERM, as the app's ore_cancel does.
 const CLI = `${import.meta.dir}/../../../../packages/cli/src/ore.ts`;
+// ORE_BRIDGE_BIN=<compiled ore>: run that instead of the source (bench.ts --compiled, as a release app does).
+const RUN = process.env.ORE_BRIDGE_BIN ? [process.env.ORE_BRIDGE_BIN] : ["bun", CLI];
 const jobs = new Map<string, ReturnType<typeof Bun.spawn>>();
 Bun.serve({
   port: Number(process.env.PORT ?? 1421),
@@ -29,7 +31,7 @@ Bun.serve({
       if (canned && (await canned.exists())) return new Promise((ok) => setTimeout(async () => ok(new Response(await canned.text(), { headers: h })), Number(process.env.ORE_MOCK_DELAY ?? 600)));
       return new Response(JSON.stringify(null), { headers: h });
     }
-    const p = Bun.spawn(["bun", CLI, ...args, "--json"], { stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
+    const p = Bun.spawn([...RUN, ...args, "--json"], { stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
     if (job) jobs.set(job, p);
     const [out, err, code] = [await new Response(p.stdout).text(), await new Response(p.stderr).text(), await p.exited];
     if (job) jobs.delete(job);

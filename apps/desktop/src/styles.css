@@ -2525,3 +2525,4 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .qa-piece:hover { background: var(--bg-hover); }
 .qa-piece:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .qa-piece-edit { width: 100%; font-size: 13px; }
+.list > .row { content-visibility: auto; contain-intrinsic-size: auto 73px; }
