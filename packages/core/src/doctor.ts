@@ -1,16 +1,19 @@
-import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, statSync, unlinkSync } from "node:fs";
 import { join, relative } from "node:path";
 import { AnnotationSchema, anchorAnnotations, annotationRevs, annotationsPath, reanchorItem } from "./annotations.ts";
 import { cardFiles, readCardFile } from "./cards.ts";
 import { syncIndex } from "./db.ts";
 import { errorLine, logFiles, readJsonlLines, sha256, visible } from "./fsutil.ts";
-import { itemDirs, readItemDir, type Item } from "./items.ts";
+import { ID_END, itemDirs, readItemDir, type Item } from "./items.ts";
 import { brokenLinks } from "./links.ts";
 import { lockStale } from "./lock.ts";
 import { paths, type Library } from "./library.ts";
 import { reviewLogFiles, ReviewSchema, UndoSchema } from "./reviews.ts";
-import { loadSkills } from "./skills.ts";
+import { loadParams } from "./scheduler.ts";
+import { loadSkills, skillsFileProblems } from "./skills.ts";
 import { readTopic } from "./topics.ts";
+
+const CUT = "cut off or not JSON (a crash mid-write leaves this), so it is skipped; delete that line in a text editor";
 
 export interface Issue {
   level: "error" | "warn";
@@ -38,11 +41,17 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
   let skillIds = new Set<string>();
   let skillsOk = true;
   try {
-    skillIds = new Set(loadSkills(lib).skills.map((s) => s.id));
+    const skills = loadSkills(lib).skills;
+    skillIds = new Set(skills.map((s) => s.id));
+    for (const p of skillsFileProblems(lib)) add("warn", paths.skills(lib), `${p}; fix it in a text editor`);
+    // Two entries with one id (a hand merge): every write finds only the first. macOS file names ignore case, so "AI" and "ai" share skills/ai/.
+    const ids = skills.map((s) => s.id.toLowerCase());
+    for (const id of new Set(ids.filter((id, n) => ids.indexOf(id) !== n))) add("error", paths.skills(lib), `two skills have the id "${id}"; give one of them another id, or merge them`);
   } catch (e) {
     skillsOk = false;
     add("error", paths.skills(lib), errorLine(e));
   }
+  if (existsSync(paths.fsrsParams(lib)) && !loadParams(lib)) add("warn", paths.fsrsParams(lib), "can't be read, so the default review weights are used; delete it, or run ore optimize to write it again");
   const topicSlugs = new Set<string>();
   const topicDir = paths.topics(lib);
   for (const f of visible(topicDir).filter((f) => f.endsWith(".md"))) {
@@ -58,7 +67,8 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
   };
 
   const items = new Map<string, Item>();
-  for (const dir of itemDirs(lib)) {
+  // Folders named as Ore names them first, so a copy is the one called a copy (Ore shows the other, oncePerId).
+  for (const dir of itemDirs(lib).sort((a, b) => Number(!ID_END.test(a)) - Number(!ID_END.test(b)))) {
     const doc = join(dir, "doc.md");
     let item: Item;
     try {
@@ -67,14 +77,21 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
       add("error", doc, `doc.md frontmatter invalid: ${errorLine(e)}`);
       continue;
     }
+    const twin = items.get(item.meta.id);
+    if (twin) {
+      // iCloud's "… 2" or Finder's "… copy".
+      add("error", doc, `a copy of ${rel(twin.dir)} (same id); Ore shows that one, so delete this copy once you've checked nothing in it is newer`);
+      continue;
+    }
     items.set(item.meta.id, item);
-    if (!dir.endsWith(item.meta.id)) add("error", doc, `id ${item.meta.id} does not match folder name`);
+    if (!ID_END.test(dir)) add("error", doc, `the folder name doesn't end in its id, so search skips it: rename it back to end in -${item.meta.id}`);
+    else if (!dir.endsWith(item.meta.id)) add("error", doc, `id ${item.meta.id} does not match folder name`);
     checkRefs(doc, item.meta.skills, item.meta.topics);
     const annPath = annotationsPath(dir);
     for (const f of logFiles(annPath))
       for (const l of readJsonlLines(f)) {
-        if (l.error) add("error", f, `line ${l.line}: invalid JSON`);
-        else if (!AnnotationSchema.safeParse(l.value).success) add("error", f, `line ${l.line}: not a valid annotation`);
+        if (l.error) add("error", f, `line ${l.line}: ${CUT}`);
+        else if (!AnnotationSchema.safeParse(l.value).success) add("error", f, `line ${l.line}: not a valid highlight, so it is skipped; fix or delete that line`);
       }
     if (sha256(item.body) !== item.meta.text_sha256) {
       if (opts.fix) {
@@ -100,7 +117,7 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
       cardIds.add(c.meta.id);
       if (!path.endsWith(`${c.meta.id}.md`)) add("error", path, `id ${c.meta.id} does not match file name`);
       const item = items.get(c.meta.item);
-      if (!item) add("error", path, `source item ${c.meta.item} not found`);
+      if (!item) add("error", path, `its source ${c.meta.item} is missing or can't be read: restore the source's folder, or retire the card (ore card retire ${c.meta.id})`);
       else if (c.meta.annotation && !annotationRevs(item.dir).some((a) => a.id === c.meta.annotation)) add("warn", path, `annotation ${c.meta.annotation} not found`);
       if (c.meta.kind === "prompt" && (c.rubric.length < 2 || c.rubric.length > 4)) add("warn", path, `prompt has ${c.rubric.length} rubric points (want 2–4)`);
       checkRefs(path, c.meta.skills, c.meta.topics);
@@ -111,18 +128,33 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
 
   for (const f of reviewLogFiles(lib)) {
     for (const l of readJsonlLines(f)) {
-      if (l.error) add("error", f, `line ${l.line}: invalid JSON`);
+      if (l.error) add("error", f, `line ${l.line}: ${CUT}`);
       else {
         if (UndoSchema.safeParse(l.value).success) continue;
         const r = ReviewSchema.safeParse(l.value);
-        if (!r.success) add("error", f, `line ${l.line}: not a valid review`);
+        if (!r.success) add("error", f, `line ${l.line}: not a valid review (${errorLine(r.error)}), so it is skipped; fix or delete that line`);
         else if (!cardIds.has(r.data.card)) add("warn", f, `line ${l.line}: card ${r.data.card} not found`);
       }
     }
   }
 
+  // Logs no other check reads line by line: a crash mid-write leaves a cut-off last line.
+  const jsonl = (dir: string) => visible(dir).filter((f) => f.endsWith(".jsonl")).map((f) => join(dir, f));
+  for (const f of [...jsonl(paths.sessions(lib)), ...jsonl(paths.cards(lib))]) for (const l of readJsonlLines(f)) if (l.error) add("error", f, `line ${l.line}: ${CUT}`);
+
   if (skillIds.size)
-    for (const l of brokenLinks(lib)) add("warn", l.path, `link "${l.text}" points to a missing ${l.target.kind === "item" ? "source" : "skill"} (${l.target.id})`);
+    try {
+      for (const l of brokenLinks(lib)) add("warn", l.path, `link "${l.text}" points to a missing ${l.target.kind === "item" ? "source" : "skill"} (${l.target.id})`);
+    } catch (e) {
+      add("error", lib.root, `links couldn't be checked: ${errorLine(e)}`);
+    }
+
+  // A git killed mid-snapshot leaves index.lock, and every later snapshot (D5) quietly fails.
+  const gitLock = join(lib.root, ".git", "index.lock");
+  if (existsSync(gitLock) && Date.now() - statSync(gitLock).mtimeMs > 60_000) {
+    if (opts.fix) { unlinkSync(gitLock); fixed.push(".git/index.lock: removed stale lock, so library history saves again"); }
+    else add("warn", gitLock, "library history has stopped saving: a git run was cut off and left this lock — run ore doctor --fix");
+  }
 
   const lock = paths.lock(lib);
   // An empty lock (a crash between create and write) read as pid 0, which kill() takes as our own group.
@@ -139,9 +171,13 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
 
   // The index reads skills.yaml for every card's retention, so it waits until that file reads.
   if (skillsOk) {
-    const { index, report } = syncIndex(lib);
-    index.close();
-    for (const e of report.errors) issues.push({ level: "error", path: e.path, message: `index: ${e.error}` });
+    try {
+      const { index, report } = syncIndex(lib);
+      index.close();
+      for (const e of report.errors) issues.push({ level: "error", path: e.path, message: `index: ${e.error}` });
+    } catch (e) {
+      add("error", paths.index(lib), `the search index couldn't be updated: ${errorLine(e)} (ore reindex builds it again)`);
+    }
   }
 
   const unique = issues.filter((i, n) => issues.findIndex((j) => j.path === i.path && j.message === i.message) === n);

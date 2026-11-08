@@ -22,8 +22,14 @@ export function scheduler(retention: number, w?: number[]): FSRS {
 export function loadParams(lib: Library): number[] | undefined {
   const p = paths.fsrsParams(lib);
   if (!existsSync(p)) return undefined;
-  const w = (JSON.parse(readFileSync(p, "utf8")) as { w?: number[] }).w;
-  return Array.isArray(w) && w.length === 21 ? w : undefined;
+  // A damaged file (cut off, hand-edited) falls back to the default weights; `ore doctor` names it.
+  let w: unknown;
+  try {
+    w = (JSON.parse(readFileSync(p, "utf8")) as { w?: unknown })?.w;
+  } catch {
+    return undefined;
+  }
+  return Array.isArray(w) && w.length === 21 && w.every((x) => typeof x === "number" && Number.isFinite(x)) ? w : undefined;
 }
 
 export const toState = (c: FsrsCard): FsrsState => ({

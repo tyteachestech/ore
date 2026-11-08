@@ -45,19 +45,21 @@ You are running a usability and bug-hunting study of **Ore**, a Mac learning app
 Ore turns reading into lasting memory: capture anything → read → highlight → answer AI questions → spaced review. Dark, compact, keyboard-first, modelled on Raycast (speed), Notion (reading), Linear (lists and menus) and Duolingo (encouraging feel). One user, the owner, who reads on his Mac and wants what he reads to stick.
 
 Main places and features:
-- **Home** (default page, ⌘0): today's goal ring (minutes of review, 10 by default), what's due, **Start review** (↵), skill chips (click toggles, ⌥-click solos), Skills grouped by collection with strength and due counts, Continue reading.
+- **Home** (default page, ⌘0): today's review goal (minutes, 10 by default), **Start review** (↵), skill chips (click toggles, ⌥-click solos), your skills and what to read next.
 - **Review** (⌘R anywhere): one card at a time. **Fact** cards: recall in your head, press 1/2/3 for confidence (Guess, Think so, Sure) which reveals the answer, then rate 1–4 or ↵ for Good. **Explain** cards: type an answer (⌘⌫ = No idea), tap confidence, ⌘↵ Check; the AI marks rubric points and proposes a rating, ↵ accepts, 1–4 overrides. After answering: E edits the card, ⇧⌘⌫ retires it, / opens "Ask about this" chat. A missed card comes back once. Esc leaves (ratings are already saved).
-- **Sidebar**: Home, sources lists (**To read** ⌘1, **Done** ⌘2), skills grouped in collections. Skills and collections can be created, renamed, given an icon/emoji and colour, dragged to reorder or into another collection, and deleted. Hovering the collapsed sidebar's edge peeks it open. ⇧⌘S toggles it.
+- **Sidebar**: Home, sources lists (**To read** ⌘1, **Done** ⌘2, **Feed** ⌘3), skills grouped in collections. Skills and collections can be created, renamed, given an icon/emoji and colour, dragged to reorder or into another collection, and deleted. Hovering the collapsed sidebar's edge peeks it open. ⇧⌘S toggles it.
 - **Add** (⌘N): paste a URL, YouTube link or text, or drop a file (PDF, EPUB). ⌘O opens a file.
-- **Reader**: one comfortable column, a thin position bar, a floating outline at the right edge (hover to expand, click to jump), reading width and a light page in Settings (⌘,). Select text → popup to highlight as **Keep (1)**, **Card (2)** or **Question (3)**, Tab writes a note on it, Backspace removes it. **C** opens the collected highlights pill. **M** writes the main point of a section. **N** opens the **source note** as a split pane (drag the divider). **R** renames the source, **A** archives it. **Finish** (⌘↵) opens the quiz panel: free recall first, then each prequestion with confidence and Check, which reveals supporting passages (↑/↓ to step through them).
-- **YouTube sources**: video pinned above the transcript, Space play/pause, ←/→ skip, [ ] speed, the transcript follows playback.
-- **Skill page** (click a skill): stat chips, skill note on the left, Questions and Sources on the right, a draggable split.
+- **Reader**: one comfortable column, a thin position bar, a floating outline at the right edge (hover to expand, click to jump), text size ⌘= / ⌘−, reading width and a light page in Settings (⌘,). Select text → popup to mark it as **Highlight (1)**, **Key point (2)**, **Question (3)** or **Try it (4)**; typing right after a highlight writes its note, Tab also opens the note, Backspace removes it. **H** highlights the focused paragraph (↑/↓ move the focus). **L** reads aloud. **⌘F** finds in the source. **R** renames the source, **A** archives it.
+- **Side panel** (⌥⌘S, right of the reader): **Collected** (C, everything you highlighted), **Questions** (Q) and the **source note** (N, your own notes; it can hide the source while you write with ⌥H). **M** recalls the chapter you're in. **Finish** (⇧⌘↵) opens the quiz: free recall first, then each prequestion with confidence and Check (⌘↵), which reveals supporting passages (↑/↓ to step through them).
+- **Tutor** (✦ in the title bar, ⌘J): a chat about the open source or your library.
+- **Video and audio sources**: player above the transcript, Space play/pause, ←/→ skip, [ ] speed, the transcript follows playback.
+- **Skill page** (click a skill): the skill note, its questions and its reading list.
 - **⌘K** command palette for everything; **⌘/** shows and rebinds all shortcuts. Every control with a shortcut should show it in a hover hint.
 - Rows open on a **single click**. Arrows move a selection, ↵ opens, Esc closes the top layer. Every list row has a hover **⋯** menu, the same actions on **right-click**, and the same in ⌘K. Destructive actions happen at once and show a toast with **Undo** (⌘Z while it shows).
 
 ### Deliberate design choices (do NOT report these as missing)
 
-No streaks that reset, no XP, badges, points, leaderboards or percent-correct scores. No reading-speed or "time left" stats. No AI summaries replacing the user's own notes. AI never sets the final rating; the user does. Dark mode only. No "Are you sure?" dialogs when Undo exists. No light theme, no sounds, no picture-in-picture video. If you think one of these choices is wrong for a persona, you may say so once in the "Opinions" section, not as a bug.
+No streaks that reset, no XP, badges, points, leaderboards or percent-correct scores. No reading-speed or "time left" stats. No AI summaries replacing the user's own notes. AI never sets the final rating; the user does. Dark app (only the reading page has a light option). No "Are you sure?" dialogs when Undo exists. No sounds, no picture-in-picture video. No counts or stat pills added just to fill a screen. The visual style is being reworked separately: report what is broken, not taste. If you think one of these choices is wrong for a persona, you may say so once in the "Opinions" section, not as a bug.
 
 ### How to work
 
@@ -83,7 +85,7 @@ Goal: figure out what the app is for and learn one article with it, without read
 **2. Dev, keyboard power user (lives in Raycast and Linear, hates touching the mouse).**
 Goal: do everything without the mouse.
 - Navigate Home → To read → a source → back, using only keys. Use ⌘K to reach at least 8 different actions.
-- Highlight text with keys only if possible (say so if not). Open the quiz with ⌘↵ and complete it by keyboard.
+- Highlight text with keys only if possible (say so if not). Open the quiz with ⇧⌘↵ and complete it by keyboard (H highlights the focused paragraph).
 - Run a full review session by keyboard: Fact and Explain cards, override a proposed rating, edit one card (E), retire one, open Ask (/), leave with Esc mid-session and come back with ⌘R.
 - Open ⌘/, rebind one shortcut, confirm it works and its hover hint updates.
 - Check: Does Tab reach every control? Is focus always visible? Does Esc close only the top layer? Does every control with a shortcut show it on hover?
@@ -99,9 +101,9 @@ Goal: set up a personal structure for three subjects.
 **4. Priya, busy daily reviewer (10 minutes a day, wants to feel progress).**
 Goal: do today's review and decide whether she'd come back tomorrow.
 - On Home, set the daily goal and the weekdays-only option. Toggle skill chips, ⌥-click to solo one, then start review.
-- Do a whole session. Notice the session bar, the goal ring, what happens when the goal closes, and the end-of-session line.
+- Do a whole session. Notice the session bar, the goal, what happens when the goal closes, and the end-of-session line.
 - Get some wrong on purpose, including one marked "Sure". Does the missed card return? Is the copy encouraging, not guilt-inducing?
-- Resume a source from Continue reading. Open a YouTube source if one exists (or add one), play, change speed, scroll away and use "Back to current".
+- Resume a source you started earlier. Open a YouTube source if one exists (or add one), play, change speed, scroll away and use "Back to current".
 - Rate honestly: would Priya return tomorrow, and why?
 
 **5. Rex, chaos tester (tries to break things).**

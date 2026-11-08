@@ -26,7 +26,7 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   writeFileSync(docling, `#!/bin/sh\nsleep 1\nwhile [ "$1" != "--output" ]; do shift; done\ncp "${FIXTURES}/tables.docling.json" "$2/tables.json"\n`);
   chmodSync(docling, 0o755);
   // Ports of their own, so a mock left running for screenshots (1420, 1421) never answers instead.
-  const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50" }, stdout: "ignore", stderr: "inherit" });
+  const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50", ORE_MOCK_ENRICH: "1" }, stdout: "ignore", stderr: "inherit" });
   const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), stdout: "ignore", stderr: "ignore" });
   const url = `http://localhost:${PORT}/`;
   for (let i = 0; i < 100; i++) {
@@ -2321,18 +2321,19 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
     const noIdea = page.getByRole("button", { name: "No idea" });
     await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
     await page.getByRole("button", { name: "Good", exact: true }).click();
-    await until("the card moves on", async () => (await doneButton.isVisible()) || ((await q.count()) > 0 && (await q.first().textContent()) !== last));
+    await until("the card moves on", async () => (await doneButton.isVisible()) || ((await q.count()) > 0 && ((await q.first().textContent({ timeout: 500 }).catch(() => last)) !== last)));
   }
   await doneButton.waitFor();
   await page.waitForTimeout(300);
   await page.keyboard.press("Meta+z");
-  await until("⌘Z leaves the end screen for the last card", async () => !(await doneButton.isVisible()) && (await q.count()) > 0 && (await q.first().textContent()) === last);
+  // The card can be swapped between the count and the read: read with a short wait, and look again.
+  await until("⌘Z leaves the end screen for the last card", async () => !(await doneButton.isVisible()) && (await q.first().textContent({ timeout: 500 }).catch(() => null)) === last);
   await page.keyboard.press("Shift+Meta+z");
   await until("⇧⌘Z rates it again and the session ends again", () => doneButton.isVisible());
   // Put every rating back for the journeys after this one.
   const undo = page.getByRole("button", { name: "Undo last rating" });
   for (let n = 0; n < 12 && (await undo.isVisible()); n++) {
-    await undo.click();
+    await undo.click({ timeout: 1000 }).catch(() => {});
     await page.waitForTimeout(250);
   }
   await page.keyboard.press("Escape");

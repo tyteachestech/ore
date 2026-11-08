@@ -181,13 +181,27 @@ export const lstatSync = statSync;
 export const realpathSync = (p: string) => p;
 
 // The library lock (lock.ts) is a file opened exclusively; the phone runs one command at a time.
+// appendJsonl reads a log's last byte ("r") to see whether it ends in a newline.
+const open = new Map<number, string>();
 export function openSync(p: string, flags?: string) {
-  if (flags === "wx" && files.has(p)) throw err("EEXIST", p);
-  put(p, files.get(p)?.text ?? "");
-  return 3;
+  if (flags === "r") {
+    if (!files.has(p)) throw err("ENOENT", p);
+  } else {
+    if (flags === "wx" && files.has(p)) throw err("EEXIST", p);
+    put(p, files.get(p)?.text ?? "");
+  }
+  const fd = 3 + open.size;
+  open.set(fd, p);
+  return fd;
+}
+export function readSync(fd: number, buf: Uint8Array, offset: number, length: number, position: number) {
+  // Positions count characters, as statSync's size does here.
+  const bytes = new TextEncoder().encode((files.get(open.get(fd) ?? "")?.text ?? "").slice(position, position + length)).subarray(0, length);
+  buf.set(bytes, offset);
+  return bytes.length;
 }
 export const writeSync = (_fd: number, s: string) => s.length;
-export const closeSync = (_fd: number) => {};
+export const closeSync = (fd: number) => void open.delete(fd);
 export const symlinkSync = () => {};
 export const cpSync = () => {};
 export function utimesSync(p: string, _atime: Date | number, mtime: Date | number) {
@@ -198,5 +212,5 @@ export function utimesSync(p: string, _atime: Date | number, mtime: Date | numbe
 
 export default {
   existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, unlinkSync, rmSync, renameSync, copyFileSync, mkdtempSync,
-  readdirSync, statSync, lstatSync, realpathSync, openSync, writeSync, closeSync, symlinkSync, cpSync, utimesSync,
+  readdirSync, statSync, lstatSync, realpathSync, openSync, readSync, writeSync, closeSync, symlinkSync, cpSync, utimesSync,
 };

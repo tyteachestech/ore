@@ -89,8 +89,17 @@ export function cardFiles(lib: Library): string[] {
   return visible(dir).filter((f) => f.endsWith(".md")).sort().map((f) => join(dir, f));
 }
 
+/** Every card, once per id: a copy iCloud or Finder made ("<id> 2.md") is left out for the file named
+ *  by the id; `ore doctor` names the copy. */
 export function listCards(lib: Library): Card[] {
-  return readable(cardFiles(lib), readCardFile);
+  const cards = readable(cardFiles(lib), readCardFile);
+  const own = new Set(cards.filter((c) => c.path.endsWith(`${c.meta.id}.md`)).map((c) => c.meta.id));
+  const seen = new Set<string>();
+  return cards.filter((c) => {
+    if (seen.has(c.meta.id) || (own.has(c.meta.id) && !c.path.endsWith(`${c.meta.id}.md`))) return false;
+    seen.add(c.meta.id);
+    return true;
+  });
 }
 
 export function findCard(lib: Library, ref: string): Card {

@@ -31,11 +31,17 @@ Bun.serve({
       if (canned && (await canned.exists())) return new Promise((ok) => setTimeout(async () => ok(new Response(await canned.text(), { headers: h })), Number(process.env.ORE_MOCK_DELAY ?? 600)));
       return new Response(JSON.stringify(null), { headers: h });
     }
-    const p = Bun.spawn([...RUN, ...args, "--json"], { stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
+    // No background enrichment unless ORE_MOCK_ENRICH=1: `ore add` would start the real claude or codex CLI and spend real usage.
+    const env = { ...process.env, ORE_NO_ENRICH: process.env.ORE_MOCK_ENRICH ? "" : "1" };
+    const p = Bun.spawn([...RUN, ...args, "--json"], { env, stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
     if (job) jobs.set(job, p);
     const [out, err, code] = [await new Response(p.stdout).text(), await new Response(p.stderr).text(), await p.exited];
     if (job) jobs.delete(job);
-    if (code !== 0) return new Response(JSON.stringify(err.trim().split("\n").pop() || "ore failed"), { status: 500, headers: h });
+    // As the app's one_line_error (src-tauri/src/main.rs): the "ore: …" line without its prefix, so code that reads an
+    // error's start (firstRun's "no library at") runs here as it does on the Mac.
+    const lines = err.split("\n").map((l) => l.trim()).filter(Boolean);
+    const line = lines.find((l) => l.startsWith("ore:"))?.slice(4).trim() ?? lines.pop();
+    if (code !== 0) return new Response(JSON.stringify(line || "ore failed"), { status: 500, headers: h });
     return new Response(out.trim() || "null", { headers: h });
   },
 });

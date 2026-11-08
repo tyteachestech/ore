@@ -29,8 +29,11 @@ async function main(argv: string[]): Promise<number> {
       return parseArgs({ args: rest, options, allowPositionals: true, strict: true });
     } catch (e) {
       // Node's own wording explains `--` terminators; say which flag and where the right ones are listed.
-      const flag = /^Unknown option '([^']+)'/.exec((e as Error).message)?.[1];
-      throw new Error(`${flag ? `unknown option ${flag}` : (e as Error).message.split(". ")[0]} (ore ${name} --help)`);
+      const msg = (e as Error).message;
+      const flag = /^Unknown option '([^']+)'/.exec(msg)?.[1];
+      // "argument is ambiguous": the flag's value is missing, or starts with "-" (a negative number, a list).
+      const bare = /^Option '([^']+)' argument is ambiguous/.exec(msg)?.[1];
+      throw new Error(`${flag ? `unknown option ${flag}` : bare ? `${bare} needs a value (write ${bare}=<value> for one that starts with "-")` : msg.split(". ")[0]} (ore ${name} --help)`);
     }
   })();
   const json = Boolean(values.json);

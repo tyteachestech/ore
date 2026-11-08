@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, basename, join } from "node:path";
 import { slugify } from "./ids.ts";
@@ -19,10 +19,26 @@ export function writeAtomic(path: string, content: string | Uint8Array): void {
   renameSync(tmp, path);
 }
 
-// One JSON object per line. O_APPEND keeps concurrent single-line appends intact.
+// One JSON object per line. O_APPEND keeps concurrent single-line appends intact. A file whose last line
+// lost its newline (a crash or a sync mid-write, an editor that drops the final newline) gets one first,
+// so the new record never joins that line and makes both unreadable.
 export function appendJsonl(path: string, record: object): void {
   mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, JSON.stringify(record) + "\n");
+  appendFileSync(path, (endsOpen(path) ? "\n" : "") + JSON.stringify(record) + "\n");
+}
+
+function endsOpen(path: string): boolean {
+  if (!existsSync(path)) return false;
+  const size = statSync(path).size;
+  if (!size) return false;
+  const fd = openSync(path, "r");
+  try {
+    const last = new Uint8Array(1);
+    readSync(fd, last, 0, 1, size - 1);
+    return last[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export interface JsonlLine<T> {
@@ -92,6 +108,11 @@ export const readLog = <T>(path: string): T[] => logFiles(path).flatMap((f) => r
 export function errorLine(e: unknown): string {
   const issues = (e as { issues?: { path: PropertyKey[]; message: string }[] } | null)?.issues;
   if (Array.isArray(issues) && issues.length) return issues.map((i) => `${i.path.map(String).join(".") || "value"}: ${i.message}`).join("; ");
+  // A folder or file he (or a sync) made read-only: say where and what to check, not the raw EACCES with a temp name.
+  const code = (e as { code?: string } | null)?.code;
+  const path = (e as { path?: string } | null)?.path;
+  // A temp file of an atomic write names its folder; anything else names itself.
+  if ((code === "EACCES" || code === "EPERM") && path) return `Ore doesn’t have permission to use ${/\.tmp$/.test(path) ? dirname(path) : path}: check its permissions in Finder › Get Info (Sharing & Permissions)`;
   return (e instanceof Error ? e.message : String(e)).split("\n")[0]!;
 }
 

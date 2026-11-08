@@ -5,7 +5,7 @@ import { annotationsPath, readAnnotations } from "./annotations.ts";
 import { errorLine, logFiles, subdirs, visible } from "./fsutil.ts";
 import { readCardFile } from "./cards.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
-import { readItemDir } from "./items.ts";
+import { ID_END, readItemDir } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { readReviews, type FsrsState, type Review } from "./reviews.ts";
 import { loadParams, replay } from "./scheduler.ts";
@@ -14,7 +14,7 @@ import { desiredRetention, loadSkills } from "./skills.ts";
 // .index/library.sqlite is a disposable cache of the files: FTS5 search plus
 // card states replayed from the review log. Every open syncs it by comparing
 // file mtimes and sizes, so direct file edits by agents are picked up.
-const SCHEMA_VERSION = "6"; // 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows
+const SCHEMA_VERSION = "7"; // 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows; 7: again, for rows from copied folders
 
 const SCHEMA = `
 create table meta(key text primary key, value text);
@@ -37,7 +37,9 @@ function scan(lib: Library): FileStat[] {
   };
   const ls = visible;
   for (const y of subdirs(paths.items(lib))) {
-    for (const d of subdirs(join(paths.items(lib), y))) {
+    // Only folders named as Ore names them (`<slug>-<id>`): a Finder or iCloud copy ("… 2") would show
+    // every hit twice, and the index drops a folder's rows by the id its name ends in. `ore doctor` names the rest.
+    for (const d of subdirs(join(paths.items(lib), y)).filter((d) => ID_END.test(d))) {
       add(join(paths.items(lib), y, d, "doc.md"), "doc");
       // One entry for a source's highlight log however many device files it spans (they are indexed together).
       const logs = logFiles(annotationsPath(join(paths.items(lib), y, d))).map((f) => statSync(f));
@@ -46,7 +48,7 @@ function scan(lib: Library): FileStat[] {
     }
   }
   for (const s of subdirs(paths.skillNotes(lib))) add(join(paths.skillNotes(lib), s, "notes.md"), "skill-notes");
-  for (const f of ls(paths.cards(lib))) if (f.endsWith(".md")) add(join(paths.cards(lib), f), "card");
+  for (const f of ls(paths.cards(lib))) if (/^[0-9A-HJKMNP-TV-Z]{26}\.md$/.test(f)) add(join(paths.cards(lib), f), "card");
   for (const f of ls(paths.topics(lib))) if (f.endsWith(".md")) add(join(paths.topics(lib), f), "topic");
   for (const f of ls(paths.reviews(lib))) if (f.endsWith(".jsonl")) add(join(paths.reviews(lib), f), "review");
   add(paths.skills(lib), "config");
@@ -326,8 +328,22 @@ export function openIndex(lib: Library): LibraryIndex {
 }
 
 export function rebuildIndex(lib: Library): SyncReport {
-  const path = paths.index(lib);
-  for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) unlinkSync(f);
+  // Emptied in place, not deleted: unlinking the file from under another `ore` that has it open fails that one
+  // with "disk I/O error". With no files known, the sync indexes everything again.
+  try {
+    const db = openDb(lib);
+    try {
+      db.transaction(() => {
+        for (const t of ["files", "items", "cards", "card_state", "fts"]) db.run(`delete from ${t}`);
+      })();
+    } finally {
+      db.close();
+    }
+  } catch {
+    // An index too damaged to open ("database disk image is malformed") is deleted and built from scratch.
+    const path = paths.index(lib);
+    for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) unlinkSync(f);
+  }
   const { index, report } = syncIndex(lib);
   index.close();
   return report;
