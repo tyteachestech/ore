@@ -214,12 +214,14 @@ type EditorProps = {
   targets: LinkTarget[];
   onOpen: (t: Omit<LinkTarget, "title">) => void;
   placeholder: string;
+  /** What VoiceOver calls the note ("Source note", "Skill note"). */
+  label: string;
   /** Keeps the caret for when this note opens again (NoteEditor's `place`). */
   place?: string;
 };
 
 /** The block editor over a loaded note; reloads when text arrives from outside it. */
-export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, place }: EditorProps) {
+export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, label, place }: EditorProps) {
   if (notes.error)
     return (
       <div className="empty-state err" role="alert">
@@ -245,6 +247,7 @@ export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, place
       noteArgs={notes.args}
       notify={notes.notify}
       placeholder={placeholder}
+      label={label}
       place={place}
     />
   );
@@ -369,7 +372,7 @@ export function SidePanel({ tab, onTab, bodyRef, onBodyMouseDown, children }: { 
 
 /** The source note tab: his note on this source, then what links to it. It keeps where it was scrolled and its
  *  caret, by source, for coming back from Collected, the docked tutor or another source (and a relaunch, for the scroll). */
-export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail, scroller }: Omit<EditorProps, "placeholder" | "place"> & { id: string; tail?: ReactNode; scroller: RefObject<HTMLDivElement | null> }) {
+export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail, scroller }: Omit<EditorProps, "placeholder" | "label" | "place"> & { id: string; tail?: ReactNode; scroller: RefObject<HTMLDivElement | null> }) {
   const target = useMemo(() => ({ item: id }), [id]);
   const key = `ore.sourcenote.scroll.${id}`;
   const loaded = notes.text !== null;
@@ -404,7 +407,7 @@ export function SourceNoteBody({ id, notes, editorRef, targets, onOpen, tail, sc
   }, [loaded, key, scroller]);
   return (
     <>
-      <NoteBody notes={notes} editorRef={editorRef} targets={targets} onOpen={onOpen} place={`item:${id}`} placeholder="The big idea, and what it connects to… / for blocks, [[ to link." />
+      <NoteBody notes={notes} editorRef={editorRef} targets={targets} onOpen={onOpen} place={`item:${id}`} label="Source note" placeholder="The big idea, and what it connects to… / for blocks, [[ to link." />
       {tail}
       <LinkedFrom target={target} onOpen={onOpen} />
     </>

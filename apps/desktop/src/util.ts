@@ -1,4 +1,4 @@
-import { useEffect, type FocusEvent, type RefObject } from "react";
+import { useEffect, useRef, type FocusEvent, type RefObject } from "react";
 
 /** A toast; `undo` adds an Undo button and puts the step on the app's history (⌘Z), and `redo`,
  *  the step again, lets ⇧⌘Z repeat it after an undo (AGENTS.md: delete acts at once, then offers Undo).
@@ -53,6 +53,32 @@ export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>): void {
       if (stranded && prev instanceof HTMLElement && prev.isConnected) prev.focus({ preventScroll: true });
     };
   }, [ref]);
+}
+
+// Whether the last thing he did was a key, not a click: only then does a closing editor move focus.
+let byKeys = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("keydown", () => (byKeys = true), true);
+  window.addEventListener("pointerdown", () => (byKeys = false), true);
+}
+
+/** When an in-place editor (the author, a skill's goal, a new question) closes from the keyboard,
+ *  Enter or Esc, focus goes back to the button that opened it, so the next Tab carries on from there
+ *  rather than from the top of the window. The button and the field often swap, so `ref` points at
+ *  the button rendered after it closes; `fallback` takes it when that button is gone (an author just
+ *  cleared). A click away leaves focus where the click put it. */
+export function useFocusBack(editing: boolean, ref: RefObject<HTMLElement | null>, fallback?: RefObject<HTMLElement | null>): void {
+  const was = useRef(editing);
+  useEffect(() => {
+    const closed = was.current && !editing && byKeys;
+    was.current = editing;
+    if (!closed) return;
+    // After the key's own events: a button focused during Enter's keydown would take its keypress as a click and open the field again.
+    const t = setTimeout(() => {
+      if (!document.activeElement || document.activeElement === document.body) (ref.current ?? fallback?.current)?.focus({ preventScroll: true });
+    });
+    return () => clearTimeout(t);
+  }, [editing, ref, fallback]);
 }
 
 const writing = new Map<string, Promise<unknown>>();

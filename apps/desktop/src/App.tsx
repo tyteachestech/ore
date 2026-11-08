@@ -2338,7 +2338,8 @@ export function App() {
           notify={notify}
         />
       )}
-      {!dropping && toast}
+      {/* Hidden under a drop, but kept mounted: the toasts are a live region, read only if it was there first. */}
+      <div style={{ display: "contents", visibility: dropping ? "hidden" : undefined }}>{toast}</div>
     </div>
   );
 }
