@@ -97,7 +97,7 @@ export function runTutorEval(vendor: Vendor, model?: string, runs = 1, concurren
     let stamp = { model: model ?? "", prompt_version: "" };
     const t0 = performance.now();
     const each = Array.from({ length: runs }, () => cases).flat();
-    const flat = await pool(each, concurrency, async (c): Promise<TutorResult> => {
+    const results = await pool(each, concurrency, async (c): Promise<TutorResult> => {
       const start = performance.now();
       try {
         if (c.reading && !id(c.reading)) throw new Error(`${c.id}: no golden doc ${c.reading}`);
@@ -113,8 +113,7 @@ export function runTutorEval(vendor: Vendor, model?: string, runs = 1, concurren
         return { id: c.id, ok: false, failed: ["error"], ms: Math.round(performance.now() - start), error: (e as Error).message };
       }
     });
-    const results = flat;
-    const byRun = Array.from({ length: runs }, (_, i) => flat.slice(i * cases.length, (i + 1) * cases.length));
+    const byRun = Array.from({ length: runs }, (_, i) => results.slice(i * cases.length, (i + 1) * cases.length));
     const costs = results.map((r) => r.usage?.cost_usd).filter((x): x is number => x !== undefined);
     return {
       vendor, model: stamp.model || "(no run succeeded)", prompt_version: stamp.prompt_version, runs,
