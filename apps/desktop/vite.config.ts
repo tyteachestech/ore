@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -104,6 +105,7 @@ function snapshot(): Record<string, string> {
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     mingcuteList,
     pixelSkillIcons,
     ...(PHONE ? [phoneLibrary] : []),
