@@ -17,7 +17,7 @@ bun run eval:mine                     # real reviews where Tyler and the grader 
 
 ## Design decisions
 
-- **Binary labels over the 1–4 scale.** Two people rarely agree on Good versus Easy, but they agree on whether he knew it. The side of the line is what changes the schedule most.
+- **Binary labels over the 1–4 scale.** Two people rarely agree on Good versus Easy, but they agree on whether he knew it. The line sits between Hard and Good because Ore's grader gives Hard for a required point missing. FSRS itself counts Hard as recalled, so a Hard from `eval:mine` needs reading before it becomes a `wrong` label.
 - **False passes matter more than false fails.** A false pass schedules a card he doesn't know weeks out; a false fail only brings it back early. The report splits them so a prompt change can't hide a rise in one behind a fall in the other.
 - **An interval, not a point.** With 20 cases one miss is 5 points. 20/20 only shows accuracy is at least 84%, so two graders that both score 19 or 20 can't be told apart. The interval stops overreading.
 - **A baseline.** String matching scores 55% here, about what "always wrong" gets, which shows the set needs a real grader. A grader near the baseline adds nothing.
@@ -28,7 +28,7 @@ bun run eval:mine                     # real reviews where Tyler and the grader 
 ## What it found
 
 - 2026-11-07, first set: Claude and Codex both 20/20, too easy to tell them apart. It also caught a cost bug: each `claude -p` call carried about 368k input tokens of Tyler's MCP server tools. Starting the CLI without them cut a run from $11.21 to $0.18 and 43 s to 17 s, same accuracy.
-- 2026-11-08, harder set: see the latest `grade-2026-11-08*.json`.
+- 2026-11-08, harder set: still saturated. Claude Sonnet 5.5 20/20 ($0.185, 18 s), Codex gpt-6-astra 20/20 (526k tokens, 43 s), and Claude Haiku 5.5 20/20 ($0.012, 20 s), against a 55% baseline. So the cases are beyond string matching but not beyond any current model, and Haiku grades this set as well as Sonnet at a fifteenth of the cost. `eval:mine` found no disagreements in Tyler's library yet. The set needs real misses, or many more cases, before it can rank models.
 
 ## Limits
 

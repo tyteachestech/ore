@@ -24,7 +24,8 @@ const Case = z.strictObject({
 export type Case = z.infer<typeof Case>;
 
 export function loadCases(path = join(import.meta.dir, "grade-cases.json")): Case[] {
-  return z.object({ cases: z.array(Case) }).parse(JSON.parse(readFileSync(path, "utf8"))).cases;
+  return z.object({ cases: z.array(Case).refine((cs) => new Set(cs.map((c) => c.id)).size === cs.length, "case ids must be unique") })
+    .parse(JSON.parse(readFileSync(path, "utf8"))).cases;
 }
 
 /** A short fingerprint of the case set, saved with each result: scores from different sets don't compare. */
@@ -74,7 +75,7 @@ export function score(vendor: Vendor, model: string, prompt_version: string, cas
  *  contains the model answer, ignoring case and punctuation. A grader that can't clear this adds nothing. */
 export function baseline(cases: Case[]): { correct: number; total: number } {
   const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  const got = (c: Case) => (norm(c.answer).includes(norm(c.model_answer)) ? "right" : "wrong");
+  const got = (c: Case) => (norm(c.model_answer) && norm(c.answer).includes(norm(c.model_answer)) ? "right" : "wrong");
   return { correct: cases.filter((c) => got(c) === c.label).length, total: cases.length };
 }
 
@@ -167,7 +168,7 @@ if (import.meta.main) {
     // Each miss with the label's reason and the grader's, to read side by side (error analysis).
     for (const c of r.cases.filter((c) => !c.correct)) {
       console.error(`  miss ${c.id}: labeled ${c.label}, ${c.error ? `error: ${c.error}` : `rated ${c.rating}`}`);
-      console.error(`    label: ${cases.find((x) => x.id === c.id)!.why}${c.feedback ? `\n    grader: ${c.feedback}` : ""}`);
+      console.error(`    label: ${cases.find((x) => x.id === c.id)?.why}${c.feedback ? `\n    grader: ${c.feedback}` : ""}`);
     }
     runs.push(r);
   }

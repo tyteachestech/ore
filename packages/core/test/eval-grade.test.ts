@@ -6,7 +6,7 @@ import { codexUsage } from "../src/ai/adapter.ts";
 import { writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { recordReview } from "../src/study.ts";
-import { baseline, loadCases, resultPath, runVendor, setId, table, verdict, wilson } from "../eval/grade.ts";
+import { baseline, type Case, loadCases, resultPath, runVendor, setId, table, verdict, wilson } from "../eval/grade.ts";
 import { disagreements } from "../eval/mine.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -29,11 +29,12 @@ console.log(JSON.stringify({ is_error: false, structured_output: { rating, gaps:
 afterEach(() => { process.env.PATH = savedPath; });
 
 describe("grading eval", () => {
-  test("the golden set is 20 labeled cards with reasons: half right, half wrong, every level, unique ids", () => {
-    const cases = loadCases();
-    expect(cases).toHaveLength(20);
-    expect(new Set(cases.map((c) => c.id)).size).toBe(20);
-    expect(cases.filter((c) => c.label === "right")).toHaveLength(10);
+  test("the golden set is at least 20 labeled cards with reasons: about half right, every level, unique ids", () => {
+    const cases = loadCases(); // it may grow with eval:mine
+    expect(cases.length).toBeGreaterThanOrEqual(20);
+    const right = cases.filter((c) => c.label === "right").length / cases.length;
+    expect(right).toBeGreaterThanOrEqual(0.4);
+    expect(right).toBeLessThanOrEqual(0.6);
     for (const lvl of ["easy", "partial", "tricky"]) expect(cases.filter((c) => c.level === lvl).length).toBeGreaterThanOrEqual(4);
     for (const lvl of ["partial", "tricky"]) { // the hard levels test both ways of failing
       expect(cases.some((c) => c.level === lvl && c.label === "right")).toBe(true);
@@ -41,7 +42,7 @@ describe("grading eval", () => {
     }
     expect(setId(cases)).toMatch(/^[0-9a-f]{8}$/);
     // String matching alone gets little more than "always wrong" would: the set needs a real grader.
-    expect(baseline(cases).correct).toBeLessThanOrEqual(12);
+    expect(baseline(cases).correct / cases.length).toBeLessThanOrEqual(0.6);
     for (const c of cases) if (c.kind === "prompt") expect(c.rubric.length).toBeGreaterThan(0);
   });
 
@@ -50,9 +51,8 @@ describe("grading eval", () => {
   });
 
   test("runs the real grader on each card and scores it, with cost, tokens and time; a failed run is a miss", async () => {
-    const cases = loadCases().filter((c) => c.level === "easy"); // Canberra, Sydney, no idea, spread out
-    expect(cases.map((c) => c.answer.split(" ")[0])).toEqual(["Canberra", "Sydney", "no", "If"]);
-    cases.push({ ...cases[0]!, id: "fails", answer: "boom" });
+    const mk = (id: string, answer: string, label: Case["label"]): Case => ({ id, level: "easy", kind: "card", question: "Capital of Australia?", model_answer: "Canberra.", rubric: [], answer, label, why: "test" });
+    const cases = [mk("easy-capital", "Canberra", "right"), mk("easy-capital-wrong", "Sydney", "wrong"), mk("easy-blank", "no idea", "wrong"), mk("easy-spacing", "Canberra, I think", "right"), mk("fails", "boom", "right")];
     const r = await runVendor("claude", cases);
     expect(r.model).toBe("claude-fake-1");
     expect(r.prompt_version).toBe("grade@2");
@@ -70,6 +70,14 @@ describe("grading eval", () => {
     expect(process.env.ORE_AI).toBeUndefined(); // the vendor pick doesn't leak out of the run
     expect(table([r])).toContain("60% (3/5)");
     expect(table([r])).toContain("23–88%");
+  });
+
+  test("loadCases refuses duplicate ids; the baseline never passes an empty model answer", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ore-eval-cases-"));
+    const c = loadCases()[0]!;
+    writeFileSync(join(dir, "c.json"), JSON.stringify({ cases: [c, c] }));
+    expect(() => loadCases(join(dir, "c.json"))).toThrow("unique");
+    expect(baseline([{ ...c, model_answer: "→", answer: "no idea", label: "wrong" }]).correct).toBe(1);
   });
 
   test("accuracy carries its 95% Wilson interval: 20/20 is only known to be at least 84%", () => {
@@ -90,6 +98,7 @@ describe("grading eval", () => {
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ kind: "prompt", question: "Why does testing help?", rubric: ["Retrieval strengthens memory"], answer: "pulling it out makes it stick", label: "right", level: "tricky" });
     expect(found[0]!.why).toContain("the grader proposed 2, Tyler recorded 3");
+    expect(found[0]!.id).toMatch(/^real-[0-9a-z]{6}-20261102\d{6}$/); // to the second: two on one day differ
   });
 
   test("codex usage is summed from its turn.completed events", () => {

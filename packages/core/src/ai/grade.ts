@@ -25,11 +25,17 @@ export function gradeShown(lib: Library, shown: Shown, answer: string) {
   });
 }
 
-// Proposes a rating; never logs it (D21). With a variant (D66), grades against its key points.
-export async function gradeAnswer(lib: Library, cardRef: string, answer: string, variantRef?: string) {
+/** What the grader is shown for a card, or for the variant he was shown (D66): its key points. */
+export function shownFor(lib: Library, cardRef: string, variantRef?: string): Shown & { card: string } {
   const card = findCard(lib, cardRef);
   const v = variantRef ? findVariant(lib, card.meta.id, variantRef) : null;
-  const shown: Shown = v ? { kind: "prompt", question: v.question, model_answer: v.answer, rubric: v.rubric } : { kind: card.meta.kind, question: card.question, model_answer: card.answer, rubric: card.rubric };
+  return v ? { card: card.meta.id, kind: "prompt", question: v.question, model_answer: v.answer, rubric: v.rubric }
+    : { card: card.meta.id, kind: card.meta.kind, question: card.question, model_answer: card.answer, rubric: card.rubric };
+}
+
+// Proposes a rating; never logs it (D21).
+export async function gradeAnswer(lib: Library, cardRef: string, answer: string, variantRef?: string) {
+  const { card, ...shown } = shownFor(lib, cardRef, variantRef);
   const { data, ai } = await gradeShown(lib, shown, answer);
-  return { card: card.meta.id, ...data, ai };
+  return { card, ...data, ai };
 }
