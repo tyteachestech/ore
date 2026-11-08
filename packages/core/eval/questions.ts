@@ -88,7 +88,8 @@ export const CARD_ANSWER_MAX = 200;
 /** The checks a question fails by code, by name; none means it passed them. */
 export function codeFailures(q: Question, author?: string): string[] {
   const out: string[] = [];
-  const surname = author?.split(/[\s,]+/).filter((w) => w.length > 2).pop();
+  // Letters only, so a name like "Smith)" or "C++" makes no broken pattern.
+  const surname = author?.split(/[^\p{L}]+/u).filter((w) => w.length > 2).pop();
   if (q.kind === "prequestion") {
     if (ATTRIBUTED.test(q.question) || POINTS_AT.test(q.question) || (surname && new RegExp(`\\b${surname}\\b`, "i").test(q.question))) out.push("code:attributed");
     return out;

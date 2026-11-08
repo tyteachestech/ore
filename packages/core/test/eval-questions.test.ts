@@ -39,6 +39,7 @@ describe("question-quality eval", () => {
     expect(codeFailures(q({ kind: "prequestion", question: "Why do highlights feel like learning?" }), "Priya Natarajan")).toEqual([]);
     for (const bad of ["According to the essay, why do highlights fail?", "Why does Natarajan delete old notes?", "What does the author recommend after reading?"])
       expect(codeFailures(q({ kind: "prequestion", question: bad }), "Priya Natarajan")).toEqual(["code:attributed"]);
+    expect(codeFailures(q({ kind: "prequestion", question: "Why do Smith notes fail?" }), "J. (Smith)")).toEqual(["code:attributed"]);
   });
 
   test("a card points at no source, asks for no list, and keeps its answer short; a prompt may explain a set", () => {
