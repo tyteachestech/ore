@@ -22,7 +22,7 @@ About $1.40 and under two minutes a run on Sonnet (writer ~$0.65, judge ~$0.80).
 - Prequestions passed every check (17/17, twice): the v8 rules (ask about the idea, never the author) hold.
 - Review cards passed 49% and 53%. The misses, most first: rubric points the question never asks for (a "fix" point on a "when would you…" question), the same idea asked twice (a prequestion's review prompt repeating a highlight's card), two questions joined with "and", and answers that drop the source's hedge ("tends to favour" became "favours").
 
-## What enrich@12 changed (D146)
+## What enrich@12 changed (D147)
 
 The plan writes each prequestion's review prompt first and folds a highlight on the same idea into it; every question asks one thing; rubric points must be asked for; hedges stay. Two runs each, same set and judge:
 
