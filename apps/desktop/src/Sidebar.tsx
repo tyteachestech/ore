@@ -518,7 +518,12 @@ function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; col
                 const head = e.currentTarget.closest(".side-section")?.querySelector<HTMLElement>(".side-label");
                 const back = opener?.isConnected && opener !== document.body && !opener.closest(".side-head-tools") ? opener : head;
                 onDone(null);
-                setTimeout(() => (back?.isConnected ? back : document.querySelector<HTMLElement>(".sidebar .side-label"))?.focus({ preventScroll: true }));
+                // Only if focus has nowhere else to go: a ⌘K pressed in the same instant keeps its field.
+                setTimeout(() => {
+                  const active = document.activeElement;
+                  if (active && active !== document.body) return;
+                  (back?.isConnected ? back : document.querySelector<HTMLElement>(".sidebar .side-label"))?.focus({ preventScroll: true });
+                });
               }
             }}
           />
