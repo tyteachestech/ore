@@ -1569,8 +1569,13 @@ journey("shortcuts: resetting one to a default another command took since asks b
 /** Walks a menu with ↓ to the item named `label` and picks it with ↵, as he does without the mouse. */
 async function pickWithKeys(page: Page, label: string) {
   const at = () => page.evaluate(() => (document.activeElement?.getAttribute("role") === "menuitem" ? document.activeElement.textContent ?? "" : ""));
-  for (let i = 0; i < 12 && !(await at()).startsWith(label); i++) await page.keyboard.press("ArrowDown");
-  if (!(await at()).startsWith(label)) throw new Error(`no “${label}” in the menu`);
+  // Radix moves focus to the next item on a timer: each ↓ waits for its move, as a held key's repeat would.
+  for (let i = 0, now = await at(); i < 16 && !now.startsWith(label); i++) {
+    await page.keyboard.press("ArrowDown");
+    const was = now;
+    await until("↓ moves the focus", async () => (now = await at()) !== was, 1000).catch(() => {});
+  }
+  if (!(await at()).startsWith(label)) throw new Error(`no “${label}” in the menu (at “${await at()}”)`);
   await page.keyboard.press("Enter");
 }
 
