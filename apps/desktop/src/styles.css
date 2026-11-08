@@ -2002,7 +2002,7 @@ button.home-plan:hover { color: var(--text); }
 .cite:hover .cite-more { color: var(--muted); }
 .cite-card {
   z-index: 30; width: 280px; padding: 4px; display: flex; flex-direction: column;
-  background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  background: var(--bg-raised); border-radius: 10px; box-shadow: var(--float);
   animation: hint-in 0.1s ease-out;
 }
 .cite-card button { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 6px; text-align: left; }

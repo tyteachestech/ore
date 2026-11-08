@@ -9,6 +9,9 @@ if (typeof window !== "undefined") {
   window.addEventListener("pointerdown", () => (tabbed = false), true);
 }
 
+/** For a hover card's trigger: opens on focus only when Tab moved it there, never on focus set by code. */
+export const onlyTabbed = (e: { preventDefault: () => void }) => { if (!tabbed) e.preventDefault(); };
+
 /** Escapes that only closed a hint: Radix marks them handled, but a hint is not a layer he sees, so the
  *  sheet under it closes on that same Esc (one press, as on a Mac). */
 const hintEscapes = new WeakSet<Event>();
@@ -27,7 +30,7 @@ export function Hint({ text, keys, side = "bottom", children }: { text: ReactNod
     <Tooltip.Root>
       {/* Opens on hover, and on focus only when Tab moved it there: focus set by code (a field
           autofocused, a panel opening) must not drop a hint over the label beside it. */}
-      <Tooltip.Trigger asChild onFocus={(e) => !tabbed && e.preventDefault()}>
+      <Tooltip.Trigger asChild onFocus={onlyTabbed}>
         {children}
       </Tooltip.Trigger>
       <Tooltip.Portal>

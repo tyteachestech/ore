@@ -391,6 +391,10 @@ journey("tutor web citation: a page the tutor found on the web is a pill named f
     await pill.getByText("britannica", { exact: true }).waitFor();
     await pill.hover();
     await page.locator(".cite-card").getByText("born on January 24, 1850").waitFor();
+    // Typing re-renders the chat; the open card must not be remounted away.
+    await page.getByRole("textbox", { name: "Message the tutor" }).pressSequentially("and", { delay: 30 });
+    if (!(await page.locator(".cite-card").isVisible())) throw new Error("typing closed the citation's card");
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("");
     await pill.click();
     await until("the page opens in the browser", async () => ((await page.evaluate(() => (window as any).__opened)) as string[]).includes(url));
   } finally {
