@@ -14,10 +14,18 @@ import leaveOut from "./prompts/leave-out.md" with { type: "text" };
 import askLibrary from "./prompts/ask-library.md" with { type: "text" };
 import tutor from "./prompts/tutor.md" with { type: "text" };
 import judge from "./prompts/judge.md" with { type: "text" };
+import compare from "./prompts/compare.md" with { type: "text" };
 
-export type PromptName = "enrich" | "grade" | "research" | "explain" | "recall-feedback" | "key-points" | "check" | "chat" | "variant" | "variant-check" | "leave-out" | "ask-library" | "tutor" | "judge";
+export type PromptName = "enrich" | "grade" | "research" | "explain" | "recall-feedback" | "key-points" | "check" | "chat" | "variant" | "variant-check" | "leave-out" | "ask-library" | "tutor" | "judge" | "compare";
 
-const TEXT: Record<PromptName, string> = { enrich, grade, research, explain, "recall-feedback": recallFeedback, "key-points": keyPoints, check, chat, variant, "variant-check": variantCheck, "leave-out": leaveOut, "ask-library": askLibrary, tutor, judge };
+const TEXT: Record<PromptName, string> = { enrich, grade, research, explain, "recall-feedback": recallFeedback, "key-points": keyPoints, check, chat, variant, "variant-check": variantCheck, "leave-out": leaveOut, "ask-library": askLibrary, tutor, judge, compare };
+
+const OVERRIDE: Partial<Record<PromptName, string>> = {};
+/** Evals only (`eval:tutor --against`): run `name` with this text, an older version to compare against; no text restores it. */
+export function usePromptText(name: PromptName, raw?: string) {
+  if (raw === undefined) delete OVERRIDE[name];
+  else OVERRIDE[name] = raw;
+}
 
 export interface Prompt {
   name: PromptName;
@@ -26,7 +34,7 @@ export interface Prompt {
 }
 
 export function loadPrompt(name: PromptName): Prompt {
-  const raw = TEXT[name];
+  const raw = OVERRIDE[name] ?? TEXT[name];
   const { data, body } = parseFrontmatter<{ name: string; version: number | string }>(raw);
   if (data.name !== name || data.version === undefined) throw new Error(`prompt ${name}: missing name/version header`);
   return { name, version: `${name}@${data.version}`, text: body.trim() };
