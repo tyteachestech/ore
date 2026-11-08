@@ -2365,7 +2365,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   // The phone has no Finder, no side panel and no sidebar to pin to yet.
   const menuActions = actions.filter((a) => !a.paletteOnly);
   const canFinish = !!doc && doc.status !== "done" && !doc.preview;
-  // On the phone Finish lives here and at the end of the source; the top bar stays Back and ⋯ (D146).
+  // On the phone Finish lives here and at the end of the source; the top bar stays Back and ⋯ (D156).
   const phoneActions = menuActions.filter((a) => !["reveal", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url));
   const shownActions = PHONE
     ? [...phoneActions.filter((a) => a.id === "finish").map((a) => ({ ...a, label: "Finish", hint: undefined })), ...phoneActions.filter((a) => a.id !== "finish")].map((a, i) => (i ? a : { ...a, divider: false }))
@@ -2898,7 +2898,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                     </div>
                     {!chapterFb.feedback && !chapterFb.error && (
                       <p className="loading">
-                        <Working label="Reading your recall against the chapter…" />
+                        <Working stage="read" label="Reading your recall against the chapter…" />
                       </p>
                     )}
                     {chapterFb.error && (
@@ -3074,7 +3074,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
       <button className="preq-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <CaretRight className={`caret${open ? " open" : ""}`} size={12} aria-hidden="true" />
         What do you already know?
-        {waiting && <span className="quiet"><Working label="Writing prequestions…" slow="Usually under a minute." /></span>}
+        {waiting && <span className="quiet"><Working stage="write" label="Writing prequestions…" slow="Usually under a minute." /></span>}
       </button>
       {open && qs.length > 0 && (
         <ol className="preq-body">

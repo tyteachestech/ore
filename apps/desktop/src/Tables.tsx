@@ -106,7 +106,7 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
           </button>
         </>
       ) : reading ? (
-        <Working label={`Reading the ${what(doc.structure).toLowerCase()}…`} slow="Up to a few minutes for a long paper" />
+        <Working stage="read" label={`Reading the ${what(doc.structure).toLowerCase()}…`} slow="Up to a few minutes for a long paper" />
       ) : error ? (
         <>
           <span className="pdf-tables-err">{error}</span>

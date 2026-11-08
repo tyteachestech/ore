@@ -177,16 +177,12 @@
 .toast-mark.ok { fill: var(--c-green); }
 .toast-mark.bad { fill: var(--error); }
 .sprite { flex: none; display: block; }
-.toast .pixel-spin { margin-right: -4px; }
-.pixel-spin { flex: none; display: inline-grid; grid-template-columns: 4px 4px; grid-template-rows: 4px 4px; width: 8px; height: 8px; }
-.pixel-spin i { background: var(--border); animation: pixel-spin 480ms steps(1) infinite; }
-.pixel-spin i:nth-child(2) { animation-delay: -360ms; }
-.pixel-spin i:nth-child(4) { animation-delay: -240ms; }
-.pixel-spin i:nth-child(3) { animation-delay: -120ms; }
-@keyframes pixel-spin { 0% { background: currentColor; } 25% { background: var(--border); } }
+/* Working.tsx: the 5×5 dot matrix before a wait's label, its pattern per stage (D146). */
+.matrix { flex: none; fill: currentColor; }
+.matrix .dim { opacity: 0.4; }
+.matrix .off { opacity: 0.12; }
 @media (prefers-reduced-motion: reduce) {
   .toasts.fan .toast { transition: none; }
-  .pixel-spin i { animation: none; background: var(--muted); }
 }
 
 /* Big pixel numbers roll digit by digit in four hard frames when they change (D113, Roll.tsx). */

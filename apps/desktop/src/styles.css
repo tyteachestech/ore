@@ -1477,7 +1477,10 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .try.done .try-quote .note, .try.done .try-quote .exact { color: var(--faint); }
 .try-reflection { display: block; width: 100%; text-align: left; margin: 0 0 4px; padding: 2px 8px 2px 16px; border-left: 2px solid var(--apply-solid); font-size: 13px; color: var(--text-read); line-height: 1.45; }
 .try-reflection:hover { color: var(--text); }
-.try-reflect { margin: 2px 8px 6px 8px; }
+.try-use { display: flex; flex-wrap: wrap; gap: 0 8px; margin: 0 0 4px; padding: 0 8px 0 16px; border-left: 2px solid var(--apply-solid); font-size: 13px; line-height: 1.45; color: var(--text-read); }
+.try-use-plan { color: var(--faint); }
+.try.history .try-quote .exact { color: var(--faint); }
+.try-reflect { display: grid; gap: 4px; margin: 2px 8px 6px 8px; }
 .try-reflect .field { width: 100%; min-height: 34px; padding: 7px 10px; line-height: 1.45; }
 .skill-col.side .try .question-actions { position: absolute; top: 4px; right: 4px; margin: 0; padding: 2px; border-radius: 6px; background: var(--bg-raised); border: 1px solid var(--border); visibility: hidden; }
 .skill-col.side .try:hover .question-actions, .skill-col.side .try:focus-within .question-actions { visibility: visible; }
@@ -1615,8 +1618,8 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .quiz-verdict b { display: block; font-size: 15px; }
 .quiz-verdict span:not(.quiz-badge) { color: var(--muted); }
 .quiz-badge { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--bg-active); color: var(--muted); }
-/* Waiting on the AI's check: the pixel spinner at 2x (whole cells, so it stays sharp). */
-.quiz-badge .pixel-spin { transform: scale(2); --border: var(--bg); color: var(--text); }
+/* Waiting on the AI's check: the dot matrix in the badge, its dim cells on the badge's fill. */
+.quiz-badge .matrix { color: var(--text); }
 .quiz-verdict.yes { background: color-mix(in srgb, var(--c-green) 13%, transparent); }
 .quiz-verdict.yes b { color: color-mix(in srgb, var(--c-green) 70%, white); }
 .quiz-verdict.yes .quiz-badge { background: var(--c-green); color: #0f2a19; }
@@ -1672,7 +1675,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .feedback .sections { color: var(--muted); font-size: 14px; }
 .feedback ul { padding-left: 20px; }
 .loading { color: var(--muted); font-size: 14px; }
-/* Working.tsx: the pixel spinner before a wait's label (D113; .pixel-spin in retro.css). */
+/* Working.tsx: the dot matrix before a wait's label (D146; .matrix in retro.css). */
 .working { display: inline-flex; align-items: center; gap: 8px; vertical-align: top; }
 .working-slow { color: var(--faint); animation: hint-in .3s both; }
 .reader-loading { margin: 48px auto; text-align: center; animation: hint-in .2s 400ms both; }
@@ -1982,6 +1985,13 @@ button.home-plan:hover { color: var(--text); }
 .review-kept b { font-family: var(--round); color: var(--text); font-size: 24px; font-variant-numeric: tabular-nums; }
 .review-rescued { margin: 6px 0 0; color: color-mix(in srgb, var(--c-green) 70%, var(--text)); }
 .review-end .quiz-faint { margin: 10px 0 0; }
+.review-try { display: flex; align-items: baseline; gap: 8px; max-width: 100%; margin: 18px 0 0; padding: 6px 12px 6px 10px; border-radius: 8px; color: var(--apply-solid); font-size: 14px; line-height: 1.4; text-align: left; }
+.review-try:hover { background: var(--bg-hover); }
+.review-try:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.review-try svg { flex: none; align-self: center; }
+.review-try-plan { color: var(--text); }
+.review-try-plan::after { content: " · "; color: var(--faint); }
+.review-try-from { color: var(--faint); font-size: 12px; }
 .review-cut { display: flex; align-items: flex-start; justify-content: center; gap: 10px; margin: 16px 0 2px; }
 .review-cut > span { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; animation: gem-in 380ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both; }
 .review-cut-skill { display: flex; justify-content: center; width: 100%; line-height: 1; font-size: 14px; }
@@ -2439,7 +2449,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone :is(.cp-row, .qp-row):active { background: var(--bg-hover); }
 /* The collected count sits in the top bar, beside Back, not over the text. */
 .phone .collected .collected-chip { padding: 0 8px; flex: none; }
-/* The source screen's bars (D146): Back and ⋯ on top, what he does while reading at the bottom near the thumb (Obsidian). They leave as he reads on. */
+/* The source screen's bars (D156): Back and ⋯ on top, what he does while reading at the bottom near the thumb (Obsidian). They leave as he reads on. */
 .phone-source > .phone-bar { position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0; transition: transform 200ms ease-out; }
 .phone-source::before { content: ""; position: absolute; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 6; }
 .phone-source .reader-tools { top: 0; right: 4px; transition: transform 200ms ease-out, opacity 150ms; }

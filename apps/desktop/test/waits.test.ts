@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 // The wait rule (AGENTS.md, Interaction checklist): every wait on the AI or the network shows that
-// it is working at once, through <Working label=…> (or the PixelSpin it draws), never a blank or a
+// it is working at once, through <Working label=…> (or the Matrix it draws), never a blank or a
 // still line. Each slow `ore` call is listed here as the label its screen shows while it runs, or as
 // "background: <why>" when nothing waits on it ("Other.tsx: <label>" when another file draws it). A new slow call fails this test until it is listed.
 const WAITS: Record<string, string> = {
@@ -19,7 +19,7 @@ const WAITS: Record<string, string> = {
   "Explain.tsx research": "Finding sources…",
   "SkillPage.tsx research": "Finding sources…",
   "SkillPage.tsx add": "Adding…",
-  "Tutor.tsx tutor": "Thinking…",
+  "Tutor.tsx tutor": "Reading your sources…",
   "Ask.tsx ask": "background: the reply's own dots (ask-dots) stand in for the label, as ChatGPT's do",
   "App.tsx feed follow": "Add.tsx: Adding…",
   "App.tsx feed open": "Feed.tsx: Opening…",
@@ -70,8 +70,8 @@ describe("waits show they are working", () => {
       const at = /^(\w+\.tsx): (.*)$/.exec(label);
       const code = at ? readFileSync(join(src, at[1]!), "utf8") : found.get(k);
       if (at) label = at[2]!;
-      // The spinner sits on the label itself (<Working label=…>) or just before it (a badge's PixelSpin).
-      return !code || ![...code.matchAll(/<Working\b|<PixelSpin\b/g)].some((m) => {
+      // The spinner sits on the label itself (<Working label=…>) or just before it (a badge's Matrix).
+      return !code || ![...code.matchAll(/<Working\b|<Matrix\b/g)].some((m) => {
         const near = code.slice(m.index, m.index + 500);
         return near.includes(label);
       });

@@ -35,6 +35,9 @@ export const AnnotationSchema = z.object({
   answers: z.array(Contribution).optional(), // Question intent only (D75)
   card: z.boolean().optional(), // Question intent: "Answered + card", so enrich drafts a card from his answer
   reflection: z.string().optional(), // Apply intent (D127): how it went, written when he checked it off
+  // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
+  // (his plan and how it went move here) and the try is open again with the new plan as its note.
+  uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional() })).optional(),
   // A card or question he typed with nothing selected ("Card here"): `exact` is only the sentence where he
   // was; the note is what counts, and a card is drafted from it and the whole source, with quotes.
   point: z.boolean().optional(),
@@ -151,7 +154,7 @@ export function isQuestionOnly(item: Item): boolean {
   return all.length > 0 && all.every((a) => a.intent === "question");
 }
 
-export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection">>;
+export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses">>;
 
 // Edits never rewrite history: they append the same id with rev + 1.
 export function reviseAnnotation(item: Item, current: Annotation, patch: AnnotationPatch): Annotation {

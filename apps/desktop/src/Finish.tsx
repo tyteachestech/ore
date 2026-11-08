@@ -8,7 +8,7 @@ import { is } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
 import { stampBefore } from "./transcript";
 import { errorText, focusPicked, type Notify } from "./util";
-import { PixelSpin, useLate, Working } from "./Working";
+import { Matrix, useLate, Working } from "./Working";
 
 /** What Finish and ChapterRecall need from the source note: wait for a pending edit before the CLI
  *  appends to notes.md, then take the text it returns. */
@@ -493,7 +493,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
         <>
           <div className={`quiz-verdict ${verdict ?? "wait"}`} role="status">
             <span className="quiz-badge" aria-hidden="true">
-              {verdict === "yes" ? <Check size={16} weight="bold" /> : verdict === "part" ? <CircleHalf size={16} weight="fill" /> : waiting ? <PixelSpin /> : <MagnifyingGlass size={15} weight="bold" />}
+              {verdict === "yes" ? <Check size={16} weight="bold" /> : verdict === "part" ? <CircleHalf size={16} weight="fill" /> : waiting ? <Matrix /> /* never the check pattern here: in this badge a check means he got it */ : <MagnifyingGlass size={15} weight="bold" />}
             </span>
             <div>
               <b>{verdict === "yes" ? "You got it" : verdict === "part" ? "Partly there" : verdict === "no" ? "Not yet. Here’s where it is" : failed ? (PHONE ? "Not checked here" : "Couldn’t check this one") : q.points ? "Checking your answer…" : "Finding the key points…"}</b>
@@ -607,7 +607,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           {typeof feedback === "string" && <p className="err">Recall feedback failed: {feedback}</p>}
           {feedbackRun.current && !feedback && (
             <p className="loading">
-              <Working label="Reading your recall against the source…" />
+              <Working stage="read" label="Reading your recall against the source…" />
             </p>
           )}
           {feedback && typeof feedback !== "string" && (
