@@ -254,6 +254,46 @@ function speakerDeck(html: string, url: string): WebDoc | undefined {
   return { title, author: cleanAuthor(talk.author?.name), published: cleanDate(talk.datePublished), markdown: parts.join("\n\n") + "\n" };
 }
 
+/** A Discourse topic (a course's, a tool's or a community's forum) as a Hacker News thread comes in:
+ *  the first post as the text, then every reply under its author and date. The page lays them out
+ *  for search engines with no names a reader keeps, beside like counts and lists of linked topics.
+ *  Returns the first post's author. */
+function discourse(doc: Document): string | undefined {
+  if (!/^Discourse\b/.test(doc.querySelector('meta[name="generator"]')?.getAttribute("content") ?? "")) return undefined;
+  const posts = [...doc.querySelectorAll(".crawler-post")].filter((p) => p.querySelector(".post"));
+  if (!posts.length) return undefined;
+  const topic = (doc.querySelector('link[rel="canonical"]')?.getAttribute("href") ?? "").replace(/\?.*$/, "");
+  const el = (tag: string, text?: string) => Object.assign(doc.createElement(tag), text === undefined ? {} : { textContent: text });
+  const article = el("article");
+  article.append(el("h1", doc.querySelector('meta[property="og:title"]')?.getAttribute("content") ?? doc.title));
+  const name = (p: Element) => p.querySelector('[itemprop="author"] [itemprop="name"]')?.textContent?.trim() ?? "";
+  posts.forEach((p, i) => {
+    const body = p.querySelector(".post")!;
+    // An image's file name and size under it, and avatars, are the forum's chrome.
+    for (const x of body.querySelectorAll(".lightbox-wrapper .meta, img.avatar, .quote-controls")) x.remove();
+    // A quoted post, under the name of who wrote it.
+    for (const q of body.querySelectorAll("aside.quote")) {
+      const quote = q.querySelector("blockquote") ?? el("blockquote");
+      const who = q.getAttribute("data-username");
+      if (who) quote.prepend(el("p", `${who}:`));
+      q.replaceWith(quote);
+    }
+    if (i === 0) return void article.append(...body.childNodes, ...(posts.length > 1 ? [el("hr"), el("h2", "Comments")] : []));
+    const reply = el("blockquote");
+    const head = el("p");
+    const when = el("a", p.querySelector("time")?.getAttribute("datetime")?.slice(0, 10) ?? "");
+    const position = p.querySelector('[itemprop="position"]')?.textContent?.trim();
+    if (topic && position) when.setAttribute("href", `${topic}/${position}`);
+    head.append(el("strong", name(p)), " · ", when);
+    reply.append(head, ...body.childNodes);
+    article.append(reply);
+  });
+  doc.body.replaceChildren(article);
+  // Discourse names are letters, digits, dots, dashes and underscores.
+  const op = name(posts[0]!);
+  return /^[\w.-]{1,60}$/.test(op) ? op : undefined;
+}
+
 /** A Hacker News thread as Defuddle's reader for it expects: names marked `.hnuser` (HN dropped the
  *  class, so every comment read as "[deleted]"), and no site after the title ("(example.com)").
  *  Returns the poster's name. */
@@ -281,7 +321,7 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);
-    const poster = hackerNews(document as unknown as Document, url);
+    const poster = hackerNews(document as unknown as Document, url) ?? discourse(document as unknown as Document);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));

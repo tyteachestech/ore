@@ -186,6 +186,21 @@ describe("import coverage: web pages", () => {
     expect(count(b, /^(?:> )+\*\*/gm)).toBe(24); // every comment
   });
 
+  test("a forum topic (Discourse): the first post as its text, then every reply under its author, quotes kept", async () => {
+    // discourse-topic.html: a real topic's page (2026), its words and names rewritten; what search engines are served.
+    const url = "https://meta.discourse.org/t/discourse-new-user-guide/96331";
+    serve({ [url]: { body: web("discourse-topic.html"), type: HTML } });
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "Understanding Discourse for new users", author: "Discourse", published: "2018-09-07T13:52:59+00:00" });
+    const b = item.body;
+    expect(b).toStartWith("> This model chunk the interleaving reading");
+    expect(b).toContain("\n## Card Pause Mind by Discourse\n");
+    expect(b).toContain("---\n\n## Comments\n\n> **Fact** · [2025-01-14](https://meta.discourse.org/t/understanding-discourse-for-new-users/96331/131)\n> \n> > Discourse:\n> > \n> > Generation at the spaced of the OP");
+    expect(b).toContain("> **reading** · [2025-09-18](https://meta.discourse.org/t/understanding-discourse-for-new-users/96331/134)");
+    expect(count(b, /^> \*\*/gm)).toBe(2); // every reply
+    expect(b).not.toContain("Likes");
+  });
+
   test("slides online (Speaker Deck): every slide's picture and words, in order, not the site's other decks", async () => {
     // speakerdeck.html: a real deck's page (2026), its words rewritten; the slides' words are in its transcript.
     const url = "https://speakerdeck.com/jennybc/how-to-name-files";
