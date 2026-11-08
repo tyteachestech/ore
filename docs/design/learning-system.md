@@ -49,7 +49,7 @@ Stages 2 to 7 are the strongest part of Ore. The two gaps that would reshape rew
 
 ## Order
 
-1. **Decide what progress means** (stage 11): memories only, or memories plus ideas used. A decision, not a build; every reward on the long arc keys off it.
+1. **Decide what progress means** (stage 11): memories only, or memories plus ideas used. A decision, not a build; every reward on the long arc keys off it. Settled for now as a record of use with no number (question 3).
 2. **Apply loop v1** (A, then B, then C if wanted).
 3. **Messages that track learning, not performance** (stage 8): "you remembered this from 9 days ago" on a pass after a long gap, one line on why a hard card is hard. Cheap, and they work on any loop.
 4. **Later:** a two-question aim before a session and a look back after (ch8), a smaller session when fewer than 80% of the last 14 days met the goal (ch8), relearning to a criterion for P1 cards (ch3), strategy-mix feedback (ch8).
@@ -75,7 +75,7 @@ Stages 2 to 7 are the strongest part of Ore. The two gaps that would reshape rew
 
 1. **Have you checked off a try yet?** If not, the gap is B (it never comes back) before A. *Rec: build B first either way.* **Tyler, 2026-11-08: not yet.** So B comes first.
 2. **Where does the one try line live?** Home under today's slice, or the end screen after the goal closes. *Rec: the end screen, when he has just finished and the next real task is ahead.* **Tyler, 2026-11-08: the end screen.**
-3. **Should using an idea count as progress?** An *idea* is one technique he marks Try it; *progress* is what Ore shows growing over weeks, today only gems (solid memories). Options: A memory only; B a record of use, each used idea one line on the skill page ("Open with the end result · used on 2 videos") with his reflections, no number; C used ideas feed gems or levels. *Rec: B now, decide C after a few weeks of real tries.* Open.
+3. **Should using an idea count as progress?** An *idea* is one technique he marks Try it; *progress* is what Ore shows growing over weeks, today only gems (solid memories). Options: A memory only; B a record of use, each used idea one line on the skill page ("Open with the end result · used on 2 videos") with his reflections, no number; C used ideas feed gems or levels. *Rec: B now, decide C after a few weeks of real tries.* **Tyler, 2026-11-08: B, start small.** If tries do get used, he wants the mining metaphor (D90) widened to the whole skill-embodiment cycle, extract, plan, try, reflect, repeat, so memory and use read as one system: using an idea might crystallise its gem, or forge a tool. That waits for real tries, and is designed with C.
 
 ## Related
 
