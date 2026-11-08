@@ -11,7 +11,7 @@ import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { xlsxToDoc } from "../src/ingest/sheets.ts";
 import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
-import { inlineMath } from "../src/ingest/web.ts";
+import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
 import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
 import { strToU8, zipSync } from "fflate";
@@ -174,13 +174,13 @@ describe("import coverage: web pages", () => {
   });
 
   test("a forum thread (Hacker News): its title, poster and date, every comment under its author, replies nested", async () => {
-    // hn-thread.html: a real thread's markup (2026), its words rewritten; HN no longer marks names with .hnuser.
+    // hn-thread.html: a real thread's markup (2026), its words, names and links rewritten; HN no longer marks names with .hnuser.
     const url = "https://news.ycombinator.com/item?id=11408447";
     serve({ [url]: { body: web("hn-thread.html"), type: HTML } });
     const item = await addSource(await tempLibrary(), url);
     expect(item.meta).toMatchObject({ title: "Spaced repetition and practice", author: "spaced", published: "2016-04-01" });
     const b = item.body;
-    expect(b).toStartWith("[http://experiments.oskarth.com/srspractice/](http://experiments.oskarth.com/srspractice/)\n\n---\n\n## Comments\n\n> **generation** · [2016-04-01](https://news.ycombinator.com/item?id=11408947)\n");
+    expect(b).toStartWith("[https://example.com/srspractice/](https://example.com/srspractice/)\n\n---\n\n## Comments\n\n> **generation** · [2016-04-01](https://news.ycombinator.com/item?id=11408947)\n");
     expect(b).toContain("> > **feedback** · [2016-04-01](https://news.ycombinator.com/item?id=11409221)");
     expect(b).not.toContain("[deleted]");
     expect(count(b, /^(?:> )+\*\*/gm)).toBe(24); // every comment
@@ -195,6 +195,24 @@ describe("import coverage: web pages", () => {
     expect(b).toContain("\n$$\nR = e^{-\\frac{t}{S}},\n$$\n");
     expect(b).toContain("Here, $$b$$ represents 'Savings'");
     expect(b).not.toContain("\\left(\\right.");
+  });
+
+  test("Wikipedia's formula corners: indented on its own, older pages, chemistry, a page of stories", async () => {
+    const words = `<p>${"Words about memory and forgetting that fill out the page. ".repeat(10)}</p>`;
+    const page = (body: string) => `<html><head><title>T</title></head><body><article><h1>T</h1>${words}${body}${words}</article></body></html>`;
+    // An indented formula (`:<math>`) is all its line holds; an older page marks a display one inside it.
+    const today = `<dl><dd><math class="mwe-math-element mwe-math-element-block" data-mw='{"name":"math","body":{"extsrc":"x^2"}}'><annotation encoding="application/x-tex">{\\displaystyle x^2}</annotation></math></dd></dl>`;
+    const older = `<dl><dd><span class="mwe-math-element"><math display="block"><annotation encoding="application/x-tex">{\\displaystyle y^{3}}</annotation></math><img class="mwe-math-fallback-image-display" alt="{\\displaystyle y^{3}}"></span></dd></dl>`;
+    // <chem>'s own data lacks its \ce{}; two groups side by side keep both braces.
+    const chem = `<p>Water is <span class="mwe-math-element" data-mw='{"name":"chem","body":{"extsrc":"H2O"}}'><annotation encoding="application/x-tex">{\\displaystyle \\ce{H2O}}</annotation></span> here, and <span class="mwe-math-element"><annotation encoding="application/x-tex">{\\displaystyle a}{b}</annotation></span> is two groups.</p>`;
+    const b = (await htmlToDoc(page(today + older + chem), "https://en.wikipedia.org/wiki/T")).markdown;
+    expect(b).toContain("\n$$\nx^2\n$$\n");
+    expect(b).toContain("\n$$\ny^{3}\n$$\n");
+    expect(b).toContain("Water is $$\\ce{H2O}$$ here");
+    expect(b).toContain("$${\\displaystyle a}{b}$$ is two groups");
+    // Hacker News' front page has a poster on every row: the page has no one author.
+    const stories = `<table><tr><td class="subline">by <a href="user?id=someone">someone</a></td></tr></table>`;
+    expect((await htmlToDoc(page(stories), "https://news.ycombinator.com/news")).author).toBeUndefined();
   });
 
   test("nbviewer and Google links point at what to read", () => {

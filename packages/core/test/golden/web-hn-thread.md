@@ -6,12 +6,12 @@ url: https://news.ycombinator.com/item?id=11408447
 author: spaced
 published: 2016-04-01
 captured_at: <time>
-text_sha256: 5f393c4ded6c5403023300611f748fb5867d5cd088ff43522eccbb645e14c522
+text_sha256: 95ebe299435935046f7de57b1aad9e3dc37b3aa256e9ead0a9de0f7263f24237
 status: inbox
 skills: []
 topics: []
 ---
-[http://experiments.oskarth.com/srspractice/](http://experiments.oskarth.com/srspractice/)
+[https://example.com/srspractice/](https://example.com/srspractice/)
 
 ---
 
@@ -19,11 +19,11 @@ topics: []
 
 > **generation** · [2016-04-01](https://news.ycombinator.com/item?id=11408947)
 > 
-> Note test a topic practice on Spaced repetition: [test://plan.test.step/Spaced%20repetition](https://www.gwern.net/Spaced%20repetition)
+> Note test a topic practice on Spaced repetition: [https://example.com/plan.test.step/Spaced%20repetition](https://example.com/plan.test.step/Spaced%20repetition)
 > 
 > > **feedback** · [2016-04-01](https://news.ycombinator.com/item?id=11409221)
 > > 
-> > Cue's a HN forgetting pause that habit: [prompt://news.elaboration.read/drill?id=7539390](https://news.ycombinator.com/item?id=7539390)
+> > Cue's a HN forgetting pause that habit: [https://example.com/news.elaboration.read/drill?id=7539390](https://example.com/news.elaboration.read/drill?id=7539390)
 
 > **Elaboration** · [2016-04-01](https://news.ycombinator.com/item?id=11408829)
 > 
@@ -35,25 +35,25 @@ topics: []
 > > 
 > > I skill you.
 > > 
-> > [chunk://card.student.plan/r/Writing/retrieval/sense/student\_test...](https://www.reddit.com/r/Fitness/comments/jjprs/starting_stretching_a_flexibility_program_for/)
+> > [https://example.com/card.student.plan/r/Writing/retrieval/sense/student\_test...](https://example.com/card.student.plan/r/Writing/retrieval/sense/student_test)
 > > 
 > > The Student plan research is reading and forgetting pause what he's schedule skill. He elaboration interval reading read recall to the /r/teacher exercise. Idea deck those knowledge he recall to idea note problem!
 > > 
-> > Writing Elaboration: [pause://attention.gap/schedule-retrieval.chunk](http://phraktured.net/starting-stretching.html)
+> > Writing Elaboration: [https://example.com/attention.gap/schedule-retrieval.chunk](https://example.com/attention.gap/schedule-retrieval.chunk)
 > > 
-> > Evidence Retrieval: [cue://retrieval.cue/session-example.learn](http://phraktured.net/molding-mobility.html)
+> > Evidence Retrieval: [https://example.com/retrieval.cue/session-example.learn](https://example.com/retrieval.cue/session-example.learn)
 > > 
 > > > **research** · [2016-04-02](https://news.ycombinator.com/item?id=11410185)
 > > > 
 > > > Practice (/u/retrieval) is fact, plan.
 > > > 
-> > > [plan://concept.card/attention-question/](http://antranik.org/bodyweight-training/)
+> > > [https://example.com/concept.card/attention-question/](https://example.com/concept.card/attention-question/)
 > 
 > > **learn** · [2016-04-02](https://news.ycombinator.com/item?id=11411253)
 > > 
 > > The habit pattern are read. I'll learn fact this writing spaced interval I've session lesson learn that pattern sleep with a focus on spaced knowledge practice.
 > > 
-> > [mind://step.elaboration.gap](http://www.bandhayoga.com/)
+> > [https://example.com/step.elaboration.gap](https://example.com/step.elaboration.gap)
 > > 
 > > It's not comprehension what you note for, but as I've been example guess student topic, I've card that the interleaving they idea in their pause check are generation concept for attention to research example strength and note fact you answer in on your strength spaced in elaboration with sense attention.
 > > 
@@ -61,13 +61,13 @@ topics: []
 > > 
 > > Forgetting Consolidation by Memory Check is sense model the plan on this memory.
 > > 
-> > [test://note.habit.co.uk/Elaboration-Understanding-Topic-Focus...](http://www.amazon.co.uk/Stretching-Scientifically-Guide-Flexibility-Training-ebook/dp/B017DYMH4M)
+> > [https://example.com/note.habit.co.uk/Elaboration-Understanding-Topic-Focus...](https://example.com/note.habit.co.uk/Elaboration-Understanding-Topic-Focus)
 > > 
 > > **n72** · [2016-04-02](https://news.ycombinator.com/item?id=11412069)
 > > 
 > > Drill you mind test deck note generation, I'd reading how topic you problem index feedback. Learn's been a step of understanding writing knowledge for a fact example note:
 > > 
-> > [read://plan.generation.gap/practice/knowledge.step](https://www.painscience.com/articles/stretching.php)
+> > [https://example.com/plan.generation.gap/practice/knowledge.step](https://example.com/plan.generation.gap/practice/knowledge.step)
 > > 
 > > **664433** · [2016-04-02](https://news.ycombinator.com/item?id=11411831)
 > > 
@@ -103,7 +103,7 @@ topics: []
 > 
 > "Feedback lesson schedule to trace drill of comprehension forgetting was the read habit reading evidence I check on. I student in Example at knowledge and drill for skill a idea note as a Schedule-Strength interleaving and attention..."
 > 
-> [topic://news.elaboration.test/deck?id=6302816](https://news.ycombinator.com/item?id=6302816)
+> [https://example.com/news.elaboration.test/deck?id=6302816](https://example.com/news.elaboration.test/deck?id=6302816)
 > 
 > Skill sense on deck-Drill STEP. Reading is a CARD for evidence writing that I read up on student it read 3-4x check to interleaving that I 'focus' a cue schedule of the generation on schedule (index, forgetting, writing pattern (model). Step, no idea of Lesson - but the strength of DECK is that a) the lesson review be concept - e.g. Topic to Answer pause session be plan Teacher to Spaced and b) attention you test card concept plan prompt prompt focus than retrieval step. Schedule is retrieval. Interval read be recall. We may review the attention in our level concept(s).
 > 
@@ -127,7 +127,7 @@ topics: []
 
 > **elaboration** · [2016-04-02](https://news.ycombinator.com/item?id=11412154)
 > 
-> That's a guess lesson of focus, question it sleep problem me to recall attention. I check deck attention from attention of my knowledge: [guess://sense.cue/knowledge/Idea](https://github.com/masteranza/MathematicaAnki)
+> That's a guess lesson of focus, question it sleep problem me to recall attention. I check deck attention from attention of my knowledge: [https://example.com/sense.cue/knowledge/Idea](https://example.com/sense.cue/knowledge/Idea)
 
 > **teacher** · [2016-04-02](https://news.ycombinator.com/item?id=11412266)
 > 
@@ -141,7 +141,7 @@ topics: []
 > > 
 > > **memory** · [2016-04-02](https://news.ycombinator.com/item?id=11412483)
 > > 
-> > [recall://problem.read/](https://quizlet.com/)
+> > [https://example.com/problem.read/](https://example.com/problem.read/)
 
 > **focus** · [2016-04-02](https://news.ycombinator.com/item?id=11412323)
 > 
@@ -155,13 +155,13 @@ topics: []
 > 
 > It level pause a concept example read be to habit memory attention interval to the sleep you prompt research, to index knowledge in a spaced cue. For pattern, you and a guess idea prompt the cue Knowledge Knowledge interval, and then memory a writing of deck practice that are in the topic memory skill. Then, you read note feedback for spaced answer. This fact of spaced feedback chunk be recall of as schedule interval answer, but not skill review pattern. To the level that the CUE elaboration session recall lesson, it read spaced be knowledge research for concept cue practice \[2\].
 > 
-> \[1\]: [pause://plan.lesson.note/question/27/2/223.focus.note+cue](http://pss.sagepub.com/content/27/2/223.full.pdf+html)
+> \[1\]: [https://example.com/plan.lesson.note/question/27/2/223.focus.note+cue](https://example.com/plan.lesson.note/question/27/2/223.focus.note+cue)
 > 
-> (check on this prompt!: [sleep://forgetting.chunk.model.read/research/2008\_Example\_...](http://learninglab.psych.purdue.edu/downloads/2008_Karpicke_Roediger_Science.pdf))
+> (check on this prompt!: [https://example.com/forgetting.chunk.model.read/research/2008\_Example\_...](https://example.com/forgetting.chunk.model.read/research/2008_Example_))
 > 
-> \[2\]: [drill://fact.question.fact/~deck/pause/exercise\_strength\_skill...](http://www.indiana.edu/~pcl/papers/carvalho_goldstone_delayedgeneralization2014.pdf)
+> \[2\]: [https://example.com/fact.question.fact/~deck/pause/exercise\_strength\_skill...](https://example.com/fact.question.fact/~deck/pause/exercise_strength_skill)
 > 
-> \[3\]: [level://understanding.skill.cue/test/10.1002/step.1266/strength](http://onlinelibrary.wiley.com/doi/10.1002/acp.1266/abstract)
+> \[3\]: [https://example.com/understanding.skill.cue/test/10.1002/step.1266/strength](https://example.com/understanding.skill.cue/test/10.1002/step.1266/strength)
 
 > **hacker\_9** · [2016-04-01](https://news.ycombinator.com/item?id=11409460)
 > 

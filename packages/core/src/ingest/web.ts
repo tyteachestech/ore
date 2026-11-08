@@ -184,19 +184,39 @@ function paperAuthors(doc: Document): string | undefined {
  *  its MathML, which comes out as `\left(\right. log \left(t\right)`. */
 function wikiMath(doc: Document) {
   for (const el of doc.querySelectorAll(".mwe-math-element")) {
-    // Today's pages carry it in the element's own data (`body.extsrc`); older ones in an annotation.
     let raw = el.querySelector('annotation[encoding="application/x-tex"]')?.textContent ?? el.querySelector("img")?.getAttribute("alt") ?? "";
+    // Today's pages carry a <math> formula's source in the element's own data (`body.extsrc`);
+    // a <chem> one's source there lacks its \ce{}, so it keeps its annotation.
     try {
-      raw = (JSON.parse(el.getAttribute("data-mw") ?? "{}") as { body?: { extsrc?: string } }).body?.extsrc ?? raw;
+      const mw = JSON.parse(el.getAttribute("data-mw") ?? "{}") as { name?: string; body?: { extsrc?: string } };
+      if (mw.name === "math" && mw.body?.extsrc) raw = mw.body.extsrc;
     } catch { /* not Wikipedia's data after all */ }
-    const tex = raw.trim().replace(/^\{\\displaystyle\s*([\s\S]*)\}$/, "$1").trim();
+    raw = raw.trim();
+    const wrapped = raw.match(/^\{\\displaystyle\s*([\s\S]*)\}$/)?.[1];
+    // Only when that last brace closes the wrapper: `{\displaystyle a}{b}` is two groups.
+    const tex = (wrapped !== undefined && balanced(wrapped) ? wrapped : raw).trim();
     if (!tex) continue;
     const math = doc.createElement("span");
-    const block = el.classList.contains("mwe-math-element-block") || el.getAttribute("display") === "block";
+    const block =
+      el.classList.contains("mwe-math-element-block") ||
+      el.getAttribute("display") === "block" ||
+      !!el.querySelector('math[display="block"], img.mwe-math-fallback-image-display');
     math.className = block ? "math math-display" : "math math-inline";
     math.setAttribute("data-latex", tex);
+    // With text in it, a formula that is the only thing in its line (Wikipedia indents display ones) stays.
+    math.textContent = tex;
     el.replaceWith(math);
   }
+}
+
+/** Whether every brace in a TeX string closes one opened before it. */
+function balanced(tex: string): boolean {
+  let depth = 0;
+  for (const m of tex.matchAll(/\\.|[{}]/g)) {
+    if (m[0] === "{") depth++;
+    else if (m[0] === "}" && --depth < 0) return false;
+  }
+  return depth === 0;
 }
 
 /** A Hacker News thread as Defuddle's reader for it expects: names marked `.hnuser` (HN dropped the
@@ -206,7 +226,9 @@ function hackerNews(doc: Document, url: string): string | undefined {
   if (!/^https?:\/\/news\.ycombinator\.com\//.test(url)) return undefined;
   for (const a of doc.querySelectorAll('.comhead a[href^="user?id="], .subline a[href^="user?id="]')) a.classList.add("hnuser");
   for (const s of doc.querySelectorAll(".titleline .sitebit")) s.remove();
-  return doc.querySelector(".subline .hnuser")?.textContent?.trim() || undefined;
+  // Only a thread has one poster: a list of stories has one per row. HN names are 2 to 15 of these.
+  const name = /\/item\?id=/.test(url) ? doc.querySelector(".subline .hnuser")?.textContent?.trim() : undefined;
+  return name && /^[\w-]{2,15}$/.test(name) ? name : undefined;
 }
 
 export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
@@ -222,12 +244,13 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);
+    const poster = hackerNews(document as unknown as Document, url);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
-    const paper = paperAuthors(document as unknown as Document) ?? hackerNews(document as unknown as Document, url);
+    const paper = paperAuthors(document as unknown as Document);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
     const markdown = inlineMath(htmlTables(r.content.trim()));
     if (markdown.length > 200) {
-      return { title: siteless(r.title, h1) || url, author: paper ?? cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
+      return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
     }
   } catch {
     // fall through to Readability
