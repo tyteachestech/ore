@@ -5,7 +5,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Hint } from "./Hint";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
@@ -208,12 +208,15 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
 
   const nav = useRef<HTMLElement>(null);
   const cursor = useSideCursor(nav, home ? "home" : feed ? "feed" : skill ?? "all");
+  const roving = useRoving(nav);
 
   return (
     <WithMenu actions={spaceMenu}>
     <nav
       ref={nav}
       onPointerDown={cursor.onPointerDown}
+      onFocus={roving.onFocus}
+      onKeyDown={roving.onKeyDown}
       className={`sidebar${peek ? " peek" : ""}${within ? " within" : ""}${active !== null ? " sorting" : ""}`}
       aria-label="Skills"
       hidden={hidden}
@@ -413,6 +416,54 @@ function RenameField({ value, label = "Collection name", placeholder, taken, onS
     )}
     </>
   );
+}
+
+/** The sidebar's items, one per row (Home, Feed, All sources, a collection's name, a skill), and the tools at a row's right (⋯, +). */
+const ITEMS = "button.side-main, button.side-label";
+const TOOLS = ".side-tool, .side-more";
+/** One Tab stop for the whole sidebar (VS Code's tree, Finder's sidebar): the view shown, or the item last
+ *  focused, keeps tabindex 0 and the rest -1, so Tab goes on to the content. ↑↓ (and Home, End) move
+ *  between items, → reaches the row's own ⋯ and + tools, ← comes back. Fields (a new name) keep their keys. */
+function useRoving(nav: RefObject<HTMLElement | null>) {
+  const last = useRef<HTMLElement | null>(null);
+  const apply = () => {
+    const el = nav.current;
+    if (!el) return;
+    const stops = [...el.querySelectorAll<HTMLElement>(`${ITEMS}, ${TOOLS}`)];
+    const kept = last.current && stops.includes(last.current) ? last.current : null;
+    const current = kept ?? stops.find((s) => s.getAttribute("aria-pressed") === "true") ?? stops.find((s) => s.matches(ITEMS)) ?? null;
+    for (const s of stops) s.tabIndex = s === current ? 0 : -1;
+  };
+  // After every render: new skills and reopened groups come with tabindex -1.
+  useEffect(apply);
+  const onFocus = (e: FocusEvent<HTMLElement>) => {
+    const t = e.target as HTMLElement;
+    if (!t.matches(`${ITEMS}, ${TOOLS}`)) return;
+    // The stop is the row's item, so ⇧Tab back from the content lands on it, not on a hover-only ⋯.
+    last.current = t.matches(ITEMS) ? t : t.closest(".side-item, .side-head")?.querySelector<HTMLElement>(ITEMS) ?? t;
+    apply();
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    const t = e.target as HTMLElement;
+    if (e.metaKey || e.altKey || e.ctrlKey || !t.matches(`${ITEMS}, ${TOOLS}`)) return;
+    const shown = (s: HTMLElement) => s.getClientRects().length > 0;
+    const items = [...nav.current!.querySelectorAll<HTMLElement>(ITEMS)].filter(shown);
+    const row = t.closest<HTMLElement>(".side-item, .side-head");
+    const item = t.matches(ITEMS) ? t : row?.querySelector<HTMLElement>(ITEMS) ?? t;
+    const tools = row ? [...row.querySelectorAll<HTMLElement>(TOOLS)] : [];
+    const step = (d: number) => items[Math.max(0, Math.min(items.length - 1, items.indexOf(item) + d))];
+    let to: HTMLElement | undefined;
+    if (e.key === "ArrowDown") to = step(1);
+    else if (e.key === "ArrowUp") to = step(-1);
+    else if (e.key === "Home") to = items[0];
+    else if (e.key === "End") to = items[items.length - 1];
+    else if (e.key === "ArrowRight") to = tools[t === item ? 0 : tools.indexOf(t) + 1];
+    else if (e.key === "ArrowLeft") to = t === item ? undefined : tools[tools.indexOf(t) - 1] ?? item;
+    else return;
+    e.preventDefault();
+    to?.focus();
+  };
+  return { onFocus, onKeyDown };
 }
 
 function SkillFace({ s, marked }: { s: Skill; marked: boolean }) {

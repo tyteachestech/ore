@@ -58,6 +58,8 @@ has to ask for something obvious, add a row here in the same PR.**
 | Any list | ⇧-click and ⇧↑↓ extend a selection from its anchor, ⌘-click toggles, ⌘A selects all, Esc clears; ⋯, right-click and ⌘K act on the whole selection with one Undo | Linear, Finder |
 | Any list | Dragging a selection files every item in it | Finder, Things |
 | Any list | ⌘C on a selected row copies it as Markdown with its link | Notion, Linear |
+| Any list or row with actions | One control per row for a screen reader: the title (or the list's own focus) opens it, the row's ⋯ and chips sit beside it, never inside a `button` or `option`; a list whose rows hold controls is a `grid` of `row`s (ARIA's layout grid). A click anywhere on the row still opens it. axe's `nested-interactive` runs in the e2e a11y journey | Linear, WAI-ARIA APG |
+| Sidebar | One Tab stop: the item last focused (or the view shown) keeps it; ↑↓ Home End move between items, → reaches the row's ⋯ and +, ← comes back, Tab goes on to the content | VS Code's tree, Finder's sidebar |
 | Any list of sources | Each row starts with the source's thumbnail (`<Thumb>`), or its kind icon, wherever it is listed: All sources, skill page, Home, ⌘K | Raindrop, Readwise Reader |
 | Any list of sources | A source's skill chips open its skill picker on click, wherever the row is listed (All sources, skill page, Home); the row itself still opens on click | Linear labels, Notion multi-select |
 | Set of pills or tags | Clicking the set opens a multi-select: search, toggle with a click or Enter, create a new one from the query | Notion |

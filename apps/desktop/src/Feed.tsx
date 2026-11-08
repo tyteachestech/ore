@@ -244,16 +244,18 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     <WithMenu key={p.url} actions={() => postActions(p)}>
       <div
         id={`post-${p.url}`}
-        role="option"
+        role="row"
         aria-selected={current === p}
         className={`row post${current === p ? " on" : ""}${p.read ? " read" : ""}`}
         onClick={() => open(p)}
       >
-        <PostThumb post={p} />
-        <span className="title">{p.title}</span>
-        {withFeed && <span className="kind">{p.feed_title}</span>}
-        {opening === p.url ? <span className="when"><Working label="Opening…" /></span> : <span className="when">{when(p.published)}</span>}
-        <MoreButton label={`Actions for ${p.title}`} actions={() => postActions(p)} />
+        <span role="gridcell" className="cell">
+          <PostThumb post={p} />
+          <span className="title">{p.title}</span>
+          {withFeed && <span className="kind">{p.feed_title}</span>}
+          {opening === p.url ? <span className="when"><Working label="Opening…" /></span> : <span className="when">{when(p.published)}</span>}
+          <MoreButton label={`Actions for ${p.title}`} actions={() => postActions(p)} />
+        </span>
       </div>
     </WithMenu>
   );
@@ -280,6 +282,13 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     if (from >= 0 && to >= 0 && from !== to) arrange(arrayMove(feeds, from, to));
   };
 
+  /** The posts: a grid, not a listbox, since a row holds its own ⋯ (ARIA's layout grid); ↑↓ move the
+   *  selection from the grid itself, so it is the view's one Tab stop. */
+  const grid = (rows: ReactNode) => (
+    <div ref={listRef} className="feed-grid" tabIndex={0} role="grid" aria-label="Feed" aria-activedescendant={current ? `post-${current.url}` : undefined} onKeyDown={onKey}>
+      {rows}
+    </div>
+  );
   let body: ReactNode;
   if (loadError)
     body = (
@@ -306,14 +315,15 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     body = (
       <>
         {failing.map(retryLine)}
-        {shown.length ? shown.map((p) => row(p, true)) : checking ? <div className="empty-state"><Working label="Checking your feeds…" /></div> : (
+        {shown.length ? grid(shown.map((p) => row(p, true))) : checking ? <div className="empty-state"><Working label="Checking your feeds…" /></div> : (
           <div className="empty-state">{show === "unread" && data.posts.length ? <>All read. <button className="link" onClick={() => setShow("all")}>Show all</button> to see them again.</> : "No posts in the last two weeks."}</div>
         )}
       </>
     );
   else
-    body = (
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    body = grid(
+      // dnd-kit's live region goes to <body>: a grid's children are rows and row groups only.
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} accessibility={{ container: document.body }}>
         <SortableContext items={feeds.map((f) => f.url)} strategy={verticalListSortingStrategy}>
           {groups.map((g) => (
             <FeedGroup
@@ -341,11 +351,11 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
                 </span>
               )}
             >
-              {g.posts.length ? g.posts.map((p) => row(p, false)) : <div className="group-empty">{checking && !g.feed.checked_at ? "Checking…" : show === "unread" ? "Nothing unread" : "No posts in the last two weeks"}</div>}
+              {g.posts.length ? g.posts.map((p) => row(p, false)) : <div className="group-empty" role="row"><span role="gridcell">{checking && !g.feed.checked_at ? "Checking…" : show === "unread" ? "Nothing unread" : "No posts in the last two weeks"}</span></div>}
             </FeedGroup>
           ))}
         </SortableContext>
-      </DndContext>
+      </DndContext>,
     );
 
   return (
@@ -356,16 +366,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       </div>
       {/* Right-click on the list offers its create action (Finder's New Folder), as the sources list does. */}
       <WithMenu actions={[{ id: "follow", label: "Follow a blog or newsletter…", hint: label(keys.add), run: onFollow }]}>
-        <div
-          className="list feed-list"
-          ref={listRef}
-          tabIndex={0}
-          role="listbox"
-          aria-label="Feed"
-          aria-activedescendant={current ? `post-${current.url}` : undefined}
-          onKeyDown={onKey}
-          onPointerMove={() => keyed && setKeyed(false)}
-        >
+        <div className="list feed-list" onPointerMove={() => keyed && setKeyed(false)}>
           {body}
         </div>
       </WithMenu>
@@ -385,11 +386,12 @@ function FeedGroup({ feed, menu, renaming, onRename, onCancelRename, skillsPicke
   children: ReactNode;
 }) {
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: feed.url });
-  const { role: _role, tabIndex: _tab, ...a11y } = attributes;
+  const { role: _role, tabIndex: _tab, "aria-pressed": _pressed, ...a11y } = attributes;
   return (
-    <div ref={setNodeRef} role="group" aria-label={feed.title} className={`feed-group${isDragging ? " slot" : ""}`} style={{ transform: CSS.Translate.toString(transform), transition }}>
+    <div ref={setNodeRef} role="rowgroup" aria-label={feed.title} className={`feed-group${isDragging ? " slot" : ""}`} style={{ transform: CSS.Translate.toString(transform), transition }}>
       <WithMenu actions={menu}>
-        <div className="list-group feed-head" ref={setActivatorNodeRef} {...a11y} {...listeners}>
+        <div className="list-group feed-head" role="row" ref={setActivatorNodeRef} {...a11y} {...listeners}>
+          <span role="gridcell" className="cell">
           {renaming ? (
             <input
               className="row-rename"
@@ -414,6 +416,7 @@ function FeedGroup({ feed, menu, renaming, onRename, onCancelRename, skillsPicke
           <span className="feed-tools" onPointerDown={(e) => e.stopPropagation()}>
             {skillsPicker}
             <MoreButton label={`Actions for ${feed.title}`} actions={menu} />
+          </span>
           </span>
         </div>
       </WithMenu>

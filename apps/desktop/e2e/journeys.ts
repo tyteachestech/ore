@@ -5002,6 +5002,60 @@ journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the histor
   await until("⌘Z again takes it back", async () => (await title()) === AGENTS);
 });
 
+journey("a11y: a row is one control with its actions beside it (axe nested-interactive), and the sidebar is one Tab stop", async (page) => {
+  // axe-core (MPL-2.0) runs in the page on the rules a row's shape can break: a button inside a button or an
+  // option, and a grid's rows and cells. The whole app under every rule is another pass (keyboard-a11y memo).
+  const rules = ["nested-interactive", "aria-required-children", "aria-required-parent", "aria-allowed-attr", "aria-allowed-role"];
+  const check = async (where: string) => {
+    await page.addScriptTag({ path: join(import.meta.dir, "../../../node_modules/axe-core/axe.min.js") });
+    const bad = await page.evaluate(async (rules) => {
+      const r = await (window as unknown as { axe: { run: (c: Element, o: unknown) => Promise<{ violations: { id: string; nodes: { target: string[]; failureSummary: string; any: { relatedNodes: { html: string }[] }[] }[] }[] }> } }).axe.run(document.body, { runOnly: rules });
+      return r.violations.flatMap((v) => v.nodes.map((n) => `${v.id} ${n.target.join(" ")} (${n.failureSummary.replace(/\s+/g, " ")}: ${n.any.flatMap((a) => a.relatedNodes.map((r) => r.html.slice(0, 120))).join(" | ")})`));
+    }, rules);
+    if (bad.length) throw new Error(`${where}: ${bad.length} axe findings: ${bad.slice(0, 4).join("; ")}`);
+  };
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".home-read").first().waitFor();
+  await page.locator(".home-skill").first().waitFor();
+  await check("Home");
+  // The whole row still opens on a click: on its picture, not only its title.
+  const read = page.locator(".home-read").first();
+  const r = (await read.boundingBox())!;
+  await page.mouse.click(r.x + 40, r.y + r.height / 2);
+  await page.locator(".reader-scroll").waitFor();
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".list .row").first().waitFor();
+  await check("All sources");
+  // An empty grid (nothing matches) is still a grid.
+  await page.getByRole("searchbox").or(page.locator(".filter input")).first().fill("zzzz-nothing");
+  await page.locator(".list .empty-state").waitFor();
+  await check("All sources, empty");
+  await page.getByRole("searchbox").or(page.locator(".filter input")).first().fill("");
+  // One Tab stop: Tab from inside the sidebar leaves it, ⇧Tab comes back to the item he left, ↑↓ move
+  // between its items, → reaches a row's own ⋯ and + tools, ← comes back (VS Code's tree, Finder's sidebar).
+  const focused = () => page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    return { inSide: !!el?.closest(".sidebar"), label: el?.getAttribute("aria-label") ?? el?.textContent?.trim() ?? "", skill: !!el?.matches(".side-item > .side-main") };
+  });
+  await page.locator(".sidebar .side-item").first().focus();
+  await page.keyboard.press("Tab");
+  if ((await focused()).inSide) throw new Error(`Tab inside the sidebar stopped on another of its items: ${(await focused()).label}`);
+  await page.keyboard.press("Shift+Tab");
+  await until("⇧Tab comes back to the item he left", async () => (await focused()).label === "Home");
+  await page.keyboard.press("ArrowDown");
+  await until("↓ moves to the next item", async () => (await focused()).label === "Feed");
+  // Down to a skill's row, then → to its ⋯.
+  for (let n = 0; n < 12 && !(await focused()).skill; n++) await page.keyboard.press("ArrowDown");
+  const skill = (await focused()).label;
+  await page.keyboard.press("ArrowRight");
+  await until("→ reaches the skill's ⋯", async () => (await focused()).label === `Actions for ${skill}`);
+  await page.keyboard.press("ArrowLeft");
+  await until("← comes back to the skill", async () => (await focused()).label === skill);
+  await page.keyboard.press("Tab");
+  if ((await focused()).inSide) throw new Error("Tab after the arrows stayed in the sidebar");
+});
+
 // —— run ——
 
 let failed = 0;
