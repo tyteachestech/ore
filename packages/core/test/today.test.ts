@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { findCard, writeCardContent, writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
@@ -168,6 +169,30 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(picked.flatMap((e, i) => (e.due === null ? [i] : []))).toEqual([4, 9]);
     expect(picked.filter((e) => e.due === null).map((e) => e.id)).toEqual([fromB.meta.id, fromC.meta.id]);
     expect(dueQueue(lib, later, { skills: ["habits"] }).map((e) => e.id)).toEqual([habit.meta.id]);
+  });
+
+  // Review's Delete on a New card is `ore card retire`; its Undo is `ore card restore --state draft` (D144: answer approves, delete drops).
+  test("a retired draft leaves the queue and can't be rated; restored as a draft it is new again, as live it is due", async () => {
+    const { lib, cards } = await library(2);
+    const ore = async (...args: string[]) => {
+      const p = Bun.spawn(["bun", join(import.meta.dir, "../../cli/src/ore.ts"), ...args, "--json"], { env: { ...process.env, ORE_LIBRARY: lib.root }, stdout: "pipe", stderr: "pipe" });
+      if ((await p.exited) !== 0) throw new Error(await new Response(p.stderr).text());
+    };
+    const [a, b] = cards.map((c) => c.meta.id);
+    const day1 = T();
+    await ore("card", "retire", a!);
+    expect(dueQueue(lib, day1).map((e) => e.id)).toEqual([b!]);
+    await expect(recordReview(lib, a!, { rating: 3, confidence: 2, now: day1 })).rejects.toThrow(/retired/);
+    await ore("card", "restore", a!, "--state", "draft");
+    expect(dueQueue(lib, day1).map((e) => [e.id, e.due])).toEqual([[a!, null], [b!, null]]);
+    // A live card retired and restored keeps its schedule: due again on its FSRS date.
+    await recordReview(lib, b!, { rating: 3, confidence: 2, now: day1 });
+    const later = new Date(day1.getTime() + 90 * 864e5);
+    await ore("card", "retire", b!);
+    expect(dueQueue(lib, later).map((e) => e.id)).toEqual([a!]);
+    await ore("card", "restore", b!, "--state", "live");
+    expect(dueQueue(lib, later).map((e) => [e.id, e.due !== null])).toEqual([[b!, true], [a!, false]]);
+    await expect(ore("card", "restore", b!)).rejects.toThrow(/--state/);
   });
 
   test("--skill keeps only cards of the picked skills", async () => {
