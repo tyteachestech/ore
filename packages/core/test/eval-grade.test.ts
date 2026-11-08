@@ -6,7 +6,7 @@ import { codexUsage } from "../src/ai/adapter.ts";
 import { writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { recordReview } from "../src/study.ts";
-import { loadCases, resultPath, runVendor, setId, table, verdict, wilson } from "../eval/grade.ts";
+import { baseline, loadCases, resultPath, runVendor, setId, table, verdict, wilson } from "../eval/grade.ts";
 import { disagreements } from "../eval/mine.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -40,6 +40,8 @@ describe("grading eval", () => {
       expect(cases.some((c) => c.level === lvl && c.label === "wrong")).toBe(true);
     }
     expect(setId(cases)).toMatch(/^[0-9a-f]{8}$/);
+    // String matching alone gets little more than "always wrong" would: the set needs a real grader.
+    expect(baseline(cases).correct).toBeLessThanOrEqual(12);
     for (const c of cases) if (c.kind === "prompt") expect(c.rubric.length).toBeGreaterThan(0);
   });
 

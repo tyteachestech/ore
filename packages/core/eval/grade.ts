@@ -70,6 +70,14 @@ export function score(vendor: Vendor, model: string, prompt_version: string, cas
   };
 }
 
+/** The no-AI floor (Eugene Yan's advice: beat string matching first): an answer is right when it
+ *  contains the model answer, ignoring case and punctuation. A grader that can't clear this adds nothing. */
+export function baseline(cases: Case[]): { correct: number; total: number } {
+  const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const got = (c: Case) => (norm(c.answer).includes(norm(c.model_answer)) ? "right" : "wrong");
+  return { correct: cases.filter((c) => got(c) === c.label).length, total: cases.length };
+}
+
 export async function pool<T, R>(items: T[], n: number, f: (t: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let next = 0;
@@ -163,10 +171,12 @@ if (import.meta.main) {
     }
     runs.push(r);
   }
+  const base = baseline(cases);
   const dir = join(import.meta.dir, "results");
   mkdirSync(dir, { recursive: true });
   const out = resultPath(dir);
-  writeFileSync(out, JSON.stringify({ eval: "grade", date: new Date().toISOString(), cases: cases.length, set: setId(cases), runs }, null, 2) + "\n");
+  writeFileSync(out, JSON.stringify({ eval: "grade", date: new Date().toISOString(), cases: cases.length, set: setId(cases), baseline: base, runs }, null, 2) + "\n");
   console.log(table(runs));
-  console.log(`\nSaved ${out}`);
+  console.log(`\nNo-AI baseline (answer contains the model answer): ${pct(base.correct / base.total)} (${base.correct}/${base.total})`);
+  console.log(`Saved ${out}`);
 }
