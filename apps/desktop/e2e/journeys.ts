@@ -4005,6 +4005,25 @@ journey("skill picker: a skill with a long name still shows its tick", async (pa
   }
 });
 
+journey("reader toolbar at a narrow window: it never covers the sidebar toggle or Back, and what it holds stays on screen", async (page) => {
+  await openSource(page, TESTING);
+  await page.locator(".reader-tools .collected").waitFor();
+  for (const width of [700, 800, 1280]) {
+    await page.setViewportSize({ width, height: 700 });
+    await page.waitForTimeout(200);
+    const clash = await page.evaluate(() => {
+      const tools = document.querySelector(".reader-tools")!.getBoundingClientRect();
+      for (const sel of [".side-toggle", ".nav-arrows button"]) {
+        const r = document.querySelector(sel)!.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (!hit?.closest(sel)) return `${sel} is covered by ${hit?.className}`;
+      }
+      return tools.left < 0 ? `the toolbar starts at x=${tools.left}` : null;
+    });
+    if (clash) throw new Error(`at ${width}px: ${clash}`);
+  }
+});
+
 // —— run ——
 
 let failed = 0;

@@ -8,7 +8,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Collected, CollectedPanel, ICON, LABEL, MEANS } from "./Collected";
+import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
@@ -331,6 +331,34 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** ⌘F: open with the bump that refocuses it; the query stays for the next ⌘F, as in Safari. `note`:
    *  opened by ⌘K on a match in the source note, so it searches only there. */
   const [find, setFind] = useState<{ open: boolean; focus: number; query: string; note?: boolean }>({ open: false, focus: 0, query: "" });
+  // The toolbar sits at the reader's top right. With the sidebar hidden a narrow reader would push it over
+  // the sidebar toggle and Back, which are fixed at the window's left: Collected gives way instead, a
+  // chip per type, then one chip for all, then none (the side panel's Collected tab lists them all).
+  const [tools, setTools] = useState<HTMLDivElement | null>(null);
+  const [fit, setFit] = useState<Fit>("all");
+  useLayoutEffect(() => {
+    const pane = tools?.offsetParent;
+    if (PHONE || !tools || !pane) return;
+    let now: Fit = "all";
+    setFit(now);
+    const widths = { all: 0, one: 0 };
+    const measure = () => {
+      const box = tools.getBoundingClientRect();
+      const gap = parseFloat(getComputedStyle(tools).columnGap) || 0;
+      const chips = tools.querySelector(".collected")?.getBoundingClientRect().width;
+      if (chips !== undefined && now !== "none") widths[now] = chips + gap;
+      const rest = box.width - (chips === undefined ? 0 : chips + gap);
+      const left = Math.max(pane.getBoundingClientRect().left, document.querySelector(".nav-arrows")?.getBoundingClientRect().right ?? 0) + 8;
+      const room = box.right - left - rest;
+      // A width not measured yet (0) is tried, then measured.
+      now = widths.all <= room ? "all" : widths.one <= room ? "one" : "none";
+      setFit(now);
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(tools);
+    ro.observe(pane);
+    return () => ro.disconnect();
+  }, [tools]);
   // The reading focus (Readwise Reader): blocks from `anchor` to `head`, moved with ↑ ↓ and widened with ⇧.
   const [focus, setFocus] = useState<{ anchor: HTMLElement; head: HTMLElement } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -2262,6 +2290,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         if (popup) closePopup();
         p.onShowSide("questions", true);
       }}
+      fit={fit}
     />
   );
   const suggested = doc.suggested_skill;
@@ -2345,7 +2374,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         </Hint>
       )}
       {!closedBook && (
-        <div className={`reader-tools${PHONE || panelShown ? "" : " by-toggle"}`}>
+        <div className={`reader-tools${PHONE || panelShown ? "" : " by-toggle"}`} ref={setTools}>
           {listen && (
             <div className="listen-bar" role="group" aria-label="Listening">
               <Hint text={listen.playing ? "Pause" : "Play"} keys="play">
