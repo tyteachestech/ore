@@ -40,7 +40,7 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, inOrder, load, save, type Notify } from "./util";
+import { errorText, inOrder, load, save, useFocusBack, type Notify } from "./util";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
 import { Working } from "./Working";
@@ -302,6 +302,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   }, [p.showCollected]);
   const [renaming, setRenaming] = useState(false);
   const [authoring, setAuthoring] = useState(false);
+  const authorRef = useRef<HTMLButtonElement>(null);
+  useFocusBack(authoring, authorRef);
   const askedRename = useRef(p.renameSource);
   useEffect(() => {
     if (p.renameSource !== askedRename.current) setRenaming(true);
@@ -2370,7 +2372,6 @@ function ReaderView(p: Props & { reload: () => void }) {
   return (
     <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}`} ref={readerRef}>
       <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
-      {!closedBook && !video && !PHONE && <Position scroll={scrollRef} doc={docEl.current} ready={ready} onJump={markPlace} />}
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
         <Hint text="Back to the passage you left" keys="nav-back" side="top">
@@ -2537,7 +2538,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                     <span className="by">{doc.author}</span>
                   ) : (
                     <Hint text="Edit author">
-                      <button className="by" onClick={() => setAuthoring(true)}>
+                      <button className="by" ref={authorRef} onClick={() => setAuthoring(true)}>
                         {doc.author}
                       </button>
                     </Hint>
@@ -2728,6 +2729,8 @@ function ReaderView(p: Props & { reload: () => void }) {
           )}
         </div>
       </div>
+      {/* After the text, so Tab reaches the outline once the source's own head is behind him. */}
+      {!closedBook && !video && !PHONE && <Position scroll={scrollRef} doc={docEl.current} ready={ready} onJump={markPlace} />}
       {tip && !popup && (
         // A preview stays on screen at a phone's width too. A highlight note's is at most six lines
         // (styles.css), above the pointer when there is no room below; a footnote's is whole, below its

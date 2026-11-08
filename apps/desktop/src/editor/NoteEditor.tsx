@@ -113,6 +113,8 @@ type Props = {
   noteArgs: string[];
   notify: Notify;
   placeholder: string;
+  /** The editor's accessible name: its placeholder is drawn by CSS, so VoiceOver hears this instead. */
+  label: string;
   /** Set to a reader of the editor's text as of now, for a save that can't wait for its next change
    *  report (those come 200 ms after typing stops, and never when the editor closes first). */
   pull?: { current: (() => string | null) | null };
@@ -267,6 +269,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
+      e.action((ctx) => {
+        const dom = ctx.get(editorViewCtx).dom;
+        dom.setAttribute("aria-label", live.current.p.label);
+        dom.setAttribute("aria-multiline", "true");
+      });
       base = markdownOf(e);
       const b = base;
       if (live.current.p.pull) live.current.p.pull.current = read = () => keepUnedited(original, b, markdownOf(e));

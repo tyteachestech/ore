@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { Arrow, ARROW_H, playHop, still } from "./SideCursor";
 
 /** Most lines the collapsed outline shows; deeper levels drop out until it fits. */
@@ -95,6 +95,19 @@ export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTM
     el.focus({ preventScroll: true });
   };
 
+  const onKey = (e: ReactKeyboardEvent) => {
+    const all = [...(panel.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
+    const at = all.indexOf(document.activeElement as HTMLButtonElement);
+    const to = e.key === "ArrowDown" ? at + 1 : e.key === "ArrowUp" ? at - 1 : e.key === "Home" ? 0 : e.key === "End" ? all.length - 1 : null;
+    if (to !== null && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault(); // the reader's ↑ ↓ reading focus leaves arrows a list has taken
+      all[Math.max(0, Math.min(all.length - 1, to))]?.focus();
+    } else if (e.key === "Escape") {
+      e.stopPropagation(); // closes the outline, not the source
+      scroll.current?.focus({ preventScroll: true });
+    }
+  };
+
   return (
     <>
       {/* With an outline, its lines already say where he is (Tyler, 2026-11-03): the bar is for a source without headings. */}
@@ -111,9 +124,11 @@ export function Position({ scroll, doc, ready, onJump }: { scroll: RefObject<HTM
             ))}
           </div>
           <Arrow ref={arrow} className="outline-cursor" />
-          <div className="outline-panel" ref={panel}>
+          {/* One Tab stop, on the heading he is in; ↑ ↓ move between headings, Enter jumps, Esc goes back to the text
+              (a macOS sidebar's outline). Tab onto it opens it, as hovering does. */}
+          <div className="outline-panel" ref={panel} onKeyDown={onKey}>
             {headings.map((h, i) => (
-              <button key={i} className={i === current ? "on" : undefined} style={{ paddingLeft: 10 + (h.level - top) * 12 }} onClick={() => jump(h)}>
+              <button key={i} className={i === current ? "on" : undefined} tabIndex={i === Math.max(0, current) ? 0 : -1} style={{ paddingLeft: 10 + (h.level - top) * 12 }} onClick={() => jump(h)}>
                 {h.title}
               </button>
             ))}

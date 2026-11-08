@@ -251,10 +251,16 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => {
                         e.stopPropagation();
+                        // Focus goes back to the row, as the sources list's rename does, so Tab carries on from it.
+                        const row = e.currentTarget.closest<HTMLElement>(".home-read");
                         if (e.key === "Enter") {
                           setRenaming(null);
                           onRename?.(i, e.currentTarget.value);
-                        } else if (e.key === "Escape") setRenaming(null);
+                          row?.focus({ preventScroll: true });
+                        } else if (e.key === "Escape") {
+                          setRenaming(null);
+                          row?.focus({ preventScroll: true });
+                        }
                       }}
                       // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
                       onBlur={() => setRenaming(null)}
