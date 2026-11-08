@@ -21,6 +21,8 @@ jobs:
       - run: bun run typecheck
       - run: bun test
       - run: bun run --cwd apps/desktop build
+      # The iPhone bundle has its own Vite setup (D78): a core import only Bun understands breaks it and nothing else.
+      - run: mkdir -p /tmp/empty-library && cd apps/desktop && ORE_PHONE=1 ORE_PHONE_LIBRARY=/tmp/empty-library bunx vite build
       - run: bun apps/desktop/scripts/mock/impeccable-gate.ts
   e2e:
     runs-on: ubuntu-latest
