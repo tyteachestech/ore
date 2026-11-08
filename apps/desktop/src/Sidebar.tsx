@@ -455,7 +455,7 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
           )}
           <span className="label">{s.name}</span>
         </button>
-        <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} />
+        <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} hoverOnly />
       </div>
     </WithMenu>
   );
@@ -464,6 +464,8 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
 /** Names a new skill in place, like a new page in Notion's sidebar: Enter creates it through
  *  `ore skills add`, Esc or clicking away drops the name (never saved on blur). */
 function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; collection: string; marked: boolean; onDone: (s: Skill | null) => void }) {
+  // What opened it, read before its field takes focus: Esc gives focus back there.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -512,7 +514,16 @@ function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; col
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 e.stopPropagation();
+                // The + shows only on hover, so from it (or when what opened it is gone) focus goes to the collection's name.
+                const head = e.currentTarget.closest(".side-section")?.querySelector<HTMLElement>(".side-label");
+                const back = opener?.isConnected && opener !== document.body && !opener.closest(".side-head-tools") ? opener : head;
                 onDone(null);
+                // Only if focus has nowhere else to go: a ⌘K pressed in the same instant keeps its field.
+                setTimeout(() => {
+                  const active = document.activeElement;
+                  if (active && active !== document.body) return;
+                  (back?.isConnected ? back : document.querySelector<HTMLElement>(".sidebar .side-label"))?.focus({ preventScroll: true });
+                });
               }
             }}
           />

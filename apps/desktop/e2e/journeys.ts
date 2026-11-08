@@ -3750,6 +3750,47 @@ journey("outline: Tab after the source's head opens it on the current heading, �
   if (!(await page.locator(".doc-head").filter({ hasText: AGENTS }).count())) throw new Error("Esc on the outline left the source");
 });
 
+journey("sidebar: closing a hover-only ⋯ or + gives focus to its row, and ⇧⌘S from the sidebar puts it on the list", async (page) => {
+  const focused = () => page.evaluate(() => { const el = document.activeElement as HTMLElement | null; return el ? `${el.className} ${el.innerText.trim()}` : ""; });
+  const row = page.locator(".sidebar .side-item").filter({ has: page.locator(".side-more") }).first();
+  const name = (await row.locator(".side-main .label").innerText()).trim();
+  await row.hover();
+  await row.locator(".side-more").click();
+  await page.getByRole("menu").waitFor();
+  await page.keyboard.press("Escape");
+  await until(`the ⋯'s menu gives focus to “${name}”`, async () => (await focused()).startsWith("side-main") && (await focused()).endsWith(name));
+  const head = page.locator(".sidebar .side-head").filter({ has: page.locator(".side-tool[aria-label^='New skill in']") }).first();
+  const group = (await head.locator(".side-label-text").innerText()).trim();
+  await head.hover();
+  await head.locator(".side-tool[aria-label^='New skill in']").click();
+  await page.getByRole("textbox", { name: "New skill name" }).waitFor();
+  await page.keyboard.press("Escape");
+  await until(`the + gives focus to “${group}”`, async () => (await focused()).startsWith("side-label") && (await focused()).includes(group));
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".list").waitFor();
+  await page.getByRole("button", { name: /^All sources/ }).focus();
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await until("⇧⌘S puts focus on the list", () => page.evaluate(() => document.activeElement?.classList.contains("list") === true));
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await page.locator(".sidebar .side-item").first().waitFor();
+  // In a source there is no list: the text takes it.
+  await openSource(page, AGENTS);
+  await page.getByRole("button", { name: /^All sources/ }).focus();
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await until("⇧⌘S in a source puts focus on the text", () => page.evaluate(() => document.activeElement?.classList.contains("reader-scroll") === true));
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await page.locator(".sidebar .side-item").first().waitFor();
+  // Every hover-only ⋯ does the same, not only the sidebar's: Home's skill tiles.
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const tile = page.locator(".home-skill").first();
+  await tile.hover();
+  await tile.locator(".more").click();
+  await page.getByRole("menu").waitFor();
+  await page.mouse.move(0, 0);
+  await page.keyboard.press("Escape");
+  await until("Home's tile ⋯ gives focus to its tile", () => tile.evaluate((el) => el === document.activeElement));
+});
+
 journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
   const plus = page.getByRole("button", { name: "New skill", exact: true });
   await plus.hover();

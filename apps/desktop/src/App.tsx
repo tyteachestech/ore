@@ -833,12 +833,15 @@ export function App() {
   const toggleSidebar = useCallback(() => {
     clearTimeout(peekTimer.current);
     setPeek(false);
+    // Hidden with focus in it: focus goes to the view's list where it has one (Tyler, 2026-11-08), else the text or the page's first control.
+    if (!collapsed && document.activeElement?.closest(".sidebar"))
+      setTimeout(() => (listRef.current ?? document.querySelector<HTMLElement>(".reader-scroll") ?? document.querySelector<HTMLElement>("main :is(button, a[href], [tabindex='0'])"))?.focus({ preventScroll: true }));
     if (autoHide && !hideSidebar) return setShowAnyway((v) => !v);
     setHideSidebar((v) => {
       save("ore.sidebar", v ? "open" : "collapsed");
       return !v;
     });
-  }, [autoHide, hideSidebar]);
+  }, [autoHide, hideSidebar, collapsed]);
 
   /** Back from Settings; Home re-reads the goal it may have changed. */
   const closeSettings = useCallback(() => {
@@ -1882,7 +1885,7 @@ export function App() {
         )}
         {details.includes("type") && <span className="col kind">{KIND[r.type] ?? r.type}</span>}
         {detailCols(r, [r.captured_at])}
-        <MoreButton label={pickN > 1 ? `Actions for ${sourcesN(pickN)}` : `Actions for ${r.title}`} actions={acts} />
+        <MoreButton label={pickN > 1 ? `Actions for ${sourcesN(pickN)}` : `Actions for ${r.title}`} actions={acts} hoverOnly />
       </DragRow>
       </WithMenu>
     );
@@ -1962,7 +1965,7 @@ export function App() {
         )}
         {details.includes("type") && <span className="col kind">course</span>}
         {detailCols({ url: c.url ?? c.lessons[0]?.url }, c.lessons.map((l) => l.captured_at))}
-        <MoreButton label={`Actions for ${c.title}`} actions={courseActions(c)} />
+        <MoreButton label={`Actions for ${c.title}`} actions={courseActions(c)} hoverOnly />
       </DragRow>
       </WithMenu>
     );
