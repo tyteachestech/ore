@@ -78,8 +78,23 @@ export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {
   return [...here, ...rest].slice(0, Math.max(10, here.length)).map((p, i) => ({ ...p, id: `P${i + 1}` }));
 }
 
+/** The reply so far in a structured answer's half-written JSON (its `reply` string, unescaped), or null. */
+export function partialReply(json: string): string | null {
+  const m = json.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
+  if (!m) return null;
+  try {
+    // A \u escape cut off mid-way waits for the next chunk.
+    return JSON.parse(`"${m[1]!.replace(/\\u[0-9a-fA-F]{0,3}$/, "")}"`) as string;
+  } catch {
+    return null;
+  }
+}
+
+/** While a reply is written: its text so far, or a web search starting (claude only). */
+export type TutorProgress = { reply: string } | { searching: true };
+
 /** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
-export async function tutor(lib: Library, message: string, { earlier = [], ...focus }: { earlier?: TutorTurn[] } & TutorFocus = {}) {
+export async function tutor(lib: Library, message: string, { earlier = [], onProgress, ...focus }: { earlier?: TutorTurn[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
   const m = withDiagrams(lib, focus.item, message.trim());
   if (!m) throw new Error("message is empty");
   const recent = earlier.slice(-6);
@@ -93,6 +108,11 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
     prompt: "tutor",
     cwd: lib.root,
     web: true,
+    onProgress: onProgress && ((p) => {
+      if ("searching" in p) return onProgress(p);
+      const reply = partialReply(p.partial);
+      if (reply) onProgress({ reply });
+    }),
     schema: TutorOutput,
     input: { message: m, earlier: recent, ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
     check: (d, seen) => {

@@ -394,8 +394,9 @@ export function App() {
         // A list fills its bar entry by entry; a course by lesson, as `ore add --course` reports each one;
         // audio as it is transcribed (D96).
         progress(course ? "Reading the course…" : list.length > 1 ? `Adding ${i + 1} of ${list.length}…` : "Adding…", list.length > 1 && !course ? i / list.length : undefined, cancel);
+        // A tutor reply streams on the same channel (its payload has no count).
         const stop = await listen<{ done: number; of: number; label: string }>("ore-progress", ({ payload: p }) =>
-          cancelled || progress(course ? `Adding “${p.label}” · lesson ${p.done + 1} of ${p.of}` : `${p.label}…`, p.done / p.of, cancel),
+          cancelled || typeof p.done !== "number" || progress(course ? `Adding “${p.label}” · lesson ${p.done + 1} of ${p.of}` : `${p.label}…`, p.done / p.of, cancel),
         ).catch(() => () => {});
         try {
           const r = await oreJob<Item | CourseAdd>(job, stdin, ...args, ...to.map((k) => opt("skill", k)), ...(forQuestion ? [opt("for", forQuestion)] : [])).finally(stop);

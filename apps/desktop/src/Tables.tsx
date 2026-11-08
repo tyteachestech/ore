@@ -30,7 +30,8 @@ export function installReader(): Promise<void> {
   step = "";
   installing = (async () => {
     const stop = await listen<{ done: number; of: number; label: string }>("ore-progress", ({ payload: p }) => {
-      if (installing) (step = ` (${p.done + 1} of ${p.of})`), changed();
+      // A tutor reply streams on the same channel (its payload has no count).
+      if (installing && typeof p.done === "number") (step = ` (${p.done + 1} of ${p.of})`), changed();
     }).catch(() => () => {});
     try {
       await oreJob(JOB, null, "tables", "--install");

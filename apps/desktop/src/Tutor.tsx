@@ -1,5 +1,6 @@
 import { ArrowUp, Check, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -28,6 +29,8 @@ export type TutorTurn = {
   message: string; item?: string; title?: string; mentions?: Mention[];
   /** The @ context the request carried: his own @s, else the ones still in effect from before (D128.3). */
   pointed?: Mention[];
+  /** While the reply is written: its text so far, and whether it is searching the web (claude streams both). */
+  partial?: string; searching?: boolean;
   reply?: string; citations?: AnyCitation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
@@ -61,12 +64,19 @@ export function useTutorChat(notify: Notify) {
   const drop = (m: Mention) => setCarry(carryNow.current.filter((x) => x.kind !== m.kind || x.id !== m.id));
   const run = async (t: TutorTurn, before: TutorTurn[]) => {
     const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: x.reply }] : []));
+    // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
+    // second or two instead of the whole reply after five.
+    const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
+      if (p.stream === t.id) patch(t.id, p.reply !== undefined ? { partial: p.reply } : { searching: true });
+    }).catch(() => () => {});
     try {
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
-      const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []));
-      patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, ai: r.ai, error: undefined });
+      const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
+      patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, ai: r.ai, error: undefined, partial: undefined, searching: undefined });
     } catch (e) {
-      patch(t.id, { error: errorText(e, "answer that") });
+      patch(t.id, { error: errorText(e, "answer that"), partial: undefined, searching: undefined });
+    } finally {
+      stop();
     }
   };
   /** Adds his message to the thread and asks. */
@@ -283,8 +293,11 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                     {t.error}{" "}
                     <button className="link" onClick={() => chat.retry(t.id)}>Try again</button>
                   </p>
+                ) : t.reply === undefined && t.partial ? (
+                  // Its [n] markers wait for the citations, which come with the whole reply.
+                  <Answer text={t.partial.replace(/\s?\[\d*\]?$|\s?\[\d+\]/g, "")} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
                 ) : t.reply === undefined ? (
-                  <Working label="Thinking…" slow="A reply takes about 10 seconds." />
+                  <Working label={t.searching ? "Searching the web…" : "Thinking…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />
                 ) : (
                   <>
                     <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} />

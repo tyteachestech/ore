@@ -1,5 +1,5 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, addTutorCard, type TutorTurn, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { int, need, str, strs } from "./util.ts";
@@ -107,15 +107,24 @@ export const aiCommands: Record<string, Command> = {
   },
 
   tutor: {
-    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply}]',
-    options: { item: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" } },
+    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply}], --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching: true} when a web search starts)',
+    options: { item: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" }, stream: { type: "string" } },
     async run(words, f) {
       const lib = openLibrary();
       let earlier: TutorTurn[] = [];
       if (str(f.earlier)) {
         try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply}]"); }
       }
-      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill) });
+      // --stream <id>: the reply as it is written, and a web search starting, as `{"progress": {stream, …}}`
+      // lines on stderr, which the app shows on the turn with that id (claude only).
+      const stream = str(f.stream);
+      let last = 0;
+      const onProgress = stream ? (p: TutorProgress) => {
+        if ("reply" in p && Date.now() - last < 50) return; // a few a second is smooth; every token is noise
+        last = Date.now();
+        process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n");
+      } : undefined;
+      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill), onProgress });
       const text = [r.reply, ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
       return { data: r, text };
     },

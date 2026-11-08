@@ -17,6 +17,8 @@ export interface AgentTask<T> {
   schema: z.ZodType<T>;
   check?: (data: T, web?: WebSeen) => string | null; // semantic validation beyond the schema
   web?: boolean; // allow web search/fetch
+  /** While it runs (claude web tasks): the answer's JSON so far, and a search starting. */
+  onProgress?: (p: { partial: string } | { searching: true }) => void;
   cwd: string;
 }
 
@@ -109,13 +111,50 @@ const TIMEOUT_MS = 15 * 60_000;
 
 interface Exec { stdout: string; stderr: string; code: number; timedOut: boolean }
 
-async function exec(cmd: string[], cwd: string): Promise<Exec> {
+/** Runs a vendor CLI; `onLine` sees each line of its stdout as it comes (a stream-json run's events). */
+async function exec(cmd: string[], cwd: string, onLine?: (line: string) => void): Promise<Exec> {
   const proc = Bun.spawn(cmd, { cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; proc.kill(); }, TIMEOUT_MS);
-  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  const read = async () => {
+    if (!onLine) return new Response(proc.stdout).text();
+    let all = "";
+    let rest = "";
+    const dec = new TextDecoder();
+    for await (const chunk of proc.stdout) {
+      const text = dec.decode(chunk, { stream: true });
+      all += text;
+      const lines = (rest + text).split("\n");
+      rest = lines.pop()!;
+      for (const l of lines) onLine(l);
+    }
+    if (rest) onLine(rest);
+    return all;
+  };
+  const [stdout, stderr, code] = await Promise.all([read(), new Response(proc.stderr).text(), proc.exited]);
   clearTimeout(timer);
   return { stdout, stderr, code, timedOut };
+}
+
+/** A stream-json line's news for `onProgress`: a web search starting, or more of the structured
+ *  answer's JSON (claude writes it as the StructuredOutput tool's input, streamed with
+ *  --include-partial-messages). `state` keeps the answer's block index and its JSON so far. */
+export function streamProgress(line: string, state: { block?: number; json: string }): { partial: string } | { searching: true } | null {
+  let e: { type?: string; event?: { type?: string; index?: number; content_block?: { type?: string; name?: string }; delta?: { type?: string; partial_json?: string } } };
+  try { e = JSON.parse(line); } catch { return null; }
+  const ev = e.type === "stream_event" ? e.event : undefined;
+  if (ev?.type === "content_block_start" && ev.content_block?.type === "tool_use") {
+    if (ev.content_block.name === "StructuredOutput") {
+      state.block = ev.index;
+      state.json = "";
+    } else state.block = undefined;
+    return ev.content_block.name === "WebSearch" || ev.content_block.name === "WebFetch" ? { searching: true } : null;
+  }
+  if (ev?.type === "content_block_delta" && ev.index === state.block && ev.delta?.type === "input_json_delta") {
+    state.json += ev.delta.partial_json ?? "";
+    return { partial: state.json };
+  }
+  return null;
 }
 
 /** `claude -p` otherwise loads his own MCP servers, skills, settings and hooks into every call: on
@@ -167,11 +206,13 @@ function claudeResult(r: Exec, events?: StreamEvent[]) {
 async function runClaude(system: string, message: string, schema: object, task: AgentTask<unknown>, { model }: RunOpts): Promise<RawRun> {
   const bin = Bun.which("claude", { PATH: process.env.PATH ?? "" });
   if (!bin) throw new Error("Claude Code isn’t installed (no `claude` on PATH). Install it, or pick Codex in Settings → AI.");
-  const tools = ["Read", "Grep", "Glob", ...(task.web ? ["WebSearch", "WebFetch"] : [])];
+  // File tools only for a task that names files: each tool's definition is input on every call, and a
+  // task given everything in its input (the tutor, grading) has nothing to read.
+  const tools = [...(task.files?.length ? ["Read", "Grep", "Glob"] : []), ...(task.web ? ["WebSearch", "WebFetch"] : [])];
   // A web task streams its events, so the pages its searches returned can be checked against its citations.
   const cmd = [
     bin, "-p", message,
-    "--output-format", task.web ? "stream-json" : "json", ...(task.web ? ["--verbose"] : []),
+    "--output-format", task.web ? "stream-json" : "json", ...(task.web ? ["--verbose"] : []), ...(task.web && task.onProgress ? ["--include-partial-messages"] : []),
     "--json-schema", JSON.stringify(schema),
     "--system-prompt", system,
     "--tools", tools.join(","),
@@ -181,7 +222,9 @@ async function runClaude(system: string, message: string, schema: object, task: 
     "--no-session-persistence",
     ...(model ? ["--model", model] : []),
   ];
-  const r = await exec(cmd, task.cwd);
+  const state = { json: "" };
+  const onLine = task.web && task.onProgress ? (l: string) => { const p = streamProgress(l, state); if (p) task.onProgress!(p); } : undefined;
+  const r = await exec(cmd, task.cwd, onLine);
   const events = task.web ? streamEvents(r.stdout) : undefined;
   const out = claudeResult(r, events);
   // The model that wrote the most is the one that ran, except on a web task, where the search's own
