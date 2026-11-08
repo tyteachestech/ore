@@ -195,6 +195,9 @@ export async function findFeed(url: string): Promise<Found> {
   if (YT_FEED.test(url)) return found(await readFeed(url));
   const got = await fetchText(url);
   if (isFeedText(got.text)) return found({ url: got.url, ...(await parseFeed(got.text, got.url)) });
+  // A wiki (Wikipedia, any MediaWiki) names feeds of its edits, in every language: nothing to follow.
+  if (/<meta\b(?=[^>]*\bname=["']generator["'])(?=[^>]*\bcontent=["']MediaWiki)/i.test(got.text))
+    throw new Error(`Found no feed on ${host(got.url)}: a wiki's feeds list its edits, not articles to read.`);
   const tried = new Set<string>();
   const named = [...got.text.matchAll(/<link\b[^>]*>/gi)]
     .map((m) => m[0])
