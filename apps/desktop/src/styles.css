@@ -198,6 +198,7 @@ kbd {
 .skill-icon.dot:not([data-color]) { --dot-opacity: 0.45; }
 .mark .skill-icon { font-size: 15px; }
 .skill-icon.palette-icon { width: 16px; font-size: 15px; text-align: center; }
+.skill-icon.glyph.palette-icon { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; } /* a menu row: 16, as in a chip */
 .skill-icon.palette-icon.dot { width: 7px; height: 7px; margin: 0 4.5px; font-size: 14px; }
 .mark .skill-icon.dot { font-size: 14px; }
 
@@ -252,6 +253,18 @@ img.thumb { filter: brightness(0.86); }
 .row:has(> .row-main):not(.lesson) { height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
 .list .row:not(.lesson) .thumb { width: 64px; height: 36px; }
 .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+/* A skill page's list is Readwise Reader's (D130, Tyler's pick B of five): a 96×54 picture, the title, the
+   author and other skills, then the kind in the mono label style; the other skills stay since they only
+   show when there are any. A question mark at the row's right, centred, marks a source that may answer an
+   open question (D75); its hint lists them. */
+.skill-page .list .row:not(.lesson) .thumb { width: 96px; height: 54px; }
+.skill-page .row:has(> .row-main):not(.lesson) { min-height: 70px; gap: 12px; }
+.skill-page .row-main { gap: 2px; }
+.skill-page .row .title { font-weight: 500; }
+.row .kind-line { color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.row .row-q { flex: none; align-self: center; display: inline-flex; color: var(--question-solid); }
+.hint-q { display: flex; flex-direction: column; gap: 2px; }
+.hint-q span::before { content: "? "; color: var(--question-solid); }
 .row-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .row .row-line .title { flex: 0 1 auto; }
 .row-line .chips-button { flex: 0 1 auto; gap: 0; overflow: hidden; }

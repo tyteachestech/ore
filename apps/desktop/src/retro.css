@@ -104,7 +104,7 @@
 /* Labels: section and card titles, sidebar groups, metadata. */
 .card-title h2, .home-h, .home-cont .home-h, .side-label { font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .card-title .card-icon { margin-right: 2px; }
-.skill-page .row .kind, .row .count, .side-item .count, .home-read .chip, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
+.skill-page .row .kind, .row .kind-line, .row .count, .side-item .count, .home-read .chip, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
 
 /* Big numbers in pixel type. */
 .home-solid, .hero-strength .home-solid, .home-goal h1, .review-kept b, .review-cut b { font-family: var(--pixel); font-weight: 400; }

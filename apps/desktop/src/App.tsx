@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, MagnifyingGlass, SidebarSimple } from "./icons";
+import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { DndContext, PointerSensor, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { listen } from "@tauri-apps/api/event";
@@ -8,7 +8,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, use
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type Question as QuestionView, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat } from "./Tutor";
@@ -954,6 +954,22 @@ export function App() {
     () => (q && hits.q === q ? tabRows.filter((r) => hits.snip.has(r.id) && !byTitle.includes(r)) : []),
     [tabRows, byTitle, hits, q],
   );
+  /** On a skill page, the open questions each source may answer (D75's matches), so picking what to read
+   *  next and chasing a question are one act (D130): a question mark on the row, the questions in its hint. */
+  const [mayAnswer, setMayAnswer] = useState<Map<string, string[]>>(new Map());
+  useEffect(() => {
+    if (!onSkillPage) return;
+    let live = true;
+    ore<QuestionView[]>("questions", opt("skill", skill!)).then((qs) => {
+      if (!live) return;
+      const m = new Map<string, string[]>();
+      for (const q of qs) if (q.status === "open") for (const x of q.matches) m.set(x.item, [...(m.get(x.item) ?? []), q.note?.trim() || q.exact.replace(/\s+/g, " ").trim()]);
+      setMayAnswer(m);
+    }, () => live && setMayAnswer(new Map()));
+    return () => {
+      live = false;
+    };
+  }, [onSkillPage, skill, items]);
   /** On a skill page the first few, so Questions below stays in sight; "Show all" lists the rest. */
   const [showAll, setShowAll] = useState(false);
   useEffect(() => setShowAll(false), [skill, status]);
@@ -1644,7 +1660,7 @@ export function App() {
     return (
       <Same
         key={r.id}
-        deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, pickFor === r.id, skills, skill, onSkillPage, details]}
+        deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, pickFor === r.id, skills, skill, onSkillPage, details, mayAnswer.get(r.id)]}
         render={() => rowView(r, lesson, snip, on, sel, pickN, dragged)}
       />
     );
@@ -1725,7 +1741,16 @@ export function App() {
                 </SkillPicker>
               </span>
             )}
+            {/* A skill page's rows are Reader's (D130): a third line says what kind it is (its length joins once import records one). */}
+            {onSkillPage && !lesson && !snip && <span className="kind-line">{KIND[r.type] ?? r.type}</span>}
           </span>
+        )}
+        {onSkillPage && mayAnswer.has(r.id) && (
+          <Hint text={<span className="hint-q">{mayAnswer.get(r.id)!.map((t, i) => <span key={i}>{t}</span>)}</span>} side="top">
+            <span className="row-q" role="img" aria-label={`May answer: ${mayAnswer.get(r.id)!.join("; ")}`}>
+              <QuestionMark size={16} aria-hidden="true" />
+            </span>
+          </Hint>
         )}
         {details.includes("type") && <span className="col kind">{KIND[r.type] ?? r.type}</span>}
         {detailCols(r, [r.captured_at])}
