@@ -37,7 +37,7 @@ Glossary: [`CONTEXT.md`](CONTEXT.md).
 
 ## Running it
 
-Requirements: macOS, [Bun](https://bun.sh), and for the desktop app [Rust and the Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/). For the AI features, the [`claude`](https://code.claude.com) or [`codex`](https://github.com/openai/codex) CLI, signed in.
+Requirements: macOS, [Bun](https://bun.sh) 1.4.4 (the version CI uses), and for the desktop app [Rust and the Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/). For the AI features, the [`claude`](https://code.claude.com) or [`codex`](https://github.com/openai/codex) CLI, signed in.
 
 ```bash
 bun install                     # workspace deps
@@ -45,8 +45,8 @@ bun test                        # all tests
 bun run typecheck               # tsc strict, whole workspace
 
 cd packages/cli && bun link     # puts `ore` on PATH
-ORE_LIBRARY=/tmp/lib ore init # a scratch library to play with
-ore --help                     # every command accepts --json
+ORE_LIBRARY=/tmp/lib ore init   # a scratch library to play with
+ore --help                      # every command accepts --json
 ```
 
 The desktop app, against that scratch library:
@@ -97,6 +97,8 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`CONTEXT.md`](CONTEXT.md) | Glossary: source, highlight, intent, prequestion, finish, skill… |
 | [`PRODUCT.md`](PRODUCT.md) · [`DESIGN.md`](DESIGN.md) | Product brief and design system (tokens, components, states) |
 | [`AGENTS.md`](AGENTS.md) | Working agreement for AI coding agents: rules, UI quality bar, interaction checklist |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Reporting a broken import, setting up, and what a pull request needs |
+| [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | How the maintainer's threads merge and reinstall the app |
 
 **Research** ([`docs/research/`](docs/research/)): the evidence behind the decisions.
 
@@ -142,7 +144,11 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 
 **Guidebooks** ([`docs/guidebooks/`](docs/guidebooks/)): four evidence-based books the research briefs draw on (Learning Science, Teaching, Gamification, UX and UI Design), each with its paper summaries and source lists.
 
-**Guides**: [`docs/guides/ai-user-testing.md`](docs/guides/ai-user-testing.md) (usability testing with an AI agent driving the app) and its [iPhone version](docs/guides/ai-user-testing-iphone.md), [`skills/ore/README.md`](skills/ore/README.md) (the `/ore` Claude Code skill), [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md) (the mocked app for screenshots).
+**Guides**: [`docs/guides/ai-user-testing.md`](docs/guides/ai-user-testing.md) (usability testing with an AI agent driving the app) and its [iPhone version](docs/guides/ai-user-testing-iphone.md), the AI evals ([grading](docs/guides/grading-eval.md), [Ask your library](docs/guides/ask-library.md), [tutor](docs/guides/tutor-eval.md)), [`skills/ore/README.md`](skills/ore/README.md) (the `/ore` Claude Code skill), [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md) (the mocked app for screenshots).
+
+## Contributing
+
+A link or file that didn't come in whole is the most useful report: open an issue with the **A source came in broken** form. Setup and what a pull request needs: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 

@@ -1,0 +1,24 @@
+name: A source came in broken
+description: A link or file that Ore refused, or saved with something missing or wrong
+labels: [import]
+body:
+  - type: input
+    id: source
+    attributes:
+      label: Link, or the kind of file
+      description: A public link is best. Attach a file only if you're allowed to share it publicly.
+      placeholder: https://… or "a scanned PDF of a textbook"
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What's missing or wrong
+      description: Title, author, date, headings, images, tables, math, code, timestamps, or the text itself.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Ore version
+      description: Ore › About Ore, or `git rev-parse --short HEAD` in a checkout.

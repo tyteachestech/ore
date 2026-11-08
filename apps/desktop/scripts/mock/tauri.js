@@ -23,7 +23,7 @@ window.__TAURI_INTERNALS__ = {
   unregisterCallback: () => {},
   convertFileSrc: (p) => "http://localhost:" + (window.__ORE_BRIDGE || 1421) + "/file?p=" + encodeURIComponent(p),
   async invoke(cmd, args) {
-    if (cmd === "ore" || cmd === "ore_detached") {
+    if (cmd === "ore") {
       // window.__ORE_FAIL = { enrich: "why" }: that command fails with that reason (a test of the failure path).
       const fail = window.__ORE_FAIL && window.__ORE_FAIL[args.args[0]];
       if (fail) throw fail;

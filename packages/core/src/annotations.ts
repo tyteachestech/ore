@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { appendJsonl, deviceLog, latestRevs, logFiles, readLog, sha256 } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
-import { findItem, itemDirs, listItems, updateItemMeta, type Item } from "./items.ts";
+import { findItem, itemDirs, updateItemMeta, type Item } from "./items.ts";
 import type { Library } from "./library.ts";
 import { anchor, locate, quoteSelector, type Anchor } from "./anchoring.ts";
 

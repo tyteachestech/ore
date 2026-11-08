@@ -6,7 +6,7 @@
 import { chromium, type Page } from "playwright";
 import { mkdirSync, readFileSync } from "node:fs";
 
-const [out, screen, ...rest] = process.argv.slice(2);
+const [out, screen = "", ...rest] = process.argv.slice(2);
 if (!out || !screen) throw new Error("usage: ab.ts <out-dir> <screen> [--crop <selector>] [<name>=<file.css> ...]");
 const at = rest.indexOf("--crop");
 const crop = at >= 0 ? rest.splice(at, 2)[1] : undefined;
