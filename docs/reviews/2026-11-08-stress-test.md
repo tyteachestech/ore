@@ -32,10 +32,10 @@ Six personas over a 113-card backlog with drafts, tries and one source broken on
 
 Fixed in #192: ⌘K → All sources from Home left focus on the body (arrows and Enter did nothing until ~30 Tabs); a highlight over a passage already highlighted, with a note, dropped the intent and the note silently (`ore highlight --intent apply --note`, the `/ore` skill's path).
 
-### Calls for Tyler
-1. **Rescued over a backlog.** With everything overdue, "N rescued just before you'd have forgotten them" is nearly every card, every session (13 of 14). Keep it, or show it only when it is a minority of the session?
-2. **A write-up's confirmation.** Saving "How did it go" closes the box with no toast; "a card comes from how it went" is said only in the undo toast. Fine as a quiet step, or one toast?
-3. **The picker by keyboard.** Enter on Start review puts focus on the "What to review" panel itself: Space does nothing until ↓ picks a row. Focus the first row instead?
+### Calls for Tyler (answered by the coordinator under the product principle, 2026-11-08 23:37Z; Tyler can override)
+1. **Rescued over a backlog.** With everything overdue, "N rescued just before you'd have forgotten them" is nearly every card, every session (13 of 14). Built: shown only when rescues are a minority of the session (`rescuedWorthSaying`).
+2. **A write-up's confirmation.** Saving "How did it go" closes the box with no toast; "a card comes from how it went" is said only in the undo toast. Kept quiet.
+3. **The picker by keyboard.** Enter on Start review puts focus on the "What to review" panel itself: Space does nothing until ↓ picks a row. Built: the first row takes focus.
 
 ### Lessons
 - Review ignores a rating digit for 300 ms after the answer shows (the same keys pick how sure): a script must wait, a person never notices.

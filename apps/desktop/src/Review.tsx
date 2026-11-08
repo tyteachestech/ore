@@ -8,7 +8,7 @@ import { Gem } from "./Gem";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
-import { ore, opt, PHONE, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -1236,7 +1236,7 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
         // A session of misses is still the work that makes them stick (D62: no guilt copy).
         <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>
       )}
-      {s.rescued > 0 && (
+      {rescuedWorthSaying(s) && (
         <p className="review-rescued">
           {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}
         </p>

@@ -331,6 +331,18 @@ journey("Tab shows a focus ring on a control whose hover is a fill (Home's gear)
   if (ring !== "solid") throw new Error(`the focused gear shows outline ${ring}`);
 });
 
+journey("What to review by keyboard: it opens on its first row, Space unticks it, ↵ starts with the rest", async (page) => {
+  await page.getByRole("button", { name: "Start review" }).focus();
+  await page.keyboard.press("Enter");
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  await pick.waitFor();
+  await until("the first row has focus", () => page.evaluate(() => !!document.activeElement?.classList.contains("pick-row") && document.activeElement === document.querySelector(".pick-row")));
+  await page.keyboard.press("Space");
+  await until("Space unticked it", async () => (await pick.locator(".pick-row").first().getAttribute("aria-checked")) === "false");
+  await page.keyboard.press("Enter");
+  await page.locator(".review-card").waitFor();
+});
+
 journey("⌘K ↵ on Home starts review, never flips a display setting", async (page) => {
   await page.keyboard.press("Meta+k");
   await page.locator("[cmdk-item]").first().waitFor();

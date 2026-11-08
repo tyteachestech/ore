@@ -297,6 +297,10 @@ export type CardFull = {
 export type Grade = { rating: 1 | 2 | 3 | 4; gaps: string[]; feedback: string; covered: boolean[]; evidence?: string[] };
 
 /** `ore session end` (D62). */
+/** The end screen says how many were rescued only when they are a minority of the session: over a backlog
+ *  (the normal state, docs/design/daily-session.md) nearly every card is, so the line would say nothing. */
+export const rescuedWorthSaying = (s: { reviews: number; rescued: number }) => s.rescued > 0 && s.rescued * 2 < s.reviews;
+
 export type SessionEnd = {
   id: string; reviews: number; kept: number; rescued: number; caught_up?: boolean;
   /** Cards that became solid this session, as each one's first skill (D90): one cut gem each. */
