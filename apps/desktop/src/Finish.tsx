@@ -573,7 +573,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             <ul className="quiz-made-list">
               {recall.trim() && <li>Your recall, saved to the source note</li>}
               {!!made?.highlights && <li>{made.highlights} {made.highlights === 1 ? "highlight" : "highlights"}</li>}
-              {!!made?.questions && <li>{made.questions} {made.questions === 1 ? "question" : "questions"}, waiting on the skill page</li>}
+              {!!made?.questions && <li>{made.questions} {made.questions === 1 ? "question" : "questions"}, {doc.skills.length ? "waiting on the skill page" : "in Collected"}</li>}
             </ul>
           )}
           {typeof feedback === "string" && <p className="err">Recall feedback failed: {feedback}</p>}

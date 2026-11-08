@@ -3132,6 +3132,23 @@ journey("finish again: the recall box holds the last recall with the caret at it
   if (note.trim() !== "## Recall\n\nFIRST recall text. SECOND.") throw new Error(`the note is ${JSON.stringify(note)}`);
 });
 
+journey("finish: a question on a source with no skill is pointed to Collected, not a skill page", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# No skill yet\n\nA first source, filed under no skill, with one passage worth asking about.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A first source, filed under no skill").waitFor();
+  await select(page, "one passage worth asking about");
+  await page.getByRole("dialog", { name: "Highlight" }).locator(".intent.question").click();
+  await page.locator(".mark-icon.question").first().waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  const made = page.locator(".quiz-made-list").filter({ hasText: "1 question" });
+  await made.waitFor();
+  if ((await made.innerText()).includes("skill page")) throw new Error(`“${await made.innerText()}”: this source has no skill page`);
+  await page.getByRole("button", { name: "Keep reading" }).click();
+});
+
 journey("ore down at launch: Home's Try again brings back the skills and the sources too", async (page) => {
   const skillRows = page.locator(".side-item:not(.side-main)");
   await skillRows.first().waitFor();
