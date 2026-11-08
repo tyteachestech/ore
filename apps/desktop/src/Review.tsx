@@ -1,7 +1,7 @@
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Gem } from "./Gem";
@@ -42,11 +42,15 @@ const drafts = new Map<string, { text: string; conf?: number }>();
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false }: {
+export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Hidden while he reads the source a card opened; it waits on that card, its keys off. */
   paused?: boolean;
+  /** Under the palette or the shortcuts sheet (controls-08): its keys are theirs until they close. */
+  under?: boolean;
+  /** Set to what Esc does without the end screen, for a palette action to leave Review first. */
+  leave?: MutableRefObject<(() => Promise<void>) | null>;
   skills: Skill[];
   onOpenSource: (item: string, at?: string) => void;
   onClose: (again?: boolean) => void;
@@ -683,9 +687,10 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     }
   };
 
+  if (leave) leave.current = () => finish(false);
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
-    if (paused) return;
+    if (paused || under) return;
     if (is(e, "undo") && busyNow.current && !(inTextField(e) && !(e.target as HTMLElement).hasAttribute("data-app-undo"))) {
       // The step it should take back isn't on the history yet (or is being taken back): it waits.
       e.preventDefault();

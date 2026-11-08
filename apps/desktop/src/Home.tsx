@@ -5,7 +5,8 @@ import { Hint } from "./Hint";
 import { label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
-import { lessonsOf, levelProgress, nextLesson, ore, touched, type Item, type Skill, type Today } from "./ore";
+import { lessonsOf, levelProgress, nextLesson, ore, PHONE, touched, type Item, type Skill, type Today } from "./ore";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
 import { SkillChip, skillGroups, SkillPicker } from "./Skills";
@@ -186,6 +187,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                   today.plan && <p className="home-plan">After {today.plan}, I review.</p>
                 )}
                 <Week week={today.week} />
+                <Unreadable list={today.unreadable} />
               </div>
               {/* Beside the ring, not on a row of its own: Today is only as tall as the ring. Nothing due: the
                   subline already says so, so no dead button. */}
@@ -366,6 +368,29 @@ export function waiting(t: Today): string {
   if (!t.new_per_day) return `${cards} wait. New cards are off in Settings.`;
   // New cards only take the goal time due cards leave (D65), so past a day's worth say that, not "up to 10 a day".
   return n <= t.new_per_day ? `${cards} start${n === 1 ? "s" : ""} tomorrow.` : `${cards} wait. A few start each day, as your goal leaves room.`;
+}
+
+/** A source whose doc.md can't be read drops out of every list (files-10), so Home names it in one quiet
+ *  line; the hint says why (what `ore doctor` says) and a click shows the file in Finder to mend it. */
+function Unreadable({ list }: { list: Today["unreadable"] }) {
+  if (!list.length) return null;
+  const text = `${list.length} source${list.length === 1 ? "" : "s"} couldn’t be read`;
+  const why = (
+    <span className="hint-lines">
+      {!PHONE && <span>Show it in Finder</span>}
+      {list.slice(0, 3).map((u) => (
+        <span key={u.dir} className="home-unreadable-why">{u.dir.split("/").pop()!.replace(/-[0-9A-Z]{26}$/, "")}: {u.error}</span>
+      ))}
+    </span>
+  );
+  if (PHONE) return <p className="home-plan home-unreadable">{text}</p>;
+  return (
+    <Hint text={why}>
+      <button className="home-plan home-unreadable" onClick={() => void revealItemInDir(`${list[0]!.dir}/doc.md`)}>
+        {text}
+      </button>
+    </Hint>
+  );
 }
 
 function Week({ week }: { week: Today["week"] }) {

@@ -6,7 +6,7 @@
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 import { chromium, type Page } from "playwright";
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
@@ -105,6 +105,29 @@ journey("Home: today's minutes are the big number, and the goal ring stands unfr
   });
   if (look.minutes !== "24px" || look.unit !== "15px") throw new Error(`goal number ${look.minutes}, unit ${look.unit}`);
   if (look.ring !== "none") throw new Error(`goal ring framed: ${look.ring}`);
+});
+
+journey("Home: a source whose doc.md can't be read gets one quiet line that shows it in Finder; gone, the line goes (files-10)", async (page) => {
+  const items = (await ore("ls")) as { dir: string }[];
+  // A folder of its own, so no other journey's source is touched; cut-off frontmatter, as a crash mid-write leaves.
+  const dir = join(items[0]!.dir, "..", "broken-01JZZZZZZZZZZZZZZZZZZZZZZZ");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "doc.md"), "---\nid: [cut off\n");
+  try {
+    await page.reload();
+    const line = page.getByRole("button", { name: "1 source couldn’t be read" });
+    await line.waitFor();
+    await line.hover();
+    await page.locator(".hint", { hasText: "Show it in Finder" }).waitFor();
+    await line.click();
+    await until("the folder shown in Finder", () => page.evaluate((d) => JSON.stringify((window as unknown as { __ORE_REVEALED?: string[] }).__ORE_REVEALED) === JSON.stringify([`${d}/doc.md`]), dir));
+    rmSync(dir, { recursive: true, force: true });
+    await page.reload();
+    await page.locator(".home-goal h1").waitFor();
+    await until("the line gone with the folder", async () => !(await line.isVisible()));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 journey("add pasted text: it opens in the reader", async (page) => {
@@ -1804,6 +1827,32 @@ journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette 
   await settings.getByRole("alert").filter({ hasText: "Command palette" }).waitFor();
   if (await page.getByRole("dialog", { name: "Command palette" }).count()) throw new Error("⌘K while recording opened the palette");
   await page.keyboard.press("Escape");
+});
+
+journey("Review: ⌘K and ⌘/ open over it, Esc goes back to the card, and a palette action leaves Review as Esc does (controls-08)", async (page) => {
+  await startReview(page, /Teaching/); // its one due card is an Explain card, answered by typing
+  const question = await page.locator(".review-q").innerText();
+  const field = page.getByLabel("Your answer");
+  await field.fill("half an answ");
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  await page.keyboard.press("Meta+k");
+  await palette.waitFor();
+  await page.keyboard.press("Escape");
+  await palette.waitFor({ state: "detached" });
+  if ((await page.locator(".review-q").innerText()) !== question) throw new Error("Esc in the palette left the card");
+  if (!(await field.evaluate((el) => el === document.activeElement))) throw new Error("focus didn't go back to the answer");
+  await page.keyboard.press("Meta+Slash");
+  const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await sheet.waitFor();
+  await page.keyboard.press("Escape");
+  await sheet.waitFor({ state: "detached" });
+  if ((await page.locator(".review-q").innerText()) !== question) throw new Error("Esc in the shortcuts sheet left the card");
+  await page.keyboard.press("Meta+k");
+  await palette.waitFor();
+  await page.keyboard.type("Go to Feed");
+  await page.keyboard.press("Enter");
+  await page.locator(".review").waitFor({ state: "detached" });
+  await page.locator(".home-goal").waitFor({ state: "detached" });
 });
 
 journey("sidebar: a new skill named like one he has is refused in place, in words, as a taken collection name is", async (page) => {

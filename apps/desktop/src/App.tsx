@@ -234,6 +234,8 @@ export function App() {
   const [readerPractice] = useState<PracticeRef>(() => ({ current: null, pending: null }));
   const feedPick = useRef<{ title: string; actions: MenuAction[] } | null>(null);
   const [palette, setPalette] = useState(false);
+  /** Leaves Review as Esc does, without its end screen: a palette action run over Review goes there instead. */
+  const leaveReview = useRef<(() => Promise<void>) | null>(null);
   // The tutor (D128): open, and the thread so far (kept while he moves around the app).
   const [tutorOpen, setTutorOpen] = useState(false);
   // Floating over the corner (Notion AI's default) or docked at the right, as he last chose (D128).
@@ -871,7 +873,8 @@ export function App() {
   const openCourse = openId ? (items ?? []).find((i) => i.id === openId)?.course?.id : undefined;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((reviewing && !reviewing.paused) || asking) return; // Review and its picker handle their own keys
+      // Review and its picker handle their own keys; ⌘K and ⌘/ still open over Review (controls-08).
+      if (asking || (reviewing && !reviewing.paused && !is(e, "palette") && !is(e, "shortcuts"))) return;
       if (is(e, "settings")) {
         e.preventDefault();
         setPalette(false);
@@ -2236,6 +2239,8 @@ export function App() {
           pick={reviewing.pick}
           skills={skills}
           paused={!!reviewing.paused}
+          under={palette || help}
+          leave={leaveReview}
           onOpenSource={(item, at) => {
             setReviewing((r) => r && { ...r, paused: item });
             openSource(item, at);
@@ -2261,6 +2266,7 @@ export function App() {
 
       {palette && (
         <Palette
+          leave={reviewing && !reviewing.paused ? () => leaveReview.current?.() : undefined}
           actions={actions}
           recent={recent.flatMap((id) => (id === openId ? [] : (items ?? []).filter((i) => i.id === id)))}
           items={items ?? []}

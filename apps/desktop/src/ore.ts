@@ -246,6 +246,8 @@ export type Today = {
   week: { date: string; status: "met" | "open" | "off"; active_ms: number }[];
   days_met: number;
   skills: ({ skill: string; due: number } & Omit<Strength, "explain">)[];
+  /** Sources whose doc.md can't be read, and why (files-10): they drop out of every list. */
+  unreadable: { dir: string; error: string }[];
 };
 
 /** A skill's strength (D62, D63): solid = live cards with stability of 21 days or more. `level`

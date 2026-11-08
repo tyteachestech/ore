@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { findCard, writeCardContent, writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { paths } from "../src/library.ts";
@@ -170,6 +170,22 @@ describe("today (D60)", () => {
     await recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, now: new Date(Date.parse(first.due_next)) }); // on time
     await recordReview(lib, cards[1]!.meta.id, { rating: 3, confidence: 2, now: new Date(Date.parse(first.due_next) + 60 * 864e5) }); // two months late
     expect(await endSession(lib, new Date(Date.parse(first.due_next) + 61 * 864e5))).toMatchObject({ kept: 2, rescued: 1 });
+  });
+
+  test("a source whose doc.md can't be read is named, every time, until it reads again (files-10)", async () => {
+    const { lib, item } = await library(1);
+    expect(today(lib).unreadable).toEqual([]);
+    const good = readFileSync(item.docPath, "utf8");
+    writeFileSync(item.docPath, "---\nid: [broken\n---\nText\n");
+    for (const _ of [1, 2]) {
+      // The index reports a bad file only on the sync that saw it change, so the second call checks it is still named.
+      const [bad, ...rest] = today(lib).unreadable;
+      expect(rest).toEqual([]);
+      expect(bad).toMatchObject({ dir: item.dir });
+      expect(bad!.error).not.toBe("");
+    }
+    writeFileSync(item.docPath, good);
+    expect(today(lib).unreadable).toEqual([]);
   });
 
   test("weekdays only: a weekend day is off", async () => {

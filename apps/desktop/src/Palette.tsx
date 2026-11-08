@@ -27,6 +27,8 @@ type Props = {
   /** A skill made from the palette (New skill, New collection). */
   onCreated: (s: Skill) => void;
   onClose: () => void;
+  /** Over Review (controls-08): leaves it as Esc does before an action runs, as if he had closed it first. */
+  leave?: () => Promise<void> | undefined;
 };
 
 type Source = Pick<Item, "id" | "title" | "type" | "thumbnail">;
@@ -50,7 +52,7 @@ const TITLES = 8;
 
 /** ⌘K: recent sources, actions, skills, sources and courses by title, then sources whose text matches
  *  (`ore search`, SQLite FTS5) in their own group below. */
-export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, onCreated, onClose }: Props) {
+export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, onCreated, onClose, leave }: Props) {
   const [q, setQ] = useState("");
   const [page, setPage] = useState<Page | null>(null);
   const [hits, setHits] = useState<Hit[]>([]);
@@ -119,6 +121,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
     try {
       const made = await ore<Skill>("skills", "add", name, opt("collection", page.kind === "skill" ? page.collection : ""));
       onClose();
+      await leave?.();
       onCreated(made);
     } catch (e) {
       setError(errorText(e));
@@ -257,8 +260,9 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   const [selected, setSelected] = useState(first);
   useEffect(() => setSelected(first), [first]);
 
-  const run = (f: () => void) => {
+  const run = async (f: () => void) => {
     onClose();
+    await leave?.();
     f();
   };
   // A naming step keeps the palette open; every other row closes it first.
