@@ -1462,7 +1462,8 @@ journey("note equations: /equation opens a TeX field that draws as he types; ↵
   await until("it draws as he types", async () => (await pm.locator(".note-math .katex annotation").last().textContent()) === "\\pi r^2");
   await page.keyboard.press("Enter");
   await page.keyboard.type(" here");
-  await until("the field closes and he types after it", async () => !(await page.getByLabel("Equation (TeX)").count()) && (await pm.locator("p", { has: page.locator(".note-math") }).last().evaluate((p) => p.lastChild?.textContent)) === " here");
+  // The line's text, not its last DOM node: under load the typed words can land as more than one text node.
+  await until("the field closes and he types after it", async () => !(await page.getByLabel("Equation (TeX)").count()) && / here$/.test((await pm.locator("p", { has: page.locator(".note-math") }).last().textContent()) ?? ""));
   await page.waitForTimeout(600); // the note saves after a pause
   await page.reload();
   await openSource(page, AGENTS);
