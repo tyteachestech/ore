@@ -62,6 +62,7 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "youtube-auto-captions", add: "https://www.youtube.com/watch?v=oreGolden01", serve: { "https://captions.test/talk.en.vtt": ["video/talk.en.vtt", "text/vtt"] } },
   // Wikipedia (CC BY-SA 4.0) and the Python docs (PSF License) may be shared.
   { name: "web-wikipedia", add: "https://en.wikipedia.org/wiki/Spaced_repetition", serve: { "https://en.wikipedia.org/wiki/Spaced_repetition": ["web/wikipedia.html", HTML] } },
+  { name: "web-hn-thread", add: "https://news.ycombinator.com/item?id=11408447", serve: { "https://news.ycombinator.com/item?id=11408447": ["web/hn-thread.html", HTML] } }, // markup kept, words rewritten
   { name: "web-python-docs", add: "https://docs.python.org/3/tutorial/classes.html", serve: { "https://docs.python.org/3/tutorial/classes.html": ["web/docs-python.html", HTML] } },
 ];
 

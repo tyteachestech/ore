@@ -180,6 +180,16 @@ function paperAuthors(doc: Document): string | undefined {
   return names.length === 1 ? names[0] : names.length === 2 ? names.join(" and ") : `${names[0]} et al.`;
 }
 
+/** A Hacker News thread as Defuddle's reader for it expects: names marked `.hnuser` (HN dropped the
+ *  class, so every comment read as "[deleted]"), and no site after the title ("(example.com)").
+ *  Returns the poster's name. */
+function hackerNews(doc: Document, url: string): string | undefined {
+  if (!/^https?:\/\/news\.ycombinator\.com\//.test(url)) return undefined;
+  for (const a of doc.querySelectorAll('.comhead a[href^="user?id="], .subline a[href^="user?id="]')) a.classList.add("hnuser");
+  for (const s of doc.querySelectorAll(".titleline .sitebit")) s.remove();
+  return doc.querySelector(".subline .hnuser")?.textContent?.trim() || undefined;
+}
+
 export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
   // A Notion page as the browser drew it (added from the tab, or reimported from its copy).
   const notion = notionMarkdown(html, url);
@@ -193,7 +203,7 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
-    const paper = paperAuthors(document as unknown as Document);
+    const paper = paperAuthors(document as unknown as Document) ?? hackerNews(document as unknown as Document, url);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
     const markdown = inlineMath(htmlTables(r.content.trim()));
     if (markdown.length > 200) {

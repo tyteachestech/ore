@@ -173,6 +173,19 @@ describe("import coverage: web pages", () => {
     expect(count(item.body, /^#{1,6} /gm)).toBeGreaterThanOrEqual(5);
   });
 
+  test("a forum thread (Hacker News): its title, poster and date, every comment under its author, replies nested", async () => {
+    // hn-thread.html: a real thread's markup (2026), its words rewritten; HN no longer marks names with .hnuser.
+    const url = "https://news.ycombinator.com/item?id=11408447";
+    serve({ [url]: { body: web("hn-thread.html"), type: HTML } });
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "Spaced repetition and practice", author: "spaced", published: "2016-04-01" });
+    const b = item.body;
+    expect(b).toStartWith("[http://experiments.oskarth.com/srspractice/](http://experiments.oskarth.com/srspractice/)\n\n---\n\n## Comments\n\n> **generation** · [2016-04-01](https://news.ycombinator.com/item?id=11408947)\n");
+    expect(b).toContain("> > **feedback** · [2016-04-01](https://news.ycombinator.com/item?id=11409221)");
+    expect(b).not.toContain("[deleted]");
+    expect(count(b, /^(?:> )+\*\*/gm)).toBe(24); // every comment
+  });
+
   test("nbviewer and Google links point at what to read", () => {
     expect(rewrite("https://nbviewer.org/github/jakevdp/PythonDataScienceHandbook/blob/master/notebooks/a.ipynb")).toMatchObject({ kind: "fetch", url: "https://raw.githubusercontent.com/jakevdp/PythonDataScienceHandbook/master/notebooks/a.ipynb" });
     expect(rewrite("https://docs.google.com/document/d/abc_123/edit?usp=sharing")).toEqual({ kind: "fetch", url: "https://docs.google.com/document/d/abc_123/export?format=docx" });
