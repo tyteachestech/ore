@@ -16,7 +16,7 @@ bun run eval:tutor --vendor claude --model claude-haiku-5-5
 ## What the first runs found (2026-11-08, Sonnet 5.5)
 
 - 75% (9/12) on tutor@5. One real miss: after two wrong tries it gave a third hint instead of the answer, though the prompt said "or has tried twice". Two misses were the eval's: a worked example's own numbers matched the withheld answer, and "Explain …" after a question counted as not asking.
-- tutor@6 counts his attempts in `earlier` and gives the answer with why on the second wrong try, and makes Quiz me's feedback on a wrong answer the right answer, not another hint. Then 92% and 100% after fixing the eval's two patterns.
+- tutor@6 counts his attempts in `earlier` and gives the answer with why on the second wrong try, and makes Quiz me's feedback on a wrong answer the right answer, not another hint. Then 92% and 100% after fixing the eval's two patterns, and 12/12 twice more after the checks were tightened (word boundaries, a fraction isn't a score, a quoted question isn't asking) and rule 3 stopped claiming Quiz me's questions.
 
 ## Limits
 

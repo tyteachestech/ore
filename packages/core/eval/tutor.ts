@@ -34,8 +34,9 @@ export const loadTutorCases = (path = join(import.meta.dir, "tutor-cases.json"))
 /** What a reply did, for the checks. */
 export interface Reply { reply: string; hint: boolean; exercise: boolean; cited: number; searched: boolean }
 
-// A score, grade or rating ("7/10", "8 out of 10", "B+", "you scored"): he rates his own cards (D21).
-const SCORE = /\b\d+\s*(?:\/|out of)\s*\d+\b|\b(?:score|grade|rating)\b|\b[A-F][+-](?=\s|$)/i;
+// A score, grade or rating of his answer ("7/10", "8 out of 10", "B+", "you scored"): he rates his own
+// cards (D21). A fraction from the material ("about 1/4 is left") is not one.
+const SCORE = /\b\d+\s*(?:\/|out of)\s*(?:5|10|100)\b(?!\s*%)|\b(?:you )?scored?\b|\bgrade (?:of|is|:)|\brat(?:e|ing) (?:it|this|your answer)\b|\b[A-F][+-](?=\s|$)/i;
 
 /** The checks a reply fails, by name; none means it passed. */
 export function failures(e: z.infer<typeof Expect>, r: Reply): string[] {
@@ -45,7 +46,8 @@ export function failures(e: z.infer<typeof Expect>, r: Reply): string[] {
   for (const p of e.withholds ?? []) if (new RegExp(p, "i").test(r.reply)) out.push(`gave /${p}/`);
   if (e.exercise !== undefined && r.exercise !== e.exercise) out.push(e.exercise ? "no exercise" : "an exercise");
   // Asks: it puts a question to him ("Is that a sign of weak minds? Explain…" counts).
-  if (e.asks && !r.reply.includes("?")) out.push("doesn't ask");
+  // A question mark inside a quote ("you said … 'how much is recalled?'") isn't one put to him.
+  if (e.asks && !r.reply.replace(/"[^"\n]*"|“[^”\n]*”/g, "").includes("?")) out.push("doesn't ask");
   if (e.cites && !r.cited) out.push("no citation");
   if (e.no_score && SCORE.test(r.reply)) out.push("a score");
   if (e.no_search && r.searched) out.push("searched the web");
@@ -66,6 +68,7 @@ export function runTutorEval(vendor: Vendor, model?: string, concurrency = 4) {
     const results = await pool(cases, concurrency, async (c): Promise<TutorResult> => {
       const start = performance.now();
       try {
+        if (c.reading && !id(c.reading)) throw new Error(`${c.id}: no golden doc ${c.reading}`);
         const r = await tutor(lib, c.message, { earlier: c.earlier ?? [], item: c.reading ? id(c.reading) : undefined });
         stamp = r.ai;
         const failed = failures(c.expect, { reply: r.reply, hint: r.hint, exercise: !!r.exercise, cited: r.citations.length, searched: r.searched });
@@ -94,6 +97,7 @@ if (import.meta.main) {
   const pick: Vendor[] = vendors.length ? vendors : ["claude", "codex"];
   if (args.includes("--model") && pick.length > 1) throw new Error("--model needs one --vendor");
   const model = args.includes("--model") ? args[args.indexOf("--model") + 1] : undefined;
+  if (args.includes("--model") && !model) throw new Error("--model needs a model id");
   const runs = [];
   for (const v of pick) {
     console.error(`Tutoring with ${v}…`);

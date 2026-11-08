@@ -28,4 +28,16 @@ describe("tutor pedagogy eval", () => {
     expect(failures(withholds, reply({ reply: "Say a gap of 10 days: you get 10 × 2.5 = 25. Now yours?" }))).toEqual([]);
     expect(failures(withholds, reply({ reply: "The next gap is 10." }))).toEqual(["gave /" + withholds.withholds![0] + "/"]);
   });
+
+  test("the checks read what the reply means: a fraction isn't a score, a quoted question isn't asking, a rejection isn't a yes", () => {
+    expect(failures({ no_score: true }, reply({ reply: "Not quite: about 1/4 (25%) is recalled after 7 days [1]." }))).toEqual([]);
+    expect(failures({ no_score: true }, reply({ reply: "I'd give that 8 out of 10." }))).toEqual(["a score"]);
+    expect(failures({ asks: true }, reply({ reply: 'You said half to "how much is recalled after 7 days?": it is 25% [1].' }))).toEqual(["doesn't ask"]);
+    const right = loadTutorCases().find((c) => c.id === "quiz-right-answer")!.expect;
+    expect(failures(right, reply({ reply: "Exactly right: 25% [1]." }))).toEqual([]);
+    expect(failures(right, reply({ reply: "Not quite right: 25% is incorrect, it's 21% [1]." })).length).toBeGreaterThan(0);
+    const worked = loadTutorCases().find((c) => c.id === "no-idea-worked-example")!.expect;
+    expect(failures(worked, reply({ reply: "Try this 10-second check on a gap of 2 days first." }))).toEqual([]);
+    expect(failures(worked, reply({ reply: "So you'd wait 10 days next." })).length).toBe(1);
+  });
 });
