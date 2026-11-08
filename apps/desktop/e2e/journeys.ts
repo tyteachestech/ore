@@ -2781,6 +2781,52 @@ journey("review: a held ↵ rates the last card once and the end screen stays", 
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: ⌘Z while a rating saves, or while the session wraps up, takes back that rating, never an older one", async (page) => {
+  const app = oreCalls(page);
+  await page.addInitScript("window.__ORE_SLOW = { review: 600, session: 600 }");
+  await page.reload();
+  await page.locator(".side-item").first().waitFor();
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  const undone = () => app.calls.filter((a) => a[0] === "review" && a.some((x) => x.startsWith("--undo"))).map((a) => a.find((x) => x.startsWith("--undo"))!.slice(7));
+  try {
+    // Mid-session: the second rating is still saving.
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the first rating is logged", async () => app.rated.length === 1);
+    await until("the next card shows", async () => (await q.count()) > 0 && !(await page.getByRole("button", { name: "Good", exact: true }).isVisible()));
+    const second = await q.innerText();
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await page.waitForTimeout(100);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes back the rating that was saving", async () => app.rated.length === 2 && undone().length === 1);
+    if (undone()[0] !== app.rated[1]!.ts) throw new Error(`⌘Z took back ${undone()[0]}, not the newest rating ${app.rated[1]!.ts}`);
+    await until("that card is back", async () => (await q.count()) > 0 && (await q.innerText()) === second);
+    app.rated.pop();
+  } finally {
+    await app.undoAll();
+  }
+  await page.keyboard.press("Escape"); // the first card's rating stood until now: the end screen, then away
+  await page.locator(".review-foot").getByRole("button", { name: "Done" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  // Wrapping up: the last card's rating is saved and the session is ending.
+  await startReview(page, /^\s*AI\b/);
+  try {
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the rating is logged", async () => app.rated.length === 1);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes back that rating and returns to the card", async () => undone().includes(app.rated[0]!.ts) && (await q.count()) > 0);
+    app.rated.pop();
+  } finally {
+    await app.undoAll();
+  }
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: two rating keys in one task log one rating", async (page) => {
   const app = oreCalls(page);
   await startReview(page, null);

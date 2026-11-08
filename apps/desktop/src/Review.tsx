@@ -274,6 +274,16 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     if (queue && !queue.length && !end && !(quick && !reviewed.current)) void finish();
   }, [queue, end, finish, quick]);
 
+  /** ⌘Z pressed while a rating saved or the session wrapped up: it goes to the history once that is done,
+   *  so it takes back the newest step (that rating), never an older card's step meanwhile. */
+  const undoWaiting = useRef<KeyboardEventInit | null>(null);
+  useEffect(() => {
+    const w = undoWaiting.current;
+    if (busy || busyNow.current || !w) return;
+    undoWaiting.current = null;
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { ...w, bubbles: true, cancelable: true }));
+  }, [busy]);
+
   /** The passage the card came from, shown only after the answer (D59). */
   const loadPassage = (c: CardFull) => {
     setQuoteAt(0);
@@ -627,6 +637,13 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
     if (paused) return;
+    if (is(e, "undo") && busyNow.current && !(inTextField(e) && !(e.target as HTMLElement).hasAttribute("data-app-undo"))) {
+      // The step it should take back isn't on the history yet (or is being taken back): it waits.
+      e.preventDefault();
+      e.stopPropagation();
+      undoWaiting.current = { code: e.code, key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey };
+      return;
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       if (phase === "edit") {
