@@ -3589,9 +3589,13 @@ journey("review that can't start because ore failed offers Try again, focused, w
   await page.locator(".review .err").filter({ hasText: "isn’t answering" }).waitFor();
   const retry = page.locator(".review").getByRole("button", { name: "Try again" });
   await until("Try again is focused", () => retry.evaluate((el) => el === document.activeElement));
+  // Only `due` failed: the session that started stays the one, with no second one left open.
+  const starts: string[] = [];
+  page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["session","start"]') && starts.push(r.url()));
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
   await page.keyboard.press("Enter");
   await page.locator(".review-q").waitFor();
+  if (starts.length) throw new Error(`Try again started ${starts.length} more session(s)`);
   await page.keyboard.press("Escape");
 });
 

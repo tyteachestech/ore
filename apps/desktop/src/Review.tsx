@@ -148,12 +148,15 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setError(null);
     void (async () => {
       try {
-        const started = ore<{ id: string }>("session", "start");
-        sessionReady.current = started.catch(() => {});
-        const s = await started;
-        // Closed before the session began: it ends at once, as leaving would have ended it.
-        if (!live) return void ore("session", "end", s.id).catch(() => {});
-        session.current = { id: s.id, open: true };
+        // Try again after `due` failed keeps the session already started: a second would be left open.
+        if (!session.current?.open) {
+          const started = ore<{ id: string }>("session", "start");
+          sessionReady.current = started.catch(() => {});
+          const s = await started;
+          // Closed before the session began: it ends at once, as leaving would have ended it.
+          if (!live) return void ore("session", "end", s.id).catch(() => {});
+          session.current = { id: s.id, open: true };
+        }
         const t = ore<Today>("today").then((t) => {
           before.current = t;
           setStart(t);
@@ -171,13 +174,15 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     return () => {
       live = false;
       mounted.current = false;
-      // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
-      // this session ends, by its id, never another window's.
-      const s = session.current;
-      if (s?.open) void ore("session", "end", s.id).catch(() => {});
-      session.current = null;
     };
   }, [pick, startTry]);
+  // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
+  // this session ends, by its id, never another window's. Try again keeps it.
+  useEffect(() => () => {
+    const s = session.current;
+    if (s?.open) void ore("session", "end", s.id).catch(() => {});
+    session.current = null;
+  }, [pick]);
 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
   // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
