@@ -880,9 +880,9 @@ describe("import coverage: text recognition", () => {
     expect(item.body).toContain("## The testing effect\n\nRetrieving a memory makes it stronger than reading it again. Quiz yourself before you feel ready.");
   });
 
-  test("a scanned PDF is read page by page", async () => {
+  test("a scanned PDF is read page by page, titled by its first heading", async () => {
     const item = await addSource(await tempLibrary(), file("scan.pdf"));
-    expect(item.meta.type).toBe("pdf");
+    expect(item.meta).toMatchObject({ type: "pdf", title: "The testing effect" });
     expect(item.body).toStartWith("<!-- page 1 -->\n\n## The testing effect\n\nRetrieving a memory");
   });
 
