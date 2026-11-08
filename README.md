@@ -152,6 +152,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`2026-11-06-notion-parity.md`](docs/reviews/2026-11-06-notion-parity.md) | The note editor checked block by block against Notion |
 | [`2026-11-08-design-critique-round-5.md`](docs/reviews/2026-11-08-design-critique-round-5.md) | UX critique round 5 (28/40) |
 | [`2026-11-08-shadcn-components.md`](docs/reviews/2026-11-08-shadcn-components.md) | shadcn-ecosystem components pitched for the learning loop, and which were picked (D141 to D143) |
+| [`2026-11-08-more-components.md`](docs/reviews/2026-11-08-more-components.md) | Component pitches round 2, in Rare UI's spirit: ten ideas for the learning loop and which were built |
 | [`2026-11-08-stress-test.md`](docs/reviews/2026-11-08-stress-test.md) | Six-area stress test: 84 findings, the PRs that fixed them, and the design calls (D144) |
 
 
