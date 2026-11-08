@@ -211,10 +211,13 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
   // The arrows move the active cell; keep it in view as they leave the visible rows (not on hover).
   const scroll = useRef<HTMLDivElement>(null);
   const keyed = useRef(false);
+  // An arrow past the drawn rows lands on a cell that draws a render later, with the next page: scroll then.
   useEffect(() => {
-    if (keyed.current) scroll.current?.querySelector<HTMLElement>("[data-active]")?.scrollIntoView({ block: "nearest" });
+    const cell = keyed.current && scroll.current?.querySelector<HTMLElement>("[data-active]");
+    if (!cell) return;
+    cell.scrollIntoView({ block: "nearest" });
     keyed.current = false;
-  }, [active]);
+  }, [active, limit]);
 
   const onKey = (e: ReactKeyboardEvent) => {
     const move = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: COLS, ArrowUp: -COLS }[e.key];

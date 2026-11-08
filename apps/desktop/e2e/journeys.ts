@@ -1762,6 +1762,23 @@ journey("Settings: Esc in the review plan field drops the draft and keeps focus 
   await settings.waitFor({ state: "detached" });
 });
 
+journey("icon picker: ↓ past the rows drawn so far draws the next ones and keeps the picked icon in view", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  await page.getByRole("dialog", { name: "Edit skill Habits" }).getByRole("button", { name: "Change icon" }).click();
+  await page.locator(".picker-cell").nth(100).waitFor();
+  for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowDown"); // onto the first row not drawn yet
+  await until("the picked icon is in view", () =>
+    page.evaluate(() => {
+      const cell = document.querySelector(".picker-cell[data-active]")?.getBoundingClientRect();
+      const box = document.querySelector(".picker-scroll")!.getBoundingClientRect();
+      return !!cell && cell.top >= box.top - 1 && cell.bottom <= box.bottom + 1;
+    }),
+  );
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);
