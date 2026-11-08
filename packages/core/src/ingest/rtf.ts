@@ -1,6 +1,6 @@
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { cleanTitle, fileAuthor } from "./check.ts";
+import { cleanTitle, escapeMarkdown, fileAuthor } from "./check.ts";
 
 // Rich Text (.rtf), what TextEdit saves and Word and Google Docs can export (D122 gap 8): read here
 // as Markdown, with its title, author and date, bold and italic, headings (Word's outline levels, or
@@ -49,7 +49,6 @@ type Para = { runs: Run[]; level: number; list: boolean; ordered: boolean; depth
 /** A paragraph that is already Markdown: a picture. */
 type Raw = { raw: string };
 
-const escape = (s: string) => s.replace(/([\\`*_[\]<>])/g, "\\$1");
 
 /** A paragraph's runs as Markdown: bold and italic opened and closed around words, never spaces. */
 function markdown(runs: Run[]): string {
@@ -69,7 +68,7 @@ function markdown(runs: Run[]): string {
     let keep = 0;
     while (keep < open.length && open[keep] === want[keep]) keep++;
     close(keep);
-    out += lead + want.slice(keep).join("") + escape(core) + tail;
+    out += lead + want.slice(keep).join("") + escapeMarkdown(core) + tail;
     open.push(...want.slice(keep));
   }
   close(0);

@@ -74,7 +74,7 @@ const PLAYLIST = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/playlist\?/;
 const PODCAST = /^https?:\/\/(?:podcasts\.apple\.com\/.+[?&]i=|open\.spotify\.com\/episode\/|overcast\.fm\/|pca\.st\/)/;
 const X_POST = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/\w+\/status\//;
 /** File types Ore reads, by extension. */
-export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "rtf", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
+export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "rtf", "xlsx", "csv", "tsv", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
 /** Audio transcribed on the Mac (D96); as `audio.ts` AUDIO_TYPES, which loads only when used. */
 const AUDIO_TYPES = ["mp3", "m4a", "wav", "aac", "aiff", "flac"];
 /** Video files, heard from their sound on the Mac; as `audio.ts` VIDEO_TYPES. */
@@ -129,6 +129,10 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     const e = await Promise.resolve().then(() => epubToDoc(bytes)).catch(damaged("EPUB"));
     return { type: "epub", title: e.title ?? fileStem(name), author: e.author, published: e.published, url, body: e.body, source: { ext: "epub", data: bytes }, assets: e.assets };
   }
+  if (kind === "xlsx") {
+    const s = await Promise.resolve().then(async () => (await import("./sheets.ts")).xlsxToDoc(bytes)).catch(damaged("Excel", "Excel or Numbers"));
+    return { type: "article", title: s.title ?? fileStem(name), author: s.author, url, body: s.body, source: { ext: "xlsx", data: bytes } };
+  }
   if (kind === "docx" || kind === "pptx") {
     const office = await import("./office.ts");
     const o = await Promise.resolve().then(() => (kind === "docx" ? office.docxToDoc(bytes) : office.pptxToDoc(bytes))).catch(damaged(kind === "docx" ? "Word" : "PowerPoint", kind === "docx" ? "Word or Pages" : "PowerPoint or Keynote"));
@@ -139,6 +143,10 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "article", title: r.title ?? fileStem(name), author: r.author, published: r.published, url, body: r.body, source: { ext: "rtf", data: bytes }, assets: r.assets };
   }
   const text = decodeText(bytes);
+  if (kind === "csv" || kind === "tsv") {
+    const s = (await import("./sheets.ts")).csvToDoc(text, kind === "tsv");
+    return { type: "article", title: fileStem(name), url, body: s.body, source: { ext: kind, data: text } };
+  }
   if (kind === "ipynb") {
     const n = (await import("./notebook.ts")).notebookToDoc(text);
     return { type: "article", title: n.title ?? fileStem(name), url, body: n.body, source: { ext: "ipynb", data: text }, assets: n.assets };
@@ -182,6 +190,9 @@ function kindOf(name: string, ctype = ""): string | null {
   if (ctype.includes("wordprocessingml") || ext === "docx") return "docx";
   if (ctype.includes("presentationml") || ext === "pptx") return "pptx";
   if (/\brtf\b/.test(ctype) || ext === "rtf") return "rtf";
+  if (ctype.includes("spreadsheetml") || ext === "xlsx") return "xlsx";
+  if (/text\/csv/.test(ctype) || ext === "csv") return "csv";
+  if (/tab-separated/.test(ctype) || ext === "tsv") return "tsv";
   if (["ipynb", "srt", "vtt"].includes(ext)) return ext;
   if (IMAGE_TYPES.includes(ext) || AUDIO_TYPES.includes(ext)) return ext;
   const audio = ctype.match(/^audio\/(mpeg|mp3|mp4|x-m4a|aac|wav|x-wav|flac|aiff)/)?.[1];
@@ -219,7 +230,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   const host = new URL(url).host;
   // An arXiv paper with no HTML version (older ones) is read from its PDF.
   // A Google Doc or deck that isn't shared answers its export link with a sign-in page or an error.
-  const google = rw?.url.startsWith("https://docs.google.com/") ? `That Google ${rw.url.includes("/presentation/") ? "Slides deck" : "Doc"} isn’t shared publicly, so Ore can’t download it. In Google, choose Share › Anyone with the link, then add it again; or open it in your browser and ${FROM_TAB}.` : null;
+  const google = rw?.url.startsWith("https://docs.google.com/") ? `That Google ${rw.url.includes("/presentation/") ? "Slides deck" : rw.url.includes("/spreadsheets/") ? "Sheet" : "Doc"} isn’t shared publicly, so Ore can’t download it. In Google, choose Share › Anyone with the link, then add it again; or open it in your browser and ${FROM_TAB}.` : null;
   const res = await get(rw?.url ?? url, host).catch((e) => {
     if (google) throw new Error(google);
     return rw?.url.startsWith("https://arxiv.org/html/") ? get(rw.url.replace("/html/", "/pdf/"), host) : Promise.reject(e);
@@ -386,7 +397,7 @@ async function keep(lib: Library, had: Item, opts: AddOptions): Promise<Item & K
 /** Whether a link reads best by fetching it (a video's transcript, a GitHub file, a PDF), not from the
  *  page a browser shows. */
 const readsByLink = async (url: string) =>
-  isYoutubeUrl(url) || VIDEO_SITE.test(url) || !!(await import("./links.ts")).rewrite(url) || /\.(pdf|epub|docx|pptx|rtf|ipynb)(?:[?#]|$)/i.test(url);
+  isYoutubeUrl(url) || VIDEO_SITE.test(url) || !!(await import("./links.ts")).rewrite(url) || /\.(pdf|epub|docx|pptx|rtf|xlsx|csv|tsv|ipynb)(?:[?#]|$)/i.test(url);
 
 /** The page open in his browser as a source (D96): signed-in, paywalled and browser-built pages come
  *  in as he sees them. A link Ore reads better by fetching (a video, a PDF) is added by its link. */

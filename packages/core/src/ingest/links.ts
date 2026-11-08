@@ -1,5 +1,5 @@
 // Links whose page is not the thing to read, pointed at what is: a GitHub repo at its README, a
-// file on GitHub or nbviewer at its raw text, a shared Google Doc or Slides deck at its export, an
+// file on GitHub or nbviewer at its raw text, a shared Google Doc, Slides deck or Sheet at its export, an
 // arXiv abstract at the paper's full HTML. Others pass through.
 
 export type Rewrite =
@@ -14,6 +14,7 @@ const GH_BLOB = /^https?:\/\/(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)\/blob\/
 const NBVIEWER = /^https?:\/\/nbviewer\.(?:org|jupyter\.org)\/github\/([\w.-]+)\/([\w.-]+)\/blob\/([^?#]+)/;
 const GDOC = /^https?:\/\/docs\.google\.com\/document\/d\/([\w-]+)/;
 const GSLIDES = /^https?:\/\/docs\.google\.com\/presentation\/d\/([\w-]+)/;
+const GSHEETS = /^https?:\/\/docs\.google\.com\/spreadsheets\/d\/([\w-]+)/;
 const ARXIV = /^https?:\/\/(?:www\.)?arxiv\.org\/abs\/([\w.\/-]+?)(?:v\d+)?\/?(?:[?#].*)?$/;
 /** github.com paths that are site pages, not repos. */
 const GH_PAGES = new Set(["orgs", "topics", "settings", "marketplace", "explore", "features", "pricing", "sponsors", "collections", "trending"]);
@@ -28,6 +29,7 @@ export function rewrite(url: string): Rewrite | null {
   if (m && !GH_PAGES.has(m[1]!)) return { kind: "readme", owner: m[1]!, repo: m[2]! };
   if ((m = url.match(GDOC))) return { kind: "fetch", url: `https://docs.google.com/document/d/${m[1]}/export?format=docx` };
   if ((m = url.match(GSLIDES))) return { kind: "fetch", url: `https://docs.google.com/presentation/d/${m[1]}/export/pptx` };
+  if ((m = url.match(GSHEETS))) return { kind: "fetch", url: `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=xlsx` };
   if ((m = url.match(ARXIV))) return { kind: "fetch", url: `https://arxiv.org/html/${m[1]}` };
   return null;
 }

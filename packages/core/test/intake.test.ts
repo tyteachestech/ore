@@ -8,6 +8,7 @@ import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
 import { rtfToDoc } from "../src/ingest/rtf.ts";
+import { xlsxToDoc } from "../src/ingest/sheets.ts";
 import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { inlineMath } from "../src/ingest/web.ts";
@@ -176,6 +177,7 @@ describe("import coverage: web pages", () => {
     expect(rewrite("https://nbviewer.org/github/jakevdp/PythonDataScienceHandbook/blob/master/notebooks/a.ipynb")).toMatchObject({ kind: "fetch", url: "https://raw.githubusercontent.com/jakevdp/PythonDataScienceHandbook/master/notebooks/a.ipynb" });
     expect(rewrite("https://docs.google.com/document/d/abc_123/edit?usp=sharing")).toEqual({ kind: "fetch", url: "https://docs.google.com/document/d/abc_123/export?format=docx" });
     expect(rewrite("https://docs.google.com/presentation/d/abc_123/edit#slide=id.p")).toEqual({ kind: "fetch", url: "https://docs.google.com/presentation/d/abc_123/export/pptx" });
+    expect(rewrite("https://docs.google.com/spreadsheets/d/abc_123/edit#gid=0")).toEqual({ kind: "fetch", url: "https://docs.google.com/spreadsheets/d/abc_123/export?format=xlsx" });
     expect(rewrite("https://github.com/topics/learning")).toBeNull();
     expect(rewrite("https://example.com/a")).toBeNull();
     expect(absolutize("![a](img/x.png) [b](#top)", "https://raw.githubusercontent.com/o/r/main/README.md")).toBe("![a](https://raw.githubusercontent.com/o/r/main/img/x.png) [b](#top)");
@@ -242,6 +244,9 @@ describe("import coverage: junk is refused with the next step", () => {
     expect(cleanAuthor("AK, AM, BH, CM, CD")).toBeUndefined();
     expect(cleanAuthor("Ashish Vaswani, Noam Shazeer")).toBe("Ashish Vaswani, Noam Shazeer");
     expect(cleanAuthor("Microsoft Office User")).toBeUndefined();
+    expect(cleanAuthor("openpyxl")).toBeUndefined();
+    expect(cleanTitle("Book1")).toBeUndefined();
+    expect(cleanTitle("vocab.xlsx")).toBeUndefined();
     expect(cleanDate("2026-10-26, 2026-10-21, 2026-10-19")).toBeUndefined();
     expect(cleanDate("Elapsed00:00")).toBeUndefined();
     expect(cleanDate("1 month ago")).toBeUndefined();
@@ -409,6 +414,67 @@ describe("import coverage: files", () => {
     expect(rtf("\\pard\\ls1\\ilvl0{\\listtext 1.\\tab}First\\par\\pard\\ls1\\ilvl1{\\listtext a.\\tab}Inner\\par\\pard\\ls1\\ilvl0{\\listtext 2.\\tab}Second\\par")).toBe("1. First\n  1. Inner\n1. Second\n");
     expect(rtf("visible{\\v hidden} and {\\deleted gone}kept\\par")).toBe("visible and kept\n");
     expect(rtf("5*3 and 2*4 are [products]\\par - 5 degrees\\par {\\b bold}{\\b\\i both}{\\i it}\\par")).toBe("5\\*3 and 2\\*4 are \\[products\\]\n\n\\- 5 degrees\n\n**bold*both****it*\n");
+  });
+
+  test("Excel: each sheet a table under its name, dates as dates, formulas' values, its title and author", async () => {
+    const item = await addSource(await tempLibrary(), file("vocab.xlsx"));
+    expect(item.meta).toMatchObject({ type: "article", title: "Spanish vocabulary", author: "Ada Learner" });
+    expect(item.body).toBe(
+      [
+        "## Spanish",
+        "",
+        "| Word | Meaning | Example | Added | Reviews |",
+        "| --- | --- | --- | --- | --- |",
+        '| olvidar | to forget | Sin repasar, "olvidamos" rápido. | 2025-03-04 | 3 |',
+        "| recordar | to remember, to recall | Recordar es practicar \\| de verdad. | 2025-03-05 | 5 |",
+        "| repasar | to review |  | 2025-03-06 | 8 |",
+        "",
+        "## Grammar",
+        "",
+        "| Rule | Example |",
+        "| --- | --- |",
+        "| Ser for what something is | La memoria es frágil. |",
+        "| Estar for how it is now | Estoy cansado. |",
+        "",
+      ].join("\n"),
+    );
+    expect(existsSync(join(item.dir, "source.xlsx"))).toBe(true);
+  });
+
+  test("Excel's corners: the 1904 calendar, times and durations, prefixed XML, a table that starts at B2, empty formatted rows", async () => {
+    const xml = (sheet: string, workbookPr = "") =>
+      zipSync({
+        "[Content_Types].xml": strToU8("<Types/>"),
+        "_rels/.rels": strToU8('<Relationships><Relationship Id="r1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
+        "xl/workbook.xml": strToU8(`<x:workbook xmlns:x="main" xmlns:r="rel">${workbookPr}<x:sheets><x:sheet name="Log" sheetId="1" r:id="rId1"/></x:sheets></x:workbook>`),
+        "xl/_rels/workbook.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Type=".../worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="strings.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'),
+        "xl/strings.xml": strToU8("<x:sst><x:si><x:t>Day</x:t></x:si><x:si><x:t>Start</x:t></x:si><x:si><x:t>Studied</x:t></x:si></x:sst>"),
+        "xl/styles.xml": strToU8('<x:styleSheet><x:numFmts><x:numFmt numFmtId="170" formatCode="[h]:mm"/></x:numFmts><x:cellXfs><x:xf numFmtId="0"/><x:xf numFmtId="14"/><x:xf numFmtId="20"/><x:xf numFmtId="170"/></x:cellXfs></x:styleSheet>'),
+        "xl/worksheets/sheet1.xml": strToU8(`<x:worksheet><x:sheetData><x:row r="1" ht="20"/>${sheet}<x:row r="9" ht="20"/></x:sheetData></x:worksheet>`),
+      });
+    const rows = '<x:row r="2"><x:c r="B2" t="s"><x:v>0</x:v></x:c><x:c r="C2" t="s"><x:v>1</x:v></x:c><x:c r="D2" t="s"><x:v>2</x:v></x:c><x:c r="Z2" s="1"/></x:row><x:row r="3"><x:c r="B3" s="1"><x:v>43894</x:v></x:c><x:c r="C3" s="2"><x:v>0.5208333333</x:v></x:c><x:c r="D3" s="3"><x:v>1.5</x:v></x:c></x:row>';
+    const table = "## Log\n\n| Day | Start | Studied |\n| --- | --- | --- |\n| ROW |\n";
+    expect(xlsxToDoc(xml(rows)).body).toBe(table.replace("ROW", "2020-03-04 | 12:30 | 36:00"));
+    // Older Mac Excel counts days from 1904.
+    expect(xlsxToDoc(xml(rows, '<x:workbookPr date1904="1"/>')).body).toBe(table.replace("ROW", "2024-03-05 | 12:30 | 36:00"));
+  });
+
+  test("CSV and TSV: a table, quotes, commas and line breaks inside cells, Excel's semicolons", async () => {
+    const d = mkdtempSync(join(tmpdir(), "ore-csv-"));
+    // verbs.csv: a byte-order mark, Windows line ends, an empty first column, a space before a quote,
+    // Markdown's own characters in a cell.
+    const csv = await addSource(await tempLibrary(), file("verbs.csv"));
+    expect(csv.meta.title).toBe("verbs");
+    expect(csv.body).toBe('| word | meaning | note |\n| --- | --- | --- |\n| olvidar | to forget, lose | irregular? no, regular |\n| recordar | to remember to recall | o → ue: "recuerdo" |\n| \\*soler\\* | to usually do | \\<always\\> \\[with\\] an infinitive |\n');
+    writeFileSync(join(d, "es.csv"), "palabra;significado\nolvidar;to forget, lose\n");
+    expect((await addSource(await tempLibrary(), join(d, "es.csv"))).body).toBe("| palabra | significado |\n| --- | --- |\n| olvidar | to forget, lose |\n");
+    writeFileSync(join(d, "terms.tsv"), "term\tdefinition\nspacing\treviews spread over days\n");
+    expect((await addSource(await tempLibrary(), join(d, "terms.tsv"))).body).toContain("| spacing | reviews spread over days |");
+    writeFileSync(join(d, "empty.csv"), "\n\n");
+    await expect(addSource(await tempLibrary(), join(d, "empty.csv"))).rejects.toThrow(/no rows/);
+    // A dataset is not something to read, and half of one would be worse.
+    writeFileSync(join(d, "data.csv"), "id,value\n" + "1,2\n".repeat(6000));
+    await expect(addSource(await tempLibrary(), join(d, "data.csv"))).rejects.toThrow(/6,001 rows, too many to read/);
   });
 
   test("a damaged or empty RTF file says so", async () => {
@@ -1074,7 +1140,7 @@ describe("import coverage: the grid's small holes", () => {
   test("a damaged EPUB, Word or PowerPoint file says to download it again", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ore-broken-"));
     const cut = new Uint8Array(readFileSync(join(FIX, "files", "deck.pptx")).subarray(0, 600));
-    for (const [name, what] of [["book.epub", "EPUB"], ["notes.docx", "Word"], ["deck.pptx", "PowerPoint"]] as const) {
+    for (const [name, what] of [["book.epub", "EPUB"], ["notes.docx", "Word"], ["deck.pptx", "PowerPoint"], ["vocab.xlsx", "Excel"]] as const) {
       writeFileSync(join(dir, name), cut);
       await expect(addSource(await tempLibrary(), join(dir, name))).rejects.toThrow(new RegExp(`That ${what} file is damaged or only partly downloaded\\. Download it again`));
     }
