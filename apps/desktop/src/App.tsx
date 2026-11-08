@@ -307,6 +307,16 @@ export function App() {
   // second A then archives it again). Each write reads the list again once it settles.
   const writes = useRef(0);
   const writing = <T,>(p: Promise<T>) => (writes.current++, p.finally(() => writes.current--));
+  /** One action's writes, one after another: an Undo pressed while its archive still saves waits for it,
+   *  or the two `ore` runs race and the archive can land last, leaving it archived. */
+  const inOrder = () => {
+    let last: Promise<unknown> = Promise.resolve();
+    return <T,>(write: () => Promise<T>): Promise<T> => {
+      const p = last.then(write);
+      last = p.catch(() => {});
+      return writing(p);
+    };
+  };
   const refresh = useCallback(async () => {
     const n = ++reads.current;
     try {
@@ -1252,7 +1262,8 @@ export function App() {
       setItems((all) => (on ? all?.filter((i) => i.id !== item.id) : all && [moved, ...all.filter((i) => i.id !== item.id)]) ?? all);
       setArchived((all) => (on ? [moved, ...all.filter((i) => i.id !== item.id)] : all.filter((i) => i.id !== item.id)));
     };
-    const save = (on: boolean) => writing(ore("archive", item.id, ...(on ? [] : ["--undo"])));
+    const queue = inOrder();
+    const save = (on: boolean) => queue(() => ore("archive", item.id, ...(on ? [] : ["--undo"])));
     mark(archived);
     if (archived && openId === item.id) setOpenId(null);
     const was = cursor;
@@ -1359,13 +1370,14 @@ export function App() {
     const ids = new Set(c.lessons.map((l) => l.id));
     setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
     if (openId && ids.has(openId)) setOpenId(null);
+    const queue = inOrder();
     const apply = (on: boolean) => {
       if (on) setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
-      writing(ore("course", "archive", c.id, ...(on ? [] : ["--undo"]))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+      queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"]))).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
     };
     notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
     try {
-      await writing(ore("course", "archive", c.id));
+      await queue(() => ore("course", "archive", c.id));
     } catch (e) {
       notify(errorText(e), "error");
     }
@@ -1394,13 +1406,14 @@ export function App() {
     const sel = many;
     const ids = new Set(sel.map((i) => i.id));
     const was = cursor;
+    const queue = inOrder();
     const go = async (forward: boolean) => {
       if (patch) setItems((all) => all && (forward ? all.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) : [...all.filter((i) => !ids.has(i.id)), ...sel]));
       if (!forward) setCursor(was);
       try {
-        await writing((async () => {
+        await queue(async () => {
           for (const i of sel) await write(i, forward);
-        })());
+        });
       } catch (e) {
         notify(errorText(e), "error");
       }

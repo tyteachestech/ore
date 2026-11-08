@@ -3086,6 +3086,12 @@ journey("archive a source from its row, then Undo from the toast", async (page) 
   await until("the row leaves the list", async () => !(await row.isVisible()));
   await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
   await row.waitFor();
+  // An Undo pressed while the archive still saves runs after it, so the file ends restored (the two
+  // `ore` runs used to race, and the archive could land last).
+  await until("the library has it back", async () => ((await ore("ls")) as { title: string }[]).some((i) => i.title === AGENTS));
+  await page.waitForTimeout(1000);
+  if (!((await ore("ls")) as { title: string }[]).some((i) => i.title === AGENTS)) throw new Error("the archive landed after its Undo");
+  await row.waitFor();
 });
 
 journey("finish: when drafting the cards fails, a toast says why and Try again drafts them", async (page) => {
