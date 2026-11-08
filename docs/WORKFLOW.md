@@ -13,7 +13,7 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 - Pause pulls while Tyler or an AI tester is using the app.
 
 ## Parallel threads
-- `~/Developer/ore` stays on `master`: the installed app runs its CLI (D30) against his real library. Build branches in a worktree (`git worktree add ../ore-<topic>`), never by checking one out there.
+- `~/Developer/ore` stays on `master`: the installed app carries a CLI compiled from it at install (D30), run against his real library. Build branches in a worktree (`git worktree add ../ore-<topic>`), never by checking one out there.
 - Rebase onto `origin/master` before pushing and again before merging; another thread may have landed.
 - Git housekeeping is the thread's job, never Tyler's: do resets, rebases, branch cleanup and reinstalls yourself on the Mac, and never ask him to run a git command. Never rewrite master's history; if it ever must be, the thread that does it also resets `~/Developer/ore`, rebases open PRs and deletes the old branches.
 - Name files in NFC Unicode (macOS shows NFD names as untracked).

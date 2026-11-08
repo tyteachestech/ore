@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "tauri": "CARGO_TARGET_DIR=\"${CARGO_TARGET_DIR:-$HOME/Library/Caches/ore/target}\" tauri",
-    "app:install": "bun run tauri build --bundles app && { [ ! -e /Applications/Ore.app ] || trash /Applications/Ore.app; } && ditto \"${CARGO_TARGET_DIR:-$HOME/Library/Caches/ore/target}/release/bundle/macos/Ore.app\" /Applications/Ore.app"
+    "app:install": "bun run tauri build --config src-tauri/tauri.release.json --bundles app && { [ ! -e /Applications/Ore.app ] || trash /Applications/Ore.app; } && ditto \"${CARGO_TARGET_DIR:-$HOME/Library/Caches/ore/target}/release/bundle/macos/Ore.app\" /Applications/Ore.app"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",

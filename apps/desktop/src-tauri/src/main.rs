@@ -61,7 +61,8 @@ fn login_path() -> &'static str {
     })
 }
 
-/// (ore binary, PATH for the child). `$ORE_BIN`, then `~/.bun/bin/ore`, then the login PATH.
+/// (ore binary, PATH for the child). `$ORE_BIN`, then the compiled one the app carries, then
+/// `~/.bun/bin/ore`, then the login PATH.
 fn resolve() -> Result<(PathBuf, String), String> {
     let path = login_path();
     let home = home();
@@ -71,13 +72,14 @@ fn resolve() -> Result<(PathBuf, String), String> {
             candidates.push(PathBuf::from(bin.trim()));
         }
     }
-    candidates.push(home.join(".bun/bin/ore"));
-    candidates.extend(path.split(':').filter(|d| !d.is_empty()).map(|d| Path::new(d).join("ore")));
-    // Last, the one a release build carries beside the app as ore-cli (tauri.release.json; the app
-    // itself is MacOS/ore): a friend's Mac has no checkout, so it runs there; a linked checkout wins.
+    // The CLI an installed build carries beside the app as ore-cli (tauri.release.json, which
+    // app:install uses too; the app itself is MacOS/ore), compiled to bytecode: a call starts in
+    // ~25 ms against ~75 ms from source (D30). `tauri dev` carries none, so it runs the linked checkout.
     if let Some(dir) = env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
         candidates.push(dir.join("ore-cli"));
     }
+    candidates.push(home.join(".bun/bin/ore"));
+    candidates.extend(path.split(':').filter(|d| !d.is_empty()).map(|d| Path::new(d).join("ore")));
     let bin = candidates
         .into_iter()
         .find(|p| p.is_file())
