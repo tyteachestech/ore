@@ -1021,3 +1021,81 @@ describe("import coverage: the grid's small holes", () => {
     await expect(addSource(lib, "https://docs.google.com/presentation/d/abc_123/edit")).rejects.toThrow(/That Google Slides deck isn’t shared publicly/);
   });
 });
+
+// D122 gap 4: what people learn from in other languages and scripts.
+describe("import coverage: other languages", () => {
+  test("PDF in other scripts: Russian, Greek, Japanese and Chinese lines join as written, Arabic as plain letters", async () => {
+    // make-scripts-pdf.py: Japanese and Chinese wrap mid-sentence with no space at the break; Arabic is
+    // set as word processors write it, in shaped letters (U+FExx) that no search would match.
+    const item = await addSource(await tempLibrary(), file("scripts.pdf"));
+    expect(item.meta.title).toBe("Память и повторение");
+    const b = item.body;
+    expect(b).toContain("каждый раз, когда мы вспоминаем факт");
+    expect(b).toContain("την απλή ανάγνωση, γιατί");
+    expect(b).toContain("思い出す練習が記憶を強くする。読み返すだけでは、わかった気になるだけだ。");
+    expect(b).toContain("而不是反复阅读。每次回忆都会让记忆更加牢固。");
+    expect(b).toContain("التكرار المتباعد يساعد على التذكر، والاسترجاع يقوي الذاكرة");
+    expect(b).not.toMatch(/[ﭐ-﷿ﹰ-﻾]/);
+  });
+
+  test("a screenshot in Japanese: its lines join without spaces", () => {
+    const l = (t: string, y: number) => ({ t, x: 0.05, y, w: 0.9, h: 0.02 });
+    expect(ocrMarkdown({ lines: [l("思い出す", 0.1), l("練習が記憶を強くする。", 0.125), l("Recall works in English too,", 0.15), l("across lines.", 0.175)] })).toBe("思い出す練習が記憶を強くする。 Recall works in English too, across lines.");
+  });
+
+  describe("podcasts are heard in their own language", () => {
+    const VTT = "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nHola a todos.\n\n";
+    let dir = "";
+    const was = process.env.ORE_TRANSCRIBE;
+    beforeAll(() => {
+      dir = mkdtempSync(join(tmpdir(), "ore-lang-"));
+      writeFileSync(join(dir, "out.vtt"), VTT);
+      writeFileSync(join(dir, "transcribe"), `#!/bin/sh\necho "$@" > '${dir}/args'\ncat '${dir}/out.vtt'\n`);
+      chmodSync(join(dir, "transcribe"), 0o755);
+      process.env.ORE_TRANSCRIBE = join(dir, "transcribe");
+    });
+    afterAll(() => {
+      if (was === undefined) delete process.env.ORE_TRANSCRIBE;
+      else process.env.ORE_TRANSCRIBE = was;
+    });
+    const language = () => readFileSync(join(dir, "args"), "utf8").trim().split(" ").slice(1).join(" ");
+    const feed = (lang: string, items = "") => `<?xml version="1.0"?><rss><channel><title>Radio Ambulante</title><language>${lang}</language>${items}</channel></rss>`;
+
+    test("a Spanish show on Apple Podcasts is heard in Spanish, as its feed says", async () => {
+      serve({
+        "https://itunes.apple.com/lookup?id=527614348&entity=podcastEpisode&limit=200": { body: JSON.stringify({ results: [{ wrapperType: "track", kind: "podcast", trackId: 527614348, feedUrl: "https://feeds.test/ambulante" }, { trackId: 1000600000001, episodeUrl: "https://audio.test/ep1.mp3", trackName: "La memoria", collectionName: "Radio Ambulante" }] }), type: "application/json" },
+        "https://feeds.test/ambulante": { body: feed("es-419"), type: "application/rss+xml" },
+        "https://audio.test/ep1.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
+      });
+      const item = await addSource(await tempLibrary(), "https://podcasts.apple.com/us/podcast/la-memoria/id527614348?i=1000600000001");
+      expect(item.body).toBe("[00:00] Hola a todos.\n");
+      expect(language()).toBe("es-419");
+    });
+
+    test("a Spotify episode is heard in its feed's language; a show's own page in its page's", async () => {
+      serve({
+        "https://open.spotify.com/episode/abc": { body: `<meta property="og:title" content="La memoria"><meta property="og:description" content="Radio Ambulante · Episode">`, type: HTML },
+        "https://itunes.apple.com/search?media=podcast&entity=podcast&limit=10&term=Radio%20Ambulante": { body: JSON.stringify({ results: [{ collectionName: "Radio Ambulante", feedUrl: "https://feeds.test/ambulante" }] }), type: "application/json" },
+        "https://feeds.test/ambulante": { body: feed("es", `<item><title>La memoria</title><enclosure url="https://audio.test/ep1.mp3"/></item>`), type: "application/rss+xml" },
+        "https://audio.test/ep1.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
+      });
+      await addSource(await tempLibrary(), "https://open.spotify.com/episode/abc");
+      expect(language()).toBe("es");
+      serve({
+        "https://pca.st/episode/xyz": { body: `<html lang="fr"><head><meta property="og:title" content="La mémoire"></head><body><audio src="https://audio.test/fr.mp3"></audio></body></html>`, type: HTML },
+        "https://audio.test/fr.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
+      });
+      await addSource(await tempLibrary(), "https://pca.st/episode/xyz");
+      expect(language()).toBe("fr");
+    });
+
+    test("an episode whose feed names no language is heard in the Mac's", async () => {
+      serve({
+        "https://overcast.fm/+NoLang": { body: `<html><head><meta property="og:title" content="Memory"></head><body><audio src="https://audio.test/en.mp3"></audio></body></html>`, type: HTML },
+        "https://audio.test/en.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
+      });
+      await addSource(await tempLibrary(), "https://overcast.fm/+NoLang");
+      expect(language()).toBe("");
+    });
+  });
+});

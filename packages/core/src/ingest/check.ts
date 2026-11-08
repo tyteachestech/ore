@@ -13,6 +13,12 @@ export function wordCount(md: string): number {
   return spaced + (text.match(CJK)?.length ?? 0);
 }
 
+const CJK_END = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\u3000-\u303f\uff00-\uffef]$/u;
+const CJK_START = /^[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\u3000-\u303f\uff00-\uffef]/u;
+/** What goes between two lines joined into one paragraph: a space, except where a Chinese or Japanese
+ *  sentence wraps, since those scripts put no space between words. */
+export const lineBreakSpace = (before: string, after: string): string => (CJK_END.test(before) && CJK_START.test(after) ? "" : " ");
+
 /** The next step for a page only his browser can open (D96). */
 export const FROM_TAB = "add it from the browser (Browser tab in the add box, or `ore add --tab`)";
 

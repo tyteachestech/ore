@@ -3,7 +3,7 @@ import * as pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { cleanTitle } from "./check.ts";
+import { cleanTitle, lineBreakSpace } from "./check.ts";
 import type { Box, Region } from "./docling.ts";
 import { pageFigures, png } from "./pdf-figures.ts";
 
@@ -55,7 +55,10 @@ interface Line {
 function toItem(it: TextItem, font: (name: string) => string): Item {
   const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = it.transform;
   const size = b || c ? 0 : Math.round(Math.hypot(c, d) * 10) / 10;
-  return { str: it.str, x, y, end: x + (it.width ?? 0) * (a < 0 ? -1 : 1), size, eol: it.hasEOL, ...faceOf(font(it.fontName)) };
+  // Arabic set in its shaped letters (how word processors write it) reads as plain Arabic letters,
+  // which search, highlights and the tutor can match.
+  const str = it.str.replace(/[\uFB50-\uFDFF\uFE70-\uFEFE]+/g, (s) => s.normalize("NFKC"));
+  return { str, x, y, end: x + (it.width ?? 0) * (a < 0 ? -1 : 1), size, eol: it.hasEOL, ...faceOf(font(it.fontName)) };
 }
 
 /** Math fonts set every variable in italic: that is notation, not emphasis. */
@@ -225,7 +228,7 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
     if (body && (l.size >= body * 1.15 || (l.size >= body * 1.05 && NUMBERED.test(line)))) {
       let j = i + 1;
       while (j < lines.length && lines[j]!.size === l.size) j++;
-      const text = lines.slice(i, j).map((x) => plain(x.text)).join(" ");
+      const text = lines.slice(i, j).map((x) => plain(x.text)).reduce((a, t) => a + lineBreakSpace(a, t) + t);
       const next = lines[j];
       if (text.length <= 150 && /\p{L}{3}/u.test(text) && !/[.,;:<>]$/.test(text) && (!next || Math.abs(next.size - body) <= body * 0.1)) {
         push();
@@ -284,7 +287,7 @@ function join(para: string, text: string, words: Set<string>): string {
   }
   const piece = p.match(/(?:^|[^\p{L}])(\p{Ll}{2,})$/u)?.[1];
   if (piece && /^\p{Ll}{2,}/u.test(right) && words.has(piece + right) && !words.has(piece)) return para + text;
-  return para + " " + text;
+  return para + lineBreakSpace(p, plain(text)) + text;
 }
 
 /** A face most of the text is set in (a deck all in bold) marks nothing: only a face used for some
@@ -370,7 +373,7 @@ function titleFrom(first: Line[], body: number): string | undefined {
   const at = first.findIndex((l) => l.size === top);
   const lines = [plain(first[at]!.text)];
   for (let i = at + 1; i < first.length && first[i]!.size === top; i++) lines.push(plain(first[i]!.text));
-  let t = lines.join(" ").trim();
+  let t = lines.reduce((a, l) => a + lineBreakSpace(a, l) + l).trim();
   const name = LABEL.test(t) ? first.slice(at + lines.length).find((l) => l.size >= body * 1.6) : undefined;
   if (name) t = `${unshout(t)}: ${unshout(plain(name.text))}`;
   return t.length >= 4 && t.length <= 200 ? t : undefined;

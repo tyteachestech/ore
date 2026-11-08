@@ -16,13 +16,13 @@ type Progress = (done: number, label?: string) => void;
 
 /** The audio as WebVTT. `onProgress` gets 0..1 as it goes, and a line to show while the speech model
  *  downloads the first time. */
-export async function transcribe(data: Uint8Array, ext: string, onProgress?: Progress): Promise<string> {
+export async function transcribe(data: Uint8Array, ext: string, onProgress?: Progress, language?: string): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "ore-audio-"));
   madeThisRun(dir);
   try {
     const file = join(dir, `audio.${ext}`);
     writeFileSync(file, data);
-    return await transcribeFile(file, onProgress);
+    return await transcribeFile(file, onProgress, language);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -55,7 +55,19 @@ export interface Episode {
   title?: string;
   show?: string;
   published?: string;
+  /** The speech's language as the show's feed or page names it ("es-419"), so it is heard in it. */
+  language?: string;
 }
+
+/** A feed's or page's language tag in its usual spelling ("en-us" → "en-US"); none when it isn't one. */
+function languageTag(tag: string | undefined): string | undefined {
+  try {
+    return tag?.trim() ? Intl.getCanonicalLocales(tag.trim())[0] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const feedLanguage = (xml: string) => languageTag(xml.match(/<language>([^<]*)<\/language>/i)?.[1]);
 
 const APPLE = /^https?:\/\/podcasts\.apple\.com\/.*\/id(\d+)\b.*[?&]i=(\d+)/;
 const SPOTIFY = /^https?:\/\/open\.spotify\.com\/episode\//;
@@ -68,9 +80,13 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   if (apple) {
     // Apple's lookup finds episodes by their show (the path's id), not by the episode's own id.
     const res = await fetcher(`https://itunes.apple.com/lookup?id=${apple[1]}&entity=podcastEpisode&limit=200`).catch(() => null);
-    const hit = res?.ok ? ((await res.json()) as { results?: Record<string, string>[] }).results?.find((r) => String(r.trackId) === apple[2] && r.episodeUrl) : undefined;
+    const results = res?.ok ? (((await res.json()) as { results?: Record<string, string>[] }).results ?? []) : [];
+    const hit = results.find((r) => String(r.trackId) === apple[2] && r.episodeUrl);
     if (!hit) throw new Error("Couldn’t find that episode’s audio on Apple Podcasts (it may be older than the show’s last 200). Add the episode from the show’s own site instead.");
-    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate };
+    // The show's own feed names the language it speaks.
+    const feed = results.find((r) => r.feedUrl)?.feedUrl;
+    const xml = feed ? await (await fetcher(feed).catch(() => null))?.text().catch(() => "") : "";
+    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, language: feedLanguage(xml ?? "") };
   }
   const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
   const html = res?.ok ? await res.text() : "";
@@ -80,7 +96,8 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   const meta = (p: string) => tags.map((t) => ((attr(t, "property") ?? attr(t, "name"))?.toLowerCase() === p ? attr(t, "content") : undefined)).find(Boolean);
   const audio = meta("og:audio") ?? meta("og:audio:url") ?? html.match(/<(?:audio|source)[^>]+src=["']([^"']+\.(?:mp3|m4a)[^"']*)["']/i)?.[1];
   if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
-  return { audio: new URL(audio.replace(/&amp;/g, "&"), url).href, title: meta("og:title"), show: meta("og:site_name") };
+  const language = languageTag(html.match(/<html\b[^>]*\blang\s*=\s*["']([^"']+)["']/i)?.[1]);
+  return { audio: new URL(audio.replace(/&amp;/g, "&"), url).href, title: meta("og:title"), show: meta("og:site_name"), language };
 }
 
 /** Titles compared as words: case, punctuation and "&" vs "and" aside. */
@@ -118,5 +135,5 @@ async function spotify(url: string, fetcher: typeof fetch): Promise<Episode> {
   const sameDay = published ? items.filter((i) => i.audio && i.day === published.slice(0, 10)) : [];
   const hit = items.find((i) => i.audio && words(i.title) === want) ?? (sameDay.length === 1 ? sameDay[0] : undefined);
   if (!hit?.audio) throw new Error(`Couldn’t find “${title}” in ${show}’s public feed: it may be only on Spotify. Find the episode on Apple Podcasts or the show’s site and add that link instead.`);
-  return { audio: decodeXml(hit.audio), title, show, published };
+  return { audio: decodeXml(hit.audio), title, show, published, language: feedLanguage(xml) };
 }

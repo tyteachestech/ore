@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { lineBreakSpace } from "./check.ts";
 import { run, swiftHelper } from "./swift.ts";
 
 // Text recognition (D96 phase 3): a scanned PDF or an image read with Apple's Vision framework,
@@ -46,7 +47,7 @@ export function ocrMarkdown(page: OcrPage): string {
     const prev = lines[i - 1];
     const gap = prev ? l.y - (prev.y + prev.h) : 0;
     if (prev && (gap > h * 0.7 || l.y < prev.y - h * 0.5 || Math.abs(l.x - prev.x) > 0.25)) flush();
-    para = !para ? text : /\p{L}-$/u.test(para) && /^\p{Ll}/u.test(text) ? para.slice(0, -1) + text : `${para} ${text}`;
+    para = !para ? text : /\p{L}-$/u.test(para) && /^\p{Ll}/u.test(text) ? para.slice(0, -1) + text : para + lineBreakSpace(para, text) + text;
   });
   flush();
   return out.join("\n\n");
