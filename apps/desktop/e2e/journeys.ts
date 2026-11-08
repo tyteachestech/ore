@@ -692,20 +692,21 @@ journey("tutor steps: Show me's worked answer shows one step at a time, Next ste
     const next = tutor.getByRole("button", { name: "Next step" });
     await next.click();
     await until("Next step shows the second", async () => (await shown.count()) === 2 && (await shown.nth(1).innerText()).includes("stronger"));
+    // Closed and opened again, the steps he showed stay shown.
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+j");
+    await until("the steps came back as he left them", async () => (await shown.count()) === 2);
+    // The next message carries the steps he has seen as what the tutor said, not the one still hidden.
+    await field.fill("Why step 2?");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("Step 2 is the testing effect.").waitFor();
+    if (!bodies[2]!.includes("2. Pulling them out made the memory stronger.")) throw new Error("the follow-up didn't carry the steps");
+    if (bodies[2]!.includes("remembered more")) throw new Error("the follow-up carried a step he hadn't seen");
     await next.click();
     await until("the last step shows", async () => (await shown.count()) === 3);
     await shown.nth(2).locator("strong").waitFor();
     if (await next.count()) throw new Error("Next step stayed after the last step");
     await until("the field has the focus", () => field.evaluate((f) => f === document.activeElement));
-    // Closed and opened again, the steps he showed stay shown.
-    await page.keyboard.press("Escape");
-    await page.keyboard.press("Meta+j");
-    await until("the steps came back as he left them", async () => (await shown.count()) === 3);
-    // The next message carries the steps as what the tutor said.
-    await field.fill("Why step 2?");
-    await page.keyboard.press("Enter");
-    await tutor.getByText("Step 2 is the testing effect.").waitFor();
-    if (!bodies[2]!.includes("2. Pulling them out made the memory stronger.")) throw new Error("the follow-up didn't carry the steps");
   } finally {
     await page.unroute(/\/ore$/);
   }

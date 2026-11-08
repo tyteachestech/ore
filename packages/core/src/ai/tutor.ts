@@ -18,6 +18,9 @@ import { PASSAGES, plainText, retrieve, splitPassages, type Citation, type Passa
 
 export interface TutorTurn { message: string; reply: string }
 
+/** A reply with its worked answer's steps numbered under it (D142): what it said, as text. */
+export const withSteps = (r: { reply: string; steps: string[] }) => [r.reply, ...r.steps.map((s, i) => `${i + 1}. ${s}`)].join("\n");
+
 export const TutorCard = z.strictObject({
   kind: z.enum(["card", "prompt"]),
   content_type: ContentType,
@@ -139,7 +142,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
         if (!locate(p.text, c.quote)) return `the quote "${c.quote}" is not in ${c.passage}: copy its exact words`;
       }
       const top = Math.max(0, ...[...[d.reply, ...d.steps].join("\n").matchAll(/\[(\d+)\]/g)].map((x) => +x[1]!));
-      if (d.steps.length === 1) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
+      if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
       if (d.steps.length && (d.hint || d.exercise)) return "steps are a worked answer: not with a hint or an exercise";
       if (top > d.citations.length) return `marker [${top}] has no citation`;
       if (d.card && d.card.kind === "prompt" && !d.card.rubric.length) return "a prompt card needs 2 to 4 rubric points";

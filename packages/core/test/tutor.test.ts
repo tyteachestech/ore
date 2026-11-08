@@ -274,6 +274,8 @@ describe("tutor: hints and cards", () => {
       { reply: "Here's the working.", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: true, steps, exercise: null, card: null },
       { reply: "Here's the working.", citations: [], general: false, hint: false, steps, exercise: null, card: null },
       { reply: "Here's the working.", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, steps, exercise: null, card: null },
+      { reply: "Here's the working.", citations: [], general: false, hint: false, steps: Array(7).fill(steps[1]), exercise: null, card: null },
+      { reply: "Here's the working.", citations: [], general: false, hint: false, steps: [steps[1]!, steps[1]!], exercise: null, card: null },
     ]);
     // A lone step: retried, and the retry's hint with steps is refused too (two tries, then it fails).
     await expect(tutor(lib, "show me the missed card answer", { item: a.meta.id })).rejects.toThrow();
@@ -282,6 +284,9 @@ describe("tutor: hints and cards", () => {
     // A marker in a step needs its citation, as one in the reply does.
     await expect(tutor(lib, "show me the missed card answer", { item: a.meta.id })).resolves.toMatchObject({ steps, citations: [{ n: 1, quote: "goes back to the first box" }] });
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("marker [1] has no citation");
+    // Seven steps is more than the 2 to 6 a worked answer gets: sent back.
+    await expect(tutor(lib, "show me the missed card answer", { item: a.meta.id })).resolves.toMatchObject({ steps: [steps[1], steps[1]] });
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8").split("give 2 to 6 steps").length).toBe(3);
   });
 
   test("a kept card is a draft on its source, with its skills and the reply's AI recorded", async () => {

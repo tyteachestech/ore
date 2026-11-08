@@ -67,8 +67,9 @@ export function useTutorChat(notify: Notify) {
   const setCarry = (m: Mention[]) => setCarryState((carryNow.current = m));
   const drop = (m: Mention) => setCarry(carryNow.current.filter((x) => x.kind !== m.kind || x.id !== m.id));
   const run = async (t: TutorTurn, before: TutorTurn[]) => {
-    // A worked answer's steps are part of what the tutor said, so a follow-up ("why step 2?") can lean on them.
-    const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
+    // The steps of a worked answer he has shown are part of what the tutor said, so a follow-up ("why step
+    // 2?") can lean on them; the ones still hidden aren't, so his own try at the next step is his (D142).
+    const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).slice(0, stepsShown.get(x.id) ?? 1).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
     const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: said(x) }] : []));
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
@@ -97,6 +98,7 @@ export function useTutorChat(notify: Notify) {
     const i = now.current.findIndex((t) => t.id === id);
     if (i < 0) return;
     const { message, item, title, mentions, pointed } = now.current[i]!;
+    stepsShown.delete(id); // a new reply starts its steps from the first
     const t = { id, message, item, title, mentions, pointed };
     landed.current.delete(id);
     update((ts) => ts.map((x) => (x.id === id ? t : x)));
@@ -254,7 +256,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     const atEnd = force.current || !turns.length || el.scrollTop + el.clientHeight >= end.current - 24;
     force.current = false;
     if (atEnd) toEnd();
-    else setBelow(true);
+    else if (el.scrollHeight > end.current + 1) setBelow(true); // grew below him, not a change higher up (+ Card)
   }, [turns]);
 
   return (
@@ -568,15 +570,25 @@ const stepsShown = new Map<string, number>();
 function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; onDone?: () => void; children: (step: string) => ReactNode }) {
   const [n, setN] = useState(() => Math.min(stepsShown.get(id) ?? 1, steps.length));
   const list = useRef<HTMLOListElement>(null);
+  const shown = useRef(false);
   const next = () => {
     const k = n + 1;
     stepsShown.set(id, k);
+    shown.current = true;
     setN(k);
     // The button goes with the last step: the field takes the focus, for what he wants to ask next.
     if (k === steps.length) onDone?.();
   };
-  useEffect(() => {
-    if (n > 1) list.current?.lastElementChild?.scrollIntoView({ block: "nearest" });
+  // The step he just showed scrolls into view inside the log only, never the page under a floating tutor,
+  // and only when he asked for it (not when the tutor reopens on a worked answer).
+  useLayoutEffect(() => {
+    if (!shown.current) return;
+    shown.current = false;
+    const step = list.current?.lastElementChild;
+    const box = step?.closest(".tutor-turns");
+    if (!step || !box) return;
+    const over = step.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom;
+    if (over > 0) box.scrollTop += over;
   }, [n]);
   return (
     <>

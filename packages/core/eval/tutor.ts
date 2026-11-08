@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import type { Usage, Vendor } from "../src/ai/adapter.ts";
-import { tutor } from "../src/ai/tutor.ts";
+import { tutor, withSteps } from "../src/ai/tutor.ts";
 import { addGolden } from "./ask.ts";
 import { columns, costText, pct, pool, range, resultPath, setId, wilson, withVendor } from "./grade.ts";
 
@@ -71,8 +71,8 @@ export function runTutorEval(vendor: Vendor, model?: string, concurrency = 4) {
         if (c.reading && !id(c.reading)) throw new Error(`${c.id}: no golden doc ${c.reading}`);
         const r = await tutor(lib, c.message, { earlier: c.earlier ?? [], item: c.reading ? id(c.reading) : undefined });
         stamp = r.ai;
-        const failed = failures(c.expect, { reply: r.reply, hint: r.hint, exercise: !!r.exercise, cited: r.citations.length, searched: r.searched });
-        return { id: c.id, ok: !failed.length, failed, reply: r.reply, ms: Math.round(performance.now() - start), usage: r.usage };
+        const failed = failures(c.expect, { reply: withSteps(r), hint: r.hint, exercise: !!r.exercise, cited: r.citations.length, searched: r.searched });
+        return { id: c.id, ok: !failed.length, failed, reply: withSteps(r), ms: Math.round(performance.now() - start), usage: r.usage };
       } catch (e) {
         return { id: c.id, ok: false, failed: ["error"], ms: Math.round(performance.now() - start), error: (e as Error).message };
       }
