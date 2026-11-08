@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { parseFrontmatter } from "../src/frontmatter.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { findItem, ItemMetaSchema, setPrequestionAttempt, updateItemMeta } from "../src/items.ts";
-import { setRecall } from "../src/notes.ts";
+import { appendNoteText, setRecall } from "../src/notes.ts";
 import { tempLibrary } from "./helpers.ts";
 
 async function setup() {
@@ -52,5 +52,24 @@ describe("prequestion attempts and free recall (D18)", () => {
     const r = await setRecall(lib, id, "second");
     expect(findItem(lib, id).meta.recall).toEqual({ text: "second", at: r.recall.at });
     await expect(setRecall(lib, id, " ")).rejects.toThrow(/empty/);
+  });
+
+  test("finishing again: a recall that grows the earlier one takes its place in the note; a new one goes beside it", async () => {
+    const { lib, id } = await setup();
+    await setRecall(lib, id, "FIRST recall text.");
+    // The quiz opens holding his earlier recall; he adds to it.
+    expect((await setRecall(lib, id, "SECOND FIRST recall text.")).notes).toBe("## Recall\n\nSECOND FIRST recall text.");
+    expect((await setRecall(lib, id, "SECOND FIRST recall text. And more.")).notes).toBe("## Recall\n\nSECOND FIRST recall text. And more.");
+    // The same recall saved again changes nothing; one written afresh keeps the earlier one too.
+    expect((await setRecall(lib, id, "SECOND FIRST recall text. And more.")).notes).toBe("## Recall\n\nSECOND FIRST recall text. And more.");
+    expect((await setRecall(lib, id, "Something else entirely.")).notes).toBe("## Recall\n\nSECOND FIRST recall text. And more.\n\nSomething else entirely.");
+  });
+
+  test("a recall that grows the earlier one replaces it only under its own heading, never his other sections", () => {
+    const both = "## Recall\n\nFIRST.\n\n## Ideas\n\nFIRST.\n";
+    expect(appendNoteText(both, "FIRST. More.", "Recall", "FIRST.")).toBe("## Recall\n\nFIRST. More.\n\n## Ideas\n\nFIRST.\n");
+    // Copied into another section only: that one stays, and the new recall goes under Recall.
+    expect(appendNoteText("## Ideas\n\nFIRST.\n", "FIRST. More.", "Recall", "FIRST.")).toBe("## Ideas\n\nFIRST.\n\n## Recall\n\nFIRST. More.");
+    expect(appendNoteText("FIRST.\n\n## Recall\n\nOther.", "FIRST. More.", "Recall", "FIRST.")).toBe("FIRST.\n\n## Recall\n\nOther.\n\nFIRST. More.");
   });
 });

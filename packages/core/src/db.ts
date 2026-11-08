@@ -327,6 +327,18 @@ export function openIndex(lib: Library): LibraryIndex {
   return syncIndex(lib).index;
 }
 
+/** Runs `f` on `index`, an index the caller already opened (and closes), or on one opened for it.
+ *  A command that reads several views (Home's Today, a skill page's stats) syncs the files once. */
+export function withIndex<T>(lib: Library, index: LibraryIndex | undefined, f: (index: LibraryIndex) => T): T {
+  if (index) return f(index);
+  const own = openIndex(lib);
+  try {
+    return f(own);
+  } finally {
+    own.close();
+  }
+}
+
 export function rebuildIndex(lib: Library): SyncReport {
   // Emptied in place, not deleted: unlinking the file from under another `ore` that has it open fails that one
   // with "disk I/O error". With no files known, the sync indexes everything again.

@@ -203,7 +203,7 @@ describe("card remixing (D66)", () => {
     const lib = await tempLibrary();
     const c = await concept(lib);
     const a = variant(lib, c.meta.id, "new-case", "a YouTube explainer");
-    fakeClaude([{ rating: 3, gaps: [], feedback: "Good.", covered: [true, true] }]);
+    fakeClaude([{ rating: 3, gaps: [], feedback: "Good.", covered: [true, true], evidence: ["", ""] }]);
     expect((await gradeAnswer(lib, c.meta.id, "the asked parts", a.id)).covered).toEqual([true, true]);
     const input = JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[0]!)[1] as string;
     expect(input).toContain(a.question);

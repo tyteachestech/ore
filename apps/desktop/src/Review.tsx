@@ -1,5 +1,6 @@
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
@@ -10,7 +11,7 @@ import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { ore, opt, PHONE, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today } from "./ore";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, type Notify } from "./util";
+import { errorText, focusPicked, type Notify } from "./util";
 import { Working } from "./Working";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
@@ -62,6 +63,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [conf, setConf] = useState<number | undefined>();
   const [askSure, setAskSure] = useState(false);
   const [grade, setGrade] = useState<Grade | null>(null);
+  /** The key point under the pointer, and the one whose mark has focus: its evidence is marked in his answer (D141). */
+  const [hoverPoint, setHoverPoint] = useState<number | null>(null);
+  const [focusPoint, setFocusPoint] = useState<number | null>(null);
   const [gradeError, setGradeError] = useState<string | null>(null);
   /** One per key point: got, missed, or not marked yet (an in-head answer starts unmarked, D68). */
   const [marks, setMarks] = useState<(boolean | undefined)[] | null>(null);
@@ -99,7 +103,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [error, setError] = useState<string | null>(null);
   /** Bumped by Try again after a card failed to load: loads the same card again, the session as it was. */
   const [loadTry, setLoadTry] = useState(0);
-  const retryLoad = () => setLoadTry((n) => n + 1);
+  /** Bumped by Try again after the session failed to start (`ore` down): starts it again. */
+  const [startTry, setStartTry] = useState(0);
+  const retryLoad = () => (queue ? setLoadTry : setStartTry)((n) => n + 1);
   const shownAt = useRef(Date.now());
   /** When the answer showed: a rating key right after it is the confidence key pressed twice. */
   const shownAnswerAt = useRef(0);
@@ -142,14 +148,18 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   useEffect(() => {
     let live = true;
+    setError(null);
     void (async () => {
       try {
-        const started = ore<{ id: string }>("session", "start");
-        sessionReady.current = started.catch(() => {});
-        const s = await started;
-        // Closed before the session began: it ends at once, as leaving would have ended it.
-        if (!live) return void ore("session", "end", s.id).catch(() => {});
-        session.current = { id: s.id, open: true };
+        // Try again after `due` failed keeps the session already started: a second would be left open.
+        if (!session.current?.open) {
+          const started = ore<{ id: string }>("session", "start");
+          sessionReady.current = started.catch(() => {});
+          const s = await started;
+          // Closed before the session began: it ends at once, as leaving would have ended it.
+          if (!live) return void ore("session", "end", s.id).catch(() => {});
+          session.current = { id: s.id, open: true };
+        }
         const t = ore<Today>("today").then((t) => {
           before.current = t;
           setStart(t);
@@ -167,12 +177,14 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     return () => {
       live = false;
       mounted.current = false;
-      // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
-      // this session ends, by its id, never another window's.
-      const s = session.current;
-      if (s?.open) void ore("session", "end", s.id).catch(() => {});
-      session.current = null;
     };
+  }, [pick, startTry]);
+  // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
+  // this session ends, by its id, never another window's. Try again keeps it.
+  useEffect(() => () => {
+    const s = session.current;
+    if (s?.open) void ore("session", "end", s.id).catch(() => {});
+    session.current = null;
   }, [pick]);
 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
@@ -199,6 +211,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setConf(undefined);
     setAskSure(false);
     setGrade(null);
+    setHoverPoint(null);
+    setFocusPoint(null);
     setGradeError(null);
     setMarks(null);
     setRemark(false);
@@ -405,6 +419,12 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       failed(e instanceof TypeError || e instanceof SyntaxError ? "Couldn’t check this one: got an unexpected reply." : `Couldn’t check this one. ${why}${/[.!?]$/.test(why) ? "" : "."}`);
     }
   };
+
+  /** His words that earned key point i, as the grader quoted them; none once he marks it missed. A grade
+   *  is dropped when the key points change, so its evidence always lines up with them. */
+  const quoteFor = (i: number) => (marks?.[i] && grade?.evidence?.[i]) || "";
+  const shown = hoverPoint ?? focusPoint;
+  const shownQuote = shown === null ? "" : quoteFor(shown);
 
   /** The rating to highlight: the AI's, or (once he flips a mark) one that follows his marks. Never logged by itself (D21). */
   const suggested = ((): number | undefined => {
@@ -700,7 +720,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       return;
     }
     if (!card) {
-      if (e.key === "Enter" && onSurface && error && entry) {
+      if (e.key === "Enter" && onSurface && error && (entry || !queue)) {
         e.preventDefault();
         retryLoad();
       }
@@ -812,7 +832,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         {error && (
           <p className="err">
             {error}
-            {entry && !card && (
+            {(!queue || (entry && !card)) && (
               <>
                 {" "}
                 <Hint text={<>Try again <kbd>↵</kbd></>}>
@@ -909,7 +929,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                 {card.kind === "prompt" && !inHead && (
                   <>
                     <div className="quiz-kicker">Your answer</div>
-                    <p className="quiz-yours">{answer.trim() || <span className="quiz-faint">No idea</span>}</p>
+                    <p className="quiz-yours">{answer.trim() ? <Evidence answer={answer.trim()} quote={shownQuote} /> : <span className="quiz-faint">No idea</span>}</p>
                   </>
                 )}
                 <div className="quiz-kicker">Answer</div>
@@ -920,14 +940,17 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                     <ul className="quiz-points">
                       {card.rubric.map((p, i) => {
                         const mark = marks?.[i];
+                        const quote = quoteFor(i);
                         return (
-                          <li key={i} className={mark === false ? "missed" : mark ? "got" : ""}>
+                          <li key={i} className={mark === false ? "missed" : mark ? "got" : ""} onMouseEnter={() => setHoverPoint(i)} onMouseLeave={() => setHoverPoint(null)}>
                             {marks ? (
                               <Hint text={mark ? "Mark as missed" : "Mark as got"}>
                                 <button
                                   className="quiz-mark"
+                                  onFocus={() => setFocusPoint(i)}
+                                  onBlur={() => setFocusPoint(null)}
                                   aria-pressed={mark}
-                                  aria-label={mark ? `Got: ${p}. Mark as missed` : mark === false ? `Missed: ${p}. Mark as got` : `${p}. Mark as got`}
+                                  aria-label={mark ? `Got: ${p}${quote ? `, from “${quote}”` : ""}. Mark as missed` : mark === false ? `Missed: ${p}. Mark as got` : `${p}. Mark as got`}
                                   onClick={() => (setRemark(false), setMarks((m) => m!.map((x, j) => (j === i ? !x : x))))}
                                 >
                                   {mark ? <Check size={14} weight="bold" /> : <Circle size={14} weight="bold" />}
@@ -1111,16 +1134,17 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
 
 function Sure({ refEl, conf, onPick }: { refEl: React.RefObject<HTMLDivElement | null>; conf?: number; onPick: (n: number) => void }) {
   return (
-    <div className="quiz-sure" role="radiogroup" aria-labelledby="review-sure" ref={refEl}>
+    // One Tab stop, ← → between the three (Radix, as Settings' segmented rows); a click on the one picked picks it again.
+    <ToggleGroup.Root type="single" className="quiz-sure" aria-labelledby="review-sure" ref={refEl} value={conf ? String(conf) : ""} onValueChange={(v) => onPick(v ? Number(v) : conf!)} onFocus={focusPicked}>
       {SURE.map((label, i) => (
         <Hint key={label} text={<>{label} <kbd>{i + 1}</kbd></>} side="top">
           {/* Keeps focus in the answer, so on iPhone the keyboard stays up and Check doesn't move under the finger. */}
-          <button role="radio" aria-checked={conf === i + 1} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i + 1)}>
+          <ToggleGroup.Item value={String(i + 1)} onMouseDown={(e) => e.preventDefault()}>
             {label}
-          </button>
+          </ToggleGroup.Item>
         </Hint>
       ))}
-    </div>
+    </ToggleGroup.Root>
   );
 }
 
@@ -1235,5 +1259,29 @@ function EndScreen({ end, skills, quick, onDone, onAgain }: { end: End; skills: 
         </Hint>
       </div>
     </div>
+  );
+}
+
+/** His answer with the words that earned the key point under the pointer underlined (D141): the grader's
+ *  quote, found as he wrote it. A quote that isn't there (an edited answer) marks nothing. */
+function Evidence({ answer, quote }: { answer: string; quote: string }) {
+  const ref = useRef<HTMLElement>(null);
+  const at = quote ? answer.indexOf(quote) : -1;
+  // The answer box scrolls past nine lines: bring the words into it, scrolling only that box, so the
+  // page never moves the key point out from under the pointer.
+  useEffect(() => {
+    const m = ref.current, box = m?.parentElement;
+    if (!m || !box) return;
+    const top = m.offsetTop - box.offsetTop, bottom = top + m.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = top;
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
+  }, [quote]);
+  if (at < 0) return <>{answer}</>;
+  return (
+    <>
+      {answer.slice(0, at)}
+      <mark ref={ref} className="quiz-evidence">{quote}</mark>
+      {answer.slice(at + quote.length)}
+    </>
   );
 }

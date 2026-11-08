@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, type FocusEvent, type RefObject } from "react";
 
 /** A toast; `undo` adds an Undo button and puts the step on the app's history (⌘Z), and `redo`,
  *  the step again, lets ⇧⌘Z repeat it after an undo (AGENTS.md: delete acts at once, then offers Undo).
@@ -10,7 +10,8 @@ import { useEffect, type RefObject } from "react";
  *  (a selection he dropped with Esc). */
 /** `show`: the toast's one action: Show on a result, Try again on an error. */
 /** `stay`: an error toast that stays until its Try again is pressed or its × dismisses it, for a failure only that toast can recover. */
-export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => void, redo?: () => void, show?: () => void, stay?: boolean) => () => void;
+/** `slot`: one toast at a time for it; a new one takes the place of the one showing (a retry that failed again). */
+export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => void, redo?: () => void, show?: () => void, stay?: boolean, slot?: string) => () => void;
 
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never
  *  reaches the UI as "Cannot read properties of null". */
@@ -65,3 +66,11 @@ export function inOrder<T>(key: string, write: () => Promise<T>): Promise<T> {
   void done.then(() => writing.get(key) === done && writing.delete(key));
   return next;
 }
+
+/** A radio row's onFocus (How sure): Tab or ⇧Tab into it lands on the one picked, as a Mac radio group's
+ *  does, not on the last one the keys or a click passed over. */
+export const focusPicked = (e: FocusEvent<HTMLElement>) => {
+  if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+  const picked = e.currentTarget.querySelector<HTMLElement>('[aria-checked="true"]');
+  if (picked && picked !== e.target) picked.focus();
+};

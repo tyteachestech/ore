@@ -3103,6 +3103,162 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   }, AGENTS);
 });
 
+journey("finish again: the recall box holds the last recall with the caret at its end, and the note holds it once", async (page) => {
+  const title = "Recall twice";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# ${title}\n\nA page to finish twice, adding to the recall the second time.`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A page to finish twice").waitFor();
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByLabel("Free recall").fill("FIRST recall text.");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Keep reading" }).click();
+  await page.reload();
+  await page.locator(".side-item").first().waitFor();
+  await openSource(page, title);
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  const box = page.getByLabel("Free recall");
+  await until("the box holds the last recall", async () => (await box.inputValue()) === "FIRST recall text.");
+  const caret = await box.evaluate((el: HTMLTextAreaElement) => [el.selectionStart, el.value.length]);
+  if (caret[0] !== caret[1]) throw new Error(`the caret is at ${caret[0]} of ${caret[1]}, not at the end`);
+  await page.keyboard.type(" SECOND.");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Keep reading" }).waitFor();
+  const note = await page.evaluate(async (title) => {
+    const ore = (args: string[]) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args });
+    const items = (await ore(["ls"])) as { id: string; title: string }[];
+    return ((await ore(["notes", items.find((i) => i.title === title)!.id])) as { text: string }).text;
+  }, title);
+  if (note.trim() !== "## Recall\n\nFIRST recall text. SECOND.") throw new Error(`the note is ${JSON.stringify(note)}`);
+});
+
+journey("focus comes back to what opened it: the tutor's ✦ after Esc, and a Continue reading row after Esc from its source", async (page) => {
+  const on = (sel: string) => page.evaluate((sel) => !!document.activeElement?.matches(sel), sel);
+  await page.locator(".tutor-bubble").focus();
+  await page.keyboard.press("Enter");
+  await page.locator(".tutor textarea, .tutor [contenteditable=true]").first().waitFor();
+  await page.keyboard.press("Escape");
+  await until("focus is back on the ✦", () => on(".tutor-bubble"));
+  const row = page.locator(".home-read").first();
+  await row.focus();
+  const title = (await row.innerText()).split("\n")[0]!;
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".home-read").first().waitFor();
+  await until(`focus is back on “${title}”`, async () => (await on(".home-read")) && (await page.evaluate(() => (document.activeElement as HTMLElement).innerText.split("\n")[0])) === title);
+  // Opened from Home but left another way (All sources, another source, ⌘0): no old row takes focus later.
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").waitFor();
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".row").filter({ hasText: AGENTS }).first().click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+Digit0");
+  await page.locator(".home-read").first().waitFor();
+  await page.waitForTimeout(200);
+  if (await on(".home-read")) throw new Error("a row opened long ago took focus on ⌘0");
+});
+
+journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
+  const plus = page.getByRole("button", { name: "New skill", exact: true });
+  await plus.hover();
+  // A click's checks, without the click: an aria-disabled ancestor makes it "not enabled".
+  await plus.click({ trial: true, timeout: 2000 });
+  const dimmed = await page.evaluate(() => [...document.querySelectorAll(".side-head")].filter((h) => h.closest("[aria-disabled=true]")).length);
+  if (dimmed) throw new Error(`${dimmed} section header(s) read as disabled`);
+});
+
+journey("finish: a question on a source with no skill is pointed to Collected, not a skill page", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# No skill yet\n\nA first source, filed under no skill, with one passage worth asking about.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A first source, filed under no skill").waitFor();
+  await select(page, "one passage worth asking about");
+  await page.getByRole("dialog", { name: "Highlight" }).locator(".intent.question").click();
+  await page.locator(".mark-icon.question").first().waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  const made = page.locator(".quiz-made-list").filter({ hasText: "1 question" });
+  await made.waitFor();
+  if ((await made.innerText()).includes("skill page")) throw new Error(`“${await made.innerText()}”: this source has no skill page`);
+  await page.getByRole("button", { name: "Keep reading" }).click();
+});
+
+journey("ore down at launch: Home's Try again brings back the skills and the sources too", async (page) => {
+  const skillRows = page.locator(".side-item:not(.side-main)");
+  await skillRows.first().waitFor();
+  const skills = await skillRows.count();
+  await page.addInitScript(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { ls: "The `ore` command isn’t installed.", skills: "The `ore` command isn’t installed.", today: "The `ore` command isn’t installed." }));
+  await page.reload();
+  const retry = page.locator(".home-today").getByRole("button", { name: "Try again" });
+  await retry.waitFor();
+  // Still down: each Try again says so again in the same toast, not one more each press.
+  for (let n = 0; n < 3; n++) await retry.click();
+  await page.waitForTimeout(300);
+  const said = await page.locator(".toast").filter({ hasText: "isn’t installed" }).count();
+  if (said > 1) throw new Error(`${said} toasts say the same failure`);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await retry.click();
+  await page.locator(".home-goal").waitFor();
+  await until("the sidebar lists the skills again", async () => (await skillRows.count()) === skills);
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".row").filter({ hasText: TESTING }).first().waitFor();
+});
+
+journey("finish: drafting the cards starts on Done, not after the moment, so closing the window then still drafts them", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Drafting at once\n\nA short page whose cards are drafted the moment he says Done.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A short page whose cards are drafted").waitFor();
+  const enriched: number[] = [];
+  page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["enrich"') && enriched.push(Date.now()));
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".quiz-done.moment").waitFor();
+  await until("drafting has started while the moment shows", async () => enriched.length > 0, 900);
+  if (await page.locator(".toast").filter({ hasText: "Finished “Drafting at once”" }).count()) throw new Error("drafting started only after the moment");
+});
+
+journey("finish: drafting that fails after Done stays in front of “Finished” until he acts on it", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Drafting that fails\n\nA short page whose cards can't be drafted, because the AI is down.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A short page whose cards").waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { enrich: "Codex isn’t installed." }));
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".toast").filter({ hasText: "Finished “Drafting that fails”" }).waitFor();
+  const failure = page.locator(".toast").filter({ hasText: "weren’t drafted: Codex isn’t installed." });
+  await failure.waitFor();
+  await page.waitForTimeout(300);
+  const front = await page.locator(".toasts > .toast").last().innerText();
+  if (!front.includes("weren’t drafted")) throw new Error(`the toast in front is “${front}”, not the drafting failure`);
+  // Try again is the only way back to the cards, so the failure stays until he acts on it.
+  if (!(await failure.getByRole("button", { name: "Dismiss" }).count())) throw new Error("the drafting failure goes away by itself");
+  // A second source that fails too: one toast says both, and its Try again drafts both.
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Drafting that fails again\n\nAnother short page whose cards can't be drafted either.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("Another short page whose cards").waitFor();
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  const both = page.locator(".toast").filter({ hasText: "Cards for 2 sources weren’t drafted: Codex isn’t installed." });
+  await both.waitFor();
+  await page.waitForTimeout(300);
+  const failures = await page.locator(".toast").filter({ hasText: "weren’t drafted" }).count();
+  if (failures !== 1) throw new Error(`${failures} drafting failures stacked`);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  const drafted: string[] = [];
+  page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["enrich"') && drafted.push(r.postData()!));
+  await both.getByRole("button", { name: "Try again" }).click();
+  await until("Try again drafts both", async () => drafted.length === 2);
+});
+
 journey("undo that fails: the toast says why, and ⌘Z tries the same step again", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator(".row").filter({ hasText: AGENTS }).first();
@@ -3163,6 +3319,23 @@ journey("quiz check: one click makes a passage a key point, and marks a highligh
   await until("two more key points, one fewer plain highlight", async () => (await count("card")) === card0 + 2 && (await count("keep")) === keep0 - 1);
   await page.keyboard.press("Meta+z");
   await until("⌘Z takes the mark back", async () => (await count("card")) === card0 + 1 && (await count("keep")) === keep0);
+});
+
+journey("quiz check that fails says why, as Review does, with try again", async (page) => {
+  await openSource(page, TESTING);
+  const why = "Codex isn’t installed (no `codex` on PATH). Install it, or pick Claude in Settings → AI.";
+  await page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { "key-points": why, check: why }), why);
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip to questions" }).click();
+  await page.getByLabel("Your answer").fill("It feels familiar");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const verdict = page.locator(".quiz-verdict").filter({ hasText: "Couldn’t check this one" });
+  await verdict.waitFor();
+  if (!(await verdict.innerText()).includes(why)) throw new Error(`no reason: “${await verdict.innerText()}”`);
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await verdict.getByRole("button", { name: "try again" }).click();
+  await page.locator(".quiz-verdict").filter({ hasNotText: "Couldn’t check this one" }).waitFor();
+  await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
 // Last: its question highlight would change the lists the question journeys read.
@@ -3427,6 +3600,65 @@ journey("finish quiz: while Check saves, his answer and how sure he is stay as s
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
+journey("how sure: one Tab stop in Review and the finish quiz, ← → move between the three, Space picks", async (page) => {
+  const focused = () => page.evaluate(() => ({ role: document.activeElement?.getAttribute("role"), name: (document.activeElement as HTMLElement | null)?.innerText.trim() }));
+  const walk = async (field: ReturnType<Page["getByRole"]>) => {
+    await field.fill("an answer");
+    await field.focus();
+    await page.keyboard.press("Tab");
+    if ((await focused()).role !== "radio") throw new Error(`Tab from the answer went to ${JSON.stringify(await focused())}`);
+    // Radix moves focus a tick after the key.
+    await page.keyboard.press("ArrowRight");
+    await until("→ moves to Think so", async () => (await focused()).name === "Think so", 2000);
+    await page.keyboard.press("ArrowRight");
+    await until("→ moves to Sure", async () => (await focused()).name === "Sure", 2000);
+    await page.keyboard.press("Space");
+    await until("Sure is picked", async () => (await page.getByRole("radio", { name: "Sure" }).getAttribute("aria-checked")) === "true");
+    await page.keyboard.press("Tab");
+    if ((await focused()).role === "radio") throw new Error("Tab stopped on another of the three");
+    // Back into the row, focus lands on the one he picked, by key or by click.
+    await page.keyboard.press("Shift+Tab");
+    await until("⇧Tab lands on Sure", async () => (await focused()).name === "Sure", 2000);
+    await page.getByRole("radio", { name: "Guess" }).click();
+    await until("Guess is picked", async () => (await page.getByRole("radio", { name: "Guess" }).getAttribute("aria-checked")) === "true");
+    await field.focus();
+    await page.keyboard.press("Tab");
+    await until("Tab lands on Guess", async () => (await focused()).name === "Guess", 2000);
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await field.focus();
+    await page.keyboard.press("Tab");
+    await until("Tab lands on Think so, the one picked", async () => (await focused()).name === "Think so", 2000);
+  };
+  await startReview(page, /Teaching/);
+  await walk(page.getByRole("textbox", { name: "Your answer" }));
+  await page.getByRole("textbox", { name: "Your answer" }).fill("");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Skip to questions" }).click();
+  await walk(page.getByLabel("Your answer"));
+  await page.getByRole("button", { name: "Close quiz" }).click();
+});
+
+journey("review that can't start because ore failed offers Try again, focused, which starts it", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { due: "The `ore` command isn’t answering." }));
+  await page.getByRole("button", { name: "Start review" }).click();
+  await page.getByRole("dialog", { name: "What to review" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator(".review .err").filter({ hasText: "isn’t answering" }).waitFor();
+  const retry = page.locator(".review").getByRole("button", { name: "Try again" });
+  await until("Try again is focused", () => retry.evaluate((el) => el === document.activeElement));
+  // Only `due` failed: the session that started stays the one, with no second one left open.
+  const starts: string[] = [];
+  page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["session","start"]') && starts.push(r.url()));
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await page.keyboard.press("Enter");
+  await page.locator(".review-q").waitFor();
+  if (starts.length) throw new Error(`Try again started ${starts.length} more session(s)`);
+  await page.keyboard.press("Escape");
+});
+
 journey("review: a card that fails to load offers Try again, focused, which loads it without losing the rating before it; Undo clears the error", async (page) => {
   const q = page.locator(".review-q");
   const session = page.locator(".review [role=progressbar]").first();
@@ -3525,6 +3757,37 @@ journey("review: changing an Explain card's key points after it was checked keep
   await page.waitForTimeout(200);
   if ((await field.inputValue()) !== "His own wording") throw new Error("an undo threw away what he typed in the editor");
   await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: hovering or focusing a key point he got underlines the words of his answer that earned it; a missed one, or one he marks missed, underlines nothing (D141)", async (page) => {
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ rating: 2, gaps: [], feedback: "", covered: [true, false], evidence: ["feels like knowing", ""] }) });
+  });
+  await startReview(page, /Teaching/);
+  await page.getByRole("textbox", { name: "Your answer" }).fill("Fluency feels like knowing, so you overrate yourself");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const points = page.locator(".quiz-points li");
+  const mark = page.locator(".quiz-yours .quiz-evidence");
+  await until("the AI marked the first point", async () => (await page.locator(".quiz-points li.got").count()) === 1);
+  await page.unroute(/\/ore$/);
+  if (await mark.count()) throw new Error("words are underlined before he points at a key point");
+  await points.nth(0).hover();
+  await until("the first point's words are underlined", async () => (await mark.count()) === 1 && (await mark.innerText()) === "feels like knowing");
+  await points.nth(1).hover();
+  await until("a missed point underlines nothing", async () => (await mark.count()) === 0);
+  // The keyboard reaches it too: focus on the point's mark shows its words, and VoiceOver hears them.
+  await page.mouse.move(0, 0);
+  await points.nth(0).locator(".quiz-mark").focus();
+  await until("focus underlines the words", async () => (await mark.count()) === 1);
+  const label = await points.nth(0).locator(".quiz-mark").getAttribute("aria-label");
+  if (!label?.includes("from “feels like knowing”")) throw new Error(`the mark's label doesn't say his words: ${label}`);
+  // Marked missed, the point no longer claims his words.
+  await page.keyboard.press("Enter");
+  await until("a point he marks missed underlines nothing", async () => (await mark.count()) === 0);
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
 });

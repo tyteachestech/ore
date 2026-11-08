@@ -144,19 +144,26 @@ export const studyCommands: Record<string, Command> = {
     options: { skill: { type: "string" } },
     async run(_, f) {
       const lib = openLibrary();
-      const s = libraryStats(lib);
-      const rows = f.skill ? s.skills.filter((x) => x.skill === f.skill) : s.skills;
-      if (f.skill && !rows.length) throw new Error(`unknown skill "${f.skill}"`);
-      const ret = (r: number | null, n: number) => (r === null ? `– (n=${n}, needs 10)` : `${pct(r)} (n=${n})`);
-      const text = table([
-        ["Skill", "Pri", "Read", "Items live", "Cards live", "Reviews", "Sessions", "Retention", "Own words", "No note"],
-        ...[...rows.map((x) => ({ ...x, label: x.name, pri: x.priority })), ...(f.skill ? [] : [{ ...s.total, label: "All", pri: "" }])].map((x) => [
-          x.label, x.pri, String(x.items_read), String(x.items_live), String(x.cards_live), String(x.reviews), String(x.session_starts),
-          ret(x.retention, x.retention_n), ret(x.retention_own_words, x.retention_own_words_n), ret(x.retention_no_note, x.retention_no_note_n),
-        ]),
-      ]);
-      // remix: variant vs original pass rates, for us to watch the prompts (D66); the app never shows it.
-      return { data: f.skill ? rows.map((x) => ({ ...x, strength: skillStrength(lib, x.skill), growth: skillGrowth(lib, x.skill) })) : { ...s, remix: remixStats(lib), calibration: calibration(readReviews(lib)) }, text };
+      // One sync of the files for all three views (each opened its own: ~35 ms apiece at 950 sources).
+      const index = openIndex(lib);
+      try {
+        const s = libraryStats(lib, index);
+        const rows = f.skill ? s.skills.filter((x) => x.skill === f.skill) : s.skills;
+        if (f.skill && !rows.length) throw new Error(`unknown skill "${f.skill}"`);
+        const ret = (r: number | null, n: number) => (r === null ? `– (n=${n}, needs 10)` : `${pct(r)} (n=${n})`);
+        const text = table([
+          ["Skill", "Pri", "Read", "Items live", "Cards live", "Reviews", "Sessions", "Retention", "Own words", "No note"],
+          ...[...rows.map((x) => ({ ...x, label: x.name, pri: x.priority })), ...(f.skill ? [] : [{ ...s.total, label: "All", pri: "" }])].map((x) => [
+            x.label, x.pri, String(x.items_read), String(x.items_live), String(x.cards_live), String(x.reviews), String(x.session_starts),
+            ret(x.retention, x.retention_n), ret(x.retention_own_words, x.retention_own_words_n), ret(x.retention_no_note, x.retention_no_note_n),
+          ]),
+        ]);
+        // remix: variant vs original pass rates, for us to watch the prompts (D66); the app never shows it.
+        const now = new Date();
+        return { data: f.skill ? rows.map((x) => ({ ...x, strength: skillStrength(lib, x.skill, now, index), growth: skillGrowth(lib, x.skill, now, 12, index) })) : { ...s, remix: remixStats(lib), calibration: calibration(readReviews(lib)) }, text };
+      } finally {
+        index.close();
+      }
     },
   },
 

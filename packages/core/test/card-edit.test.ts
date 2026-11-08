@@ -16,7 +16,7 @@ beforeEach(() => {
     join(binDir, "claude"),
     `#!/usr/bin/env bun
 require("fs").appendFileSync(${JSON.stringify(binDir)} + "/args.jsonl", JSON.stringify(process.argv.slice(2)) + "\\n");
-console.log(JSON.stringify({ is_error: false, structured_output: { rating: 3, gaps: [], feedback: "Good.", covered: [true, false] }, modelUsage: { "claude-fake-1": { outputTokens: 10 } } }));
+console.log(JSON.stringify({ is_error: false, structured_output: { rating: 3, gaps: [], feedback: "Good.", covered: [true, false], evidence: ["forgetting", ""] }, modelUsage: { "claude-fake-1": { outputTokens: 10 } } }));
 `,
   );
   chmodSync(join(binDir, "claude"), 0o755);
