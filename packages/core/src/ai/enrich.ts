@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { readAnnotations, type Annotation } from "../annotations.ts";
@@ -121,8 +121,19 @@ export function enrichError(lib: Library, id: string): string | null {
   }
 }
 
+const skipFile = (lib: Library, id: string) => join(paths.logs(lib), `enrich-${id}.skipped`);
+
+/** Added with no enrich on its way (`--no-enrich`): the reader doesn't wait for prequestions nothing is
+ *  writing, and offers to write them. The next enrich (by hand, or the day's catch-up) clears it. */
+export function markEnrichSkipped(lib: Library, id: string): void {
+  mkdirSync(paths.logs(lib), { recursive: true });
+  writeFileSync(skipFile(lib, id), "");
+}
+export const enrichSkipped = (lib: Library, id: string): boolean => existsSync(skipFile(lib, id));
+
 export async function enrichItem(lib: Library, ref: string): Promise<EnrichResult> {
   const id = findItem(lib, ref).meta.id;
+  rmSync(skipFile(lib, id), { force: true });
   try {
     const r = await enrichOnce(lib, id);
     rmSync(errorFile(lib, id), { force: true });

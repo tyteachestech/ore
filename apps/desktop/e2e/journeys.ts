@@ -4112,6 +4112,19 @@ journey("sidebar: scrolled to the end, its rows stop under the title bar, never 
   if (!clear.equals(await page.screenshot({ clip: strip }))) throw new Error("sidebar rows show under the title bar");
 });
 
+journey("prequestions: a source added with --no-enrich offers to write them, never a wait on nothing", async (page) => {
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich"], stdin: "# Added by an agent\n\nNo enrich is on its way for this one." }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Added by an agent");
+    await page.locator(".preq-head").filter({ hasText: "No prequestions yet" }).waitFor();
+    await page.getByRole("button", { name: "Write them" }).waitFor();
+    if (await page.getByText("Writing prequestions…").count()) throw new Error("it waits on an enrich nothing started");
+  } finally {
+    await ore("archive", made.id);
+  }
+});
+
 // —— run ——
 
 let failed = 0;

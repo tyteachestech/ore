@@ -613,7 +613,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         if (!live) return;
         setDoc(d);
         // Enrich runs once, right after `ore add`: long after that with nothing to show, it failed.
-        if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
+        if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
         setAnns((d.annotations ?? []).filter(visible));
         // Opening starts it and moves it up To read (D110); a preview isn't listed, so it's left alone.
         if (!d.preview) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
@@ -673,7 +673,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     try {
       await ore("enrich", p.id);
       const d = (await ore<Item[]>("ls")).find((i) => i.id === p.id);
-      if (d) setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: d.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at, enrich_error: undefined });
+      if (d) setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: d.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at, enrich_error: undefined, enrich_skipped: undefined });
       p.onChanged();
     } catch (e) {
       setDoc((cur) => cur && { ...cur, enrich_error: errorText(e) });
@@ -2896,9 +2896,10 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
       <section className="preq">
         <div className="preq-head failed">
           What do you already know?
-          <span className="quiet">Couldn’t write prequestions</span>
+          {/* Added with no enrich on its way: nothing failed, they just aren't written yet. */}
+          <span className="quiet">{doc.enrich_skipped ? "No prequestions yet" : "Couldn’t write prequestions"}</span>
           <button className="preq-retry" onClick={onRetry}>
-            Try again
+            {doc.enrich_skipped ? "Write them" : "Try again"}
           </button>
         </div>
         {doc.enrich_error && <p className="preq-why">{doc.enrich_error}</p>}

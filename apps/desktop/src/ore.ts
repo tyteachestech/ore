@@ -113,6 +113,8 @@ export type Item = {
   enriched_at?: string;
   /** Why background enrich failed, while the source has never been enriched. */
   enrich_error?: string;
+  /** Added with no enrich on its way (`ore add --no-enrich`): nothing is writing its prequestions. */
+  enrich_skipped?: boolean;
   recall?: { text: string; at: string; feedback?: string };
   chapter_recalls?: ChapterRecall[];
   /** From `ore ls`: the source note (notes.md) has text. */
