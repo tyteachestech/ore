@@ -25,3 +25,18 @@ Fixed, one PR per area, each fix with a test that failed first: #134 damaged lib
 - Fix workers go in worktrees. Uncommitted edits in the shared checkout break `ore` for the testers running against it.
 - The vite on :1420 serves only the main checkout, so a worktree runs its own vite.
 - Local e2e is flaky when many agents share the machine. CI decides.
+
+## Round 2 (evening): today's features
+
+Six personas over a 113-card backlog with drafts, tries and one source broken on disk, in the same mock harness: the backlog grinder (40 cards; New drafts approved, edited and deleted; undo of a rating; ⌘K and ⌘/ over Review), the try loop (the end screen's try line opens the passage; To try, How did it go + Next time I'll…, Used record; undo and redo), the tutor with a passage and a web citation, keyboard only, the broken source, and undo everywhere (a rating from Home after Review, archive, pin). Held up: the 1-in-5 new-card share, drafts flagged New, undo and redo of every step tried, ⌘K and ⌘/ over Review with Esc back to the card, the try loop's rounds, citation pills and their hover card, Home's "couldn't be read" line with its reason, and a card whose source can't be read (it says so under the answer and still rates).
+
+Fixed in #192: ⌘K → All sources from Home left focus on the body (arrows and Enter did nothing until ~30 Tabs); a highlight over a passage already highlighted, with a note, dropped the intent and the note silently (`ore highlight --intent apply --note`, the `/ore` skill's path).
+
+### Calls for Tyler
+1. **Rescued over a backlog.** With everything overdue, "N rescued just before you'd have forgotten them" is nearly every card, every session (13 of 14). Keep it, or show it only when it is a minority of the session?
+2. **A write-up's confirmation.** Saving "How did it go" closes the box with no toast; "a card comes from how it went" is said only in the undo toast. Fine as a quiet step, or one toast?
+3. **The picker by keyboard.** Enter on Start review puts focus on the "What to review" panel itself: Space does nothing until ↓ picks a row. Focus the first row instead?
+
+### Lessons
+- Review ignores a rating digit for 300 ms after the answer shows (the same keys pick how sure): a script must wait, a person never notices.
+- The mock bridge answers a cited item that doesn't exist (`"item": "x"` in a mock reply) with a 500 the app survives; cite a seeded item to test the jump.
