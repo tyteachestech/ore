@@ -17,3 +17,9 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 - Rebase onto `origin/master` before pushing and again before merging; another thread may have landed.
 - Git housekeeping is the thread's job, never Tyler's: do resets, rebases, branch cleanup and reinstalls yourself on the Mac, and never ask him to run a git command. Never rewrite master's history; if it ever must be, the thread that does it also resets `~/Developer/ore`, rebases open PRs and deletes the old branches.
 - Name files in NFC Unicode (macOS shows NFD names as untracked).
+
+## Component catalogs (shadcn MCP)
+- `.mcp.json` starts the shadcn MCP server (`bunx --bun shadcn@latest mcp`, no key) in Claude Code sessions on this repo. Approve it once when Claude Code asks; check with `/mcp`.
+- It searches the registries in the root `components.json`: shadcn/ui (always on), Cult UI (`@cult-ui`, MIT) and Rare UI (`@rare-ui`). Ask by registry, e.g. "show me `@cult-ui/…`"; a bare name searches only shadcn.
+- Rare UI is MIT plus a Commons Clause that bars redistributing its components, which clashes with D120: read it for ideas, never copy its code into Ore. shadcn and Cult UI code may be copied in, restyled to `DESIGN.md`.
+- The root `components.json` holds only registries, so `shadcn add` won't write files from it; bring a component in by reading it through the MCP and adapting it by hand.

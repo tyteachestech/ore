@@ -1,0 +1,7 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "registries": {
+    "@cult-ui": "https://www.cult-ui.com/r/{name}.json",
+    "@rare-ui": "https://raw.githubusercontent.com/swamimalode07/rare-ui/main/public/r/{name}.json"
+  }
+}
