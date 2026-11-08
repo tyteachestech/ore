@@ -972,7 +972,7 @@ journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to t
   await until("then ⌘[ leaves the source, as before", async () => !(await page.locator(".doc").isVisible()));
 });
 
-journey("figure zoom: a click opens a figure to fill the window and keys don't reach the page behind; Esc, a click or a scroll puts it back (D143)", async (page) => {
+journey("figure zoom: a click opens a figure to fill the window and keys don't reach the page behind; Esc, a click or a scroll puts it back (D144)", async (page) => {
   await openSource(page, AGENTS);
   const fig = page.locator(".doc img").first();
   await fig.scrollIntoViewIfNeeded();
@@ -3137,9 +3137,10 @@ journey("review: the quick quiz during a review keeps its own session; the card 
 });
 
 journey("review: when the quick quiz closes, a new card it didn't rate stays, even with the day's new cards used up", async (page) => {
-  await startReview(page, null);
+  // Storytelling holds only the day's new draft, so it is the first card (over due cards a new one is every fifth, D144).
+  await startReview(page, /Storytelling/);
   const q = page.locator(".review-q");
-  await page.locator(".review-new").first().waitFor(); // the first card is the day's new draft
+  await page.locator(".review-new").first().waitFor();
   const draft = await q.innerText();
   const goal = (await ore("today")) as { new_per_day: number };
   await ore("goal", "--new-per-day=0");

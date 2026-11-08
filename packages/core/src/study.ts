@@ -111,15 +111,16 @@ export const medians = (rs: Review[], kinds: Map<string, string>): Record<"card"
 export interface QueueOptions {
   /** Only cards filed under one of these skills (Home's skill chips, D58); all when absent. */
   skills?: string[];
-  /** Apply the new-card limits (D60, D65): at most `new_per_day`, only in goal time the due cards leave,
-   *  and none drafted today. On by default. */
+  /** Apply the new-card limits (D60, D65, D144): at most `new_per_day`, and none drafted today. On by default. */
   newLimit?: boolean;
 }
 
-// Due queue (SPEC §3): live cards due now, unseen drafts (freshest source first, D60), and today's
-// pending relearn passes, in queue order. A draft waits until the day after it was
-// written, so its first review is spaced from the reading (D65). New drafts enter only while
-// today's goal has room after the due cards, up to `new_per_day` (D65).
+/** One card in this many is new while due cards last (D144). */
+const NEW_EVERY = 5;
+
+// Due queue (SPEC §3): live cards due now in queue order, with unseen drafts (freshest source first,
+// D60) taking every fifth place, and today's pending relearn passes last. A draft waits until the day
+// after it was written, so its first review is spaced from the reading (D65). Up to `new_per_day` a day.
 export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}, open?: LibraryIndex): QueueEntry[] {
   return withIndex(lib, open, (index) => {
     const skills = loadSkills(lib).skills;
@@ -176,20 +177,17 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
       else entries.push(entry);
     }
     unseen.sort((a, b) => b.fresh.localeCompare(a.fresh) || a.entry.id.localeCompare(b.entry.id));
-    if (limit) {
-      // Goal time left after today's reviews so far and the cards due now.
-      const med = medians(reviews, new Map(cards.map((c) => [c.id, c.kind])));
-      let room = settings.goal_minutes * 60_000 - activeMs(doneToday) - entries.reduce((t, e) => t + med[e.kind], 0);
-      let n = 0;
-      for (const u of unseen) {
-        const ms = med[u.entry.kind];
-        if (n >= newLeft || ms > room) break;
-        entries.push(u.entry);
-        room -= ms;
-        n++;
-      }
-    } else entries.push(...unseen.map((u) => u.entry));
-    return orderQueue(entries);
+    // A backlog of due cards is the normal case (D144): new cards get every fifth place of the session,
+    // so new learning comes in whatever is due, and the due cards fill the rest, most urgent first.
+    const fresh = unseen.slice(0, newLeft).map((u) => u.entry);
+    const ordered = orderQueue(entries);
+    const live = ordered.filter((e) => !e.relearn);
+    const out: QueueEntry[] = [];
+    for (const e of live) {
+      out.push(e);
+      if (out.length % NEW_EVERY === NEW_EVERY - 1 && fresh.length) out.push(fresh.shift()!);
+    }
+    return [...out, ...fresh, ...ordered.filter((e) => e.relearn)];
   });
 }
 
