@@ -1203,10 +1203,10 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   /** A passage chosen with the mouse or the keyboard: inside a highlight he already made, that one opens
    *  (with the type he keyed) instead of stacking a second; otherwise it becomes a new highlight. */
+  const holderOf = (r: Range) =>
+    [...ranges.current].find(([, h]) => h.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, r) >= 0);
   function highlightRange(r: Range, intent?: Intent, aim?: Aim, snap = false) {
-    const inside = [...ranges.current].find(
-      ([, h]) => h.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, r) >= 0,
-    );
+    const inside = holderOf(r);
     if (inside) {
       fresh.current = null;
       openPopup(inside[0], inside[1], annsRef.current.find((a) => a.id === inside[0])?.note ?? "", aim);
@@ -1853,11 +1853,12 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
 
   const onMouseDown = (e: MouseEvent) => {
-    // A click that is not the third of a triple: the double-clicked word is kept now.
+    // A click that is not the third of a triple: the double-clicked word is kept now, quietly (no popup,
+    // and the selection this click starts is left alone).
     const word = wordWait.current;
     if (word && e.detail !== 3) {
       dropWord();
-      word.keep();
+      word.quiet();
     }
     setFocus(null); // the mouse takes over from the keyboard focus
     if (popup && !popupRef.current?.contains(e.target as Node)) {
@@ -1935,7 +1936,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   // A double click's word waits out the Mac's double-click time (0.5 s by default): a third click
   // makes it the paragraph, one highlight and one step, as Books acts on the final selection.
-  const wordWait = useRef<{ timer: number; keep: () => void } | null>(null);
+  const wordWait = useRef<{ timer: number; quiet: () => void } | null>(null);
   const dropWord = () => {
     if (wordWait.current) clearTimeout(wordWait.current.timer);
     wordWait.current = null;
@@ -1948,11 +1949,13 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (e.button !== 0 || e.ctrlKey) return;
     const stamp = video && (e.target as HTMLElement).closest?.<HTMLElement>(".ts");
     if (stamp) return seekTo(Number(stamp.dataset.t), true);
-    dropWord();
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.rangeCount) {
       const r = sel.getRangeAt(0);
       if (el.contains(r.startContainer) && el.contains(r.endContainer)) {
+        // The paragraph replaces a double click's word only now that it will be highlighted: a triple
+        // click whose selection runs past the text (the last paragraph, in WebKit) keeps the word.
+        dropWord();
         const up = sel.focusNode === r.startContainer && sel.focusOffset === r.startOffset;
         const range = r.cloneRange();
         const aim = { x: e.clientX, y: e.clientY, up };
@@ -1964,7 +1967,8 @@ function ReaderView(p: Props & { reload: () => void }) {
         };
         if (e.detail === 2) {
           const timer = window.setTimeout(() => (dropWord(), keep()), 500);
-          wordWait.current = { timer, keep };
+          const quiet = () => void (holderOf(range) || createHighlight(exact ? range : snapRange(range), "keep", undefined, false));
+          wordWait.current = { timer, quiet };
         } else keep();
       }
       return;

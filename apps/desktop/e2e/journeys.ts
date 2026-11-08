@@ -875,6 +875,59 @@ journey("highlight: one the core can't place says what to do, not “text not fo
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
 });
 
+/** The middle of a phrase in the reader, scrolled into view. */
+async function pointAt(page: Page, phrase: string) {
+  return (await page.evaluate((phrase) => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf(phrase);
+      if (i < 0) continue;
+      n.parentElement!.scrollIntoView({ block: "center" });
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + phrase.length);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    }
+  }, phrase))!;
+}
+
+journey("highlight: a drag that starts right after a double click keeps both, the word without a popup", async (page) => {
+  await openSource(page, TESTING);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
+  await page.waitForTimeout(300);
+  const word = await pointAt(page, "laboratory");
+  await page.mouse.dblclick(word.x, word.y);
+  await select(page, "Free recall, short-answer questions"); // within the double-click time
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await until("the drag's passage is highlighted, its popup open", async () => (await active()).startsWith("Free recall, short-answer questions"));
+  await until("the word is kept too", async () => (await kept()).includes("laboratory"));
+});
+
+journey("highlight: a triple click whose selection runs past the text keeps the double click's word", async (page) => {
+  await openSource(page, TESTING);
+  const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+  await page.waitForTimeout(300);
+  const word = await pointAt(page, "Decades");
+  await page.mouse.dblclick(word.x, word.y);
+  // WebKit's triple click on the last paragraph selects past the end of the text: the reader can't
+  // highlight that, so the word he double-clicked stays his.
+  await page.evaluate(({ x, y }) => {
+    const p = document.elementFromPoint(x, y)!.closest("p")!;
+    const r = document.createRange();
+    r.setStart(p, 0);
+    r.setEnd(document.body, document.body.childNodes.length);
+    const sel = getSelection()!;
+    sel.removeAllRanges();
+    for (const type of ["mousedown", "mouseup"]) {
+      if (type === "mouseup") sel.addRange(r);
+      p.dispatchEvent(new MouseEvent(type, { bubbles: true, detail: 3, button: 0, clientX: x, clientY: y }));
+    }
+  }, word);
+  await until("the word is highlighted", async () => (await kept()).includes("Decades"));
+});
+
 journey("highlight: an edge he dragged is his, so Esc keeps the highlight and ⌘Z moves the edge back", async (page) => {
   await openSource(page, AGENTS);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
