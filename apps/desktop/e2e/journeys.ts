@@ -16,10 +16,12 @@ const FIXTURES = join(import.meta.dir, "../../../packages/core/test/fixtures/int
 const PORT = Number(process.env.ORE_E2E_PORT ?? 1450);
 const BRIDGE = process.env.E2E_URL ? Number(process.env.E2E_BRIDGE ?? 1421) : Number(process.env.ORE_E2E_MOCK_PORT ?? 1451);
 const only = process.argv[2];
+/** The seeded library (or, against a mock already running, $ORE_LIBRARY): for state no `ore` command makes. */
+let LIB = process.env.ORE_LIBRARY ?? "";
 
 async function start(): Promise<{ url: string; stop: () => void }> {
   if (process.env.E2E_URL) return { url: process.env.E2E_URL, stop: () => {} };
-  const lib = mkdtempSync(join(tmpdir(), "ore-e2e-"));
+  const lib = (LIB = mkdtempSync(join(tmpdir(), "ore-e2e-")));
   await $`bun ${join(MOCK, "seed.ts")} ${lib}`.quiet();
   // The table and formula reader (D125) stands in as a script that writes Docling's saved reading of tables.pdf.
   const docling = join(lib, ".ore", "docling");
@@ -970,7 +972,7 @@ journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to t
   await until("then ⌘[ leaves the source, as before", async () => !(await page.locator(".doc").isVisible()));
 });
 
-journey("figure zoom: a click opens a figure to fill the window and keys don't reach the page behind; Esc, a click or a scroll puts it back (D143)", async (page) => {
+journey("figure zoom: a click opens a figure to fill the window and keys don't reach the page behind; Esc, a click or a scroll puts it back (D144)", async (page) => {
   await openSource(page, AGENTS);
   const fig = page.locator(".doc img").first();
   await fig.scrollIntoViewIfNeeded();
@@ -1378,6 +1380,45 @@ journey("note shortcuts as in Notion: # in a numbered item makes a heading; Mark
   await page.waitForTimeout(400);
   if (await page.locator(".toast", { hasText: "Added" }).count()) throw new Error("the paste also added a source");
   await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+});
+
+journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words, ⌘↵ closes a toggle", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("/h1", { delay: 20 });
+  await until("/h1 offers Heading 1 alone", async () => (await rows()).join() === "Heading 1");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("/", { delay: 20 });
+  await until("a new / opens the menu again", async () => (await rows()).length > 5);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("Read the guide", { delay: 10 });
+  await page.keyboard.press("Shift+Home");
+  await page.waitForTimeout(150); // the editor takes the selection a moment after the page shows it
+  await page.keyboard.press("Meta+k"); // the palette's key, in the note with words selected
+  await page.getByPlaceholder("Paste a link").waitFor();
+  await page.keyboard.type("example.com/guide");
+  await page.keyboard.press("Enter");
+  await until("the words link to it", async () => (await pm.locator('a[href="https://example.com/guide"]').innerText().catch(() => "")) === "Read the guide");
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("> Why", { delay: 20 });
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Because", { delay: 10 });
+  await page.keyboard.press("ArrowUp");
+  await page.waitForTimeout(150);
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await until("the toggle closes", async () => (await page.locator(".note-editor .toggle.closed").count()) === 1);
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await until("and opens", async () => (await page.locator(".note-editor .toggle.closed").count()) === 0);
 });
 
 journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
@@ -3096,9 +3137,10 @@ journey("review: the quick quiz during a review keeps its own session; the card 
 });
 
 journey("review: when the quick quiz closes, a new card it didn't rate stays, even with the day's new cards used up", async (page) => {
-  await startReview(page, null);
+  // Storytelling holds only the day's new draft, so it is the first card (over due cards a new one is every fifth, D144).
+  await startReview(page, /Storytelling/);
   const q = page.locator(".review-q");
-  await page.locator(".review-new").first().waitFor(); // the first card is the day's new draft
+  await page.locator(".review-new").first().waitFor();
   const draft = await q.innerText();
   const goal = (await ore("today")) as { new_per_day: number };
   await ore("goal", "--new-per-day=0");
@@ -4656,6 +4698,63 @@ journey("reader toolbar: Collected goes back to a chip per type when a type goes
     await page.getByRole("menuitemcheckbox", { name: "Highlight" }).dispatchEvent("click");
     await until("three types fit again: a chip per type", async () => !(await one()) && (await page.locator(".reader-tools .collected-chip.keep").count()) === 1);
   } finally {
+    await ore("archive", made.id);
+  }
+});
+
+journey("course: a rename from its menu goes on the history; ⌘Z puts the old name back, ⇧⌘Z renames it again", async (page) => {
+  // A course needs a course site to add; two sources made its lessons stand in.
+  if (!LIB) throw new Error("this journey edits the library: set ORE_LIBRARY to the running mock's");
+  // Core by path, so the desktop's typecheck doesn't take in core's sources.
+  const { updateItemMeta } = (await import(join(import.meta.dir, "../../../packages/core/src/items.ts"))) as { updateItemMeta: (lib: { root: string }, id: string, patch: (m: object) => object) => Promise<unknown> };
+  const made = await Promise.all(["One", "Two"].map((n) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: `# Lesson ${n}\n\nA lesson.` }) }).then((r) => r.json() as Promise<{ id: string }>)));
+  for (const [i, m] of made.entries()) await updateItemMeta({ root: LIB }, m.id, (x) => ({ ...x, course: { id: "spacing-course", title: "Spacing course", part: i + 1 } }));
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const row = page.locator(".list .row.course");
+    await row.filter({ hasText: "Spacing course" }).waitFor();
+    await row.filter({ hasText: "Spacing course" }).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Rename…" }).click();
+    await page.locator(".list .row.course").getByLabel("Title").fill("Spacing, renamed");
+    await page.keyboard.press("Enter");
+    await row.filter({ hasText: "Spacing, renamed" }).waitFor();
+    await page.waitForTimeout(300); // the write lands, then its step is on the history
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z puts the old name back", async () => (await row.filter({ hasText: "Spacing course" }).count()) === 1);
+    await page.keyboard.press("Meta+Shift+z");
+    await until("⇧⌘Z renames it again", async () => (await row.filter({ hasText: "Spacing, renamed" }).count()) === 1);
+  } finally {
+    for (const m of made) await ore("archive", m.id).catch(() => {});
+  }
+});
+
+journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the suggestion returns) and Dismiss", async (page) => {
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Why sleep consolidates memory\n\nSleep replays the day." }) }).then((r) => r.json())) as { id: string };
+  // Undo of a dismiss puts a suggestion on it, as enrich would.
+  await ore("suggested-skill", made.id, "undo", JSON.stringify({ suggestion: { name: "Sleep Science", hook: "Rest that helps you learn" } }));
+  try {
+    await page.reload();
+    await openSource(page, "Why sleep consolidates memory");
+    const chip = page.locator(".chip.suggested");
+    const skill = page.locator(".sidebar .side-item", { hasText: "Sleep Science" });
+    await chip.getByRole("button", { name: "+ Sleep Science" }).click();
+    await skill.waitFor();
+    await until("the chip goes", async () => (await chip.count()) === 0);
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes the new skill away and brings the suggestion back", async () => (await skill.count()) === 0 && (await chip.count()) === 1);
+    await page.keyboard.press("Meta+Shift+z");
+    await until("⇧⌘Z accepts it again", async () => (await skill.count()) === 1 && (await chip.count()) === 0);
+    await page.keyboard.press("Meta+z");
+    await until("back to the suggestion", async () => (await chip.count()) === 1);
+    await chip.getByRole("button", { name: "Dismiss suggested skill Sleep Science" }).click();
+    await until("Dismiss takes the chip away", async () => (await chip.count()) === 0);
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings the dismissed suggestion back", async () => (await chip.count()) === 1);
+  } finally {
+    await ore("skills", "rm", "sleep-science").catch(() => {});
     await ore("archive", made.id);
   }
 });

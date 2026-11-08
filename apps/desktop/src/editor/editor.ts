@@ -13,7 +13,7 @@ import { highlightSchema, remarkColors, stringifyColor, textColorSchema, underli
 import { blockSelPlugin } from "./blocksel";
 import { tablePlugin, tableView } from "./tables";
 import { emojiTrigger } from "./emoji";
-import { emptyHints, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
+import { emptyHints, foldPlugin, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
 export async function createEditor(root: HTMLElement, markdown: string, onChange: (md: string) => void, plugins: MilkdownPlugin[] = []): Promise<Editor> {
@@ -31,6 +31,7 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     // Before the keymaps, so selected blocks get their keys first.
     .use(blockSelPlugin)
     .use(tablePlugin)
+    .use(foldPlugin)
     .use(notionKeys)
     // Before the presets' own rules, which would take a shortcut first and do it otherwise.
     .use(notionRules)
@@ -80,13 +81,20 @@ export type Trigger = { kind: "link" | "slash" | "emoji" | "date"; query: string
 export function menuTrigger(before: string): Trigger | null {
   const link = before.match(/\[\[([^[\]\n]{0,40})$/);
   if (link) return { kind: "link", query: link[1]!, typed: link[0].length };
-  const slash = before.match(/(?:^|[\s￼])\/([a-z0-9]{0,16})$/i);
+  const slash = before.match(/(?:^|[\s￼])\/([a-z0-9#]{0,16})$/i);
   if (slash) return { kind: "slash", query: slash[1]!, typed: slash[1]!.length + 1 };
   // @ at the start of a word: Notion's dates (an email address has a letter before it).
   const date = before.match(/(?:^|[\s([{])@([a-z0-9 -]{0,16})$/i);
   if (date) return { kind: "date", query: date[1]!, typed: date[1]!.length + 1 };
   const emoji = emojiTrigger(before);
   return emoji ? { kind: "emoji", query: emoji[2]!, typed: emoji[1]!.length } : null;
+}
+
+/** Whether a `/` menu row answers what was typed after the slash: a part of its label (letters and digits
+ *  only, so "todo" finds "To-do list"), or the start of one of the names Notion takes (`/h1`, `/#`, `/hr`). */
+export function slashMatch(label: string, names: readonly string[], query: string): boolean {
+  const q = query.toLowerCase().replace(/[^a-z0-9#]/g, "");
+  return !q || label.toLowerCase().replace(/[^a-z0-9]/g, "").includes(q) || names.some((n) => n.startsWith(q));
 }
 
 /** The editor's Markdown for its current document. */

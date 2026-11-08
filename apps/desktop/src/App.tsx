@@ -1351,16 +1351,24 @@ export function App() {
   ];
 
   type CourseLine = Extract<Line, { kind: "course" }>;
-  /** Renames a course on every lesson: optimistic, put back if the write fails. */
+  /** Renames a course on every lesson: optimistic, put back if the write fails. On the history, as a source's rename is. */
   const renameCourse = async (c: CourseLine, title: string) => {
     setRenamingRow(null);
     listRef.current?.focus({ preventScroll: true });
-    const t = title.trim();
-    if (!t || t === c.title) return;
-    setItems((all) => all?.map((i) => (i.course?.id === c.id ? { ...i, course: { ...i.course, title: t } } : i)) ?? all);
+    await recourse(c.id, c.title, title.trim());
+  };
+  const recourse = async (id: string, before: string, t: string, undoable = true) => {
+    if (!t || t === before) return;
+    setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: t } } : i)) ?? all);
     try {
-      await ore("course", "set", c.id, opt("title", t));
+      await ore("course", "set", id, opt("title", t));
+      if (undoable) notify(`Renamed to “${t}”`, "quiet", () => recourse(id, t, before, false), () => recourse(id, before, t, false));
     } catch (e) {
+      // An undo's or redo's failure goes back to the history, which says so.
+      if (!undoable) {
+        void refresh();
+        throw e;
+      }
       notify(errorText(e), "error");
     }
     void refresh();

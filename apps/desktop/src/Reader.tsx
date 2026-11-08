@@ -2375,19 +2375,33 @@ function ReaderView(p: Props & { reload: () => void }) {
     />
   );
   const suggested = doc.suggested_skill;
-  const suggestion = async (action: "accept" | "dismiss") => {
+  /** Accept or dismiss the skill enrich suggested, with Undo: `ore suggested-skill undo` takes back just
+   *  what the accept filed (and a skill it made), and the suggestion returns either way. */
+  const suggestion = async (action: "accept" | "dismiss", undoable = true) => {
+    const id = doc.id;
+    const was = doc.suggested_skill;
+    if (!was) return;
+    const takeBack = (record: object) => async () => {
+      const m = await ore<Item>("suggested-skill", id, "undo", JSON.stringify(record));
+      setDoc((cur) => cur && cur.id === id ? { ...cur, skills: m.skills, suggested_skill: m.suggested_skill } : cur);
+      p.onSkillsChanged();
+      p.onChanged();
+    };
     try {
       if (action === "accept") {
-        const r = await ore<{ skill: Skill; created: boolean; item: Item }>("suggested-skill", doc.id, "accept");
-        setDoc((cur) => cur && { ...cur, skills: r.item.skills, suggested_skill: undefined });
+        const r = await ore<{ skill: Skill; created: boolean; item: Item; undo: object }>("suggested-skill", id, "accept");
+        setDoc((cur) => cur && cur.id === id ? { ...cur, skills: r.item.skills, suggested_skill: undefined } : cur);
         p.onSkillsChanged();
-        p.notify(r.created ? `Created skill ${r.skill.name}` : `Filed under ${r.skill.name}`);
+        if (undoable) p.notify(r.created ? `Created skill ${r.skill.name}` : `Filed under ${r.skill.name}`, "info", takeBack(r.undo), () => suggestion("accept", false));
       } else {
-        await ore("suggested-skill", doc.id, "dismiss");
-        setDoc((cur) => cur && { ...cur, suggested_skill: undefined });
+        await ore("suggested-skill", id, "dismiss");
+        setDoc((cur) => cur && cur.id === id ? { ...cur, suggested_skill: undefined } : cur);
+        if (undoable) p.notify(`Dismissed suggested skill ${was.name}`, "info", takeBack({ suggestion: was }), () => suggestion("dismiss", false));
       }
       p.onChanged();
     } catch (e) {
+      // A redo's failure goes back to the history, which says so; a first try says it here.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   };
