@@ -276,6 +276,8 @@ export function invalid(id: KeyId, combo: Combo): string | null {
   if (combo === "Escape" || combo === "Enter" || combo.startsWith("Arrow")) return `${label(combo)} is reserved`;
   if (MAC[combo]) return `${label(combo)} is the Mac's ${MAC[combo]}`;
   if (APP[combo] && !("scope" in b)) return `${label(combo)} is ${APP[combo]}`;
+  // Review's fixed 1–4 (the rating, and 1–3 for how sure) go before any binding there.
+  if (/^Digit[1-4]$/.test(combo) && (IN_REVIEW.has(id) || IN_REVIEW_TOO.has(id))) return `${label(combo)} rates the card in Review`;
   return null;
 }
 
