@@ -8,9 +8,11 @@ nothing is built until he picks.
 **Searched:** all 28 of Rare UI's components (site and registry), then the MIT registries for the same kinds of
 pieces: assistant-ui, Cult UI, Dice UI, Magic UI, Motion Primitives, Animate UI, Kibo UI, shadcn.
 
-**Constraints kept:** purpose rule (each pitch names what he learns or does better); D120: Rare UI's license
-(MIT plus Commons Clause, attribution) bars copying its code, so it gives the idea and the behaviour, and the
-code comes from an MIT source or is written for Ore; motion follows `review-animations/STANDARDS.md` (keyboard
+**Constraints kept:** purpose rule (each pitch names what he learns or does better); D120: Rare UI's terms
+(README: MIT plus Commons Clause, attribution) bar redistributing its components, which a public AGPL repo does,
+so it gives the idea and the behaviour, and the code comes from an MIT source or is written for Ore. Checked
+2026-11-08: the repo's LICENSE file is plain MIT and contradicts the README; until the author says which governs,
+the safe reading stands; motion follows `review-animations/STANDARDS.md` (keyboard
 and 100-times-a-day actions don't animate); D23 (no streaks or scores).
 
 ## Already in Ore from Rare UI (D113, 2026-11-03)
