@@ -368,9 +368,24 @@ describe("import coverage: files", () => {
   });
 
   test("an unreadable file type says which ones work", async () => {
-    const key = join(mkdtempSync(join(tmpdir(), "ore-key-")), "talk.key");
-    writeFileSync(key, "x");
-    await expect(addSource(await tempLibrary(), key)).rejects.toThrow(/can’t read “.key” files yet.*docx, pptx.*png/);
+    const sketch = join(mkdtempSync(join(tmpdir(), "ore-sketch-")), "talk.sketch");
+    writeFileSync(sketch, "x");
+    await expect(addSource(await tempLibrary(), sketch)).rejects.toThrow(/can’t read “.sketch” files yet.*docx, pptx.*png/);
+  });
+
+  test("Pages, Keynote, Kindle and old Word files say how to save a copy Ore reads", async () => {
+    const d = mkdtempSync(join(tmpdir(), "ore-export-"));
+    const lib = await tempLibrary();
+    // Pages and Keynote save either one file or a package Finder shows as one (a folder underneath).
+    writeFileSync(join(d, "essay.pages"), "x");
+    mkdirSync(join(d, "talk.key"));
+    for (const name of ["essay.pages", "talk.key"]) await expect(addSource(lib, join(d, name))).rejects.toThrow(/^Ore can’t read (Pages|Keynote) files\. Open it in \1 and choose File › Export To › (Word|PowerPoint), then add that file\.$/);
+    writeFileSync(join(d, "grades.numbers"), "x");
+    await expect(addSource(lib, join(d, "grades.numbers"))).rejects.toThrow(/Export To › Excel/);
+    writeFileSync(join(d, "novel.mobi"), "x");
+    await expect(addSource(lib, join(d, "novel.mobi"))).rejects.toThrow(/Kindle book.*EPUB/);
+    writeFileSync(join(d, "old.doc"), "x");
+    await expect(addSource(lib, join(d, "old.doc"))).rejects.toThrow(/older Word file.*Save As.*\.docx/);
   });
 });
 

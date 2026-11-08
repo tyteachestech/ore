@@ -303,12 +303,24 @@ async function readme(url: string, owner: string, repo: string): Promise<NewItem
   throw new Error(`Couldn’t find a README in ${owner}/${repo}. Check the link, or open the file you want on GitHub and add that link instead.`);
 }
 
+/** Files only their own app reads, refused with how to save a copy Ore does read (D96). Pages and
+ *  Keynote keep their text in Apple's private format; Word's pre-2007 .doc is a binary one. */
+function exportFirst(ext: string): string | null {
+  const apple = { pages: ["Pages", "Word"], key: ["Keynote", "PowerPoint"], numbers: ["Numbers", "Excel"] }[ext];
+  if (apple) return `Ore can’t read ${apple[0]} files. Open it in ${apple[0]} and choose File › Export To › ${apple[1]}, then add that file.`;
+  if (["mobi", "azw", "azw3", "kfx"].includes(ext)) return "That’s a Kindle book, which Ore can’t read. If it isn’t locked to Kindle, convert it to EPUB (Calibre does this for free) and add that.";
+  if (ext === "doc") return "That’s an older Word file (.doc). Open it in Word or Pages and choose File › Save As, as a .docx, then add that file.";
+  return null;
+}
+
 async function fromFile(path: string, opts: AddOptions, input = path): Promise<NewItem> {
   if (!existsSync(path)) {
     // "example.com/post" typed without its scheme reads as a path; say how to add it as the link it is.
     const site = /^[\w-]+(\.[\w-]+)*\.[a-z]{2,}(\/|$)/i.test(input) && !kindOf(input.split("/")[0]!) ? ` For a web page, add its full link: https://${input}` : " Check the path, or drag the file in instead.";
     throw new Error(`There’s no file at ${path}.${site}`);
   }
+  const exported = exportFirst(extname(path).slice(1).toLowerCase());
+  if (exported) throw new Error(exported);
   const stat = statSync(path);
   if (stat.isDirectory()) throw new Error("That’s a folder. Open it and add the files inside instead.");
   // Finder's own files (.DS_Store, AppleDouble ._ copies) ride along when a folder's files are dropped.
