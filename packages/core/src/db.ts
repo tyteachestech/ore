@@ -14,7 +14,7 @@ import { desiredRetention, loadSkills } from "./skills.ts";
 // .index/library.sqlite is a disposable cache of the files: FTS5 search plus
 // card states replayed from the review log. Every open syncs it by comparing
 // file mtimes and sizes, so direct file edits by agents are picked up.
-const SCHEMA_VERSION = "5"; // 5: card_state.sig, so a new review replays only its own card
+const SCHEMA_VERSION = "6"; // 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows
 
 const SCHEMA = `
 create table meta(key text primary key, value text);
@@ -305,7 +305,9 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
         db.run("delete from files where path = ?", [k.path]);
       }
       for (const f of changed) {
-        if (known.has(f.path)) dropFile(db, lib, f.path, f.kind);
+        // Always, not only for files this process saw before: several `ore` processes sync at once (the app's
+        // launch), and one that read the files table before another committed would index a file twice.
+        dropFile(db, lib, f.path, f.kind);
         try {
           indexFile(db, lib, f);
         } catch (e) {

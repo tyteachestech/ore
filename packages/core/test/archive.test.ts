@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { Database } from "bun:sqlite";
 import { openIndex } from "../src/db.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { allItems, findItem, listItems, setItemArchived, setItemPinned } from "../src/items.ts";
 import { loadSkills, removeSkill, restoreSkill } from "../src/skills.ts";
+import { paths } from "../src/library.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const search = (lib: Awaited<ReturnType<typeof tempLibrary>>, q: string) => {
@@ -108,5 +110,22 @@ describe("pin a source", () => {
     expect((await setItemPinned(lib, id, true, "2020-01-01T00:00:00.000Z")).pinned_at).toBe("2020-01-01T00:00:00.000Z");
     await expect(setItemPinned(lib, id, true, "tomorrow")).rejects.toThrow(/ISO time/);
     expect(findItem(lib, id).meta.pinned_at).toBe("2020-01-01T00:00:00.000Z");
+  });
+});
+
+describe("search index with several ore processes at once", () => {
+  test("a file two processes both index shows once in search", async () => {
+    const lib = await tempLibrary();
+    const id = (await addSnippet(lib, { text: "Spacing beats cramming." })).item.meta.id;
+    openIndex(lib).close();
+    // The second process read the files table before the first committed, so it indexes the same file again.
+    const db = new Database(paths.index(lib));
+    db.run("delete from files");
+    db.close();
+    const index = openIndex(lib);
+    const hits = index.search("spacing").map((h) => `${h.kind} ${h.ref}`);
+    index.close();
+    expect(hits).toContain(`item ${id}`);
+    expect(hits.length).toBe(new Set(hits).size);
   });
 });

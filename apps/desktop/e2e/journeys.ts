@@ -242,6 +242,13 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("⌘K ↵ on Home starts review, never flips a display setting", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.locator("[cmdk-item]").first().waitFor();
+  await page.keyboard.press("Enter");
+  await page.getByRole("dialog", { name: "What to review" }).waitFor();
+});
+
 journey("highlight popup open: typing letters doesn't start Listen or open the original", async (page) => {
   await openSource(page, TESTING);
   await select(page, "Each successful retrieval changes the memory itself");

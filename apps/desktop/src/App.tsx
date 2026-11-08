@@ -1559,16 +1559,8 @@ export function App() {
             : [{ id: a.id, label: a.id === "rename" ? "Rename source…" : a.id === "archive" ? "Archive source" : a.label, hint: a.hint, run: a.id === "rename" ? () => setRenameSource((n) => n + 1) : a.run }],
         )
       : []),
-    ...CHIP_LOOKS.filter((l) => l.id !== chipLook()).map((l) => ({ id: `chips:${l.id}`, label: `Skill tags: ${l.label}`, keywords: ["chips", "pills", "emoji", "compact"], run: () => setChipLook(l.id) })),
-    ...(openId && !finishing ? WIDTHS.filter((w) => w.id !== width).map((w) => ({ id: `width:${w.id}`, label: `Reading width: ${w.label}`, keywords: ["column", "measure"], run: () => setWidth(w.id) })) : []),
-    ...(openId && !finishing
-      ? [
-          { id: "bigger", label: "Bigger text", hint: label(keys.bigger), keywords: ["font", "size", "zoom"], run: bigger },
-          { id: "smaller", label: "Smaller text", hint: label(keys.smaller), keywords: ["font", "size", "zoom"], run: smaller },
-          ...(size !== DEFAULT_SIZE ? [{ id: "size-default", label: "Default text size", keywords: ["font", "zoom", "reset"], run: () => setSize(DEFAULT_SIZE) }] : []),
-          ...PAGES.filter((t) => t.id !== page).map((t) => ({ id: `page:${t.id}`, label: `Reading page: ${t.label}`, keywords: ["theme", "light", "dark", "white"], run: () => setPage(t.id) })),
-        ]
-      : []),
+    // The day's main job comes first among the app-wide actions, as Raycast puts the likely one on top.
+    { id: "review", label: "Start review", hint: label(keys.review), run: askReview },
     ...(openId ? [{ id: "back", label: skill ? `Back to ${skillOf(skill).name}` : "Back to sources", hint: "Esc", run: () => setOpenId(null) }] : []),
     ...(skill || onHome ? [{ id: "all", label: "All sources", run: () => openSkill(null) }] : []),
     // A list row only once the keyboard has selected it, so ⌘K never acts on a row he can't see:
@@ -1578,15 +1570,10 @@ export function App() {
     ...(onFeed && !openId && feedPick.current ? rowPalette(feedPick.current.actions, feedPick.current.title, "post") : []),
     // A course row picked by the keyboard: the same actions as its ⋯ menu.
     ...(!openId && !onHome && keyed && currentCourse ? rowPalette(courseActions(currentCourse), currentCourse.title, "course") : []),
-    // The list's details, as the row menus' Show submenu (D108).
-    ...(!openId && !onHome && !onFeed
-      ? DETAILS.map((d) => ({ id: `detail:${d.id}`, label: `${details.includes(d.id) ? "Hide" : "Show"} ${d.label.toLowerCase()} on rows`, keywords: ["column", "details", "metadata", "row"], run: () => toggleDetail(d.id) }))
-      : []),
     ...(!openId && !onSkillPage ? [{ id: "filter", label: "Filter sources", hint: label(keys.filter), keywords: ["search", "find"], run: () => {
       setPlace("sources");
       requestAnimationFrame(() => filterRef.current?.focus());
     } }] : []),
-    { id: "review", label: "Start review", hint: label(keys.review), run: askReview },
     { id: "tutor", label: tutorOpen ? "Close the tutor" : "Tutor chat…", hint: label(keys.tutor), keywords: ["ask", "library", "question", "chat", "answer", "ai", "quiz"], run: () => (tutorOpen ? closeTutor() : openTutor()) },
     ...(tutor.turns.length ? [{ id: "tutor-new", label: "New tutor chat", keywords: ["ask", "chat", "clear"], run: () => { tutor.fresh(); openTutor(); } }] : []),
     ...(onHome ? [] : [{ id: "home", label: "Go to Home", hint: label(keys.home), run: goHome }]),
@@ -1608,6 +1595,21 @@ export function App() {
           })),
           { id: "delete-skill", label: `Delete skill ${skillOf(skill).name}…`, run: () => setDeleting(skill) },
         ]
+      : []),
+    // Display settings last: ⌘K ↵ on an empty query does the likely thing, never flips a setting (2026-11-08).
+    ...CHIP_LOOKS.filter((l) => l.id !== chipLook()).map((l) => ({ id: `chips:${l.id}`, label: `Skill tags: ${l.label}`, keywords: ["chips", "pills", "emoji", "compact"], run: () => setChipLook(l.id) })),
+    ...(openId && !finishing ? WIDTHS.filter((w) => w.id !== width).map((w) => ({ id: `width:${w.id}`, label: `Reading width: ${w.label}`, keywords: ["column", "measure"], run: () => setWidth(w.id) })) : []),
+    ...(openId && !finishing
+      ? [
+          { id: "bigger", label: "Bigger text", hint: label(keys.bigger), keywords: ["font", "size", "zoom"], run: bigger },
+          { id: "smaller", label: "Smaller text", hint: label(keys.smaller), keywords: ["font", "size", "zoom"], run: smaller },
+          ...(size !== DEFAULT_SIZE ? [{ id: "size-default", label: "Default text size", keywords: ["font", "zoom", "reset"], run: () => setSize(DEFAULT_SIZE) }] : []),
+          ...PAGES.filter((t) => t.id !== page).map((t) => ({ id: `page:${t.id}`, label: `Reading page: ${t.label}`, keywords: ["theme", "light", "dark", "white"], run: () => setPage(t.id) })),
+        ]
+      : []),
+    // The list's details, as the row menus' Show submenu (D108).
+    ...(!openId && !onHome && !onFeed
+      ? DETAILS.map((d) => ({ id: `detail:${d.id}`, label: `${details.includes(d.id) ? "Hide" : "Show"} ${d.label.toLowerCase()} on rows`, keywords: ["column", "details", "metadata", "row"], run: () => toggleDetail(d.id) }))
       : []),
     { id: "sidebar", label: collapsed ? "Show sidebar" : "Hide sidebar", hint: label(keys.sidebar), run: toggleSidebar },
     { id: "settings", label: "Settings", hint: label(keys.settings), keywords: ["preferences", "goal", "width", "ai"], run: () => setSettings({}) },
