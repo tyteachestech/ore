@@ -1628,6 +1628,23 @@ journey("sidebar: New collection “Other” names a skill among the ungrouped o
   await until("one Other heading", async () => (await page.locator(".side-label-text").allInnerTexts()).filter((t) => /^other$/i.test(t)).length === 1);
 });
 
+journey("a row's ⋯ menu in a short window stays inside it, scrolling, as its right-click twin does", async (page) => {
+  await page.setViewportSize({ width: 900, height: 480 }); // Tauri's smallest window
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".row");
+  await rows.nth(2).waitFor();
+  const last = rows.last();
+  await last.scrollIntoViewIfNeeded();
+  await last.hover();
+  await last.getByRole("button", { name: /^Actions for/ }).click();
+  const menu = page.locator(".menu-list").last();
+  await menu.waitFor();
+  await page.waitForTimeout(200);
+  const box = (await menu.boundingBox())!;
+  if (box.y < 0 || box.y + box.height > 480) throw new Error(`the menu runs out of the window: top ${box.y}, bottom ${box.y + box.height}`);
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);

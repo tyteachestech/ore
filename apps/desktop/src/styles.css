@@ -2101,7 +2101,8 @@ button.home-plan:hover { color: var(--text); }
 }
 
 /* Object menus (Menu.tsx): right-click and the row's ⋯ show the same list, macOS-style. */
-.menu-list { min-width: 200px; max-width: 320px; padding: 4px; border-radius: 10px; }
+/* No taller than the room Radix finds beside its trigger, scrolling past it, so a ⋯ menu in a short window never runs off the top. */
+.menu-list { min-width: 200px; max-width: 320px; max-height: var(--radix-popper-available-height); overflow-y: auto; padding: 4px; border-radius: 10px; }
 .menu-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-item { display: flex; align-items: center; gap: 16px; height: 28px; padding: 0 10px; border-radius: 6px; color: var(--text); outline: none; cursor: default; user-select: none; -webkit-user-select: none; }
 .menu-item[data-highlighted] { background: var(--bg-active); }
