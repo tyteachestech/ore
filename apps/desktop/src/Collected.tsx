@@ -31,12 +31,15 @@ type Props = {
   rectOf: (id: string) => DOMRect | undefined;
   /** A chip: the Collected tab of the side panel, at that type's group. */
   onOpen: (intent: Intent) => void;
+  /** How much of it fits in the toolbar: a chip per type, one chip for all (as on the phone), or none. */
+  fit?: Fit;
 };
+export type Fit = "all" | "one" | "none";
 
 
 /** D64: what he has collected in this source, at the bottom center of the reader. Each new
  *  highlight flies into its type's chip, which pops; a click opens the Collected tab. */
-export function Collected({ anns, ready, rectOf, onOpen }: Props) {
+export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
   const [pop, setPop] = useState<{ intent: Intent; n: number } | null>(null);
   const chips = useRef(new Map<Intent, HTMLElement>());
   const prev = useRef<Map<string, { intent: Intent; noted: boolean }> | null>(null);
@@ -95,11 +98,12 @@ export function Collected({ anns, ready, rectOf, onOpen }: Props) {
   }, [pop]);
 
   const total = anns.length;
-  if (!total) return null;
+  if (!total || fit === "none") return null;
   const shown = INTENTS.filter((i) => counts[i] > 0);
 
-  // The iPhone's top bar has room for one count beside Back (Tyler, 2026-11-06): every type's dot flies into it.
-  if (PHONE)
+  // The iPhone's top bar has room for one count beside Back (Tyler, 2026-11-06): every type's dot flies
+  // into it. So does a Mac toolbar too narrow for a chip per type.
+  if (PHONE || fit === "one")
     return (
       <div className="collected" role="group" aria-label="Collected in this source">
         <button
