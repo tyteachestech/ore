@@ -4078,6 +4078,26 @@ journey("long skill names: a row's chips each end in an ellipsis inside the row,
   }
 });
 
+journey("toast: a long title is clipped to two lines, not a wall of text over the list", async (page) => {
+  const title = `The surprisingly long history ${"of a very long title that keeps going ".repeat(12).trim()}`;
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich"], stdin: `# ${title}\n\nA body.` }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const row = page.locator(".list .row").filter({ hasText: "The surprisingly long history" }).first();
+    await row.click({ button: "right" });
+    await page.getByRole("menuitem", { name: /^Archive/ }).click();
+    const toast = page.locator(".toast").filter({ hasText: "Archived" });
+    await toast.waitFor();
+    const lines = await toast.locator(".toast-msg").evaluate((m) => Math.round(m.getBoundingClientRect().height / parseFloat(getComputedStyle(m).lineHeight)));
+    if (lines > 2) throw new Error(`the toast is ${lines} lines tall`);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings it back", async () => (await row.count()) === 1);
+  } finally {
+    await ore("archive", made.id);
+  }
+});
+
 // —— run ——
 
 let failed = 0;
