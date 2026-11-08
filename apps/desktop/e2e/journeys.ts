@@ -856,7 +856,7 @@ journey("highlight: one the core can't place says what to do, not â€œtext not fo
   await openSource(page, TESTING);
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { highlight: 'ore: text not found in item 01M6Y59CWZB27HBM869RVJPBGR: "Tom & Jerry"' }));
   await page.waitForTimeout(300);
-  await select(page, "Each successful retrieval changes the memory itself.");
+  await select(page, "Space the tests out, mix topics together"); // a passage no other journey highlights
   await until("an error toast", async () => (await page.locator(".toast").allInnerTexts()).some((t) => t.includes("Couldnâ€™t highlight")));
   const toast = (await page.locator(".toast").allInnerTexts()).join(" ");
   if (/01M6Y|text not found/.test(toast)) throw new Error(`the toast shows the core's words: ${toast}`);
@@ -868,18 +868,18 @@ journey("highlight: an edge he dragged is his, so Esc keeps the highlight and âŒ
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
   const popup = page.getByRole("dialog", { name: "Highlight" });
   await page.waitForTimeout(300);
-  await select(page, "Routing classifies an input");
+  await select(page, "That might mean not building"); // a passage no other journey highlights
   await popup.waitFor();
-  await until("the highlight is saved", async () => (await kept()).includes("Routing classifies an input"));
+  await until("the highlight is saved", async () => (await kept()).includes("That might mean not building"));
   const knob = (await page.locator(".grab-edge.end").boundingBox())!;
   const to = (await page.evaluate(() => {
     const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
-      const i = n.data.indexOf("specialised follow-up.");
+      const i = n.data.indexOf("is often enough.");
       if (i < 0) continue;
       const r = document.createRange();
-      r.setStart(n, i + "specialised follow-up.".length - 1);
-      r.setEnd(n, i + "specialised follow-up.".length);
+      r.setStart(n, i + "is often enough.".length - 1);
+      r.setEnd(n, i + "is often enough.".length);
       const b = r.getBoundingClientRect();
       return { x: b.right - 1, y: b.top + b.height / 2 };
     }
@@ -888,7 +888,7 @@ journey("highlight: an edge he dragged is his, so Esc keeps the highlight and âŒ
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 8 });
   await page.mouse.up();
-  const long = "Routing classifies an input and sends it to a specialised follow-up.";
+  const long = "That might mean not building an agent at all: a single call with retrieval and good examples is often enough.";
   await until("the edge moved", async () => (await kept()).includes(long));
   await page.waitForTimeout(300); // the move is saved
   await page.keyboard.press("Escape");
@@ -896,7 +896,7 @@ journey("highlight: an edge he dragged is his, so Esc keeps the highlight and âŒ
   await page.waitForTimeout(300);
   if (!(await kept()).includes(long)) throw new Error(`Esc dropped the resized highlight: ${JSON.stringify(await kept())}`);
   await page.keyboard.press("Meta+z");
-  await until("âŒ˜Z puts the edge back", async () => (await kept()).includes("Routing classifies an input"));
+  await until("âŒ˜Z puts the edge back", async () => (await kept()).includes("That might mean not building"));
 });
 
 journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
