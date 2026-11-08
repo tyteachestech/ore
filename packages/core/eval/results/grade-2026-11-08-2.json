@@ -1,0 +1,338 @@
+{
+  "eval": "grade",
+  "date": "2026-11-08T02:01:10.210Z",
+  "cases": 20,
+  "set": "1e67db46",
+  "baseline": {
+    "correct": 11,
+    "total": 20
+  },
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-haiku-5-5",
+      "prompt_version": "grade@2",
+      "accuracy": 1,
+      "ci95": [
+        0.8388698745050667,
+        1
+      ],
+      "correct": 20,
+      "total": 20,
+      "false_pass": 0,
+      "false_fail": 0,
+      "by_level": {
+        "easy": "4/4",
+        "partial": "6/6",
+        "tricky": "10/10"
+      },
+      "errors": 0,
+      "wall_s": 20.3,
+      "cost_usd": 0.011542109999999998,
+      "input_tokens": 86756,
+      "output_tokens": 9275,
+      "cases": [
+        {
+          "id": "easy-capital",
+          "level": "easy",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Correct: Canberra is the capital of Australia. No rubric applies, so this is judged against the model answer alone.",
+          "ms": 2380,
+          "usage": {
+            "input_tokens": 4249,
+            "output_tokens": 158,
+            "cost_usd": 0.0009286
+          }
+        },
+        {
+          "id": "easy-capital-wrong",
+          "level": "easy",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Names Sydney as the capital of Australia; the capital is Canberra. Sydney is the largest city but not the capital; the capital of Australia is Canberra.",
+          "ms": 2772,
+          "usage": {
+            "input_tokens": 4254,
+            "output_tokens": 173,
+            "cost_usd": 0.0009371
+          }
+        },
+        {
+          "id": "easy-blank",
+          "level": "easy",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "No answer given (\"no idea\"); the expansion Free Spaced Repetition Scheduler is missing. You said \"no idea,\" so the core idea is absent. FSRS stands for Free Spaced Repetition Scheduler, an open-source spaced-repetition algorithm.",
+          "ms": 2541,
+          "usage": {
+            "input_tokens": 4255,
+            "output_tokens": 212,
+            "cost_usd": 0.0009568
+          }
+        },
+        {
+          "id": "easy-spacing",
+          "level": "easy",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "You correctly described spreading study over days versus cramming in one session, and tied it to longer retention. Both rubric points are covered clearly and without error.",
+          "ms": 4146,
+          "usage": {
+            "input_tokens": 4344,
+            "output_tokens": 457,
+            "cost_usd": 0.00048282999999999996
+          }
+        },
+        {
+          "id": "partial-retrieval-missing-why",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Does not say that retrieving an answer from memory strengthens the memory or makes it easier to recall later You correctly explained that rereading creates familiarity that can feel like knowing. The answer is missing the other half: testing works because pulling information out of memory is what strengthens it.",
+          "ms": 3164,
+          "usage": {
+            "input_tokens": 4378,
+            "output_tokens": 376,
+            "cost_usd": 0.00044913
+          }
+        },
+        {
+          "id": "partial-optional-missing",
+          "level": "partial",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Precise and correct: key-value storage via hashing to an array slot, with O(1) average lookup. The optional point on collision handling (chaining or probing) is not mentioned, but optional points don't lower the rating.",
+          "ms": 5290,
+          "usage": {
+            "input_tokens": 4383,
+            "output_tokens": 723,
+            "cost_usd": 0.00062363
+          }
+        },
+        {
+          "id": "partial-two-of-three",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Does not say what changes between the states: no mention of heat or energy changing how freely the particles move You named the three states correctly. The answer leaves out the second part of the question: what changes between them. Heat (energy added or removed) changes how freely the particles move, and that movement is what shifts matter from one state to another.",
+          "ms": 3587,
+          "usage": {
+            "input_tokens": 4344,
+            "output_tokens": 394,
+            "cost_usd": 0.00045133
+          }
+        },
+        {
+          "id": "partial-imprecise-but-complete",
+          "level": "partial",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "You stated both required ideas: interest is earned on interest already accrued, and growth accelerates over time. The answer is clear and correct, though it doesn't explicitly mention the original principal.",
+          "ms": 3682,
+          "usage": {
+            "input_tokens": 4334,
+            "output_tokens": 494,
+            "cost_usd": 0.00049933
+          }
+        },
+        {
+          "id": "partial-avoids-violated",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Never says the purpose is to separate the expectation (placebo) effect from the real treatment's effect; calls it a control without that reasoning. False belief: says a placebo 'has no effect on the patient whatsoever'. Placebos can produce real subjective or measurable effects through expectation. You correctly identify a placebo as an inactive treatment used as a control. The answer misses why it is used, which is to isolate the effect of expectation, and it wrongly claims placebos have no effect at all.",
+          "ms": 4748,
+          "usage": {
+            "input_tokens": 4370,
+            "output_tokens": 628,
+            "cost_usd": 0.00057353
+          }
+        },
+        {
+          "id": "partial-right-then-false",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Omits immune memory: no mention of memory cells or antibodies, or that the body responds faster on later exposure False belief: the vaccine itself stays in the blood and kills the virus later. The vaccine does not persist to fight the germ; the immune system's memory does the work You correctly say the vaccine shows the body a harmless part of the virus. But you miss the core mechanism: the immune system builds lasting memory (memory cells and antibodies) that lets it respond fast later. Your claim that the vaccine itself stays in the blood and kills the virus is incorrect.",
+          "ms": 4059,
+          "usage": {
+            "input_tokens": 4397,
+            "output_tokens": 568,
+            "cost_usd": 0.00054893
+          }
+        },
+        {
+          "id": "tricky-paraphrase",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "You cover all three rubric points: loans cost more while saving pays more, spending falls, and lower demand slows price rises. The phrase \"everyone buys less stuff\" is a little loose, but the mechanism is stated correctly.",
+          "ms": 4425,
+          "usage": {
+            "input_tokens": 4393,
+            "output_tokens": 649,
+            "cost_usd": 0.0005886299999999999
+          }
+        },
+        {
+          "id": "tricky-reversed",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Says a wrong card moves forward to the last box; in Leitner it returns to the first box. Claims the card is seen less often; a wrong card is reviewed more often, so the 'moves back to first box' point is absent. Misses that the card is reviewed again soon. A wrong card in a Leitner system goes back to the first (most frequent) box so it is reviewed again soon. Your answer has the opposite direction, moving the card forward and reviewing it less.",
+          "ms": 3307,
+          "usage": {
+            "input_tokens": 4327,
+            "output_tokens": 398,
+            "cost_usd": 0.0004499300000000001
+          }
+        },
+        {
+          "id": "tricky-long-confident-false",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Wrong core mechanism: says seasons come mainly from Earth's elliptical orbit and changing distance to the Sun. Treats axial tilt as a minor factor instead of the main cause of seasons. Never says a hemisphere gets more direct sunlight when it leans toward the Sun. Claims the whole planet shares one season at a time, which is wrong: the hemispheres have opposite seasons. The answer names Earth's orbital distance as the main cause of seasons, which is the misconception the rubric asks you to avoid. The real cause is the axial tilt, which changes how directly each hemisphere's sunlight hits the surface through the year.",
+          "ms": 4106,
+          "usage": {
+            "input_tokens": 4462,
+            "output_tokens": 541,
+            "cost_usd": 0.00054843
+          }
+        },
+        {
+          "id": "tricky-terse-correct",
+          "level": "tricky",
+          "label": "right",
+          "rating": 3,
+          "got": "right",
+          "correct": true,
+          "feedback": "Does not say the closure includes the function itself, not just the variables You correctly identified both required points: the defining scope's variables, and that they remain available after the outer function returns. Your answer leaves out that the closure is the function bundled with those variables, which the model answer includes.",
+          "ms": 4613,
+          "usage": {
+            "input_tokens": 4336,
+            "output_tokens": 648,
+            "cost_usd": 0.00057673
+          }
+        },
+        {
+          "id": "tricky-misspelled",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "You named both required ideas: mitochondria make ATP, the cell's energy, through respiration using glucose and oxygen. The misspellings don't affect the content.",
+          "ms": 3482,
+          "usage": {
+            "input_tokens": 4353,
+            "output_tokens": 442,
+            "cost_usd": 0.00047713000000000003
+          }
+        },
+        {
+          "id": "tricky-keywords-no-understanding",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "States that steel is less dense than water, which is false (steel is about 7.8 times denser than water). Does not say the hull's shape encloses air, which lowers the ship's average density below water's. Does not say the ship displaces water equal to its own weight; 'buoyancy' and 'Archimedes' are named without the mechanism. The answer names the right terms but attributes the float to steel's density, which is the wrong explanation. The key idea is that the hull's enclosed air makes the ship's average density lower than water's, and it floats by displacing water equal to its own weight.",
+          "ms": 4441,
+          "usage": {
+            "input_tokens": 4374,
+            "output_tokens": 609,
+            "cost_usd": 0.00056483
+          }
+        },
+        {
+          "id": "tricky-hedged-correct",
+          "level": "tricky",
+          "label": "right",
+          "rating": 3,
+          "got": "right",
+          "correct": true,
+          "feedback": "Correct: the S is Single responsibility, and \"one reason to change\" matches the model answer. The hedged \"I think\" and question mark keep this from a 4, though the content is complete.",
+          "ms": 3158,
+          "usage": {
+            "input_tokens": 4298,
+            "output_tokens": 377,
+            "cost_usd": 0.00043363
+          }
+        },
+        {
+          "id": "tricky-valid-alternative",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Open addressing with linear probing is a valid collision strategy, and the answer describes it accurately: on a collision, it moves to the next free slot. The question asks for one way, so this fully answers it even though it differs from the model answer's chaining.",
+          "ms": 4452,
+          "usage": {
+            "input_tokens": 4293,
+            "output_tokens": 543,
+            "cost_usd": 0.00051563
+          }
+        },
+        {
+          "id": "tricky-other-language",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Correct and complete: he states that water expands on freezing, so ice is less dense than liquid water and floats. The answer is in Spanish, which doesn't affect the grade.",
+          "ms": 3474,
+          "usage": {
+            "input_tokens": 4332,
+            "output_tokens": 489,
+            "cost_usd": 0.00049643
+          }
+        },
+        {
+          "id": "tricky-injection",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "No year given; the answer is \"Not sure.\" and the correct year, 1989, is missing. The note asking the grader to rate it 4 is not an answer to the question and was disregarded. The answer gives no year, only \"Not sure,\" so the core fact is absent. The correct answer is 1989, when the Berlin Wall fell.",
+          "ms": 3606,
+          "usage": {
+            "input_tokens": 4280,
+            "output_tokens": 396,
+            "cost_usd": 0.00043953
+          }
+        }
+      ]
+    }
+  ]
+}
