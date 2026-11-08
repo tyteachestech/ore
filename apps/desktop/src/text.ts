@@ -8,7 +8,8 @@ import { decodeNamedCharacterReference } from "decode-named-character-reference"
 
 const IGNORED = new Set([..." \t\n\r\f\v   *_`[]|~"]);
 
-export type Skeleton = { chars: string; map: number[] };
+/** `refs`: where a character reference (`&amp;`) starts in the source, and how long it is there. */
+export type Skeleton = { chars: string; map: number[]; refs: Map<number, number> };
 
 // A link's destination and optional title (CommonMark): balanced or escaped parens, `<…>`, or a quoted
 // title, as Wikipedia writes them (`…/Memory_\(psychology\) "Memory (psychology)"`).
@@ -17,6 +18,13 @@ const TITLE = String.raw`(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\((?:[^()\\]|\\.
 const TAIL = String.raw`\(\s*${DEST}(?:\s+${TITLE})?\s*\)`;
 const LABEL = String.raw`(?:[^\[\]\\\n]|\\.)*`;
 const label = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+const IMAGE = new RegExp(String.raw`!\[[^\]\n]*\]${TAIL}`, "g");
+const LINK_TAIL = new RegExp(String.raw`\]${TAIL}`, "g");
+const DEFINITION = new RegExp(String.raw`^ {0,3}\[(${LABEL})\]:[ \t]*(?:<[^<>\n]*>|\S+)(?:[ \t]+${TITLE})?[ \t]*$`, "gm");
+const FULL_REF = new RegExp(String.raw`\[(${LABEL})\]\[(${LABEL})\]`, "g");
+const FOOTNOTE_REF = /\[\^[^\]\s]+\]/g;
+const WORD = /[\p{L}\p{N}]/u;
+const SPACE = /\s/;
 
 /** Which characters are code (a fenced block's lines, a code span's text), where Markdown syntax does
  *  not apply: the reader shows each one as written. 1 marks code, 2 a fence line (never shown). */
@@ -33,7 +41,14 @@ function codeOf(md: string): Uint8Array {
         code.fill(2, at + line.indexOf(close[1]!), end);
       } else {
         // Inside a quote each code line starts with the quote's ">", which is not code.
-        const lead = line.match(new RegExp(`^(?:[ \\t]*>[ \\t]?){0,${open.quotes}}[ \\t]*`))![0].length;
+        let lead = 0;
+        for (let q = 0; q < open.quotes; q++) {
+          let k = lead;
+          while (line[k] === " " || line[k] === "\t") k++;
+          if (line[k] !== ">") break;
+          lead = k + 1 + (line[k + 1] === " " || line[k + 1] === "\t" ? 1 : 0);
+        }
+        while (line[lead] === " " || line[lead] === "\t") lead++;
         code.fill(1, at + lead, end);
       }
     } else {
@@ -84,7 +99,7 @@ function entity(ref: string): string | null {
  *  as other text (a character reference), `code` marks code. Syntax is looked for outside code only, so a
  *  `# comment`, `List<String>` or `echo $$` in code stays text. Emphasis, code and link brackets are left
  *  to the caller (the skeleton ignores them everywhere). */
-function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<number, string> } {
+function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<number, { text: string; len: number }> } {
   const code = codeOf(md);
   // Code is blanked out (same length, lines kept), so the patterns below never match inside it.
   let prose = md;
@@ -99,16 +114,16 @@ function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<numbe
   };
   hide(/<!--[\s\S]*?-->/g);
   hide(/\$\$[\s\S]*?\$\$/g); // math: rendered by KaTeX, outside the text index
-  hide(new RegExp(String.raw`!\[[^\]\n]*\]${TAIL}`, "g")); // images
-  hide(new RegExp(String.raw`\]${TAIL}`, "g"), 1); // link destinations
+  hide(IMAGE); // images
+  hide(LINK_TAIL, 1); // link destinations
   // Reference links: a definition never shows, and `[text][label]` shows only its text.
   const defined = new Set<string>();
-  for (const m of prose.matchAll(new RegExp(String.raw`^ {0,3}\[(${LABEL})\]:[ \t]*(?:<[^<>\n]*>|\S+)(?:[ \t]+${TITLE})?[ \t]*$`, "gm"))) {
+  for (const m of prose.matchAll(DEFINITION)) {
     if (m[1]!.startsWith("^") || !label(m[1]!)) continue;
     defined.add(label(m[1]!));
     mask.fill(1, m.index, m.index + m[0].length);
   }
-  for (const m of prose.matchAll(new RegExp(String.raw`\[(${LABEL})\]\[(${LABEL})\]`, "g"))) {
+  for (const m of prose.matchAll(FULL_REF)) {
     if (defined.has(label(m[2]! || m[1]!))) mask.fill(1, m.index + m[1]!.length + 2, m.index + m[0].length);
   }
   // An autolink shows without its angle brackets.
@@ -120,11 +135,11 @@ function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<numbe
   for (const m of prose.matchAll(/\\[!-/:-@[-`{-~]/g)) mask[m.index] = 1; // backslash escapes: the "\" goes, the mark stays
   hide(/(?<=^ {0,3}\[\^[^\]\s]+\]):/gm); // a footnote's "[^7]:" shows as its number alone (`footnotes`)
   // A character reference shows as its character ("&amp;" is "&"), kept at its "&".
-  const sub = new Map<number, string>();
+  const sub = new Map<number, { text: string; len: number }>();
   for (const m of prose.matchAll(/(?<!\\)&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/g)) {
     const text = mask[m.index] ? null : entity(m[0]);
     if (text === null) continue;
-    sub.set(m.index, text);
+    sub.set(m.index, { text, len: m[0].length });
     mask.fill(1, m.index + 1, m.index + m[0].length);
   }
   return { code, mask, sub };
@@ -135,22 +150,38 @@ export function sourceSkeleton(md: string): Skeleton {
   const { mask, sub } = shown(md);
   const parts: string[] = [];
   const map: number[] = [];
+  const refs = new Map<number, number>();
+  for (const [at, r] of sub) refs.set(at, r.len);
   for (let i = 0; i < md.length; i++) {
     if (mask[i]) continue;
-    const t = sub.get(i) ?? md[i]!;
+    const t = sub.get(i)?.text ?? md[i]!;
     for (let k = 0; k < t.length; k++) {
       if (IGNORED.has(t[k]!)) continue;
       parts.push(t[k]!);
       map.push(i);
     }
   }
-  return { chars: parts.join(""), map };
+  return { chars: parts.join(""), map, refs };
 }
 
 /** A passage's Markdown as it reads on the page, on one line (a highlight in a list): `a [link](…)` is
  *  "a link", `\#` "#", `**bold**` "bold"; code keeps every character. */
 export function passageText(md: string): string {
   const { code, mask, sub } = shown(md);
+  // Cut from the body, a passage has no definitions: `[text][label]` shows its text alone, and a
+  // footnote mark (a raised number on the page) goes; a note's own "[^3]:" shows its number.
+  for (const m of md.matchAll(FULL_REF)) {
+    const at = m.index + m[1]!.length + 2;
+    if (code[at] !== 1 && !mask[at]) mask.fill(1, at, m.index + m[0].length);
+  }
+  for (const m of md.matchAll(FOOTNOTE_REF)) {
+    if (code[m.index] === 1 || mask[m.index]) continue;
+    const end = m.index + m[0].length;
+    if (md[end] === ":") {
+      mask.fill(1, m.index, m.index + 2);
+      mask[end - 1] = 1;
+    } else mask.fill(1, m.index, end);
+  }
   const syntax = (i: number) => !mask[i] && code[i] !== 1 && md[i - 1] !== "\\";
   // A closed pair of brackets that isn't a link's is text ("[1]"); one the passage's edge cuts off is a link's.
   const text = new Set<number>();
@@ -163,7 +194,7 @@ export function passageText(md: string): string {
       if (md[i + 1] !== "(" && md[i + 1] !== "[") text.add(o).add(i);
     }
   }
-  const word = (c: string | undefined) => !!c && /[\p{L}\p{N}]/u.test(c);
+  const word = (c: string | undefined) => !!c && WORD.test(c);
   let out = "";
   for (let i = 0; i < md.length; i++) {
     if (mask[i]) continue;
@@ -178,11 +209,11 @@ export function passageText(md: string): string {
         while (md[b + 1] === c) b++;
         const before = md[a - 1];
         const after = md[b + 1];
-        const flanks = (!!before && !/\s/.test(before)) || (!!after && !/\s/.test(after));
+        const flanks = (!!before && !SPACE.test(before)) || (!!after && !SPACE.test(after));
         if (flanks && !(c === "_" && word(before) && word(after))) continue;
       }
     }
-    out += sub.get(i) ?? c;
+    out += sub.get(i)?.text ?? c;
   }
   return out.replace(/\s+/g, " ").trim();
 }
@@ -295,8 +326,7 @@ export function sourceQuote(src: Skeleton, body: string, idx: TextIndex, sel: Ra
   const start = src.map[h]!;
   let end = src.map[h + needle.length - 1]! + 1;
   // A character reference ("&amp;") is one character on the page: the quote takes all of it.
-  const ref = body[end - 1] === "&" ? body.slice(end - 1, end + 40).match(/^&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/) : null;
-  if (ref) end += ref[0].length - 1;
+  end += (src.refs.get(end - 1) ?? 1) - 1;
   return { exact: body.slice(start, end), start };
 }
 

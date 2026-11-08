@@ -174,4 +174,26 @@ test("a passage reads as the page shows it, not as its Markdown", async () => {
   expect(passageText('see [the docs](https://x.y/a_(b) "T") and [1], ~~gone~~')).toBe("see the docs and [1], gone");
   expect(passageText("scope_test and 5 * 3, Tom &amp; Jerry")).toBe("scope_test and 5 * 3, Tom & Jerry");
   expect(passageText("- one\n- two `a*b_c`")).toBe("one two a*b_c");
+  // Cut from the body, a passage has no definitions: a reference link still shows its text alone, and a
+  // footnote mark (a raised number on the page) has no place on one plain line.
+  expect(passageText("the [memory][1] of it[^3] and [this][] goes")).toBe("the memory of it and this goes");
+  expect(passageText("[^3]: A note.")).toBe("3 A note.");
+  expect(passageText("`a[b][c]` and `x[^1]`")).toBe("a[b][c] and x[^1]");
+});
+
+// A character reference widens a quote to all of itself, but only where the page shows it as one
+// character: in code, or escaped, "&amp;" is five characters, and a quote ending on its "&" stays there.
+describe("a quote ending on an & takes the reference only where it is one (review of reader-07)", () => {
+  const cases: [string, string, string, string, string][] = [
+    ["entity", "Tom &amp; Jerry.\n", "Tom", "&", "Tom &amp;"],
+    ["in code", "Code `a &amp; b` here.\n", "a", "&", "a &"],
+    ["escaped", "Text \\&amp; here.\n", "Text", "&", "Text \\&"],
+  ];
+  for (const [name, md, from, to, exact] of cases) {
+    test(name, () => {
+      const root = render(md);
+      const q = sourceQuote(sourceSkeleton(md), md, indexText(root), drag(root, from, to));
+      expect(q?.exact).toBe(exact);
+    });
+  }
 });
