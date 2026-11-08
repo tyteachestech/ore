@@ -2080,7 +2080,12 @@ export function App() {
             blocked={overlay}
             targets={targets}
             onOpenLink={openLink}
-            onBack={() => setOpenId(null)}
+            onBack={() => {
+              // Back on Home, focus goes to the source's Continue reading row, as the list's row keeps it.
+              const id = openId;
+              flushSync(() => setOpenId(null));
+              if (!onSkillPage && place === "home") document.querySelector<HTMLElement>(`.home-read[data-id="${id}"]`)?.focus();
+            }}
             onChanged={() => void refresh()}
             onSkillsChanged={reloadSkills}
             onDone={() => {

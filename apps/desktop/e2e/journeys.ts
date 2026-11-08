@@ -3147,6 +3147,17 @@ journey("focus comes back to what opened it: the tutor's ✦ after Esc, and a Co
   await page.keyboard.press("Escape");
   await page.locator(".home-read").first().waitFor();
   await until(`focus is back on “${title}”`, async () => (await on(".home-read")) && (await page.evaluate(() => (document.activeElement as HTMLElement).innerText.split("\n")[0])) === title);
+  // Opened from Home but left another way (All sources, another source, ⌘0): no old row takes focus later.
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").waitFor();
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".row").filter({ hasText: AGENTS }).first().click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+Digit0");
+  await page.locator(".home-read").first().waitFor();
+  await page.waitForTimeout(200);
+  if (await on(".home-read")) throw new Error("a row opened long ago took focus on ⌘0");
 });
 
 journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
