@@ -386,5 +386,7 @@ describe("toggles open and close from the keyboard (Notion)", () => {
     expect(await fold(TWO, "{Mod-Alt-t}", "{Mod-Alt-t}")).toBe("One Two | One");
     expect(await fold(TWO, "{Mod-Enter}", "{Mod-Alt-t}")).toBe("[One] [Two] | One");
     expect(await fold(TWO.replace("One‸", "One").replace("second", "sec‸ond"), "{Mod-Alt-t}")).toBe("[One] [Two] | Two");
+    // A selection running into a body it closes: the next key types at the title's end, never over hidden text.
+    expect(await md(TWO.replace("One‸", "‹One").replace("first", "fi›rst"), "{Mod-Alt-t}", "X")).toMatch(/^<details><summary>OneX<\/summary>\n\nfirst\n/);
   });
 });

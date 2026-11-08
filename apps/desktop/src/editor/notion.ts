@@ -1,5 +1,5 @@
 import { InputRule, undoInputRule } from "@milkdown/kit/prose/inputrules";
-import { keymap } from "@milkdown/kit/prose/keymap";
+import { keydownHandler, keymap } from "@milkdown/kit/prose/keymap";
 import { lift, setBlockType } from "@milkdown/kit/prose/commands";
 import type { ResolvedPos } from "@milkdown/kit/prose/model";
 import { splitListItem } from "@milkdown/kit/prose/schema-list";
@@ -193,35 +193,46 @@ const tick: Command = (state, dispatch) => {
 };
 
 /** ⌘Enter in a toggle's title opens or closes it, as in Notion. Open or closed is the view's, never saved. */
-const fold: Command = (state, _dispatch, view) => {
+const fold: Command = (state, dispatch, view) => {
   const $c = state.selection.$from;
   if ($c.parent.type.name !== "toggle_summary" || !view) return false;
-  (view.nodeDOM($c.before(-1)) as HTMLElement | null)?.classList.toggle("closed");
+  if (dispatch) (view.nodeDOM($c.before(-1)) as HTMLElement | null)?.classList.toggle("closed");
   return true;
 };
 
-/** ⌘⌥T closes every toggle in the note, or opens them all when all are closed (Notion). A caret in a
- *  body it closes goes up to the end of that toggle's title, so typing never lands in hidden text. */
+/** The end of the title of the outermost toggle whose body holds `$p`, if any. */
+function titleEnd($p: ResolvedPos): number | null {
+  for (let d = 1; d < $p.depth; d++) {
+    const n = $p.node(d);
+    if (n.type.name !== "toggle") continue;
+    return $p.depth === d + 1 && $p.index(d) === 0 ? null : $p.start(d) + n.firstChild!.nodeSize - 1;
+  }
+  return null;
+}
+
+/** ⌘⌥T closes every toggle in the note, or opens them all when all are closed (Notion). A selection
+ *  reaching into a body it closes goes up to the end of that toggle's title, so a key never lands in hidden text. */
 const foldAll: Command = (state, dispatch, view) => {
   if (!view) return false;
-  const all: { pos: number; dom: HTMLElement }[] = [];
+  const all: HTMLElement[] = [];
   state.doc.descendants((n, pos) => {
     const dom = n.type.name === "toggle" ? (view.nodeDOM(pos) as HTMLElement | null) : null;
-    if (dom) all.push({ pos, dom });
+    if (dom) all.push(dom);
   });
   if (!all.length) return false;
-  const close = all.some((t) => !t.dom.classList.contains("closed"));
-  for (const t of all) t.dom.classList.toggle("closed", close);
-  const $c = state.selection.$from;
-  if (close)
-    for (let d = 1; d < $c.depth; d++) {
-      const n = $c.node(d);
-      if (n.type.name !== "toggle") continue;
-      if (!($c.depth === d + 1 && $c.index(d) === 0)) dispatch?.(state.tr.setSelection(TextSelection.create(state.doc, $c.start(d) + n.firstChild!.nodeSize - 1)));
-      break;
-    }
+  if (!dispatch) return true;
+  const close = all.some((t) => !t.classList.contains("closed"));
+  for (const t of all) t.classList.toggle("closed", close);
+  const { $from, $to } = state.selection;
+  const to = close ? (titleEnd($from) ?? titleEnd($to)) : null;
+  if (to != null) dispatch(state.tr.setSelection(TextSelection.create(state.doc, to)));
   return true;
 };
+
+/** Folding is the view's own, so the page around the note never hears these keys too (⌘↵ ends a
+ *  chapter's block or saves a try, D115). */
+const foldKeys = keydownHandler({ "Mod-Enter": fold, "Mod-Alt-t": foldAll });
+export const foldPlugin = $prose(() => new Plugin({ props: { handleKeyDown: (view, e) => foldKeys(view, e) && (e.stopPropagation(), true) } }));
 
 /** Tab in a code block indents the line. */
 const tabInCode: Command = (state, dispatch) => {
@@ -281,8 +292,7 @@ export const notionKeys = $prose(() =>
   keymap({
     Backspace: backspace,
     Enter: (state, dispatch) => enterInQuote(state, dispatch) || enterInTodo(state, dispatch),
-    "Mod-Enter": (state, dispatch, view) => fold(state, dispatch, view) || tick(state, dispatch),
-    "Mod-Alt-t": foldAll,
+    "Mod-Enter": tick,
     Tab: (state, dispatch) => tabInCode(state, dispatch) || nest(state, dispatch),
     "Shift-Tab": unnest,
     "Mod-z": undoInputRule,

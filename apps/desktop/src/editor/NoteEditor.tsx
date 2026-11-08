@@ -166,7 +166,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
   // The editor's plugins live as long as it does; they read the latest props, rows and menu
   // through this. The menu here is set as the caret moves, ahead of React's render.
-  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: -1, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), renames: new Set() });
+  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: { at: -1, ch: "" }, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), bar: false, renames: new Set() });
+
+  /** The format bar's selection; `live.current.bar` says whether it is up, for ⌘K. */
+  const showSel = (s: Sel | null) => {
+    live.current.bar = !!s;
+    setSel(s);
+  };
 
   // Creation is async: a focus asked for before the editor exists (opening the source note) waits for it.
   const wantFocus = useRef(false);
@@ -195,7 +201,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         if (!reuse) tr = tr.insert(at, schema.nodes.paragraph!.create());
         tr = tr.insertText("/", at + 1);
         live.current.added = { at, made: !reuse };
-        live.current.dismissed = -1;
+        live.current.dismissed = { at: -1, ch: "" };
         v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 2)).scrollIntoView());
         v.focus();
       }),
@@ -266,7 +272,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, setSel)]), imageView(live), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, showSel)]), imageView(live), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
@@ -593,7 +599,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
       {PHONE && <KeyboardBar view={view} targets={p.targets} />}
-      {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => setSel(null)} askLink={askLink} />}
+      {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => showSel(null)} askLink={askLink} />}
       {menu && ((menu.kind !== "emoji" && menu.kind !== "date") || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
@@ -629,12 +635,14 @@ type Live = {
     menu: Menu | null;
     rowsFor: (m: Menu | null) => Row[];
     index: number;
-    dismissed: number;
+    /** Where the menu Esc closed starts, and the character there then. */
+    dismissed: { at: number; ch: string };
     /** The line the + just added (`made`) or reused, while its / menu is open. */
     added: { at: number; made: boolean } | null;
     draw: (name: string) => void;
-    /** Opens the format bar's web link field on the selected text (⌘K). */
+    /** Opens the format bar's web link field on the selected text (⌘K), while the bar is up (`bar`). */
     askLink: () => void;
+    bar: boolean;
     /** Diagram renames made in this editor, as "from to", both ways, for ⌘Z and ⇧⌘Z to follow. */
     renames: Set<string>;
   };
@@ -657,15 +665,17 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
   const detect = (view: EditorView) => {
     const { $from, empty } = view.state.selection;
     if (!empty || !$from.parent.isTextblock || $from.parent.type.spec.code) return show(null);
+    // A / closed with Esc stays closed while it is there; deleted and typed again, it opens (Notion).
+    const d = live.current.dismissed;
+    if (d.at >= 0 && (d.at >= view.state.doc.content.size || view.state.doc.textBetween(d.at, d.at + 1) !== d.ch)) live.current.dismissed = { at: -1, ch: "" };
     const t = menuTrigger($from.parent.textBetween(0, $from.parentOffset, undefined, "￼"));
     if (!t) {
       live.current.added = null;
-      live.current.dismissed = -1; // the / Esc closed is gone: a new one opens the menu again (Notion)
       return show(null);
     }
     const { kind, query, typed } = t;
     const from = $from.pos - typed;
-    if (from === live.current.dismissed) return show(null);
+    if (from === live.current.dismissed.at) return show(null);
     const c = view.coordsAtPos(from);
     show({ kind, query, from, to: $from.pos, x: c.left, y: c.bottom + 4 });
   };
@@ -678,7 +688,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             const { menu, index } = live.current;
             const rows = live.current.rowsFor(menu);
             const { $from } = view.state.selection;
-            if (!menu && e.key === "Enter" && !e.metaKey && !e.ctrlKey && $from.parent.type.name === "toggle_summary") {
+            if (!menu && e.key === "Enter" && $from.parent.type.name === "toggle_summary") {
               // Enter in a toggle's title goes to its first line.
               view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve($from.after() + 1))));
               return true;
@@ -715,7 +725,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
               // With words selected, ⌘K links them and ⌘⇧H gives them the last colour, as in Notion;
               // with none, ⌘K stays the palette.
               const words = view.state.selection instanceof TextSelection && !view.state.selection.empty;
-              if (words && !PHONE && is(e, "palette")) {
+              if (words && live.current.bar && is(e, "palette")) {
                 live.current.askLink();
                 e.preventDefault();
                 e.stopPropagation();
@@ -763,7 +773,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
                 show(null);
                 return used();
               }
-              live.current.dismissed = menu.from;
+              live.current.dismissed = { at: menu.from, ch: view.state.doc.textBetween(menu.from, menu.from + 1) };
               show(null);
               return used();
             }

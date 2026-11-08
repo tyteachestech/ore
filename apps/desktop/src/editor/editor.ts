@@ -13,7 +13,7 @@ import { highlightSchema, remarkColors, stringifyColor, textColorSchema, underli
 import { blockSelPlugin } from "./blocksel";
 import { tablePlugin, tableView } from "./tables";
 import { emojiTrigger } from "./emoji";
-import { emptyHints, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
+import { emptyHints, foldPlugin, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
 export async function createEditor(root: HTMLElement, markdown: string, onChange: (md: string) => void, plugins: MilkdownPlugin[] = []): Promise<Editor> {
@@ -31,6 +31,7 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     // Before the keymaps, so selected blocks get their keys first.
     .use(blockSelPlugin)
     .use(tablePlugin)
+    .use(foldPlugin)
     .use(notionKeys)
     // Before the presets' own rules, which would take a shortcut first and do it otherwise.
     .use(notionRules)

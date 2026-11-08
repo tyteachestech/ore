@@ -1380,6 +1380,7 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.keyboard.press("Enter");
   await page.keyboard.type("Because", { delay: 10 });
   await page.keyboard.press("ArrowUp");
+  await page.waitForTimeout(150);
   await page.keyboard.press("ControlOrMeta+Enter");
   await until("the toggle closes", async () => (await page.locator(".note-editor .toggle.closed").count()) === 1);
   await page.keyboard.press("ControlOrMeta+Enter");
