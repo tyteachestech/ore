@@ -13,6 +13,7 @@ import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, type Notify } from "./util";
 import { Working } from "./Working";
+import { Trap } from "./Trap";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
 
@@ -793,7 +794,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
 
   return (
-    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-label="Review" hidden={paused}>
+    // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it.
+    <Trap off={paused}>
+    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused}>
       <div className="review-head" data-tauri-drag-region>
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).
@@ -1103,6 +1106,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       </div>
       {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested !== undefined} variant={!!card.variant} inHead={!!card.in_head_ok} />}
     </div>
+    </Trap>
   );
 }
 

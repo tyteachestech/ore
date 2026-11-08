@@ -1,0 +1,74 @@
+{
+  "about": "Question-quality eval: the questions Ore's AI writes for him to answer, judged as learning material. Each case is one source run the way he uses it: added (enrich writes the prequestions he guesses before reading and answers in the in-reader quiz), then read with these highlights and finished (enrich plans the review cards from them, and turns each prequestion into a review prompt). `source` is `golden:<name>` (test/golden) or `eval:<name>` (eval/question-sources, written for this eval). Highlights: `intent` keep (plain), card (a key point), apply (a try, with `note` where and `reflection` how it went); `skip: true` marks one a good plan gives no card (a stray word, an aside with a note that names no idea). `points` are lines he typed with nothing selected (Card here), anchored at the sentence `at` starts. `missed`: ideas his finish recall missed. Every question is checked by code (no attribution in a prequestion, no pointing at 'the article', no 'name all three' card) and by a judge reading the source (see question-judge.md).",
+  "cases": [
+    {
+      "id": "notes-graveyard",
+      "source": "eval:notes-graveyard",
+      "highlights": [
+        { "exact": "Rereading your highlights makes the feeling stronger without making the memory stronger.", "intent": "card" },
+        { "exact": "Psychologists call the trap the fluency illusion.", "intent": "keep" },
+        { "exact": "When text is in front of you, it feels familiar, and familiarity is easy to mistake for knowing.", "intent": "keep" },
+        { "exact": "When I finish a chapter or an article, I close it and write three sentences from memory: what the main claim was, why it might be true, and where I would use it.", "intent": "keep", "note": "try this after every YouTube research session" },
+        { "exact": "Writing from memory is a form of retrieval practice, and retrieving an idea changes the memory of it: it becomes easier to find the next time.", "intent": "keep" },
+        { "exact": "An idea tied to a real problem in your own work has somewhere to live.", "intent": "keep" },
+        { "exact": "If I have not returned to a note in six months and it is not tied to a current project, it goes.", "intent": "keep" },
+        { "exact": "I suspect yours are the same.", "intent": "keep", "note": "ha, guilty", "skip": true },
+        { "exact": "hard drive", "intent": "keep", "skip": true }
+      ],
+      "missed": ["Notes still belong in a searchable system for reference material; the argument is only that they are a poor way to learn ideas."]
+    },
+    {
+      "id": "sourdough",
+      "source": "eval:sourdough-rise",
+      "highlights": [
+        { "exact": "A healthy starter holds wild yeasts and lactic acid bacteria, usually in a ratio of roughly one yeast cell to a hundred bacteria.", "intent": "keep" },
+        { "exact": "The yeasts eat sugars from the flour and give off carbon dioxide and a little alcohol.", "intent": "keep" },
+        { "exact": "they mostly produce lactic and acetic acids, which give sourdough its tang", "intent": "keep" },
+        { "exact": "Bread rises because the dough can trap the gas.", "intent": "card" },
+        { "exact": "When flour is mixed with water, two proteins in wheat, glutenin and gliadin, bond into gluten: a stretchy network of strands.", "intent": "keep" },
+        { "exact": "Wild yeasts are most active around 24 to 27 °C.", "intent": "keep" },
+        { "exact": "cooler, longer fermentation tends to favour acetic acid, which tastes sharper, while warmer fermentation favours the milder lactic acid", "intent": "keep" },
+        { "exact": "The yeast keeps making gas while the acids slowly weaken the gluten, until the network can no longer hold the bubbles.", "intent": "keep" },
+        { "exact": "half an hour", "intent": "keep", "skip": true }
+      ],
+      "points": [{ "at": "Two signs tell you when the dough is ready to bake.", "note": "what the poke test tells you" }]
+    },
+    {
+      "id": "feedback-talk",
+      "source": "eval:feedback-talk",
+      "highlights": [
+        { "exact": "the reason usually isn't that the person didn't care. it's that the feedback was too vague to act on", "intent": "keep" },
+        { "exact": "describe a specific behaviour, in a specific situation, and the impact it had", "intent": "card" },
+        { "exact": "\"you're a bad listener\" is an identity, and people will fight you on their identity", "intent": "keep" },
+        { "exact": "before you give your view, ask for theirs", "intent": "keep" },
+        { "exact": "people learn the pattern very quickly and then they discount the praise because they're waiting for the \"but\"", "intent": "keep" },
+        { "exact": "end with one concrete next step that you agree on together, not a list of ten things", "intent": "keep" },
+        { "exact": "one way to remember it is situation, behaviour, impact", "intent": "apply", "note": "my next notes to my video editor", "reflection": "Used it on his thumbnail draft. Naming the impact landed and he fixed it fast; I forgot to ask for his view first and he got defensive." }
+      ]
+    },
+    {
+      "id": "spaced-repetition-wiki",
+      "source": "golden:web-wikipedia",
+      "highlights": [
+        { "exact": "There is evidence that the popular method of \"expanding intervals\" (when the interval between the repetitions increases with each repetition) performs as well as or better than uniformly spaced repetitions.", "intent": "card" },
+        { "exact": "Spaced repetition with expanding intervals is believed to be so effective because with each expanded interval of repetition it becomes more difficult to retrieve the information because of the time elapsed between test periods; this creates a deeper level of processing of the learned information in long-term memory at each point.", "intent": "keep" },
+        { "exact": "Another reason that the expanding repetition model is believed to work so effectively is that the first test happens early on in the rehearsal process.", "intent": "keep" },
+        { "exact": "However, little evidence has been found to back this claim.", "intent": "keep" },
+        { "exact": "It has also been proposed that the best schedule is learner-dependent, making general recommendations irrelevant.", "intent": "keep" },
+        { "exact": "When a participant gave a wrong response, they were likely to get it correct on the following tests if the researcher gave them the correct answer after a delayed period.", "intent": "keep", "note": "so a review app should show the answer after a miss" },
+        { "exact": "Iowa", "intent": "keep", "skip": true }
+      ]
+    },
+    {
+      "id": "python-classes",
+      "source": "golden:web-python-docs",
+      "highlights": [
+        { "exact": "the special thing about methods is that the instance object is passed as the first argument of the function.", "intent": "card" },
+        { "exact": "Generally speaking, instance variables are for data unique to each instance and class variables are for attributes and methods shared by all instances of the class", "intent": "keep" },
+        { "exact": "the *tricks* list in the following code should not be used as a class variable because just a single list would be shared by all *Dog* instances", "intent": "keep" },
+        { "exact": "Name mangling is helpful for letting subclasses override methods without breaking intraclass method calls.", "intent": "keep" },
+        { "exact": "canine", "intent": "keep", "skip": true }
+      ]
+    }
+  ]
+}

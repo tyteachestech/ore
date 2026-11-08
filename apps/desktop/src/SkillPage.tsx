@@ -17,7 +17,7 @@ import { levelProgress, ore, opt, type Question, type Research, type Skill, type
 import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
-import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
+import { errorText, load, save, useFocusBack, useFocusWhileMounted, type Notify } from "./util";
 
 type Props = {
   skill: Skill;
@@ -171,7 +171,7 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
                 </Hint>
               </div>
             )}
-            <NoteBody notes={notes} editorRef={editor} targets={targets} onOpen={onOpen} placeholder={notes.text === "" ? "Or just start writing. Type / for blocks." : "Type / for blocks, [[ to link."} />
+            <NoteBody notes={notes} editorRef={editor} targets={targets} onOpen={onOpen} label="Skill note" placeholder={notes.text === "" ? "Or just start writing. Type / for blocks." : "Type / for blocks, [[ to link."} />
             <LinkedFrom target={ref} onOpen={onOpen} />
           </section>
         </div>
@@ -322,6 +322,8 @@ function useStats(skill: string): SkillStats | null {
  *  closed-book recall with the goal as its prompt; each try is saved, dated, in the skill note. */
 function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; lastTry: string | null; onTry: () => void; onChanged: () => void; notify: Notify }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const goalRef = useRef<HTMLButtonElement>(null);
+  useFocusBack(draft !== null, goalRef);
   const save = async () => {
     const v = (draft ?? "").trim();
     setDraft(null);
@@ -361,7 +363,7 @@ function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; last
   return (
     <div className="skill-goal-row">
       <Hint text={skill.goal ? "Edit your goal" : "A goal you could show gives this skill a target"}>
-        <button className={`skill-goal${skill.goal ? "" : " empty"}`} onClick={() => setDraft(skill.goal ?? "")}>
+        <button ref={goalRef} className={`skill-goal${skill.goal ? "" : " empty"}`} onClick={() => setDraft(skill.goal ?? "")}>
           <Target size={15} weight="bold" aria-hidden="true" />
           <span>{skill.goal || "What could you show you can do?"}</span>
         </button>
@@ -495,6 +497,8 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
   const [showAnswered, setShowAnswered] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [asking, setAsking] = useState(false);
+  const askRef = useRef<HTMLButtonElement>(null);
+  useFocusBack(asking, askRef);
   const [version, setVersion] = useState(0);
   const reload = () => setVersion((v) => v + 1);
 
@@ -524,7 +528,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
       actions={[{ id: "ask", label: "Add a question", run: () => setAsking(true) }]}
       action={
         <Hint text="Add a question">
-          <button className="icon-btn" aria-label="Add a question" onClick={() => setAsking(true)}>
+          <button className="icon-btn" ref={askRef} aria-label="Add a question" onClick={() => setAsking(true)}>
             <Plus size={14} weight="bold" aria-hidden="true" />
           </button>
         </Hint>

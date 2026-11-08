@@ -33,6 +33,8 @@ bun run eval:tutor --vendor claude --against 85e22fb   # blind A/B: today's tuto
 - New 3, old 5, same 5, $1.11. Two of the old wins were real: on "show me" for a fact (where a missed card goes) and after two wrong tries (which release added FSRS), tutor@7 built the answer as four steps where one plain sentence was the answer. Steps (D142) are for working, and a fact has none. The checks all passed, since none asked for no steps there: the comparison found what they didn't.
 - The three quiz wins went to whichever reply asked the better next question, which both prompts leave to the model: noise from one run until `--runs` shows them again.
 
+- tutor@8 says a fact plainly with steps [] and keeps steps for working (a calculation, a function traced); `flashcard-show-me` and `flashcard-two-tries` now check for no steps. Then 26/26 over 2 runs, and against tutor@7 over 2 runs: new 8, old 9, same 9, $0.86. That is even: the wins on both sides were quiz and practice replies, whose rules neither version changed, and the same pair (`flashcard-show-me`) went to steps in one run and to the plain answer in the other. Read the comparator's reasons and its counts over several runs, not one verdict.
+
 ## Limits
 
 - 13 cases, written for this eval. Five carry judge checks; the rest are still a regex and a flag, so a hint there that gives the answer away in other words passes.

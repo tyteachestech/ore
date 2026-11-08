@@ -997,10 +997,11 @@ body.resizing iframe { pointer-events: none; }
 .outline-lines span { flex: none; height: 2px; border-radius: 1px; background: var(--border); transition: background 0.12s ease-out; }
 .outline-lines span.on { background: var(--muted); }
 .outline-panel {
-  display: none; position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 260px; max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; padding: 4px;
+  /* Hidden but focusable (not display: none), so Tab can reach its current heading and open it. */
+  opacity: 0; pointer-events: none; position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 260px; max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; padding: 4px;
   background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
-.outline:hover .outline-panel, .outline:focus-within .outline-panel { display: block; }
+.outline:hover .outline-panel, .outline:focus-within .outline-panel { opacity: 1; pointer-events: auto; }
 .outline:hover .outline-lines, .outline:focus-within .outline-lines { visibility: hidden; }
 .outline-panel button { display: block; width: 100%; text-align: left; padding: 5px 10px; border-radius: 6px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .outline-panel button:hover { background: var(--bg-hover); color: var(--text); }
@@ -2273,8 +2274,33 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .quick .review-end { margin-top: 0; }
 .settings-hotkey .settings-btn kbd { background: none; border: 0; box-shadow: none; padding: 0; font-size: 13px; }
 
-/* ---- iPhone shell (src/phone/PhoneApp.tsx): a tab bar like Apple Books, screens full width. */
-.phone-app { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100%; }
+/* ---- iPhone shell (src/phone/PhoneApp.tsx): a drawer like Obsidian's, screens full width. */
+.phone-app { height: 100%; }
+.phone-shell { --drawer: min(80vw, 320px); position: relative; height: 100%; overflow: hidden; }
+.phone-root { display: flex; flex-direction: column; height: 100%; padding-top: env(safe-area-inset-top, 0px); transition: transform 250ms cubic-bezier(.2, .9, .3, 1); }
+.phone-root .phone-page { flex: 1; min-height: 0; padding-top: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.phone-shell:is(.open, .dragging) .phone-root { transform: translateX(calc(var(--open) * var(--drawer))); }
+.phone-scrim { position: absolute; inset: 0; z-index: 9; border: 0; padding: 0; background: #000; opacity: calc(var(--open) * .5); pointer-events: none; transition: opacity 250ms cubic-bezier(.2, .9, .3, 1); }
+.phone-shell.open .phone-scrim { pointer-events: auto; }
+.phone-drawer { position: absolute; inset: 0 auto 0 0; z-index: 10; width: var(--drawer); box-sizing: border-box; padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px calc(env(safe-area-inset-bottom, 0px) + 16px); overflow-y: auto; background: var(--bg-side); border-right: 1px solid var(--border); transform: translateX(calc((var(--open) - 1) * 100%)); transition: transform 250ms cubic-bezier(.2, .9, .3, 1); }
+.phone-shell.dragging :is(.phone-root, .phone-scrim, .phone-drawer) { transition: none; }
+.phone-drawer button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 8px; background: none; border: 0; border-radius: 6px; color: var(--text); font: 400 16px var(--font); text-align: left; }
+.phone-drawer button.on, .phone-drawer button:active { background: var(--bg-hover); }
+.phone-drawer h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 20px 8px 4px; }
+.phone-icon { justify-content: center; width: 44px; height: 44px; padding: 0; }
+.phone-root > .phone-bar { justify-content: space-between; }
+/* Shown behind the content as it is pulled down; the rubber band makes the room. */
+.phone-pull { --pull: 0; position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 56px); display: flex; justify-content: center; color: var(--muted); opacity: var(--pull); pointer-events: none; }
+/* The palette as a full sheet, its field at the bottom near the thumb and above the keyboard (Perplexity, Linear). */
+.phone .overlay:has(.palette-field) { align-items: stretch; padding: env(safe-area-inset-top, 0px) 0 var(--keyboard, 0px); background: var(--bg); }
+.phone .overlay .panel:has(.palette-field) { display: flex; flex-direction: column-reverse; width: 100%; background: none; border: 0; border-radius: 0; box-shadow: none; }
+.phone .palette-field { display: flex; align-items: center; gap: 4px; padding: 8px 8px max(8px, calc(env(safe-area-inset-bottom, 0px) - var(--keyboard, 0px))); border-top: 1px solid var(--border); }
+.phone .palette-field .panel-input { flex: 1; min-width: 0; height: 44px; padding: 0 8px; border: 0; font-size: 16px; }
+.phone .palette-close { display: grid; place-items: center; flex: none; width: 44px; height: 44px; background: none; border: 0; color: var(--muted); }
+.phone .overlay .panel [cmdk-list] { flex: 1; min-height: 0; max-height: none; }
+.phone .overlay .panel [cmdk-item] { min-height: 44px; height: auto; font-size: 16px; }
+.phone .overlay .panel .panel-foot:not(:has(.err)) { display: none; }
+.phone .overlay .panel .panel-foot .right { display: none; }
 .phone-page { overflow-y: auto; padding-top: env(safe-area-inset-top, 0px); }
 /* The status bar sits over content that scrolls under it, as in Apple's apps: a bar behind it keeps the clock readable. */
 .phone-app::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 5; }
@@ -2284,17 +2310,17 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-reader { padding-bottom: var(--keyboard, 0px); }
 .phone-bar { display: flex; align-items: center; height: 44px; padding: 0 8px; flex: none; position: relative; z-index: 5; background: var(--bg); }
 .phone-back { display: inline-flex; align-items: center; gap: 2px; background: none; border: 0; color: var(--accent); font: 500 17px var(--font); padding: 8px; }
-.phone-tabs { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border); background: var(--bg-side); padding-bottom: env(safe-area-inset-bottom, 0px); }
-.phone-tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; background: none; border: 0; color: var(--faint); font: 500 10px var(--font); }
-.phone-tabs button.on { color: var(--accent); }
 .phone-sources { padding: 12px 16px 24px; }
 .phone-sources h1 { font-size: 30px; margin: 8px 0 12px; }
 .phone-sources h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 28px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .phone-sources ul { list-style: none; margin: 0; padding: 0; }
-.phone-sources li button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 10px 0; background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text); text-align: left; font: 17px var(--font); }
+.phone-sources li { position: relative; overflow: hidden; -webkit-touch-callout: none; }
+.phone-sources li button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 0; background: var(--bg); border: 0; border-bottom: 1px solid var(--border); color: var(--text); text-align: left; font: 16px var(--font); }
+.phone-swipe { position: absolute; inset: 0; display: flex; align-items: center; color: var(--muted); font: 400 12px var(--mono); }
+.phone-swipe.left { justify-content: flex-end; }
 .phone-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The source's picture (D77) tells it apart; its kind shows as the icon when it has none. 16:9 like the Mac's, at list size. */
-.phone-thumb { width: 64px; height: 36px; }
+.phone-thumb { width: 48px; height: 27px; }
 .phone-thumb.none svg { width: 16px; height: 16px; }
 .phone-chip { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; color: var(--text); padding: 6px 12px; font: 14px var(--font); }
 .phone-empty, .phone-error { color: var(--muted); padding: 16px; }

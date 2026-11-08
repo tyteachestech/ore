@@ -181,6 +181,20 @@ journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel,
   await page.keyboard.press("Escape");
 });
 
+journey("review: Tab and ⇧Tab stay on the card, never in the sidebar or sources hidden behind it", async (page) => {
+  const inside = () => page.evaluate(() => !!document.activeElement?.closest(".review"));
+  await page.getByRole("button", { name: "Start review" }).click();
+  await page.getByRole("dialog", { name: "What to review" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator(".review-q").waitFor();
+  for (let n = 0; n < 12; n++) {
+    await page.keyboard.press(n < 6 ? "Tab" : "Shift+Tab");
+    if (!(await inside())) throw new Error(`${n < 6 ? "Tab" : "⇧Tab"} ${n + 1} left the review for ${await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80))}`);
+  }
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("add a list where one fails: ⌘Z still takes back the ones that went in", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const rows = page.locator(".row");
@@ -516,7 +530,7 @@ journey("tutor scroll: a reply streaming in while he reads higher up leaves his 
     if (!body.includes('"tutor",')) return route.fallback();
     id = (JSON.parse(body).args as string[]).find((a) => a.startsWith("--stream="))!.slice(9);
     await held;
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: long, citations: [], general: true, searched: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@7" } }) });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: long, citations: [], general: true, searched: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@8" } }) });
   });
   try {
     await page.keyboard.press("Meta+j");
@@ -723,7 +737,7 @@ journey("tutor steps: Show me's worked answer shows one step at a time, Next ste
     { reply: "Think about what the tested group did.", citations: [], general: false, hint: true, steps: [], exercise: null, card: null },
     { reply: "Here's the working.", citations: [], general: false, hint: false, steps, exercise: null, card: null },
     { reply: "Step 2 is the testing effect.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null },
-  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@7" } }));
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@8" } }));
   const bodies: string[] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
@@ -1405,6 +1419,35 @@ journey("note shortcuts as in Notion: # in a numbered item makes a heading; Mark
   await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
 });
 
+journey("note images: a pasted screenshot and an image dropped from Finder go into the note, not the library, and ⌘Z takes one out", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  // A 1×1 PNG on the clipboard, as ⌃⇧⌘4 leaves a screenshot: no text with it.
+  await pm.evaluate((el) => {
+    const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+    const dt = new DataTransfer();
+    dt.items.add(new File([png], "image.png", { type: "image/png" }));
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await until("the screenshot is in the note", async () => (await pm.locator('img.note-image[src*="pasted"]').count()) === 1);
+  // From Finder the app hears the drop (Tauri) and hands the note its paths.
+  const file = join(mkdtempSync(join(tmpdir(), "ore-drop-")), "Whiteboard.png");
+  writeFileSync(file, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+  const box = (await pm.locator("p").first().boundingBox())!;
+  const at = { x: box.x + 20, y: box.y + 2 };
+  await page.locator(".note-editor").first().evaluate((el, at) => el.dispatchEvent(new CustomEvent("ore-image-drag", { detail: at })), at);
+  await page.locator(".note-editor .block-drop").waitFor();
+  await page.locator(".note-editor").first().evaluate((el, d) => el.dispatchEvent(new CustomEvent("ore-image-drop", { detail: d })), { paths: [file], ...at });
+  await until("the dropped image is in the note, above the first line", async () => (await pm.locator('img.note-image[src*="whiteboard"]').count()) === 1);
+  if (await page.locator(".note-editor .block-drop").count()) throw new Error("the drop line stayed");
+  await page.keyboard.press("ControlOrMeta+z");
+  await until("⌘Z takes the dropped one out", async () => (await pm.locator('img.note-image[src*="whiteboard"]').count()) === 0);
+  if (await page.locator(".toast", { hasText: "Added" }).count()) throw new Error("an image was added as a source");
+});
+
 journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words, ⌘↵ closes a toggle", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);
@@ -1553,6 +1596,7 @@ journey("Home: Continue reading rows rename from their menu, in place; Esc keeps
   await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
   await page.keyboard.press("Escape");
   await until("Esc keeps the old title", async () => (await title()) === TESTING);
+  await until("and gives the row its focus back", () => row.evaluate((el) => el === document.activeElement));
   await row.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
   await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
@@ -3560,12 +3604,16 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   await saved.waitFor();
 });
 
-journey("archive a source from its row, then Undo from the toast", async (page) => {
+journey("archive a source from its row, then Undo from the toast; VoiceOver hears the toast", async (page) => {
+  // The live region is there before the toast, so a screen reader reads the toast when it comes.
+  const live = page.locator(".toasts[aria-live=polite]");
+  await live.waitFor({ state: "attached" });
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator(".row").filter({ hasText: AGENTS }).first();
   await row.click({ button: "right" });
   await page.getByRole("menuitem", { name: /Archive/ }).click();
   await until("the row leaves the list", async () => !(await row.isVisible()));
+  await until("the toast lands in it", async () => (await live.locator(".toast").count()) > 0);
   await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
   await row.waitFor();
   // An Undo pressed while the archive still saves runs after it, so the file ends restored (the two
@@ -3650,6 +3698,56 @@ journey("focus comes back to what opened it: the tutor's ✦ after Esc, and a Co
   await page.locator(".home-read").first().waitFor();
   await page.waitForTimeout(200);
   if (await on(".home-read")) throw new Error("a row opened long ago took focus on ⌘0");
+});
+
+journey("in-place editors give focus back on Esc: the author, a skill's goal, a new question; the notes have names", async (page) => {
+  const on = (name: string) => page.evaluate((name) => document.activeElement?.getAttribute("aria-label") === name || (document.activeElement as HTMLElement | null)?.innerText.trim() === name, name);
+  await openSource(page, AGENTS);
+  const by = page.locator("button.by");
+  const author = (await by.innerText()).trim();
+  await by.focus();
+  await page.keyboard.press("Enter");
+  await page.getByRole("textbox", { name: "Author" }).waitFor();
+  await page.keyboard.press("Escape");
+  await until("focus is back on the author", () => on(author));
+  await page.getByRole("textbox", { name: "Source note" }).waitFor({ state: "attached" });
+  await page.keyboard.press("Escape");
+  await page.locator(".sidebar .side-item:not(.side-main)").first().click();
+  const goal = page.locator("button.skill-goal");
+  await goal.focus();
+  const was = (await goal.innerText()).trim();
+  await page.keyboard.press("Enter");
+  await page.locator("input.skill-goal").waitFor();
+  await page.keyboard.press("Escape");
+  await until("focus is back on the goal", () => on(was));
+  await page.getByRole("textbox", { name: "Skill note" }).waitFor({ state: "attached" });
+  const add = page.getByRole("button", { name: "Add a question" });
+  await add.focus();
+  await page.keyboard.press("Enter");
+  await page.getByRole("textbox", { name: "New question" }).waitFor();
+  await page.keyboard.press("Escape");
+  await until("focus is back on Add a question", () => on("Add a question"));
+});
+
+journey("outline: Tab after the source's head opens it on the current heading, ↓ and Enter jump, Esc goes back to the text and keeps the source", async (page) => {
+  const focused = () => page.evaluate(() => (document.activeElement as HTMLElement | null)?.innerText.trim() ?? "");
+  await openSource(page, AGENTS);
+  await page.locator(".preq-head").focus();
+  await page.keyboard.press("Tab");
+  await until("Tab lands on the outline's first heading", async () => (await focused()) === "Workflows and agents");
+  await until("the outline shows", async () => (await page.locator(".outline-panel").evaluate((el) => getComputedStyle(el).opacity)) === "1");
+  await page.keyboard.press("ArrowDown");
+  await until("↓ moves to the next heading", async () => (await focused()) === "Patterns");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab");
+  await until("⇧Tab back comes to the heading the arrows left it on", async () => (await focused()) === "Patterns");
+  const before = await page.locator(".reader-scroll").evaluate((el) => el.scrollTop);
+  await page.keyboard.press("Enter");
+  await until("Enter jumps there and hands the text the focus", () => page.locator(".reader-scroll").evaluate((el, before) => el === document.activeElement && el.scrollTop > before, before));
+  await page.locator(".outline-panel button").first().focus();
+  await page.keyboard.press("Escape");
+  await until("Esc goes back to the text", () => page.evaluate(() => document.activeElement?.classList.contains("reader-scroll") === true));
+  if (!(await page.locator(".doc-head").filter({ hasText: AGENTS }).count())) throw new Error("Esc on the outline left the source");
 });
 
 journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {

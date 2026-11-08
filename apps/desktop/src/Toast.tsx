@@ -171,9 +171,12 @@ export function useToast() {
     }
   });
 
-  const view = toasts.length > 0 && (
+  // Always mounted, even empty, so VoiceOver reads each toast as it comes: a live region that appears with its words often
+  // stays silent. An error is an alert: the nearest live region decides, so it is read once, at once.
+  const view = (
     <div
       ref={box}
+      aria-live="polite"
       className={`toasts${fanned ? " fan" : ""}`}
       onMouseEnter={() => (setFanned(true), hold())}
       onMouseLeave={() => (setFanned(false), release())}
@@ -181,7 +184,7 @@ export function useToast() {
       onBlur={release}
     >
       {toasts.map((t) => (
-        <div key={t.id} className="toast" data-kind={t.kind} role={t.kind === "error" ? "alert" : "status"}>
+        <div key={t.id} className="toast" data-kind={t.kind} role={t.kind === "error" ? "alert" : undefined}>
           {t.kind === "progress" ? <PixelSpin /> : t.settled && <Sprite rows={t.settled === "ok" ? CHECK : CROSS} className={`toast-mark ${t.settled}`} />}
           <span className={t.done === undefined ? "toast-msg" : "toast-text"}>{t.message}</span>
           {t.done !== undefined && (

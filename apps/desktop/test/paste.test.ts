@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { addArgs, copiedEntry, copiedWhat, dropPoint, entries, fileKind, manyAdded } from "../src/paste";
+import { addArgs, copiedEntry, copiedWhat, dropPoint, entries, fileKind, imageExt, manyAdded, noteImage } from "../src/paste";
 
 test("a list's toast counts only what went in", () => {
   expect(manyAdded(3, 0)).toBe("Added 3 sources");
@@ -87,4 +87,10 @@ describe("copied link offered in the add box", () => {
     expect(copiedWhat({ kind: "link", url: "https://example.com" })).toBe("link");
     expect(copiedWhat({ kind: "file", path: "/a/b.epub" })).toBe("book");
   });
+});
+
+test("images a note holds, dropped or pasted into it; other pictures are sources, read for their text", () => {
+  expect(["/a/Shot 1.PNG", "/a/b.jpeg", "/a/c.jpg", "/a/d.gif", "/a/e.webp", "/a/f.svg"].every(noteImage)).toBe(true);
+  expect(["/a/scan.heic", "/a/scan.tiff", "/a/paper.pdf", "/a/png"].some(noteImage)).toBe(false);
+  expect(["image/png", "image/jpeg", "image/svg+xml", "image/webp"].map(imageExt)).toEqual(["png", "jpg", "svg", "webp"]);
 });

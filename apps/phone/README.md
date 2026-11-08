@@ -5,8 +5,8 @@ is the phone layout, and `src/phone/core.ts` runs the `ore` commands inside the 
 CLI to run (D30). This folder is only the Tauri shell around it. See D78 in `docs/DECISIONS.md`.
 
 For the feel test the library is a snapshot: the text files of `ORE_PHONE_LIBRARY`, read at build time and
-shipped in the app. Changes made on the phone stay on the phone (IndexedDB) and survive new builds: a new build brings in the files the Mac changed since the last one, and the phone keeps its own reviews and every other edit (D78). Nothing syncs yet, so phone reviews don't reach the Mac. Library search
-and AI (grading, card drafts) don't work on the phone yet.
+shipped in the app. Changes made on the phone stay on the phone (IndexedDB) and survive new builds: a new build brings in the files the Mac changed since the last one, and the phone keeps its own reviews and every other edit (D78). Nothing syncs yet, so phone reviews don't reach the Mac. AI (grading,
+card drafts) doesn't work on the phone yet.
 
 ## Run it on an iPhone (Mac, Xcode, a free Apple account)
 

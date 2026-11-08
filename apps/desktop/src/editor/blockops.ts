@@ -45,6 +45,13 @@ const contentOf = (doc: PMNode, b: Block) => doc.slice(b.from, b.to).content;
  *  list. An item dropped at the top level comes wrapped in a list like the one it left. */
 export type Gap = { pos: number; wrap?: string };
 
+/** The gaps between the note's top-level blocks, first to last: where a dropped image goes. */
+export function topGaps(doc: PMNode): Gap[] {
+  const out: Gap[] = [{ pos: 0 }];
+  doc.forEach((n, pos) => void out.push({ pos: pos + n.nodeSize }));
+  return out;
+}
+
 export function gaps(doc: PMNode, b: Block): Gap[] {
   const out: Gap[] = [];
   const rm = removal(doc, b);
