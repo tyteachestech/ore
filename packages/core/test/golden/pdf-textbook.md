@@ -2,7 +2,6 @@
 id: <id>
 type: pdf
 title: "Chapter 1: Learning"
-author: anonymous
 captured_at: <time>
 text_sha256: 2d813417056c201badb805fa2571b00285c9e6693ee5bf926cc0787f9ff6f5ad
 status: inbox

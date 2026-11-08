@@ -41,9 +41,13 @@ export function refusal(title: string, markdown: string, host: string): string |
   return null;
 }
 
+/** A file's author unless it is only a tool's or a template's default name ("anonymous" is ReportLab's). */
+export const fileAuthor = (a: string | undefined): string | undefined =>
+  a?.trim() && !/^(python-(docx|pptx)|microsoft office user|windows user|user|owner|author|unknown|anonymous|administrator|admin)$/i.test(a.trim()) ? a.trim() : undefined;
+
 /** An author as a page names one, or undefined when it isn't a name: a sentence fragment, a list of initials, a long blurb. */
 export function cleanAuthor(a: string | undefined): string | undefined {
-  const s = a?.replace(/\s+/g, " ").trim();
+  const s = fileAuthor(a?.replace(/\s+/g, " "));
   if (!s || s.length > 120 || !/^[\p{Lu}\p{Lo}\d@]/u.test(s)) return undefined;
   const parts = s.split(/\s*,\s*/);
   if (parts.length > 1 && parts.every((p) => p.replace(/\W/g, "").length <= 3)) return undefined;

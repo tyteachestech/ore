@@ -2,7 +2,6 @@
 id: <id>
 type: pdf
 title: Память и повторение
-author: anonymous
 captured_at: <time>
 text_sha256: fe13f9cb4891bec549a1522117223754ab51d0d4b29f1a0f55d2170a973d208d
 status: inbox

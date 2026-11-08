@@ -3,7 +3,7 @@ import { parseHTML } from "linkedom";
 import { posix } from "node:path";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { cleanTitle } from "./check.ts";
+import { cleanTitle, fileAuthor } from "./check.ts";
 import { td } from "./markdown.ts";
 
 // Word and PowerPoint files (and Google Docs and Slides, exported as them). A .docx goes through
@@ -26,8 +26,7 @@ function coreProps(files: Record<string, Uint8Array>): { title?: string; author?
   const core = files["docProps/core.xml"] ? strFromU8(files["docProps/core.xml"]) : "";
   const tag = (t: string) => xmlText(core.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`))?.[1] ?? "").trim() || undefined;
   // A tool's or a template's default name is not the author, nor Word's "Document1" the title.
-  const author = tag("dc:creator");
-  return { title: cleanTitle(tag("dc:title")), author: author && !/^(python-(docx|pptx)|microsoft office user|user|author|unknown|administrator)$/i.test(author) ? author : undefined };
+  return { title: cleanTitle(tag("dc:title")), author: fileAuthor(tag("dc:creator")) };
 }
 
 export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
