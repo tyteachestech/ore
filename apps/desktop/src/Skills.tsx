@@ -184,19 +184,28 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
     if (draft === null && refocus.current) button.current?.focus();
     refocus.current = false;
   }, [draft]);
+  const [saving, setSaving] = useState(false);
+  /** `saving` for the blur's timeout, which runs after the render it was made in. */
+  const busy = useRef(false);
+  /** True once the name is saved (or unchanged); a failed save keeps his draft in the field. */
   const save = async () => {
     const v = (draft ?? "").trim().replace(/\s+/g, " ");
-    if (!v) return;
-    setDraft(null);
-    if (v === skill.name) return;
+    if (!v) return false;
+    const close = () => ((refocus.current = true), setDraft(null), true);
+    if (v === skill.name) return close();
     const to = (name: string) => () =>
       void ore("skills", "set", skill.id, opt("name", name)).then(onRenamed, (e) => notify(errorText(e), "error"));
+    setSaving((busy.current = true));
     try {
       await ore("skills", "set", skill.id, opt("name", v));
       onRenamed();
       notify(`Renamed “${skill.name}” to “${v}”`, "info", to(skill.name), to(v));
+      return close();
     } catch (e) {
       notify(errorText(e), "error");
+      return false;
+    } finally {
+      setSaving((busy.current = false));
     }
   };
   if (draft === null)
@@ -222,21 +231,24 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
         autoFocus={clicked}
         onFocus={(e) => e.currentTarget.select()}
         value={draft}
+        readOnly={saving}
         aria-label={`Rename ${skill.name}`}
         autoComplete="off"
         onChange={(e) => setDraft(e.target.value)}
         // Clicking away keeps the old name; a focus that comes straight back (a dialog opening) does not count.
         onBlur={(e) => {
           const input = e.currentTarget;
-          setTimeout(() => document.activeElement !== input && setDraft(null), 0);
+          setTimeout(() => !busy.current && document.activeElement !== input && setDraft(null), 0);
         }}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key !== "Enter" && e.key !== "Escape") return;
           e.preventDefault(); // or the Enter would also click the name button that takes focus
-          refocus.current = true;
-          if (e.key === "Enter") void save().then(() => onEnter?.());
-          if (e.key === "Escape") setDraft(null);
+          if (e.key === "Enter" && !saving) void save().then((ok) => ok && onEnter?.());
+          if (e.key === "Escape" && !saving) {
+            refocus.current = true;
+            setDraft(null);
+          }
         }}
       />
     </Tag>

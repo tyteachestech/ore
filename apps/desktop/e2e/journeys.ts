@@ -536,6 +536,39 @@ journey("Collected row menu: change a highlight's type and remove it without ope
   await page.waitForTimeout(500); // the write lands before the next journey reads the library
 });
 
+journey("Collected: a key point he is typing survives closing its group and switching to the note and back", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const toggle = page.locator(".cp-head.card .cp-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  await page.getByRole("button", { name: "Add a key point" }).click();
+  const field = page.getByRole("textbox", { name: "Key point", exact: true });
+  await until("+ puts the caret in the field", () => field.evaluate((el) => el === document.activeElement));
+  await field.fill("Retrieval beats rereading for the long run");
+  await toggle.click();
+  await toggle.click();
+  if ((await field.inputValue()) !== "Retrieval beats rereading for the long run") throw new Error("closing Key points lost his words");
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await page.getByRole("tab", { name: "Collected" }).click();
+  if ((await field.inputValue()) !== "Retrieval beats rereading for the long run") throw new Error("switching to the note lost his words");
+  if (await field.evaluate((el) => el === document.activeElement)) throw new Error("coming back to Collected took the caret into the kept field");
+  await field.press("Escape");
+});
+
+journey("Collected: questions that fail to load say why, and Try again shows them", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { questions: "The library is busy." }));
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const toggle = page.locator(".cp-head.question .cp-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  const alert = page.getByRole("alert").filter({ hasText: "The library is busy." });
+  await alert.waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await alert.getByRole("button", { name: "Try again" }).click();
+  await page.locator(".qp-row").first().waitFor();
+  if (await alert.count()) throw new Error("the error stayed after the list loaded");
+});
+
 journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {
   await openSource(page, TESTING);
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
@@ -902,6 +935,28 @@ journey("sidebar: renaming a collection to a name another one has is refused in 
   await until("typing clears the refusal", async () => (await page.getByRole("alert").filter({ hasText: "is taken" }).count()) === 0);
   await page.keyboard.press("Escape");
   await until("Esc keeps the old name, and Life is still its own", async () => (await page.locator(".side-label-text").allInnerTexts()).filter((t) => /^(craft|life)$/i.test(t)).length === 2);
+});
+
+journey("skill editor: a rename whose save fails keeps the name he typed and the dialog open; Enter again saves it", async (page) => {
+  const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { skills: why } : {}), why);
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Habits" });
+  const field = dialog.getByLabel("Rename Habits");
+  await field.fill("Habit loops");
+  await fail("The library is read-only.");
+  await field.press("Enter");
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await page.waitForTimeout(200);
+  if (!(await dialog.isVisible())) throw new Error("the failed rename closed the dialog");
+  if ((await field.inputValue()) !== "Habit loops") throw new Error("the failed rename lost the name he typed");
+  await fail(null);
+  await field.press("Enter");
+  await dialog.waitFor({ state: "detached" });
+  await page.locator(".sidebar .side-item", { hasText: "Habit loops" }).first().waitFor();
+  // Put the name back for the journeys after this one.
+  await page.keyboard.press("Meta+z");
+  await page.locator(".sidebar .side-item", { hasText: /^Habits$/ }).first().waitFor();
 });
 
 journey("pinned sources: Move up and a drag put them in his order; ⌘Z takes a move back", async (page) => {

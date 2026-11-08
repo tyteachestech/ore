@@ -142,13 +142,18 @@ export function Collected({ anns, ready, rectOf, onOpen }: Props) {
 /** The side panel's Collected tab (Tyler, 2026-10-29): his cards, then his questions, then his keeps, each
  *  a collapsible group in reading order. A row opens its passage; + on Cards adds one where he is ("Card
  *  here"): a line he types, drafted from the whole source. */
-export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, onAsk, questions, actions }: {
+export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk, takeAddFocus, onAdd, onJump, onAsk, questions, actions }: {
   anns: Annotation[];
   /** A video source: the time each highlight is spoken, for the row's right edge. */
   timeOf?: (a: Annotation) => string | null;
   /** The key point field (a line of his own, here) is open, with what he had typed (kept when a save fails). */
   adding: string | null;
   onAdding: (on: boolean) => void;
+  /** Each edit of the key point field: kept by the Reader, so closing the group or the tab keeps it. */
+  onEdit: (line: string) => void;
+  /** Bumps when he asks for the field; `takeAddFocus` says (once) whether it should take focus. */
+  addAsk: number;
+  takeAddFocus: () => boolean;
   onAdd: (line: string) => void;
   onJump: (id: string) => void;
   onAsk: () => void;
@@ -176,7 +181,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, 
   const addDone = (line: string) => {
     onAdding(false);
     if (line) onAdd(line);
-    requestAnimationFrame(() => box.current?.querySelector<HTMLElement>(".cp-head.card .icon-btn")?.focus());
+    requestAnimationFrame(() => !box.current?.querySelector(".cp-input") && box.current?.querySelector<HTMLElement>(".cp-head.card .icon-btn")?.focus());
   };
 
   // ↑ ↓ move between rows, as in any list here; Enter or a click opens one.
@@ -233,7 +238,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, 
         )}
         {!shut.has("card") && (
           <>
-            {adding !== null && <AddLine initial={adding} onDone={addDone} />}
+            {adding !== null && <AddLine value={adding} ask={addAsk} takeFocus={takeAddFocus} onChange={onEdit} onDone={addDone} />}
             {cards.map(row)}
             {!cards.length && adding === null && (
               <button className="cp-empty" onClick={() => onAdding(true)}>
@@ -273,23 +278,26 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onAdd, onJump, 
 }
 
 /** Linear's inline create: the field is focused, Enter commits, Esc drops it; a blur keeps the field and what he typed. */
-function AddLine({ initial, onDone }: { initial: string; onDone: (line: string) => void }) {
-  const [v, setV] = useState(initial);
+function AddLine({ value: v, ask, takeFocus, onChange, onDone }: { value: string; ask: number; takeFocus: () => boolean; onChange: (line: string) => void; onDone: (line: string) => void }) {
   const done = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => void (takeFocus() && input.current?.focus()), [ask]);
   const finish = (line: string) => {
     if (done.current) return;
     done.current = true;
     onDone(line.trim());
+    // The field can stay (a key point with no place to go keeps it open): the next Enter or Esc counts.
+    setTimeout(() => (done.current = false), 0);
   };
   return (
     <div className="cp-row cp-add">
       <input
-        autoFocus
+        ref={input}
         className="cp-input"
         value={v}
         placeholder="What to remember…"
         aria-label="Key point"
-        onChange={(e) => setV(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === "Enter" && !e.nativeEvent.isComposing) {

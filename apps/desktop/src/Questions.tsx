@@ -396,21 +396,24 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   const [asking, setAsking] = useState(false);
   const [version, setVersion] = useState(0);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
+  /** Why the list didn't load; Try again reloads it. */
+  const [failed, setFailed] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const { setStatus, remove } = useQuestionEdits(setQs, notify);
   useEffect(() => void (ask && setAsking(true)), [ask]);
 
   useEffect(() => {
     let live = true;
+    setFailed(null);
     ore<Question[]>("questions", opt("item", item)).then(
       // Answered ones stay out, except those answered just now (kept in place, struck through).
-      (r) => live && setQs((cur) => r.filter((q) => q.status !== "done" || cur?.some((c) => c.id === q.id))),
-      (e) => live && notify(errorText(e), "error"),
+      (r) => live && (setFailed(null), setQs((cur) => r.filter((q) => q.status !== "done" || cur?.some((c) => c.id === q.id)))),
+      (e) => live && setFailed(`Couldn’t load your questions: ${errorText(e)}`),
     );
     return () => {
       live = false;
     };
-  }, [item, version, notify]);
+  }, [item, version]);
 
   const dismiss = async (q: Question) => {
     setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x)));
@@ -544,6 +547,14 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
               if (added) reload();
             }}
           />
+        )}
+        {failed && (
+          <div className="empty-state err" role="alert">
+            <p>{failed}</p>
+            <button className="pill-btn" onClick={reload}>
+              Try again
+            </button>
+          </div>
         )}
         {qs && !order.length && !asking && (
           <p className="quiet qp-empty">
