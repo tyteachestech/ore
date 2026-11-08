@@ -1303,6 +1303,9 @@ journey("source title: one click renames it in place, Enter saves, Esc keeps the
 });
 
 journey("Home: Continue reading rows rename from their menu, in place; Esc keeps the title, ⌘Z takes it back", async (page) => {
+  // Opened last, so sources other journeys added and opened don't push it off the list.
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
   const row = page.locator(".home-read").filter({ hasText: "The Testing Effect" }).first();
   await row.waitFor();
   const title = () => row.locator(".title").innerText();
