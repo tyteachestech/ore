@@ -1,6 +1,5 @@
 // Speech to text for audio files and podcast episodes (D96 phase 3), on the Mac, with Apple's
-// on-device SpeechAnalyzer (macOS 26). Usage: transcribe <audio or video file> [language]; with no
-// language, the one the file's sound is tagged with, else the Mac's. Prints
+// on-device SpeechAnalyzer (macOS 26). Usage: transcribe <audio or video file> [language]. Prints
 // WebVTT; on stderr, `progress <0..1>` and `status <line>` lines while it works. Exits 3 on an older
 // macOS, 4 when there is no speech model for the language. A video (or audio AVAudioFile can't open)
 // is first exported to an m4a of its sound. Compiled on first use by `audio.ts`.
@@ -33,22 +32,10 @@ func soundOf(_ url: URL) async throws -> (URL, Bool) {
   return (out, true)
 }
 
-/** The language a file's sound is tagged with ("spa", "es-MX"), if any: a recording made on a Spanish
- *  Mac, or a downloaded course, says what it speaks. */
-func taggedLanguage(_ url: URL) async -> Locale? {
-  guard let track = try? await AVURLAsset(url: url).loadTracks(withMediaType: .audio).first else { return nil }
-  let tag = (try? await track.load(.extendedLanguageTag)) ?? nil
-  let code = (try? await track.load(.languageCode)) ?? nil
-  guard let id = tag ?? code, !id.isEmpty, id != "und" else { return nil }
-  return Locale(identifier: Locale.canonicalLanguageIdentifier(from: id))
-}
-
 let args = CommandLine.arguments
 guard args.count == 2 || args.count == 3 else { fail("usage: transcribe <audio or video file> [language]") }
 guard #available(macOS 26.0, *) else { fail("Transcription needs macOS 26 or later.", 3) }
-var wanted = args.count == 3 ? Locale(identifier: args[2]) : await taggedLanguage(URL(fileURLWithPath: args[1])) ?? Locale.current
-// Speech in the Mac's own language is heard with its own dialect's model, already downloaded.
-if wanted.language.languageCode == Locale.current.language.languageCode { wanted = Locale.current }
+let wanted = args.count == 3 ? Locale(identifier: args[2]) : Locale.current
 do {
   guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: wanted) else {
     fail("No speech model for \(wanted.identifier).", 4)

@@ -42,7 +42,7 @@ export async function transcribeFile(file: string, onProgress?: Progress, langua
       e.code === 3
         ? "Transcribing audio needs macOS 26 or later. If it has a transcript, copy it and paste it here instead."
         : e.code === 4
-          ? `Your Mac can’t transcribe speech in this language (${language}) yet. If it has a transcript, copy it and paste it here instead.`
+          ? `Your Mac can’t transcribe speech in this language${language ? ` (${language})` : ""} yet. If it has a transcript, copy it and paste it here instead.`
           : `Couldn’t transcribe the audio (${e.message.split("\n").pop()}). If it has a transcript, copy it and paste it here instead.`,
     );
   });
@@ -55,7 +55,7 @@ export interface Episode {
   title?: string;
   show?: string;
   published?: string;
-  /** The speech's language as the show's feed or page names it ("es-419"), so it is heard in it. */
+  /** The speech's language as the show's feed names it ("es-419"), so it is heard in it. */
   language?: string;
 }
 
@@ -67,7 +67,27 @@ function languageTag(tag: string | undefined): string | undefined {
     return undefined;
   }
 }
-const feedLanguage = (xml: string) => languageTag(xml.match(/<language>([^<]*)<\/language>/i)?.[1]);
+const feedLanguage = (xml: string) => {
+  const tag = xml.match(/<(language|itunes:language)>([\s\S]*?)<\/\1>/i)?.[2];
+  return languageTag(tag && decodeXml(tag.trim()));
+};
+
+/** The language a show's feed names, read only as far as its channel's own tags: a long-running
+ *  show's feed can be many megabytes of episodes. */
+async function showLanguage(feed: string, fetcher: typeof fetch): Promise<string | undefined> {
+  const res = await fetcher(feed).catch(() => null);
+  if (!res?.ok || !res.body) return undefined;
+  const reader = res.body.getReader();
+  const text = new TextDecoder();
+  let head = "";
+  while (!/<\/(?:itunes:)?language>|<item\b/i.test(head) && head.length < 1_000_000) {
+    const { done, value } = await reader.read().catch(() => ({ done: true, value: undefined }));
+    if (done || !value) break;
+    head += text.decode(value, { stream: true });
+  }
+  void reader.cancel().catch(() => {});
+  return feedLanguage(head);
+}
 
 const APPLE = /^https?:\/\/podcasts\.apple\.com\/.*\/id(\d+)\b.*[?&]i=(\d+)/;
 const SPOTIFY = /^https?:\/\/open\.spotify\.com\/episode\//;
@@ -85,8 +105,7 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
     if (!hit) throw new Error("Couldn’t find that episode’s audio on Apple Podcasts (it may be older than the show’s last 200). Add the episode from the show’s own site instead.");
     // The show's own feed names the language it speaks.
     const feed = results.find((r) => r.feedUrl)?.feedUrl;
-    const xml = feed ? await (await fetcher(feed).catch(() => null))?.text().catch(() => "") : "";
-    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, language: feedLanguage(xml ?? "") };
+    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, language: feed ? await showLanguage(feed, fetcher) : undefined };
   }
   const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
   const html = res?.ok ? await res.text() : "";
@@ -96,8 +115,7 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   const meta = (p: string) => tags.map((t) => ((attr(t, "property") ?? attr(t, "name"))?.toLowerCase() === p ? attr(t, "content") : undefined)).find(Boolean);
   const audio = meta("og:audio") ?? meta("og:audio:url") ?? html.match(/<(?:audio|source)[^>]+src=["']([^"']+\.(?:mp3|m4a)[^"']*)["']/i)?.[1];
   if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
-  const language = languageTag(html.match(/<html\b[^>]*\blang\s*=\s*["']([^"']+)["']/i)?.[1]);
-  return { audio: new URL(audio.replace(/&amp;/g, "&"), url).href, title: meta("og:title"), show: meta("og:site_name"), language };
+  return { audio: new URL(audio.replace(/&amp;/g, "&"), url).href, title: meta("og:title"), show: meta("og:site_name") };
 }
 
 /** Titles compared as words: case, punctuation and "&" vs "and" aside. */

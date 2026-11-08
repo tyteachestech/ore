@@ -5,16 +5,20 @@
 /** Below this many words a page is not something to read: a wall, a shell built in the browser. */
 export const MIN_WORDS = 50;
 
+/** Chinese and Japanese letters. */
+const CJK_SCRIPTS = "\\p{sc=Han}\\p{sc=Hiragana}\\p{sc=Katakana}";
+
 /** Words in any script. Chinese and Japanese put no spaces between words, so each of their characters counts as one. */
 export function wordCount(md: string): number {
   const text = md.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\]\([^)]*\)/g, "]");
-  const CJK = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}]/gu;
+  const CJK = new RegExp(`[${CJK_SCRIPTS}]`, "gu");
   const spaced = text.replace(CJK, " ").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
   return spaced + (text.match(CJK)?.length ?? 0);
 }
 
-const CJK_END = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\u3000-\u303f\uff00-\uffef]$/u;
-const CJK_START = /^[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\u3000-\u303f\uff00-\uffef]/u;
+// Chinese and Japanese letters, punctuation and full-width forms.
+const CJK_END = new RegExp(`[${CJK_SCRIPTS}\\u3000-\\u303f\\uff00-\\uffef]$`, "u");
+const CJK_START = new RegExp(`^[${CJK_SCRIPTS}\\u3000-\\u303f\\uff00-\\uffef]`, "u");
 /** What goes between two lines joined into one paragraph: a space, except where a Chinese or Japanese
  *  sentence wraps, since those scripts put no space between words. */
 export const lineBreakSpace = (before: string, after: string): string => (CJK_END.test(before) && CJK_START.test(after) ? "" : " ");

@@ -200,7 +200,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
     const ep = await (await import("./audio.ts")).episode(url);
     const res = await get(ep.audio, new URL(ep.audio).host);
     const ext = kindOf(new URL(res.url || ep.audio).pathname, res.headers.get("content-type") ?? "") ?? "mp3";
-    const draft = await fromBytes(await readCapped(res), ext, ep.title ?? "Episode", url, url, { ...opts, language: ep.language });
+    const draft = await fromBytes(await readCapped(res), ext, ep.title ?? "Episode", url, url, { ...opts, language: ep.language ?? opts.language });
     return { ...draft, title: ep.title ?? draft.title, author: ep.show, published: ep.published };
   }
   if (VIDEO_SITE.test(url)) {

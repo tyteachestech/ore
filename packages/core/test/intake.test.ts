@@ -1072,26 +1072,22 @@ describe("import coverage: other languages", () => {
       expect(language()).toBe("es-419");
     });
 
-    test("a Spotify episode is heard in its feed's language; a show's own page in its page's", async () => {
+    test("a Spotify episode is heard in its feed's language", async () => {
       serve({
         "https://open.spotify.com/episode/abc": { body: `<meta property="og:title" content="La memoria"><meta property="og:description" content="Radio Ambulante · Episode">`, type: HTML },
         "https://itunes.apple.com/search?media=podcast&entity=podcast&limit=10&term=Radio%20Ambulante": { body: JSON.stringify({ results: [{ collectionName: "Radio Ambulante", feedUrl: "https://feeds.test/ambulante" }] }), type: "application/json" },
-        "https://feeds.test/ambulante": { body: feed("es", `<item><title>La memoria</title><enclosure url="https://audio.test/ep1.mp3"/></item>`), type: "application/rss+xml" },
+        // Some hosts write it only as iTunes's own tag, in CDATA.
+        "https://feeds.test/ambulante": { body: `<rss><channel><itunes:language><![CDATA[ es ]]></itunes:language><item><title>La memoria</title><enclosure url="https://audio.test/ep1.mp3"/></item></channel></rss>`, type: "application/rss+xml" },
         "https://audio.test/ep1.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
       });
       await addSource(await tempLibrary(), "https://open.spotify.com/episode/abc");
       expect(language()).toBe("es");
-      serve({
-        "https://pca.st/episode/xyz": { body: `<html lang="fr"><head><meta property="og:title" content="La mémoire"></head><body><audio src="https://audio.test/fr.mp3"></audio></body></html>`, type: HTML },
-        "https://audio.test/fr.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
-      });
-      await addSource(await tempLibrary(), "https://pca.st/episode/xyz");
-      expect(language()).toBe("fr");
     });
 
-    test("an episode whose feed names no language is heard in the Mac's", async () => {
+    test("another player's page is heard in the Mac's language, not the player's own", async () => {
       serve({
-        "https://overcast.fm/+NoLang": { body: `<html><head><meta property="og:title" content="Memory"></head><body><audio src="https://audio.test/en.mp3"></audio></body></html>`, type: HTML },
+        // Overcast's page is in English whatever the show speaks.
+        "https://overcast.fm/+NoLang": { body: `<html lang="en"><head><meta property="og:title" content="Memory"></head><body><audio src="https://audio.test/en.mp3"></audio></body></html>`, type: HTML },
         "https://audio.test/en.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
       });
       await addSource(await tempLibrary(), "https://overcast.fm/+NoLang");
