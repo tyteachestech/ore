@@ -140,7 +140,6 @@
 .quiz-sure button[aria-checked="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); box-shadow: 0 3px 0 #6b6a66; filter: none; }
 .pick-box { border-radius: 0; }
 .pick-row[aria-checked="true"] .pick-box { background: var(--paper); color: var(--ink); box-shadow: 0 2px 0 #6b6a66; }
-.side-tabs button { border-radius: 0; }
 
 /* The skill badge: a matte tile in the skill's colour with 8-bit stepped corners, no outline (Tyler, 2026-10-29). */
 .skill-badge, .skill-badge.tinted {
