@@ -393,6 +393,42 @@ journey("tutor web citation: a page the tutor found on the web shows its site an
   await page.keyboard.press("Escape");
 });
 
+journey("tutor streaming: the reply shows as it is written (markers wait for the citations), a search says so, and the whole reply replaces it", async (page) => {
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  let id = "";
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (!body.includes('"tutor",')) return route.fallback();
+    id = (JSON.parse(body).args as string[]).find((a) => a.startsWith("--stream="))!.slice(9);
+    await held;
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Spacing beats cramming over a week.", citations: [], general: true, searched: true, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@5" } }) });
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("Does spacing beat cramming?");
+    await page.keyboard.press("Enter");
+    await until("the call carries its stream id", async () => !!id);
+    const emit = (p: object) => page.evaluate(([p]) => (window as any).__emit("ore-progress", p), [p] as const);
+    await emit({ stream: "someone-else", reply: "Not this turn's words" });
+    await emit({ stream: id, searching: true });
+    await tutor.getByText("Searching the web…").waitFor();
+    await emit({ stream: id, reply: "Spacing beats [1" });
+    await tutor.getByText("Spacing beats", { exact: true }).waitFor();
+    if (await tutor.getByText("Not this turn's words").count()) throw new Error("another turn's words landed here");
+    if (await tutor.getByText("Searching the web…").count()) throw new Error("the wait stayed up under the words");
+    release();
+    await tutor.getByText("Spacing beats cramming over a week.").waitFor();
+  } finally {
+    release();
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("tutor @: typing @ lists skills and sources, Enter writes the name in, and the message goes out pointed at it", async (page) => {
   await page.keyboard.press("Meta+j");
   const field = page.getByRole("textbox", { name: "Message the tutor" });

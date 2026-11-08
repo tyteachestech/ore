@@ -2,6 +2,8 @@
 // POST /ore {args, stdin, job} -> runs the real ore CLI against $ORE_LIBRARY, returns its JSON (or 500 with the error line).
 // POST /cancel {job} stops that run with SIGTERM, as the app's ore_cancel does.
 const CLI = `${import.meta.dir}/../../../../packages/cli/src/ore.ts`;
+// ORE_BRIDGE_BIN=<compiled ore>: run that instead of the source (bench.ts --compiled, as a release app does).
+const RUN = process.env.ORE_BRIDGE_BIN ? [process.env.ORE_BRIDGE_BIN] : ["bun", CLI];
 const jobs = new Map<string, ReturnType<typeof Bun.spawn>>();
 Bun.serve({
   port: Number(process.env.PORT ?? 1421),
@@ -31,7 +33,7 @@ Bun.serve({
     }
     // No background enrichment unless ORE_MOCK_ENRICH=1: `ore add` would start the real claude or codex CLI and spend real usage.
     const env = { ...process.env, ORE_NO_ENRICH: process.env.ORE_MOCK_ENRICH ? "" : "1" };
-    const p = Bun.spawn(["bun", CLI, ...args, "--json"], { env, stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
+    const p = Bun.spawn([...RUN, ...args, "--json"], { env, stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
     if (job) jobs.set(job, p);
     const [out, err, code] = [await new Response(p.stdout).text(), await new Response(p.stderr).text(), await p.exited];
     if (job) jobs.delete(job);

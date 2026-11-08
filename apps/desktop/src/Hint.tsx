@@ -1,6 +1,7 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { ReactElement, ReactNode } from "react";
 import { label, useKeymap, type KeyId } from "./keys";
+import { useLite } from "./Lite";
 
 let tabbed = false;
 if (typeof window !== "undefined") {
@@ -20,6 +21,8 @@ export const escTaken = (e: Event) => e.defaultPrevented && !hintEscapes.has(e);
 export function Hint({ text, keys, side = "bottom", children }: { text: ReactNode; keys?: KeyId | KeyId[]; side?: "top" | "bottom" | "left" | "right"; children: ReactElement }) {
   const map = useKeymap();
   const combos = (Array.isArray(keys) ? keys : keys ? [keys] : []).map((k) => label(map[k])).filter(Boolean);
+  // A row not on screen yet can't be hovered.
+  if (useLite()) return children;
   return (
     <Tooltip.Root>
       {/* Opens on hover, and on focus only when Tab moved it there: focus set by code (a field

@@ -1,7 +1,7 @@
 // What a paste or a typed entry in the add box becomes: links and file paths are fetched or read
 // by `ore add`; anything else is kept as text (`ore add --stdin`).
 
-export const FILE_TYPES = ["pdf", "md", "markdown", "txt", "text", "html", "htm", "epub", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
+export const FILE_TYPES = ["pdf", "md", "markdown", "txt", "text", "html", "htm", "epub", "docx", "pptx", "rtf", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
 
 /** What kind of source a dropped file becomes, from its extension; null when Ore can't read it. */
 export type FileKind = "pdf" | "book" | "note" | "page" | "image" | "audio" | "video";
@@ -9,7 +9,7 @@ export function fileKind(path: string): FileKind | null {
   const ext = path.split(".").pop()?.toLowerCase();
   if (ext === "pdf") return "pdf";
   if (ext === "epub") return "book";
-  if (ext === "md" || ext === "markdown" || ext === "txt" || ext === "text" || ext === "docx" || ext === "ipynb" || ext === "srt" || ext === "vtt") return "note";
+  if (ext === "md" || ext === "markdown" || ext === "txt" || ext === "text" || ext === "docx" || ext === "rtf" || ext === "ipynb" || ext === "srt" || ext === "vtt") return "note";
   if (ext && ["png", "jpg", "jpeg", "heic", "tiff", "webp", "gif"].includes(ext)) return "image"; // its text, read on the Mac (D96)
   if (ext && ["mp3", "m4a", "wav", "aac", "aiff", "flac"].includes(ext)) return "audio"; // transcribed on the Mac (D96)
   if (ext && ["mp4", "mov", "m4v"].includes(ext)) return "video"; // heard from its sound on the Mac (D122)

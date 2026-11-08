@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Citation } from "../src/ai/ask.ts";
-import { addTutorCard, tutor, tutorPassages, type TutorCard } from "../src/ai/tutor.ts";
+import { addTutorCard, partialReply, tutor, tutorPassages, type TutorCard } from "../src/ai/tutor.ts";
 import { sceneOutline, setDiagram } from "../src/diagrams.ts";
 import { findCard } from "../src/cards.ts";
 import { createItem, findItem } from "../src/items.ts";
@@ -164,6 +164,53 @@ describe("tutor: the web", () => {
     expect((await tutor(lib, "Where was Ebbinghaus born?")).citations[0]).toMatchObject({ url: blog.url, title: "", site: "blog.example.com" });
   });
 
+  test("the reply so far is read out of half-written JSON, escapes and all; a half-cut escape waits", () => {
+    expect(partialReply('{"rep')).toBeNull();
+    expect(partialReply('{"reply": "Hel')).toBe("Hel");
+    expect(partialReply('{"reply": "a\\nb\\')).toBe("a\nb");
+    expect(partialReply('{"reply": "x \\u00')).toBe("x ");
+    expect(partialReply('{"reply": "say \\"hi\\" [1]", "citations": [')).toBe('say "hi" [1]');
+    expect(partialReply('{"reply": "C:\\\\u')).toBe("C:\\u"); // an escaped backslash, then a plain u
+  });
+
+  test("--stream: the reply comes as it is written, and a search says so as it starts", async () => {
+    const { lib } = await library();
+    const delta = (index: number, partial_json: string) => ({ type: "stream_event", event: { type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json } } });
+    const web = [
+      { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", name: "WebSearch" } } },
+      delta(0, '{"query": "reply"'), // the search's own input is not the reply
+      { type: "stream_event", event: { type: "content_block_start", index: 1, content_block: { type: "tool_use", name: "StructuredOutput" } } },
+      delta(1, '{"reply": "Your sources'), delta(1, ' don\'t say \\u00e'), delta(1, '9 [1'), delta(1, ']", "citations": []'),
+    ];
+    fakeClaude([{ web, out: { reply: "Your sources don't say é.", citations: [], general: true, hint: false, exercise: null, card: null } }]);
+    const seen: unknown[] = [];
+    const r = await tutor(lib, "When was Ebbinghaus born?", { onProgress: (p) => seen.push(p) });
+    // The run starts the answer over, then the search starts; the reply's first words come at once and
+    // later ones a few times a second (these all came within 50 ms, so only the first shows).
+    expect(seen).toEqual([{ reply: "" }, { searching: true }, { reply: "Your sources" }]);
+    expect(r.reply).toBe("Your sources don't say é.");
+    expect(readFileSync(join(binDir, "argv.json"), "utf8")).toContain("--include-partial-messages");
+  });
+
+  test("a retry after a failed check starts the streamed reply over, and a search's results end the search wait", async () => {
+    const { lib } = await library();
+    const run = (reply: string, citations: unknown[]) => ({
+      web: [
+        { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", name: "WebSearch" } } },
+        { type: "user", message: { content: [] } },
+        { type: "stream_event", event: { type: "message_start" } },
+        { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", name: "StructuredOutput" } } },
+        { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: `{"reply": "${reply}"` } } },
+      ],
+      out: { reply, citations, general: true, hint: false, exercise: null, card: null },
+    });
+    fakeClaude([run("Born in 1850 [1].", [{ passage: "https://made.up/page", quote: "1850" }]), run("Your sources don't say.", [])]);
+    const seen: unknown[] = [];
+    await tutor(lib, "When was Ebbinghaus born?", { onProgress: (p) => seen.push(p) });
+    const twice = [{ reply: "" }, { searching: true }, { searching: false }];
+    expect(seen).toEqual([...twice, { reply: "Born in 1850 [1]." }, ...twice, { reply: "Your sources don't say." }]);
+  });
+
   test("a web citation with no search at all is refused: the link would be made up", async () => {
     const { lib } = await library();
     const out = { reply: "Born in 1850 [1].", citations: [{ passage: BRIT.url, quote: "born in 1850" }], general: false, hint: false, exercise: null, card: null };
@@ -171,12 +218,13 @@ describe("tutor: the web", () => {
     await expect(tutor(lib, "When was Ebbinghaus born?")).rejects.toThrow("is not a page your web search returned");
   });
 
-  test("the tutor may search: its tools include web search and fetch", async () => {
+  test("the tutor may search: its tools are web search and fetch, no file tools", async () => {
     const { lib } = await library();
     fakeClaude([{ reply: "Hi!", citations: [], general: false, hint: false, exercise: null, card: null }]);
     await tutor(lib, "hello");
-    const args = readFileSync(join(binDir, "argv.json"), "utf8");
-    expect(args).toContain("WebSearch,WebFetch");
+    const args = JSON.parse(readFileSync(join(binDir, "argv.json"), "utf8")) as string[];
+    // Only the web tools: it is given its passages, so file tools would be input it never uses.
+    expect(args[args.indexOf("--tools") + 1]).toBe("WebSearch,WebFetch");
     expect(args).toContain("stream-json");
   });
 });

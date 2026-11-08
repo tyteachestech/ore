@@ -19,6 +19,7 @@ import { Settings, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
+import { OnScreen } from "./Lite";
 import { citeSources, copyCited } from "./cite";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Boundary } from "./Boundary";
@@ -394,8 +395,9 @@ export function App() {
         // A list fills its bar entry by entry; a course by lesson, as `ore add --course` reports each one;
         // audio as it is transcribed (D96).
         progress(course ? "Reading the course…" : list.length > 1 ? `Adding ${i + 1} of ${list.length}…` : "Adding…", list.length > 1 && !course ? i / list.length : undefined, cancel);
+        // A tutor reply streams on the same channel (its payload has no count).
         const stop = await listen<{ done: number; of: number; label: string }>("ore-progress", ({ payload: p }) =>
-          cancelled || progress(course ? `Adding “${p.label}” · lesson ${p.done + 1} of ${p.of}` : `${p.label}…`, p.done / p.of, cancel),
+          cancelled || typeof p.done !== "number" || progress(course ? `Adding “${p.label}” · lesson ${p.done + 1} of ${p.of}` : `${p.label}…`, p.done / p.of, cancel),
         ).catch(() => () => {});
         try {
           const r = await oreJob<Item | CourseAdd>(job, stdin, ...args, ...to.map((k) => opt("skill", k)), ...(forQuestion ? [opt("for", forQuestion)] : [])).finally(stop);
@@ -1659,12 +1661,14 @@ export function App() {
     const sel = picked.includes(r.id);
     const dragged = rowDrag?.many ? rowDrag.many.some((i) => i.id === r.id) : rowDrag?.item.id === r.id && !rowDrag.course;
     const pickN = sel ? many.length : 0;
+    // Off screen, a row's menus and hints wait until it scrolls in (Lite.tsx): a long list opens at once.
     return (
-      <Same
-        key={r.id}
-        deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, pickFor === r.id, skills, skill, onSkillPage, details, mayAnswer.get(r.id)]}
-        render={() => rowView(r, lesson, snip, on, sel, pickN, dragged)}
-      />
+      <OnScreen key={r.id} id={`row-${r.id}`} full={on || renamingRow === r.id || pickFor === r.id}>
+        <Same
+          deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, pickFor === r.id, skills, skill, onSkillPage, details, mayAnswer.get(r.id)]}
+          render={() => rowView(r, lesson, snip, on, sel, pickN, dragged)}
+        />
+      </OnScreen>
     );
   };
   const rowView = (r: Item, lesson: boolean, snip: string | undefined, on: boolean, sel: boolean, pickN: number, dragged: boolean) => {

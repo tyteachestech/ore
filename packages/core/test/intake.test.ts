@@ -7,6 +7,7 @@ import { addSource, addTab, addText, reimportSource } from "../src/ingest/index.
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
+import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { inlineMath } from "../src/ingest/web.ts";
@@ -368,9 +369,69 @@ describe("import coverage: files", () => {
   });
 
   test("an unreadable file type says which ones work", async () => {
-    const key = join(mkdtempSync(join(tmpdir(), "ore-key-")), "talk.key");
-    writeFileSync(key, "x");
-    await expect(addSource(await tempLibrary(), key)).rejects.toThrow(/can’t read “.key” files yet.*docx, pptx.*png/);
+    const sketch = join(mkdtempSync(join(tmpdir(), "ore-sketch-")), "talk.sketch");
+    writeFileSync(sketch, "x");
+    await expect(addSource(await tempLibrary(), sketch)).rejects.toThrow(/can’t read “.sketch” files yet.*docx, pptx.*png/);
+  });
+
+  test("RTF from TextEdit: its heading, bold and italic, list, accents and dashes", async () => {
+    const item = await addSource(await tempLibrary(), file("textedit.rtf"));
+    expect(item.meta).toMatchObject({ type: "article", title: "Notes on retrieval practice" });
+    const b = item.body;
+    expect(b).toStartWith("### Notes on retrieval practice\n\nTesting yourself beats rereading. A café study group");
+    expect(b).toContain("rereads its notes together — even when");
+    expect(b).toContain("Three habits help, and the **first** matters most:\n\n- Space reviews out over days\n- Mix topics in one session\n- Explain each answer in your own words\n\n");
+    expect(b).toEndWith("*Write the question before you read the answer.* Then check it the next day: that’s the retrieval that sticks.\n");
+    expect(b).not.toMatch(/Helvetica|disc|\\/);
+  });
+
+  test("RTF from Word: title, author and date, outline headings, a table, a picture, a link, a footnote, Unicode, no header or field codes", async () => {
+    const item = await addSource(await tempLibrary(), file("word.rtf"));
+    expect(item.meta).toMatchObject({ title: "Mixing topics in practice", author: "Ada Learner", published: "2025-03-04" });
+    const b = item.body;
+    expect(b).toStartWith("# Why mixing works\n\nPractising one kind of problem at a time");
+    expect(b).toContain("**Interleaving** the kinds of problem beats blocking them.");
+    expect(b).toContain("In Japanese the idea is 間隔反復 (spaced repetition), and its root word is 記憶.");
+    expect(b).toContain("[The original study](https://example.edu/interleaving)[^1] is in the appendix.");
+    expect(b).toContain("# A mixed week\n\n| **Day** | **Problems** |\n| --- | --- |\n| Monday | area, volume |\n| Tuesday | volume, angles |\n\nScores on the mixed test:");
+    const pic = b.match(/!\[\]\((assets\/[0-9a-f]{16}\.png)\)/)?.[1];
+    expect(readFileSync(join(item.dir, pic!)).subarray(1, 4).toString()).toBe("PNG");
+    expect(b).toEndWith("That's all for this week.\n\n[^1]: Rohrer and Taylor, 2007.\n");
+    expect(b).not.toMatch(/Study guide, draft|HYPERLINK|Times New Roman|Normal;|wordml/);
+    expect(readFileSync(join(item.dir, "source.rtf"), "utf8")).toStartWith("{\\rtf1");
+  });
+
+  test("RTF's awkward corners: fallbacks across line breaks, fonts' own code pages, numbered and nested lists, hidden text, Markdown's own characters", () => {
+    const rtf = (s: string) => rtfToDoc(new TextEncoder().encode(`{\\rtf1\\ansi\\ansicpg1252{\\fonttbl{\\f0 Arial;}{\\f1\\fcharset134 SimSun;}}${s}}`)).body;
+    // Word wraps its lines anywhere, even between a character and its fallback; a group's end ends the fallback.
+    expect(rtf("A\\u38291\r\n\\'3fB {\\u8212}CD\\par")).toBe("A間B —CD\n");
+    expect(rtf("\\f1 \\'c4\\'e3\\'ba\\'c3\\f0  ok\\par")).toBe("你好 ok\n");
+    expect(rtf("\\pard\\ls1\\ilvl0{\\listtext 1.\\tab}First\\par\\pard\\ls1\\ilvl1{\\listtext a.\\tab}Inner\\par\\pard\\ls1\\ilvl0{\\listtext 2.\\tab}Second\\par")).toBe("1. First\n  1. Inner\n1. Second\n");
+    expect(rtf("visible{\\v hidden} and {\\deleted gone}kept\\par")).toBe("visible and kept\n");
+    expect(rtf("5*3 and 2*4 are [products]\\par - 5 degrees\\par {\\b bold}{\\b\\i both}{\\i it}\\par")).toBe("5\\*3 and 2\\*4 are \\[products\\]\n\n\\- 5 degrees\n\n**bold*both****it*\n");
+  });
+
+  test("a damaged or empty RTF file says so", async () => {
+    const d = mkdtempSync(join(tmpdir(), "ore-rtf-"));
+    writeFileSync(join(d, "cut.rtf"), new Uint8Array(readFileSync(file("deck.pptx")).subarray(0, 300)));
+    await expect(addSource(await tempLibrary(), join(d, "cut.rtf"))).rejects.toThrow(/That RTF file is damaged.*save it again/);
+    writeFileSync(join(d, "empty.rtf"), "{\\rtf1\\ansi{\\fonttbl\\f0 Helvetica;}\\par}");
+    await expect(addSource(await tempLibrary(), join(d, "empty.rtf"))).rejects.toThrow(/no text to read/);
+  });
+
+  test("Pages, Keynote, Kindle and old Word files say how to save a copy Ore reads", async () => {
+    const d = mkdtempSync(join(tmpdir(), "ore-export-"));
+    const lib = await tempLibrary();
+    // Pages and Keynote save either one file or a package Finder shows as one (a folder underneath).
+    writeFileSync(join(d, "essay.pages"), "x");
+    mkdirSync(join(d, "talk.key"));
+    for (const name of ["essay.pages", "talk.key"]) await expect(addSource(lib, join(d, name))).rejects.toThrow(/^Ore can’t read (Pages|Keynote) files\. Open it in \1 and choose File › Export To › (Word|PowerPoint), then add that file\.$/);
+    writeFileSync(join(d, "grades.numbers"), "x");
+    await expect(addSource(lib, join(d, "grades.numbers"))).rejects.toThrow(/Export To › Excel/);
+    writeFileSync(join(d, "novel.mobi"), "x");
+    await expect(addSource(lib, join(d, "novel.mobi"))).rejects.toThrow(/Kindle book.*EPUB/);
+    writeFileSync(join(d, "old.doc"), "x");
+    await expect(addSource(lib, join(d, "old.doc"))).rejects.toThrow(/older Word file.*Save As.*\.docx/);
   });
 });
 

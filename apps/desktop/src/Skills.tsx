@@ -3,6 +3,7 @@ import { Command } from "cmdk";
 import { CaretDown, Check as CheckIcon, Plus } from "./icons";
 import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type KeyboardEvent as ReactKeyboardEvent, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
+import { useLite } from "./Lite";
 import { Trap } from "./Trap";
 import { IconPicker, SkillIcon } from "./IconPicker";
 import { ore, opt, SKILL_COLORS, type Skill, type SkillColor } from "./ore";
@@ -54,6 +55,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(startOpen);
+  const lite = useLite();
   const [query, setQuery] = useState("");
   // Ticks made while open show at once and build on each other; whenever the skills it is given change
   // (a save landing, or one that failed and was taken back), it shows those, open or not.
@@ -82,6 +84,21 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   // A row opens on click and a list takes arrow keys: what happens in here stays in here (the
   // portal still bubbles React events up to the row).
   const stop = (e: SyntheticEvent) => e.stopPropagation();
+  // Off screen in a long list (Lite.tsx): the pills as the trigger renders them, the picker once the row scrolls in.
+  const bare = lite && !open;
+  const button = (
+    <button
+      {...(bare && { type: "button", "aria-haspopup": "dialog", "aria-expanded": false })}
+      className={children ? "chips-button" : "chips-add"}
+      aria-label={`Skills for ${title}`}
+      onClick={stop}
+      onPointerDown={stop}
+      onKeyDown={(e) => e.key === "Enter" && stop(e)}
+    >
+      {children || <Plus size={11} weight="bold" aria-hidden="true" />}
+    </button>
+  );
+  if (bare) return button;
   return (
     <Popover.Root
       open={open}
@@ -95,17 +112,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
       }}
     >
       <Hint text={children ? "Change skills" : "Add to a skill"}>
-        <Popover.Trigger asChild>
-          <button
-            className={children ? "chips-button" : "chips-add"}
-            aria-label={`Skills for ${title}`}
-            onClick={stop}
-            onPointerDown={stop}
-            onKeyDown={(e) => e.key === "Enter" && stop(e)}
-          >
-            {children || <Plus size={11} weight="bold" aria-hidden="true" />}
-          </button>
-        </Popover.Trigger>
+        <Popover.Trigger asChild>{button}</Popover.Trigger>
       </Hint>
       <Popover.Portal>
         <Popover.Content className="popover menu skill-picker" side="bottom" align="start" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => {
