@@ -177,7 +177,7 @@ ore skills set <skill> [--name n] [--icon emoji|mc:name] [--color gray|red|orang
 ore skills add <name> [--collection c]   new skill at P2 (the sidebar's + on a section header); refuses a name that matches an existing skill
 ore skills arrange '<layout json>'   the sidebar in one write: [{"collection":"Work","skills":["ai",...]},{"collection":"","skills":[...]}], every skill exactly once; sorts skills.yaml into that order (a collection sits where its first skill is) and sets or clears each collection. Drag, Move to, renaming, reordering or deleting a collection, and their Undo all use it
 ore skills rm <skill> [--archive]      delete a skill: drops it from skills.yaml and untags its sources, cards and topics (cards keep reviewing, the skill note stays on disk); --archive also archives sources filed only under it
-ore suggested-skill <item> accept|dismiss   accept creates the suggested skill (P2) if new and files the item, its cards and topics under it
+ore suggested-skill <item> accept|dismiss|undo <json>   accept creates the suggested skill (P2) if new and files the item, its cards and topics under it; undo takes back an accept (its `undo` record) or a dismiss
 ore enrich [item...|--all-pending]    runs AI (several items one after another): prequestions, skills, topics, card/prompt drafts from Card highlights, changed the source note and, once the item is done, its prequestions
 ore research <question>               AI finds 3–5 sources for one of his questions and prints them; writes nothing (D95); `ore add <url> --for <q>` any
 ore explain <item> --exact "<term>" [--start N]   AI explains a term in its paragraph and in general (Explain, D97); writes nothing

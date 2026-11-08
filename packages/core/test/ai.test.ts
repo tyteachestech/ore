@@ -18,7 +18,7 @@ import { addSnippet } from "../src/ingest/index.ts";
 import { sha256 } from "../src/fsutil.ts";
 import { createItem, findItem, setItemStatus, setPrequestionAttempt, updateItemMeta } from "../src/items.ts";
 import { appendNote, setChapterRecall, setNotes, setRecall } from "../src/notes.ts";
-import { acceptSuggestedSkill, dismissSuggestedSkill, loadSkills } from "../src/skills.ts";
+import { acceptSuggestedSkill, dismissSuggestedSkill, loadSkills, setItemSkills, undoSuggestedSkill } from "../src/skills.ts";
 import { readTopic } from "../src/topics.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -439,6 +439,46 @@ describe("AI adapter", () => {
     await dismissSuggestedSkill(lib, item.meta.id);
     expect(findItem(lib, item.meta.id).meta.suggested_skill).toBeUndefined();
     await expect(acceptSuggestedSkill(lib, item.meta.id)).rejects.toThrow(/no suggested skill/);
+  });
+
+  test("Undo takes back a dismiss or an accept exactly, so Accept works again", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Index funds track a market. Fees compound." });
+    const hl = addHighlight(findItem(lib, item.meta.id), { exact: "Fees compound.", intent: "card" });
+    const suggestion = { name: "Personal Finance", hook: "Money that lasts" };
+    fakeClaude([{ ...enrichOut(["Q1?", "Q2?"], [draft(hl.id)]), skills: [], suggested_skill: suggestion }]);
+    await enrichItem(lib, item.meta.id);
+    const topic = findItem(lib, item.meta.id).meta.topics[0]!;
+    const skillsBefore = loadSkills(lib).skills.map((k) => k.id);
+    await dismissSuggestedSkill(lib, item.meta.id);
+    await undoSuggestedSkill(lib, item.meta.id, { suggestion });
+    expect(findItem(lib, item.meta.id).meta.suggested_skill).toEqual(suggestion);
+
+    // An accept that made the skill: undo takes it off the source, its cards and topics, and deletes it.
+    const r = await acceptSuggestedSkill(lib, item.meta.id);
+    expect(r.undo).toMatchObject({ skill: "personal-finance", created: true, filed: true, topics: [topic] });
+    expect(r.undo.cards).toHaveLength(1);
+    await undoSuggestedSkill(lib, item.meta.id, r.undo);
+    expect(findItem(lib, item.meta.id).meta).toMatchObject({ skills: [], suggested_skill: suggestion });
+    expect(listCards(lib)[0]!.meta.skills).toEqual([]);
+    expect(readTopic(lib, topic)!.meta.skills).not.toContain("personal-finance");
+    expect(loadSkills(lib).skills.map((k) => k.id)).toEqual(skillsBefore);
+
+    // Filed elsewhere since the accept: the skill stays for that; only what the accept filed comes off.
+    const again = await acceptSuggestedSkill(lib, item.meta.id);
+    const other = (await addSnippet(lib, { text: "Budgets plan spending." })).item;
+    await setItemSkills(lib, other.meta.id, ["personal-finance"]);
+    await undoSuggestedSkill(lib, item.meta.id, again.undo);
+    expect(findItem(lib, item.meta.id).meta.skills).toEqual([]);
+    expect(loadSkills(lib).skills.some((k) => k.id === "personal-finance")).toBe(true);
+
+    // Into a skill that exists: the skill stays; the source comes off it.
+    const into = await acceptSuggestedSkill(lib, item.meta.id);
+    expect(into.undo).toMatchObject({ created: false, filed: true });
+    await undoSuggestedSkill(lib, item.meta.id, into.undo);
+    expect(findItem(lib, item.meta.id).meta).toMatchObject({ skills: [], suggested_skill: suggestion });
+    expect(loadSkills(lib).skills.some((k) => k.id === "personal-finance")).toBe(true);
+    await expect(undoSuggestedSkill(lib, item.meta.id, { suggestion: { name: "  " } })).rejects.toThrow(/name/);
   });
 
   const inputOf = (call: number) => JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[call]!)[1] as string;

@@ -5,7 +5,7 @@ import { listCards, writeCardMeta } from "./cards.ts";
 import { parseYaml, stringifyFrontmatter, loadYaml } from "./frontmatter.ts";
 import { isOther, tidyCollection } from "./collection-name.ts";
 import { writeAtomic } from "./fsutil.ts";
-import { allItems, findItem, ItemMetaSchema, updateItemMeta, type ItemMeta } from "./items.ts";
+import { allItems, findItem, ItemMetaSchema, SuggestedSkill, updateItemMeta, type ItemMeta } from "./items.ts";
 import { nowIso, slugify } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
@@ -296,7 +296,7 @@ export async function addSkill(lib: Library, name: string, collection = ""): Pro
 
 // Accept an item's suggested skill: create it in skills.yaml at the default priority unless it
 // already exists, then file the item, its cards and its topics under it. Tyler creates skills; AI only suggests (D25).
-export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{ skill: Skill; created: boolean; item: ItemMeta }> {
+export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{ skill: Skill; created: boolean; item: ItemMeta; undo: SuggestionUndo }> {
   return withLock(paths.lock(lib), () => {
     const item = findItem(lib, ref);
     const s = item.meta.suggested_skill;
@@ -311,13 +311,62 @@ export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{
       writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     }
     const id = skill.id;
+    const cards: string[] = [], topics: string[] = [];
+    const undo = { suggestion: s, skill: id, created, filed: !item.meta.skills.includes(id), cards, topics };
     const meta = ItemMetaSchema.parse({ ...item.meta, skills: [...new Set([...item.meta.skills, id])], suggested_skill: undefined });
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
-    for (const c of listCards(lib).filter((c) => c.meta.item === meta.id && !c.meta.skills.includes(id)))
+    for (const c of listCards(lib).filter((c) => c.meta.item === meta.id && !c.meta.skills.includes(id))) {
       writeCardMeta(c, { ...c.meta, skills: [...c.meta.skills, id] });
+      cards.push(c.meta.id);
+    }
     for (const t of meta.topics.map((slug) => readTopic(lib, slug)))
-      if (t && !t.meta.skills.includes(id)) writeTopic({ ...t, meta: { ...t.meta, skills: [...t.meta.skills, id] } });
-    return { skill, created, item: meta };
+      if (t && !t.meta.skills.includes(id)) {
+        writeTopic({ ...t, meta: { ...t.meta, skills: [...t.meta.skills, id] } });
+        topics.push(t.slug);
+      }
+    return { skill, created, item: meta, undo };
+  });
+}
+
+/** What an accept changed, so Undo takes back exactly that (or, with only `suggestion`, a dismiss). */
+export const SuggestionUndoSchema = z.object({
+  suggestion: SuggestedSkill,
+  skill: z.string().optional(),
+  created: z.boolean().default(false),
+  filed: z.boolean().default(false),
+  cards: z.array(z.string()).default([]),
+  topics: z.array(z.string()).default([]),
+});
+export type SuggestionUndo = z.input<typeof SuggestionUndoSchema>;
+
+/** Undoes an accept or a dismiss in one locked step: the skill comes off what the accept filed under it
+ *  (a skill it made goes too, unless something has been filed under it since), and the suggestion
+ *  returns, so the chip shows again and Accept works. */
+export async function undoSuggestedSkill(lib: Library, ref: string, input: SuggestionUndo): Promise<ItemMeta> {
+  const r = SuggestionUndoSchema.parse(input);
+  if (!r.suggestion.name.trim()) throw new Error("a suggested skill needs a name");
+  return withLock(paths.lock(lib), () => {
+    const item = findItem(lib, ref);
+    const id = r.skill;
+    const off = (skills: string[]) => skills.filter((x) => x !== id);
+    const meta = ItemMetaSchema.parse({ ...item.meta, skills: id && r.filed ? off(item.meta.skills) : item.meta.skills, suggested_skill: r.suggestion });
+    writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
+    if (!id) return meta;
+    const cards = new Set(r.cards);
+    for (const c of listCards(lib).filter((c) => cards.has(c.meta.id) && c.meta.skills.includes(id))) writeCardMeta(c, { ...c.meta, skills: off(c.meta.skills) });
+    for (const t of r.topics.map((slug) => readTopic(lib, slug)))
+      if (t?.meta.skills.includes(id)) writeTopic({ ...t, meta: { ...t.meta, skills: off(t.meta.skills) } });
+    const used = allItems(lib).some((i) => i.meta.skills.includes(id)) || listCards(lib).some((c) => c.meta.skills.includes(id)) || listTopics(lib).some((t) => t.meta.skills.includes(id));
+    if (r.created && !used) {
+      const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+      const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
+      const i = list.items.findIndex((m) => m.get("id") === id);
+      if (i >= 0) {
+        list.items.splice(i, 1);
+        writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+      }
+    }
+    return meta;
   });
 }
 
