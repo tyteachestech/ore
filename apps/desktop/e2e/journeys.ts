@@ -970,6 +970,38 @@ journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to t
   await until("then ⌘[ leaves the source, as before", async () => !(await page.locator(".doc").isVisible()));
 });
 
+journey("figure zoom: a click opens a figure to fill the window and keys don't reach the page behind; Esc, a click or a scroll puts it back (D143)", async (page) => {
+  await openSource(page, AGENTS);
+  const fig = page.locator(".doc img").first();
+  await fig.scrollIntoViewIfNeeded();
+  const small = (await fig.boundingBox())!;
+  const zoom = page.locator(".figure-zoom");
+  const big = page.locator(".figure-zoom.open img");
+  const shut = () => until("it is put back", async () => !(await zoom.count()) && (await fig.evaluate((i) => getComputedStyle(i).visibility)) === "visible");
+  await fig.click();
+  await big.waitFor();
+  await until("the figure grows to fill the window", async () => ((await big.boundingBox())?.width ?? 0) > small.width * 1.3);
+  // Keys stay with the figure: the page behind doesn't scroll, and Esc puts it back at once.
+  const top = await page.locator(".reader-scroll").evaluate((el) => el.scrollTop);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Escape");
+  await shut();
+  if ((await page.locator(".reader-scroll").evaluate((el) => el.scrollTop)) !== top) throw new Error("keys pressed over the figure scrolled the page behind");
+  if (!(await page.locator(".doc").isVisible())) throw new Error("Esc left the source as well as the figure");
+  // A click on it puts it back, and so does a scroll.
+  await fig.click();
+  await big.waitFor();
+  await page.waitForTimeout(300);
+  await zoom.click();
+  await shut();
+  await fig.click();
+  await big.waitFor();
+  await page.mouse.wheel(0, 200);
+  await shut();
+  if ((await page.locator(".reader-scroll").evaluate((el) => el.scrollTop)) !== top) throw new Error("the scroll that put the figure back moved the page too");
+});
+
 journey("highlight note: a long note's hover preview stays inside the window", async (page) => {
   await openSource(page, AGENTS);
   const popup = page.getByRole("dialog", { name: "Highlight" });
