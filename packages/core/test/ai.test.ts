@@ -37,7 +37,7 @@ fs.writeFileSync(dir + "/count", String(n + 1));
 fs.appendFileSync(dir + "/args.jsonl", JSON.stringify(process.argv.slice(2)) + "\\n");
 const out = JSON.parse(fs.readFileSync(dir + "/queue.json", "utf8"))[n];
 if (fs.existsSync(dir + "/while.js")) require(dir + "/while.js"); // what happens in the library while the AI runs
-console.log(JSON.stringify({ is_error: false, structured_output: out, modelUsage: { "claude-fake-1": { outputTokens: 10 } } }));
+console.log(JSON.stringify({ type: "result", is_error: false, structured_output: out, modelUsage: { "claude-fake-1": { outputTokens: 10 } } }));
 `;
   writeFileSync(join(binDir, "claude"), script);
   chmodSync(join(binDir, "claude"), 0o755);

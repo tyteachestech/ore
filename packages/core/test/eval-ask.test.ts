@@ -12,10 +12,10 @@ afterEach(() => {
   if (saved.ai === undefined) delete process.env.ORE_AI;
   else process.env.ORE_AI = saved.ai;
 });
-/** A fake `claude` that always gives this structured output. */
-function fakeClaude(out: unknown) {
+/** A fake `claude` that always gives this structured output, after these stream-json events (a web search's). */
+function fakeClaude(out: unknown, events: unknown[] = []) {
   const dir = mkdtempSync(join(tmpdir(), "ore-fakebin-"));
-  writeFileSync(join(dir, "claude"), `#!/usr/bin/env bun\nconsole.log(JSON.stringify({ is_error: false, structured_output: ${JSON.stringify(out)}, modelUsage: { "claude-fake-1": { outputTokens: 5 } } }));\n`);
+  writeFileSync(join(dir, "claude"), `#!/usr/bin/env bun\n${events.map((e) => `console.log(${JSON.stringify(JSON.stringify(e))});\n`).join("")}console.log(JSON.stringify({ type: "result", is_error: false, structured_output: ${JSON.stringify(out)}, modelUsage: { "claude-fake-1": { outputTokens: 5 } } }));\n`);
   chmodSync(join(dir, "claude"), 0o755);
   process.env.PATH = `${dir}:${saved.path}`;
   process.env.ORE_AI = "claude";
@@ -49,6 +49,13 @@ describe("ask-your-library eval", () => {
     expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(true);
     fakeClaude({ reply: "He was born in 1850.", citations: [], general: false, hint: false, exercise: null, card: null });
     expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(false);
+    // A web page's link says so too: it is plainly not one of his sources.
+    const page = { url: "https://www.britannica.com/biography/Hermann-Ebbinghaus", title: "Hermann Ebbinghaus" };
+    fakeClaude({ reply: "He was born in 1850 [1].", citations: [{ passage: page.url, quote: "born on January 24, 1850" }], general: false, hint: false, exercise: null, card: null }, [
+      { type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "WebSearch", input: { query: "q" } }] } },
+      { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "Hermann Ebbinghaus was born on January 24, 1850." }] }, tool_use_result: { results: [{ content: [page] }] } },
+    ]);
+    expect(await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).toMatchObject({ found: false, outside: true, searched: true, citations: [], web: [{ url: page.url, site: "britannica.com" }] });
   });
 
   test("a reply says the answer isn't in his sources in words, even when it cites what is there nearby", () => {
@@ -67,15 +74,19 @@ describe("ask-your-library eval", () => {
     const at = body(wiki).indexOf("return to the first box");
     const cite = { n: 1, item: wiki, title: "Spaced repetition", heading: "", quote: "return to the first box", text: "return to the first box", start: at, end: at + 23 };
     const c = loadAskCases().cases.find((x) => x.id === "wiki-leitner-wrong")!;
-    const r = (over: object) => ({ found: true, answer: "It goes back to the first box [1].", citations: [cite], outside: false, ...over });
+    const r = (over: object) => ({ found: true, answer: "It goes back to the first box [1].", citations: [cite], web: [], outside: false, ...over });
     expect(scoreAnswer(c, r({}), names, body)).toEqual({ answer_ok: true, citation_ok: true });
     expect(scoreAnswer(c, r({ answer: "It moves up a box [1]." }), names, body)).toEqual({ answer_ok: false, citation_ok: true });
     expect(scoreAnswer(c, r({ citations: [{ ...cite, start: at + 1 }] }), names, body).citation_ok).toBe(false); // not where it says
     expect(scoreAnswer(c, r({ citations: [] }), names, body).citation_ok).toBe(false);
-    const absent = loadAskCases().absent[0]!;
+    const absent = loadAskCases().absent.find((x) => !x.outside)!; // no settled answer to get right
     expect(scoreAnswer(absent, r({ found: false, citations: [], outside: true }), names, body)).toEqual({ answer_ok: true, citation_ok: true });
     expect(scoreAnswer(absent, r({}), names, body).answer_ok).toBe(false); // cited a passage as if it held the answer
     expect(scoreAnswer(absent, r({ outside: true }), names, body)).toEqual({ answer_ok: true, citation_ok: true }); // said so, and cited what is there nearby
     expect(scoreAnswer(absent, r({ found: false, citations: [], outside: false }), names, body).answer_ok).toBe(false); // answered without saying it isn't his sources
+    // Where the fact is settled, the answer from outside his library must also be right.
+    const born = loadAskCases().absent.find((x) => x.id === "absent-ebbinghaus-born")!;
+    expect(scoreAnswer(born, r({ found: false, citations: [], outside: true, answer: "Your sources don't say; he was born in 1850 [1]." }), names, body).answer_ok).toBe(true);
+    expect(scoreAnswer(born, r({ found: false, citations: [], outside: true, answer: "Your sources don't say; he was born in 1856." }), names, body).answer_ok).toBe(false);
   });
 });

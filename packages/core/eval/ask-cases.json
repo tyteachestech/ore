@@ -23,14 +23,14 @@
     { "id": "hazards-turing", "question": "Which 1950 article asked whether machines can think?", "sources": ["pdf-hazards"], "answer": ["Computing Machinery and Intelligence"], "evidence": "Computing Machinery" }
   ],
   "absent": [
-    { "id": "absent-mongolia", "question": "What is the capital of Mongolia?" },
-    { "id": "absent-austen", "question": "Who wrote Pride and Prejudice?" },
+    { "id": "absent-mongolia", "question": "What is the capital of Mongolia?", "outside": ["Ula(a)?n ?ba(a)?tar"] },
+    { "id": "absent-austen", "question": "Who wrote Pride and Prejudice?", "outside": ["Austen"] },
     { "id": "absent-sleep-hours", "question": "How many hours of sleep do I need to consolidate memories?" },
     { "id": "absent-caffeine", "question": "Does caffeine improve memory?" },
-    { "id": "absent-leitner-birth", "question": "In what year was Sebastian Leitner born?" },
-    { "id": "absent-ebbinghaus-born", "question": "In what year was Hermann Ebbinghaus born?" },
-    { "id": "absent-fsrs-default", "question": "What desired retention does FSRS use by default?" },
-    { "id": "absent-walrus", "question": "Which Python version added the walrus operator?" },
-    { "id": "absent-python-lambda", "question": "How do you write a lambda function in Python?" }
+    { "id": "absent-leitner-birth", "question": "In what year was Sebastian Leitner born?", "outside": ["1919"] },
+    { "id": "absent-ebbinghaus-born", "question": "In what year was Hermann Ebbinghaus born?", "outside": ["1850"] },
+    { "id": "absent-fsrs-default", "question": "What desired retention does FSRS use by default?", "outside": ["0\\.9\\b|90 ?%"] },
+    { "id": "absent-walrus", "question": "Which Python version added the walrus operator?", "outside": ["3\\.8"] },
+    { "id": "absent-python-lambda", "question": "How do you write a lambda function in Python?", "outside": ["lambda"] }
   ]
 }

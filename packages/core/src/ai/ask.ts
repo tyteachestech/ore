@@ -96,6 +96,8 @@ export const AskLibraryOutput = z.strictObject({
 
 /** `quote` is the exact Markdown at start..end (for the jump); `text` is how it reads. */
 export interface Citation { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number }
+/** A web page the tutor's search found, cited like a passage: `quote` is words the search returned from it. */
+export interface WebCitation { n: number; url: string; title: string; site: string; quote: string; text: string }
 
 /** Markdown as it reads: a link's text without its URL, no emphasis or code marks, no footnote marks. */
 export const plainText = (md: string) =>

@@ -363,6 +363,36 @@ journey("tutor citation: a numbered source in a reply opens that source at the q
   await page.keyboard.press("Escape");
 });
 
+journey("tutor web citation: a page the tutor found on the web shows its site and opens in the browser", async (page) => {
+  const url = "https://www.britannica.com/biography/Hermann-Ebbinghaus";
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"tutor",')) return route.fallback();
+    const cite = { n: 1, url, title: "Hermann Ebbinghaus", site: "britannica.com", quote: "born on January 24, 1850", text: "born on January 24, 1850" };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Your sources don't say; he was born in 1850 [1].", citations: [cite], general: false, searched: true, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@5" } }) });
+  });
+  await page.evaluate(() => {
+    const t = (window as any).__TAURI_INTERNALS__;
+    const invoke = ((window as any).__invoke = t.invoke);
+    (window as any).__opened = [];
+    t.invoke = (cmd: string, args: any) => (cmd.includes("opener") ? ((window as any).__opened.push(args?.url), Promise.resolve()) : invoke(cmd, args));
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("When was Ebbinghaus born?");
+    await page.keyboard.press("Enter");
+    await tutor.locator(".library-sources").getByText("britannica.com ·").waitFor();
+    await tutor.getByRole("button", { name: "Source 1: Hermann Ebbinghaus (britannica.com)" }).click();
+    await until("the page opens in the browser", async () => ((await page.evaluate(() => (window as any).__opened)) as string[]).includes(url));
+  } finally {
+    await page.unroute(/\/ore$/);
+    await page.evaluate(() => { (window as any).__TAURI_INTERNALS__.invoke = (window as any).__invoke; });
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("tutor @: typing @ lists skills and sources, Enter writes the name in, and the message goes out pointed at it", async (page) => {
   await page.keyboard.press("Meta+j");
   const field = page.getByRole("textbox", { name: "Message the tutor" });

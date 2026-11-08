@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Citation } from "../src/ai/ask.ts";
 import { addTutorCard, tutor, tutorPassages, type TutorCard } from "../src/ai/tutor.ts";
 import { sceneOutline, setDiagram } from "../src/diagrams.ts";
 import { findCard } from "../src/cards.ts";
@@ -20,7 +21,11 @@ const dir = ${JSON.stringify(binDir)};
 const n = Number(fs.readFileSync(dir + "/count", "utf8"));
 fs.writeFileSync(dir + "/count", String(n + 1));
 fs.appendFileSync(dir + "/msgs.jsonl", JSON.stringify(process.argv[process.argv.indexOf("-p") + 1]) + "\\n");
-console.log(JSON.stringify({ is_error: false, structured_output: JSON.parse(fs.readFileSync(dir + "/queue.json", "utf8"))[n], modelUsage: { "claude-fake-1": { outputTokens: 5 } } }));
+fs.writeFileSync(dir + "/argv.json", JSON.stringify(process.argv));
+// An entry { web: [events…], out } first prints those stream-json events (what its web search returned).
+const q = JSON.parse(fs.readFileSync(dir + "/queue.json", "utf8"))[n];
+for (const e of q?.web ?? []) console.log(JSON.stringify(e));
+console.log(JSON.stringify({ type: "result", is_error: false, structured_output: q?.web ? q.out : q, modelUsage: { "claude-fake-1": { outputTokens: 5 } } }));
 `);
   chmodSync(join(binDir, "claude"), 0o755);
 }
@@ -77,9 +82,9 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@4" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@5" });
     expect(r.general).toBe(false);
-    const c = r.citations[0]!;
+    const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
     expect(findItem(lib, a.meta.id).body.slice(c.start, c.end)).toBe("A card you miss goes back to the first box.");
     expect(sent()[0]!.reading).toEqual({ title: "Flashcard boxes" });
@@ -111,6 +116,51 @@ describe("tutor: replies", () => {
     fakeClaude([{ reply: "Less often.", citations: [], general: false, hint: false, exercise: null, card: null }]);
     await tutor(lib, "and the right ones?", { earlier: [{ message: "What happens to a missed card?", reply: "First box." }] });
     expect(sent()[0]!.earlier).toEqual([{ message: "What happens to a missed card?", reply: "First box." }]);
+  });
+});
+
+/** What a stream-json run prints when its web search returns these pages, with this summary text. */
+const searched = (pages: { url: string; title: string }[], text: string) => [
+  { type: "system", subtype: "init", model: "claude-main-1" },
+  { type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "WebSearch", input: { query: "q" } }] } },
+  { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: `Links: ${JSON.stringify(pages)}\n\n${text}` }] }, tool_use_result: { query: "q", results: [{ content: pages }] } },
+];
+const BRIT = { url: "https://www.britannica.com/biography/Hermann-Ebbinghaus", title: "Hermann Ebbinghaus | Britannica" };
+
+describe("tutor: the web", () => {
+  test("when his sources don't hold it, a web page the search returned is cited by its URL, title and site", async () => {
+    const { lib } = await library();
+    fakeClaude([{ web: searched([BRIT], "Hermann Ebbinghaus was born on January 24, 1850, in Barmen."), out: { reply: "Your sources don't give it; he was born in 1850 [1].", citations: [{ passage: "https://britannica.com/biography/Hermann-Ebbinghaus/", quote: "born on January 24, 1850" }], general: false, hint: false, exercise: null, card: null } }]);
+    const r = await tutor(lib, "When was Ebbinghaus born?");
+    expect(r.searched).toBe(true);
+    expect(r.ai.model).toBe("claude-main-1"); // not the search's helper model, which wrote more
+    expect(r.citations).toEqual([{ n: 1, url: BRIT.url, title: BRIT.title, site: "britannica.com", quote: "born on January 24, 1850", text: "born on January 24, 1850" }]);
+  });
+
+  test("a link the search never returned, or a quote it never gave, goes back once to fix", async () => {
+    const { lib } = await library();
+    const web = searched([BRIT], "Hermann Ebbinghaus was born on January 24, 1850, in Barmen.");
+    const reply = (passage: string, quote: string) => ({ web, out: { reply: "Born in 1850 [1].", citations: [{ passage, quote }], general: false, hint: false, exercise: null, card: null } });
+    fakeClaude([reply("https://en.wikipedia.org/wiki/Hermann_Ebbinghaus", "born on January 24, 1850"), reply(BRIT.url, "born on 24 January 1850 in Bonn"), reply(BRIT.url, "born on January 24, 1850")]);
+    await expect(tutor(lib, "When was Ebbinghaus born?")).rejects.toThrow("is not in what the web search returned");
+    expect(sent()).toHaveLength(2);
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("is not a page your web search returned");
+  });
+
+  test("a web citation with no search at all is refused: the link would be made up", async () => {
+    const { lib } = await library();
+    const out = { reply: "Born in 1850 [1].", citations: [{ passage: BRIT.url, quote: "born in 1850" }], general: false, hint: false, exercise: null, card: null };
+    fakeClaude([{ web: [], out }, { web: [], out }]);
+    await expect(tutor(lib, "When was Ebbinghaus born?")).rejects.toThrow("is not a page your web search returned");
+  });
+
+  test("the tutor may search: its tools include web search and fetch", async () => {
+    const { lib } = await library();
+    fakeClaude([{ reply: "Hi!", citations: [], general: false, hint: false, exercise: null, card: null }]);
+    await tutor(lib, "hello");
+    const args = readFileSync(join(binDir, "argv.json"), "utf8");
+    expect(args).toContain("WebSearch,WebFetch");
+    expect(args).toContain("stream-json");
   });
 });
 

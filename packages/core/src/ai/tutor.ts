@@ -7,13 +7,14 @@ import { withLock } from "../lock.ts";
 import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
 import type { Library } from "../library.ts";
-import { runAgent, type Usage } from "./adapter.ts";
-import { plainText, retrieve, splitPassages, type Citation, type Passage } from "./ask.ts";
+import { runAgent, samePage, type Usage } from "./adapter.ts";
+import { plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
 
 // The tutor (D128): the chat docked at the window's right, grown out of Ask your library. It answers
-// his own questions from his sources with citations, falls back to general knowledge only when it says
-// so, gives hints instead of answers on practice, and uses the source he has open, and the sources
-// and skills he @-mentions, as context.
+// his own questions from his sources with citations; when they don't hold the answer it says so, then
+// searches the web (cited the same way) or answers from general knowledge under a label. It gives hints
+// instead of answers on practice, and uses the source he has open, and the sources and skills he
+// @-mentions, as context.
 
 export interface TutorTurn { message: string; reply: string }
 
@@ -28,6 +29,7 @@ export type TutorCard = z.infer<typeof TutorCard>;
 
 export const TutorOutput = z.strictObject({
   reply: z.string().min(1),
+  // `passage` is a passage id, or the URL of a page the web search returned.
   citations: z.array(z.strictObject({ passage: z.string(), quote: z.string().min(1) })),
   general: z.boolean(),
   // The reply holds back an answer he is meant to find (a hint rung): the app offers "Show me".
@@ -87,15 +89,23 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
   const pointed = [...(focus.sources ?? []).map((id) => findItem(lib, id).meta.title), ...(focus.skills ?? []).map((s) => `the skill ${skillNames.get(s)}`)];
   const passages = tutorPassages(lib, [...recent.slice(-2).map((t) => t.message), m].join(" "), focus);
   const byId = new Map(passages.map((p) => [p.id, p]));
-  const { data, ai, usage } = await runAgent(lib, {
+  const { data, ai, usage, web } = await runAgent(lib, {
     prompt: "tutor",
     cwd: lib.root,
+    web: true,
     schema: TutorOutput,
     input: { message: m, earlier: recent, ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
-    check: (d) => {
+    check: (d, seen) => {
       for (const c of d.citations) {
+        if (isUrl(c.passage)) {
+          if (!URL.canParse(c.passage)) return `${c.passage} is not a link`;
+          // Claude reports what its searches returned, so a web citation is checked as a passage is; codex doesn't.
+          if (seen && !seen.pages.some((p) => samePage(p.url, c.passage))) return `${c.passage} is not a page your web search returned: cite one it returned, or a passage`;
+          if (seen && !locate(seen.text, c.quote)) return `the quote "${c.quote}" is not in what the web search returned: copy its exact words`;
+          continue;
+        }
         const p = byId.get(c.passage);
-        if (!p) return `no passage ${c.passage}; cite one of ${passages.map((x) => x.id).join(", ") || "none (there are no passages)"}`;
+        if (!p) return `no passage ${c.passage}; cite one of ${passages.map((x) => x.id).join(", ") || "none (there are no passages)"}, or a page your web search returned`;
         if (!locate(p.text, c.quote)) return `the quote "${c.quote}" is not in ${c.passage}: copy its exact words`;
       }
       const top = Math.max(0, ...[...d.reply.matchAll(/\[(\d+)\]/g)].map((x) => +x[1]!));
@@ -105,14 +115,24 @@ export async function tutor(lib: Library, message: string, { earlier = [], ...fo
       return d.card ? cardTextProblem(d.card) : null;
     },
   });
-  const citations: Citation[] = data.citations.map((c, i) => {
+  const citations: (Citation | WebCitation)[] = data.citations.map((c, i) => {
+    if (isUrl(c.passage)) {
+      const page = web?.pages.find((p) => samePage(p.url, c.passage));
+      const url = page?.url ?? c.passage;
+      const site = new URL(url).hostname.replace(/^www\./, "");
+      const at = web ? locate(web.text, c.quote) : null;
+      const quote = at ? web!.text.slice(at.start, at.end) : c.quote;
+      return { n: i + 1, url, title: page?.title || site, site, quote, text: plainText(quote) };
+    }
     const p = byId.get(c.passage)!;
     const at = locate(p.text, c.quote)!;
     const quote = p.text.slice(at.start, at.end);
     return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
   });
-  return { message: m, reply: data.reply, citations, general: data.general, hint: data.hint, exercise: data.exercise, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
+  return { message: m, reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
 }
+
+const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
 
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the
  *  source it came from (the first one cited, else the one he was reading) and takes that source's

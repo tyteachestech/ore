@@ -1,5 +1,6 @@
 import { ArrowUp, Check, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
@@ -11,6 +12,11 @@ import { Working } from "./Working";
 import { mentionMatches, type Mention } from "./mentions";
 
 export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
+/** A web page the tutor's search found (D128, Tyler 2026-11-08): cited like a passage, opened in the browser. */
+export type WebCitation = { n: number; url: string; title: string; site: string; quote: string; text: string };
+type AnyCitation = Citation | WebCitation;
+/** The first of his own sources a reply cites: where a card from it belongs. */
+const firstSource = (cs: AnyCitation[] | undefined) => cs?.find((c): c is Citation => !("url" in c))?.item;
 /** One exchange. `item`/`title` is the source it was asked about (the context chip at the time). */
 export type TutorCard = { kind: "card" | "prompt"; content_type: string; question: string; answer: string; rubric: string[] };
 type Ai = { vendor: string; model: string; prompt_version: string };
@@ -22,11 +28,11 @@ export type TutorTurn = {
   message: string; item?: string; title?: string; mentions?: Mention[];
   /** The @ context the request carried: his own @s, else the ones still in effect from before (D128.3). */
   pointed?: Mention[];
-  reply?: string; citations?: Citation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
+  reply?: string; citations?: AnyCitation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
 };
-type Reply = { reply: string; citations: Citation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; ai: Ai };
+type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; ai: Ai };
 /** What he has typed and not sent yet, with the @-mentions in it. */
 export type TutorDraft = { input: string; mentions: Mention[] };
 export type TutorChat = ReturnType<typeof useTutorChat>;
@@ -83,7 +89,7 @@ export function useTutorChat(notify: Notify) {
   /** Keeps the reply's card on the source it cites first (else the one he asked about); ⌘Z retires it. */
   const keep = async (id: string) => {
     const t = now.current.find((x) => x.id === id);
-    const item = t?.citations?.[0]?.item ?? t?.item;
+    const item = firstSource(t?.citations) ?? t?.item;
     if (!t?.card || !t.ai || !item || t.kept) return;
     const mark = (kept: string | undefined) => patch(id, { kept });
     mark("adding");
@@ -117,7 +123,9 @@ export function useTutorChat(notify: Notify) {
     };
     notify("Chat cleared", "info", swap, swap);
   };
-  return { turns, draft, setDraft, carry, drop, ask, retry, keep, fresh };
+  /** A web page a reply cites, in his browser. */
+  const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
+  return { turns, draft, setDraft, carry, drop, ask, retry, keep, fresh, openLink };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -279,8 +287,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                   <Working label="Thinking…" slow="A reply takes about 10 seconds." />
                 ) : (
                   <>
-                    <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} general={t.general} />
-                    {((last && (t.hint || (t.exercise && t.item))) || (t.card && (t.citations?.[0]?.item ?? t.item))) && (
+                    <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} />
+                    {((last && (t.hint || (t.exercise && t.item))) || (t.card && (firstSource(t.citations) ?? t.item))) && (
                       <div className="tutor-acts">
                         {last && t.hint && <button onClick={() => send("Show me")}>Show me</button>}
                         {last && t.exercise && t.item && (
@@ -288,7 +296,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                             <button onClick={() => onWrite(t.exercise!, { id: t.item!, title: t.title ?? "" })}>Write it in your note</button>
                           </Hint>
                         )}
-                        {t.card && (t.citations?.[0]?.item ?? t.item) && (
+                        {t.card && (firstSource(t.citations) ?? t.item) && (
                           <Hint text={t.kept && t.kept !== "adding" ? "In review from tomorrow" : t.card.question}>
                             <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Card added" : `Add card: ${t.card.question}`} disabled={!!t.kept} onClick={() => void chat.keep(t.id)}>
                               {t.kept ? <><Check size={12} aria-hidden="true" />Card added</> : <><Plus size={12} aria-hidden="true" />Card</>}
@@ -408,10 +416,11 @@ function marked(text: string, mentions: Mention[]) {
   return text.split(re).map((part, i) => (names.includes(part) ? <span key={i} className="tutor-at">{part}</span> : part));
 }
 
-/** A reply in Markdown: each [n] a small button that opens the cited passage, and the sources under it
- *  (Perplexity's numbered sources). A reply from general knowledge says so. */
-function Answer({ text, citations, general, onOpen }: { text: string; citations: Citation[]; general?: boolean; onOpen: (item: string, at: string) => void }) {
-  const open = (c: Citation) => onOpen(c.item, `q:${c.start}:${c.end}`);
+/** A reply in Markdown: each [n] a small button that opens the cited passage, or the web page in the
+ *  browser, and the sources under it (Perplexity's numbered sources, a page by its site). A reply from
+ *  general knowledge says so. */
+function Answer({ text, citations, general, onOpen, onLink }: { text: string; citations: AnyCitation[]; general?: boolean; onOpen: (item: string, at: string) => void; onLink: (url: string) => void }) {
+  const open = (c: AnyCitation) => ("url" in c ? onLink(c.url) : onOpen(c.item, `q:${c.start}:${c.end}`));
   return (
     <>
       <ReactMarkdown
@@ -420,7 +429,7 @@ function Answer({ text, citations, general, onOpen }: { text: string; citations:
           a: ({ href, children }) => {
             const c = href?.startsWith("#cite-") ? citations.find((x) => x.n === Number(href.slice(6))) : undefined;
             return c ? (
-              <button className="cite" aria-label={`Source ${c.n}: ${c.title}`} onClick={() => open(c)}>{c.n}</button>
+              <button className="cite" aria-label={`Source ${c.n}: ${c.title}${"url" in c ? ` (${c.site})` : ""}`} onClick={() => open(c)}>{c.n}</button>
             ) : (
               <span>{children}</span>
             );
@@ -438,8 +447,10 @@ function Answer({ text, citations, general, onOpen }: { text: string; citations:
                 <span className="library-n">{c.n}</span>
                 <span className="library-src">
                   <span className="library-title">
+                    {/* A page leads with its site, so a long title can't hide that it is from the web (Perplexity). */}
+                    {"url" in c && <span className="sub">{c.site} · </span>}
                     {c.title}
-                    {c.heading && <span className="sub"> › {c.heading}</span>}
+                    {!("url" in c) && c.heading && <span className="sub"> › {c.heading}</span>}
                   </span>
                   <span className="library-quote">“{c.text}”</span>
                 </span>
