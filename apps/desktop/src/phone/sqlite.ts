@@ -1,7 +1,7 @@
 // bun:sqlite for the core on iPhone (phase 0 feel test): the same calls over sql.js (SQLite in
 // WebAssembly). The index is a disposable cache (D5), so it lives in memory and is rebuilt at launch.
-// sql.js's stock build has FTS4, not FTS5: the search table is created as FTS4, so library search
-// (bm25 ranking) doesn't work on the phone yet. Phase 1 uses the phone's own SQLite instead.
+// sql.js's stock build has FTS4, not FTS5: the search statements are rewritten for it, without bm25's
+// ranking (hits come in library order). Phase 1 uses the phone's own SQLite instead.
 import initSqlJs, { type Database as SqlJsDb, type SqlValue } from "sql.js";
 
 let SQL: Awaited<ReturnType<typeof initSqlJs>> | null = null;
@@ -10,9 +10,23 @@ export async function ready(wasmUrl: string) {
 }
 
 const open = new Map<string, SqlJsDb>();
-const fix = (sql: string) => sql.replace(/using fts5/gi, "using fts4").replace(/pragma (busy_timeout|journal_mode)[^;]*;?/gi, "");
+/** FTS4 spells FTS5's `name unindexed` columns as a `notindexed=name` option. */
+const fts4Columns = (cols: string) => {
+  const list = cols.split(",").map((c) => c.trim());
+  const hidden = list.filter((c) => / unindexed$/i.test(c)).map((c) => `notindexed=${c.split(" ")[0]}`);
+  return `using fts4(${[...list.map((c) => c.split(" ")[0]), ...hidden].join(", ")})`;
+};
+const fix = (sql: string) =>
+  sql
+    .replace(/using fts5\(([^)]*)\)/gi, (_, cols: string) => fts4Columns(cols))
+    // FTS4's snippet takes the column after the marks; FTS5's before them.
+    .replace(/snippet\(fts, (-?\d+), ('[^']*'), ('[^']*'), ('[^']*'), (\d+)\)/g, "snippet(fts, $2, $3, $4, $1, $5)")
+    .replace(/bm25\(fts(, [\d.]+)*\)/g, "rowid")
+    .replace(/pragma (busy_timeout|journal_mode)[^;]*;?/gi, "");
 const bind = (p: unknown[]): SqlValue[] => p.map((v) => (typeof v === "boolean" ? Number(v) : v === undefined ? null : (v as SqlValue)));
 const params = (p: unknown[]) => bind(p.length === 1 && Array.isArray(p[0]) ? p[0] : p);
+/** FTS5's prefix query is `"word"*`; FTS4 wants the star inside the quotes. */
+const matchParams = (sql: string, p: unknown[]) => params(p).map((v) => (/\bfts match \?/i.test(sql) && typeof v === "string" ? v.replace(/"([^"]*)"\*/g, '"$1*"') : v));
 
 export class Database {
   private db: SqlJsDb;
@@ -36,7 +50,7 @@ export class Database {
     const all = (...p: unknown[]): T[] => {
       const st = db.prepare(fix(sql));
       try {
-        st.bind(params(p));
+        st.bind(matchParams(sql, p));
         const out: T[] = [];
         while (st.step()) out.push(st.getAsObject() as T);
         return out;
