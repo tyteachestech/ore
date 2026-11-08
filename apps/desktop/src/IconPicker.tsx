@@ -45,6 +45,13 @@ function recents(): string[] {
 
 const random = <T,>(xs: T[]): T | undefined => xs[Math.floor(Math.random() * xs.length)];
 
+/** The popover's onOpenAutoFocus: the caret goes in Filter, so typing searches at once (Notion,
+ *  Linear). Left to Radix, focus lands on the first tab and the fields' autoFocus is lost. */
+export const focusFilter = (e: Event) => {
+  e.preventDefault();
+  (e.currentTarget as HTMLElement).querySelector<HTMLElement>(".picker-search")?.focus();
+};
+
 /** Notion-style picker: Emoji and Icons tabs, search, recents, random, remove; icons take the skill color. */
 export function IconPicker({ value, color, onPick, onColor, onRemove }: {
   value?: string;

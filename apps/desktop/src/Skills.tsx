@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ElementType, type ReactNode, type Ref
 import { Hint } from "./Hint";
 import { useLite } from "./Lite";
 import { Trap } from "./Trap";
-import { IconPicker, SkillIcon } from "./IconPicker";
+import { focusFilter, IconPicker, SkillIcon } from "./IconPicker";
 import { ore, opt, SKILL_COLORS, type Skill, type SkillColor } from "./ore";
 import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
 
@@ -323,7 +323,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
               </Popover.Trigger>
             </Hint>
             <Popover.Portal>
-              <Popover.Content className="popover" side="bottom" align="start" sideOffset={6} collisionPadding={12}>
+              <Popover.Content className="popover" side="bottom" align="start" sideOffset={6} collisionPadding={12} onOpenAutoFocus={focusFilter}>
                 <IconPicker
                   value={look.icon}
                   color={look.color}

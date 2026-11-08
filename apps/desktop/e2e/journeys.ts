@@ -1645,6 +1645,23 @@ journey("a row's ⋯ menu in a short window stays inside it, scrolling, as its r
   await page.keyboard.press("Escape");
 });
 
+journey("icon picker: it opens with the caret in Filter, so typing searches at once (Notion), from Edit skill and the skill page", async (page) => {
+  const typed = async () => {
+    await page.locator(".picker-search").first().waitFor();
+    await page.keyboard.type("star");
+    await until("Filter has what he typed", async () => (await page.locator(".picker-search").first().inputValue()) === "star");
+    await page.keyboard.press("Escape");
+  };
+  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  await page.getByRole("dialog", { name: "Edit skill Creativity" }).getByRole("button", { name: "Add icon" }).click();
+  await typed();
+  await page.keyboard.press("Escape");
+  await page.locator(".sidebar .side-item", { hasText: "Storytelling" }).first().click();
+  await page.locator(".skill-badge").click();
+  await typed();
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);
