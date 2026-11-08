@@ -2,7 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Children, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -146,6 +146,73 @@ const withImages = (base: Components, dir: string): Components => ({
   },
 });
 
+/** A figure open to fill the window (D143): its image in the text, and where it sat. */
+type Zoomed = { img: HTMLImageElement; from: DOMRect };
+
+/** A figure, slide or chart drawn at the column's width opens to fill the window, so labels too small to
+ *  read there can be read (Medium, Readwise Reader). It grows from where it sits; a click or a scroll puts it
+ *  back the same way, Esc at once (keys don't animate). While it is open no key reaches the page behind. */
+function FigureZoom({ fig, onClose }: { fig: Zoomed; onClose: () => void }) {
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const [open, setOpen] = useState(still);
+  const leaving = useRef(false);
+  const close = useRef(onClose);
+  close.current = onClose;
+  const back = () => {
+    if (leaving.current) return;
+    leaving.current = true;
+    if (still) close.current();
+    else setOpen(false);
+  };
+  const backRef = useRef(back);
+  backRef.current = back;
+  useLayoutEffect(() => {
+    fig.img.style.visibility = "hidden";
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));
+    return () => {
+      cancelAnimationFrame(id);
+      fig.img.style.visibility = "";
+    };
+  }, [fig]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.key === "Escape") close.current();
+    };
+    const onWheel = (e: WheelEvent) => (e.preventDefault(), backRef.current());
+    const onResize = () => close.current();
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
+  // Drawn at its open size, so a picture larger than the column comes in sharp, and shrunk back onto its place.
+  const { from } = fig;
+  const scale = Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height);
+  const w = from.width * scale;
+  const h = from.height * scale;
+  const left = (innerWidth - w) / 2;
+  const top = (innerHeight - h) / 2;
+  const stop = (e: MouseEvent) => e.stopPropagation();
+  return createPortal(
+    <div className={`figure-zoom${open ? " open" : ""}`} onClick={(e) => (stop(e), back())} onMouseDown={stop} onMouseUp={stop} onMouseMove={stop}>
+      <img
+        src={fig.img.currentSrc || fig.img.src}
+        alt={fig.img.alt}
+        draggable={false}
+        style={{ left, top, width: w, height: h, transform: open ? "none" : `translate(${from.left - left}px, ${from.top - top}px) scale(${1 / scale})` }}
+        onTransitionEnd={(e) => e.propertyName === "transform" && leaving.current && close.current()}
+      />
+    </div>,
+    document.body,
+  );
+}
+
 const Chunk = memo(function Chunk({ md, video, dir }: { md: string; video: boolean; dir: string }) {
   const parts = useMemo(() => withImages(video ? stamped : components, dir), [video, dir]);
   return (
@@ -280,6 +347,9 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [anns, setAnns] = useState<Annotation[]>([]);
   const [ready, setReady] = useState(false);
   const [popup, setPopup] = useState<Popup | null>(null);
+  const [zoom, setZoom] = useState<Zoomed | null>(null);
+  const zoomed = useRef(false);
+  zoomed.current = !!zoom;
   // The popup as it is now, for its note to be written when he leaves the source with it open.
   const popupNow = useRef(popup);
   popupNow.current = popup;
@@ -1938,6 +2008,12 @@ function ReaderView(p: Props & { reload: () => void }) {
     p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. Add it with ${label(keys.file)} to read it here.`, "error");
   };
   const onClick = (e: MouseEvent) => {
+    // A figure opens to fill the window (D143), unless it is a link (the link wins) or already about as big.
+    const fig = (e.target as Element).closest?.("img");
+    if (fig instanceof HTMLImageElement && docEl.current?.contains(fig) && !fig.closest("a[href]") && fig.naturalWidth) {
+      const from = fig.getBoundingClientRect();
+      if (Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height) > 1.1) return setZoom({ img: fig, from });
+    }
     const a = (e.target as Element).closest?.("a[href]");
     if (!a || !docEl.current?.contains(a)) return;
     e.preventDefault();
@@ -1962,7 +2038,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       const el = scrollRef.current;
       // Only from the text: in a diagram beside it ⌘[ is Send backward.
       const t = e.target as Node;
-      if (!by || !el || inTextField(e) || (t !== document.body && !el.contains(t)) || !places.current[by].length) return;
+      if (!by || !el || zoomed.current || inTextField(e) || (t !== document.body && !el.contains(t)) || !places.current[by].length) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       const other = by === "back" ? "fwd" : "back";
@@ -2018,8 +2094,8 @@ function ReaderView(p: Props & { reload: () => void }) {
       if (i >= 0) seekTo(words.time[i]!, true);
       return;
     }
-    // A link inside a highlight opens the link; the rest of the highlight opens its popup.
-    if ((e.target as Element).closest?.("a[href]")) return;
+    // A link or a figure inside a highlight opens the link or the figure; the rest of the highlight opens its popup.
+    if ((e.target as Element).closest?.("a[href], img")) return;
     const id = hitTest(ranges.current, e.clientX, e.clientY);
     const range = id && ranges.current.get(id);
     if (id && range) {
@@ -2850,6 +2926,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           onNotes={notes.apply}
         />
       ) : null}
+      {zoom && <FigureZoom fig={zoom} onClose={() => setZoom(null)} />}
     </div>
   );
 }
