@@ -2802,10 +2802,26 @@ journey("typing with an input method: Enter that picks a word neither sends an a
     Object.defineProperty(e, "keyCode", { get: () => 229 });
     el.dispatchEvent(e);
   };
-  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
-  await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+  // A question of its own, so nothing that ran before changes what it finds.
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const head = page.locator(".cp-head", { hasText: "Questions" });
+  const toggle = head.locator(".cp-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  const ask = "Does this work in kana?";
+  await head.getByRole("button", { name: "Ask a question" }).click();
+  const fresh = page.getByLabel("New question");
+  await fresh.fill(ask);
+  await fresh.evaluate(composingEnter);
+  await fresh.evaluate(imeEnter);
+  await page.waitForTimeout(300);
+  if ((await page.locator(".qp-line", { hasText: ask }).count()) || !(await fresh.isVisible())) throw new Error("a composing Enter added the question");
+  await page.keyboard.press("Enter");
+  const line = page.locator(".qp-line", { hasText: ask });
+  await line.waitFor();
+  await line.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Answer…" }).click();
-  const box = page.getByLabel("Your answer to Does this hold for kids?");
+  const box = page.getByLabel(`Your answer to ${ask}`);
   await box.fill("たぶん");
   await box.evaluate(composingEnter);
   await box.evaluate(imeEnter);
@@ -2813,13 +2829,14 @@ journey("typing with an input method: Enter that picks a word neither sends an a
   if ((await box.inputValue()) !== "たぶん" || (await page.getByRole("button", { name: "Edit: たぶん" }).count())) throw new Error("a composing Enter sent the answer");
   await box.fill("");
   await page.keyboard.press("Escape");
-  // A source of its own, so the note is empty whatever ran before.
+  // A source of its own to draw in, so its note is empty.
   await page.getByRole("button", { name: /^All sources/ }).click();
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# Words in other scripts\n\nA short page to draw beside.");
   await page.keyboard.press("Enter");
   await page.locator(".doc").getByText("A short page to draw beside.").waitFor();
   if (!(await page.locator(".mynotes").count())) await page.keyboard.press("n");
+  await page.getByRole("tab", { name: "Source note" }).click();
   const note = page.locator(".note-editor [contenteditable=true]").first();
   await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
   await page.keyboard.press("Meta+ArrowDown");
