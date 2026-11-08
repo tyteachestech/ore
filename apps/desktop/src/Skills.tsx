@@ -426,8 +426,8 @@ export function skillMade(skill: Skill, notify: Notify, onChanged: () => void, o
 
 const Check = () => <CheckIcon className="check" size={12} aria-hidden="true" />;
 
-/** Deleting a skill asks what happens to its sources (Tyler's call): kept by default, untagged, or
- *  archived when filed nowhere else. Cards always stay and keep reviewing. Enter deletes, Esc cancels. */
+/** Deleting a skill whose sources are filed nowhere else asks what happens to them (Tyler's call):
+ *  kept by default, untagged, or archived. With nothing to ask it deletes at once, with Undo. Cards always stay and keep reviewing. Enter deletes, Esc cancels. */
 export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   skill: Skill;
   /** Its sources, how many are filed under no other skill, and its archived ones (the delete takes it off them too). */
@@ -442,7 +442,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   const keepRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const choice = sources.all > 0 && sources.only > 0;
-  useFocusWhileMounted(choice ? keepRef : panelRef);
+  useFocusWhileMounted(keepRef);
   const n = (k: number) => `${k} source${k === 1 ? "" : "s"}`;
   const alsoArchived = sources.archived ? ` (and ${sources.archived} archived)` : "";
 
@@ -465,6 +465,16 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
       setBusy(false);
     }
   };
+
+  // Nothing to decide (no source would be left in no skill): it goes at once, with Undo, as every
+  // other delete does. The dialog is only for the Keep or Archive choice.
+  const once = useRef(false);
+  useEffect(() => {
+    if (choice || once.current) return;
+    once.current = true;
+    void remove();
+  }, []);
+  if (!choice) return null;
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onDone(false)}>
@@ -504,9 +514,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
               </span>
             </label>
           </fieldset>
-        ) : (
-          <p className="quiet">{sources.all ? `Its ${n(sources.all)}${alsoArchived} stay under their other skills.` : sources.archived ? `Only ${n(sources.archived)} in Archived are filed under it.` : "No sources are filed under it."}</p>
-        )}
+        ) : null}
         <p className="quiet">Its cards stay and keep coming up in review.</p>
         <div className="skill-edit-foot">
           <span className="right">

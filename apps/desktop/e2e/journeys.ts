@@ -4510,6 +4510,42 @@ journey("prequestions: a source added with --no-enrich offers to write them, nev
   }
 });
 
+journey("stacked Undo: each ⌘Z's toast comes to the front and names the source it put back", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const titles = () => page.locator(".list .row .title").allInnerTexts();
+  await until("All sources lists three sources", async () => (await titles()).length >= 3);
+  const before = await titles();
+  await page.locator(".list").focus();
+  await page.keyboard.press("ArrowDown");
+  for (const t of before.slice(0, 3)) {
+    await page.keyboard.press("a");
+    await until(`“${t}” is archived`, async () => !(await titles()).includes(t));
+  }
+  const front = () => page.locator(".toasts .toast").last().locator(".toast-msg").innerText();
+  await page.keyboard.press("Meta+z");
+  await until("the first ⌘Z names the last one archived", async () => (await front()) === `Undone: Archived “${before[2]}”`);
+  await page.keyboard.press("Meta+z");
+  await until("the second ⌘Z's toast is in front, naming the one it put back", async () => (await front()) === `Undone: Archived “${before[1]}”`);
+  await page.keyboard.press("Meta+z");
+  await until("all three are back", async () => (await titles()).length === before.length);
+});
+
+journey("delete skill: with nothing to decide it deletes at once, and ⌘Z puts it back (no Are you sure)", async (page) => {
+  const k = (await ore("skills", "add", "Knot tying")) as { id: string };
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Knot tying" }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: /^Delete skill/ }).click();
+    await page.locator(".toast-msg", { hasText: "Deleted Knot tying" }).waitFor();
+    if (await page.getByRole("alertdialog").count()) throw new Error("a dialog asked first, though Undo can take it back");
+    await until("the skill leaves the sidebar", async () => (await page.locator(".sidebar .side-item", { hasText: "Knot tying" }).count()) === 0);
+    await page.keyboard.press("Meta+z");
+    await page.locator(".sidebar .side-item", { hasText: "Knot tying" }).first().waitFor();
+  } finally {
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
 journey("delete skill: the dialog counts its archived sources too, since the delete takes the skill off them", async (page) => {
   const k = (await ore("skills", "add", "Woodworking")) as { id: string };
   const add = (text: string) =>
