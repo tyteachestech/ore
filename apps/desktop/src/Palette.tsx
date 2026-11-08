@@ -374,14 +374,15 @@ export const asksQuestion = (q: string) =>
 /** How well a title matches: every query word must appear in it, and a word that starts a title
  *  word counts more than one inside it (Linear, Raindrop). Letters scattered across a long title
  *  never match, which cmdk's fuzzy score allows. Accents fold ("cafe" finds Café, Raycast), a query
- *  with no letters (🔥) matches the titles that hold it, and the title that is the query ranks first. */
+ *  of emoji (🔥) matches the titles that hold it, and the title that is the query ranks first. */
 export function titleScore(title: string, query: string): number {
   const t = fold(title);
   const q = fold(query).trim();
   const exact = t.trim() === q ? 1 : 0;
   // A word keeps a trailing # or + (C#, C++, F#), or "c#" would match every title with a c-word.
   const terms = q.match(/[\p{L}\p{N}_]+[#+]*/gu) ?? [];
-  if (!terms.length) return q && t.includes(q) ? 1 + (t.startsWith(q) ? 0.5 : 0) + exact : 0;
+  // No letters: emoji (🔥) match the titles that hold them; punctuation alone (: . -) matches nothing.
+  if (!terms.length) return /\p{Extended_Pictographic}/u.test(q) && t.includes(q) ? 1 + (t.startsWith(q) ? 0.5 : 0) + exact : 0;
   let score = 0;
   for (const term of terms) {
     let i = t.indexOf(term);

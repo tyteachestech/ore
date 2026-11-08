@@ -37,6 +37,10 @@ test("a query of emoji or other non-letters matches the titles that hold it", ()
   expect(titleScore("Building effective agents", "🔥")).toBe(0);
 });
 
+test("punctuation alone matches nothing, so : . - never list every “Go to skill: …”", () => {
+  for (const q of [":", ".", "-", ": -", "&"]) expect(titleScore("Go to skill: AI - notes. & more", q)).toBe(0);
+});
+
 test("a title that is the query ranks above one that starts with it", () => {
   expect(titleScore("Spanish", "spanish")).toBeGreaterThan(titleScore("Spanish pronunciation", "spanish"));
   expect(titleScore("Café", "cafe")).toBeGreaterThan(titleScore("Cafe culture", "cafe"));
