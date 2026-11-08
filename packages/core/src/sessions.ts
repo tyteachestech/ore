@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { appendJsonl, deviceLog, readJsonl, visible, writeAtomic } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
+import { withLock } from "./lock.ts";
 import { readReviews } from "./reviews.ts";
 import { findCard } from "./cards.ts";
 import { loadParams, retrievability } from "./scheduler.ts";
@@ -52,24 +53,30 @@ export function readSessions(lib: Library): SessionReceipt[] {
 
 /** Opens an ended session again, so a rating taken back on the end screen (⌘Z) returns him to that
  *  session's cards; its next end writes a new receipt that replaces the first. */
-export function reopenSession(lib: Library, id: string): void {
-  const open = openSessionId(lib);
-  if (open && open !== id) throw new Error(`session ${open} is open; end it first`);
-  if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
-  writeAtomic(paths.openSession(lib), id);
+export function reopenSession(lib: Library, id: string): Promise<void> {
+  return withLock(paths.lock(lib), () => {
+    if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
+    // Another window's session open meanwhile (the quick quiz) stays the default; the app names its own.
+    if (!openSessionId(lib)) writeAtomic(paths.openSession(lib), id);
+  });
 }
 
-// The open session id lives in .ore/session; reviews attach to it.
+// The last session started lives in .ore/session: a review given no session attaches to it. Two windows
+// can each have one open (the main window and the quick quiz, D76), so the app names its own by id.
 export function openSessionId(lib: Library): string | null {
   const p = paths.openSession(lib);
   return existsSync(p) ? readFileSync(p, "utf8").trim() || null : null;
 }
 
-export function startSession(lib: Library, now = new Date()): SessionReceipt {
-  const r: SessionReceipt = { type: "start", id: ulid(now.getTime()), ts: nowIso(now) };
-  appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
-  writeAtomic(paths.openSession(lib), r.id);
-  return r;
+// Starting, ending and reopening read and write .ore/session under the library lock, so one window's
+// end never removes the pointer another window's start has just written.
+export function startSession(lib: Library, now = new Date()): Promise<SessionReceipt> {
+  return withLock(paths.lock(lib), () => {
+    const r: SessionReceipt = { type: "start", id: ulid(now.getTime()), ts: nowIso(now) };
+    appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
+    writeAtomic(paths.openSession(lib), r.id);
+    return r;
+  });
 }
 
 /** The first session end with reviews this week (Monday on, local time): where calibration shows, at most weekly (D69). */
@@ -80,9 +87,14 @@ export function firstEndThisWeek(lib: Library, now = new Date()): boolean {
   return readSessions(lib).filter((s) => s.type === "end" && (s.reviews ?? 0) > 0 && Date.parse(s.ts) >= monday.getTime() && Date.parse(s.ts) <= now.getTime()).length === 1;
 }
 
-export function endSession(lib: Library, now = new Date(), caughtUp = false): SessionReceipt {
-  const id = openSessionId(lib);
+/** Ends session `id` (the open one by default); the open file goes only when it names this session. */
+export function endSession(lib: Library, now = new Date(), caughtUp = false, which?: string): Promise<SessionReceipt> {
+  return withLock(paths.lock(lib), () => receipt(lib, now, caughtUp, which ?? openSessionId(lib)));
+}
+
+function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null): SessionReceipt {
   if (!id) throw new Error("no open session (ore session start)");
+  if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
   const own = readReviews(lib).filter((x) => x.session === id);
   // A card counts once, by its first answer this session; a relearn pass doesn't make it kept.
   const first = new Map([...own].reverse().map((x) => [x.card, x]));
@@ -110,6 +122,6 @@ export function endSession(lib: Library, now = new Date(), caughtUp = false): Se
     });
   const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
-  unlinkSync(paths.openSession(lib));
+  if (openSessionId(lib) === id) unlinkSync(paths.openSession(lib));
   return r;
 }

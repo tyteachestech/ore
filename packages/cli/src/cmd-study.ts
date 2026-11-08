@@ -86,12 +86,12 @@ export const studyCommands: Record<string, Command> = {
   },
 
   due: {
-    usage: "[--limit N] [--skill s]...    ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills",
-    options: { limit: { type: "string" }, skill: { type: "string", multiple: true } },
+    usage: "[--limit N] [--skill s]... [--all]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills; --all: every unseen draft, past the day's new-card limits",
+    options: { limit: { type: "string" }, skill: { type: "string", multiple: true }, all: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
       const picked = strs(f.skill);
-      const all = dueQueue(lib, new Date(), { skills: picked.length ? picked : undefined });
+      const all = dueQueue(lib, new Date(), { skills: picked.length ? picked : undefined, newLimit: !f.all });
       const limit = int(f.limit, "limit");
       if (limit !== undefined && limit < 0) throw new Error("--limit must be 0 or more"); // slice(0, -1) would drop the last
       const q = limit === undefined ? all : all.slice(0, limit);
@@ -242,18 +242,18 @@ export const studyCommands: Record<string, Command> = {
   },
 
   session: {
-    usage: "start|end|reopen <id>         review session receipts; reopen: an ended session again (an undo on its end screen)",
+    usage: "start|end [<id>]|reopen <id>  review session receipts; end: that session (the last one started by default); reopen: an ended session again (an undo on its end screen)",
     async run([sub, id]) {
       const lib = openLibrary();
       if (sub === "start") {
-        const r = startSession(lib);
+        const r = await startSession(lib);
         // Catch up on variants missed while the Mac slept (D8); this session shows the originals.
         startRemix(lib, cardsToRemix(lib, listCards(lib)));
         startCatchUp(lib);
         return { data: { id: r.id, ts: r.ts }, text: `Session ${r.id} started` };
       }
       if (sub === "end") {
-        const r = endSession(lib, new Date(), dueQueue(lib).length === 0);
+        const r = await endSession(lib, new Date(), dueQueue(lib).length === 0, id);
         snapshot(lib, { force: true });
         // Calibration on the week's first end screen only, never during a card (D69).
         const cal = (r.reviews ?? 0) > 0 && firstEndThisWeek(lib) ? calibration(readReviews(lib)) : null;
@@ -261,10 +261,10 @@ export const studyCommands: Record<string, Command> = {
         return { data, text: `Session ${r.id} ended (${r.reviews} reviews, ${r.kept} kept, ${r.rescued} rescued)` };
       }
       if (sub === "reopen") {
-        reopenSession(lib, need(id, "<id>"));
+        await reopenSession(lib, need(id, "<id>"));
         return { data: { id }, text: `Session ${id} reopened` };
       }
-      throw new Error("usage: ore session start|end|reopen <id>");
+      throw new Error("usage: ore session start|end [<id>]|reopen <id>");
     },
   },
 

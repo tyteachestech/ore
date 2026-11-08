@@ -60,19 +60,19 @@ describe("calibration (D69)", () => {
 
   test("shows on the week's first session end that had reviews", async () => {
     const { lib, cards } = await library(1);
-    startSession(lib);
-    endSession(lib); // left at once: no reviews
+    await startSession(lib);
+    await endSession(lib); // left at once: no reviews
     expect(firstEndThisWeek(lib)).toBe(false);
     // Reviews of one card are one review per millisecond (a repeated log line is dropped), so the
     // second is a millisecond later, as a fast machine could otherwise write both in the same one.
     const t = Date.now();
-    startSession(lib);
+    await startSession(lib);
     await recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, now: new Date(t) });
-    endSession(lib);
+    await endSession(lib);
     expect(firstEndThisWeek(lib)).toBe(true);
-    startSession(lib);
+    await startSession(lib);
     await recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, now: new Date(t + 1) });
-    endSession(lib);
+    await endSession(lib);
     expect(firstEndThisWeek(lib)).toBe(false);
   });
 });
@@ -133,7 +133,7 @@ describe("today (D60)", () => {
     const at = T();
     let t = today(lib, at);
     expect(t).toMatchObject({ due: 2, met: false, caught_up: false, active_ms: 0, goal_ms: 600_000, estimate_ms: 40_000 });
-    startSession(lib, at);
+    await startSession(lib, at);
     await recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, elapsed_ms: 10 * 60_000, now: at });
     t = today(lib, at);
     expect(t.active_ms).toBe(180_000);
@@ -142,7 +142,7 @@ describe("today (D60)", () => {
     t = today(lib, at);
     expect(t).toMatchObject({ caught_up: true, met: true, days_met: 1, new_today: 2 });
     expect(t.week.filter((d) => d.status === "met")).toHaveLength(1);
-    expect(endSession(lib, at, true)).toMatchObject({ reviews: 2, kept: 2, rescued: 0, caught_up: true });
+    expect(await endSession(lib, at, true)).toMatchObject({ reviews: 2, kept: 2, rescued: 0, caught_up: true });
   });
 
   test("new cards held back by the daily limit are counted, so caught up doesn't hide them (D65)", async () => {
@@ -158,10 +158,10 @@ describe("today (D60)", () => {
     const at = T();
     const first = await recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, now: at });
     await recordReview(lib, cards[1]!.meta.id, { rating: 3, confidence: 2, now: at });
-    startSession(lib, new Date(Date.parse(first.due_next)));
+    await startSession(lib, new Date(Date.parse(first.due_next)));
     await recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, now: new Date(Date.parse(first.due_next)) }); // on time
     await recordReview(lib, cards[1]!.meta.id, { rating: 3, confidence: 2, now: new Date(Date.parse(first.due_next) + 60 * 864e5) }); // two months late
-    expect(endSession(lib, new Date(Date.parse(first.due_next) + 61 * 864e5))).toMatchObject({ kept: 2, rescued: 1 });
+    expect(await endSession(lib, new Date(Date.parse(first.due_next) + 61 * 864e5))).toMatchObject({ kept: 2, rescued: 1 });
   });
 
   test("weekdays only: a weekend day is off", async () => {
@@ -230,10 +230,10 @@ describe("strength breakdown and peak level (D63)", () => {
     at = new Date((await recordReview(lib, id, { rating: 3, confidence: 2, now: at })).due_next);
     expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 0, growing: 1, ready: 1, ready_today: 1 });
     expect(skillStrength(lib, "learning", new Date(at.getTime() - 3 * 864e5))).toMatchObject({ ready: 1, ready_today: 0 }); // due in three days
-    startSession(lib, at);
+    await startSession(lib, at);
     await recordReview(lib, id, { rating: 3, confidence: 2, now: at });
     expect(skillStrength(lib, "learning")).toMatchObject({ solid: 1, growing: 0, ready: 0 });
-    expect(endSession(lib, at).cut).toEqual(["learning"]);
+    expect((await endSession(lib, at)).cut).toEqual(["learning"]);
   });
 
   test("the hook is his why, one line, set in skills.yaml", async () => {
