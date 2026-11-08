@@ -88,7 +88,48 @@ export function loadSkills(lib: Library): SkillsFile {
     const why = loadYaml().parseDocument(text).errors[0]?.message.split("\n")[0]?.replace(/:$/, "") ?? "it isn’t valid YAML";
     throw new Error(`skills.yaml in your library has a typo: ${why}. Fix it in a text editor.`);
   }
-  return SkillsFileSchema.parse(data);
+  return parseSkillsFile(data).file;
+}
+
+/** What `loadSkills` had to leave out of skills.yaml to read it, for `ore doctor`. */
+export const skillsFileProblems = (lib: Library): string[] => parseSkillsFile(parseYaml(readFileSync(paths.skills(lib), "utf8"))).dropped;
+
+// Fields a hand edit can get wrong without the skill itself being unreadable: each falls back to its
+// default (no colour, no icon, P2), so one typo like `color: violet` doesn't blank every screen.
+const LENIENT = new Set(["color", "icon", "priority", "hook", "goal", "collection"]);
+
+/** Reads skills.yaml's data, dropping fields a hand edit got wrong (named in `dropped`); a file that still
+ *  can't be read says which skill and field, with the fix, instead of zod's raw path. */
+function parseSkillsFile(data: unknown): { file: SkillsFile; dropped: string[] } {
+  if (data == null) throw new Error("skills.yaml in your library is empty. Restore it from the library's history, or run `ore init` in a new folder for a fresh one.");
+  const first = SkillsFileSchema.safeParse(data);
+  if (first.success) return { file: first.data, dropped: [] };
+  const copy = structuredClone(data) as Record<string, unknown>;
+  const dropped: string[] = [];
+  for (const issue of first.error.issues) {
+    const [top, n, field] = issue.path;
+    const skill = top === "skills" && typeof n === "number" ? ((copy.skills as Record<string, unknown>[])[n] as Record<string, unknown> | undefined) : undefined;
+    if (skill && typeof field === "string" && LENIENT.has(field)) {
+      dropped.push(`skill "${String(skill.name ?? skill.id ?? Number(n) + 1)}" has ${field} ${JSON.stringify(skill[field])}, which Ore can't use, so ${field === "priority" ? `${DEFAULT_PRIORITY} is used` : "it is left out"}`);
+      if (field === "priority") skill.priority = DEFAULT_PRIORITY;
+      else delete skill[field];
+    } else if ((top === "review" || top === "models") && typeof n === "string" && copy[top] && typeof copy[top] === "object") {
+      dropped.push(`${top}.${n} is ${JSON.stringify((copy[top] as Record<string, unknown>)[n])}, which Ore can't use, so the default is used`);
+      delete (copy[top] as Record<string, unknown>)[n];
+    } else if (top === "ai" && issue.path.length === 1) {
+      dropped.push(`ai is ${JSON.stringify(copy.ai)} (claude or codex), so claude is used`);
+      delete copy.ai;
+    }
+  }
+  const second = SkillsFileSchema.safeParse(copy);
+  if (second.success) return { file: second.data, dropped };
+  const issue = second.error.issues[0]!;
+  const [top, n, field] = issue.path;
+  const skill = top === "skills" && typeof n === "number" ? ((copy.skills as Record<string, unknown>[] | undefined)?.[n] as Record<string, unknown> | undefined) : undefined;
+  const where = skill && typeof skill === "object"
+    ? `skill ${Number(n) + 1}${typeof skill.name === "string" ? ` ("${skill.name}")` : typeof skill.id === "string" ? ` (id ${skill.id})` : ""} ${field ? `has no usable ${String(field)}` : "isn't a skill"}`
+    : top === "skills" ? "its skills: list is missing or not a list" : `${issue.path.join(".") || "the file"}: ${issue.message}`;
+  throw new Error(`skills.yaml in your library: ${where}. Fix it in a text editor.`);
 }
 
 // A card's priority is the highest priority among its skills.
@@ -112,8 +153,11 @@ const newSkillId = (skills: Skill[], name: string): string => {
   return id;
 };
 
+/** Names that read the same: case aside, and "é" typed (one letter) or from a Mac file name (e + accent). */
+const sameName = (a: string, b: string) => a.normalize("NFC").toLowerCase() === b.normalize("NFC").toLowerCase();
+
 export const matchSkill = (skills: Skill[], name: string): Skill | undefined =>
-  skills.find((s) => s.id === name.trim() || s.name.toLowerCase() === name.trim().replace(/\s+/g, " ").toLowerCase());
+  skills.find((s) => s.id === name.trim() || sameName(s.name, name.trim().replace(/\s+/g, " ")));
 
 // One emoji (flags and keycaps included), "mc:<file_name>" or "ph:<kebab-name>". Checked on write only, so a
 // hand-edited skills.yaml never stops loading; the app just doesn't draw an icon it can't read.
@@ -132,7 +176,7 @@ export async function setReviewSettings(lib: Library, patch: Partial<ReviewSetti
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
     for (const [k, v] of Object.entries(valid)) if (v !== undefined) doc.setIn(["review", k], v);
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
-    return { ...REVIEW_DEFAULTS, ...SkillsFileSchema.parse(doc.toJSON()).review };
+    return { ...REVIEW_DEFAULTS, ...parseSkillsFile(doc.toJSON()).file.review };
   });
 }
 
@@ -159,7 +203,7 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
     const name = look.name?.trim().replace(/\s+/g, " ");
     if (name !== undefined) {
       if (!name) throw new Error("a skill needs a name");
-      const other = loadSkills(lib).skills.find((s) => s.id !== id && s.name.toLowerCase() === name.toLowerCase());
+      const other = loadSkills(lib).skills.find((s) => s.id !== id && sameName(s.name, name));
       if (other) throw new Error(`skill "${other.name}" already exists`);
       node.set("name", name);
     }
@@ -221,11 +265,11 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
 // Create a skill Tyler named (D25), at the default priority, optionally in a sidebar collection.
 export async function addSkill(lib: Library, name: string, collection = ""): Promise<Skill> {
   return withLock(paths.lock(lib), () => {
-    const n = name.trim().replace(/\s+/g, " ");
+    const n = name.normalize("NFC").trim().replace(/\s+/g, " ");
     if (!n) throw new Error("a skill needs a name");
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
-    const skills = SkillsFileSchema.parse(doc.toJSON()).skills;
-    const existing = skills.find((s) => s.name.toLowerCase() === n.toLowerCase());
+    const skills = parseSkillsFile(doc.toJSON()).file.skills;
+    const existing = skills.find((s) => sameName(s.name, n));
     if (existing) throw new Error(`skill "${existing.name}" already exists`);
     const id = newSkillId(skills, n);
     const c = collection.trim();
@@ -306,9 +350,7 @@ export async function removeSkill(lib: Library, id: string, opts: { archive?: bo
     const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
     const i = list.items.findIndex((m) => m.get("id") === id);
     if (i < 0) throw new Error(`unknown skill "${id}"`);
-    const skill = SkillSchema.parse(list.items[i]!.toJSON());
-    list.items.splice(i, 1);
-    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    const skill = parseSkillsFile(doc.toJSON()).file.skills[i]!;
     const removed: RemovedSkill = { skill, at: i, items: [], cards: [], topics: [] };
     for (const item of allItems(lib)) {
       if (!item.meta.skills.includes(id)) continue;
@@ -326,6 +368,9 @@ export async function removeSkill(lib: Library, id: string, opts: { archive?: bo
       writeTopic({ ...t, meta: { ...t.meta, skills: t.meta.skills.filter((s) => s !== id) } });
       removed.topics.push(t.slug);
     }
+    // Last, so a run cut off midway leaves the skill still there: running it again finishes the job.
+    list.items.splice(i, 1);
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     return { skill, untagged: removed.items.length, archived: removed.items.filter((x) => x.archived).length, removed };
   });
 }

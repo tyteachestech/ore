@@ -217,20 +217,38 @@ export function findItem(lib: Library, ref: string): Item {
     const id = d.slice(-26);
     return id === key || id.startsWith(key) || id.endsWith(key);
   });
-  if (hits.length === 0) throw new Error(`no item matches "${ref}"`);
   if (hits.length > 1) throw new Error(`"${ref}" matches ${hits.length} items; use more of the id`);
-  return readItemDir(hits[0]!);
+  if (hits.length === 1) return readItemDir(hits[0]!);
+  // A folder renamed in Finder no longer ends in its id, but its doc.md still names it.
+  const renamed = readable(itemDirs(lib).filter((d) => !ID_END.test(d)), readItemDir).filter((i) => i.meta.id === key || i.meta.id.startsWith(key) || i.meta.id.endsWith(key));
+  if (renamed.length === 1) return renamed[0]!;
+  if (renamed.length > 1) throw new Error(`"${ref}" matches ${renamed.length} items; use more of the id`);
+  throw new Error(`no item matches "${ref}"`);
 }
+
+/** A folder named as Ore names it: `<slug>-<26-letter id>`. */
+export const ID_END = /-[0-9A-HJKMNP-TV-Z]{26}$/;
+
+/** One item per id: a copy Finder or iCloud made ("… 2", "… copy") lists once, as the folder ending in
+ *  the id; `ore doctor` names the copy. */
+const oncePerId = (items: Item[]): Item[] => {
+  const best = new Map<string, Item>();
+  for (const i of items) {
+    const had = best.get(i.meta.id);
+    if (!had || (!had.dir.endsWith(i.meta.id) && i.dir.endsWith(i.meta.id))) best.set(i.meta.id, i);
+  }
+  return items.filter((i) => best.get(i.meta.id) === i);
+};
 
 /** Every item, without archived ones unless `archived` (then only archived ones). Feed posts being
  *  previewed are never listed, unless `preview` (then only those). */
 export function listItems(lib: Library, opts: { archived?: boolean; preview?: boolean } = {}): Item[] {
-  return readable(itemDirs(lib), readItemDir).filter((i) => !!i.meta.preview === !!opts.preview && (opts.preview || !!i.meta.archived_at === !!opts.archived));
+  return oncePerId(readable(itemDirs(lib), readItemDir)).filter((i) => !!i.meta.preview === !!opts.preview && (opts.preview || !!i.meta.archived_at === !!opts.archived));
 }
 
 /** Live and archived sources in one read; with `preview`, the Feed's previews too. */
 export function allItems(lib: Library, opts: { preview?: boolean } = {}): Item[] {
-  return readable(itemDirs(lib), readItemDir).filter((i) => opts.preview || !i.meta.preview);
+  return oncePerId(readable(itemDirs(lib), readItemDir)).filter((i) => opts.preview || !i.meta.preview);
 }
 
 // Read-modify-write of item frontmatter under the library lock. Body untouched.

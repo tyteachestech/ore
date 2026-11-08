@@ -19,10 +19,20 @@ export function writeAtomic(path: string, content: string | Uint8Array): void {
   renameSync(tmp, path);
 }
 
-// One JSON object per line. O_APPEND keeps concurrent single-line appends intact.
+// One JSON object per line. O_APPEND keeps concurrent single-line appends intact. A file whose last line
+// lost its newline (a crash or a sync mid-write, an editor that drops the final newline) gets one first,
+// so the new record never joins that line and makes both unreadable.
 export function appendJsonl(path: string, record: object): void {
   mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, JSON.stringify(record) + "\n");
+  appendFileSync(path, (endsOpen(path) ? "\n" : "") + JSON.stringify(record) + "\n");
+}
+
+function endsOpen(path: string): boolean {
+  if (!existsSync(path)) return false;
+  // The whole file, not its last byte: the iPhone build's fs stand-in has no file handles, and a log is
+  // a month's or one source's lines, which every reader reads whole anyway.
+  const text = readFileSync(path, "utf8");
+  return text.length > 0 && !text.endsWith("\n");
 }
 
 export interface JsonlLine<T> {
@@ -92,6 +102,10 @@ export const readLog = <T>(path: string): T[] => logFiles(path).flatMap((f) => r
 export function errorLine(e: unknown): string {
   const issues = (e as { issues?: { path: PropertyKey[]; message: string }[] } | null)?.issues;
   if (Array.isArray(issues) && issues.length) return issues.map((i) => `${i.path.map(String).join(".") || "value"}: ${i.message}`).join("; ");
+  // A folder or file he (or a sync) made read-only: say where and what to check, not the raw EACCES with a temp name.
+  const code = (e as { code?: string } | null)?.code;
+  const path = (e as { path?: string } | null)?.path;
+  if ((code === "EACCES" || code === "EPERM") && path) return `Ore doesn’t have permission to use ${dirname(path)}: check its permissions in Finder › Get Info (Sharing & Permissions)`;
   return (e instanceof Error ? e.message : String(e)).split("\n")[0]!;
 }
 

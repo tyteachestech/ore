@@ -15,6 +15,14 @@ export function libraryRoot(explicit?: string): string {
 export function openLibrary(explicit?: string): Library {
   const root = libraryRoot(explicit);
   if (!existsSync(join(root, "skills.yaml"))) {
+    // A library that lost only its skills.yaml (iCloud hasn't downloaded it, a sync renamed it "skills 2.yaml")
+    // must not read as "no library": the app answers that with `ore init`, which would write a fresh one over his.
+    if (["items", "cards", "reviews", ".git"].some((d) => existsSync(join(root, d)))) {
+      const why = existsSync(join(root, ".skills.yaml.icloud"))
+        ? "iCloud hasn't downloaded it yet: open the folder in Finder to download it"
+        : "put it back (a synced copy may be named “skills 2.yaml”), or restore it from the library's history";
+      throw new Error(`skills.yaml is missing from your library at ${root}: ${why}`);
+    }
     throw new Error(`no library at ${root} (run \`ore init\`, or set ORE_LIBRARY)`);
   }
   return { root };

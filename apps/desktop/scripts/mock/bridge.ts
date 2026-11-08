@@ -33,7 +33,11 @@ Bun.serve({
     if (job) jobs.set(job, p);
     const [out, err, code] = [await new Response(p.stdout).text(), await new Response(p.stderr).text(), await p.exited];
     if (job) jobs.delete(job);
-    if (code !== 0) return new Response(JSON.stringify(err.trim().split("\n").pop() || "ore failed"), { status: 500, headers: h });
+    // As the app's one_line_error (src-tauri/src/main.rs): the "ore: …" line without its prefix, so code that reads an
+    // error's start (firstRun's "no library at") runs here as it does on the Mac.
+    const lines = err.split("\n").map((l) => l.trim()).filter(Boolean);
+    const line = lines.find((l) => l.startsWith("ore:"))?.slice(4).trim() ?? lines.pop();
+    if (code !== 0) return new Response(JSON.stringify(line || "ore failed"), { status: 500, headers: h });
     return new Response(out.trim() || "null", { headers: h });
   },
 });
