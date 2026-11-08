@@ -147,6 +147,15 @@ describe("tutor: the web", () => {
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("is not a page your web search returned");
   });
 
+  test("a quote of a page's title with quotes in it holds, though the search lists titles JSON-escaped", async () => {
+    const { lib } = await library();
+    const page = { url: "https://www.hackster.io/news/python-3-8-walrus", title: 'Python 3.8 Brings "Walrus Operator," Standardizes ABI' };
+    fakeClaude([{ web: searched([page], "Python 3.8 added assignment expressions."), out: { reply: "Python 3.8 [1].", citations: [{ passage: page.url, quote: page.title }], general: false, hint: false, exercise: null, card: null } }]);
+    const r = await tutor(lib, "When did the walrus operator arrive?");
+    expect(r.citations[0]).toMatchObject({ url: page.url, quote: page.title });
+    expect(sent()).toHaveLength(1);
+  });
+
   test("a quote is checked against its own page's results, and a link inside a fetched page isn't a page it returned", async () => {
     const { lib } = await library();
     const blog = { url: "https://blog.example.com/ebbinghaus", title: "A blog" };

@@ -99,6 +99,10 @@ export function partialReply(json: string): string | null {
 export type TutorProgress = { reply: string } | { searching: boolean };
 
 /** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
+/** What a quote from a web page is checked against: its title as the search gave it, then the results' text,
+ *  which lists titles JSON-escaped (a title with "quotes" in it reads \"quotes\" there). */
+const pageWords = (page: { title: string; text: string }) => `${page.title}\n${page.text}`;
+
 export async function tutor(lib: Library, message: string, { earlier = [], onProgress, ...focus }: { earlier?: TutorTurn[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
   const m = withDiagrams(lib, focus.item, message.trim());
   if (!m) throw new Error("message is empty");
@@ -134,7 +138,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
           // The retry is a fresh run that can't see this one's results, so the reason lists them.
           const returned = seen.pages.slice(0, 8).map((p) => p.url).join(", ") || "none: search first";
           if (!page) return `${c.passage} is not a page your web search returned (it returned ${returned}): cite one of those, or a passage`;
-          if (!locate(page.text, c.quote)) return `the quote "${c.quote}" is not in what the web search returned for ${page.url}: copy its exact words`;
+          if (!locate(pageWords(page), c.quote)) return `the quote "${c.quote}" is not in what the web search returned for ${page.url}: copy its exact words`;
           continue;
         }
         const p = byId.get(c.passage);
@@ -154,8 +158,8 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
     if (isWebUrl(c.passage)) {
       const page = web?.pages.find((p) => samePage(p.url, c.passage));
       const url = page?.url ?? c.passage.trim();
-      const at = page ? locate(page.text, c.quote) : null;
-      const quote = at ? page!.text.slice(at.start, at.end) : c.quote;
+      const at = page ? locate(pageWords(page), c.quote) : null;
+      const quote = at ? pageWords(page!).slice(at.start, at.end) : c.quote;
       // A fetched page has no title of its own here: "" (the app shows its site alone).
       return { n: i + 1, url, title: page?.title ?? "", site: new URL(url).hostname.replace(/^www\./, ""), quote, text: plainText(quote) };
     }
