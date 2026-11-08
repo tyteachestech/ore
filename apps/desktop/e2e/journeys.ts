@@ -282,6 +282,8 @@ journey("skill page Questions: each row is one Tab stop then its ⋯, and ↑ �
   if (!(await rows.nth(1).evaluate((b) => b === document.activeElement))) throw new Error("↓ didn't move to the next question");
   await page.keyboard.press("ArrowUp");
   if (!(await rows.first().evaluate((b) => b === document.activeElement))) throw new Error("↑ didn't move back");
+});
+
 journey("Tab shows a focus ring on a control whose hover is a fill (Home's gear)", async (page) => {
   await page.keyboard.press("Tab");
   const gear = page.locator(".home-gear").first();
