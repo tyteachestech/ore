@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { failures, loadTutorCases, summary, type TutorResult } from "../eval/tutor.ts";
+import { failures, loadTutorCases, summary, tally, unblind, type TutorResult } from "../eval/tutor.ts";
+import { loadPrompt, usePromptText } from "../src/ai/prompts.ts";
 import { withSteps } from "../src/ai/tutor.ts";
 
 const reply = (over: object = {}) => ({ reply: "Think about which box the hard cards go to?", hint: true, exercise: false, steps: 0, cited: 0, searched: false, ...over });
@@ -61,5 +62,18 @@ describe("tutor pedagogy eval", () => {
 
   test("judge checks are sentences about the reply", () => {
     for (const c of loadTutorCases()) for (const j of c.expect.judge ?? []) expect(j).toMatch(/^It .+\.$/);
+  });
+
+  test("a blind comparison maps the judge's A or B back to new or old, whichever side each was shown on", () => {
+    expect([unblind("A", false), unblind("B", false), unblind("A", true), unblind("B", true), unblind("same", true)]).toEqual(["new", "old", "old", "new", "same"]);
+    expect(tally([{ id: "a", pick: "new" }, { id: "b", pick: "old" }, { id: "b", pick: "old" }, { id: "c", pick: "same" }])).toEqual({ new: 1, old: 2, same: 1, old_won: ["b"] });
+  });
+
+  test("an older tutor prompt stands in for the comparison, then today's comes back", () => {
+    const today = loadPrompt("tutor").version;
+    usePromptText("tutor", "---\nname: tutor\nversion: 1\n---\nOld rules.");
+    expect(loadPrompt("tutor")).toMatchObject({ version: "tutor@1", text: "Old rules." });
+    usePromptText("tutor");
+    expect(loadPrompt("tutor").version).toBe(today);
   });
 });
