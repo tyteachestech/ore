@@ -20,7 +20,9 @@ const stem = (w: string) => w.replace(/(?<=\p{L}{3})(ing|ed|es|ly|s)$/u, "");
 
 export interface Passage { id: string; item: string; title: string; heading: string; text: string; start: number; end: number }
 
-/** A source's body cut into passages: paragraphs (short ones joined to the one before under the
+const LIST = /^\s*(?:[-*+]|\d+[.)])\s/;
+
+/** A source's body cut into passages: paragraphs (short ones, and a list with its lead-in, joined to the one before under the
  *  same heading), each with its heading and its place in doc.md. Page markers and bare images are left out. */
 export function splitPassages(body: string): Omit<Passage, "id" | "item" | "title">[] {
   const out: Omit<Passage, "id" | "item" | "title">[] = [];
@@ -32,7 +34,10 @@ export function splitPassages(body: string): Omit<Passage, "id" | "item" | "titl
     if (/^#{1,6}\s/.test(t) && !t.includes("\n")) { heading = t.replace(/^#+\s*/, "").replace(/\\/g, ""); continue; }
     if (/^<!--[^]*-->$/.test(t) || /^!\[[^\]]*\]\([^)]*\)$/.test(t)) continue;
     const last = out[out.length - 1];
-    if (last && last.heading === heading && last.text.split(/\s+/).length < 40) {
+    const words = last ? last.text.split(/\s+/).length : 0;
+    // A list item stays with the list and the line leading into it, up to a long passage.
+    const list = LIST.test(t) && !!last && (/:\s*$/.test(last.text) || LIST.test(last.text.slice(last.text.lastIndexOf("\n") + 1))) && words < 250;
+    if (last && last.heading === heading && (words < 40 || list)) {
       last.text = body.slice(last.start, end);
       last.end = end;
     } else out.push({ heading, text: t, start, end });

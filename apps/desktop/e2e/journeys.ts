@@ -260,6 +260,36 @@ journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources
   await page.keyboard.press("Escape");
 });
 
+journey("tutor citation: a numbered source in a reply opens that source at the quoted passage, marked", async (page) => {
+  // The reply cites a real passage of the seeded source, placed in its doc.md as the tutor places it.
+  const bridge = (args: string[]) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args }) }).then((r) => r.json());
+  const item = ((await bridge(["ls"])) as { id: string; title: string }[]).find((i) => i.title === TESTING)!;
+  const body = ((await bridge(["show", item.id])) as { body: string }).body;
+  const quote = "Each successful retrieval changes the memory itself.";
+  const start = body.indexOf(quote);
+  if (start < 0) throw new Error("the seeded source no longer holds the quote");
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"tutor",')) return route.fallback();
+    const cite = { n: 1, item: item.id, title: TESTING, heading: "", quote, text: quote, start, end: start + quote.length };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Retrieval changes the memory [1].", citations: [cite], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }) });
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("Why does testing work?");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: `Source 1: ${TESTING}` }).click();
+    await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+    const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
+    await until("the quoted passage is marked", async () => (await active()) === quote);
+  } finally {
+    await page.unroute(/\/ore$/); // a failure here mustn't answer later journeys' tutor calls
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("tutor @: typing @ lists skills and sources, Enter writes the name in, and the message goes out pointed at it", async (page) => {
   await page.keyboard.press("Meta+j");
   const field = page.getByRole("textbox", { name: "Message the tutor" });

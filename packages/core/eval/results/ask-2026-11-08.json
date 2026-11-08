@@ -1,0 +1,1057 @@
+{
+  "eval": "ask",
+  "date": "2026-11-08T02:57:54.302Z",
+  "set": "14649873",
+  "runs": [
+    {
+      "vendor": "claude",
+      "chat": "tutor",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@4",
+      "retrieval": "20/20",
+      "answer_accuracy": 0.95,
+      "answer_ci95": [
+        0.7638641064874331,
+        0.9911187805671268
+      ],
+      "citation_accuracy": 1,
+      "citation_ci95": [
+        0.8388698745050667,
+        1
+      ],
+      "answered": "19/20",
+      "cited": "20/20",
+      "says_absent": "5/9",
+      "errors": 0,
+      "wall_s": 35.5,
+      "cost_usd": 0.5378374999999999,
+      "input_tokens": 224634,
+      "output_tokens": 12760,
+      "cases": [
+        {
+          "id": "wiki-origin",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Your source credits Hermann Ebbinghaus, a German scientist, who first conceived of the method in the 1880s [1]. He drew the \"forgetting curve,\" a graph of how learned information is lost over time, and proposed that reviewing it at several intervals could curb that loss [1].\n\nOne caveat: the flashcard-box version came later. The Leitner system is the one your source describes [2], but it doesn't say who invented it or when.",
+          "cited": [
+            "web-wikipedia: The method of spaced repetition was first conceived of in the 1880s by German scientist [Hermann Ebbinghaus]",
+            "web-wikipedia: In the Leitner system, correctly answered cards are advanced to the next, less frequent box, while incorrectly answered cards return to the first box for more aggressive review and repetition."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 5005,
+          "usage": {
+            "input_tokens": 8047,
+            "output_tokens": 530,
+            "cost_usd": 0.037484
+          }
+        },
+        {
+          "id": "wiki-leitner-wrong",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "It goes back to the first box. In the Leitner system, a card you get wrong returns to the first box for more aggressive review and repetition [1]. A card you get right moves up to the next, less frequent box [1]. Each later box has a longer wait before you see its cards again [2].",
+          "cited": [
+            "web-wikipedia: incorrectly answered cards return to the first box for more aggressive review and repetition",
+            "web-wikipedia: correctly answered cards are advanced to the next, less frequent box",
+            "web-wikipedia: Each succeeding group has a longer period of time before the learner is required to revisit the cards."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 6992,
+          "usage": {
+            "input_tokens": 7945,
+            "output_tokens": 573,
+            "cost_usd": 0.037506000000000005
+          }
+        },
+        {
+          "id": "wiki-leitner-partitions",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "The partitions were 1, 2, 5, 8 and 14 cm. [1] In Leitner's original method, the size of each partition set the review schedule: a partition had to be full before you reviewed some of its cards, moving them forward or back depending on whether you remembered them. [2]",
+          "cited": [
+            "web-wikipedia: These were 1, 2, 5, 8 and 14 cm.",
+            "web-wikipedia: Only when a partition became full was the learner to review some of the cards it contained, moving them forward or back, depending on whether they remembered them."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4469,
+          "usage": {
+            "input_tokens": 8631,
+            "output_tokens": 428,
+            "cost_usd": 0.0388
+          }
+        },
+        {
+          "id": "wiki-pimsleur",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Pimsleur published these intervals in his 1967 paper: 5 seconds, 25 seconds, 2 minutes, 10 minutes, 1 hour, 5 hours, 1 day, 5 days, 25 days, 4 months, and 2 years [1]. Each step is roughly 5× the last, which is my own observation, not from your source. The very short early gaps are why it suits programmed audio instruction [2].",
+          "cited": [
+            "web-wikipedia: The intervals published in Pimsleur's paper were: 5 seconds, 25 seconds, 2 minutes, 10 minutes, 1 hour, 5 hours, 1 day, 5 days, 25 days, 4 months, and 2 years.",
+            "web-wikipedia: is particularly suited to programmed audio instruction due to the very short times (measured in seconds or minutes) between the first few repetitions"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 6029,
+          "usage": {
+            "input_tokens": 8401,
+            "output_tokens": 728,
+            "cost_usd": 0.04088
+          }
+        },
+        {
+          "id": "wiki-mace",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "It was *Psychology of Study* by C. A. Mace, in 1932. Your Spaced repetition source says the idea of using spacing to improve learning was first proposed there [1]. Mace suggested revision at gradually increasing intervals, roughly one day, two days, four days, eight days, and so on [1].",
+          "cited": [
+            "web-wikipedia: The notion that spaced repetition could be used for improving learning was first proposed in the book *Psychology of Study* by [C. A. Mace](https://en.wikipedia.org/wiki/Cecil_Alec_Mace \"Cecil Alec Mace\") in 1932",
+            "web-wikipedia: Acts of revision should be spaced in gradually increasing intervals, roughly intervals of one day, two days, four days, eight days, and so on."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 5461,
+          "usage": {
+            "input_tokens": 8005,
+            "output_tokens": 505,
+            "cost_usd": 0.0175387
+          }
+        },
+        {
+          "id": "wiki-spitzer",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Over 3,600 students. Spitzer tested them in 1939 on sixth-graders in Iowa who were learning science facts, and the results showed spaced repetition was effective [1].",
+          "cited": [
+            "web-wikipedia: Spitzer tested over 3600 students in Iowa and showed that spaced repetition was effective."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 3959,
+          "usage": {
+            "input_tokens": 8421,
+            "output_tokens": 343,
+            "cost_usd": 0.0175827
+          }
+        },
+        {
+          "id": "wiki-anki-fsrs",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "FSRS arrived in Anki with release 23.10 [1]. Your source's references point to the Anki 23.10 release notes, dated October 31, 2023 [2]. FSRS stands for Free Spaced Repetition Scheduler. It's also in RemNote, starting with release 1.16.",
+          "cited": [
+            "web-wikipedia: which is available in Anki starting with release 23.10",
+            "web-wikipedia: Damien, Elmes (October 31, 2023). [\"Anki Release 23.10\"](https://github.com/ankitects/anki/releases/tag/23.10)."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4195,
+          "usage": {
+            "input_tokens": 8571,
+            "output_tokens": 430,
+            "cost_usd": 0.0190527
+          }
+        },
+        {
+          "id": "python-namespace",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "A namespace is a mapping from names to objects. [1] Most are implemented as Python dictionaries, though you normally won't notice. Examples: the built-in names (like `abs()`), the global names in a module, and the local names in a function call. [2] The key point is that names in different namespaces are unrelated, so two modules can both define `maximize` without clashing, and you just prefix the module name. [3]\n\nWant to see how namespaces differ from scopes next?",
+          "cited": [
+            "web-python-docs: A *namespace* is a mapping from names to objects.",
+            "web-python-docs: Examples of namespaces are: the set of built-in names (containing functions such as [`abs()`](https://docs.python.org/3/builtins/functions.html#abs \"abs\"), and built-in exception names); the global names in a module; and the local names in a function invocation.",
+            "web-python-docs: The important thing to know about namespaces is that there is absolutely no relation between names in different namespaces"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4563,
+          "usage": {
+            "input_tokens": 7406,
+            "output_tokens": 565,
+            "cost_usd": 0.0157427
+          }
+        },
+        {
+          "id": "python-mangling",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Python does *name mangling* on it. Any identifier like `__spam` (at least two leading underscores, at most one trailing) is textually replaced with `_classname__spam`, where `classname` is the current class name with leading underscores stripped [1]. It happens for any such identifier written inside a class definition, wherever it appears [1]. The point is to avoid name clashes with names defined by subclasses [1].\n\nSo inside `class Foo`, `__spam` becomes `_Foo__spam`. It's not true privacy, though. A single underscore like `_spam` is only a convention for \"non-public\" [2].",
+          "cited": [
+            "web-python-docs: Any identifier of the form `__spam` (at least two leading underscores, at most one trailing underscore) is textually replaced with `_classname__spam`",
+            "web-python-docs: This mangling is done without regard to the syntactic position of the identifier, as long as it occurs within the definition of a class.",
+            "web-python-docs: namely to avoid name clashes of names with names defined by subclasses",
+            "web-python-docs: a name prefixed with an underscore (e.g. `_spam`) should be treated as a non-public part of the API"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 5311,
+          "usage": {
+            "input_tokens": 7937,
+            "output_tokens": 658,
+            "cost_usd": 0.0187967
+          }
+        },
+        {
+          "id": "python-stopiteration",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "It raises `StopIteration`. When there are no more elements, `__next__()` raises it, and that tells the `for` loop to terminate [1]. You can see it in the `Reverse` example, where `__next__` does `raise StopIteration` once `self.index == 0` [2].",
+          "cited": [
+            "web-python-docs: When there are no more elements, `__next__()` raises a [`StopIteration`](https://docs.python.org/3/builtins/exceptions.html#StopIteration \"StopIteration\") exception which tells the `for` loop to terminate.",
+            "web-python-docs: if self.index == 0:\n            raise StopIteration"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4318,
+          "usage": {
+            "input_tokens": 8200,
+            "output_tokens": 445,
+            "cost_usd": 0.017718699999999997
+          }
+        },
+        {
+          "id": "textbook-test-forms",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "The chapter says a test can take many forms, and the passage I can see lists two: **free recall**, where you write down all you remember [1], and **cued recall**, where you answer from a prompt or a question [2]. The list seems to continue past those two, but the rest isn't in the text I have, so check the section \"Testing beats rereading\" for the other forms.",
+          "cited": [
+            "pdf-textbook: **free recall** to write down all you remember;",
+            "pdf-textbook: **cued recall** to answer from a prompt or a question;"
+          ],
+          "answer_ok": false,
+          "citation_ok": true,
+          "ms": 4239,
+          "usage": {
+            "input_tokens": 7760,
+            "output_tokens": 413,
+            "cost_usd": 0.0156387
+          }
+        },
+        {
+          "id": "textbook-interleaving",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Interleaving is mixing different kinds of problems within one session, instead of doing all of one kind and then all of another [1]. Your chapter says it helps for the same reason spacing does, meaning practice spread over days beats cramming [2]. For example, rather than ten fraction problems and then ten decimal problems, you'd alternate between them.",
+          "cited": [
+            "pdf-textbook: Mixing kinds of problems in one session, called **interleaving**, helps for the same reason.",
+            "pdf-textbook: Practice spread over days beats the same practice crammed into one night."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4295,
+          "usage": {
+            "input_tokens": 6130,
+            "output_tokens": 418,
+            "cost_usd": 0.0091687
+          }
+        },
+        {
+          "id": "epub-week",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "About 25%. The book's table puts recall at 25% after 7 days, down from 58% after 1 day and 21% after 30 days [1]. The book's takeaway is that recall drops fast at first and then levels off, so the first review matters most [2].",
+          "cited": [
+            "epub: | 7 | 25% |",
+            "epub: Recall drops fast at first and then levels off, so the first review matters most."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4159,
+          "usage": {
+            "input_tokens": 7815,
+            "output_tokens": 386,
+            "cost_usd": 0.0155887
+          }
+        },
+        {
+          "id": "epub-gap",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "When the answer was remembered, the next gap is the old gap times 2.5. The function is `gap * 2.5 if remembered else 1` [1]. So a 2-day gap becomes 5 days. If he forgot, the gap resets to 1.",
+          "cited": [
+            "epub: return gap * 2.5 if remembered else 1"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4199,
+          "usage": {
+            "input_tokens": 7741,
+            "output_tokens": 393,
+            "cost_usd": 0.0153627
+          }
+        },
+        {
+          "id": "word-effect-size",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Your retrieval practice notes list retrieval practice at 0.61 and rereading at 0.13 [1]. So retrieval is nearly five times larger. The notes don't say what kind of effect size that is or which studies it comes from. The same notes explain the gap: testing yourself strengthens the memory trace and shows what you haven't learned yet [2].",
+          "cited": [
+            "word: | Retrieval practice | 0.61 |",
+            "word: Testing yourself beats rereading because each retrieval strengthens the memory trace and shows what you have not learned yet."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4276,
+          "usage": {
+            "input_tokens": 7505,
+            "output_tokens": 440,
+            "cost_usd": 0.0148887
+          }
+        },
+        {
+          "id": "slides-sleep",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "According to your notes in \"How memory works,\" consolidation happens during sleep. [1] That's all that note says so far, so it doesn't explain why sleep matters or what gets consolidated. Want to add a sub point on that?",
+          "cited": [
+            "powerpoint: Consolidation happens during sleep"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4444,
+          "usage": {
+            "input_tokens": 6932,
+            "output_tokens": 303,
+            "cost_usd": 0.0112267
+          }
+        },
+        {
+          "id": "slides-notes",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Your notes on Encoding say to start with the cocktail party example [1]. It fits the point right above it, that attention decides what gets in, so it works as an opener: you hear your own name across a noisy room because attention filtered it in.",
+          "cited": [
+            "powerpoint: Start with the cocktail party example."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 3765,
+          "usage": {
+            "input_tokens": 7666,
+            "output_tokens": 258,
+            "cost_usd": 0.013712700000000001
+          }
+        },
+        {
+          "id": "video-fight",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "The video's answer is short: \"we test ourselves and we space the tests out over days.\" [1] So two moves: self-testing (retrieving the idea instead of rereading) and spacing those tests over time. This matches the idea that Ebbinghaus, who made the forgetting curve, thought forgetting can be curbed by reviewing at several intervals. [2]",
+          "cited": [
+            "youtube-auto-captions: we test ourselves and we space the tests out over days",
+            "web-wikipedia: postulated that it can be curbed by reviewing such information at several intervals over a period of time."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 5149,
+          "usage": {
+            "input_tokens": 7385,
+            "output_tokens": 477,
+            "cost_usd": 0.014778699999999999
+          }
+        },
+        {
+          "id": "notebook-arange",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "It gives `array([0, 2, 4])` [1]. `np.arange(3)` makes `[0, 1, 2]`, and multiplying by 2 applies to every element at once, so you get `[0, 2, 4]` with no loop. That \"one value stretched across the whole array\" idea is what your source goes on to call broadcasting.",
+          "cited": [
+            "notebook: array([0, 2, 4])"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4076,
+          "usage": {
+            "input_tokens": 7303,
+            "output_tokens": 380,
+            "cost_usd": 0.013480700000000002
+          }
+        },
+        {
+          "id": "hazards-turing",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "That's Alan Turing's \"Computing Machinery and Intelligence\" from 1950. Your *How Memory Works* source mentions it as the article that asked whether machines can think. [1]",
+          "cited": [
+            "pdf-hazards: The idea goes back to Alan Turing’s 1950 article “Computing Machinery and Intelligence,” which asked whether machines can think."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4089,
+          "usage": {
+            "input_tokens": 8114,
+            "output_tokens": 352,
+            "cost_usd": 0.0164447
+          }
+        },
+        {
+          "id": "absent-mongolia",
+          "absent": true,
+          "found": false,
+          "answer": "The capital of Mongolia is Ulaanbaatar (also spelled Ulan Bator). It's also the country's largest city. This comes from my general knowledge, not from your sources, since nothing in your library covers it. Want me to turn it into a card?",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 3577,
+          "usage": {
+            "input_tokens": 5975,
+            "output_tokens": 303,
+            "cost_usd": 0.007398699999999999
+          }
+        },
+        {
+          "id": "absent-austen",
+          "absent": true,
+          "found": false,
+          "answer": "Jane Austen wrote *Pride and Prejudice*, published in 1813. It's none of your sources, so this is just from general knowledge. Are you reading it, or did it come up somewhere in your notes?",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 3976,
+          "usage": {
+            "input_tokens": 5976,
+            "output_tokens": 295,
+            "cost_usd": 0.0073227000000000006
+          }
+        },
+        {
+          "id": "absent-sleep-hours",
+          "absent": true,
+          "found": true,
+          "answer": "Your notes only say that consolidation happens during sleep [1]. They don't give a number of hours. From general knowledge: most adults do well with about 7 to 9 hours. Research points less to a magic total and more to getting full nights with enough deep sleep and REM, and to sleeping soon after you learn something. Short naps can help a bit too, but regular, complete nights matter most.",
+          "cited": [
+            "powerpoint: Consolidation happens during sleep"
+          ],
+          "answer_ok": false,
+          "citation_ok": false,
+          "ms": 4183,
+          "usage": {
+            "input_tokens": 8254,
+            "output_tokens": 308,
+            "cost_usd": 0.0165647
+          }
+        },
+        {
+          "id": "absent-caffeine",
+          "absent": true,
+          "found": false,
+          "answer": "Your sources don't say anything about caffeine, so this part comes from general knowledge, not from them. The evidence is mixed. Caffeine reliably boosts alertness and attention, which can help you learn when you're tired. Some studies suggest a dose taken *after* studying gives a small boost to consolidation, but the effect is modest and not consistent. Too much can backfire through anxiety and poor sleep, and sleep matters a lot for memory.\n\nWhat your sources do back is a different lever: spacing out your practice. Combining spaced repetition with the testing effect improves long-term memory. If you want, we can look at how that compares to something like caffeine. Which one are you more curious about?",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 5506,
+          "usage": {
+            "input_tokens": 8063,
+            "output_tokens": 379,
+            "cost_usd": 0.0165107
+          }
+        },
+        {
+          "id": "absent-leitner-birth",
+          "absent": true,
+          "found": true,
+          "answer": "Your passages don't give his birth year. They do say he devised the Leitner system in 1973 [1], and that he was a German science journalist who proposed it in the 1970s [2]. From general knowledge, I believe he was born in 1919 and died in 1989, but check that against a biography before you rely on it. Do you want a card on what the Leitner system is?",
+          "cited": [
+            "web-wikipedia: in 1973 [Sebastian Leitner](https://en.wikipedia.org/wiki/Sebastian_Leitner \"Sebastian Leitner\") devised his \" [Leitner system](https://en.wikipedia.org/wiki/Leitner_system \"Leitner system\") \"",
+            "web-wikipedia: proposed by the German science journalist"
+          ],
+          "answer_ok": false,
+          "citation_ok": false,
+          "ms": 4075,
+          "usage": {
+            "input_tokens": 7813,
+            "output_tokens": 412,
+            "cost_usd": 0.0158407
+          }
+        },
+        {
+          "id": "absent-ebbinghaus-born",
+          "absent": true,
+          "found": true,
+          "answer": "Hermann Ebbinghaus was born in 1850. That's from my own general knowledge, not your sources. None of your passages give his birth year. They only place his work in the 1880s, when spaced repetition was \"first conceived of in the 1880s\" [1]. So he was in his thirties when he did the forgetting-curve experiments.",
+          "cited": [
+            "web-wikipedia: first conceived of in the 1880s"
+          ],
+          "answer_ok": false,
+          "citation_ok": false,
+          "ms": 7283,
+          "usage": {
+            "input_tokens": 7610,
+            "output_tokens": 683,
+            "cost_usd": 0.0177387
+          }
+        },
+        {
+          "id": "absent-fsrs-default",
+          "absent": true,
+          "found": true,
+          "answer": "Your sources don't give a default desired retention for FSRS. The Spaced repetition article only places it among the algorithm families: \"the closely related FSRS (Free Spaced Repetition Scheduler), which is available in Anki starting with release 23.10\" [1].\n\nFrom what I know, outside your sources: Anki's FSRS setting defaults to 0.9, meaning you aim to recall about 90% of cards when they come due. Higher values give shorter intervals and more reviews. Lower values give longer intervals and more forgetting. Check your Anki version's docs to confirm, since defaults can change.",
+          "cited": [
+            "web-wikipedia: the closely related FSRS[^29] (*Free Spaced Repetition Scheduler*), which is available in Anki starting with release 23.10[^30]"
+          ],
+          "answer_ok": false,
+          "citation_ok": false,
+          "ms": 4933,
+          "usage": {
+            "input_tokens": 9132,
+            "output_tokens": 495,
+            "cost_usd": 0.0219467
+          }
+        },
+        {
+          "id": "absent-walrus",
+          "absent": true,
+          "found": false,
+          "answer": "Python 3.8 added the walrus operator (`:=`, assignment expressions), via PEP 572. It lets you assign and use a value in one expression, like `if (n := len(items)) > 10:`. Your passages don't cover this, so that's from general knowledge, not your sources.",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 3784,
+          "usage": {
+            "input_tokens": 8008,
+            "output_tokens": 323,
+            "cost_usd": 0.0157307
+          }
+        },
+        {
+          "id": "absent-python-lambda",
+          "absent": true,
+          "found": false,
+          "answer": "Your sources don't cover lambdas, so this is from general knowledge. Use the `lambda` keyword, then the parameters, a colon, and a single expression. The result is returned automatically:\n\n```python\nsquare = lambda x: x * x\nsquare(4)  # 16\n\nadd = lambda a, b=1: a + b\nsorted(words, key=lambda w: len(w))\n```\n\nIt's the same as a small `def`, but anonymous and limited to one expression (no statements). It's most handy for short throwaway functions, like a `key=` argument. Want to try writing one that sorts a list of tuples by their second item?",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 5532,
+          "usage": {
+            "input_tokens": 7888,
+            "output_tokens": 537,
+            "cost_usd": 0.017390700000000002
+          }
+        }
+      ]
+    },
+    {
+      "vendor": "codex",
+      "chat": "tutor",
+      "model": "gpt-6-astra",
+      "prompt_version": "tutor@4",
+      "retrieval": "20/20",
+      "answer_accuracy": 0.9,
+      "answer_ci95": [
+        0.6989617935882066,
+        0.9721341060158468
+      ],
+      "citation_accuracy": 1,
+      "citation_ci95": [
+        0.8388698745050667,
+        1
+      ],
+      "answered": "18/20",
+      "cited": "20/20",
+      "says_absent": "7/9",
+      "errors": 0,
+      "wall_s": 80,
+      "input_tokens": 826376,
+      "output_tokens": 4281,
+      "cases": [
+        {
+          "id": "wiki-origin",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Your source credits German scientist **Hermann Ebbinghaus**, in the **1880s**, with first conceiving spaced repetition.[1]",
+          "cited": [
+            "web-wikipedia: The method of spaced repetition was first conceived of in the 1880s by German scientist [Hermann Ebbinghaus](https://en.wikipedia.org/wiki/Hermann_Ebbinghaus \"Hermann Ebbinghaus\")."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 11965,
+          "usage": {
+            "input_tokens": 29028,
+            "output_tokens": 165
+          }
+        },
+        {
+          "id": "wiki-leitner-wrong",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "It goes back to the **first box**, where it gets reviewed more frequently.[1]",
+          "cited": [
+            "web-wikipedia: In the Leitner system, correctly answered cards are advanced to the next, less frequent box, while incorrectly answered cards return to the first box for more aggressive review and repetition."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 11662,
+          "usage": {
+            "input_tokens": 28950,
+            "output_tokens": 139
+          }
+        },
+        {
+          "id": "wiki-leitner-partitions",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "The five partitions were **1, 2, 5, 8, and 14 cm**.[1] A partition filling up triggered a review of some of its cards.[2]",
+          "cited": [
+            "web-wikipedia: These were 1, 2, 5, 8 and 14 cm.",
+            "web-wikipedia: Only when a partition became full was the learner to review some of the cards it contained, moving them forward or back, depending on whether they remembered them."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 12532,
+          "usage": {
+            "input_tokens": 29373,
+            "output_tokens": 185
+          }
+        },
+        {
+          "id": "wiki-pimsleur",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Pimsleur published these intervals: **5 seconds → 25 seconds → 2 minutes → 10 minutes → 1 hour → 5 hours → 1 day → 5 days → 25 days → 4 months → 2 years**.[1]",
+          "cited": [
+            "web-wikipedia: The intervals published in Pimsleur's paper were: 5 seconds, 25 seconds, 2 minutes, 10 minutes, 1 hour, 5 hours, 1 day, 5 days, 25 days, 4 months, and 2 years."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 12869,
+          "usage": {
+            "input_tokens": 29253,
+            "output_tokens": 197
+          }
+        },
+        {
+          "id": "wiki-mace",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "*Psychology of Study* by **C. A. Mace**, published in **1932**.[1]",
+          "cited": [
+            "web-wikipedia: The notion that spaced repetition could be used for improving learning was first proposed in the book *Psychology of Study* by [C. A. Mace](https://en.wikipedia.org/wiki/Cecil_Alec_Mace \"Cecil Alec Mace\") in 1932:"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 14083,
+          "usage": {
+            "input_tokens": 29045,
+            "output_tokens": 173
+          }
+        },
+        {
+          "id": "wiki-spitzer",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Spitzer tested **over 3,600 students** in Iowa.[1]",
+          "cited": [
+            "web-wikipedia: Spitzer tested over 3600 students in Iowa and showed that spaced repetition was effective."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 10232,
+          "usage": {
+            "input_tokens": 29264,
+            "output_tokens": 118
+          }
+        },
+        {
+          "id": "wiki-anki-fsrs",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Anki **23.10** added FSRS support.[1]",
+          "cited": [
+            "web-wikipedia: which is available in Anki starting with release 23.10[^30]"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 9586,
+          "usage": {
+            "input_tokens": 29365,
+            "output_tokens": 107
+          }
+        },
+        {
+          "id": "python-namespace",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "A namespace in Python connects names to the objects they refer to—a lookup of “this name means this object.”[1] Different namespaces keep names separate: two modules can each have a function called `maximize`, and you distinguish them by putting the module name first, such as `module_a.maximize` and `module_b.maximize`.[2]",
+          "cited": [
+            "web-python-docs: A *namespace* is a mapping from names to objects.",
+            "web-python-docs: The important thing to know about namespaces is that there is absolutely no relation between names in different namespaces; for instance, two different modules may both define a function `maximize` without confusion — users of the modules must prefix it with the module name."
+          ],
+          "answer_ok": false,
+          "citation_ok": true,
+          "ms": 11033,
+          "usage": {
+            "input_tokens": 28672,
+            "output_tokens": 227
+          }
+        },
+        {
+          "id": "python-mangling",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Python applies **name mangling**: it rewrites `__spam` as `_classname__spam`, stripping leading underscores from the class name. So inside `class Widget`, `__spam` becomes `_Widget__spam`.[1] This helps avoid name clashes with subclasses.[2]",
+          "cited": [
+            "web-python-docs: Any identifier of the form `__spam` (at least two leading underscores, at most one trailing underscore) is textually replaced with `_classname__spam`, where `classname` is the current class name with leading underscore(s) stripped.",
+            "web-python-docs: Since there is a valid use-case for class-private members (namely to avoid name clashes of names with names defined by subclasses), there is limited support for such a mechanism, called *name mangling*."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 12177,
+          "usage": {
+            "input_tokens": 29029,
+            "output_tokens": 263
+          }
+        },
+        {
+          "id": "python-stopiteration",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "It raises `StopIteration`, which tells the `for` loop to terminate.[1]",
+          "cited": [
+            "web-python-docs: When there are no more elements, `__next__()` raises a [`StopIteration`](https://docs.python.org/3/builtins/exceptions.html#StopIteration \"StopIteration\") exception which tells the `for` loop to terminate."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 9372,
+          "usage": {
+            "input_tokens": 29191,
+            "output_tokens": 148
+          }
+        },
+        {
+          "id": "textbook-test-forms",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "The excerpt names two forms:\n\n- **Free recall:** write down everything you remember.[1]\n- **Cued recall:** answer from a prompt or question.[2]",
+          "cited": [
+            "pdf-textbook: **free recall** to write down all you remember;",
+            "pdf-textbook: **cued recall** to answer from a prompt or a question;"
+          ],
+          "answer_ok": false,
+          "citation_ok": true,
+          "ms": 15668,
+          "usage": {
+            "input_tokens": 28901,
+            "output_tokens": 161
+          }
+        },
+        {
+          "id": "textbook-interleaving",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Interleaving means mixing different kinds of problems within one practice session.[1] For example, you could alternate between fraction, percentage, and algebra problems instead of doing all the fraction problems first.",
+          "cited": [
+            "pdf-textbook: Mixing kinds of problems in one session, called **interleaving**, helps for the same reason."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 9154,
+          "usage": {
+            "input_tokens": 27800,
+            "output_tokens": 139
+          }
+        },
+        {
+          "id": "epub-week",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "The book’s table shows **25% recalled after 7 days** without review.[1]",
+          "cited": [
+            "epub: | 7 | 25% |"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 7818,
+          "usage": {
+            "input_tokens": 26925,
+            "output_tokens": 116
+          }
+        },
+        {
+          "id": "epub-gap",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "When the answer was remembered, the next gap is **the previous gap × 2.5**.[1] For example, a 4-day gap becomes 10 days.",
+          "cited": [
+            "epub: return gap * 2.5 if remembered else 1"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8717,
+          "usage": {
+            "input_tokens": 28854,
+            "output_tokens": 140
+          }
+        },
+        {
+          "id": "word-effect-size",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Your notes list **0.61 for retrieval practice**[1] and **0.13 for rereading**.[2] The table doesn’t identify the effect-size measure or study, so these are the reported figures, with limited context.",
+          "cited": [
+            "word: | Retrieval practice | 0.61 |",
+            "word: | Rereading | 0.13 |"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 9377,
+          "usage": {
+            "input_tokens": 28664,
+            "output_tokens": 184
+          }
+        },
+        {
+          "id": "slides-sleep",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Consolidation happens during sleep, according to your notes.[1]",
+          "cited": [
+            "powerpoint: Consolidation happens during sleep"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 7573,
+          "usage": {
+            "input_tokens": 28359,
+            "output_tokens": 95
+          }
+        },
+        {
+          "id": "slides-notes",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Start with the **cocktail party example**—your speaker notes explicitly name it as the opener.[1]",
+          "cited": [
+            "powerpoint: Start with the cocktail party example."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 7614,
+          "usage": {
+            "input_tokens": 26798,
+            "output_tokens": 73
+          }
+        },
+        {
+          "id": "video-fight",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "The video gives two steps: **test yourself**, and **space those tests out over days**.[1]",
+          "cited": [
+            "youtube-auto-captions: [01:02] so how do we fight it we test ourselves and we space the tests out over days thanks for watching"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 9300,
+          "usage": {
+            "input_tokens": 28636,
+            "output_tokens": 152
+          }
+        },
+        {
+          "id": "notebook-arange",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "It gives `array([0, 2, 4])`.[1]",
+          "cited": [
+            "notebook: array([0, 2, 4])"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 9360,
+          "usage": {
+            "input_tokens": 28584,
+            "output_tokens": 136
+          }
+        },
+        {
+          "id": "hazards-turing",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "answer": "Alan Turing’s 1950 article “Computing Machinery and Intelligence.”[1]",
+          "cited": [
+            "pdf-hazards: The idea goes back to Alan Turing’s 1950 article “Computing Machinery and Intelligence,” which asked whether machines can think."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8157,
+          "usage": {
+            "input_tokens": 29108,
+            "output_tokens": 129
+          }
+        },
+        {
+          "id": "absent-mongolia",
+          "absent": true,
+          "found": false,
+          "answer": "The capital of Mongolia is Ulaanbaatar.",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8734,
+          "usage": {
+            "input_tokens": 25663,
+            "output_tokens": 72
+          }
+        },
+        {
+          "id": "absent-austen",
+          "absent": true,
+          "found": false,
+          "answer": "Jane Austen wrote *Pride and Prejudice*.",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 7562,
+          "usage": {
+            "input_tokens": 27690,
+            "output_tokens": 71
+          }
+        },
+        {
+          "id": "absent-sleep-hours",
+          "absent": true,
+          "found": true,
+          "answer": "For most adults, **7–9 hours a night** is a practical target—not a precise threshold where memory consolidation switches on or finishes. Your source says consolidation happens during sleep, but gives no number of hours.[1] The 7–9-hour range is general sleep guidance, not a memory-specific requirement established by your source.",
+          "cited": [
+            "powerpoint: Consolidation happens during sleep"
+          ],
+          "answer_ok": false,
+          "citation_ok": false,
+          "ms": 12112,
+          "usage": {
+            "input_tokens": 26883,
+            "output_tokens": 194
+          }
+        },
+        {
+          "id": "absent-caffeine",
+          "absent": true,
+          "found": true,
+          "answer": "Caffeine can help you feel more alert and pay attention, which can help you take in information. But its effects on memory itself are mixed—it isn’t a reliable shortcut to remembering what you study. Your supplied passages don’t discuss caffeine; they support combining spaced repetition with testing yourself to improve long-term memory.[1]",
+          "cited": [
+            "web-wikipedia: The [testing effect](https://en.wikipedia.org/wiki/Testing_effect \"Testing effect\") and spaced repetition can be combined to improve long-term memory."
+          ],
+          "answer_ok": false,
+          "citation_ok": false,
+          "ms": 14212,
+          "usage": {
+            "input_tokens": 28993,
+            "output_tokens": 269
+          }
+        },
+        {
+          "id": "absent-leitner-birth",
+          "absent": true,
+          "found": false,
+          "answer": "Sebastian Leitner was born in **1919**. That date isn’t in the passages you shared.",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8307,
+          "usage": {
+            "input_tokens": 28818,
+            "output_tokens": 82
+          }
+        },
+        {
+          "id": "absent-ebbinghaus-born",
+          "absent": true,
+          "found": false,
+          "answer": "Hermann Ebbinghaus was born in **1850**. That date isn’t in the supplied passages.",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 9409,
+          "usage": {
+            "input_tokens": 28748,
+            "output_tokens": 117
+          }
+        },
+        {
+          "id": "absent-fsrs-default",
+          "absent": true,
+          "found": false,
+          "answer": "FSRS commonly defaults to **90% desired retention**, including in Anki: it aims for a 90% chance of remembering a card when it comes due. Your supplied passages don’t state that default; this is general knowledge, and individual apps can choose a different setting.",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 13333,
+          "usage": {
+            "input_tokens": 29769,
+            "output_tokens": 174
+          }
+        },
+        {
+          "id": "absent-walrus",
+          "absent": true,
+          "found": false,
+          "answer": "Python **3.8** added the walrus operator (`:=`), which assigns a value within an expression.",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 7853,
+          "usage": {
+            "input_tokens": 27026,
+            "output_tokens": 91
+          }
+        },
+        {
+          "id": "absent-python-lambda",
+          "absent": true,
+          "found": false,
+          "answer": "Use `lambda arguments: expression` to create a small function. Python returns the expression’s value automatically—no `return` needed.\n\n```python\ndouble = lambda x: x * 2\nprint(double(5))  # 10\n```\n\nA lambda can take multiple arguments, as in `lambda x, y: x + y`, but its body must be a single expression.",
+          "cited": [],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 10667,
+          "usage": {
+            "input_tokens": 28987,
+            "output_tokens": 164
+          }
+        }
+      ]
+    }
+  ]
+}
