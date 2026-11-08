@@ -74,7 +74,7 @@ const PLAYLIST = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/playlist\?/;
 const PODCAST = /^https?:\/\/(?:podcasts\.apple\.com\/.+[?&]i=|open\.spotify\.com\/episode\/|overcast\.fm\/|pca\.st\/)/;
 const X_POST = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/\w+\/status\//;
 /** File types Ore reads, by extension. */
-export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
+export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html", "htm", "docx", "pptx", "rtf", "ipynb", "srt", "vtt", "png", "jpg", "jpeg", "heic", "tiff", "webp", "gif", "mp3", "m4a", "wav", "aac", "aiff", "flac", "mp4", "mov", "m4v"];
 /** Audio transcribed on the Mac (D96); as `audio.ts` AUDIO_TYPES, which loads only when used. */
 const AUDIO_TYPES = ["mp3", "m4a", "wav", "aac", "aiff", "flac"];
 /** Video files, heard from their sound on the Mac; as `audio.ts` VIDEO_TYPES. */
@@ -134,6 +134,10 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     const o = await Promise.resolve().then(() => (kind === "docx" ? office.docxToDoc(bytes) : office.pptxToDoc(bytes))).catch(damaged(kind === "docx" ? "Word" : "PowerPoint", kind === "docx" ? "Word or Pages" : "PowerPoint or Keynote"));
     return { type: "article", title: o.title ?? fileStem(name), author: o.author, url, body: o.body, source: { ext: kind, data: bytes }, assets: o.assets };
   }
+  if (kind === "rtf") {
+    const r = (await import("./rtf.ts")).rtfToDoc(bytes);
+    return { type: "article", title: r.title ?? fileStem(name), author: r.author, published: r.published, url, body: r.body, source: { ext: "rtf", data: bytes }, assets: r.assets };
+  }
   const text = decodeText(bytes);
   if (kind === "ipynb") {
     const n = (await import("./notebook.ts")).notebookToDoc(text);
@@ -177,6 +181,7 @@ function kindOf(name: string, ctype = ""): string | null {
   if (ctype.includes("epub") || ext === "epub") return "epub";
   if (ctype.includes("wordprocessingml") || ext === "docx") return "docx";
   if (ctype.includes("presentationml") || ext === "pptx") return "pptx";
+  if (/\brtf\b/.test(ctype) || ext === "rtf") return "rtf";
   if (["ipynb", "srt", "vtt"].includes(ext)) return ext;
   if (IMAGE_TYPES.includes(ext) || AUDIO_TYPES.includes(ext)) return ext;
   const audio = ctype.match(/^audio\/(mpeg|mp3|mp4|x-m4a|aac|wav|x-wav|flac|aiff)/)?.[1];
@@ -303,16 +308,28 @@ async function readme(url: string, owner: string, repo: string): Promise<NewItem
   throw new Error(`Couldn’t find a README in ${owner}/${repo}. Check the link, or open the file you want on GitHub and add that link instead.`);
 }
 
+/** Files only their own app reads, refused with how to save a copy Ore does read (D96). Pages and
+ *  Keynote keep their text in Apple's private format; Word's pre-2007 .doc is a binary one. */
+function exportFirst(ext: string): string | null {
+  const apple = { pages: ["Pages", "Word"], key: ["Keynote", "PowerPoint"], numbers: ["Numbers", "Excel"] }[ext];
+  if (apple) return `Ore can’t read ${apple[0]} files. Open it in ${apple[0]} and choose File › Export To › ${apple[1]}, then add that file.`;
+  if (["mobi", "azw", "azw3", "kfx"].includes(ext)) return "That’s a Kindle book, which Ore can’t read. If it isn’t locked to Kindle, convert it to EPUB (Calibre does this for free) and add that.";
+  if (ext === "doc") return "That’s an older Word file (.doc). Open it in Word or Pages and choose File › Save As, as a .docx, then add that file.";
+  return null;
+}
+
 async function fromFile(path: string, opts: AddOptions, input = path): Promise<NewItem> {
   if (!existsSync(path)) {
     // "example.com/post" typed without its scheme reads as a path; say how to add it as the link it is.
     const site = /^[\w-]+(\.[\w-]+)*\.[a-z]{2,}(\/|$)/i.test(input) && !kindOf(input.split("/")[0]!) ? ` For a web page, add its full link: https://${input}` : " Check the path, or drag the file in instead.";
     throw new Error(`There’s no file at ${path}.${site}`);
   }
-  const stat = statSync(path);
-  if (stat.isDirectory()) throw new Error("That’s a folder. Open it and add the files inside instead.");
   // Finder's own files (.DS_Store, AppleDouble ._ copies) ride along when a folder's files are dropped.
   if (/^(\.DS_Store|\._.*|Icon\r)$/.test(basename(path))) throw new Error(`“${basename(path)}” is a file Finder keeps for itself, not something to read. Add the file you meant instead.`);
+  const exported = exportFirst(extname(path).slice(1).toLowerCase());
+  if (exported) throw new Error(exported);
+  const stat = statSync(path);
+  if (stat.isDirectory()) throw new Error("That’s a folder. Open it and add the files inside instead.");
   const ext = extname(path).slice(1).toLowerCase();
   if (VIDEO_TYPES.includes(ext) && !opts.type) {
     // A lecture recording or a downloaded course video: heard from its sound where it lies, never
@@ -369,7 +386,7 @@ async function keep(lib: Library, had: Item, opts: AddOptions): Promise<Item & K
 /** Whether a link reads best by fetching it (a video's transcript, a GitHub file, a PDF), not from the
  *  page a browser shows. */
 const readsByLink = async (url: string) =>
-  isYoutubeUrl(url) || VIDEO_SITE.test(url) || !!(await import("./links.ts")).rewrite(url) || /\.(pdf|epub|docx|pptx|ipynb)(?:[?#]|$)/i.test(url);
+  isYoutubeUrl(url) || VIDEO_SITE.test(url) || !!(await import("./links.ts")).rewrite(url) || /\.(pdf|epub|docx|pptx|rtf|ipynb)(?:[?#]|$)/i.test(url);
 
 /** The page open in his browser as a source (D96): signed-in, paywalled and browser-built pages come
  *  in as he sees them. A link Ore reads better by fetching (a video, a PDF) is added by its link. */
