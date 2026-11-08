@@ -48,6 +48,8 @@ Both on the big library with tutor@6 (`results/ask-2026-11-08-8.json`, `-9.json`
 
 Haiku costs about a seventh as much and teaches as well, but cites less exactly (a quote from the wrong part of a passage, one of two sources left uncited, a turn that claimed the video's transcript wasn't there) and was slower in this run (the eval doesn't record why; a failed quote check sending it back for a second round is the likely cost). The tutor stays on Sonnet; Settings › AI › Model switches it.
 
+A web answer takes about 10 s, most of it the search itself. Leaving out WebFetch (search results only) didn't make it faster (11.7 s against 10.4 s on the golden library, 2026-11-08) and cost more, so the tutor keeps both.
+
 ## Limits
 
 - 34 answerable questions over 11 docs, all written for this eval; the paraphrases were written knowing the passages, so they are milder than his real questions. At scale the distractors are seed-big's generated sources, which repeat their topic's words more than real writing does; a real library of his would be the better test.
