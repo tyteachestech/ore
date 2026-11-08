@@ -1079,7 +1079,7 @@ body.resizing iframe { pointer-events: none; }
 .cp-head { display: flex; align-items: center; margin: 0 0 2px; }
 .cp-head .icon-btn { width: 20px; height: 20px; margin-left: auto; opacity: 0; }
 .cp-head:hover .icon-btn, .cp-head .icon-btn:focus-visible, .cp-head .icon-btn[aria-expanded="true"] { opacity: 1; }
-.cp-toggle { display: flex; align-items: center; gap: 6px; padding: 2px 4px; margin-left: -4px; border-radius: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--faint); }
+.cp-toggle { display: flex; align-items: center; gap: 6px; padding: 2px 4px; margin-left: -4px; border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--faint); }
 .cp-toggle:hover { color: var(--muted); }
 .cp-toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .cp-caret { transition: transform 120ms ease-out; }
@@ -1365,7 +1365,8 @@ button.skill-badge:hover { filter: brightness(1.2); }
 .fold-action { display: contents; }
 .fold-head .caret { flex: none; color: var(--faint); transform: rotate(90deg); transition: transform 0.12s ease; }
 .fold-head[aria-expanded="false"] .caret { transform: none; }
-.fold-head.caret-only { flex: none; width: 22px; justify-content: center; margin-right: -4px; }
+/* The caret sits on the rule's start and the icon after it, as in a fold whose whole head is the button. */
+.fold-head.caret-only { flex: none; width: auto; margin-right: -4px; }
 .fold-fill { flex: 1; }
 .fold-sum { margin-left: auto; display: flex; gap: 10px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fold-body { margin: 0 -6px; }
@@ -1485,12 +1486,16 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .hint-lines { display: flex; flex-direction: column; gap: 2px; }
 /* The hover actions stop short of the lead mark, so it stays under the pointer. */
 .skill-col.side .question:has(.q-lead) .question-actions { right: 32px; }
-.skill-col.side .question-actions { position: absolute; top: 50%; translate: 0 -50%; right: 4px; margin: 0; padding: 2px; border-radius: 6px; background: var(--bg-raised); border: 1px solid var(--border); visibility: hidden; }
+.skill-col.side .question-actions { position: absolute; top: 50%; translate: 0 -50%; right: 4px; margin: 0; padding: 2px; border-radius: 6px; background: var(--bg-hover); visibility: hidden; }
+.skill-col.side .question { border-radius: 8px; }
+.skill-col.side .question:hover { background: var(--bg-hover); }
+.skill-col.side .question-quote:hover { background: none; }
 .skill-col.side .question:hover .question-actions, .skill-col.side .question:focus-within .question-actions { visibility: visible; }
 .skill-col.side .question-actions button { border-color: transparent; }
 .question-quote:hover { background: var(--bg-hover); }
 .question-quote .exact { display: block; color: var(--text-read); line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .question-quote .note { display: block; color: var(--text); margin-top: 2px; }
+.question-quote .note.passage { color: var(--muted); }
 .question-quote .from { display: block; color: var(--faint); font-size: 12px; margin-top: 2px; }
 .question.done .exact, .question.done .note { color: var(--faint); }
 .question-actions { display: flex; gap: 6px; margin: 0 0 6px; }
@@ -1861,7 +1866,6 @@ button.home-plan:hover { color: var(--text); }
 .ring svg { display: block; }
 .ring-fill { transition: stroke-dashoffset 600ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .ring-burst { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); animation: ring-burst 700ms ease-out 550ms 1 both; }
-.ring.met .ring-fill { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c-green) 45%, transparent)); }
 @keyframes ring-burst { from { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); } to { transform: scale(1.25); opacity: 0; box-shadow: 0 0 0 14px transparent; } }
 
 /* Review (D59): one card centred, the session bar on top, the keys at the foot. */
@@ -1914,6 +1918,7 @@ button.home-plan:hover { color: var(--text); }
 .review-passage figcaption span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-passage figcaption button { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 6px; color: var(--muted); }
 .review-passage figcaption button:hover, .review-passage figcaption button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
+.review-passage figcaption button:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
 .review-quotes { display: flex; align-items: center; gap: 6px; margin: 0 -8px; }
 .review-quotes blockquote { flex: 1; min-width: 0; min-height: calc(1.55em * 2); -webkit-line-clamp: 4; }
 .review-quotes button { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--muted); }
@@ -2170,7 +2175,7 @@ button.home-plan:hover { color: var(--text); }
 .settings-row + .settings-row { border-top: 1px solid var(--border); }
 .settings-row-text { flex: 1; min-width: 0; }
 .settings-row-text > span, .settings-row-text > label { display: block; color: var(--text); font-weight: 500; }
-.settings-row-text p { margin: 2px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; }
+.settings-row-text p { margin: 2px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; text-wrap: pretty; }
 .settings-row-control { flex: none; display: flex; align-items: center; gap: 10px; max-width: 55%; min-width: 0; }
 .settings-row-control .seg-item { min-width: 34px; height: 24px; padding: 0 9px; }
 .seg[data-disabled] { opacity: 0.5; }
