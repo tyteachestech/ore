@@ -152,7 +152,7 @@ export function Home({ items, empty, skills, recent, reload, onReview, onOpenSou
               <Ring value={today.goal_ms ? today.active_ms / today.goal_ms : 0} met={today.met} size={92} label={`${minutes(today.active_ms)} of ${today.goal_minutes} minutes today`} />
               <div className="home-goal-text">
                 <h1>
-                  <Roll id="goal" value={minutesText(today.active_ms)} /> <span>of {today.goal_minutes} min</span>
+                  <Roll id="goal" value={minutesText(today.active_ms)} /> <span className="goal-of">of {today.goal_minutes} min</span>
                 </h1>
                 {/* Today's slice, not the pile (D65): the full count waits in the hint. */}
                 {today.due > 0 ? (

@@ -95,6 +95,16 @@ async function until(what: string, ok: () => Promise<boolean>, ms = 5000) {
 
 // —— journeys ——
 
+journey("Home: today's minutes are the big number, and the goal ring stands unframed", async (page) => {
+  await page.locator(".home-goal h1 .roll").waitFor();
+  const look = await page.evaluate(() => {
+    const css = (sel: string) => getComputedStyle(document.querySelector(sel)!);
+    return { minutes: css(".home-goal h1 .roll").fontSize, unit: css(".home-goal h1 > span:not(.roll)").fontSize, ring: css(".home-goal .ring").boxShadow };
+  });
+  if (look.minutes !== "24px" || look.unit !== "15px") throw new Error(`goal number ${look.minutes}, unit ${look.unit}`);
+  if (look.ring !== "none") throw new Error(`goal ring framed: ${look.ring}`);
+});
+
 journey("add pasted text: it opens in the reader", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# Interleaving in practice\n\nMixing problem types forces you to choose a strategy each time, which is what a test asks of you. Blocked practice feels smoother but teaches less.");
