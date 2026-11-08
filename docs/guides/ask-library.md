@@ -1,6 +1,6 @@
 # Ask your library
 
-The tutor (D128, ⌘J) answers Tyler's questions from his own sources. Each claim carries a numbered citation; clicking it opens the source with the quoted passage marked. When his sources don't hold the answer, the reply says so, then searches the web for a specific fact and cites the pages the same way (D137; a click opens the page), or answers a general explanation from what it knows, labelled "Not from your sources". `ore ask-library` is the same search with a stricter prompt that answers only from the library or says it can't.
+The tutor (D128, ⌘J) answers Tyler's questions from his own sources. Each claim carries a citation, a small pill named for its source with the quote on hover (D139); clicking it opens the source with the quoted passage marked. When his sources don't hold the answer, the reply says so, then searches the web for a specific fact and cites the pages the same way (D137; a click opens the page), or answers a general explanation from what it knows, labelled "Not from your sources". `ore ask-library` is the same search with a stricter prompt that answers only from the library or says it can't.
 
 ```bash
 bun run eval:ask                       # the tutor, Claude and Codex; spends AI usage, never in CI

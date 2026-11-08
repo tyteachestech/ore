@@ -1,4 +1,6 @@
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { ArrowUp, Check, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
+import { citeRuns, siteName } from "./cite-pills";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -429,35 +431,62 @@ function marked(text: string, mentions: Mention[]) {
   return text.split(re).map((part, i) => (names.includes(part) ? <span key={i} className="tutor-at">{part}</span> : part));
 }
 
-/** A reply in Markdown: each [n] a small button that opens the cited passage, or the web page in the
- *  browser, and the sources under it (Perplexity's numbered sources, a page by its site). A reply from
- *  general knowledge says so. */
+/** A reply in Markdown, cited as ChatGPT's desktop app cites: each run of [n] markers one small pill
+ *  named for its source ("britannica", "How spaced repetition works", "+1" for a second), its passage or
+ *  page on hover, opened on click (his source at the quote, a page in the browser). The full list waits
+ *  behind "Sources" under the reply. A reply from general knowledge says so. */
 function Answer({ text, citations, general, onOpen, onLink }: { text: string; citations: AnyCitation[]; general?: boolean; onOpen: (item: string, at: string) => void; onLink: (url: string) => void }) {
+  const [listed, setListed] = useState(false);
   const open = (c: AnyCitation) => ("url" in c ? onLink(c.url) : onOpen(c.item, `q:${c.start}:${c.end}`));
+  const name = (c: AnyCitation) => ("url" in c ? siteName(c.site) : c.title);
+  const where = (c: AnyCitation) => ("url" in c ? c.site : c.heading ? `Your source › ${c.heading}` : "Your source");
   return (
     <>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ href, children }) => {
-            const c = href?.startsWith("#cite-") ? citations.find((x) => x.n === Number(href.slice(6))) : undefined;
-            return c ? (
-              <button className="cite" aria-label={`Source ${c.n}: ${"url" in c ? (c.title ? `${c.title} (${c.site})` : c.site) : c.title}`} onClick={() => open(c)}>{c.n}</button>
-            ) : (
-              <span>{children}</span>
+            const run = href?.startsWith("#cite-") ? href.slice(6).split(",").map((n) => citations.find((x) => x.n === Number(n))).filter((c): c is AnyCitation => !!c) : [];
+            // The same source cited twice in a run is one source.
+            const cs = run.filter((c, i) => run.findIndex((x) => name(x) === name(c)) === i);
+            if (!cs.length) return <span>{href?.startsWith("#cite-") ? null : children}</span>;
+            return (
+              <Tooltip.Root delayDuration={150}>
+                <Tooltip.Trigger asChild>
+                  <button className="cite" aria-label={cs.map((c) => `Source ${c.n}: ${"url" in c ? (c.title ? `${c.title} (${c.site})` : c.site) : c.title}`).join("; ")} onClick={() => open(cs[0]!)}>
+                    <span className="cite-name">{name(cs[0]!)}</span>
+                    {cs.length > 1 && <span className="cite-more">+{cs.length - 1}</span>}
+                  </button>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content className="cite-card" side="top" align="start" sideOffset={6} collisionPadding={8}>
+                    {cs.map((c) => (
+                      <button key={c.n} onClick={() => open(c)}>
+                        <span className="cite-where">{where(c)}</span>
+                        <span className="cite-title">{c.title || ("url" in c ? c.site : "")}</span>
+                        <span className="cite-quote">{c.text}</span>
+                      </button>
+                    ))}
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
             );
           },
         }}
       >
-        {text.replace(/\[(\d+)\](?!\()/g, "[$1](#cite-$1)")}
+        {citeRuns(text)}
       </ReactMarkdown>
       {general && <p className="tutor-general">Not from your sources</p>}
       {!!citations.length && (
+        <button className="tutor-sources" aria-expanded={listed} onClick={() => setListed(!listed)}>
+          Sources
+        </button>
+      )}
+      {listed && (
         <ol className="library-sources">
           {citations.map((c) => (
             <li key={c.n}>
               <button onClick={() => open(c)}>
-                <span className="library-n">{c.n}</span>
                 <span className="library-src">
                   <span className="library-title">
                     {/* A page leads with its site, so a long title can't hide that it is from the web (Perplexity). */}
@@ -465,7 +494,7 @@ function Answer({ text, citations, general, onOpen, onLink }: { text: string; ci
                     {c.title}
                     {!("url" in c) && c.heading && <span className="sub"> › {c.heading}</span>}
                   </span>
-                  <span className="library-quote">“{c.text}”</span>
+                  <span className="library-quote">{c.text}</span>
                 </span>
               </button>
             </li>
