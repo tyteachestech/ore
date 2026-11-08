@@ -240,7 +240,7 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
       aria-label={label(icon)}
       title={label(icon)}
       onClick={() => onPick(icon)}
-      onMouseEnter={() => i !== undefined && setActive(i)}
+      onMouseEnter={() => i !== undefined && ((keyed.current = false), setActive(i))}
     >
       <SkillIcon icon={icon} color={color} />
     </button>
