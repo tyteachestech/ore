@@ -1,13 +1,13 @@
 #!/bin/sh
-# Rebuild and reinstall /Applications/Ore.app when master gains a change to the desktop app or to the
-# packages its compiled `ore` is built from (D30):
+# Rebuild and reinstall /Applications/Ore.app when master gains a change to the desktop app or to what
+# its compiled `ore` is built from (packages/, the root package.json, bun.lock, tsconfig; D30):
 # a commit on master here, or a pull (post-merge runs this too). Branch worktrees share these
 # hooks, so anything not on master returns at once. Runs in the background.
 # Log: ~/Library/Caches/ore/app-install.log
 [ "$(git rev-parse --abbrev-ref HEAD)" = master ] || exit 0
 if [ -n "$ORE_HOOK_RANGE" ]; then changed=$(git diff --name-only "$ORE_HOOK_RANGE")
 else changed=$(git diff-tree --no-commit-id --name-only -r HEAD); fi
-echo "$changed" | grep -qE '^(apps/desktop|packages)/' || exit 0
+echo "$changed" | grep -qE '^(apps/desktop|packages)/|^(package\.json|bun\.lock|tsconfig\.json)$' || exit 0
 root=$(git rev-parse --show-toplevel)
 cache="$HOME/Library/Caches/ore"
 mkdir -p "$cache"

@@ -84,7 +84,12 @@ fn resolve() -> Result<(PathBuf, String), String> {
         .into_iter()
         .find(|p| p.is_file())
         .ok_or("ore CLI not found. Reinstall Ore, or run `bun link` in packages/cli.")?;
-    let dir = bin.parent().map(|d| d.display().to_string()).unwrap_or_default();
+    // The CLI's folder goes first on the child's PATH, so an AI the CLI starts finds the same `ore`;
+    // not the bundled one's, where `ore` is the app itself, so there `~/.bun/bin` gives the checkout's.
+    let dir = match bin.file_name() {
+        Some(n) if n == "ore-cli" => String::new(),
+        _ => bin.parent().map(|d| d.display().to_string()).unwrap_or_default(),
+    };
     let child_path = [
         dir,
         home.join(".bun/bin").display().to_string(),

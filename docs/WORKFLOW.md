@@ -8,7 +8,7 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 - Stacked PRs merge in order, each rebased onto master first.
 
 ## After a merge: pull, and the app reinstalls
-- On the Mac (Remote Control): `git -C ~/Developer/ore pull --ff-only`. With `core.hooksPath .githooks` set, the `post-merge` hook reinstalls /Applications/Ore.app in the background when the pulled commits touch `apps/desktop/` (log: `~/Library/Caches/ore/app-install.log`). Check the log's last line says `installed`.
+- On the Mac (Remote Control): `git -C ~/Developer/ore pull --ff-only`. With `core.hooksPath .githooks` set, the `post-merge` hook reinstalls /Applications/Ore.app in the background when the pulled commits touch `apps/desktop/`, `packages/` or the root package files, since the app carries an `ore` compiled from them (D30) (log: `~/Library/Caches/ore/app-install.log`). Check the log's last line says `installed`.
 - The hooks install only from `master`: commits in a branch worktree never replace the installed app.
 - Pause pulls while Tyler or an AI tester is using the app.
 
