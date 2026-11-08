@@ -444,8 +444,8 @@ const Check = () => <CheckIcon className="check" size={12} aria-hidden="true" />
  *  archived when filed nowhere else. Cards always stay and keep reviewing. Enter deletes, Esc cancels. */
 export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   skill: Skill;
-  /** Its sources, and how many are filed under no other skill. */
-  sources: { all: number; only: number };
+  /** Its sources, how many are filed under no other skill, and its archived ones (the delete takes it off them too). */
+  sources: { all: number; only: number; archived: number };
   onDone: (deleted: boolean) => void;
   /** Undo or redo changed the library after the dialog closed. */
   onChanged: () => void;
@@ -458,6 +458,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   const choice = sources.all > 0 && sources.only > 0;
   useFocusWhileMounted(choice ? keepRef : panelRef);
   const n = (k: number) => `${k} source${k === 1 ? "" : "s"}`;
+  const alsoArchived = sources.archived ? ` (and ${sources.archived} archived)` : "";
 
   const remove = async () => {
     if (busy) return;
@@ -501,7 +502,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
         <h2>Delete {skill.name}?</h2>
         {choice ? (
           <fieldset className="delete-choice">
-            <legend>Its {n(sources.all)}</legend>
+            <legend>Its {n(sources.all)}{alsoArchived}</legend>
             <label>
               <input ref={keepRef} type="radio" name="sources" checked={!archive} onChange={() => setArchive(false)} />
               <span>
@@ -518,7 +519,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
             </label>
           </fieldset>
         ) : (
-          <p className="quiet">{sources.all ? `Its ${n(sources.all)} stay under their other skills.` : "No sources are filed under it."}</p>
+          <p className="quiet">{sources.all ? `Its ${n(sources.all)}${alsoArchived} stay under their other skills.` : sources.archived ? `Only ${n(sources.archived)} in Archived are filed under it.` : "No sources are filed under it."}</p>
         )}
         <p className="quiet">Its cards stay and keep coming up in review.</p>
         <div className="skill-edit-foot">

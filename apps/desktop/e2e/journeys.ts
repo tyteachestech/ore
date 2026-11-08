@@ -4125,6 +4125,26 @@ journey("prequestions: a source added with --no-enrich offers to write them, nev
   }
 });
 
+journey("delete skill: the dialog counts its archived sources too, since the delete takes the skill off them", async (page) => {
+  const k = (await ore("skills", "add", "Woodworking")) as { id: string };
+  const add = (text: string) =>
+    fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--skill", k.id], stdin: text }) }).then((r) => r.json()) as Promise<{ id: string }>;
+  const live = await add("# Dovetails by hand\n\nSaw to the line.");
+  const gone = await add("# Old plane notes\n\nSharpen first.");
+  await ore("archive", gone.id);
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Woodworking" }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete skill…" }).click();
+    const dialog = page.getByRole("alertdialog", { name: "Delete Woodworking" });
+    await dialog.getByText("Its 1 source (and 1 archived)").waitFor();
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("skills", "rm", k.id);
+    for (const s of [live, gone]) await ore("archive", s.id);
+  }
+});
+
 // —— run ——
 
 let failed = 0;

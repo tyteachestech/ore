@@ -2287,6 +2287,7 @@ export function App() {
           sources={{
             all: (items ?? []).filter((i) => i.skills.includes(deleting)).length,
             only: (items ?? []).filter((i) => i.skills.length === 1 && i.skills[0] === deleting).length,
+            archived: archived.filter((i) => i.skills.includes(deleting)).length,
           }}
           onDone={(deleted) => {
             setDeleting(null);
