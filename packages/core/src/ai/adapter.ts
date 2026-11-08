@@ -17,8 +17,8 @@ export interface AgentTask<T> {
   schema: z.ZodType<T>;
   check?: (data: T, web?: WebSeen) => string | null; // semantic validation beyond the schema
   web?: boolean; // allow web search/fetch
-  /** While it runs (claude web tasks): the answer's JSON so far, and a search starting. */
-  onProgress?: (p: { partial: string } | { searching: true }) => void;
+  /** While it runs (claude web tasks): the answer's JSON so far ("" as a run starts over), and a web search starting or done. */
+  onProgress?: (p: StreamProgress) => void;
   cwd: string;
 }
 
@@ -121,14 +121,16 @@ async function exec(cmd: string[], cwd: string, onLine?: (line: string) => void)
     let all = "";
     let rest = "";
     const dec = new TextDecoder();
+    // Progress is a nicety: a listener that throws never stops the run.
+    const each = (l: string) => { try { onLine(l); } catch { /* ignore */ } };
     for await (const chunk of proc.stdout) {
       const text = dec.decode(chunk, { stream: true });
       all += text;
       const lines = (rest + text).split("\n");
       rest = lines.pop()!;
-      for (const l of lines) onLine(l);
+      for (const l of lines) each(l);
     }
-    if (rest) onLine(rest);
+    if (rest) each(rest);
     return all;
   };
   const [stdout, stderr, code] = await Promise.all([read(), new Response(proc.stderr).text(), proc.exited]);
@@ -136,19 +138,27 @@ async function exec(cmd: string[], cwd: string, onLine?: (line: string) => void)
   return { stdout, stderr, code, timedOut };
 }
 
-/** A stream-json line's news for `onProgress`: a web search starting, or more of the structured
- *  answer's JSON (claude writes it as the StructuredOutput tool's input, streamed with
- *  --include-partial-messages). `state` keeps the answer's block index and its JSON so far. */
-export function streamProgress(line: string, state: { block?: number; json: string }): { partial: string } | { searching: true } | null {
+export type StreamProgress = { partial: string } | { searching: boolean };
+
+/** A stream-json line's news for `onProgress`: a web search starting or its results back, or more of
+ *  the structured answer's JSON (claude writes it as the StructuredOutput tool's input, streamed with
+ *  --include-partial-messages). `state` keeps the answer's block index in this message and its JSON so far. */
+export function streamProgress(line: string, state: { block?: number; json: string; searching?: boolean }): StreamProgress | null {
   let e: { type?: string; event?: { type?: string; index?: number; content_block?: { type?: string; name?: string }; delta?: { type?: string; partial_json?: string } } };
   try { e = JSON.parse(line); } catch { return null; }
+  // A tool's results came back: the search is over, and the model is thinking again.
+  if (e.type === "user" && state.searching) return (state.searching = false), { searching: false };
   const ev = e.type === "stream_event" ? e.event : undefined;
-  if (ev?.type === "content_block_start" && ev.content_block?.type === "tool_use") {
+  // Block indexes start over in every message.
+  if (ev?.type === "message_start") state.block = undefined;
+  if (ev?.type === "content_block_start") {
+    state.block = undefined;
+    if (ev.content_block?.type !== "tool_use") return null;
     if (ev.content_block.name === "StructuredOutput") {
       state.block = ev.index;
       state.json = "";
-    } else state.block = undefined;
-    return ev.content_block.name === "WebSearch" || ev.content_block.name === "WebFetch" ? { searching: true } : null;
+    }
+    return ev.content_block.name === "WebSearch" || ev.content_block.name === "WebFetch" ? ((state.searching = true), { searching: true }) : null;
   }
   if (ev?.type === "content_block_delta" && ev.index === state.block && ev.delta?.type === "input_json_delta") {
     state.json += ev.delta.partial_json ?? "";
@@ -223,6 +233,8 @@ async function runClaude(system: string, message: string, schema: object, task: 
     ...(model ? ["--model", model] : []),
   ];
   const state = { json: "" };
+  // A run (the first, or a retry after a failed check) starts the answer over.
+  task.onProgress?.({ partial: "" });
   const onLine = task.web && task.onProgress ? (l: string) => { const p = streamProgress(l, state); if (p) task.onProgress!(p); } : undefined;
   const r = await exec(cmd, task.cwd, onLine);
   const events = task.web ? streamEvents(r.stdout) : undefined;
@@ -237,6 +249,8 @@ async function runClaude(system: string, message: string, schema: object, task: 
 type StreamEvent = { type?: string; subtype?: string; model?: unknown; message?: { content?: unknown }; tool_use_result?: unknown; [k: string]: unknown };
 const streamEvents = (stdout: string): StreamEvent[] =>
   stdout.split("\n").flatMap((line) => {
+    // The partial messages (one per token) are only for progress, read as they came.
+    if (line.startsWith('{"type":"stream_event"')) return [];
     try {
       const e = JSON.parse(line);
       return e && typeof e === "object" ? [e as StreamEvent] : [];

@@ -170,6 +170,7 @@ describe("tutor: the web", () => {
     expect(partialReply('{"reply": "a\\nb\\')).toBe("a\nb");
     expect(partialReply('{"reply": "x \\u00')).toBe("x ");
     expect(partialReply('{"reply": "say \\"hi\\" [1]", "citations": [')).toBe('say "hi" [1]');
+    expect(partialReply('{"reply": "C:\\\\u')).toBe("C:\\u"); // an escaped backslash, then a plain u
   });
 
   test("--stream: the reply comes as it is written, and a search says so as it starts", async () => {
@@ -184,9 +185,30 @@ describe("tutor: the web", () => {
     fakeClaude([{ web, out: { reply: "Your sources don't say é.", citations: [], general: true, hint: false, exercise: null, card: null } }]);
     const seen: unknown[] = [];
     const r = await tutor(lib, "When was Ebbinghaus born?", { onProgress: (p) => seen.push(p) });
-    expect(seen).toEqual([{ searching: true }, { reply: "Your sources" }, { reply: "Your sources don't say " }, { reply: "Your sources don't say é [1" }, { reply: "Your sources don't say é [1]" }]);
+    // The run starts the answer over, then the search starts; the reply's first words come at once and
+    // later ones a few times a second (these all came within 50 ms, so only the first shows).
+    expect(seen).toEqual([{ reply: "" }, { searching: true }, { reply: "Your sources" }]);
     expect(r.reply).toBe("Your sources don't say é.");
     expect(readFileSync(join(binDir, "argv.json"), "utf8")).toContain("--include-partial-messages");
+  });
+
+  test("a retry after a failed check starts the streamed reply over, and a search's results end the search wait", async () => {
+    const { lib } = await library();
+    const run = (reply: string, citations: unknown[]) => ({
+      web: [
+        { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", name: "WebSearch" } } },
+        { type: "user", message: { content: [] } },
+        { type: "stream_event", event: { type: "message_start" } },
+        { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", name: "StructuredOutput" } } },
+        { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: `{"reply": "${reply}"` } } },
+      ],
+      out: { reply, citations, general: true, hint: false, exercise: null, card: null },
+    });
+    fakeClaude([run("Born in 1850 [1].", [{ passage: "https://made.up/page", quote: "1850" }]), run("Your sources don't say.", [])]);
+    const seen: unknown[] = [];
+    await tutor(lib, "When was Ebbinghaus born?", { onProgress: (p) => seen.push(p) });
+    const twice = [{ reply: "" }, { searching: true }, { searching: false }];
+    expect(seen).toEqual([...twice, { reply: "Born in 1850 [1]." }, ...twice, { reply: "Your sources don't say." }]);
   });
 
   test("a web citation with no search at all is refused: the link would be made up", async () => {

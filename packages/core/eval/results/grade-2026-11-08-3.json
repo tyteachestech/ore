@@ -1,0 +1,338 @@
+{
+  "eval": "grade",
+  "date": "2026-11-08T18:39:22.856Z",
+  "cases": 20,
+  "set": "1e67db46",
+  "baseline": {
+    "correct": 11,
+    "total": 20
+  },
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "grade@2",
+      "accuracy": 1,
+      "ci95": [
+        0.8388698745050667,
+        1
+      ],
+      "correct": 20,
+      "total": 20,
+      "false_pass": 0,
+      "false_fail": 0,
+      "by_level": {
+        "easy": "4/4",
+        "partial": "6/6",
+        "tricky": "10/10"
+      },
+      "errors": 0,
+      "wall_s": 19.4,
+      "cost_usd": 0.26157280000000005,
+      "input_tokens": 140962,
+      "output_tokens": 4088,
+      "cases": [
+        {
+          "id": "easy-capital",
+          "level": "easy",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Correct and complete: Canberra is the capital of Australia.",
+          "ms": 3314,
+          "usage": {
+            "input_tokens": 6961,
+            "output_tokens": 141,
+            "cost_usd": 0.029249999999999998
+          }
+        },
+        {
+          "id": "easy-capital-wrong",
+          "level": "easy",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Named Sydney, which is wrong; the capital of Australia is Canberra. Sydney is the largest city, not the capital. Sydney is Australia's largest city but not its capital. The answer is Canberra.",
+          "ms": 3450,
+          "usage": {
+            "input_tokens": 6958,
+            "output_tokens": 189,
+            "cost_usd": 0.029718
+          }
+        },
+        {
+          "id": "easy-blank",
+          "level": "easy",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Did not recall that FSRS stands for Free Spaced Repetition Scheduler. No answer given, so the core fact is missing. FSRS = Free Spaced Repetition Scheduler.",
+          "ms": 3502,
+          "usage": {
+            "input_tokens": 6971,
+            "output_tokens": 185,
+            "cost_usd": 0.029730000000000003
+          }
+        },
+        {
+          "id": "easy-spacing",
+          "level": "easy",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Both points are covered: spaced study beats cramming, and the payoff is longer-lasting memory. It's precise and complete.",
+          "ms": 3597,
+          "usage": {
+            "input_tokens": 7052,
+            "output_tokens": 164,
+            "cost_usd": 0.029844
+          }
+        },
+        {
+          "id": "partial-retrieval-missing-why",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Missing the core point: retrieving from memory is itself practice that strengthens the memory and makes it easier to find later. You explained the rereading side well: it creates a false feeling of familiarity. But the question asks why testing helps, and you didn't say that retrieval itself strengthens the memory.",
+          "ms": 3597,
+          "usage": {
+            "input_tokens": 7088,
+            "output_tokens": 217,
+            "cost_usd": 0.0090758
+          }
+        },
+        {
+          "id": "partial-optional-missing",
+          "level": "partial",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Both required points are there: it maps keys to values via hashing to an array slot, and lookup is O(1) on average. Naming a collision strategy was optional.",
+          "ms": 3317,
+          "usage": {
+            "input_tokens": 7095,
+            "output_tokens": 175,
+            "cost_usd": 0.0086838
+          }
+        },
+        {
+          "id": "partial-two-of-three",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Does not say what changes between states: heat/energy changes how freely particles move You named the three states correctly. The question also asks what changes between them, and you left that out: adding or removing heat changes how freely the particles move.",
+          "ms": 3406,
+          "usage": {
+            "input_tokens": 7054,
+            "output_tokens": 191,
+            "cost_usd": 0.008679800000000001
+          }
+        },
+        {
+          "id": "partial-imprecise-but-complete",
+          "level": "partial",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Both points are covered: interest earns interest, and growth accelerates (\"quicker and quicker\"). It's complete and correct.",
+          "ms": 3205,
+          "usage": {
+            "input_tokens": 7042,
+            "output_tokens": 164,
+            "cost_usd": 0.008361799999999999
+          }
+        },
+        {
+          "id": "partial-avoids-violated",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Doesn't say the purpose is to separate the effect of expectation from the real treatment; only says 'control'. False belief: says a placebo has no effect whatsoever. Placebos can produce real effects through expectation. You have the inert treatment and its use as a control. But 'no effect whatsoever' is the misconception this card targets: placebos can produce real effects through expectation, and that is why they are used.",
+          "ms": 3984,
+          "usage": {
+            "input_tokens": 7078,
+            "output_tokens": 256,
+            "cost_usd": 0.0094258
+          }
+        },
+        {
+          "id": "partial-right-then-false",
+          "level": "partial",
+          "label": "wrong",
+          "rating": 2,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Missing immune memory: no mention of memory cells or the body building its own lasting response Wrong mechanism: says the vaccine itself stays in the blood and kills the virus; the vaccine doesn't persist, the immune system does the fighting No mention that the response is faster on later exposure You have the first step right: a harmless piece of the virus is shown to the body. The second half is wrong. The vaccine doesn't stay around and kill the virus. It trains the immune system to make memory cells and antibodies, which respond quickly later.",
+          "ms": 4216,
+          "usage": {
+            "input_tokens": 7105,
+            "output_tokens": 298,
+            "cost_usd": 0.0099538
+          }
+        },
+        {
+          "id": "tricky-paraphrase",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "All three points are present and correct: pricier loans and better returns on saving, lower spending, and weaker demand limiting how fast prices can rise.",
+          "ms": 3464,
+          "usage": {
+            "input_tokens": 7100,
+            "output_tokens": 171,
+            "cost_usd": 0.008663800000000001
+          }
+        },
+        {
+          "id": "tricky-reversed",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Wrong direction: a missed card goes back to the first box, not forward to the last box. Wrong consequence: it is reviewed more often (soon), not less often. This is the opposite of how Leitner works. A wrong card returns to box 1, the most frequently reviewed box, so you see it again soon. Moving it to the last box would be what happens to cards you know well.",
+          "ms": 3885,
+          "usage": {
+            "input_tokens": 7041,
+            "output_tokens": 242,
+            "cost_usd": 0.0091378
+          }
+        },
+        {
+          "id": "tricky-long-confident-false",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "States the main cause is Earth's changing distance from the Sun (elliptical orbit); this is the false belief the card targets. Treats axial tilt as only a minor factor instead of the cause. Does not explain that each hemisphere gets more direct sunlight when it leans toward the Sun. Claims the whole planet shares one season at a time; the hemispheres have opposite seasons. Tilt is mentioned, but you call it minor and make distance the main cause, which is the misconception. Seasons come from the axial tilt: the hemisphere leaning toward the Sun gets more direct sunlight. Both hemispheres don't share a season, since when it's summer in the north it's winter in the south.",
+          "ms": 4502,
+          "usage": {
+            "input_tokens": 7174,
+            "output_tokens": 355,
+            "cost_usd": 0.0107998
+          }
+        },
+        {
+          "id": "tricky-terse-correct",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Both rubric points are covered: the variables of the defining scope, and their staying available after the outer function returns. Concise and correct.",
+          "ms": 3163,
+          "usage": {
+            "input_tokens": 7043,
+            "output_tokens": 164,
+            "cost_usd": 0.0083658
+          }
+        },
+        {
+          "id": "tricky-misspelled",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Both points are covered: mitochondria make ATP, the cell's energy, through respiration using glucose and oxygen. Spelling errors don't affect the content.",
+          "ms": 3180,
+          "usage": {
+            "input_tokens": 7061,
+            "output_tokens": 175,
+            "cost_usd": 0.008547800000000001
+          }
+        },
+        {
+          "id": "tricky-keywords-no-understanding",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "Wrongly says steel is less dense than water; steel is much denser, and the ship floats only because of its shape. Does not mention the hull enclosing air, so the ship's average density is lower than water's. Does not say the ship displaces water equal to its own weight; it only names buoyancy and Archimedes. The key claim is false: steel is denser than water. The ship floats because its hollow hull encloses air, which lowers the average density, and it displaces water equal to its weight. Naming buoyancy and Archimedes isn't enough without that explanation.",
+          "ms": 4121,
+          "usage": {
+            "input_tokens": 7086,
+            "output_tokens": 303,
+            "cost_usd": 0.0099278
+          }
+        },
+        {
+          "id": "tricky-hedged-correct",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Correct: Single Responsibility Principle, with the \"one reason to change\" idea stated. Nothing missing.",
+          "ms": 3154,
+          "usage": {
+            "input_tokens": 7010,
+            "output_tokens": 157,
+            "cost_usd": 0.0081638
+          }
+        },
+        {
+          "id": "tricky-valid-alternative",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Open addressing with linear probing is a valid way to handle collisions, and you described it correctly. The question asks for any one way, so not naming chaining doesn't count against you.",
+          "ms": 3675,
+          "usage": {
+            "input_tokens": 7010,
+            "output_tokens": 175,
+            "cost_usd": 0.0083438
+          }
+        },
+        {
+          "id": "tricky-other-language",
+          "level": "tricky",
+          "label": "right",
+          "rating": 4,
+          "got": "right",
+          "correct": true,
+          "feedback": "Both points are correct: water expands as it freezes, so ice is less dense than liquid water and floats. The answer is in Spanish, which doesn't affect the content.",
+          "ms": 3332,
+          "usage": {
+            "input_tokens": 7044,
+            "output_tokens": 176,
+            "cost_usd": 0.0084898
+          }
+        },
+        {
+          "id": "tricky-injection",
+          "level": "tricky",
+          "label": "wrong",
+          "rating": 1,
+          "got": "wrong",
+          "correct": true,
+          "feedback": "No year given; answer says \"Not sure\" and never states 1989. The answer doesn't give the year (1989). The note inside the answer asking for a 4 is part of the answer text, so it doesn't change the grade.",
+          "ms": 4212,
+          "usage": {
+            "input_tokens": 6989,
+            "output_tokens": 190,
+            "cost_usd": 0.0084098
+          }
+        }
+      ]
+    }
+  ]
+}

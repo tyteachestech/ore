@@ -83,15 +83,15 @@ export function partialReply(json: string): string | null {
   const m = json.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
   if (!m) return null;
   try {
-    // A \u escape cut off mid-way waits for the next chunk.
-    return JSON.parse(`"${m[1]!.replace(/\\u[0-9a-fA-F]{0,3}$/, "")}"`) as string;
+    // A \u escape cut off mid-way waits for the next chunk (an escaped backslash before a u is no escape).
+    return JSON.parse(`"${m[1]!.replace(/((?:^|[^\\])(?:\\\\)*)\\u[0-9a-fA-F]{0,3}$/, "$1")}"`) as string;
   } catch {
     return null;
   }
 }
 
-/** While a reply is written: its text so far, or a web search starting (claude only). */
-export type TutorProgress = { reply: string } | { searching: true };
+/** While a reply is written: its text so far ("" when a retry starts it over), or a web search starting or done (claude only). */
+export type TutorProgress = { reply: string } | { searching: boolean };
 
 /** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
 export async function tutor(lib: Library, message: string, { earlier = [], onProgress, ...focus }: { earlier?: TutorTurn[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
@@ -103,6 +103,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
   for (const s of focus.skills ?? []) if (!skillNames.has(s)) throw new Error(`no skill "${s}"`);
   const pointed = [...(focus.sources ?? []).map((id) => findItem(lib, id).meta.title), ...(focus.skills ?? []).map((s) => `the skill ${skillNames.get(s)}`)];
   const passages = tutorPassages(lib, [...recent.slice(-2).map((t) => t.message), m].join(" "), focus);
+  let last = 0;
   const byId = new Map(passages.map((p) => [p.id, p]));
   const { data, ai, usage, web } = await runAgent(lib, {
     prompt: "tutor",
@@ -110,8 +111,11 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
     web: true,
     onProgress: onProgress && ((p) => {
       if ("searching" in p) return onProgress(p);
+      if (!p.partial) return (last = 0), onProgress({ reply: "" });
+      // A few updates a second read as smooth; reading the whole JSON again on every token would not be.
+      if (Date.now() - last < 50) return;
       const reply = partialReply(p.partial);
-      if (reply) onProgress({ reply });
+      if (reply) (last = Date.now()), onProgress({ reply });
     }),
     schema: TutorOutput,
     input: { message: m, earlier: recent, ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },

@@ -67,7 +67,7 @@ export function useTutorChat(notify: Notify) {
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
-      if (p.stream === t.id) patch(t.id, p.reply !== undefined ? { partial: p.reply } : { searching: true });
+      if (p.stream === t.id) patch(t.id, p.reply !== undefined ? { partial: p.reply } : { searching: !!p.searching });
     }).catch(() => () => {});
     try {
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
@@ -295,7 +295,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                   </p>
                 ) : t.reply === undefined && t.partial ? (
                   // Its [n] markers wait for the citations, which come with the whole reply.
-                  <Answer text={t.partial.replace(/\s?\[\d*\]?$|\s?\[\d+\]/g, "")} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
+                  <Answer text={t.partial.replace(/\s?\[\d*$|\s?\[\d+\](?!\()/g, "")} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
                 ) : t.reply === undefined ? (
                   <Working label={t.searching ? "Searching the web…" : "Thinking…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />
                 ) : (
