@@ -1727,6 +1727,24 @@ journey("sidebar: a new skill named like one he has is refused in place, in word
   await page.keyboard.press("Escape");
 });
 
+journey("Edit skill: the colours are one Tab stop, and ← → move and pick, as a radio group's do", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
+  const picked = () => dialog.locator(".swatch[aria-checked=true]").getAttribute("aria-label");
+  await dialog.getByRole("radio", { name: "No color" }).focus();
+  // Held as a finger holds it: Radix picks on the focus its roving focus moves a tick later, while the key is down.
+  await page.keyboard.press("ArrowRight", { delay: 50 });
+  await until("→ picks the next colour", async () => (await picked()) !== "No color");
+  const second = await picked();
+  if (!(await page.evaluate(() => document.activeElement?.getAttribute("aria-checked") === "true"))) throw new Error("focus did not move with the pick");
+  await page.keyboard.press("ArrowLeft", { delay: 50 });
+  await until("← goes back to No color", async () => (await picked()) === "No color");
+  await page.keyboard.press("Tab");
+  if (await page.evaluate(() => document.activeElement?.classList.contains("swatch"))) throw new Error(`Tab went to another swatch, not past the row (${second})`);
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", async (page) => {
   const inGroup = (group: string, skill: string) => page.locator(`.sidebar [role=group][aria-label="${group}"] .side-item`, { hasText: skill }).count();
   await until("Habits is in Life", async () => (await inGroup("Life", "Habits")) === 1);

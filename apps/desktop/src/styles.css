@@ -382,6 +382,7 @@ img.thumb { filter: brightness(0.86); }
 .swatches { display: flex; gap: 6px; }
 .swatch { width: 20px; height: 20px; border-radius: 50%; background: var(--skill, transparent); border: 1px solid var(--border); }
 .swatch.small { width: 16px; height: 16px; }
+.swatch-hint { display: flex; } /* the swatch's hover hint (IconPicker.tsx Swatches) */
 .swatch:not([data-color]) { background: linear-gradient(135deg, transparent 45%, var(--faint) 45% 55%, transparent 55%); }
 .swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--bg-raised), 0 0 0 4px var(--text); }
 .swatch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg-raised), 0 0 0 4px var(--focus); }

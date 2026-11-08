@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ElementType, type ReactNode, type Ref
 import { Hint } from "./Hint";
 import { useLite } from "./Lite";
 import { Trap } from "./Trap";
-import { focusFilter, IconPicker, SkillIcon } from "./IconPicker";
+import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
 import { ore, opt, SKILL_COLORS, type Skill, type SkillColor } from "./ore";
 import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
 
@@ -342,22 +342,9 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
           </Popover.Root>
           <SkillName skill={skill} as="h2" editing={rename} inputRef={nameRef} onRenamed={onSaved} onEnter={onClose} notify={notify} />
         </div>
-        <div className="look-row" role="radiogroup" aria-label="Color">
+        <div className="look-row">
           <span>Color</span>
-          <span className="swatches">
-            {(["", ...SKILL_COLORS] as const).map((c) => (
-              <Hint key={c || "none"} text={c ? c[0]!.toUpperCase() + c.slice(1) : "No color"}>
-                <button
-                  className="swatch"
-                  data-color={c || undefined}
-                  role="radio"
-                  aria-checked={look.color === c}
-                  aria-label={c || "No color"}
-                  onClick={() => void set("color", c)}
-                />
-              </Hint>
-            ))}
-          </span>
+          <Swatches className="swatches" value={look.color} onPick={(c) => void set("color", c)} />
         </div>
         <div className="look-row">
           <span>Collection</span>

@@ -1,3 +1,4 @@
+import * as RadioGroup from "@radix-ui/react-radio-group";
 import * as Tabs from "@radix-ui/react-tabs";
 import { defaultEmojiDataResolver, EmojiPicker } from "frimousse";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -52,6 +53,23 @@ export const focusFilter = (e: Event) => {
   (e.currentTarget as HTMLElement).querySelector<HTMLElement>(".picker-search")?.focus();
 };
 
+/** The skill colours as one radio group, as a macOS colour row: one Tab stop, ← → move and pick. */
+export function Swatches({ className, small, value, onPick }: { className: string; small?: boolean; value: SkillColor | ""; onPick: (color: SkillColor | "") => void }) {
+  return (
+    <RadioGroup.Root className={className} orientation="horizontal" loop aria-label="Color" value={value || "none"} onValueChange={(v) => onPick(v === "none" ? "" : (v as SkillColor))}>
+      {(["", ...SKILL_COLORS] as const).map((c) => (
+        // The hint sits on a wrapper: on the radio itself, its focus handler (which keeps a hint from
+        // showing on focus moved by code) would stop the pick that Radix makes as an arrow moves focus.
+        <Hint key={c || "none"} text={c ? c[0]!.toUpperCase() + c.slice(1) : "No color"}>
+          <span className="swatch-hint">
+            <RadioGroup.Item className={`swatch${small ? " small" : ""}`} value={c || "none"} data-color={c || undefined} aria-label={c || "No color"} />
+          </span>
+        </Hint>
+      ))}
+    </RadioGroup.Root>
+  );
+}
+
 /** Notion-style picker: Emoji and Icons tabs, search, recents, random, remove; icons take the skill color. */
 export function IconPicker({ value, color, onPick, onColor, onRemove }: {
   value?: string;
@@ -79,20 +97,7 @@ export function IconPicker({ value, color, onPick, onColor, onRemove }: {
           Remove
         </button>
       </div>
-      <div className="picker-colors" role="radiogroup" aria-label="Color">
-        {(["", ...SKILL_COLORS] as const).map((c) => (
-          <Hint key={c || "none"} text={c ? c[0]!.toUpperCase() + c.slice(1) : "No color"}>
-            <button
-              className="swatch small"
-              data-color={c || undefined}
-              role="radio"
-              aria-checked={color === c}
-              aria-label={c || "No color"}
-              onClick={() => onColor(c)}
-            />
-          </Hint>
-        ))}
-      </div>
+      <Swatches className="picker-colors" small value={color} onPick={onColor} />
       <Tabs.Content value="emoji" className="picker-body">
         <EmojiTab recent={recent.filter((r) => !isIcon(r))} onPick={pick} />
       </Tabs.Content>
