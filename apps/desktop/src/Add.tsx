@@ -8,7 +8,7 @@ import { is } from "./keys";
 import { SkillIcon } from "./IconPicker";
 import { ore, type Skill } from "./ore";
 import { copiedFiles, pastesFiles, takeCopied } from "./copied";
-import { copiedWhat, entries, entryName, entryText, fileKind, isCourseLink, words, type Entry, type FileKind } from "./paste";
+import { copiedWhat, entries, entryName, entryText, fileKind, isCourseLink, pastedHtml, withHtml, words, type Entry, type FileKind, type Pasted } from "./paste";
 import { SkillChip, SkillPicker } from "./Skills";
 import { useFocusWhileMounted, type Notify } from "./util";
 import { Working } from "./Working";
@@ -114,7 +114,9 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   const [copied, setCopied] = useState<Entry | null>(null);
   useEffect(() => void takeCopied(have).then(setCopied), []); // eslint-disable-line react-hooks/exhaustive-deps
   const offer = !value.trim() && !busy && !error ? copied : null;
-  const list = entries(value);
+  // A page's text pasted into the empty box (a ChatGPT answer) goes in as its HTML, images and tables kept.
+  const [pasted, setPasted] = useState<Pasted | null>(null);
+  const list = withHtml(entries(value), pasted);
   const one = list.length === 1 && list[0]!.kind === "link" && !isCourseLink(list[0]!.url) ? list[0]!.url : null;
   const feed = useFeedOf(busy ? null : one);
   /** The link is the feed itself: adding it would be refused, so ↵ follows it. */
@@ -174,9 +176,12 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
           autoCapitalize="off"
           onChange={(e) => {
             setValue(e.target.value);
+            if (!e.target.value.trim()) setPasted(null);
             setError(null);
           }}
           onPaste={(e) => {
+            const box = e.currentTarget;
+            if (!box.value.trim() || box.selectionEnd - box.selectionStart === box.value.length) setPasted({ text: e.clipboardData.getData("text/plain"), html: pastedHtml(e.clipboardData) });
             // A file copied in Finder pastes only its name: put its path in, as a drop would add it.
             if (!pastesFiles(e.clipboardData)) return;
             e.preventDefault();

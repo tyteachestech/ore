@@ -140,7 +140,7 @@ All commands accept `--json`. Exit non-zero with a one-line error on failure. Ne
 
 ```
 ore init [path]                       create library skeleton, AGENTS.md, skills.yaml, git init
-ore add <url|path> | --stdin | --tab [--skill s] [--type t] [--for <q>] [--no-enrich]   ingest → items/, status inbox → {id, title, type, path, enrich: started|skipped}; --stdin pasted text as Markdown, --tab the frontmost Safari or Chrome page (D96), --for links it to a question (D75); triggers `enrich` in background unless --no-enrich
+ore add <url|path> | --stdin [--html] | --tab [--skill s] [--type t] [--for <q>] [--no-enrich]   ingest → items/, status inbox → {id, title, type, path, enrich: started|skipped}; --stdin pasted text as Markdown (--html: the paste's HTML, its headings, tables, math, code and images kept, images saved beside it), --tab the frontmost Safari or Chrome page (D96), --for links it to a question (D75); triggers `enrich` in background unless --no-enrich
 ore snippet --text|--stdin [--url] [--app] [--intent] [--note] [--skill s] [--no-enrich]   capture a selection as a snippet item + annotation
 ore ls [--status] [--skill] [--topic] [--archived]   items (archived ones only with --archived); JSON adds dir and source_file (absolute; the original kept at capture, if any), thumbnail (absolute; thumbnail.* beside doc.md, D77) and has_notes (the source note has text)
 ore backfill [item]   fill in missing thumbnails and PDF authors on sources added before D77 (all sources without an item)
