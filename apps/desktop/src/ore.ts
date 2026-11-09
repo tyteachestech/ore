@@ -309,7 +309,7 @@ export type SessionEnd = {
   /** Cards that became solid this session, as each one's first skill (D90): one cut gem each. */
   cut?: string[];
   /** On the week's first end screen (D69): of Explain answers marked Sure, the share the key-point check passed. */
-  calibration?: { sure_n: number; sure_right: number } | null;
+  calibration?: { sure_n: number; sure_right: number; levels: { confidence: 1 | 2 | 3; n: number; right: number | null }[] } | null;
 };
 
 /** When he last added or opened a source: To read lists the last touched first (D110). */

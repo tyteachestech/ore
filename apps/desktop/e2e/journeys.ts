@@ -4720,6 +4720,33 @@ journey("review Ask: a suggested card shows only what it changes, struck and und
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review end: calibration shows a bar for each tap with enough answers, the counts on hover (D165)", async (page) => {
+  const levels = [{ confidence: 1, n: 12, right: 0.5 }, { confidence: 2, n: 4, right: null }, { confidence: 3, n: 30, right: 0.9 }];
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"args":["session","end"')) return route.fallback();
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), calibration: { sure_n: 30, sure_right: 0.9, levels } } });
+  });
+  const app = oreCalls(page);
+  try {
+    await startReview(page, /^\s*AI\b/);
+    await page.keyboard.press("2");
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    const cal = page.getByRole("group", { name: "When you say" });
+    await cal.waitFor();
+    const rows = await cal.locator(".review-calibration-row").evaluateAll((es) => es.map((e) => e.getAttribute("aria-label")));
+    if (rows.join("|") !== "Guess: right 50%|Sure: right 90%") throw new Error(`rows: ${rows.join("|")}`);
+    if ((await cal.locator(".review-calibration-row").last().locator("i[data-on]").count()) !== 9) throw new Error("Sure's bar isn't 9 of 10");
+    await cal.locator(".review-calibration-row").first().hover();
+    await page.getByText("Right 6 of 12 Explain answers in the last 12 weeks").waitFor();
+  } finally {
+    await page.unroute(/\/ore$/);
+    await app.undoAll();
+  }
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("typing with an input method: Enter that picks a word neither sends an answer nor ends a diagram label", async (page) => {
   const composingEnter = (el: Element) => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", isComposing: true, bubbles: true, cancelable: true }));
   // WKWebView's commit Enter: keyCode 229, isComposing false.

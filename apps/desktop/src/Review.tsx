@@ -1257,10 +1257,22 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
           </p>
         );
       })}
+      {/* D165: how often he is right at each of his three taps, so he sees whether they mean anything, not only whether Sure is too sure. */}
       {s.calibration && (
-        <Hint text={`From ${s.calibration.sure_n} Explain answers marked Sure in the last 12 weeks`}>
-          <p className="review-calibration">When you say Sure, you’re right {Math.round(s.calibration.sure_right * 100)}% of the time.</p>
-        </Hint>
+        <div className="review-calibration" role="group" aria-label="When you say">
+          <span className="review-calibration-label">When you say</span>
+          {s.calibration.levels.filter((l) => l.right !== null).map((l) => (
+            <Hint key={l.confidence} text={`Right ${Math.round(l.right! * l.n)} of ${l.n} Explain answers in the last 12 weeks`}>
+              <span className="review-calibration-row" tabIndex={0} aria-label={`${SURE[l.confidence - 1]}: right ${Math.round(l.right! * 100)}%`}>
+                <span className="review-calibration-name">{SURE[l.confidence - 1]}</span>
+                <span className="review-calibration-bar" aria-hidden="true">
+                  {Array.from({ length: 10 }, (_, i) => <i key={i} data-on={i < Math.round(l.right! * 10) || undefined} />)}
+                </span>
+                <span className="review-calibration-pct">{Math.round(l.right! * 100)}%</span>
+              </span>
+            </Hint>
+          ))}
+        </div>
       )}
       {!t.met && t.counts && <p className="quiz-faint">{minutesText(Math.max(0, t.goal_ms - t.active_ms))} min to today’s goal</p>}
       {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}

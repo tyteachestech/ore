@@ -54,10 +54,24 @@ describe("calibration (D69)", () => {
     ({ ts: new Date(Date.now() - days * 864e5).toISOString(), card: "C", confidence, ai_rating, in_head, rating: 3 }) as unknown as Review;
   test("Sure answers on typed Explain cards in the last 12 weeks, checked by the AI's marks; null below 20", () => {
     const rs = [...Array.from({ length: 17 }, () => r(3, 4)), ...Array.from({ length: 3 }, () => r(3, 2))];
-    expect(calibration(rs.slice(0, 19))).toEqual({ sure_n: 19, sure_right: null });
-    expect(calibration(rs)).toEqual({ sure_n: 20, sure_right: 0.85 });
+    expect(calibration(rs.slice(0, 19))).toMatchObject({ sure_n: 19, sure_right: null });
+    expect(calibration(rs)).toMatchObject({ sure_n: 20, sure_right: 0.85 });
     // Fact cards (no AI rating), in-head answers, other confidences and old reviews don't count.
     expect(calibration([...rs, r(3, undefined), r(3, 1, 1, true), r(2, 1), r(3, 1, 90)]).sure_n).toBe(20);
+  });
+
+  test("each confidence tap's share right, from 10 answers; Guess and Think so count by the same rules (D165)", () => {
+    const rs = [
+      ...Array.from({ length: 17 }, () => r(3, 4)), ...Array.from({ length: 3 }, () => r(3, 2)),
+      ...Array.from({ length: 6 }, () => r(1, 3)), ...Array.from({ length: 4 }, () => r(1, 1)),
+      ...Array.from({ length: 9 }, () => r(2, 3)),
+      r(1, undefined), r(1, 4, 1, true), r(1, 4, 90),
+    ];
+    expect(calibration(rs).levels).toEqual([
+      { confidence: 1, n: 10, right: 0.6 },
+      { confidence: 2, n: 9, right: null },
+      { confidence: 3, n: 20, right: 0.85 },
+    ]);
   });
 
   test("shows on the week's first session end that had reviews", async () => {
