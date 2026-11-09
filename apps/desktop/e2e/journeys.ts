@@ -44,10 +44,24 @@ async function open(url: string): Promise<Page> {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
+  await page.addInitScript(STOPPED_PRESSES);
   await page.goto(url);
   await page.locator(".side-item").first().waitFor();
   return page;
 }
+
+// A press stopped on its way to the document leaves an open popover deaf to it (Radix listens there), and one
+// stopped inside a popover makes the next press outside count as inside: every journey fails on one.
+const STOPPED_PRESSES = `(() => {
+  window.__stoppedPresses = [];
+  for (const m of ["stopPropagation", "stopImmediatePropagation"]) {
+    const was = Event.prototype[m];
+    Event.prototype[m] = function () {
+      if (this.type === "pointerdown") window.__stoppedPresses.push((this.target?.className?.baseVal ?? this.target?.className ?? this.target?.nodeName) + "");
+      return was.call(this);
+    };
+  }
+})()`;
 
 const errors: string[] = [];
 const { url, stop } = await start();
@@ -5094,13 +5108,15 @@ journey("list: back from a source opened low in To read, its row is selected and
 });
 
 journey("a popover closes on any click outside it, even after a press inside it or on a control that stops the event", async (page) => {
-  await page.reload();
+  await page.waitForLoadState("networkidle"); // the source the last journey left open has reopened
   await page.getByRole("button", { name: /^All sources/ }).click();
   // As in WebKit: a click moves no focus, so the popover's close-on-focus-loss can't hide a missed click.
   await page.addScriptTag({ content: `document.addEventListener("mousedown", (e) => e.preventDefault(), true)` });
+  // The picker opens on the last row, below the first, so the first row's controls stay uncovered.
+  const skills = page.locator(".row").getByRole("button", { name: /^Skills for / });
   const picker = page.locator(".skill-picker");
   const open = async () => {
-    await page.getByRole("button", { name: `Skills for ${TESTING}` }).click();
+    await skills.last().click();
     await picker.waitFor();
   };
   const closed = async (where: string) => {
@@ -5115,22 +5131,21 @@ journey("a popover closes on any click outside it, even after a press inside it 
   await closed("on empty space, after a press inside it");
   // A control that keeps its press from dragging the row.
   await open();
-  await page.getByRole("button", { name: `Skills for ${AGENTS}` }).click();
+  await skills.first().click();
   await until("one skill picker open", async () => (await page.locator(".skill-picker[data-state=open]").count()) === 1);
   await page.keyboard.press("Escape");
   await closed("on another row's skills (it opens that row's)");
   await open();
-  const row = page.locator(".row", { hasText: AGENTS }).first();
+  const row = page.locator(".row").first();
   await row.hover();
-  await row.getByRole("button", { name: `Actions for ${AGENTS}` }).click();
+  await row.getByRole("button", { name: /^Actions for / }).click();
   await closed("on another row's ⋯ menu");
   await page.keyboard.press("Escape");
   // A control that stops its click.
   await open();
-  await page.locator(".side-head-tools .side-tool").first().click({ force: true });
-  await closed("on a sidebar tool");
+  await page.locator(".side-head-tools").getByRole("button", { name: /^Actions for / }).first().click({ force: true });
+  await closed("on a sidebar ⋯ (it stops its click)");
   await page.keyboard.press("Escape");
-  await page.reload();
 });
 
 journey("skill picker: a skill with a long name still shows its tick", async (page) => {
@@ -5525,6 +5540,8 @@ for (const [name, run] of journeys) {
   const t0 = Date.now();
   try {
     await run(page);
+    const stopped = (await page.evaluate(() => (window as any).__stoppedPresses as string[]).catch(() => [])) ?? [];
+    if (stopped.length) throw new Error(`a press was stopped before it reached the document, on: ${[...new Set(stopped)].join(", ")}`);
     console.log(`ok    ${name} (${Date.now() - t0} ms)`);
   } catch (e) {
     failed++;

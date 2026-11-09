@@ -72,9 +72,8 @@ export function Grab(p: {
 
   const down = (side: Side) => (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
-    // No text selection starts under the knob, and the page's own mouse handlers stay out of it.
+    // No text selection starts under the knob (the page's own mouse handlers are kept out by .grab).
     e.preventDefault();
-    e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { side, was: p.range.cloneRange(), now: p.range.cloneRange(), id: e.pointerId };
     p.onDragging(true);

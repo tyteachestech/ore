@@ -105,7 +105,7 @@ export function board(
   // Drag pans (left or middle button); a left press that never moves is a click, which opens it.
   let dragged = false;
   dom.addEventListener("pointerdown", (e) => {
-    if (e.target === fit || grips.includes(e.target as HTMLElement)) return;
+    if ([fit, ...grips].some((c) => c.contains(e.target as Node))) return;
     if (e.pointerType === "touch" || (e.button !== 0 && e.button !== 1)) return;
     // Taken here, the press never reaches the note as a node drag or a text selection.
     e.preventDefault();

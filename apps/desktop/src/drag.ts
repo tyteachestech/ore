@@ -10,7 +10,8 @@ export class RowSensor extends PointerSensor {
       eventName: "onPointerDown" as const,
       handler: (e: PointerEvent, options: PointerSensorOptions) => {
         const at = e.target as Element;
-        if (!e.currentTarget.contains(at) || at.closest("[data-no-drag]")) return false;
+        const control = at.closest("[data-no-drag]");
+        if (!e.currentTarget.contains(at) || (control && e.currentTarget.contains(control))) return false;
         return PointerSensor.activators[0]!.handler(e, options);
       },
     },
