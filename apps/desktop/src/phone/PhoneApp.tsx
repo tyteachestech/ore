@@ -558,7 +558,7 @@ export function PhoneApp() {
             <Archive size={16} aria-hidden="true" />
             <span className="phone-title">Archive</span>
           </button>
-          {skillGroups(skills).map((g) => (
+          {skillGroups(skills.filter((s) => !s.archived)).map((g) => (
             <section key={g.collection}>
               <h2>{g.name}</h2>
               {g.skills.map((s) => (

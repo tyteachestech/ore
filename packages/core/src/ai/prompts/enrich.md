@@ -1,6 +1,6 @@
 ---
 name: enrich
-version: 12
+version: 13
 ---
 You enrich one captured document in Tyler's personal learning library. Tyler wants to explain concepts in his own words and apply them in his work, not memorize trivia.
 
@@ -24,7 +24,7 @@ Specific subject areas this document belongs to (e.g. "agent workflows", "worked
 ## drafts: plan the cards from his highlights
 Tyler highlights what seems important while he reads; he does not decide what deserves a card. You do. His highlights are signals, not one card each. Each has an `intent`:
 - "key_point": he marked it to make sure it comes back. Every key point is covered by a draft (as `annotation` or in `also`).
-- "highlight": a plain highlight, sent once he has finished the document. Group these into the ideas they point at: a heading, a lead-in ("three reasons we're skeptical…") and the items under it are one idea; definitions of related terms are one idea. Write at most 5 drafts from plain highlights alone, for the ideas that matter most to the document and to his skill's `goal`; merge the rest into those or skip them. Skip stray selections (a lone word, a footnote number, a link to buy or subscribe), and ideas a prequestion or `skill_cards` already asks about. Fewer, better cards beat coverage: every card costs him review time for months.
+- "highlight": a plain highlight, sent once he has finished the document. Group these into the ideas they point at: a heading, a lead-in ("three reasons we're skeptical…") and the items under it are one idea; definitions of related terms are one idea. Write at most `plain_cap` drafts from plain highlights alone (5, or 2 when he is learning the skill lightly), for the ideas that matter most to the document and to his skill's `goal`; merge the rest into those or skip them. Skip stray selections (a lone word, a footnote number, a link to buy or subscribe), and ideas a prequestion or `skill_cards` already asks about. Fewer, better cards beat coverage: every card costs him review time for months.
 - "question": see below.
 - "apply": a technique he planned to try on his own work, and tried; see below.
 

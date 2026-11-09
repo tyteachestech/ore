@@ -35,7 +35,7 @@ export type MenuAction = {
   divider?: boolean;
   /** Drawn before the label (a skill's icon). */
   icon?: ReactNode;
-  /** In a submenu: a checkbox item, ticked when true (Linear's labels). */
+  /** A checkbox item, ticked when true (Linear's labels): in a submenu, or at the top of a ⋯ menu. */
   checked?: boolean;
   /** In a submenu: picking it leaves the menu open, for settings he toggles while watching (Show). */
   keep?: boolean;
@@ -202,6 +202,16 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
                   </DropdownMenu.SubContent>
                 </DropdownMenu.Portal>
               </DropdownMenu.Sub>
+            ) : a.checked !== undefined ? (
+              <DropdownMenu.CheckboxItem className="menu-item check" checked={a.checked} onSelect={pick(a)}>
+                <span className="menu-tick">
+                  <DropdownMenu.ItemIndicator>
+                    <Check size={12} weight="bold" />
+                  </DropdownMenu.ItemIndicator>
+                </span>
+                {a.icon}
+                <span className="menu-label">{a.label}</span>
+              </DropdownMenu.CheckboxItem>
             ) : (
               <DropdownMenu.Item className={`menu-item${a.danger ? " danger" : ""}`} onSelect={later(a.run)}>
                 {a.label}

@@ -7,7 +7,7 @@ import { ulid } from "../ids.ts";
 import { createItem, findItem, listItems, readItemDir, setItemArchived, sourceFile, type CourseRef, type Item, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { withLock } from "../lock.ts";
-import { setItemSkills } from "../skills.ts";
+import { setItemSkills, unarchiveFiled } from "../skills.ts";
 import { withImages } from "./assets.ts";
 import { dropTitle, hasText, pageDraft, withTranscript } from "./page.ts";
 import { courseCoverFile, makeCourseCover, makeThumbnail } from "./thumbnail.ts";
@@ -217,5 +217,6 @@ export async function addCourse(lib: Library, plan: CoursePlan, opts: { skills?:
   // The course's own picture for its row, made once (a re-add makes it for a course added before it).
   const lessons = [...existing, ...added];
   if (lessons.length && !lessons.some(courseCoverFile)) await makeCourseCover(lessons[0]!, plan.url);
+  if (skills.length && added.length) await withLock(paths.lock(lib), () => unarchiveFiled(lib, skills)); // D173
   return { course: { id, title, url: plan.url }, added, kept: have.size, filled, failed, filed, restored: archived.length };
 }

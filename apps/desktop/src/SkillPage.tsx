@@ -1,4 +1,5 @@
-import { CaretRight, Check, Collapse, Expand, Plus, Target, X } from "./icons";
+import { Archive, CaretRight, Check, Collapse, Expand, Plus, Target, X } from "./icons";
+import { ImportanceIcon, levelOf } from "./importance";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Grow } from "./Grow";
@@ -36,6 +37,9 @@ type Props = {
   onAddSource: () => void;
   /** After the icon or color changed from the badge. */
   onSkillChanged: () => void;
+  /** Its importance levels to pick (D173), and Bring back once it is archived. */
+  importance: MenuAction[];
+  onBringBack: () => void;
   notify: Notify;
   /** A ⌘K match in the skill note: the note opens scrolled to these words, the find bar on them; `onFound` once it has. */
   findInNote?: string;
@@ -47,7 +51,7 @@ type Props = {
 
 /** A skill's page (D46): the D23 stats as chips in the header, then two equal columns that each
  *  scroll on their own, so a long note (D41) never buries his questions (D47) and sources. */
-export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, notify, findInNote, onFound, children }: Props) {
+export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children }: Props) {
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
@@ -141,7 +145,18 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
       <header className="skill-hero">
         <BadgePicker skill={skill} onChanged={onSkillChanged} notify={notify} />
         <div className="skill-title">
-          <SkillName skill={skill} onRenamed={onSkillChanged} notify={notify} />
+          <div className="skill-name-row">
+            <SkillName skill={skill} onRenamed={onSkillChanged} notify={notify} />
+            {/* How much it matters (D173), Linear's priority bars; archived, the one thing to do is bring it back. */}
+            {skill.archived ? (
+              <button className="skill-unarchive" onClick={onBringBack}>
+                <Archive size={16} aria-hidden="true" />
+                Bring back
+              </button>
+            ) : (
+              <MoreButton className="skill-importance" label={`Importance: ${levelOf(skill).label}`} hint={`Importance: ${levelOf(skill).label}`} icon={<ImportanceIcon skill={skill} />} actions={importance} align="start" />
+            )}
+          </div>
           <Goal skill={skill} lastTry={lastGoalTry(notes.text)} onTry={() => setRecalling("goal")} onChanged={onSkillChanged} notify={notify} />
         </div>
         {stats && stats.strength.solid + stats.strength.growing + stats.strength.new > 0 && <Strength s={stats} color={skill.color} />}

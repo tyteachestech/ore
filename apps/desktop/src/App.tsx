@@ -9,7 +9,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type Question as QuestionView, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -36,6 +36,7 @@ import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
+import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChip, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
 import { errorText, load, save } from "./util";
@@ -469,6 +470,8 @@ export function App() {
         }
       }
       await refresh();
+      // Filed under an archived skill, it brought the skill back (D173).
+      if (to.some((id) => skills.some((s) => s.id === id && s.archived))) reloadSkills();
       const at = last?.id;
       // Show opens the tab it is in: a source he finished is under Done.
       const done = (last as Item | null)?.status === "done";
@@ -513,7 +516,7 @@ export function App() {
       } else if (message) notify(message, "info", undo, redoAll, opens ? undefined : show);
       return { failure, failed: [...failed, ...stopped], first, cancelled };
     },
-    [notify, progress, refresh, skills, openSource],
+    [notify, progress, refresh, skills, openSource, reloadSkills],
   );
 
   /** New sources go to the skill whose page is open, else no skill. */
@@ -1384,6 +1387,34 @@ export function App() {
   };
   const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
 
+  /** Writes a skill's importance or archived flag (D173) at once, then saves through `ore`; a failure
+   *  puts it back. On the history, with a toast for Archive and Bring back (they move it in the sidebar). */
+  const changeSkill = async (id: string, patch: Pick<Skill, "priority" | "archived">, fromHistory = false) => {
+    setSkills((all) => all.map((k) => (k.id === id ? { ...k, ...patch } : k)));
+    try {
+      if (patch.priority) await ore("skills", "set", id, opt("priority", patch.priority));
+      if (patch.archived !== undefined) await ore("skills", "archive", id, ...(patch.archived ? [] : ["--undo"]));
+    } catch (e) {
+      if (fromHistory) throw e;
+      notify(errorText(e), "error");
+    } finally {
+      reloadSkills();
+    }
+  };
+  /** Picks a level; picking one on an archived skill brings it back too. */
+  const setImportance = (s: Skill, p: Priority) => {
+    // Archived only when it changes: a live skill's level is one write.
+    const before = { priority: s.priority ?? "P2", ...(s.archived && { archived: true }) };
+    const after = { priority: p, ...(s.archived && { archived: false }) };
+    if (before.priority === p && !s.archived) return;
+    void changeSkill(s.id, after);
+    notify(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, before.archived ? "info" : "quiet", () => changeSkill(s.id, before, true), () => changeSkill(s.id, after, true));
+  };
+  const archiveSkill = (s: Skill, on: boolean) => {
+    void changeSkill(s.id, { archived: on });
+    notify(on ? `Archived “${s.name}”` : `Brought back “${s.name}”`, "info", () => changeSkill(s.id, { archived: !on }, true), () => changeSkill(s.id, { archived: on }, true));
+  };
+
   /** A skill's actions: the sidebar's right-click and ⋯. */
   const skillMenu = (s: Skill): MenuAction[] => [
     { id: "open", label: "Open", run: () => openSkill(s.id) },
@@ -1400,6 +1431,8 @@ export function App() {
           ],
         }]
       : []),
+    { id: "importance", label: "Importance", run: () => {}, sub: importanceActions(s, setImportance) },
+    s.archived ? { id: "unarchive", label: "Bring back", run: () => archiveSkill(s, false) } : { id: "archive", label: "Archive skill", run: () => archiveSkill(s, true) },
     { id: "delete", label: "Delete skill…", danger: true, run: () => setDeleting(s.id) },
   ];
 
@@ -1597,11 +1630,14 @@ export function App() {
    *  optimistic, with Undo back to `before`. */
   const refile = async (what: { title: string; ids: Set<string>; write: (skills: string[]) => Promise<unknown> }, next: string[], before: string[], changed?: Skill, fromHistory = false) => {
     setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
+    // Filing under an archived skill brings it back (D173); Undo archives it again.
+    const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
+    const rearchive = () => Promise.all(revived.map((id) => ore("skills", "archive", id))).finally(reloadSkills);
     try {
       await what.write(next);
       if (changed) {
         const on = next.includes(changed.id);
-        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true), () => refile(what, next, before, undefined, true));
+        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true).then(rearchive), () => refile(what, next, before, undefined, true));
       }
     } catch (e) {
       // From the history (undo or redo): it puts the step back and says why.
@@ -1609,6 +1645,8 @@ export function App() {
       notify(errorText(e), "error");
     } finally {
       void refresh();
+      // Filing under an archived skill brings it back (D173): the sidebar shows it in its place again.
+      if (next.some((id) => skills.some((s) => s.id === id && s.archived))) reloadSkills();
     }
   };
   const sourceFiling = (item: Item) => ({ title: item.title, ids: new Set([item.id]), write: (ids: string[]) => ore("edit", item.id, "--skills", ids.join(",")) });
@@ -1731,6 +1769,10 @@ export function App() {
             keywords: ["collection", "group"],
             run: b.run,
           })),
+          ...LEVELS.filter((l) => skillOf(skill).archived || l.p !== (skillOf(skill).priority ?? "P2")).map((l) => ({ id: `skill-level:${l.p}`, label: `Importance of ${skillOf(skill).name}: ${l.label}`, keywords: ["priority", "focus", "normal", "light", "level"], run: () => setImportance(skillOf(skill), l.p) })),
+          skillOf(skill).archived
+            ? { id: "skill-unarchive", label: `Bring back ${skillOf(skill).name}`, keywords: ["archive", "restore", "unarchive"], run: () => archiveSkill(skillOf(skill), false) }
+            : { id: "skill-archive", label: `Archive skill ${skillOf(skill).name}`, keywords: ["hide", "shelve", "pause"], run: () => archiveSkill(skillOf(skill), true) },
           { id: "delete-skill", label: `Delete skill ${skillOf(skill).name}…`, run: () => setDeleting(skill) },
         ]
       : []),
@@ -2247,6 +2289,8 @@ export function App() {
             onAdded={() => void refresh()}
             onAddSource={() => setAdding(true)}
             onSkillChanged={reloadSkills}
+            importance={importanceActions(skillOf(skill), setImportance)}
+            onBringBack={() => archiveSkill(skillOf(skill), false)}
             notify={notify}
             findInNote={skillFind}
             onFound={() => setSkillFind(undefined)}

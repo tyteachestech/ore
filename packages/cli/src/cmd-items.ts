@@ -14,7 +14,7 @@ import {
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -529,17 +529,21 @@ export const itemCommands: Record<string, Command> = {
   },
 
   skills: {
-    usage: `[add <name> [--collection c] | rm <skill> [--archive] | restore '<json from rm>' | set <skill> [--name n] [--icon mc:name] [--color ${SkillColor.options.join("|")}] [--collection c] [--hook "why I'm learning this"] [--goal "what I could show I can do"] | arrange '[{"collection":"Work","skills":["ai"]},{"collection":"","skills":[...]}]']   list skills, add one, delete one (untags its sources and cards, which stay; --archive also archives sources filed only under it), undo a delete (restore takes the "removed" that rm printed with --json), rename one, set how one looks ("" clears), or lay out the sidebar (collections and skills in order, every skill once)`,
-    options: { archive: { type: "boolean" }, name: { type: "string" }, icon: { type: "string" }, color: { type: "string" }, collection: { type: "string" }, hook: { type: "string" }, goal: { type: "string" } },
+    usage: `[add <name> [--collection c] | rm <skill> [--archive] | restore '<json from rm>' | set <skill> [--name n] [--priority P1|P2|P3] [--icon mc:name] [--color ${SkillColor.options.join("|")}] [--collection c] [--hook "why I'm learning this"] [--goal "what I could show I can do"] | archive <skill> [--undo] | arrange '[{"collection":"Work","skills":["ai"]},{"collection":"","skills":[...]}]']   list skills, add one (Light, P3), delete one (untags its sources and cards, which stay; --archive also archives sources filed only under it), undo a delete (restore takes the "removed" that rm printed with --json), rename one, set its importance (P1 Focus, P2 Normal, P3 Light) or how it looks ("" clears), archive one (out of the sidebar's list, review, Home and enrich; --undo brings it back), or lay out the sidebar (collections and skills in order, every skill once)`,
+    options: { archive: { type: "boolean" }, undo: { type: "boolean" }, priority: { type: "string" }, name: { type: "string" }, icon: { type: "string" }, color: { type: "string" }, collection: { type: "string" }, hook: { type: "string" }, goal: { type: "string" } },
     async run([sub, id], f) {
       const lib = openLibrary();
       if (sub === "set") {
-        const skill = await setSkillLook(lib, need(id, "<skill>"), { name: str(f.name), icon: str(f.icon), color: str(f.color), collection: str(f.collection), hook: str(f.hook), goal: str(f.goal) });
+        const skill = await setSkillLook(lib, need(id, "<skill>"), { name: str(f.name), priority: str(f.priority), icon: str(f.icon), color: str(f.color), collection: str(f.collection), hook: str(f.hook), goal: str(f.goal) });
         return { data: skill, text: `${skill.name}: ${[skill.icon, skill.color, skill.collection].filter(Boolean).join(", ") || "plain"}` };
       }
       if (sub === "add") {
         const skill = await addSkill(lib, need(id, "<name>"), str(f.collection));
         return { data: skill, text: `Added skill ${skill.name} (${skill.id})` };
+      }
+      if (sub === "archive") {
+        const skill = await archiveSkill(lib, need(id, "<skill>"), !f.undo);
+        return { data: skill, text: `${skill.archived ? "Archived" : "Brought back"} skill ${skill.name}` };
       }
       if (sub === "rm") {
         const r = await removeSkill(lib, need(id, "<skill>"), { archive: !!f.archive });
@@ -553,14 +557,14 @@ export const itemCommands: Record<string, Command> = {
         const skills = await arrangeSkills(lib, SkillLayoutSchema.parse(JSON.parse(need(id, "<layout json>"))));
         return { data: skills, text: `Arranged ${skills.length} skills` };
       }
-      if (sub) throw new Error(`unknown subcommand "${sub}" (add|rm|restore|set|arrange)`);
+      if (sub) throw new Error(`unknown subcommand "${sub}" (add|rm|restore|set|archive|arrange)`);
       const { skills } = loadSkills(lib);
       return { data: skills, text: table(skills.map((s) => [s.id, s.priority, s.icon ?? "", s.collection ?? "", s.name])) };
     },
   },
 
   "suggested-skill": {
-    usage: "<item> accept|dismiss|undo <json>   accept creates the skill enrich suggested (if new, at P2) and files the item, its cards and topics under it; undo takes back an accept (its `undo`) or a dismiss ({\"suggestion\":…})",
+    usage: "<item> accept|dismiss|undo <json>   accept creates the skill enrich suggested (if new, Light: P3; an archived one comes back) and files the item, its cards and topics under it; undo takes back an accept (its `undo`) or a dismiss ({\"suggestion\":…})",
     async run([ref, action, json]) {
       const lib = openLibrary();
       need(ref, "<item>");
