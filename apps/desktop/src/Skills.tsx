@@ -279,7 +279,8 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
   onDelete: () => void;
   notify: Notify;
 }) {
-  const [look, setLook] = useState<Look>({ icon: skill.icon ?? "", color: skill.color ?? "", collection: skill.collection ?? "" });
+  // An icon from before D157 (an emoji, "ph:") draws nothing and core refuses it, so it reads as none: Undo clears it.
+  const [look, setLook] = useState<Look>({ icon: skill.icon?.startsWith("mc:") ? skill.icon : "", color: skill.color ?? "", collection: skill.collection ?? "" });
   const [picking, setPicking] = useState(false);
   const iconRef = useRef<HTMLButtonElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
