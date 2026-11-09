@@ -1,7 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
 import { CaretDown, Check as CheckIcon, Plus } from "./icons";
-import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type KeyboardEvent as ReactKeyboardEvent, type SyntheticEvent } from "react";
+import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
 import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
@@ -301,19 +301,26 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
     }
   };
 
-  // Keys from a popover bubble here through its portal; Radix closes the popover on Esc, so only
-  // an Esc from inside the panel itself closes the editor.
-  const onKey = (e: ReactKeyboardEvent) => {
-    if (e.key === "Escape" && e.currentTarget.contains(e.target as Node)) {
+  // Esc closes the editor from inside the panel, and from the body: Radix hands focus back to the
+  // icon button a tick after the picker unmounts, so an Esc in that tick lands on the body. One from
+  // inside a popover (its portal sits outside the panel) is Radix's, which closes the popover.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const panel = panelRef.current;
+      const t = e.target as Node | null;
+      if (e.key !== "Escape" || e.defaultPrevented || !panel || !(t === document.body || panel.contains(t))) return;
       e.preventDefault();
       onClose();
-    }
-  };
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Trap>
-      <div className="panel skill-edit" role="dialog" aria-modal="true" aria-label={`Edit skill ${skill.name}`} onKeyDown={onKey}>
+      <div ref={panelRef} className="panel skill-edit" role="dialog" aria-modal="true" aria-label={`Edit skill ${skill.name}`}>
         <div className="skill-edit-head">
           <Popover.Root open={picking} onOpenChange={setPicking}>
             <Hint text={look.icon ? "Change icon" : "Add icon"}>

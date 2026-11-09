@@ -30,6 +30,7 @@ import { dueSkills, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { Review } from "./Review";
 import { useToast } from "./Toast";
 import { lineAfter, lineKey, type Line } from "./lines";
+import { readGuard } from "./reads";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
@@ -291,14 +292,9 @@ export function App() {
   const tutor = useTutorChat(notify);
   const listRef = useRef<HTMLDivElement>(null);
 
-
-  // Only the newest list read lands: an older one answering late would put back what came after it.
-  const reads = useRef(0);
-  // Nor one that began before a row's optimistic write: it would put the row back (a second A then
-  // archives it again). Each write reads the list again once it settles; a read begun after it lands,
-  // so a write that hangs never freezes the list.
-  const writes = useRef(0);
-  const writing = <T,>(p: Promise<T>) => (writes.current++, p);
+  // Which list reads land, against the writes around them (reads.ts).
+  const guard = useRef(readGuard()).current;
+  const writing = guard.writing;
   /** One action's writes, one after another: an Undo pressed while its archive still saves waits for it,
    *  or the two `ore` runs race and the archive can land last, leaving it archived. */
   const inOrder = () => {
@@ -310,16 +306,15 @@ export function App() {
     };
   };
   const refresh = useCallback(async () => {
-    const n = ++reads.current;
-    const w = writes.current;
+    const read = guard.begin();
     try {
       const [all, gone] = await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
-      if (n !== reads.current || w !== writes.current) return;
+      if (!read.lands()) return;
       setItems(all);
       setArchived(gone);
       setListError(null);
     } catch (e) {
-      if (n === reads.current) setListError(errorText(e));
+      if (read.newest()) setListError(errorText(e));
     }
   }, []);
 
