@@ -17,7 +17,7 @@ import { isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./cours
 import { pageDraft } from "./page.ts";
 import type { Tab } from "./tab.ts";
 import { makeThumbnail } from "./thumbnail.ts";
-import { fetchYoutube, isYoutubeUrl, srtToVtt, vttToBody, youtubeId } from "./youtube.ts";
+import { fetchYoutube, isYoutubeUrl, srtToVtt, vttToBody, vttWords, youtubeId } from "./youtube.ts";
 export { courseCoverFile, epubCover, makeCourseCover, makeThumbnail, pageImage, thumbnailFile } from "./thumbnail.ts";
 export { transcriptOf, vttWords, youtubeId } from "./youtube.ts";
 export { embeddedVideo, pageDraft, TRANSCRIPT_HEADING, VIDEO_END } from "./page.ts";
@@ -79,6 +79,16 @@ export const FILE_TYPES = ["pdf", "epub", "md", "markdown", "txt", "text", "html
 const AUDIO_TYPES = ["mp3", "m4a", "wav", "aac", "aiff", "flac"];
 /** Video files, heard from their sound on the Mac; as `audio.ts` VIDEO_TYPES. */
 const VIDEO_TYPES = ["mp4", "mov", "m4v"];
+
+/** A podcast or recording kept whole (D167): its audio file, to play in place, and the transcript's word
+ *  times, as `transcriptOf` gives a video's. Audio added before D167 kept only its transcript: null. */
+export function audioOf(item: Item): { file: string; words: [number, string][] } | null {
+  const file = sourceFile(item);
+  const vtt = join(item.dir, "transcript.vtt");
+  if (!file || !AUDIO_TYPES.includes(extname(file).slice(1).toLowerCase()) || !existsSync(vtt)) return null;
+  return { file, words: vttWords(readFileSync(vtt, "utf8")).map((w) => [Math.round(w.t * 100) / 100, w.w]) };
+}
+
 /** Images read with text recognition (D96). */
 const IMAGE_TYPES = ["png", "jpg", "jpeg", "heic", "tiff", "webp", "gif"];
 /** A page larger than this is not an article: a video, a dump, a disk image. */
@@ -108,7 +118,8 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     const vtt = await (await import("./audio.ts")).transcribe(bytes, kind, opts.onProgress, opts.language);
     // A podcast host's file name ("17456166-summer-shorts-…") as words, its id dropped.
     const title = fileStem(name).replace(/^\d{5,}[-_ ]+/, "").replace(/[-_]+/g, " ").trim() || fileStem(name);
-    return { type: "article", title: title[0]!.toUpperCase() + title.slice(1), url, body: vttToBody(vtt), source: { ext: "vtt", data: vtt } };
+    // The audio itself is the original, kept to play in place (D122, D167); the timed transcript beside it.
+    return { type: "article", title: title[0]!.toUpperCase() + title.slice(1), url, body: vttToBody(vtt), source: { ext: kind, data: bytes }, transcript: vtt };
   }
   if (kind === "pdf") {
     const p = await pdfToDoc(bytes, opts.regions).catch(async (e) => {

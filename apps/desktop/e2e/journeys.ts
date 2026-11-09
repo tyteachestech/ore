@@ -1202,11 +1202,31 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   if (card.kind !== "card" || card.figure.src !== "assets/patterns.svg" || !card.figure_file.endsWith("assets/patterns.svg")) throw new Error(JSON.stringify(card));
   const [x, y, w, h] = card.figure.box;
   if (Math.abs(x! - 0.2) > 0.02 || Math.abs(y! - 0.3) > 0.02 || Math.abs(w! - 0.2) > 0.02 || Math.abs(h! - 0.2) > 0.02) throw new Error(`box ${card.figure.box}`);
+  // An edit in review hands back the card with its figure, so the figure stays on screen.
+  if (!((await ore("card", "set", id, "--answer", "Routing")) as { figure_file?: string }).figure_file) throw new Error("editing a figure card lost its figure");
   // Esc with no box open puts the figure back; Undo takes the card back.
   await page.keyboard.press("Escape");
   await page.locator(".figure-zoom").waitFor({ state: "detached" });
   await page.getByRole("button", { name: "Undo" }).click();
   await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
+});
+
+journey("a recording plays in place: its player over the transcript, his highlights as ticks, a stamp seeks it, Space plays and pauses (D167)", async (page) => {
+  await openSource(page, "Lecture 4");
+  const player = page.locator(".player.audio");
+  await player.waitFor();
+  if (await player.locator("iframe").count()) throw new Error("a recording drew a video frame");
+  await until("its length is read from the file", async () => (await player.locator(".time").innerText()).includes("1:00"));
+  await until("both highlights are ticks on the bar", async () => (await player.locator(".scrub-tick").count()) === 2);
+  const lefts = await player.locator(".scrub-tick").evaluateAll((ts) => ts.map((t) => parseFloat((t as HTMLElement).style.left)));
+  // "the memory gets stronger" is spoken at about 0:15 (word times spread over its cue), "The gap only shows" at 0:30.
+  if (!(lefts[0]! > 15 && lefts[0]! < 32 && lefts[1]! > 45 && lefts[1]! < 55)) throw new Error(`ticks at ${lefts}`);
+  await page.locator(".doc .ts").filter({ hasText: "00:30" }).click();
+  await until("the stamp seeks the recording", async () => /^0:3\d/.test((await player.locator(".time").innerText()).trim()));
+  await until("and plays it", async () => (await player.getByRole("button", { name: "Pause" }).count()) === 1);
+  await page.mouse.click(5, 300);
+  await page.keyboard.press("Space");
+  await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
 journey("highlight note: a long note's hover preview stays inside the window", async (page) => {

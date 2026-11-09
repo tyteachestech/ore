@@ -201,7 +201,7 @@ export type Research = { sources: { title: string; url: string; site: string; ty
 export type Transcript = { video: string; words: [number, string][] };
 
 /** `reached` and `leave_out`: what his last partway finish covered (D100). */
-export type Doc = Item & { body: string; annotations?: Annotation[]; transcript?: Transcript | null; reached?: number; leave_out?: { text: string } };
+export type Doc = Item & { body: string; annotations?: Annotation[]; transcript?: Transcript | null; audio?: { file: string; words: [number, string][] }; reached?: number; leave_out?: { text: string } };
 
 export const SKILL_COLORS = ["gray", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink"] as const;
 export type SkillColor = (typeof SKILL_COLORS)[number];

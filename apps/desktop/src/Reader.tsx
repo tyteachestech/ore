@@ -38,7 +38,7 @@ import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
-import { clock, MAX_RATE, MIN_RATE, Speed, useYouTube, VideoPlayer } from "./Video";
+import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
 import { errorText, inOrder, load, save, useFocusBack, type Notify } from "./util";
 import { popupPlace, type Aim } from "./popup-place";
@@ -588,8 +588,12 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   // Video sources (D48 to D50): the player, transcript words located in the rendered text, and
   // following. `following` is a ref so scroll handlers see it at once; `away` drives the pill.
-  const video = doc?.transcript ?? null;
-  const player = useYouTube(video?.video, p.id);
+  // A kept recording (D167) plays as a video does, on its own audio: the same following, stamps and keys.
+  const audio = doc?.transcript ? null : (doc?.audio ?? null);
+  const video = useMemo(() => doc?.transcript ?? (audio ? { video: "", words: audio.words } : null), [doc?.transcript, audio]);
+  const youtube = useYouTube(doc?.transcript?.video, p.id);
+  const recording = useAudio(audio?.file, p.id);
+  const player = audio ? recording : youtube;
   // A page with its video (D92): the player and its transcript sit in a card at the top of the text,
   // not pinned, and the transcript follows the speaker inside the card. Folding is kept per source.
   const cardMode = !!video && !!doc?.video && !!shownBody?.includes(VIDEO_END);
@@ -619,6 +623,16 @@ function ReaderView(p: Props & { reload: () => void }) {
         return i >= 0 ? clock(words.time[i]!) : null;
       }
     : undefined;
+
+  /** Where each highlight is spoken, in seconds: ticks on the scrubber (D167). */
+  const ticks = useMemo(() => {
+    const index = idx.current;
+    if (!words || !index) return [];
+    return painted.flatMap(({ r }) => {
+      const i = wordAtOffset(words, skeletonOffset(index, r.startContainer, r.startOffset));
+      return i >= 0 ? [words.time[i]!] : [];
+    });
+  }, [words, painted]);
 
   /** The part of the scroll pane not covered by the pinned player. */
   const band = () => {
@@ -2580,6 +2594,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             {/* Folded by CSS, not unmounted, so the player keeps its place in the video. */}
             <VideoPlayer
               player={player}
+              ticks={ticks}
               title={doc.title}
               onFinish={() => p.setFinishing(true)}
               onOpen={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}
@@ -2789,6 +2804,8 @@ function ReaderView(p: Props & { reload: () => void }) {
             <div className="player-pin" ref={playerRef}>
               <VideoPlayer
                 player={player}
+                audio={!!audio}
+                ticks={ticks}
                 title={doc.title}
                 onFinish={() => p.setFinishing(true)}
                 onOpen={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}

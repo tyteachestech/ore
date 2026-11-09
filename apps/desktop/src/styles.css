@@ -857,6 +857,11 @@ body.resizing iframe { pointer-events: none; }
 .scrub-thumb { display: block; width: 11px; height: 11px; border-radius: 50%; background: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); opacity: 0; transition: opacity 0.12s ease-out; }
 .scrub:hover .scrub-thumb, .scrub-thumb:focus-visible, .speed-slider .scrub-thumb { opacity: 1; }
 .scrub-thumb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* D167: a recording's player is its scrubber and controls, no frame; his highlights are ticks where they are spoken. */
+.player.audio { width: 100%; }
+.player.audio > .scrub { margin-top: 0; }
+.player.audio .video-error { position: static; padding: 8px 0; background: none; place-content: start; }
+.scrub-tick { position: absolute; top: 50%; width: 2px; height: 8px; margin-left: -1px; transform: translateY(-50%); background: var(--muted); pointer-events: none; }
 .popover.speed { width: 330px; padding: 14px 14px 12px; }
 .speed-head { font-weight: 600; color: var(--muted); margin-bottom: 12px; }
 .speed-head b { color: var(--text); font-variant-numeric: tabular-nums; }

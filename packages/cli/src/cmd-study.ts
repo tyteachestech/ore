@@ -10,7 +10,14 @@ import { int, need, oneOf, str, strs, table } from "./util.ts";
 
 const cardJson = (lib: Library, c: Card, state = cardStates(lib)(c)) => ({ ...c.meta, state, question: c.question, answer: c.answer, rubric: c.rubric, path: relative(lib.root, c.path) });
 /** With a figure card (D166), where its image is, so review can show it. */
-const figureJson = (lib: Library, c: Card) => (c.meta.figure ? { figure_file: figureFile(findItem(lib, c.meta.item), c.meta.figure.src) } : {});
+const figureJson = (lib: Library, c: Card) => {
+  if (!c.meta.figure) return {};
+  try {
+    return { figure_file: figureFile(findItem(lib, c.meta.item), c.meta.figure.src) };
+  } catch {
+    return {}; // its source is gone: the card's text stands alone (D166)
+  }
+};
 // A card as a variant shows it (D66): the variant's question, answer and key points, typed and
 // graded like an Explain card, with the original alongside.
 const variantJson = (lib: Library, c: Card, v: Variant) => ({
@@ -78,7 +85,7 @@ export const studyCommands: Record<string, Command> = {
           return { data: variantJson(lib, findCard(lib, id), v), text: `Saved variant ${v.id}` };
         }
         const c = await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, id), { question, answer, rubric }));
-        return { data: cardJson(lib, c), text: `Saved ${c.meta.id}` };
+        return { data: { ...cardJson(lib, c), ...figureJson(lib, c) }, text: `Saved ${c.meta.id}` };
       }
       if (sub === "retire" || sub === "restore") {
         const state = sub === "retire" ? "retired" : need(oneOf(f.state, ["draft", "live"] as const, "state"), "--state draft|live");
@@ -87,7 +94,7 @@ export const studyCommands: Record<string, Command> = {
           writeCardMeta(c, { ...c.meta, state });
           return findCard(lib, id);
         });
-        return { data: cardJson(lib, c), text: `${sub === "retire" ? "Retired" : "Restored"} ${c.meta.id}` };
+        return { data: { ...cardJson(lib, c), ...figureJson(lib, c) }, text: `${sub === "retire" ? "Retired" : "Restored"} ${c.meta.id}` };
       }
       throw new Error("usage: ore card show|edit|set|retire|restore <id>");
     },
