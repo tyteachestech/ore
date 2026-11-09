@@ -74,9 +74,10 @@ export function moleGrid(pose: Partial<Pose> = {}): (Tone | null)[][] {
   return g;
 }
 
-export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "sleepy";
+export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer" | "sleepy";
 type Move = { loop?: boolean; keys: [ms: number, pose: Partial<Pose>][] };
 const HAPPY: Partial<Pose> = { eyes: "arc", nose2: true, paw: 6, ex: 3.6, rx: 10, top: 1 };
+const CHEER: Partial<Pose> = { eyes: "arc", nose2: true, ex: 3 };
 const WIDE: Partial<Pose> = { eyes: "tall", nose2: true, rx: 10.6, top: 2 };
 const UP_R: Partial<Pose> = { lx: 1, ly: -1 }, UP_L: Partial<Pose> = { lx: -1, ly: -1 };
 /** Each mood's poses, held from their time (ms) until the next. One that doesn't loop ends at rest. */
@@ -89,6 +90,8 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   happy: { keys: [[0, HAPPY], [100, { ...HAPPY, top: 0, pawL: 1, pawR: 1 }], [220, HAPPY], [1800, {}]] },
   // Wide eyes and a jolt.
   surprised: { keys: [[0, WIDE], [80, { ...WIDE, rx: 10, top: -0.4 }], [180, WIDE], [1400, {}]] },
+  // Both paws waving, a bounce on each beat, then it settles pleased.
+  cheer: { keys: [[0, { ...CHEER, pawL: 3, pawR: 1 }], [180, { ...CHEER, top: -0.4, pawL: 1, pawR: 3 }], [360, { ...CHEER, pawL: 3, pawR: 1 }], [540, { ...CHEER, top: -0.4, pawL: 1, pawR: 3 }], [720, { ...CHEER, pawL: 3, pawR: 1 }], [900, HAPPY], [2400, HAPPY]] },
   sleepy: { loop: true, keys: [[0, { eyes: "half", top: 0.9 }], [1800, { eyes: "shut", top: 1.5 }], [3600, { eyes: "half", top: 0.9 }], [4400, { eyes: "half", top: 0.9 }]] },
 };
 
@@ -116,10 +119,10 @@ const BLINK_MS = 130, LOOK_MS = 900;
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
-/** The mole, `size` px wide. `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
+/** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite). `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
  *  5 to 9 s and glances to a side every 15 to 20 s. `look` (hover or focus on its button) faces him with a blink.
  *  Still under reduced motion (a mood shows its main pose) and while the window is hidden. */
-export function Mole({ size = 40, mood = "idle", look = false }: { size?: number; mood?: Mood; look?: boolean }) {
+export function Mole({ size = 40, mood = "idle", look = false, bare = false }: { size?: number; mood?: Mood; look?: boolean; bare?: boolean }) {
   const [pose, setPose] = useState<Partial<Pose>>({});
   const [busy, setBusy] = useState(false);
   const looking = useRef(look);
@@ -183,7 +186,7 @@ export function Mole({ size = 40, mood = "idle", look = false }: { size?: number
   const d = useMemo(() => drawn(pose), [pose]);
   // The dirt sits low in the button, so the mole reads as poking out of the ground at its foot.
   return (
-    <svg className="mole" width={size} height={size} viewBox="0 -3.3 22 22" aria-hidden="true">
+    <svg className="mole" width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : "0 -3.3 22 22"} aria-hidden="true">
       {d.map(([tone, path]) => (
         <path key={tone} className={`mole-${tone}`} d={path} />
       ))}

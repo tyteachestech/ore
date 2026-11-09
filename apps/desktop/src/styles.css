@@ -2011,6 +2011,8 @@ button.home-plan:hover { color: var(--text); }
 .review-keys { flex: none; display: flex; justify-content: center; gap: 18px; height: 38px; align-items: center; border-top: 1px solid var(--border); background: var(--bg-side); color: var(--faint); font-size: 12px; }
 .review-keys kbd { margin-right: 4px; }
 .review-end { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4vh auto 0; max-width: 420px; animation: card-in 300ms ease-out both; }
+/* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
+.review-mole { display: block; line-height: 0; margin-bottom: 2px; }
 .review-end h2 { font-family: var(--round); margin: 22px 0 0; font-size: 24px; }
 .review-kept { margin: 10px 0 0; font-size: 16px; color: var(--muted); }
 .review-kept b { font-family: var(--round); color: var(--text); font-size: 24px; font-variant-numeric: tabular-nums; }
