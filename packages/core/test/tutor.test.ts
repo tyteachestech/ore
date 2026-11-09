@@ -346,10 +346,10 @@ describe("tutor: practice", () => {
     const earlier = [{ message: "Practice", reply: "Explain why a missed card goes back to box one.", exercise }, { message: "wait, what's box one?", reply: "The box reviewed most often." }];
     const late: TutorCard = { kind: "card", content_type: "fact", question: "Where does a missed card go?", answer: "Box one.", rubric: [] };
     fakeClaude([
-      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P1", quote: "goes back to the first box" }], covered: [false, true], card: late }),
-      out({ reply: "Both points, nicely put. What about a card you get right?", covered: [true, true] }),
-      out({ reply: "Both points.", covered: [true] }),
-      out({ reply: "Both points.", covered: [true, true] }),
+      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P1", quote: "goes back to the first box" }], covered: [false, true], evidence: ["", "you see it again soon"], card: late }),
+      out({ reply: "Both points, nicely put. What about a card you get right?", covered: [true, true], evidence: ["memory is weak", "comes round most often"] }),
+      out({ reply: "Both points.", covered: [true], evidence: ["Both"] }),
+      out({ reply: "Both points.", covered: [true, true], evidence: ["", ""] }),
     ]);
     const r = await tutor(lib, "Because you see it again soon", { item: a.meta.id, earlier });
     expect(r.card).toEqual(key);
@@ -398,7 +398,7 @@ describe("tutor: practice", () => {
 
   test("covered marks with no open exercise go back to fix", async () => {
     const { lib, a } = await library();
-    fakeClaude([out({ reply: "Good.", covered: [true] }), out({ reply: "Good." })]);
+    fakeClaude([out({ reply: "Good.", covered: [true], evidence: [""] }), out({ reply: "Good." })]);
     expect((await tutor(lib, "Box one", { item: a.meta.id, earlier: [{ message: "hi", reply: "hello" }] })).card).toBeNull();
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("covered: [] when there is no open exercise");
   });

@@ -180,7 +180,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
       if (d.covered.length) {
         if (!open) return "covered: [] when there is no open exercise";
         if (d.covered.length !== open.card.rubric.length) return `covered: one boolean per rubric point (${open.card.rubric.length})`;
-        if (d.evidence.length && d.evidence.length !== d.covered.length) return `evidence: one per rubric point (${d.covered.length}), "" where not covered`;
+        if (d.evidence.length !== d.covered.length) return `evidence: one per rubric point (${d.covered.length}), "" where not covered`;
       }
       return d.card ? cardTextProblem(d.card) : null;
     },

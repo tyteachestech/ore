@@ -363,8 +363,8 @@ export function rebuildIndex(lib: Library): SyncReport {
     }
   } catch (e) {
     // An index too damaged to open ("database disk image is malformed") is deleted and built from scratch.
-    // Any other failure (another `ore` holding the write lock past busy_timeout) leaves the file alone.
-    if (!/^SQLITE_(CORRUPT|NOTADB)/.test(String((e as { code?: unknown }).code))) throw e;
+    // Another `ore` holding the lock past busy_timeout leaves the file alone: deleting it fails that one.
+    if (/^SQLITE_(BUSY|LOCKED)/.test(String((e as { code?: unknown }).code))) throw e;
     const path = paths.index(lib);
     for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) unlinkSync(f);
   }
