@@ -18,6 +18,7 @@ const PORT = Number(process.env.ORE_E2E_PORT ?? 1450);
 const BRIDGE = process.env.E2E_URL ? Number(process.env.E2E_BRIDGE ?? 1421) : Number(process.env.ORE_E2E_MOCK_PORT ?? 1451);
 const only = process.argv[2];
 const [shard, shards] = (process.env.ORE_E2E_SHARD ?? "1/1").split("/").map(Number) as [number, number];
+if (!(Number.isInteger(shard) && Number.isInteger(shards) && shard >= 1 && shard <= shards)) throw new Error(`ORE_E2E_SHARD=${process.env.ORE_E2E_SHARD}: want i/n, as 2/4`);
 /** The seeded library (or, against a mock already running, $ORE_LIBRARY): for state no `ore` command makes. */
 let LIB = process.env.ORE_LIBRARY ?? "";
 
