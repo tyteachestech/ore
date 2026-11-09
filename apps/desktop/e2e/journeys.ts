@@ -89,6 +89,17 @@ async function select(page: Page, phrase: string) {
   await page.mouse.up();
 }
 
+/** Waits until every title is back in the library, not only on screen: rows come back the moment ⌘Z is
+ *  pressed, while its write may still wait behind the archive's. A journey that ended there closed its
+ *  page first, the queued Undo was never sent, and the next journeys lost those sources (“The Testing
+ *  Effect” from To read, failing the hang and a11y journeys on CI). */
+async function inLibrary(titles: string[]) {
+  await until("the library has them all back", async () => {
+    const live = new Set(((await ore("ls")) as { title: string }[]).map((i) => i.title));
+    return titles.every((t) => live.has(t));
+  });
+}
+
 /** Waits until a check holds, for a step that saves in the background. */
 async function until(what: string, ok: () => Promise<boolean>, ms = 5000) {
   for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(100)) if (await ok()) return;
@@ -4249,6 +4260,7 @@ journey("undo that fails: the toast says why, and ⌘Z tries the same step again
   await page.locator(".list").click({ position: { x: 5, y: 5 } }).catch(() => {});
   await page.keyboard.press("Meta+z");
   await row.waitFor();
+  await inLibrary([AGENTS]);
 });
 
 journey("settings: a Review setting goes on the history; ⌘Z takes it back, ⇧⌘Z gives it again", async (page) => {
@@ -4996,6 +5008,7 @@ journey("list archive: A selects the row after the archived one, so a second A a
   await page.keyboard.press("Meta+z");
   await until("⌘Z ⌘Z bring both back", async () => (await titles()).length === before.length);
   for (const t of before) if (!(await titles()).includes(t)) throw new Error(`“${t}” did not come back`);
+  await inLibrary(before);
 });
 
 journey("list archive Undo selects the source it put back, as Finder does, though the row was never selected", async (page) => {
@@ -5232,6 +5245,7 @@ journey("stacked Undo: each ⌘Z's toast comes to the front and names the source
   await until("the second ⌘Z's toast is in front, naming the one it put back", async () => (await front()) === `Undone: Archived “${before[1]}”`);
   await page.keyboard.press("Meta+z");
   await until("all three are back", async () => (await titles()).length === before.length);
+  await inLibrary(before);
 });
 
 journey("delete skill: with nothing to decide it deletes at once, and ⌘Z puts it back (no Are you sure)", async (page) => {
