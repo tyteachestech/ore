@@ -41,6 +41,11 @@ test("sunk all the way into its hole, only the dirt is left", () => {
 });
 
 test("each mood's still pose (reduced motion, hidden window) shows the whole mole out of its hole", () => {
-  const out = (g: ReturnType<typeof moleGrid>) => g.slice(0, -1).flat().filter(Boolean).length;
-  for (const move of Object.values(MOVES)) expect(out(moleGrid(move.still))).toBeGreaterThan(out(moleGrid()) * 0.9);
+  // Out of the hole: its paws rest on the dirt and its eyes show (sunk, both are under the dirt).
+  for (const move of Object.values(MOVES)) {
+    const g = moleGrid(move.still);
+    expect(g[ROWS - 2]!.includes("paw")).toBe(true);
+    expect(cells(g, "eye").length).toBeGreaterThan(0);
+  }
+  expect(moleGrid(MOVES.peek.keys[0]![1])[ROWS - 2]!.includes("paw")).toBe(false);
 });
