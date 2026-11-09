@@ -114,14 +114,17 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
       if (!e.key.startsWith("Arrow") || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement;
       if (t.closest?.("input, textarea, [contenteditable='true'], [role='dialog'], [role='menu']")) return;
+      // A tile is placed by its box, and focused by its name: the one control in it Tab reaches (#193).
       const all = [...document.querySelectorAll<HTMLElement>(".home .home-skill, .home .home-read")];
       if (!all.length) return;
-      const at = all.indexOf(t);
+      const tile = t.closest<HTMLElement>(".home-skill, .home-read");
+      const at = tile && t.classList.contains("home-open") ? all.indexOf(tile) : -1;
       if (at < 0 && t !== document.body) return;
       e.preventDefault();
-      if (at < 0) return all[0]!.focus();
+      const go = (el: HTMLElement | undefined) => el?.querySelector<HTMLElement>(".home-open")?.focus();
+      if (at < 0) return go(all[0]);
       const box = (el: HTMLElement) => el.getBoundingClientRect();
-      const here = box(t);
+      const here = box(all[at]!);
       let next: HTMLElement | undefined;
       if (e.key === "ArrowRight") next = all[at + 1];
       else if (e.key === "ArrowLeft") next = all[at - 1];
@@ -134,7 +137,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
           .filter((el) => Math.abs(box(el).top - rowTop) < 2)
           .sort((a, b) => Math.abs(box(a).left + box(a).width / 2 - cx) - Math.abs(box(b).left + box(b).width / 2 - cx))[0];
       }
-      next?.focus();
+      go(next);
       next?.scrollIntoView({ block: "nearest" });
     };
     window.addEventListener("keydown", onKey);

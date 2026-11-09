@@ -2488,6 +2488,23 @@ journey("home: a reading row and a skill tile show ⋯ on hover; it opens their 
   await until("still on Home", async () => (await page.locator(".home-skill").count()) > 0);
 });
 
+// #193 made a tile's name its one focusable control, and the arrows went on looking for focus on the tile.
+journey("home: arrows move between skill tiles and Continue reading, from the focused name", async (page) => {
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".home-skill").nth(1).waitFor();
+  const focused = () => page.evaluate(() => document.activeElement?.closest(".home-skill, .home-read")?.querySelector(".home-open")?.textContent ?? null);
+  const names = await page.locator(".home .home-skill .home-open").allTextContents();
+  await page.locator(".home-skill .home-open").first().focus();
+  await page.keyboard.press("ArrowRight");
+  await until("→ moves to the next tile", async () => (await focused()) === names[1]);
+  if (!(await page.evaluate(() => document.activeElement?.classList.contains("home-open")))) throw new Error("focus is not on the tile's name");
+  await page.keyboard.press("ArrowLeft");
+  await until("← moves back", async () => (await focused()) === names[0]);
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await page.keyboard.press("ArrowDown");
+  await until("an arrow with nothing focused picks the first", async () => (await focused()) !== null);
+});
+
 journey("feed: ⌘K offers the selected post's actions, named for it, once the keyboard picks it", async (page) => {
   // A feed of its own, served here, with posts from the last two days.
   const day = (n: number) => new Date(Date.now() - n * 864e5).toUTCString();
