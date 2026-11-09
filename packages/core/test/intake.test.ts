@@ -559,7 +559,7 @@ describe("import coverage: files", () => {
         "xl/workbook.xml": strToU8(`<x:workbook xmlns:x="main" xmlns:r="rel">${workbookPr}<x:sheets><x:sheet name="Log" sheetId="1" r:id="rId1"/></x:sheets></x:workbook>`),
         "xl/_rels/workbook.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Type=".../worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="strings.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'),
         "xl/strings.xml": strToU8("<x:sst><x:si><x:t>Day</x:t></x:si><x:si><x:t>Start</x:t></x:si><x:si><x:t>Studied</x:t></x:si></x:sst>"),
-        "xl/styles.xml": strToU8('<x:styleSheet><x:numFmts><x:numFmt numFmtId="170" formatCode="[h]:mm"/></x:numFmts><x:cellXfs><x:xf numFmtId="0"/><x:xf numFmtId="14"/><x:xf numFmtId="20"/><x:xf numFmtId="170"/></x:cellXfs></x:styleSheet>'),
+        "xl/styles.xml": strToU8('<x:styleSheet><x:numFmts><x:numFmt numFmtId="170" formatCode="[h]:mm"/><x:numFmt numFmtId="171" formatCode="0.0%"/></x:numFmts><x:cellXfs><x:xf numFmtId="0"/><x:xf numFmtId="14"/><x:xf numFmtId="20"/><x:xf numFmtId="170"/><x:xf numFmtId="9"/><x:xf numFmtId="10"/><x:xf numFmtId="171"/></x:cellXfs></x:styleSheet>'),
         "xl/worksheets/sheet1.xml": strToU8(`<x:worksheet><x:sheetData><x:row r="1" ht="20"/>${sheet}<x:row r="9" ht="20"/></x:sheetData></x:worksheet>`),
       });
     const rows = '<x:row r="2"><x:c r="B2" t="s"><x:v>0</x:v></x:c><x:c r="C2" t="s"><x:v>1</x:v></x:c><x:c r="D2" t="s"><x:v>2</x:v></x:c><x:c r="Z2" s="1"/></x:row><x:row r="3"><x:c r="B3" s="1"><x:v>43894</x:v></x:c><x:c r="C3" s="2"><x:v>0.5208333333</x:v></x:c><x:c r="D3" s="3"><x:v>1.5</x:v></x:c></x:row>';
@@ -567,6 +567,9 @@ describe("import coverage: files", () => {
     expect(xlsxToDoc(xml(rows)).body).toBe(table.replace("ROW", "2020-03-04 | 12:30 | 36:00"));
     // Older Mac Excel counts days from 1904.
     expect(xlsxToDoc(xml(rows, '<x:workbookPr date1904="1"/>')).body).toBe(table.replace("ROW", "2024-03-05 | 12:30 | 36:00"));
+    // A cell says what the sheet shows: a percent as a percent, a sum without the float's last-digit noise.
+    const shown = '<x:row r="2"><x:c r="B2" s="4"><x:v>0.25</x:v></x:c><x:c r="C2" s="5"><x:v>0.12345</x:v></x:c><x:c r="D2" s="6"><x:v>0.5</x:v></x:c><x:c r="E2"><x:v>0.30000000000000004</x:v></x:c><x:c r="F2"><x:v>12</x:v></x:c></x:row>';
+    expect(xlsxToDoc(xml(shown)).body).toBe("## Log\n\n| 25% | 12.35% | 50.0% | 0.3 | 12 |\n| --- | --- | --- | --- | --- |\n");
   });
 
   test("CSV and TSV: a table, quotes, commas and line breaks inside cells, Excel's semicolons", async () => {

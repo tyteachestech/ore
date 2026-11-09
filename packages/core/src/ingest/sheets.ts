@@ -70,14 +70,18 @@ const column = (ref: string) => [...ref.replace(/\d+$/, "")].reduce((n, c) => n 
 const DATES = new Set([14, 15, 16, 17, 27, 30, 36, 50, 57]);
 const DATE_TIMES = new Set([22]);
 const TIMES = new Set([18, 19, 20, 21, 45, 46, 47]);
-type Shown = "date" | "datetime" | "time" | undefined;
+/** Its built-in percent formats, by their decimals: 0% and 0.00%. */
+const PERCENTS = new Map([[9, 0], [10, 2]]);
+type Shown = "date" | "datetime" | "time" | { percent: number } | undefined;
 
 /** How a cell format shows a number: a format of the book's own by its letters, outside quoted text. */
 function shown(id: number, code: string | undefined): Shown {
   if (DATES.has(id)) return "date";
   if (DATE_TIMES.has(id)) return "datetime";
   if (TIMES.has(id)) return "time";
+  if (PERCENTS.has(id)) return { percent: PERCENTS.get(id)! };
   const c = code?.replace(/\[(?![hms]+\])[^\]]*\]|"[^"]*"|\\./gi, "").toLowerCase() ?? "";
+  if (c.includes("%")) return { percent: c.match(/\.(0+)/)?.[1]!.length ?? 0 };
   const day = /[dy]/.test(c);
   const time = /h|s|\[m+\]/.test(c);
   return day && time ? "datetime" : day ? "date" : time ? "time" : undefined;
@@ -131,12 +135,14 @@ export function xlsxToDoc(data: Uint8Array): SheetDoc {
         const v = xmlText(inner.match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? "");
         const t = attr(a, "t");
         let text = t === "s" ? (strings[Number(v)] ?? "") : t === "inlineStr" ? cellText(inner.match(/<is>([\s\S]*?)<\/is>/)?.[1] ?? "") : t === "b" ? (v === "1" ? "TRUE" : "FALSE") : v;
-        const as = (!t || t === "n") && v && !Number.isNaN(Number(v)) ? xfs[Number(attr(a, "s") ?? 0)] : undefined;
+        const num = (!t || t === "n") && v && !Number.isNaN(Number(v));
+        const as = num ? xfs[Number(attr(a, "s") ?? 0)] : undefined;
         if (as === "time") text = clock(Number(v));
+        else if (typeof as === "object") text = `${(Number(v) * 100).toFixed(as.percent)}%`;
         else if (as) {
           const iso = new Date(Math.round((Number(v) - epoch) * 86400) * 1000).toISOString();
           text = as === "date" ? iso.slice(0, 10) : iso.slice(0, 16).replace("T", " ");
-        }
+        } else if (num) text = String(Number(Number(v).toPrecision(15))); // as Excel shows it: 15 digits, so 0.1+0.2 is 0.3
         // Only cells with something in them count: a styled empty cell far to the right is nothing.
         if (text) row[attr(a, "r") ? column(attr(a, "r")!) : row.length] = text;
       }
