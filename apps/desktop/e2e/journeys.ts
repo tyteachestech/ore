@@ -5094,6 +5094,7 @@ journey("list: back from a source opened low in To read, its row is selected and
 });
 
 journey("a popover closes on any click outside it, even after a press inside it or on a control that stops the event", async (page) => {
+  await page.reload();
   await page.getByRole("button", { name: /^All sources/ }).click();
   // As in WebKit: a click moves no focus, so the popover's close-on-focus-loss can't hide a missed click.
   await page.addScriptTag({ content: `document.addEventListener("mousedown", (e) => e.preventDefault(), true)` });
