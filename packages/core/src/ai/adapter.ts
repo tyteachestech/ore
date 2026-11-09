@@ -360,15 +360,19 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
   let message = userMessage(task.input, task.files ?? []);
   let lastError = "";
   let usage: Usage = { input_tokens: 0, output_tokens: 0 };
+  // What every attempt's web search returned: the retry's reason lists the first one's pages, so a retry
+  // that cites one of them without searching again is citing a page that was returned.
+  let web: WebSeen | undefined;
   for (let attempt = 1; attempt <= 2; attempt++) {
     const raw = await run(prompt.text, message, schema, task as AgentTask<unknown>, opts);
     usage = addUsage(usage, raw.usage);
+    if (raw.web) web = web ? { searched: web.searched || raw.web.searched, pages: [...web.pages, ...raw.web.pages.filter((p) => !web!.pages.some((q) => samePage(q.url, p.url)))] } : raw.web;
     try {
       const parsed = task.schema.safeParse(parseOutput(raw.output));
       if (!parsed.success) throw new Error(parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
-      const problem = task.check?.(parsed.data, raw.web);
+      const problem = task.check?.(parsed.data, web);
       if (problem) throw new Error(problem);
-      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, ...(raw.web ? { web: raw.web } : {}) };
+      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, ...(web ? { web } : {}) };
     } catch (e) {
       lastError = (e as Error).message;
       message = `${userMessage(task.input, task.files ?? [])}\n\nYour previous output was invalid: ${lastError}\nReturn only JSON that matches the schema.`;

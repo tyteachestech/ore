@@ -147,6 +147,18 @@ describe("tutor: the web", () => {
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("is not a page your web search returned");
   });
 
+  // The retry's reason lists what the first run's search returned and asks for one of those; the retry
+  // that cites one without searching again holds, since the search did return it.
+  test("a retry may cite a page the first run's search returned", async () => {
+    const { lib } = await library();
+    const out = (passage: string) => ({ reply: "Born in 1850 [1].", citations: [{ passage, quote: "born on January 24, 1850" }], general: false, hint: false, steps: [], exercise: null, card: null });
+    fakeClaude([{ web: searched([BRIT], "Hermann Ebbinghaus was born on January 24, 1850, in Barmen."), out: out("https://en.wikipedia.org/wiki/Hermann_Ebbinghaus") }, { web: [{ type: "system", subtype: "init", model: "claude-main-1" }], out: out(BRIT.url) }]);
+    const r = await tutor(lib, "When was Ebbinghaus born?");
+    expect(sent()).toHaveLength(2);
+    expect(r.searched).toBe(true);
+    expect(r.citations[0]).toMatchObject({ url: BRIT.url, title: BRIT.title, quote: "born on January 24, 1850" });
+  });
+
   test("a quote of a page's title with quotes in it holds, though the search lists titles JSON-escaped", async () => {
     const { lib } = await library();
     const page = { url: "https://www.hackster.io/news/python-3-8-walrus", title: 'Python 3.8 Brings "Walrus Operator," Standardizes ABI' };
