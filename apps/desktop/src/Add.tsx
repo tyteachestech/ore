@@ -134,6 +134,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
 
   /** Picked files join the box as pasted ones do, so his text and skills stay and ↵ adds them all. */
   const pickFiles = async () => {
+    if (busy) return; // what is going in was read when he pressed ↵: nothing joins it now
     const paths = await onPickFiles();
     if (!open.current) return;
     if (paths.length) {
@@ -256,7 +257,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
               </button>
             </Hint>
             <Hint text="Choose a file" keys="file">
-              <button className="add-file" onClick={() => void pickFiles()}>
+              <button className="add-file" onClick={() => void pickFiles()} disabled={busy}>
                 <Paperclip size={13} aria-hidden="true" />
                 File
               </button>

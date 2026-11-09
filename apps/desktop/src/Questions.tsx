@@ -312,7 +312,9 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
 
 /** Types a question in place, like a new skill in the sidebar: Enter saves it as a question snippet
  *  filed under these skills (as Raycast's Capture Question does), Esc or clicking away drops it. */
-export function AskQuestion({ skills, onDone, notify }: { skills: string[]; onDone: (added: boolean) => void; notify: Notify }) {
+/** `item`: the source he is asking from. A question lives under skills (D75); from a source in none, it is
+ *  marked as one this source may answer, or the source that took it could never show it. */
+export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]; item?: string; onDone: (added: boolean) => void; notify: Notify }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -321,6 +323,7 @@ export function AskQuestion({ skills, onDone, notify }: { skills: string[]; onDo
     setBusy(true);
     try {
       const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
+      if (item && !skills.length) await ore("match", item, r.annotation.id);
       onDone(true);
       // Asking goes on the history: ⌘Z takes the question back, ⇧⌘Z asks it again.
       const set = (status: string) => ore("annotate", r.annotation.id, "--status", status).then(() => onDone(true));
@@ -367,7 +370,7 @@ const CAP = 6;
 /** The reader's Questions tab (D75): the open questions of this source's skills, the ones it may
  *  answer first. Click one (or ↑ ↓ ↵) to write toward its answer; a selection made before Q comes in
  *  as the quote. */
-export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote, onJumpHighlight, notify, ask }: {
+export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote, onJumpHighlight, notify, ask, marked }: {
   item: string;
   /** The source's skills: their names head the list, and a question typed here is filed under them. */
   skills: { id: string; name: string }[];
@@ -378,6 +381,8 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   notify: Notify;
   /** Inside the Collected tab's Questions group, whose header holds the + and the arrows: bumped to ask one. */
   ask?: number;
+  /** The source's own question highlights, as saved: the list reads again when one is made, retyped or removed. */
+  marked?: string;
 }) {
   const grouped = ask !== undefined;
   const [qs, setQs] = useState<Question[] | null>(null);
@@ -404,7 +409,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
     return () => {
       live = false;
     };
-  }, [item, version, changes]);
+  }, [item, version, changes, marked]);
 
   const dismiss = async (q: Question) => {
     setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x)));
@@ -533,6 +538,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
         {asking && (
           <AskQuestion
             skills={skills.map((s) => s.id)}
+            item={item}
             notify={notify}
             onDone={(added) => {
               setAsking(false);

@@ -4189,6 +4189,68 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   }, AGENTS);
 });
 
+journey("questions: one asked on a source in no skill is listed there; a highlight retyped as a question joins the list at once", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# In no skill yet\n\nOne passage about useful deliberate practice, to ask about.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("One passage about useful").waitFor();
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const head = page.locator(".cp-head", { hasText: "Questions" });
+  if ((await head.locator(".cp-toggle").getAttribute("aria-expanded")) === "false") await head.locator(".cp-toggle").click();
+  await head.getByRole("button", { name: "Ask a question" }).click();
+  await page.getByLabel("New question").fill("Does this hold without a coach?");
+  await page.keyboard.press("Enter");
+  await page.locator(".qp-line", { hasText: "Does this hold without a coach?" }).waitFor({ timeout: 3000 }).catch(() => {
+    throw new Error("the question he asked on a source in no skill is not listed on it");
+  });
+  await select(page, "useful deliberate practice");
+  await page.keyboard.press("3"); // a question highlight
+  await page.locator(".qp-line", { hasText: "useful deliberate practice" }).waitFor({ timeout: 3000 }).catch(() => {
+    throw new Error("a passage marked as a question is missing from Questions until the tab is reopened");
+  });
+});
+
+journey("note: words typed just before a save that merges an outside edit comes back are kept", async (page) => {
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# A note two hands write\n\nA page for its note." }) }).then((r) => r.json())) as { id: string };
+  await ore("notes", made.id, "--set=Original.");
+  try {
+    await page.reload();
+    await openSource(page, "A note two hands write");
+    await page.getByRole("tab", { name: "Source note", exact: true }).click();
+    const ed = page.locator(".ProseMirror").filter({ hasText: "Original." });
+    await ed.waitFor();
+    const n = (await ore("notes", made.id)) as { path: string; text: string };
+    writeFileSync(join(LIB, n.path), `${n.text}\n\nOutside line.\n`);
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { notes: 1500 }));
+    await ed.click();
+    await page.keyboard.press("Meta+ArrowRight");
+    const saving = page.waitForRequest((r) => r.url().endsWith("/ore") && (r.postData() ?? "").includes("--set"));
+    await page.keyboard.type(" First edit.");
+    await saving;
+    await page.waitForTimeout(1380); // inside the editor's 200 ms report delay when the save comes back
+    await page.keyboard.type(" LATE WORDS.");
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    await until("the outside line is merged in", async () => ((await ore("notes", made.id)) as { text: string }).text.includes("Outside line."));
+    await until("the late words are saved too", async () => ((await ore("notes", made.id)) as { text: string }).text.includes("LATE WORDS."), 6000);
+    if (!(await page.locator(".ProseMirror").first().innerText()).includes("LATE WORDS.")) throw new Error("the late words left the page");
+  } finally {
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
+journey("add box: File waits while an add is going in, so nothing picked meanwhile is dropped", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# A slow add\n\nIt takes its time going in.");
+  await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { add: 1200 }));
+  await page.keyboard.press("Enter");
+  const file = page.getByRole("button", { name: "File", exact: true });
+  const usable = await file.isEnabled();
+  await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+  await page.locator(".doc").getByText("It takes its time going in").waitFor();
+  if (usable) throw new Error("File can be picked while an add is going in, and what is picked is dropped");
+});
+
 journey("bulk filing under an archived skill brings it back in the sidebar, and ⌘Z archives it again (D173)", async (page) => {
   const k = (await ore("skills", "add", "Lathe work")) as { id: string };
   await ore("skills", "archive", k.id);

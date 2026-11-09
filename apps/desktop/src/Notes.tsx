@@ -101,6 +101,10 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     return queue(() => ore<Notes & { merged: boolean }>("notes", ...key.split(" "), opt("set", t), opt("base", at()))).then(
       (r) => {
         unsaved.delete(key);
+        // What the editor shows now, as above: a key pressed in its last 200 ms is not in the draft yet, and
+        // showing the merged text over it would drop those words.
+        const shown = owner.current === key ? pull.current?.() : null;
+        if (shown != null && shown !== t) draft.current = shown;
         // An agent or a recall changed the file meanwhile and the CLI merged it in. With no newer
         // typing, show the merged text; otherwise keep his draft and merge again on the next save.
         if (owner.current === key && r.merged && draft.current === t) return apply(r.text), true;

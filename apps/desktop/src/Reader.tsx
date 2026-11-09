@@ -3074,6 +3074,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                   onJumpHighlight={(id) => onSource(() => jumpToHighlight(id))}
                   notify={p.notify}
                   ask={ask}
+                  marked={anns.filter((a) => a.intent === "question").map((a) => a.id).join()}
                 />
               }
             />
