@@ -1482,8 +1482,11 @@ journey("note equations: /equation opens a TeX field that draws as he types; ↵
   const pm = page.locator(".note-editor .ProseMirror").first();
   await openSource(page, AGENTS);
   await pm.click();
-  await page.keyboard.press("ControlOrMeta+End");
-  await page.keyboard.press("Enter");
+  // A fresh note: after the toggle journey, ⌘End lands inside the toggle (its heading or the start of its body),
+  // so the equation went into a heading, or before the body's words, and the line never ended in " here".
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
   await page.keyboard.type("Area grows as /equation", { delay: 20 });
   await page.locator(".note-menu-row.on", { hasText: "Inline equation" }).waitFor();
   await page.keyboard.press("Enter");
