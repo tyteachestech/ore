@@ -7,8 +7,9 @@ export const Lite = createContext(false);
 export const useLite = () => useContext(Lite);
 
 // One observer per scrolling list, reaching a screen's height past its edges, so a row has its menus
-// before it scrolls into reach.
-const observers = new Map<Element | null, IntersectionObserver>();
+// before it scrolls into reach. It goes once it watches no row, so a list that mounts again (a screen
+// switch) never leaves the old one holding its detached rows.
+const observers = new Map<Element | null, { io: IntersectionObserver; rows: Set<Element> }>();
 const waiting = new Map<Element, Set<() => void>>();
 const scroller = (el: Element): Element | null => {
   for (let p = el.parentElement; p; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return p;
@@ -16,30 +17,39 @@ const scroller = (el: Element): Element | null => {
 };
 const watch = (el: Element, on: () => void) => {
   const root = scroller(el);
-  let io = observers.get(root);
-  if (!io) {
-    io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          for (const f of waiting.get(e.target) ?? []) f();
-          waiting.delete(e.target);
-          io!.unobserve(e.target);
-        }
-      },
-      { root, rootMargin: "100% 0px" },
-    );
-    observers.set(root, io);
+  let o = observers.get(root);
+  const stop = (row: Element) => {
+    waiting.delete(row);
+    o!.io.unobserve(row);
+    o!.rows.delete(row);
+    if (o!.rows.size) return;
+    o!.io.disconnect();
+    if (observers.get(root) === o) observers.delete(root);
+  };
+  if (!o) {
+    o = {
+      io: new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            for (const f of waiting.get(e.target) ?? []) f();
+            stop(e.target);
+          }
+        },
+        { root, rootMargin: "100% 0px" },
+      ),
+      rows: new Set(),
+    };
+    observers.set(root, o);
   }
   const set = waiting.get(el) ?? new Set();
   set.add(on);
   waiting.set(el, set);
-  io.observe(el);
+  o.rows.add(el);
+  o.io.observe(el);
   return () => {
     set.delete(on);
-    if (set.size) return;
-    waiting.delete(el);
-    io.unobserve(el);
+    if (!set.size && o.rows.has(el)) stop(el);
   };
 };
 
