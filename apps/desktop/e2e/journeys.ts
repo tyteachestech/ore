@@ -3519,7 +3519,15 @@ journey("review: a Tutor card with no passage still offers Open in source after 
   await startReview(page, /Storytelling/);
   const q = page.locator(".review-q");
   const question = "Which word links the Story Spine's middle beats?";
-  if ((await q.innerText()) !== question) throw new Error(`the card is ${await q.innerText()}`);
+  // Journeys before this one share the library: a Storytelling card they missed is due again today, and then the
+  // new card is every fifth (D144), not first. Rate Good through the due ones until it comes up.
+  for (let n = 0; (await q.innerText()) !== question; n++) {
+    if (n === 8) throw new Error(`the card is ${await q.innerText()}`);
+    await reveal(page);
+    await page.waitForTimeout(350);
+    await page.getByRole("button", { name: "Good" }).click();
+    await until("the next card", async () => (await q.innerText()) !== "" && (await page.locator(".review-rate").count()) === 0);
+  }
   await reveal(page);
   await page.getByRole("button", { name: /Open in source/ }).click();
   await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
@@ -4162,6 +4170,8 @@ journey("tutor Practice: Write it in your note puts the exercise in the source i
 async function explain(page: Page, phrase: string) {
   await select(page, phrase);
   const popup = page.getByRole("dialog", { name: "Highlight" });
+  // A drag under CI load now and then lands before the page has settled from the last journey: one more drag.
+  if (!(await popup.waitFor({ timeout: 2500 }).then(() => true, () => false))) await select(page, phrase);
   await popup.waitFor();
   await popup.getByRole("button", { name: "Explain", exact: true }).click();
   await page.getByRole("dialog", { name: `Explain ${phrase}` }).waitFor();
