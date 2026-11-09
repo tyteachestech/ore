@@ -346,7 +346,9 @@ function hackerNews(doc: Document, url: string): string | undefined {
   return name && /^[\w-]{2,15}$/.test(name) ? name : undefined;
 }
 
-export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
+/** `min`: the fewest characters a page's article holds before the plain reader is tried instead; a
+ *  paste is all content, however short. */
+export async function htmlToDoc(html: string, url: string, min = 200): Promise<WebDoc> {
   // A Notion page as the browser drew it (added from the tab, or reimported from its copy).
   const notion = notionMarkdown(html, url);
   if (notion) {
@@ -367,7 +369,7 @@ export async function htmlToDoc(html: string, url: string): Promise<WebDoc> {
     const paper = paperAuthors(document as unknown as Document);
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
     const markdown = inlineMath(htmlTables(r.content.trim()));
-    if (markdown.length > 200) {
+    if (markdown.length > min) {
       return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
     }
   } catch {

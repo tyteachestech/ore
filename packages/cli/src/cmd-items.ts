@@ -49,8 +49,8 @@ async function keptFromFeed(lib: Library, item: Item): Promise<boolean> {
 
 export const itemCommands: Record<string, Command> = {
   add: {
-    usage: "<url|path> | --stdin | --tab [--skill s] [--type t] [--for <question>] [--course] [--no-enrich]   ingest → items/, status inbox (--stdin: pasted text as a Markdown source; --tab: the page open in the frontmost Safari or Chrome window, as signed in there, D96; --for: added for a question, D75; --course: every lesson of a Claude Academy course or YouTube playlist as its own source, D79); enrich runs in background",
-    options: { skill: { type: "string", multiple: true }, type: { type: "string" }, stdin: { type: "boolean" }, tab: { type: "boolean" }, for: { type: "string" }, course: { type: "boolean" }, "no-enrich": { type: "boolean" } },
+    usage: "<url|path> | --stdin [--html] | --tab [--skill s] [--type t] [--for <question>] [--course] [--no-enrich]   ingest → items/, status inbox (--stdin: pasted text as a Markdown source, --html: the paste is HTML, its headings, tables, math, code and images kept; --tab: the page open in the frontmost Safari or Chrome window, as signed in there, D96; --for: added for a question, D75; --course: every lesson of a Claude Academy course or YouTube playlist as its own source, D79); enrich runs in background",
+    options: { skill: { type: "string", multiple: true }, type: { type: "string" }, stdin: { type: "boolean" }, html: { type: "boolean" }, tab: { type: "boolean" }, for: { type: "string" }, course: { type: "boolean" }, "no-enrich": { type: "boolean" } },
     async run([input], f) {
       const lib = openLibrary();
       if (f.course) {
@@ -72,7 +72,7 @@ export const itemCommands: Record<string, Command> = {
       // Transcribing audio takes minutes: it reports how far it has got (the app shows it on the add bar).
       const onProgress = (done: number, label?: string) => progress(Math.round(done * 100), 100, label ?? "Transcribing the audio", label ?? `Transcribing… ${Math.round(done * 100)}%`);
       const item: Awaited<ReturnType<typeof addSource>> = f.stdin
-        ? await addText(lib, await readStdin(), { skills: strs(f.skill) })
+        ? await addText(lib, await readStdin(), { skills: strs(f.skill), html: !!f.html })
         : f.tab
           ? await addTab(lib, { skills: strs(f.skill), onProgress })
           : await addSource(lib, need(input, "<url|path>"), { type: oneOf(f.type, ItemType.options, "type"), skills: strs(f.skill), onProgress });

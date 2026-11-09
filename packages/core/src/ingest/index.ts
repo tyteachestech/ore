@@ -11,7 +11,7 @@ import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
 import { setItemSkills } from "../skills.ts";
-import { withImages } from "./assets.ts";
+import { saveImages, withImages } from "./assets.ts";
 import { BOT, cleanAuthor, cleanDate, FROM_TAB, refusal, wordCount } from "./check.ts";
 import { isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./course.ts";
 import { pageDraft } from "./page.ts";
@@ -451,18 +451,50 @@ async function tabDraft(tab: Tab, host: string): Promise<NewItem> {
 
 // Pasted text as a source: a Markdown item titled by its first heading, else its first line.
 // Pasted frontmatter (a copied Obsidian note) fills the title, author and date, as a .md file's does.
+// Pasted HTML (a ChatGPT answer, a page's selection) keeps its headings, tables, math, code and images,
+// which its plain text loses; the images it shows are saved beside it, as a page's are (D96, D122).
 // The same text pasted again (a retry after an add that looked failed) is the source already here, as a file's is.
-export async function addText(lib: Library, text: string, opts: AddOptions = {}): Promise<Item & Partial<Kept>> {
-  const source = text.trim() + "\n";
-  if (!source.trim()) throw new Error("text is empty");
-  const md = markdownFile(source, "");
-  const body = md.body.trim() + "\n";
-  if (!body.trim()) throw new Error("text is empty: only frontmatter, no text to read");
+export async function addText(lib: Library, text: string, opts: AddOptions & { html?: boolean } = {}): Promise<Item & Partial<Kept>> {
+  const source = opts.html ? pastedPage(text) : text.trim() + "\n";
+  if (!text.trim()) throw new Error("text is empty");
+  const md = opts.html ? { ...(await pastedMarkdown(source)), author: undefined, published: undefined } : markdownFile(source, "");
+  if (!md.body.trim()) throw new Error(opts.html ? "the pasted text is empty" : "text is empty: only frontmatter, no text to read");
+  const { body, assets } = await saveImages(md.body.trim() + "\n");
   const same = sameText(lib, body);
   if (same) return keep(lib, same, opts);
   const first = body.split("\n")[0]!.replace(/^#+\s*/, "");
   const title = md.title || (first.length > 80 ? first.slice(0, 77).trimEnd() + "…" : first);
-  return createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: "md", data: source }, skills: opts.skills });
+  return createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: opts.html ? "html" : "md", data: source }, assets, skills: opts.skills });
+}
+
+/** A pasted fragment as a whole page, kept as the source's original: the clipboard holds only the
+ *  selection's tags (`<meta charset><h1>…`), which a page reader can't place. */
+function pastedPage(html: string): string {
+  return /<body[\s>]/i.test(html) ? html : `<!doctype html><html><head><meta charset="utf-8"></head><body>${html.replace(/^\s*<meta[^>]*>/i, "")}</body></html>\n`;
+}
+
+/** The pasted page as Markdown: read as a page is (math, tables, code), or, when that drops much of
+ *  its text, converted tag by tag. A code block's own header (ChatGPT's language label and Copy
+ *  button) is left out, so the code reads as written. */
+async function pastedMarkdown(html: string): Promise<{ title: string; body: string }> {
+  const { parseHTML } = await import("linkedom");
+  const { document } = parseHTML(html);
+  for (const pre of document.querySelectorAll("pre")) {
+    const code = pre.querySelector("code");
+    if (code && code.parentElement !== pre) pre.replaceChildren(code);
+  }
+  for (const b of document.querySelectorAll("button")) b.remove();
+  // A citation pill's "+2" (two more sources behind it) is a count, not the link's name.
+  for (const n of document.querySelectorAll("a span")) if (/^\+\d+$/.test(n.textContent?.trim() ?? "")) n.remove();
+  const page = document.toString();
+  const all = wordCount(document.body?.textContent ?? "");
+  const { htmlToDoc } = await import("./web.ts");
+  const d = await htmlToDoc(page, "file:///pasted", 0).catch(() => null);
+  // An image on its own line is its own block, never glued to the math or list beside it.
+  const own = (md: string) => md.replace(/^[ \t]*(!\[[^\]\n]*\]\([^)\n]+\))[ \t]*$/gm, "\n$1\n").replace(/\n{3,}/g, "\n\n");
+  if (d && wordCount(d.markdown) >= all / 2) return { title: d.title === "file:///pasted" ? "" : d.title, body: own(d.markdown) };
+  const { td } = await import("./markdown.ts");
+  return { title: "", body: td.turndown(document.body as unknown as HTMLElement) };
 }
 
 export interface SnippetInput {

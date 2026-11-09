@@ -55,6 +55,8 @@ function serve(pages: Record<string, { body: BodyInit; type: string }>) {
 }
 const HTML = "text/html; charset=utf-8";
 
+/** The saved images a body shows, in order. */
+const images = (body: string) => [...body.matchAll(/!\[([^\]]*)\]\((assets\/[0-9a-f]{16}\.\w+)\)/g)].map((m) => ({ alt: m[1], path: m[2]! }));
 const count = (s: string, re: RegExp) => (s.match(re) ?? []).length;
 const words = (s: string) => s.split(/\s+/).filter((w) => /\w/.test(w)).length;
 
@@ -696,6 +698,40 @@ describe("import coverage: awkward files", () => {
     expect(rule.body).toContain("Just prose after a rule.");
   });
 
+  test("a pasted ChatGPT answer keeps its headings, tables, math, code and images", async () => {
+    // What ⌘C on a ChatGPT answer puts on the clipboard as HTML (ore add --stdin --html).
+    const png = readFileSync(file("screenshot.png"));
+    serve({ "https://images.example.org/forgetting-curve.png": { body: png, type: "image/png" } });
+    const lib = await tempLibrary();
+    const item = await addText(lib, readFileSync(file("chatgpt-copy.html"), "utf8"), { html: true });
+    expect(item.meta).toMatchObject({ type: "markdown", title: "How spacing makes memories last" });
+    for (const p of ["opens with the main claim: reviews spread over days", "A memory fades along a curve", "let the gaps grow as the answers come easily."]) expect(item.body).toContain(p);
+    expect(item.body.match(/^#{2,3} .+$/gm)).toEqual(["## What the studies show", "## Gaps that work", "### A tiny scheduler"]);
+    expect(item.body).toContain("| One year | Three to four weeks |");
+    expect(item.body).toContain("$$\nR = e^{-t/S}\n$$");
+    expect(item.body).toContain("recall after $$t$$ days");
+    // The code reads as written: no "python" label or "Copy code" button glued to it.
+    expect(item.body).toContain("```python\ndef next_gap(gap, ok):\n");
+    expect(item.body).not.toMatch(/Copy (code|table)/);
+    // A citation pill is its source's link, without its "+1".
+    expect(item.body).toContain("[example.org](https://example.org/spacing-review)");
+    const [curve] = images(item.body);
+    expect(curve?.alt).toBe("A forgetting curve that flattens after each review");
+    expect(readFileSync(join(item.dir, curve!.path))).toEqual(png);
+    expect(item.body).toMatch(/\n\n!\[A forgetting curve[^\n]*\)\n\n- \*\*Spacing effect/);
+    // The paste is kept whole as the original.
+    expect(readFileSync(join(item.dir, "source.html"), "utf8")).toContain('<td data-start="870" data-end="900">Three to four weeks</td>');
+  });
+
+  test("pasted Markdown's images are saved beside it", async () => {
+    const png = readFileSync(file("screenshot.png"));
+    serve({ "https://images.example.org/curve.png": { body: png, type: "image/png" } });
+    const item = await addText(await tempLibrary(), "# Spacing\n\nForgetting makes the next recall harder.\n\n![curve](https://images.example.org/curve.png)\n");
+    const [curve] = images(item.body);
+    expect(curve?.path).toMatch(/^assets\/[0-9a-f]{16}\.png$/);
+    expect(readFileSync(join(item.dir, curve!.path))).toEqual(png);
+  });
+
   test("Finder's own files are refused, not saved as a source", async () => {
     const lib = await tempLibrary();
     await expect(addSource(lib, put(".DS_Store", new Uint8Array([0, 0, 0, 1, 0x42, 0x75, 0x64, 0x31])))).rejects.toThrow(/Finder keeps for itself.*Add the file you meant/);
@@ -1209,7 +1245,6 @@ describe("import coverage: figures and slide pictures", () => {
     writeFileSync(f, readFileSync(join(FIX, "files", name)));
     return f;
   };
-  const images = (body: string) => [...body.matchAll(/!\[([^\]]*)\]\((assets\/[0-9a-f]{16}\.\w+)\)/g)].map((m) => ({ alt: m[1], path: m[2]! }));
 
   test("PowerPoint: each slide's pictures after its text, a logo on every slide left out", async () => {
     const item = await addSource(await tempLibrary(), file("deck-pictures.pptx"));
