@@ -1,6 +1,6 @@
 import type { TutorTurn } from "./Tutor";
 
-/** What the owl says for a reply that landed while the tutor was closed (D159): the reply as plain text, its
+/** What the mole says for a reply that landed while the tutor was closed (D159): the reply as plain text, its
  *  citation markers and Markdown dropped (the bubble shows its first lines), or the error. */
 export function firstWords(t: Pick<TutorTurn, "reply" | "error">): string {
   if (t.error) return t.error;
@@ -18,7 +18,7 @@ export function firstWords(t: Pick<TutorTurn, "reply" | "error">): string {
  *  waiting between calls; a turn that lands while the tutor is open is heard where it lands. */
 export function landedClosed(turns: TutorTurn[], asked: Set<string>, open: boolean): TutorTurn | null {
   // A turn no longer in the thread (New chat set it aside) is forgotten: if Undo brings it back landed, he
-  // sees it there, not from the owl.
+  // sees it there, not from the mole.
   const ids = new Set(turns.map((t) => t.id));
   for (const id of asked) if (!ids.has(id)) asked.delete(id);
   let landed: TutorTurn | null = null;

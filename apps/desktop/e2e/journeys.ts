@@ -392,15 +392,15 @@ journey("highlight popup open: typing writes the note, and no letter runs a shor
   if (after !== words + "2") throw new Error(`a 2 typed after the note became “${after}”`);
 });
 
-journey("tutor owl: it sits at the bottom right on every screen, pages keep room to scroll clear of it, and a quiz panel hides it (D160)", async (page) => {
+journey("tutor mole: it sits at the bottom right on every screen, pages keep room to scroll clear of it, and a quiz panel hides it (D160, D168)", async (page) => {
   const button = page.getByRole("button", { name: "Open the tutor" });
   const vp = page.viewportSize()!;
   const check = async (where: string, scroller: string) => {
     const b = (await button.boundingBox())!;
-    if (Math.abs(vp.width - (b.x + b.width) - 16) > 1 || Math.abs(vp.height - (b.y + b.height) - 16) > 1) throw new Error(`${where}: the owl is not 16px in from the bottom right corner (${b.x}, ${b.y})`);
+    if (Math.abs(vp.width - (b.x + b.width) - 16) > 1 || Math.abs(vp.height - (b.y + b.height) - 16) > 1) throw new Error(`${where}: the mole is not 16px in from the bottom right corner (${b.x}, ${b.y})`);
     // The last line of what scrolls under it can come up above it.
     const room = await page.locator(scroller).first().evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
-    if (room < vp.height - b.y) throw new Error(`${where}: ${scroller} keeps ${room}px at its foot, less than the owl's ${vp.height - b.y}px`);
+    if (room < vp.height - b.y) throw new Error(`${where}: ${scroller} keeps ${room}px at its foot, less than the mole's ${vp.height - b.y}px`);
   };
   await check("Home", ".home");
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
@@ -732,7 +732,7 @@ journey("tutor pending: closing mid-reply asks once; a new chat keeps its own re
   await page.keyboard.press("Meta+j");
 });
 
-journey("owl says: a reply that lands while the tutor is closed comes out of the owl; a click opens the tutor at it, × waves it off, and one that lands while it is open says nothing (D159)", async (page) => {
+journey("mole says: a reply that lands while the tutor is closed comes out of the mole; a click opens the tutor at it, × waves it off, and one that lands while it is open says nothing (D159)", async (page) => {
   const release: (() => void)[] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
@@ -744,18 +744,18 @@ journey("owl says: a reply that lands while the tutor is closed comes out of the
   try {
     const tutor = page.getByRole("complementary", { name: "Tutor" });
     const field = page.getByRole("textbox", { name: "Message the tutor" });
-    const says = page.locator(".owl-says");
+    const says = page.locator(".mole-says");
     const ask = async (message: string) => {
       if (!(await tutor.count())) await page.keyboard.press("Meta+j");
       await field.fill(message);
       await page.keyboard.press("Enter");
       await tutor.getByText("Reading your sources…").waitFor();
     };
-    // Asked, then closed while it thinks: the reply comes out of the owl, as plain text.
+    // Asked, then closed while it thinks: the reply comes out of the mole, as plain text.
     await ask("Spacing");
     await page.keyboard.press("Escape");
     await until("Esc closes it", async () => (await tutor.count()) === 0);
-    if (await says.count()) throw new Error("the owl spoke before the reply came");
+    if (await says.count()) throw new Error("the mole spoke before the reply came");
     release.shift()!();
     await says.getByRole("button", { name: "Spacing comes back." }).waitFor();
     await page.getByRole("status").filter({ hasText: "The tutor answered: Spacing comes back." }).waitFor({ state: "attached" });
@@ -764,17 +764,17 @@ journey("owl says: a reply that lands while the tutor is closed comes out of the
     await page.keyboard.press("Enter");
     await tutor.getByText("Spacing comes back").waitFor();
     if (await says.count()) throw new Error("the bubble stayed with the tutor open");
-    const owlFocused = async () => page.evaluate(() => document.activeElement?.matches(".tutor-bubble") ?? false);
-    // × waves it off, from the keys too, and focus goes to the owl; the reply is still in the tutor.
+    const moleFocused = async () => page.evaluate(() => document.activeElement?.matches(".tutor-bubble") ?? false);
+    // × waves it off, from the keys too, and focus goes to the mole; the reply is still in the tutor.
     await ask("Interleaving");
     await page.keyboard.press("Escape");
-    await until("closing the tutor opened from the bubble puts focus on the owl", owlFocused);
+    await until("closing the tutor opened from the bubble puts focus on the mole", moleFocused);
     release.shift()!();
     await says.getByRole("button", { name: "Interleaving comes back." }).waitFor();
     await says.getByRole("button", { name: "Dismiss the reply" }).focus();
     await page.keyboard.press("Enter");
     await until("× waves it off", async () => (await says.count()) === 0);
-    await until("focus goes to the owl beside it", owlFocused);
+    await until("focus goes to the mole beside it", moleFocused);
     // One that lands while the tutor is open was heard there, even after closing and reopening it while it
     // thought: closing it again says nothing.
     await ask("Retrieval");
@@ -787,7 +787,7 @@ journey("owl says: a reply that lands while the tutor is closed comes out of the
     await page.keyboard.press("Escape");
     await until("Esc closes it", async () => (await tutor.count()) === 0);
     await page.waitForTimeout(200);
-    if (await says.count()) throw new Error("the owl repeated a reply he saw land");
+    if (await says.count()) throw new Error("the mole repeated a reply he saw land");
   } finally {
     release.forEach((ok) => ok());
     await page.unroute(/\/ore$/);
