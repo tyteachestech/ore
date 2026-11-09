@@ -794,12 +794,8 @@ let peeked = false;
 export function TutorBubble({ onOpen, said = null, failed = false, thinking = false, onHush }: { onOpen: () => void; said?: string | null; failed?: boolean; thinking?: boolean; onHush?: () => void }) {
   const [look, setLook] = useState(false);
   // Out of its hole once a launch; thinking while a reply is written; a hop when one lands, a jolt for an error.
-  const [mood, setMood] = useState<Mood>(() => (peeked ? "idle" : ((peeked = true), "peek")));
-  useEffect(() => {
-    if (thinking) setMood("thinking");
-    else if (said) setMood(failed ? "surprised" : "happy");
-    else setMood((m) => (m === "peek" ? m : "idle"));
-  }, [thinking, said, failed]);
+  const [first] = useState<Mood>(() => (peeked ? "idle" : ((peeked = true), "peek")));
+  const mood: Mood = thinking ? "thinking" : said ? (failed ? "surprised" : "happy") : first;
   const mole = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -830,7 +826,7 @@ export function TutorBubble({ onOpen, said = null, failed = false, thinking = fa
           onFocus={() => setLook(true)}
           onBlur={() => setLook(false)}
         >
-          <Mole mood={mood} look={look || !!said} />
+          <Mole mood={mood} cue={said} look={look || !!said} />
         </button>
       </Hint>
     </>

@@ -39,3 +39,8 @@ test("sunk all the way into its hole, only the dirt is left", () => {
   const g = moleGrid(MOVES.peek.keys[0]![1]);
   expect(g.slice(0, -1).flat().every((t) => t === null)).toBe(true);
 });
+
+test("each mood's still pose (reduced motion, hidden window) shows the whole mole out of its hole", () => {
+  const out = (g: ReturnType<typeof moleGrid>) => g.slice(0, -1).flat().filter(Boolean).length;
+  for (const move of Object.values(MOVES)) expect(out(moleGrid(move.still))).toBeGreaterThan(out(moleGrid()) * 0.9);
+});

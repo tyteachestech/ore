@@ -74,27 +74,26 @@ export function moleGrid(pose: Partial<Pose> = {}): (Tone | null)[][] {
   return g;
 }
 
-export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer" | "sleepy";
-type Move = { loop?: boolean; keys: [ms: number, pose: Partial<Pose>][] };
+export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer";
+/** Poses held from their time (ms) until the next; at `end` a loop starts over and any other move rests.
+ *  `still` is the one pose shown under reduced motion or in a hidden window. */
+type Move = { keys: [ms: number, pose: Partial<Pose>][]; end: number; loop?: boolean; still: Partial<Pose> };
 const HAPPY: Partial<Pose> = { eyes: "arc", nose2: true, paw: 6, ex: 3.6, rx: 10, top: 1 };
 const CHEER: Partial<Pose> = { eyes: "arc", nose2: true, ex: 3 };
 const WIDE: Partial<Pose> = { eyes: "tall", nose2: true, rx: 10.6, top: 2 };
 const UP_R: Partial<Pose> = { lx: 1, ly: -1 }, UP_L: Partial<Pose> = { lx: -1, ly: -1 };
-/** Each mood's poses, held from their time (ms) until the next. One that doesn't loop ends at rest. */
 export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // Out of the hole: rises in three steps, overshoots a dot, settles, blinks.
-  peek: { keys: [[0, { y: 17 }], [90, { y: 9 }], [180, { y: 5 }], [270, { y: 2 }], [360, { top: 1.3 }], [450, { top: -0.3 }], [540, {}], [1200, { eyes: "shut" }], [1330, {}]] },
+  peek: { keys: [[0, { y: 17 }], [90, { y: 9 }], [180, { y: 5 }], [270, { y: 2 }], [360, { top: 1.3 }], [450, { top: -0.3 }], [540, {}], [1200, { eyes: "shut" }], [1330, {}]], end: 1330, still: {} },
   // Looks up to one side and taps a paw, then the other.
-  thinking: { loop: true, keys: [[0, UP_R], [400, { ...UP_R, pawR: 1 }], [600, UP_R], [800, { ...UP_R, pawR: 1 }], [1000, UP_R], [2000, UP_L], [2400, { ...UP_L, pawL: 1 }], [2600, UP_L], [2800, { ...UP_L, pawL: 1 }], [3000, UP_L], [4000, UP_L]] },
+  thinking: { loop: true, keys: [[0, UP_R], [400, { ...UP_R, pawR: 1 }], [600, UP_R], [800, { ...UP_R, pawR: 1 }], [1000, UP_R], [2000, UP_L], [2400, { ...UP_L, pawL: 1 }], [2600, UP_L], [2800, { ...UP_L, pawL: 1 }], [3000, UP_L]], end: 4000, still: UP_R },
   // Arc eyes and a hop with both paws.
-  happy: { keys: [[0, HAPPY], [100, { ...HAPPY, top: 0, pawL: 1, pawR: 1 }], [220, HAPPY], [1800, {}]] },
+  happy: { keys: [[0, HAPPY], [100, { ...HAPPY, top: 0, pawL: 1, pawR: 1 }], [220, HAPPY]], end: 1800, still: HAPPY },
   // Wide eyes and a jolt.
-  surprised: { keys: [[0, WIDE], [80, { ...WIDE, rx: 10, top: -0.4 }], [180, WIDE], [1400, {}]] },
+  surprised: { keys: [[0, WIDE], [80, { ...WIDE, rx: 10, top: -0.4 }], [180, WIDE]], end: 1400, still: WIDE },
   // Both paws waving, a bounce on each beat, then it settles pleased.
-  cheer: { keys: [[0, { ...CHEER, pawL: 3, pawR: 1 }], [180, { ...CHEER, top: -0.4, pawL: 1, pawR: 3 }], [360, { ...CHEER, pawL: 3, pawR: 1 }], [540, { ...CHEER, top: -0.4, pawL: 1, pawR: 3 }], [720, { ...CHEER, pawL: 3, pawR: 1 }], [900, HAPPY], [2400, HAPPY]] },
-  sleepy: { loop: true, keys: [[0, { eyes: "half", top: 0.9 }], [1800, { eyes: "shut", top: 1.5 }], [3600, { eyes: "half", top: 0.9 }], [4400, { eyes: "half", top: 0.9 }]] },
+  cheer: { keys: [[0, { ...CHEER, pawL: 3, pawR: 1 }], [180, { ...CHEER, top: -0.4, pawL: 1, pawR: 3 }], [360, { ...CHEER, pawL: 3, pawR: 1 }], [540, { ...CHEER, top: -0.4, pawL: 1, pawR: 3 }], [720, { ...CHEER, pawL: 3, pawR: 1 }], [900, HAPPY]], end: 2400, still: HAPPY },
 };
-
 /** One path per tone: a circle per dot (eyes a little bigger, so each reads as one black shape). */
 function paths(g: (Tone | null)[][]): [Tone, string][] {
   const by = new Map<Tone, string[]>();
@@ -115,14 +114,16 @@ const drawn = (p: Partial<Pose>) => {
   return cache.get(k)!;
 };
 
+/** In its button the sprite sits 3.3 dots below a square's top, so its dirt lands low and it pokes out of the ground. */
+const LIFT = 3.3;
 const BLINK_MS = 130, LOOK_MS = 900;
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
 /** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite). `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
  *  5 to 9 s and glances to a side every 15 to 20 s. `look` (hover or focus on its button) faces him with a blink.
- *  Still under reduced motion (a mood shows its main pose) and while the window is hidden. */
-export function Mole({ size = 40, mood = "idle", look = false, bare = false }: { size?: number; mood?: Mood; look?: boolean; bare?: boolean }) {
+ *  Still under reduced motion and while the window is hidden (a mood shows its still pose). */
+export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean }) {
   const [pose, setPose] = useState<Partial<Pose>>({});
   const [busy, setBusy] = useState(false);
   const looking = useRef(look);
@@ -130,21 +131,28 @@ export function Mole({ size = 40, mood = "idle", look = false, bare = false }: {
   const resting = useRef(true);
   const blink = useRef<() => void>(() => {});
 
-  // A mood's move: each pose at its time; a loop starts over, one that doesn't hands back to rest.
+  // A mood's move: its first pose now (so the frame before it never shows), the rest at their times; a loop starts
+  // over, any other move hands back to rest. `cue` replays the same mood for a new event (another reply landing).
+  // Reduced motion, or a hidden window, shows its still pose; a window shown again plays it then (a move that already played once stays done).
   useEffect(() => {
     if (mood === "idle") { setBusy(false); setPose({}); return; }
     const move = MOVES[mood];
-    if (still()) { setPose(move.keys[Math.min(2, move.keys.length - 1)]![1]); setBusy(move.loop ?? false); return; }
-    const timers: number[] = [];
-    const end = move.keys[move.keys.length - 1]![0];
+    const timers = new Set<number>();
+    const later = (fn: () => void, ms: number) => { const id = window.setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); };
+    let played = false;
     const run = () => {
-      for (const [ms, p] of move.keys) timers.push(window.setTimeout(() => setPose(p), ms));
-      timers.push(window.setTimeout(() => (move.loop ? run() : (setBusy(false), setPose({}))), end));
+      if (still() || document.hidden) { setPose(move.still); setBusy(!!move.loop); return; }
+      played = !move.loop;
+      setPose(move.keys[0]![1]);
+      for (const [ms, p] of move.keys.slice(1)) later(() => setPose(p), ms);
+      later(() => (move.loop && !document.hidden ? run() : (setBusy(!!move.loop), setPose(move.loop ? move.still : {}))), move.end);
     };
+    const shown = () => { if (!document.hidden && !played) { timers.forEach(clearTimeout); timers.clear(); run(); } };
     setBusy(true);
     run();
-    return () => timers.forEach(clearTimeout);
-  }, [mood]);
+    document.addEventListener("visibilitychange", shown);
+    return () => { timers.forEach(clearTimeout); document.removeEventListener("visibilitychange", shown); };
+  }, [mood, cue]);
   resting.current = !busy;
 
   // At rest: blinks and glances, never while it is facing him, hidden, or asked for less motion.
@@ -186,7 +194,7 @@ export function Mole({ size = 40, mood = "idle", look = false, bare = false }: {
   const d = useMemo(() => drawn(pose), [pose]);
   // The dirt sits low in the button, so the mole reads as poking out of the ground at its foot.
   return (
-    <svg className="mole" width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : "0 -3.3 22 22"} aria-hidden="true">
+    <svg className="mole" width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : `0 ${-LIFT} ${COLS} ${COLS}`} aria-hidden="true">
       {d.map(([tone, path]) => (
         <path key={tone} className={`mole-${tone}`} d={path} />
       ))}
