@@ -29,6 +29,7 @@ cards/<id>.md                  # one review item per file (kind card|prompt)
 cards/<id>.variants.jsonl      # remixed versions of that card (D66), append-only with `rev` like annotations.jsonl
 reviews/<yyyy>-<mm>.<device>.jsonl    # append-only review log, one per device (D78); source of truth for scheduling
 sessions/<yyyy>-<mm>.<device>.jsonl   # session start/end receipts (habit metric)
+chats/<id>.json                # tutor chats (D171): {id, title, created, updated, carry, turns}, the turns as the app shows them; written only through `ore chat`
 inbox/                         # dropped watcher (D95): a file added from here with `ore add` is removed after ingest
 .index/feeds.json              # fetched Feed posts (D107), rebuilt by `ore feed --refresh`
 .index/library.sqlite          # FTS5 index + materialized card states; gitignored; `ore reindex` rebuilds
@@ -195,6 +196,7 @@ ore grade <card> --answer "<text>" [--variant v]   AI grades against rubric (the
 ore ask <card> --message "<text>" [--answer "<his>"] [--session id] [--variant v]   Ask about this (D61): one chat turn on his plan → reply, proposal (a better card or null; apply with card set), session (pass back to continue)
 ore ask-library "<question>" [--earlier <json>]   Ask your library: retrieves passages through the FTS5 index (no embeddings), the AI answers only from them → {found, answer with [n] markers, citations[{n, item, title, heading, quote, start, end}]}; found false says the library doesn't cover it (no AI call when no source has the words)
 ore tutor "<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--stream <id>]   The tutor (D128): one chat turn over the open source's and the @-mentioned sources' passages first, then the library's (only the @-mentioned skills' sources when any), then the library's → {reply with [n] markers, citations[{n, item, title, heading, quote, start, end} or, from a web search when his sources don't hold it (D137), {n, url, title, site, quote}], general, searched}; general true marks a reply from the AI's own knowledge, hint true a reply that holds back the answer (the app offers Show me), card a card worth keeping or null; practice gets hints, not answers; --stream <id> writes {"progress": {stream: id, reply}} lines on stderr as the reply is written, and {stream: id, searching: true} when a web search starts (D138; claude only)
+ore chat [<id> [--set [--keep-time] | --delete]]   the tutor's saved chats (D171): list (last changed first), print one, replace one with the chat JSON on stdin, or delete one (prints it, for Undo)
 ore tutor-card <source> --card <json> --ai <json>   keep the card a tutor reply proposed: a draft (from: tutor) on that source, with its skills, first topic and the reply's ai stamp
 ore recall <item> --text "<text>"     store free recall (clears old feedback), append to the source note under "Recall" → {item, recall: {text, at}, notes}
 ore recall <item> --feedback          AI feedback on recall + after-answers + section lines, stored in recall.feedback → {item, feedback, questions: [{n, feedback}], missed, section_lines}

@@ -82,12 +82,20 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@11" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@12" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
     expect(findItem(lib, a.meta.id).body.slice(c.start, c.end)).toBe("A card you miss goes back to the first box.");
     expect(sent()[0]!.reading).toEqual({ title: "Flashcard boxes" });
+  });
+
+  test("the first reply names the chat (D171); later ones don't rename it", async () => {
+    const { lib, a } = await library();
+    const out = (title: string) => ({ reply: "Box one.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title });
+    fakeClaude([out(" Leitner boxes "), out("Something else")]);
+    expect((await tutor(lib, "Explain this simply", { item: a.meta.id })).title).toBe("Leitner boxes");
+    expect((await tutor(lib, "and then?", { item: a.meta.id, earlier: [{ message: "Explain this simply", reply: "Box one." }] })).title).toBe("");
   });
 
   test("a made-up quote or a marker with no citation goes back once to fix", async () => {
