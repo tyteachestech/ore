@@ -2638,10 +2638,16 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-bubble:active { transform: scale(0.96); }
 .tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .app:has(.quiz) .tutor-bubble { display: none; }
-.mole-body { fill: var(--faint); }
-.mole-shade { fill: color-mix(in srgb, var(--faint) 50%, var(--bg-raised)); }
-.mole-face { fill: var(--text-read); }
-.mole-pupil { fill: var(--text); }
+/* The mole's tones (D169): grey fur lit a step at the upper left, a lighter muzzle, white paws, black eyes with a
+   white glint, a pink nose (its one colour) and a dim row of dirt. */
+.mole-fur { fill: var(--faint); }
+.mole-lit { fill: color-mix(in srgb, var(--faint) 85%, var(--text)); }
+.mole-muzzle { fill: color-mix(in srgb, var(--faint) 45%, var(--text-read)); }
+.mole-white { fill: var(--text-read); }
+.mole-paw, .mole-glint { fill: var(--text); }
+.mole-eye { fill: #060607; }
+.mole-nose { fill: #f096ac; }
+.mole-dirt { fill: color-mix(in srgb, var(--faint) 55%, var(--bg-raised)); }
 @media (prefers-reduced-motion: reduce) { .tutor-bubble { transition: none; } }
 /* The mole says a reply that landed while the tutor was closed (D159, after Cult UI's speech bubble): its first
    lines in a raised bubble left of the mole, the tail a stair of 3px steps pointing at it. It grows out of the mole once. */

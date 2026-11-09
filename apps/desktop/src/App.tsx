@@ -2101,7 +2101,7 @@ export function App() {
     </>
   );
 
-  const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} said={unheard.said} onHush={unheard.hush} />;
+  const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} said={unheard.said} failed={unheard.failed} thinking={unheard.thinking} onHush={unheard.hush} />;
   return (
     <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />

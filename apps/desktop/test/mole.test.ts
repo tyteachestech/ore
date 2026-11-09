@@ -1,27 +1,41 @@
 import { expect, test } from "bun:test";
-import { MOLE, MOLE_BLINK, moleTurned } from "../src/Mole";
+import { COLS, MOVES, ROWS, moleGrid } from "../src/Mole";
 
-// D160, D168: every frame stays a 16-grid sprite, so the mole never leaves the pixel icons' grid while it moves.
-const frames = { front: MOLE, blink: MOLE_BLINK, left: moleTurned(-1), right: moleTurned(1) };
+// D169: every pose is one grid of dots, so the mole never leaves the grid while it moves.
+const mask = (g: ReturnType<typeof moleGrid>) => g.map((r) => r.map((t) => (t ? "#" : ".")).join(""));
+const cells = (g: ReturnType<typeof moleGrid>, tone: string) => g.flatMap((r, y) => r.flatMap((t, x) => (t === tone ? [[x, y]] : [])));
 
-test("every mole frame is 16 by 16 in its four tones", () => {
-  for (const rows of Object.values(frames)) {
-    expect(rows).toHaveLength(16);
-    for (const r of rows) expect(r).toMatch(/^[.#+oP]{16}$/);
-  }
+test("every pose of every move is a 22 by 18 grid over the same row of dirt", () => {
+  for (const move of Object.values(MOVES))
+    for (const [, pose] of move.keys) {
+      const g = moleGrid(pose);
+      expect(g).toHaveLength(ROWS);
+      for (const r of g) expect(r).toHaveLength(COLS);
+      expect(g[ROWS - 1]!.every((t) => t === "dirt")).toBe(true);
+      expect(g.slice(0, -1).flat().includes("dirt")).toBe(false);
+    }
 });
 
-test("frames keep the silhouette: only the face rows change, inside the head", () => {
-  for (const rows of Object.values(frames)) {
-    expect([...rows.slice(0, 4), ...rows.slice(9)]).toEqual([...MOLE.slice(0, 4), ...MOLE.slice(9)]);
-    for (const [y, r] of rows.entries()) expect(r.replace(/[^.]/g, "#")).toBe(MOLE[y]!.replace(/[^.]/g, "#"));
-  }
+test("at rest the silhouette is mirror-symmetric, with two eyes, two glints and a nose on the midline", () => {
+  const g = moleGrid();
+  for (const row of mask(g)) expect(row).toBe([...row].reverse().join(""));
+  expect(cells(g, "glint")).toHaveLength(2);
+  expect(cells(g, "nose").map(([x]) => x)).toEqual([10, 11]);
+  // The glints both sit top right (one light), so the eyes are symmetric with them counted in.
+  const eyes = [...cells(g, "eye"), ...cells(g, "glint")].map(([x]) => x!);
+  expect(eyes.map((x) => COLS - 1 - x).sort((a, b) => a - b)).toEqual([...eyes].sort((a, b) => a - b));
 });
 
-test("a blink shuts both eyes and a glance moves eyes, snout and nose a column", () => {
-  const lit = (rows: readonly string[], from = 4, to = 8) => rows.slice(from, to + 1).flatMap((r, i) => [...r].flatMap((c, x) => (c === "P" ? [[x, i]] : [])));
-  expect(MOLE_BLINK[4]).not.toContain("P");
-  expect(lit(MOLE_BLINK, 5)).toEqual(lit(MOLE, 5));
-  expect(lit(moleTurned(-1))).toEqual(lit(MOLE).map(([x, y]) => [x! - 1, y!]));
-  expect(lit(moleTurned(1))).toEqual(lit(MOLE).map(([x, y]) => [x! + 1, y!]));
+test("a blink only touches the eyes, and a glance moves them a whole column", () => {
+  const rest = moleGrid(), shut = moleGrid({ eyes: "shut" });
+  expect(mask(shut)).toEqual(mask(rest));
+  expect(cells(shut, "nose")).toEqual(cells(rest, "nose"));
+  expect(cells(shut, "eye").length).toBeLessThan(cells(rest, "eye").length);
+  const right = moleGrid({ lx: 1 });
+  expect(cells(right, "eye")).toEqual(cells(rest, "eye").map(([x, y]) => [x! + 1, y!]));
+});
+
+test("sunk all the way into its hole, only the dirt is left", () => {
+  const g = moleGrid(MOVES.peek.keys[0]![1]);
+  expect(g.slice(0, -1).flat().every((t) => t === null)).toBe(true);
 });
