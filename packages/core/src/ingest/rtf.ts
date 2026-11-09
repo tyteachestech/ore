@@ -331,6 +331,7 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
         level = -1;
         // Word writes an item's {\listtext} before its \pard: that marker is still this paragraph's.
         if (!marked) list = ordered = false;
+        marked = false;
         depth = 0;
         leaving = inTable;
         break;
