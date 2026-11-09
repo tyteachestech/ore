@@ -94,9 +94,12 @@ export function inOrder<T>(key: string, write: () => Promise<T>): Promise<T> {
 }
 
 /** A radio row's onFocus (How sure): Tab or ⇧Tab into it lands on the one picked, as a Mac radio group's
- *  does, not on the last one the keys or a click passed over. */
+ *  does, not on the last one the keys or a click passed over. With none picked it lands on the first if
+ *  the row itself took focus: Radix leaves it there after a click on the one already focused (it reads
+ *  that click as the row's own), and the row can't be seen focused or answer ← →. */
 export const focusPicked = (e: FocusEvent<HTMLElement>) => {
   if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-  const picked = e.currentTarget.querySelector<HTMLElement>('[aria-checked="true"]');
-  if (picked && picked !== e.target) picked.focus();
+  const row = e.currentTarget;
+  const to = row.querySelector<HTMLElement>('[aria-checked="true"]') ?? (e.target === row ? row.querySelector<HTMLElement>('[role="radio"]') : null);
+  if (to && to !== e.target) to.focus();
 };

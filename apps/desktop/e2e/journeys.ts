@@ -4340,10 +4340,17 @@ journey("finish quiz: while Check saves, his answer and how sure he is stay as s
 journey("how sure: one Tab stop in Review and the finish quiz, ← → move between the three, Space picks", async (page) => {
   const focused = () => page.evaluate(() => ({ role: document.activeElement?.getAttribute("role"), name: (document.activeElement as HTMLElement | null)?.innerText.trim() }));
   const walk = async (field: ReturnType<Page["getByRole"]>) => {
+    // The library is shared: the finish quiz journey before this one saved Think so on this question,
+    // and the quiz opens with it picked. Start from Guess, so Tab lands on a known one.
+    await page.getByRole("radio", { name: "Guess" }).click();
+    await until("Guess is picked first", async () => (await page.getByRole("radio", { name: "Guess" }).getAttribute("aria-checked")) === "true");
     await field.fill("an answer");
     await field.focus();
     await page.keyboard.press("Tab");
-    if ((await focused()).role !== "radio") throw new Error(`Tab from the answer went to ${JSON.stringify(await focused())}`);
+    // Checked before → so the wait below sees focus move, not the Tab's own landing on Think so
+    // (which passed only when it looked before Radix moved it on).
+    const first = await focused();
+    if (first.role !== "radio" || first.name !== "Guess") throw new Error(`Tab from the answer went to ${JSON.stringify(first)}`);
     // Radix moves focus a tick after the key.
     await page.keyboard.press("ArrowRight");
     await until("→ moves to Think so", async () => (await focused()).name === "Think so", 2000);
@@ -4365,6 +4372,12 @@ journey("how sure: one Tab stop in Review and the finish quiz, ← → move betw
     await field.focus();
     await page.keyboard.press("Tab");
     await until("Tab lands on Think so, the one picked", async () => (await focused()).name === "Think so", 2000);
+    // A click on the one picked clears it; Tab back in still lands on one of the three, so ← → work.
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await until("Think so is cleared", async () => (await page.getByRole("radio", { name: "Think so" }).getAttribute("aria-checked")) === "false");
+    await field.focus();
+    await page.keyboard.press("Tab");
+    await until("Tab after clearing lands on one of the three", async () => (await focused()).role === "radio", 2000);
   };
   await startReview(page, /Teaching/);
   await walk(page.getByRole("textbox", { name: "Your answer" }));
