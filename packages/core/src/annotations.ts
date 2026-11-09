@@ -82,7 +82,8 @@ export function addHighlight(item: Item, input: HighlightInput): Annotation {
   if (!span) throw new Error(`text not found in item ${item.meta.id}: "${input.exact.slice(0, 60)}"`);
   const live = readAnnotations(item).filter((a) => !a.point);
   const same = live.find((a) => a.start === span.start && a.end === span.end);
-  if (same) return same;
+  // With a note (a plan, a question) it is that one highlight, revised: the words he typed never vanish.
+  if (same) return input.note?.trim() ? reviseAnnotation(item, same, { intent: input.intent, note: input.note.trim() }) : same;
   const edge = live.filter((a) => a.start < span.end && a.end > span.start && !(a.start <= span.start && a.end >= span.end));
   if (edge.length === 1) {
     const a = edge[0]!;

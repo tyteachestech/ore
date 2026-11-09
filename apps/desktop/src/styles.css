@@ -182,9 +182,14 @@ kbd {
 .sidebar.within .side-item.on:not(.drop-on) { background: var(--bg-hover); box-shadow: none; }
 .sidebar.within .side-item.on[data-color]:not(.drop-on) { background: color-mix(in srgb, var(--skill) 11%, var(--bg-side)); }
 /* "…" edits the skill; it takes the count's place on hover. */
-.side-more { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px; display: none; place-items: center; color: var(--faint); }
+/* Hidden by opacity, not display (as the collection's tools): → focuses it from the skill, and between the skill's
+   blur and its focus neither has focus, so a ⋯ that is only rendered while focused can't take it. */
+.side-more { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); opacity: 0; }
 .side-more:hover { color: var(--text); background: var(--bg-active); }
-.side-item:hover .side-more, .side-more:focus-visible, .side-more[aria-expanded="true"] { display: grid; }
+.side-item:hover .side-more, .side-more:focus-visible, .side-more[aria-expanded="true"] { opacity: 1; }
+/* With the keyboard on a skill, its ⋯ shows so → can reach it (and the collection's tools, the same). */
+.side-item:has(> .side-main:focus-visible) .side-more { opacity: 1; }
+.side-head:has(> .side-label:focus-visible) .side-head-tools { opacity: 1; }
 .side-more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 
 /* Skill icons: an emoji, a Phosphor glyph masked and filled with the skill color, or a color dot. */
@@ -251,7 +256,7 @@ img.thumb { filter: brightness(0.86); }
    full width, then the other skills it is under by name, muted (or, matched in its text, why). Author, site
    and date stay columns on the right, so they line up down the list. A lesson keeps one line: its
    skills are its course's. */
-.row:has(> .row-main):not(.lesson) { height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
+.row:has(.row-main):not(.lesson) { height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
 .list .row:not(.lesson) .thumb { width: 64px; height: 36px; }
 .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 /* Source lists are Readwise Reader's (D130, Tyler's pick B of five; All sources too since D135): a 96×54
@@ -259,7 +264,7 @@ img.thumb { filter: brightness(0.86); }
    since they only show when there are any. On a skill page a question mark at the row's right, centred, marks a
    source that may answer an open question (D75); its hint lists them. */
 .list .row:not(.lesson):not(.post) .thumb { width: 96px; height: 54px; }
-.row:has(> .row-main):not(.lesson):not(.post) { min-height: 70px; gap: 12px; }
+.row:has(.row-main):not(.lesson):not(.post) { min-height: 70px; gap: 12px; }
 .list .row:not(.post) .row-main { gap: 2px; }
 .list .row:not(.post) .title { font-weight: 500; }
 .row .kind-line { color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -287,6 +292,7 @@ img.thumb { filter: brightness(0.86); }
   display: flex; align-items: center; gap: 12px;
   height: var(--row); padding: 0 12px; border-radius: var(--radius);
 }
+.row > .cell, .feed-head > .cell { display: contents; } /* the grid row's one cell; the row lays its parts out */
 .row:hover { background: var(--bg-hover); }
 .row.on, .row.sel { background: var(--bg-active); }
 .list:focus-visible { outline: none; }
@@ -1836,7 +1842,10 @@ button.home-plan:hover { color: var(--text); }
 .home-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
 .home-skill { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); text-align: left; color: var(--text); min-width: 0;; box-shadow: var(--lift); }
 .home-skill:hover { background: var(--bg-hover); }
-.home-skill:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+/* The name is the tile's control; its focus ring is drawn on the whole tile, as before. */
+.home-skill:has(.home-open:focus-visible) { box-shadow: 0 0 0 2px var(--focus); }
+.home-open { text-align: left; }
+.home-open:focus-visible { outline: none; }
 .home-skill-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .home-skill .mark { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; }
 .home-skill .mark.tile .skill-icon { font-size: 14px; } /* a few px of tile around the emoji */
@@ -1865,7 +1874,7 @@ button.home-plan:hover { color: var(--text); }
 .home-read:hover .more, .home-read .more:focus-visible, .home-read .more[aria-expanded="true"] { display: grid; }
 .home-read .more:hover, .home-read .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 .home-read:is(:hover, :has(.more[aria-expanded="true"])) .home-meter.small { visibility: hidden; }
-.home-read:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
+.home-read:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 1px var(--focus); }
 /* The title comes first: long skill pills give way to it, ending in … (DESIGN: long text). */
 .home-read .chips-button { max-width: 40%; overflow: hidden; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
@@ -2339,7 +2348,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-full .review-keys { display: none; }
 /* iPhone: the highlight types for a touch selection (Reader.tsx), bottom centre, clear of iOS's Copy bar and the collected pill. */
 .touch-highlight { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); display: flex; gap: 2px; padding: 2px; border: 1px solid var(--border); background: var(--bg-raised); box-shadow: var(--float); }
-.touch-highlight button { display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 12px; color: var(--text); font: 500 15px var(--font); white-space: nowrap; }
+/* Four actions inside 393 pt: each shares the width, with the label small enough to keep its icon. */
+.touch-highlight { max-width: calc(100vw - 16px); }
+.touch-highlight button { display: inline-flex; flex: 1 1 0; min-width: 0; justify-content: center; align-items: center; gap: 4px; height: 44px; padding: 0 8px; color: var(--text); font: 500 13px var(--font); white-space: nowrap; }
 .touch-highlight button:active { background: var(--bg-active); }
 .touch-highlight .keep svg { color: var(--keep-solid); }
 .touch-highlight .card svg { color: var(--card-solid); }
@@ -2446,12 +2457,30 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .cp-head .icon-btn { opacity: 1; width: 44px; height: 44px; margin-right: -12px; }
 .phone :is(.cp-row, .qp-row):active { background: var(--bg-hover); }
 /* The collected count sits in the top bar, beside Back, not over the text. */
-.phone .collected { top: -42px; bottom: auto; left: 84px; transform: none; animation: none; box-shadow: none; padding: 2px; }
-/* Note in the top bar is an iOS text button, like Edit in Notes. */
-.phone .reader-tools .note-toggle { border-color: transparent; background: none; color: var(--accent); font-size: 17px; padding: 0 6px; }
-/* One "Collected n" count (Collected.tsx), stopping short of Note, Finish and ⋯ (about 190 px): three digits fit at 390 pt. */
-.phone .collected { max-width: calc(100% - 84px - 190px); overflow: hidden; }
 .phone .collected .collected-chip { padding: 0 8px; flex: none; }
+/* The source screen's bars (D156): Back and ⋯ on top, what he does while reading at the bottom near the thumb (Obsidian). They leave as he reads on. */
+.phone-source > .phone-bar { position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0; transition: transform 200ms ease-out; }
+.phone-source::before { content: ""; position: absolute; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 6; }
+.phone-source .reader-tools { top: 0; right: 4px; transition: transform 200ms ease-out, opacity 150ms; }
+.phone-source .reader-scroll { padding-top: 44px; }
+.phone-source .player-pin { top: 44px; }
+.phone .phone-source :is(.mynotes-text, .side-tabs-root, .reader > .empty-state, .reader-loading) { padding-top: 48px; }
+.phone-source:has(.reader.bars-hidden:not(.noting)) > .phone-bar { transform: translateY(-100%); }
+.phone .reader.bars-hidden:not(.noting) .reader-tools { transform: translateY(-44px); opacity: 0; pointer-events: none; }
+.phone-tools { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); z-index: 6; display: flex; align-items: center; height: 44px; padding: 0 4px; transform: translateX(-50%); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 22px; box-shadow: var(--float); transition: transform 200ms ease-out, opacity 150ms; white-space: nowrap; }
+.phone-tools > button { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 10px; background: none; border: 0; color: var(--text); font: 500 14px var(--font); }
+.phone-tools > button.has { color: var(--accent); }
+.phone-tools .collected { position: static; transform: none; padding: 0; background: none; border: 0; box-shadow: none; animation: none; }
+.phone-tools .collected-chip { height: 44px; }
+/* Toast buttons are finger-sized on the phone, without growing the toast. */
+.phone .toast-undo { min-height: 44px; margin: -12px -8px -12px 0; padding: 0 8px; display: inline-flex; align-items: center; }
+.phone .toast-x { width: 44px; height: 44px; margin: -12px -14px -12px -8px; }
+.phone .reader:is(.bars-hidden, .dragging, .noting) .phone-tools { transform: translate(-50%, calc(100% + 24px + env(safe-area-inset-bottom, 0px))); opacity: 0; pointer-events: none; }
+.phone-finish { display: flex; justify-content: center; padding: 32px 0 96px; }
+.phone-finish button { min-width: 160px; height: 44px; background: var(--paper); color: var(--ink, #141413); border: 0; font: 500 16px var(--font); }
+.phone-source .find-bar { top: 52px; left: 8px; right: 8px; width: auto; max-width: none; height: 44px; }
+.phone-source .find-bar input { font-size: 16px; }
+.phone-source .find-bar button { width: 44px; height: 44px; }
 .phone .mynotes-text { padding-top: 12px; }
 .add-box .chips-button { max-width: 260px; overflow: hidden; }
 .add-skills { display: inline-flex; min-width: 0; }

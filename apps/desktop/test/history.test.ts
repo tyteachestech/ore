@@ -94,3 +94,36 @@ test("a redo whose write fails goes back to the redo stack", async () => {
   expect(h.canUndo).toBe(false);
   expect(h.canRedo).toBe(true);
 });
+
+test("a toast's own Undo whose write fails puts the step back, and so does its Redo", async () => {
+  const failed: string[] = [];
+  const h = new History((s, _e, what) => failed.push(`${what} ${s.message}`));
+  const a = step("a");
+  const bad = { message: "b", undo: () => Promise.reject(new Error("disk full")), redo: () => Promise.reject(new Error("offline")) };
+  h.push(bad);
+  h.push(a);
+  expect(h.take(bad)).toBe(true);
+  await Bun.sleep(0);
+  expect(failed).toEqual(["undo b"]);
+  expect(h.canRedo).toBe(false);
+  expect(h.take(bad)).toBe(true); // still on the history, so its toast's Undo can try again
+  await Bun.sleep(0);
+  const ok = { message: "c", undo: () => {}, redo: () => Promise.reject(new Error("offline")) };
+  h.push(ok);
+  h.undo();
+  expect(h.again(ok)).toBe(true);
+  await Bun.sleep(0);
+  expect(failed).toEqual(["undo b", "undo b", "redo c"]);
+  expect(h.canRedo).toBe(true); // nothing was redone, so Redo offers it again
+  expect(h.again(ok)).toBe(true);
+});
+
+test("the history keeps the newest 50 steps; the oldest fall off", () => {
+  const h = new History();
+  for (let i = 1; i <= 55; i++) h.push(step(String(i)));
+  const undone: string[] = [];
+  for (let s = h.undo(); s; s = h.undo()) undone.push(s.message);
+  expect(undone).toHaveLength(50);
+  expect(undone[0]).toBe("55");
+  expect(undone.at(-1)).toBe("6");
+});

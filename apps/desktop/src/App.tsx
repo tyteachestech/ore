@@ -659,7 +659,11 @@ export function App() {
     setOpenId(null);
     setFinishing(false);
     setSkill(id);
-    if (!id) setPlace("sources");
+    if (!id) {
+      setPlace("sources");
+      // From Home the list was not on screen: it takes the keys at once, as `go` does (⌘K → All sources, then ↓ ↵).
+      requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
+    }
   }, []);
 
   const goHome = useCallback(() => {
@@ -1810,7 +1814,7 @@ export function App() {
       <DragRow
         id={r.id}
         dragged={dragged}
-        role="option"
+        role="row"
         aria-selected={on || sel}
         className={`row${lesson ? " lesson" : ""}${on ? " on" : ""}${sel ? " sel" : ""}${lesson && r.status === "done" ? " finished" : ""}${r.pinned_at ? " pinned" : ""}${snip ? " hit" : ""}`}
         onClick={(e) => (e.shiftKey ? live.current.pickRange(r.id) : e.metaKey ? live.current.pickToggle(r.id) : live.current.openSource(r.id))}
@@ -1902,7 +1906,7 @@ export function App() {
       <DragRow
         id={key}
         dragged={rowDrag?.course?.id === c.id}
-        role="option"
+        role="row"
         aria-selected={on}
         aria-expanded={c.open}
         className={`row course${on ? " on" : ""}`}
@@ -1978,8 +1982,9 @@ export function App() {
       className="list"
       ref={listRef}
       tabIndex={0}
-      role="listbox"
-      aria-multiselectable="true"
+      // The focused, scrolling group; its rows are in a grid of their own below, so its empty states,
+      // errors and Show all stand outside the grid, whose children are rows only.
+      role="group"
       aria-label={TABS.find((s) => s.id === status)?.label ?? "Archived"}
       aria-activedescendant={keyed && currentLine ? `row-${lineKey(currentLine)}` : undefined}
       onKeyDown={onListKey}
@@ -1997,8 +2002,12 @@ export function App() {
       {!listError && items && !q && rows.length === 0 && <div className="empty-state">{empty(status, keys)}</div>}
       {q && hits.q === q && hits.error && <div className="empty-state err" role="alert">Couldn’t search the text: {hits.error} Titles still filter.</div>}
       {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">No {(TABS.find((s) => s.id === status)?.label ?? "archived").toLowerCase()} sources match “{q}”.</div>}
+      {/* A grid, not a listbox: a row holds its own controls (chips, ⋯), which an option may not (ARIA's layout grid). */}
+      {rows.length > 0 && <div role="grid" aria-multiselectable="true" aria-label="Sources">
       <DndContext
         sensors={rowSensors}
+        // dnd-kit's live region goes to <body>: a grid's children are rows only.
+        accessibility={{ container: document.body }}
         onDragStart={(e) => {
           const l = lines.find((x) => lineKey(x) === e.active.id);
           const p = e.activatorEvent as PointerEvent;
@@ -2043,6 +2052,7 @@ export function App() {
           </div>
         )}
       </DndContext>
+      </div>}
       {onSkillPage && groups.length > SKILL_CAP && (
         <button className="show-all" onClick={() => setShowAll(!showAll)}>
           {showAll ? "Show fewer" : `Show all ${groups.length}`}
@@ -2175,7 +2185,7 @@ export function App() {
             renameSource={renameSource}
             actionsRef={readerActions}
             practiceRef={readerPractice}
-            onArchive={(item) => void archiveSource(item)}
+            onArchive={(item) => void (item.archived_at ? restoreSource(item) : archiveSource(item))}
             lessons={openCourse ? lessonsOf(items ?? [], openCourse) : undefined}
             onOpenLesson={(id) => openSource(id)}
             onPin={(item) => void pinSource(item)}
@@ -2207,7 +2217,7 @@ export function App() {
               // Back on Home, focus goes to the source's Continue reading row, as the list's row keeps it.
               const id = openId;
               flushSync(() => setOpenId(null));
-              if (!onSkillPage && place === "home") document.querySelector<HTMLElement>(`.home-read[data-id="${id}"]`)?.focus();
+              if (!onSkillPage && place === "home") document.querySelector<HTMLElement>(`.home-read[data-id="${id}"] .home-open`)?.focus();
             }}
             onChanged={() => void refresh()}
             onSkillsChanged={reloadSkills}
@@ -2482,7 +2492,8 @@ const Same = memo(
 
 function DragRow({ id, dragged, children, ref, ...props }: { id: string; dragged: boolean; children: ReactNode; ref?: Ref<HTMLDivElement> } & Omit<HTMLAttributes<HTMLDivElement>, "id">) {
   const { setNodeRef, listeners, attributes } = useDraggable({ id });
-  const { role: _role, tabIndex: _tab, ...a11y } = attributes;
+  // The row is a grid row (`role="row"`), not dnd-kit's button: its pressed state and tab stop go too.
+  const { role: _role, tabIndex: _tab, "aria-pressed": _pressed, ...a11y } = attributes;
   // The context menu's trigger passes its ref too; both need the node.
   const setRef = (el: HTMLDivElement | null) => {
     setNodeRef(el);
@@ -2506,7 +2517,8 @@ function DragRow({ id, dragged, children, ref, ...props }: { id: string; dragged
       }}
       className={`${props.className ?? ""}${dragged ? " dragged" : ""}`}
     >
-      {children}
+      {/* One cell, laid out as the row (display: contents): a grid row needs a cell, the look needs none. */}
+      <span role="gridcell" className="cell">{children}</span>
     </div>
   );
 }
