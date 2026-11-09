@@ -10,7 +10,7 @@ import * as HoverCard from "@radix-ui/react-hover-card";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
-import { SkillChip, skillGroups, SkillPicker } from "./Skills";
+import { archivedOnly, SkillChip, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
 import { Roll } from "./Roll";
@@ -145,9 +145,10 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   }, []);
 
   /** Skills with sources or cards; empty ones stay in the sidebar only. */
-  const shown = skills.filter((s) => items.some((i) => i.skills.includes(s.id)) || today?.skills.some((x) => x.skill === s.id && (x.due || x.solid)));
+  const shown = skills.filter((s) => !s.archived && (items.some((i) => i.skills.includes(s.id)) || today?.skills.some((x) => x.skill === s.id && (x.due || x.solid))));
 
-  const reading = continueReading(items, recent).slice(0, 5);
+  // An archived skill's sources wait off Home too (D173).
+  const reading = continueReading(items, recent).filter((i) => !archivedOnly(i.skills, skills)).slice(0, 5);
 
   const split = useSplit("ore.home-split", 1 / 3);
   const two = reading.length > 0 && shown.length > 0 && !!today;

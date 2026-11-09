@@ -17,6 +17,7 @@ import { layoutOf, skillGroups, UNGROUPED, type SkillLayout } from "./Skills";
 import { errorText, load, save } from "./util";
 
 const CLOSED = "ore.side-closed";
+const ARCHIVED_OPEN = "ore.side-archived-open";
 function closedGroups(): string[] {
   try {
     const v: unknown = JSON.parse(load(CLOSED) ?? "[]");
@@ -87,6 +88,12 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const last = base.length - (base.at(-1)?.collection ? 0 : 1);
   const shown = freshGroup ? (fresh ? [...base.slice(0, last), freshGroup, ...base.slice(last)] : [...base, freshGroup]) : base;
   const named = groups.filter((g) => g.collection);
+  // D173: archived skills keep their place in skills.yaml (so a drag or rename writes them where they
+  // were) but leave the list for a folded Archived group at the bottom, closed until he opens it.
+  const live = (g: Group) => g.skills.filter((s) => !s.archived);
+  const listed = shown.filter((g) => g === freshGroup || !g.skills.length || live(g).length > 0);
+  const archived = skills.filter((s) => s.archived);
+  const [archivedOpen, setArchivedOpen] = useState(() => load(ARCHIVED_OPEN) === "1");
 
   const setClosedSaved = (next: string[]) => {
     setClosed(next);
@@ -254,8 +261,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
         <span className="label">All sources</span>
       </button>
       <DndContext sensors={sensors} collisionDetection={collide} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-        <SortableContext items={shown.map((g) => groupId(g.collection))} strategy={verticalListSortingStrategy}>
-          {shown.map((g) => (
+        <SortableContext items={listed.map((g) => groupId(g.collection))} strategy={verticalListSortingStrategy}>
+          {listed.map((g) => (
             <Fragment key={g.collection}>
             {naming && !g.collection && namingField}
             <Section
@@ -270,9 +277,9 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
               onRename={(name) => rename(g, name)}
               onCancelRename={() => setRenaming(null)}
             >
-              <SortableContext items={g.skills.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={live(g).map((s) => s.id)} strategy={verticalListSortingStrategy}>
                 {isOpen(g) &&
-                  g.skills.map((s) => (
+                  live(g).map((s) => (
                     <SkillRow key={s.id} s={s} on={skill === s.id} drop={drop === s.id} marked={marked} onOpen={onOpen} menu={menu(s)} />
                   ))}
               </SortableContext>
@@ -293,6 +300,17 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
           ))}
           {naming && !shown.some((g) => !g.collection) && namingField}
         </SortableContext>
+        {archived.length > 0 && (
+          <div role="group" aria-label="Archived" className="side-section side-archived">
+            <div className="side-head">
+              <button className="side-label" aria-expanded={archivedOpen} onClick={() => setArchivedOpen((o) => (save(ARCHIVED_OPEN, o ? "" : "1"), !o))}>
+                <span className="side-label-text">Archived</span>
+                <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
+              </button>
+            </div>
+            {archivedOpen && archived.map((s) => <ArchivedRow key={s.id} s={s} on={skill === s.id} drop={drop === s.id} marked={marked} onOpen={onOpen} menu={menu(s)} />)}
+          </div>
+        )}
         {createPortal(
           <DragOverlay dropAnimation={SETTLE}>
             {lifted && "skills" in lifted ? (
@@ -504,6 +522,26 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
         style={{ transform: CSS.Translate.toString(transform), transition }}
       >
         <button className="side-main" aria-pressed={on} {...listeners} onClick={() => onOpen(s.id)}>
+          {marked && (
+            <span className="mark" aria-hidden="true">
+              <SkillIcon icon={s.icon} color={s.color} dot />
+            </span>
+          )}
+          <span className="label">{s.name}</span>
+        </button>
+        <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} hoverOnly />
+      </div>
+    </WithMenu>
+  );
+}
+
+/** An archived skill in the folded Archived group (D173): opens and has its menu like any skill, and
+ *  takes a dropped source (which brings it back), but doesn't drag: Bring back puts it in its place. */
+function ArchivedRow({ s, on, drop, marked, onOpen, menu }: { s: Skill; on: boolean; drop: boolean; marked: boolean; onOpen: (id: string) => void; menu: MenuAction[] }) {
+  return (
+    <WithMenu actions={menu}>
+      <div className={`side-item${on ? " on" : ""}${drop ? " drop-on" : ""}`} data-drop-skill={s.id} data-color={s.color}>
+        <button className="side-main" aria-pressed={on} onClick={() => onOpen(s.id)}>
           {marked && (
             <span className="mark" aria-hidden="true">
               <SkillIcon icon={s.icon} color={s.color} dot />

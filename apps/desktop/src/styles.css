@@ -1333,6 +1333,14 @@ body.resizing iframe { pointer-events: none; }
 .skill-page:not([data-color]) { --skill: var(--accent); }
 .skill-hero { flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 26px 32px 20px; }
 .skill-title { flex: 1 1 220px; min-width: 0; }
+/* D173: the importance bars sit after the name, quiet until hovered (Linear's priority on an issue). */
+.skill-name-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.skill-name-row > .skill-name { min-width: 0; }
+.skill-importance { flex: none; width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
+.skill-importance:hover, .skill-importance[aria-expanded="true"] { color: var(--text); background: var(--bg-hover); }
+.skill-importance:focus-visible, .skill-unarchive:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.skill-unarchive { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; color: var(--muted); font-size: 13px; }
+.skill-unarchive:hover { color: var(--text); background: var(--bg-hover); }
 .skill-cols { flex: 1; min-height: 0; display: grid; padding: 0 32px; }
 .skill-cols.dragging { user-select: none; -webkit-user-select: none; cursor: col-resize; }
 /* The bar between the columns, like the source note's divider (D44): a line shows on hover. */

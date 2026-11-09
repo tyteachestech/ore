@@ -156,6 +156,12 @@ export const skillsFirst = (skills: Skill[], first: string[]): Skill[] => [
   ...skills.filter((k) => !first.includes(k.id)),
 ];
 
+/** Filed only under archived skills (D173), as core's `archivedOnly`: it waits out of Home. */
+export const archivedOnly = (ids: string[], skills: Skill[]) => {
+  const own = skills.filter((s) => ids.includes(s.id));
+  return own.length > 0 && own.every((s) => s.archived);
+};
+
 /** The header over the skills in no collection, once there are collections. No collection takes its name. */
 export const UNGROUPED = "Other";
 
