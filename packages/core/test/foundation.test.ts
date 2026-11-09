@@ -155,13 +155,13 @@ describe("skill look", () => {
 });
 
 describe("add skill", () => {
-  test("appends a named skill at P2 in a collection, and refuses a duplicate or a blank name", async () => {
+  test("appends a named skill Light (P3, D173) in a collection, and refuses a duplicate or a blank name", async () => {
     const lib = await tempLibrary();
     const s = await addSkill(lib, "  Public   Speaking ", "Ty Teaches Tech");
-    expect(s).toEqual({ id: "public-speaking", name: "Public Speaking", priority: "P2", collection: "Ty Teaches Tech" });
+    expect(s).toEqual({ id: "public-speaking", name: "Public Speaking", priority: "P3", collection: "Ty Teaches Tech" });
     expect(loadSkills(lib).skills.at(-1)).toEqual(s);
     expect(readFileSync(join(lib.root, "skills.yaml"), "utf8")).toContain("# Skills (D25)");
-    expect(await addSkill(lib, "Chess")).toEqual({ id: "chess", name: "Chess", priority: "P2" });
+    expect(await addSkill(lib, "Chess")).toEqual({ id: "chess", name: "Chess", priority: "P3" });
     await expect(addSkill(lib, "public speaking")).rejects.toThrow('skill "Public Speaking" already exists');
     await expect(addSkill(lib, "Teaching")).rejects.toThrow("already exists");
     await expect(addSkill(lib, "   ")).rejects.toThrow("a skill needs a name");

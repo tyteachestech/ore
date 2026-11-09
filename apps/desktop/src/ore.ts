@@ -207,7 +207,8 @@ export const SKILL_COLORS = ["gray", "red", "orange", "yellow", "green", "teal",
 export type SkillColor = (typeof SKILL_COLORS)[number];
 /** `collection` groups skills in the sidebar. */
 /** `hook` is his one line on why he is learning it (D63); `goal` what he could show he can do (D101). */
-export type Skill = { id: string; name: string; hook?: string; goal?: string; icon?: string; color?: SkillColor; collection?: string };
+export type Priority = "P1" | "P2" | "P3";
+export type Skill = { id: string; name: string; priority?: Priority; archived?: boolean; hook?: string; goal?: string; icon?: string; color?: SkillColor; collection?: string };
 
 export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string; annotation?: string };
 

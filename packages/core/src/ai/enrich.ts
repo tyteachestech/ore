@@ -13,7 +13,7 @@ import { findItem, hasAttempts, listItems, ItemMetaSchema, type Item } from "../
 import { paths, type Library } from "../library.ts";
 import { withLock } from "../lock.ts";
 import { pendingNotes } from "../notes.ts";
-import { loadSkills, matchSkill } from "../skills.ts";
+import { cardPriority, loadSkills, matchSkill } from "../skills.ts";
 import { ensureTopic, listTopics } from "../topics.ts";
 import { runAgent, type Usage } from "./adapter.ts";
 import { anchorEvidence, finishScope } from "./check.ts";
@@ -47,6 +47,9 @@ export type EnrichOutput = z.infer<typeof EnrichOutput>;
 
 /** Plain highlights the finish plan writes no more than this many cards from (D118); key points come on top. */
 export const PLAN_CAP = 5;
+/** The same for a source filed only under Light skills (D173): fewer cards is what saves review time;
+ *  a lower retention target alone saves little. */
+export const LIGHT_PLAN_CAP = 2;
 
 // Highlights that should become review items and have none yet (D19, D118): a key point (`card` intent
 // in the files) at once, a question he answered with "Answered + card" (D75), and once the source is
@@ -171,7 +174,10 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
   const base = { item: item.meta.id, title: item.meta.title, prequestions: (item.meta.prequestions ?? []).map((p) => p.q), skills: item.meta.skills, topics: item.meta.topics, topics_created: [], cards: [] };
   if (item.meta.enriched_at && !pending.length && notes === null && !preqs.length) return { ...base, skipped: "already enriched; no new highlights to plan, note changes or undrafted prequestions" };
 
-  const skills = loadSkills(lib).skills;
+  const all = loadSkills(lib).skills;
+  // The AI never files under an archived skill (D173), unless the source already is.
+  const skills = all.filter((s) => !s.archived || item.meta.skills.includes(s.id));
+  const cap = item.meta.skills.length && cardPriority(item.meta.skills, all) === "P3" ? LIGHT_PLAN_CAP : PLAN_CAP;
   const topics = listTopics(lib);
   const pendingIds = new Set(pending.map((a) => a.id));
   const plain = pending.filter((a) => a.intent === "keep");
@@ -207,6 +213,7 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
       skill_cards: skillCards(allCards, item),
       missed: preqs.length || plain.length ? (item.meta.recall?.feedback?.missed ?? []) : [],
       scope: finishScope(item),
+      plain_cap: cap,
     },
     check: (d) => {
       if (notes === null && d.drafts.some((x) => x.from_notes)) return "from_notes drafts are only allowed when `notes` is given";
@@ -229,7 +236,7 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
       const uncovered = keyIds.filter((id) => !perHighlight.has(id));
       if (uncovered.length) return `every key point needs a draft (annotation or also): ${uncovered.join(", ")}`;
       const fromPlain = d.drafts.filter((x) => x.annotation && [x.annotation, ...x.also].every((id) => plainIds.has(id))).length;
-      if (fromPlain > PLAN_CAP) return `at most ${PLAN_CAP} drafts from plain highlights alone (got ${fromPlain}): merge them into fewer ideas or skip the minor ones`;
+      if (fromPlain > cap) return `at most ${cap} drafts from plain highlights alone (got ${fromPlain}): merge them into fewer ideas or skip the minor ones`;
       const points = new Set(pending.filter((a) => a.point).map((a) => a.id));
       const ungrounded = d.drafts.filter((x) => x.annotation && points.has(x.annotation) && !anchorEvidence(item.body, x.evidence).length).map((x) => x.annotation);
       if (ungrounded.length) return `drafts for point highlights need evidence: sentences copied exactly from the document (none found for ${ungrounded.join(", ")})`;

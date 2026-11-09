@@ -11,7 +11,7 @@ import { findVariant } from "./remix.ts";
 import { appendReview, appendUndo, readReviews, type FsrsState, type Review } from "./reviews.ts";
 import { emptyState, loadParams, nextState, replay, retrievability } from "./scheduler.ts";
 import { openSessionId, readSessions } from "./sessions.ts";
-import { cardPriority, desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
+import { archivedOnly, cardPriority, desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
 import { retentionMetric } from "./stats.ts";
 
 export interface ReviewInput {
@@ -158,6 +158,8 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     for (const c of cards) {
       if (c.state === "retired") continue;
       if (picked && !c.skills.some((s) => picked.has(s))) continue;
+      // An archived skill's cards wait out of review (D173), unless he picks the skill by name.
+      if (!picked && archivedOnly(c.skills, skills)) continue;
       // A miss today owes one relearn pass (D21) until he answers the card again, in this session or a
       // later one today: the session ending as the goal closes (D65), or Esc then ⌘R, doesn't drop it.
       const own = ownToday.get(c.id) ?? [];
