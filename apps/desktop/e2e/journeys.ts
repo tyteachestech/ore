@@ -4563,10 +4563,17 @@ journey("finish quiz: while Check saves, his answer and how sure he is stay as s
 journey("how sure: one Tab stop in Review and the finish quiz, ← → move between the three, Space picks", async (page) => {
   const focused = () => page.evaluate(() => ({ role: document.activeElement?.getAttribute("role"), name: (document.activeElement as HTMLElement | null)?.innerText.trim() }));
   const walk = async (field: ReturnType<Page["getByRole"]>) => {
+    // The library is shared: the finish quiz journey before this one saved Think so on this question,
+    // and the quiz opens with it picked. Start from Guess, so Tab lands on a known one.
+    await page.getByRole("radio", { name: "Guess" }).click();
+    await until("Guess is picked first", async () => (await page.getByRole("radio", { name: "Guess" }).getAttribute("aria-checked")) === "true");
     await field.fill("an answer");
     await field.focus();
     await page.keyboard.press("Tab");
-    if ((await focused()).role !== "radio") throw new Error(`Tab from the answer went to ${JSON.stringify(await focused())}`);
+    // Checked before → so the wait below sees focus move, not the Tab's own landing on Think so
+    // (which passed only when it looked before Radix moved it on).
+    const first = await focused();
+    if (first.role !== "radio" || first.name !== "Guess") throw new Error(`Tab from the answer went to ${JSON.stringify(first)}`);
     // Radix moves focus a tick after the key.
     await page.keyboard.press("ArrowRight");
     await until("→ moves to Think so", async () => (await focused()).name === "Think so", 2000);
@@ -4588,6 +4595,12 @@ journey("how sure: one Tab stop in Review and the finish quiz, ← → move betw
     await field.focus();
     await page.keyboard.press("Tab");
     await until("Tab lands on Think so, the one picked", async () => (await focused()).name === "Think so", 2000);
+    // A click on the one picked clears it; Tab back in still lands on one of the three, so ← → work.
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await until("Think so is cleared", async () => (await page.getByRole("radio", { name: "Think so" }).getAttribute("aria-checked")) === "false");
+    await field.focus();
+    await page.keyboard.press("Tab");
+    await until("Tab after clearing lands on one of the three", async () => (await focused()).role === "radio", 2000);
   };
   await startReview(page, /Teaching/);
   await walk(page.getByRole("textbox", { name: "Your answer" }));
@@ -4976,16 +4989,40 @@ journey("list archive Undo selects the source it put back, as Finder does, thoug
   const before = await titles();
   // Nothing picked: the first row stands for the selection. Archive the third from its menu.
   const row = page.locator(".list .row").filter({ has: page.locator(".title", { hasText: before[2]! }) }).first();
-  await row.click({ button: "right" });
-  await page.getByRole("menuitem", { name: /Archive/ }).click();
-  await until("the row leaves the list", async () => !(await titles()).includes(before[2]!));
-  await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
-  await until("Undo brings it back", async () => (await titles()).includes(before[2]!));
+  // Undo while the archive still saves, and the undo slower than a list read: a read begun after
+  // the archive saved, before the undo reached the library, used to land and move the selection on.
+  let release = () => {};
+  let undone = () => {};
+  const undoSaved = new Promise<void>((ok) => (undone = ok));
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"archive",')) return route.fallback();
+    if (body.includes('"--undo"')) {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      await route.fallback();
+      return undone();
+    }
+    await new Promise<void>((ok) => (release = ok));
+    await route.fallback();
+  });
+  try {
+    await row.click({ button: "right" });
+    await page.getByRole("menuitem", { name: /Archive/ }).click();
+    await until("the row leaves the list", async () => !(await titles()).includes(before[2]!));
+    await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
+    await until("Undo brings it back", async () => (await titles()).includes(before[2]!));
+    release();
+    await undoSaved;
+  } finally {
+    release();
+    await page.unroute(/\/ore$/);
+  }
+  await until("the library has it back", async () => ((await ore("ls")) as { title: string }[]).some((i) => i.title === before[2]));
+  await page.waitForTimeout(300);
   // The first ↓ shows the selection where it is.
   await page.locator(".list").focus();
   await page.keyboard.press("ArrowDown");
-  await until(`“${before[2]}” is selected, not “${before[0]}”`, async () => (await selected()) === before[2]);
-  await until("the library has it back", async () => ((await ore("ls")) as { title: string }[]).some((i) => i.title === before[2]));
+  await until(`“${before[2]}” is selected`, async () => (await selected()) === before[2]);
 });
 
 journey("Done: Move to To read and ⌘Z puts the source back in Done with the finish date it had", async (page) => {

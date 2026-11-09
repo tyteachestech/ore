@@ -298,13 +298,22 @@ export function App() {
   const guard = useRef(readGuard()).current;
   const writing = guard.writing;
   /** One action's writes, one after another: an Undo pressed while its archive still saves waits for it,
-   *  or the two `ore` runs race and the archive can land last, leaving it archived. */
+   *  or the two `ore` runs race and the archive can land last, leaving it archived. Once the action's
+   *  latest write settles, the list is read again; an earlier one's read would begin before a later one
+   *  (an Undo) reached the library, could come back first with the row still archived, and move the
+   *  selection off the row the Undo put back. */
   const inOrder = () => {
     let last: Promise<unknown> = Promise.resolve();
+    let queued = 0;
     return <T,>(write: () => Promise<T>): Promise<T> => {
+      const n = ++queued;
       const p = last.then(write);
       last = p.catch(() => {});
-      return writing(p);
+      // After `writing`'s own count of the settle, or the read would begin before it and never land.
+      writing(p);
+      const read = () => void (n === queued && refresh());
+      p.then(read, read);
+      return p;
     };
   };
   const refresh = useCallback(async () => {
@@ -1324,10 +1333,7 @@ export function App() {
       mark(on);
       // Undo selects the source it put back, as Finder selects what it puts back.
       if (on !== archived) setCursor(item.id);
-      return save(on).then(refresh, (e) => {
-        void refresh();
-        throw e;
-      });
+      return save(on);
     };
     notify(`${archived ? "Archived" : "Restored"} “${item.title}”`, "info", () => apply(!archived), () => apply(archived));
     try {
@@ -1335,7 +1341,6 @@ export function App() {
     } catch (e) {
       notify(errorText(e), "error");
     }
-    void refresh();
   };
 
   /** Lays out the sidebar at once (optimistic), then saves through `ore skills arrange`; a failure
@@ -1436,7 +1441,7 @@ export function App() {
       if (on) setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
       else setCursor(`course:${c.id}`);
       // Run only from the history, which puts a failed step back and says why.
-      return queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"]))).finally(refresh);
+      return queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"])));
     };
     notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
     try {
@@ -1444,7 +1449,6 @@ export function App() {
     } catch (e) {
       notify(errorText(e), "error");
     }
-    void refresh();
   };
   const courseActions = (c: CourseLine): MenuAction[] => [
     { id: "open", label: c.next && c.next.status !== "inbox" ? "Continue" : "Open", hint: "↵", run: () => openSource(lessonFirst(c).id) },
@@ -1480,8 +1484,6 @@ export function App() {
       } catch (e) {
         if (fromHistory) throw e;
         notify(errorText(e), "error");
-      } finally {
-        void refresh();
       }
     };
     unpick();
