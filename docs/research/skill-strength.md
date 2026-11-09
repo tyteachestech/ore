@@ -28,7 +28,7 @@ Game elements and meaning work through different routes, and the strongest desig
 | Measuring an enjoyable activity increases how much you do it but can lower enjoyment [4] | 6 experiments | No ticking counter during review. Show strength on Home and at session end |
 | Goal gradient: effort rises near a reward; illusory head starts speed completion [5][6] | field data | Show "6 to level 3" rather than a bare total |
 | Motivation sags halfway to a goal [7] | lab studies | Before the midpoint, frame as gained; after it, as remaining |
-| Hard streak resets raise quitting [8] | +32% quit | Levels never drop. A dip is shown gently, as things to win back |
+| Hard tasks in a run or at the end raise quitting (about task order, not streak counters) [8] | +32% quit | Levels never drop. A dip is shown gently, as things to win back |
 | Utility-value writing: connect material to your own life [9][10] | d up to .76 for low performers | A one-line "why" per skill, plus the closing "Where would you use this?" question (D53) |
 | Self-concordant goals get more sustained effort [11] | 3 longitudinal sets | He writes the "why" himself. The app never suggests one |
 | Progress on meaningful work is the top driver of good workdays [12] | 11,637 diaries | "You can now explain…" shows concrete progress in his own words |
@@ -67,7 +67,7 @@ Stability does not decay with time. The count only falls when a review shows you
 5. [Kivetz, Urminsky & Zheng 2006, The Goal-Gradient Hypothesis Resurrected](https://consensus.app/papers/details/814cd0e2739554448827df3ab4cf4173/), Journal of Marketing Research.
 6. [Nunes & Drèze 2006, The Endowed Progress Effect](https://consensus.app/papers/details/306ea700e0ec5ddc806c53e1059f55ba/), Journal of Consumer Research.
 7. [Bonezzi, Brendl & De Angelis 2011, Stuck in the Middle](https://consensus.app/papers/details/95154fe016bc57098b46875c252bf42a/), Psychological Science.
-8. Kang et al. 2022, PNAS (N = 14,383), via the learning-science brief §10.
+8. Kang, Daniels & Schweitzer 2022, The streak-end rule, PNAS (N = 14,383), [doi](https://doi.org/10.1073/pnas.2204460119).
 9. [Hulleman et al. 2010, Enhancing interest and performance with a utility value intervention](https://consensus.app/papers/details/8aef9305d19f5be0ac3643e10cf80f7e/), Journal of Educational Psychology.
 10. [Hulleman et al. 2017, Making Connections](https://consensus.app/papers/details/6f0b6c8465d559ecb79a172950e7f937/), Journal of Educational Psychology.
 11. [Sheldon & Elliot 1999, Goal striving, need satisfaction, and longitudinal well-being](https://consensus.app/papers/details/414bfd0e1b9653c9832549bc522916b0/), JPSP.

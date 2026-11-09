@@ -28,7 +28,7 @@ At day 365 the default reaches 171 cards a day. The model is rough (every succes
 
 Ranked by how much each helps him keep going, times the strength of the evidence, divided by effort.
 
-1. **Let new cards fill only the time the goal leaves.** New drafts enter review only while the forecast for due cards is under the daily goal. Lower retention targets to the brief's numbers: P1 0.92, P2 0.88, P3 0.80. *Evidence:* workload rises steeply above 0.90 (§5, §10); hard endings raise quitting ~32% (Kang 2022). *Changes* D22, D60. Adherence: highest; effort: small.
+1. **Let new cards fill only the time the goal leaves.** New drafts enter review only while the forecast for due cards is under the daily goal. Lower retention targets to the brief's numbers: P1 0.92, P2 0.88, P3 0.80. *Evidence:* workload rises steeply above 0.90 (§5, §10); hard tasks in a run or at the end raise quitting ~32% (Kang 2022). *Changes* D22, D60. Adherence: highest; effort: small.
 2. **Show today's slice, not the whole pile.** "About 10 minutes of your most urgent cards"; the full due count moves into a hover hint. *Evidence:* predictable load (§10); late is cheap, cramming costly (Cepeda 2008). *Changes* D58. Effort: small.
 3. **A daily cue: a one-line plan and one reminder.** "After [my morning coffee], I review." One macOS notification at that time, only while the goal is unmet. *Evidence:* implementation intentions d ≈ 0.65 (Gollwitzer & Sheeran 2006); habit is about the cue (Gardner 2022). Effort: medium (needs to fire when the app is closed).
 4. **Wait a day before a new card's first review.** The finish quiz already gives the immediate test. *Evidence:* delayed first retrieval beats immediate (Karpicke & Roediger 2007; Roediger & Karpicke 2006). *Changes* the freshDraft rule in `queue.ts`. Effort: tiny.
@@ -66,4 +66,4 @@ Ranked by how much each helps him keep going, times the strength of the evidence
 - **Own-words vs no-note retention (D34.8).** Once both groups pass 10 reviews, this answers whether Card highlights with no note are worth drafting.
 - **Old drafts waiting.** Freshest-first plus a daily limit means drafts from older sources can wait indefinitely.
 
-Effect sizes come from the evidence brief, which notes real-world effects run about 30–36% smaller than lab results. Smith, Roediger & Karpicke 2013 and Karpicke & Roediger 2007 were cited from memory; verify before quoting. The load table is a simulation with default FSRS weights, not real data.
+Effect sizes come from the evidence brief, which notes real-world effects run about 30–36% smaller than lab results. Smith, Roediger & Karpicke 2013 and Karpicke & Roediger 2007 were checked in PubMed on 2026-11-09 and hold ([`2026-11-09-pubmed-check.md`](2026-11-09-pubmed-check.md)); Smith 2013 used word lists, not prose. The load table is a simulation with default FSRS weights, not real data.

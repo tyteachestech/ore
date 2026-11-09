@@ -241,7 +241,9 @@ This is **Inference**: it uses only FSRS's parameterization, not new science.
 
 | Finding | Effect | Grade | Source |
 |---|---|---|---|
-| Interleaving, visual/category discrimination | g = 0.67 | Well-established | Brunmair & Richter 2019, k = 54 |
+| Interleaving, overall | g = 0.42 (59 studies, 238 effects) | Well-established | Brunmair & Richter 2019 [doi](https://doi.org/10.1037/bul0000209) |
+| Interleaving, paintings and other visual categories | g = 0.67 (paintings) | Well-established | Brunmair & Richter 2019 |
+| Interleaving, **expository texts** | Ambiguous, overall effect not significant | Well-established null | Brunmair & Richter 2019 |
 | Interleaving, math problem types | d = 0.83 (classroom RCT); meta g = 0.34 | Well-established | Rohrer et al. 2019; Brunmair & Richter 2019 |
 | Interleaving, **vocabulary/definitions** | **g = -0.39** (blocking is better) | Well-established | Brunmair & Richter 2019 |
 | Interleaved items need adjacency | g = 0.73 immediate vs. 0.22 with time gaps | Moderately supported | Brunmair & Richter 2019 |
@@ -298,7 +300,8 @@ This is **Inference**: it uses only FSRS's parameterization, not new science.
 |---|---|---|---|
 | Prequestions → targeted (prequestioned) content | g = 0.54, k = 97 | Moderately supported (preregistered meta-analysis) | St. Hilaire, Chan & Ahn 2024 **[web]** |
 | Prequestions → non-prequestioned content | g = 0.04, k = 91 (≈ none) | Moderately supported | St. Hilaire 2024 **[web]** |
-| **Integrative** prequestions (spanning several ideas) also help non-prequestioned content | Large in a few studies | Emerging | St. Hilaire et al. 2019; 2024 eye-tracking (N = 24) **[web]** |
+| **Integrative** prequestions (spanning several ideas) also help non-prequestioned content | Only when readers were told to look for the answers while reading; without that instruction, no benefit | Emerging | St Hilaire, Carpenter & Jennings 2019 [doi](https://doi.org/10.1080/09658211.2019.1641209); 2024 eye-tracking (N = 24) **[web]** |
+| The benefit depends on finding the answers while reading or watching | Prequestion gains appeared only for answers learners wrote down or circled during a video | Emerging | St Hilaire & Carpenter 2020 [doi](https://doi.org/10.1037/xap0000296) |
 | Pretesting, tested content, 24 h+ delay | d = 0.44 to >2.0 | Moderately supported | Pan & Carpenter 2023 (60+ studies) |
 | Classroom gains | 8-12% on unit tests and finals | Moderately supported | Beckman 2008; Soderstrom & Bjork 2023 |
 | For text, feedback can be delayed; for paired associates it must be immediate | — | Moderately supported | Pan & Carpenter 2023 |
@@ -348,7 +351,7 @@ This is **Inference**: it uses only FSRS's parameterization, not new science.
 | Implementation intentions ("After X, I will Y") | d ≈ 0.65 on goal attainment | Well-established | Gollwitzer & Sheeran 2006 (standard citation; not in the queried guidebook text). Fogg's ABC recipe is the practitioner form |
 | Habit automaticity takes a median of 66 days (range 18-254); one missed day costs ~0 (0.29 pt on a 42-pt scale); compliance under ~80% kills it | — | Emerging | Lally et al. 2010 |
 | **Streaks:** an intact logged streak raises continuation (92% vs. 65% with no log); a **broken** streak drops it *below* baseline (45%); self-attributed breaks are worst; **repair** rescues much of it (85% vs. 69%) | — | Emerging (7 studies, partly preregistered) | Silverman & Barasch, via Gamification guidebook |
-| Hard streak endings increase quitting | +32% quit likelihood (range +22% to +110%) | Moderately supported | Kang et al. 2022, PNAS (N = 14,383) |
+| Hard tasks that come in a run, or last, increase quitting (not about streak counters: volunteers randomly given hard conversations quit more when the hard ones came back to back or at the end of a shift) | +32% quit likelihood (range +22% to +110%; figures from the first pass, not rechecked 2026-11-09) | Moderately supported | Kang, Daniels & Schweitzer 2022, PNAS (N = 14,383) [doi](https://doi.org/10.1073/pnas.2204460119) |
 | Streaks become self-sustaining after ~8-11 days (observational) | >80% next-day activity after 8 days | Emerging | Weathers & Poehlman |
 | Expected tangible rewards undermine intrinsic motivation for interesting tasks | d = -0.40 | Well-established | Deci, Koestner & Ryan 1999 |
 | Notification optimization (bandit-chosen copy) | +0.5% DAU, +2% new-user retention: small | Moderately supported (one company) | Yancey & Settles 2020, KDD **[web]** |
@@ -426,7 +429,7 @@ Supporting infrastructure, not an "activity" but required:
 | **Hand-tunable interval ladders and expansion settings** | Fixed expanding vs. uniform g = 0.034. Use a proven adaptive scheduler and hide the knobs | Well-established null |
 | **"Catch up" cramming of overdue cards** | Late is cheap; massing is costly | Well-established |
 | **Shuffle-everything interleaving** (including vocabulary and definitions) | Vocabulary g = -0.39 | Well-established |
-| **Hard-reset streaks, XP, levels, leaderboards** | Broken streaks fall below baseline; hard endings +32% quitting; expected rewards d = -0.40 on intrinsic motivation | Moderately supported / Emerging |
+| **Hard-reset streaks, XP, levels, leaderboards** | Broken streaks fall below baseline; expected rewards d = -0.40 on intrinsic motivation | Moderately supported / Emerging |
 | **"21 days to a habit" messaging** | Median 66 days, range 18-254 | Emerging |
 | **Learning-style modes** (visual/auditory toggles), auto text-to-speech "for retention" | Zero support for matching; audio adds nothing to self-paced text | Well-established / Moderately supported |
 | **Speed reading / RSVP / words-per-minute goals** | Speed-comprehension trade-off | Well-established |
