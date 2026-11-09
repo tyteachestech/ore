@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { spriteSize } from "../src/icons";
 
 // The UI sprites (icons.tsx, PixelIcon.tsx) as their rows, read from the source like a lint.
 const sprites = new Map(
@@ -38,4 +39,10 @@ test("symmetric sprites mirror left to right", () => {
     const { x0, x1 } = box(rows);
     for (const r of rows) for (let x = x0; x <= x1; x++) expect(r[x] === r[x0 + x1 - x] ? "mirrored" : `${name}: ${r}`).toBe("mirrored");
   }
+});
+
+// D170: at 20px a dot fell on 2.5 device pixels of a Retina screen, so alternate columns drew dim and the dots
+// smeared into a plaid. Every size a sprite draws at puts each dot on whole device pixels at 2×.
+test("sprite sizes give each dot whole device pixels at 2×", () => {
+  for (const asked of [10, 12, 14, 16, 20, 24, 32]) expect(Number.isInteger((spriteSize(asked) * 2) / 16) ? "whole" : `${asked} → ${spriteSize(asked)}`).toBe("whole");
 });
