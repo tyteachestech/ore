@@ -168,14 +168,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 <h1>
                   <Roll id="goal" value={minutesText(today.active_ms)} /> <span className="goal-of">of {today.goal_minutes} min</span>
                 </h1>
-                {/* Today's slice, not the pile (D65): the full count waits in the hint. */}
-                {today.due > 0 ? (
-                  <Hint text={`${today.due} due · about ${Math.max(1, minutes(today.estimate_ms))} min in all`}>
-                    <p>{subline(today)}</p>
-                  </Hint>
-                ) : (
-                  <p>{subline(today)}</p>
-                )}
+                {/* Mid-goal with cards due, "N of 10 min" and Start review say it all (D65.4 as amended): no line. */}
+                {subline(today) && <p>{subline(today)}</p>}
                 {/* His plan (D67): the cue that starts review, set in Settings › Review. On the phone (no Settings)
                     the plan is read, not set: a button that does nothing is never shown. */}
                 {onSettings ? (
@@ -191,9 +185,9 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 <Unreadable list={today.unreadable} />
               </div>
               {/* Beside the ring, not on a row of its own: Today is only as tall as the ring. Nothing due: the
-                  subline already says so, so no dead button. */}
+                  subline already says so, so no dead button. The full pile waits in its hint (D65.4). */}
               {canStart && (
-                <Hint text="Start review" keys="review">
+                <Hint text={`Start review · ${today.due} due, about ${Math.max(1, minutes(today.estimate_ms))} min in all`} keys="review">
                   <button className="pill-btn home-go" onClick={ask}>
                     Start review
                   </button>
@@ -385,7 +379,7 @@ function subline(t: Today): string {
   // Caught up short of the goal still counts (D60); say why, or a full ring beside "<1 of 10" reads as a bug.
   if (t.met && t.active_ms < t.goal_ms) return t.new_waiting ? `All caught up, so today counts. ${waiting(t)}` : "All caught up, so today counts.";
   if (t.met) return t.caught_up ? (t.new_waiting ? `Goal met. ${waiting(t)}` : "Goal met and all caught up.") : "Goal met. Anything more is a bonus.";
-  if (t.due) return `About ${Math.max(1, minutes(t.slice_ms))} min of your most urgent cards`;
+  if (t.due) return "";
   return t.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Read something new.";
 }
 
