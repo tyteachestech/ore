@@ -56,6 +56,15 @@ describe("tutor chats", () => {
     expect(listChats(lib)).toEqual([]);
   });
 
+  test("`ore chat <id> --set` refuses a chat with another id before writing anything", async () => {
+    const lib = await tempLibrary();
+    const cli = join(import.meta.dir, "../../cli/src/ore.ts");
+    const p = Bun.spawnSync(["bun", cli, "chat", "a-1", "--set"], { env: { ...process.env, ORE_LIBRARY: lib.root }, stdin: Buffer.from(chat("b-1", "Other")), stderr: "pipe" });
+    expect(p.exitCode).not.toBe(0);
+    expect(p.stderr.toString()).toContain("the chat on stdin is b-1, not a-1");
+    expect(listChats(lib)).toEqual([]);
+  });
+
   test("the list skips a file that isn't a chat (Finder junk, a half-synced copy)", async () => {
     const lib = await tempLibrary();
     await saveChat(lib, chat("a-1", "First"));

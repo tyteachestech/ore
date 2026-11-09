@@ -806,6 +806,42 @@ journey("tutor chats: every chat is saved and listed by day under its name; Find
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor chats: deleting a chat while its reply is being written keeps it deleted, with no error, and the new chat goes on (D172)", async (page) => {
+  let release: (() => void) | undefined;
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    await new Promise<void>((ok) => (release = ok));
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Late reply", citations: [], general: false, hint: false, exercise: null, card: null, title: "Doomed chat", ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) });
+  });
+  const listed = async () => ((await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["chat"] }) }).then((x) => x.json())) as { title: string }[]).map((c) => c.title);
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("Doomed question");
+    await page.keyboard.press("Enter");
+    await until("the call is on its way", async () => !!release);
+    await tutor.getByRole("button", { name: /^Chats/ }).click();
+    const row = page.locator(".tutor-chats [cmdk-item]", { hasText: "Doomed question" }).first();
+    await row.hover();
+    await row.getByRole("button", { name: /^Delete/ }).click();
+    await page.keyboard.press("Escape");
+    await until("it is deleted", async () => !(await listed()).includes("Doomed question"));
+    release!();
+    await page.waitForTimeout(800);
+    const names = await listed();
+    if (names.includes("Doomed question") || names.includes("Doomed chat")) throw new Error("the late reply saved the deleted chat back");
+    if (await page.locator(".toast", { hasText: "save the chat" }).count()) throw new Error("the late reply showed a save error");
+    if (await tutor.getByText("Late reply").count()) throw new Error("the late reply landed in the new chat");
+  } finally {
+    release?.();
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Meta+j");
+});
+
 journey("mole says: a reply that lands while the tutor is closed comes out of the mole; a click opens the tutor at it, × waves it off, and one that lands while it is open says nothing (D159)", async (page) => {
   const release: (() => void)[] = [];
   await page.route(/\/ore$/, async (route) => {

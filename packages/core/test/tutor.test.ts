@@ -98,6 +98,12 @@ describe("tutor: replies", () => {
     expect((await tutor(lib, "and then?", { item: a.meta.id, earlier: [{ message: "Explain this simply", reply: "Box one." }] })).title).toBe("");
   });
 
+  test("an over-long title is cut, never a reason to refuse the reply", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{ reply: "Box one.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "x".repeat(120) }]);
+    expect((await tutor(lib, "boxes?", { item: a.meta.id })).title).toBe("x".repeat(80));
+  });
+
   test("a made-up quote or a marker with no citation goes back once to fix", async () => {
     const { lib, a } = await library();
     fakeClaude([

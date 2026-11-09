@@ -41,6 +41,9 @@ function parse(text: string, where: string): Chat {
   return r.data;
 }
 
+// What the list needs of a chat, checked without walking every turn's citations and steps.
+const Head = z.looseObject({ id: Chat.shape.id, title: Chat.shape.title, created: z.string().optional(), updated: z.string().optional(), turns: z.array(z.unknown()).min(1) });
+
 /** Every chat, last changed first: what the tutor's list shows. A file that isn't a chat is skipped. */
 export function listChats(lib: Library): ChatRow[] {
   const dir = paths.chats(lib);
@@ -48,7 +51,7 @@ export function listChats(lib: Library): ChatRow[] {
     .filter((n) => n.endsWith(".json"))
     .flatMap((n) => {
       try {
-        const c = parse(readFileSync(join(dir, n), "utf8"), n);
+        const c = Head.parse(JSON.parse(readFileSync(join(dir, n), "utf8")));
         return [{ id: c.id, title: c.title, updated: c.updated ?? c.created ?? "" }];
       } catch {
         return [];

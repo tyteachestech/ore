@@ -67,7 +67,7 @@ type SavedChat = { id: string; title: string; updated?: string; carry: Mention[]
 /** A chat's name until its first reply names it: his first message, on one line. */
 const firstLine = (m: string) => { const s = m.replace(/\s+/g, " ").trim(); return s.length > 60 ? `${s.slice(0, 59).trimEnd()}…` : s; };
 /** What is saved of a turn: not the words of a reply still being written. */
-const settled = ({ partial: _p, searching: _s, ...t }: TutorTurn) => t;
+const settled = ({ partial: _p, searching: _s, kept, ...t }: TutorTurn): TutorTurn => (kept && kept !== "adding" ? { ...t, kept } : t);
 
 /** The tutor's chat, his draft and its requests, held in App so closing the panel or moving around the
  *  app loses nothing and never asks twice. Every chat is saved in the library (D172, `ore chat`) after each
@@ -86,10 +86,13 @@ export function useTutorChat(notify: Notify) {
   const flying = useRef(new Set<string>());
   // One write at a time, in order, so a reply never lands under an older copy of its chat.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
-  const write = (f: () => Promise<unknown>) => {
-    queue.current = queue.current.then(f).catch((e) => notify(errorText(e, "save the chat"), "error"));
-    return queue.current;
+  // Reads of a saved chat wait their turn too, so none reads a copy older than a write already asked for.
+  const serial = <T,>(f: () => Promise<T>): Promise<T> => {
+    const r = queue.current.then(f);
+    queue.current = r.catch(() => {});
+    return r;
   };
+  const write = (f: () => Promise<unknown>) => serial(f).catch((e) => notify(errorText(e, "save the chat"), "error"));
   const save = () => {
     const m = metaNow.current;
     if (!m || !now.current.length) return;
@@ -106,7 +109,9 @@ export function useTutorChat(notify: Notify) {
     }
     if (p.partial !== undefined || p.searching || p.searched) return;
     void write(async () => {
-      const c = await ore<SavedChat>("chat", chat);
+      // Deleted while the reply was on its way: nothing to put it in.
+      const c = await ore<SavedChat>("chat", chat).catch(() => null);
+      if (!c) return;
       await oreWith(JSON.stringify({ ...c, ...(title ? { title } : {}), turns: c.turns.map((t) => (t.id === id ? settled({ ...t, ...p }) : t)) }), "chat", "--set");
     });
   };
@@ -219,7 +224,7 @@ export function useTutorChat(notify: Notify) {
   const open = async (id: string) => {
     if (metaNow.current?.id === id) return;
     try {
-      const c = await ore<SavedChat>("chat", id);
+      const c = await serial(() => ore<SavedChat>("chat", id));
       update(() => c.turns.map((t) => (t.reply === undefined && !t.error && !flying.current.has(t.id) ? { ...t, error: "No reply came: Ore closed before it did." } : t)));
       setCarry(c.carry ?? []);
       setMeta({ id: c.id, title: c.title });
@@ -229,16 +234,16 @@ export function useTutorChat(notify: Notify) {
   };
   /** Deletes a saved chat; Undo puts it back where it was in the list (and on screen, if it was open). */
   const remove = async (id: string) => {
+    // Off the screen first, so a reply landing meanwhile can't save it back.
+    const wasOpen = metaNow.current?.id === id;
+    if (wasOpen) fresh();
     try {
-      await queue.current;
-      const c = await ore<SavedChat>("chat", id, "--delete");
-      const wasOpen = metaNow.current?.id === id;
-      if (wasOpen) fresh();
+      const c = await serial(() => ore<SavedChat>("chat", id, "--delete"));
       notify(
         "Chat deleted",
         "info",
-        () => oreWith(JSON.stringify(c), "chat", "--set", "--keep-time").then(() => (wasOpen && !now.current.length ? open(id) : undefined)),
-        () => ore("chat", id, "--delete").then(() => (metaNow.current?.id === id ? fresh() : undefined)),
+        () => serial(() => oreWith(JSON.stringify(c), "chat", "--set", "--keep-time")).then(() => (wasOpen && !now.current.length ? open(id) : undefined)),
+        () => serial(() => ore("chat", id, "--delete")).then(() => (metaNow.current?.id === id ? fresh() : undefined)),
       );
     } catch (e) {
       notify(errorText(e, "delete that chat"), "error");
@@ -788,13 +793,12 @@ function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; o
 }
 
 /** The chat's name, which opens the list of saved chats (D172, Notion AI's chat switcher): find one by
- *  name, grouped by day, one click opens it where he left off; the bin on a row, its right-click menu or
- *  ⌘⌫ deletes it, with Undo. */
+ *  name, grouped by day, one click opens it where he left off; the bin on a row or its right-click menu
+ *  deletes it, with Undo. */
 function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<ChatRow[] | null>(null);
   const [query, setQuery] = useState("");
-  const [sel, setSel] = useState("");
   const load = () => void ore<ChatRow[]>("chat").then(setRows, () => setRows([]));
   // The chat on screen as it is now, though its last save may still be on its way.
   const cur = chat.current;
@@ -806,7 +810,7 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
   };
   const remove = (id: string) => {
     setRows((rs) => rs?.filter((r) => r.id !== id) ?? null);
-    void chat.remove(id);
+    void chat.remove(id).then(load); // as the library has it, should the delete fail
   };
   const title = chat.current?.title ?? "New chat";
   return (
@@ -825,14 +829,6 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
             label="Chats"
             loop
             shouldFilter={false}
-            value={sel}
-            onValueChange={setSel}
-            onKeyDown={(e) => {
-              if (e.key === "Backspace" && e.metaKey && sel) {
-                e.preventDefault();
-                remove(sel);
-              }
-            }}
           >
             <Command.Input className="menu-input" placeholder="Find a chat…" value={query} onValueChange={setQuery} autoFocus />
             <Command.List>
@@ -840,7 +836,7 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
               {chatGroups(shown).map((g) => (
                 <Command.Group key={g.heading} heading={g.heading}>
                   {g.rows.map((r) => (
-                    <WithMenu key={r.id} actions={[{ id: "delete", label: "Delete chat", hint: "⌘⌫", danger: true, run: () => remove(r.id) }]}>
+                    <WithMenu key={r.id} actions={[{ id: "delete", label: "Delete chat", danger: true, run: () => remove(r.id) }]}>
                       <Command.Item value={r.id} onSelect={() => pick(r.id)}>
                         <span className="menu-label">{r.title}</span>
                         {r.id === chat.current?.id && <Check size={12} className="check" aria-label="Open" />}

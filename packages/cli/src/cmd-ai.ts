@@ -131,8 +131,10 @@ export const aiCommands: Record<string, Command> = {
     async run([id], f) {
       const lib = openLibrary();
       if (f.set) {
-        const c = await saveChat(lib, await readStdin(), { touch: !f["keep-time"] });
-        if (id && id !== c.id) throw new Error(`the chat on stdin is ${c.id}, not ${id}`);
+        const json = await readStdin();
+        const given = (() => { try { return (JSON.parse(json) as { id?: unknown }).id; } catch { return undefined; } })();
+        if (id && given !== id) throw new Error(`the chat on stdin is ${String(given)}, not ${id}`);
+        const c = await saveChat(lib, json, { touch: !f["keep-time"] });
         return { data: c, text: `Saved chat ${c.id}` };
       }
       if (f.delete) {
