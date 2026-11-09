@@ -226,7 +226,7 @@ if (import.meta.main) {
   writeFileSync(out, JSON.stringify({ eval: "grade", date: new Date().toISOString(), cases: cases.length, sets: files.length ? files.map((f) => f.replace(/^.*\//, "")) : ["grade-cases.json"], set: setId(cases), baseline: base, runs, ...(times > 1 ? { summary } : {}) }, null, 2) + "\n");
   console.log(table(runs));
   for (const [v, s] of Object.entries(summary))
-    console.log(`\n${v} over ${times} runs: mean ${pct(s.mean)} ± ${Math.round(s.sd * 100)} points; ${s.flips.length} of ${cases.length} verdicts flipped between runs${s.flips.length ? ` (${s.flips.join(", ")})` : ""}; missed in some run: ${s.missed.length}`);
+    console.log(`\n${v} over ${times} runs: mean ${pct(s.mean)} ± ${(s.sd * 100).toFixed(1)} points; ${s.flips.length} of ${cases.length} verdicts flipped between runs${s.flips.length ? ` (${s.flips.join(", ")})` : ""}; missed in some run: ${s.missed.length}`);
   console.log(`\nNo-AI baseline (answer contains the model answer): ${pct(base.correct / base.total)} (${base.correct}/${base.total})`);
   console.log(`Saved ${out}`);
 }

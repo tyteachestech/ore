@@ -3,7 +3,7 @@
   "cases": [
     {
       "id": "seb-ME.72.241.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Only one circuit below will light the bulb. Which one will work? Why is that the only circuit that will work?",
       "model_answer": "That circuit is the only circuit that uses all of the correct contact points.",
@@ -14,7 +14,7 @@
     },
     {
       "id": "seb-EM.21b.645.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Georgia found one brown mineral and one black mineral. How will she know which one is harder?",
       "model_answer": "The harder mineral will leave a scratch on the less hard mineral. If the black mineral is harder, the brown mineral will have a scratch.",
@@ -25,7 +25,7 @@
     },
     {
       "id": "seb-MX.49.467.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Beth made 2 solutions of different concentrations of water and citric acid. She put 50 milliliters of the first solution in cup X and 50 milliliters of the second solution in cup Y. When she put the cups on the balance, the balance looked as shown below. Which solution, X or Y, is more concentrated? Explain how you know which is more concentrated.",
       "model_answer": "X. When equal amounts of 2 solutions are compared, the solution that is more concentrated will have the greater mass (weigh more). 50 milliliters of X has a greater mass than 50 milliliters of Y, so X must be more concentrated.",
@@ -36,7 +36,7 @@
     },
     {
       "id": "seb-ME.17a.155.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Denise made a circuit to light a bulb or run a motor. She used a special switch. Below is the schematic diagram of her circuit. The switch is inside the dotted box. What will happen when she moves the switch to the left?",
       "model_answer": "The bulb will light.",
@@ -47,7 +47,7 @@
     },
     {
       "id": "seb-FN.20a.531.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Anna wants to compare the fat in walnuts and peanuts, but she isn't sure how. Write a procedure Anna can use to compare the fat in walnuts and peanuts.",
       "model_answer": "Measure out equal masses of walnuts and peanuts. Smash the samples uniformly in the same size area on brown paper. Wait the same time for each sample.",
@@ -58,7 +58,7 @@
     },
     {
       "id": "seb-PS.46b.333.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Why was the siren's sound designed to have this property?",
       "model_answer": "So that people notice the sound.",
@@ -69,7 +69,7 @@
     },
     {
       "id": "seb-PS.4b.641.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Darla tied one end of a string around a doorknob and held the other end in her hand. When she plucked the string (pulled and let go quickly) she heard a sound. How would the pitch change if Darla made the string longer?",
       "model_answer": "When the string is longer, the pitch will be lower.",
@@ -80,7 +80,7 @@
     },
     {
       "id": "seb-ME.10.119.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "The motors shown at the right with the D-cell batteries will NOT run. Explain why.",
       "model_answer": "The negative terminals of the D-cell batteries are facing each other, so there is no flow of electricity.",
@@ -91,7 +91,7 @@
     },
     {
       "id": "seb-PS.2a.172.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Why does a rubber band make a sound when you pluck it (pull and let go quickly)?",
       "model_answer": "The rubber band vibrates.",
@@ -102,7 +102,7 @@
     },
     {
       "id": "seb-MS.30b.381.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Mary told her friend Sharice that she had a rug to sell. Sharice asked if the rug would fit perfectly, wall to wall, in her bedroom. Mary went home and measured the rug. She put her feet heel-to-toe and counted the number of shoe lengths it took to measure the rug. She found the rug was 18 shoes long and 12 shoes wide. Sharice did the same thing in her room to measure the space for the rug. Her floor was 18 shoes long and 12 shoes wide. A perfect fit! Sharice bought the rug and took it home. To her dismay, she found it was too short and too narrow for her bedroom! What could Mary and Sharice do to better measure the size of the rug?",
       "model_answer": "Use a standard unit of measurement such as centimeters or meters.",
@@ -113,7 +113,7 @@
     },
     {
       "id": "seb-LF.34b.823.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Draw an arrow to show which direction the water flows in the river. (Rose Mountain is on the left and Happy Valley is on the right in the drawing.) Why do you think the water flows in that direction?",
       "model_answer": "Water will always flow downhill (mountain to valley).",
@@ -124,7 +124,7 @@
     },
     {
       "id": "seb-ST.58.595.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "What is your \"rule\" for deciding if the part of a plant you are observing is a fruit?",
       "model_answer": "If a part of the plant contains seeds, that part is the fruit.",
@@ -135,7 +135,7 @@
     },
     {
       "id": "seb-MX.42a.416.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Joanne mixed material R and material D together, added water, and stirred. After a few minutes, the liquid was clear and there was a solid on the bottom of the cup. Joanne used a paper filter to separate the solid from the liquid. Why does the solid stay in the filter when the liquid goes through?",
       "model_answer": "The particles of the solid are too big to go through the holes in the paper filter.",
@@ -146,7 +146,7 @@
     },
     {
       "id": "seb-ME.6b.148.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Look at the diagram of a circuit at the right. Will the motor run? Why?",
       "model_answer": "The circuit is not complete. The electrical pathway is broken.",
@@ -157,7 +157,7 @@
     },
     {
       "id": "seb-ME.10.107.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "The motors shown at the right with the D-cell batteries will NOT run. Explain why.",
       "model_answer": "The negative terminals of the D-cell batteries are facing each other, so there is no flow of electricity.",
@@ -168,7 +168,7 @@
     },
     {
       "id": "seb-II.24b.405.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Design a way to use carbon printing to find out if 2 Labrador retrievers have the same paw patterns. How will you know if the 2 dogs have paw patterns that are the same?",
       "model_answer": "Compare prints to see if the patterns are the same.",
@@ -179,7 +179,7 @@
     },
     {
       "id": "seb-ME.17c.212.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Denise made a circuit to light a bulb or run a motor. She used a special switch. Below is the schematic diagram of her circuit. The switch is inside the dotted box. What will happen when she moves the switch to the right?",
       "model_answer": "The motor will run.",
@@ -190,7 +190,7 @@
     },
     {
       "id": "seb-MX.1.629.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Gerry used a paper filter to separate a mixture of sand, salt, and water. Think about particle size and answer this question: Why did the salt go through the filter while the sand got caught?",
       "model_answer": "The dissolved salt particles are small enough to go through the holes in the filter paper, but the sand particles are too large.",
@@ -201,7 +201,7 @@
     },
     {
       "id": "seb-VB.42.458.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Don wanted to find out if a battery powered toy truck would always travel the same distance in 10 seconds no matter how heavy a load the truck carried. He placed one or more blocks (the load) in the back of the truck and recorded his results. (Each block had the same mass.) The following graph displays his results. What is the relationship between the number of blocks and the distance traveled by the truck in 10 seconds?",
       "model_answer": "The more blocks the truck carries, the less distance the truck travels in 10 seconds.",
@@ -212,7 +212,7 @@
     },
     {
       "id": "seb-MX.53.575.1",
-      "level": "correct",
+      "level": "seb correct",
       "kind": "card",
       "question": "Adam's friend gave him a cup filled with a water solution. Adam did not know what solid material was used to make it. He evaporated the solution and found crystals in the dish after all of the water was gone. How will the crystals help him decide what solid material was used to make the solution?",
       "model_answer": "Crystals of different materials have different shapes. So the shape will help identify the material.",
@@ -223,7 +223,7 @@
     },
     {
       "id": "seb-MX.11c.304.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Jim used a solid and water to make Mixtures one (one spoon of solid in 100 milliliters water was clear with nothing on the bottom), 3 (3 spoons of solid in 100 milliliters water was clear with nothing on the bottom), 4 (4 spoons of solid in 100 milliliters water was clear with material on the bottom), and 5 (5 spoons of solid in 100 milliliters water was clear with material on the bottom) as shown below. He stirred each one and observed the results. Is the concentration of Mixture 5 less than, greater than, or the same as the concentration of Mixture 4? Explain your answer.",
       "model_answer": "The concentrations are the same because both mixtures are saturated.",
@@ -234,7 +234,7 @@
     },
     {
       "id": "seb-II.26.395.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Look at the rubbings of 2 different fabrics. What do the rubbings tell us about the different textures of these 2 fabrics?",
       "model_answer": "Fabric A is smoother and has a finer texture. Fabric B is rougher and has a coarser texture.",
@@ -245,7 +245,7 @@
     },
     {
       "id": "seb-MX.16a.436.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Mariella made a saturated solution by adding a solid to 100 milliliters water. Richard made a saturated solution by adding the same solid to 250 milliliters water. Do the 2 saturated solutions have the same concentration? Explain your answer.",
       "model_answer": "Yes. If both solutions are saturated (and at the same temperature), the solutions will both have the same concentration. Once a solution is saturated, the solution cannot get any more concentrated.",
@@ -256,7 +256,7 @@
     },
     {
       "id": "seb-SE.31b.246.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Julie and David each built a solar water heater. Both solar water heaters were 10 centimeters x 10 centimeters x 30 centimeters. Both water heaters were painted black on the inside bottom and filled to the top with 3 liters of room temperature water. Both water heaters were set in the sun. They checked the temperatures every 5 minutes and made the table below. Which box did Julie build, A or B? What evidence supports your answer?",
       "model_answer": "A. The water in Julie's heater got hotter faster (or had a greater temperature change in 20 minutes). The collector in heater A has the greater surface area so the water in A would get hotter faster than the water in B.",
@@ -267,7 +267,7 @@
     },
     {
       "id": "seb-MX.11f.429.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Jim used a solid and water to make Mixtures one (one spoon of solid in 100 milliliters water was clear with nothing on the bottom), 3 (3 spoons of solid in 100 milliliters water was clear with nothing on the bottom), 4 (4 spoons of solid in 100 milliliters water was clear with material on the bottom), and 5 (5 spoons of solid in 100 milliliters water was clear with material on the bottom) as shown below. He stirred each one and observed the results. If Jim made Mixture 2 with 2 spoons of solid in 100 milliliters of water, what would he observe? What evidence do you have to support this?",
       "model_answer": "Jim would see a clear solution. 3 spoons of solid dissolves, so 2 spoons will dissolve.",
@@ -278,7 +278,7 @@
     },
     {
       "id": "seb-MX.11e.571.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Jim used a solid and water to make Mixtures one (one spoon of solid in 100 milliliters water was clear with nothing on the bottom), 3 (3 spoons of solid in 100 milliliters water was clear with nothing on the bottom), 4 (4 spoons of solid in 100 milliliters water was clear with material on the bottom), and 5 (5 spoons of solid in 100 milliliters water was clear with material on the bottom) as shown below. He stirred each one and observed the results. Describe how Jim could separate the dissolved solid from the water in Mixture one. What happens to the solid and to the water?",
       "model_answer": "Set up evaporation dishes. The water will go into the air (evaporate) and the solid will be left in the dish (crystallize).",
@@ -289,7 +289,7 @@
     },
     {
       "id": "seb-ME.5b.225.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Anne is investigating which objects stick to magnets. She recorded this in her notebook. I was surprised! A nail was stuck to the magnet. When I accidentally touched the nail to a paperclip, the paperclip stuck to the nail. If Anne touched the nail to a brass ring, what do you think would happen and why?",
       "model_answer": "The brass ring would not stick to the nail because the ring is not iron. The nail is a temporary magnet, but brass cannot become a temporary magnet and thus does not stick to magnets.",
@@ -300,7 +300,7 @@
     },
     {
       "id": "seb-LP.15c.630.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "What is the relationship between the amount of effort required to lift the load and its distance from the fulcrum?",
       "model_answer": "If the effort is applied farther from the fulcrum, less effort will lift the load.",
@@ -311,7 +311,7 @@
     },
     {
       "id": "seb-ME.66a.147.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Look at the circuit in the picture. The gap between the D-cell and the switch needs to be connected. Can you use a piece of string to make the connection? Why or why not?",
       "model_answer": "No, string is an insulator, so the pathway would not be completed.",
@@ -322,7 +322,7 @@
     },
     {
       "id": "seb-ME.65b.212.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Look at the schematic diagram including a D-cell battery and 3 bulbs. Why do the other 2 bulbs stay lit if the middle bulb burns out?",
       "model_answer": "The circuit is parallel, so each bulb has its own pathway to the D-cell battery, so the bulbs that do not burn out continue to shine.",
@@ -333,7 +333,7 @@
     },
     {
       "id": "seb-ME.78b.115.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Look at the picture of the circuit to the right. What will happen to the motor if the light bulb burns out?",
       "model_answer": "The motor will continue to run because the motor still has a pathway to the D-cell.",
@@ -344,7 +344,7 @@
     },
     {
       "id": "seb-MS.43a.435.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "2 groups used marbles to weigh the same apple. Jin's group found the apple weighed 35 marbles and Bee's group found the same apple weighed 60 marbles. Both groups used the correct procedure. Since they weighed the same apple, what do you think happened to make the results different?",
       "model_answer": "The marbles used by the 2 groups were probably different masses.",
@@ -355,7 +355,7 @@
     },
     {
       "id": "seb-MX.11e.637.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Jim used a solid and water to make Mixtures one (one spoon of solid in 100 milliliters water was clear with nothing on the bottom), 3 (3 spoons of solid in 100 milliliters water was clear with nothing on the bottom), 4 (4 spoons of solid in 100 milliliters water was clear with material on the bottom), and 5 (5 spoons of solid in 100 milliliters water was clear with material on the bottom) as shown below. He stirred each one and observed the results. Describe how Jim could separate the dissolved solid from the water in Mixture one. What happens to the solid and to the water?",
       "model_answer": "Set up evaporation dishes. The water will go into the air (evaporate) and the solid will be left in the dish (crystallize).",
@@ -366,7 +366,7 @@
     },
     {
       "id": "seb-SE.25a.600.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "The graph shows temperature data from 2 containers. One container had 100 milliliters of water and the other had 100 milliliters of dry soil. Each container was placed in the sun for 20 minutes and then in the shade for 20 minutes. Which container, A or B, had the dry soil? Explain how the graph helped you decide which container had the dry soil.",
       "model_answer": "A. Dry soil heats more quickly and cools off more quickly than water. The graph shows A heats and cools more quickly than B, so A must be the dry soil.",
@@ -377,7 +377,7 @@
     },
     {
       "id": "seb-MX.41.466.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Janet found the solubility of silver chloride to be 86 grams in 50 milliliters of water. Mike found the solubility of silver nitrate to be 108 grams in 50 milliliters of water. Janet and Mike thought they must have made a mistake. They thought the solubilities of all materials in water should be the same. Is it possible that both solubilities are correct? Explain your answer.",
       "model_answer": "Yes, they could both be correct. Solubility is not the same for all materials.",
@@ -388,7 +388,7 @@
     },
     {
       "id": "seb-ME.17b.144.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Denise made a circuit to light a bulb or run a motor off a D-cell battery. She used a special switch. Below is the schematic diagram of her circuit. The switch is inside the dotted box. Why will the bulb light when she moves the switch to the left?",
       "model_answer": "There is a complete circuit connecting the bulb to the D-cell battery.",
@@ -399,7 +399,7 @@
     },
     {
       "id": "seb-ME.5b.311.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Anne is investigating which objects stick to magnets. She recorded this in her notebook. I was surprised! A nail was stuck to the magnet. When I accidentally touched the nail to a paperclip, the paperclip stuck to the nail. If Anne touched the nail to a brass ring, what do you think would happen and why?",
       "model_answer": "The brass ring would not stick to the nail because the ring is not iron. The nail is a temporary magnet, but brass cannot become a temporary magnet and thus does not stick to magnets.",
@@ -410,7 +410,7 @@
     },
     {
       "id": "seb-ME.38a.152.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Trace over the complete circuit with your pencil to show where it is. Even though there is a complete circuit, the bulb will not light. Why not?",
       "model_answer": "The circuit does not include both contact points on the bulb holder, so the electricity can not go through the bulb.",
@@ -421,7 +421,7 @@
     },
     {
       "id": "seb-MX.11c.592.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Jim used a solid and water to make Mixtures one (one spoon of solid in 100 milliliters water was clear with nothing on the bottom), 3 (3 spoons of solid in 100 milliliters water was clear with nothing on the bottom), 4 (4 spoons of solid in 100 milliliters water was clear with material on the bottom), and 5 (5 spoons of solid in 100 milliliters water was clear with material on the bottom) as shown below. He stirred each one and observed the results. Is the concentration of Mixture 5 less than, greater than, or the same as the concentration of Mixture 4? Explain your answer.",
       "model_answer": "The concentrations are the same because both mixtures are saturated.",
@@ -432,7 +432,7 @@
     },
     {
       "id": "seb-VB.40a.138.1",
-      "level": "contradictory",
+      "level": "seb contradictory",
       "kind": "card",
       "question": "Jack made a lifeboat out of a large paper cup. He decided to measure how far the boat sank when different numbers of marbles were added. His data are shown in the table. Identify the standard for Jack's experiment.",
       "model_answer": "The boat with 0 marbles is the standard in this experiment.",
@@ -443,7 +443,7 @@
     },
     {
       "id": "seb-ST.54b3.490.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "The inside of a pea seed is shown below. Describe the function of each of the parts: embryo.",
       "model_answer": "The embryo contains the tiny leaves and root of the plant.",
@@ -454,7 +454,7 @@
     },
     {
       "id": "seb-ST.25b2.471.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Look at the picture of the bean seedling shortly after germination. Describe the function of each of the parts: cotyledon.",
       "model_answer": "The cotyledon provides food for the plant until the plant can make food for itself.",
@@ -465,7 +465,7 @@
     },
     {
       "id": "seb-PS.15b.644.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Below are pictures of wind instruments. You blow air through them to produce sounds. Why does [the saxophone] make the lowest sounds?",
       "model_answer": "The saxophone has the longest and fattest tube.",
@@ -476,7 +476,7 @@
     },
     {
       "id": "seb-VB.29.432.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "When conducting a controlled experiment, why do you use a standard?",
       "model_answer": "A standard is used for comparison to determine how changing one variable changes the results.",
@@ -487,7 +487,7 @@
     },
     {
       "id": "seb-PS.12.510.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Mary was trying to understand how tuning forks make sounds. She hit the tuning fork on the table and placed the tuning fork into a cup full of water while it was still ringing. The water splashed in all directions. How did seeing what happened help Mary understand how a tuning fork makes sounds?",
       "model_answer": "The water splashed because the fork was vibrating. Vibrations make sounds.",
@@ -498,7 +498,7 @@
     },
     {
       "id": "seb-PS.26.152.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Kate said: \"An object has to move to produce sound.\" Do you agree with her? Why or why not?",
       "model_answer": "Agree. Vibrations are movements. Vibrations produce sound.",
@@ -509,7 +509,7 @@
     },
     {
       "id": "seb-VB.15a.407.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "3 girls wanted to see who could throw a ball the farthest. Each girl brought her favorite ball to the park. Ling brought her basketball, Diana brought her football, and Rachael brought her baseball. They made a line on the playground. They all had to throw the ball from that line. Ling took 2 steps up to the line and threw her basketball. Diana stood at the line and threw her football. Rachael got a running start and threw her baseball when she reached the line. Rachael threw her ball the farthest. What variable did the girls control in the contest?",
       "model_answer": "The launch position (line on the playground) is the variable that is controlled.",
@@ -520,7 +520,7 @@
     },
     {
       "id": "seb-MX.49.488.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Beth made 2 solutions of different concentrations of water and citric acid. She put 50 milliliters of the first solution in cup X and 50 milliliters of the second solution in cup Y. When she put the cups on the balance, the balance looked as shown below. Which solution, X or Y, is more concentrated? Explain how you know which is more concentrated.",
       "model_answer": "X. When equal amounts of 2 solutions are compared, the solution that is more concentrated will have the greater mass (weigh more). 50 milliliters of X has a greater mass than 50 milliliters of Y, so X must be more concentrated.",
@@ -531,7 +531,7 @@
     },
     {
       "id": "seb-MX.41.462.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Janet found the solubility of silver chloride to be 86 grams in 50 milliliters of water. Mike found the solubility of silver nitrate to be 108 grams in 50 milliliters of water. Janet and Mike thought they must have made a mistake. They thought the solubilities of all materials in water should be the same. Is it possible that both solubilities are correct? Explain your answer.",
       "model_answer": "Yes, they could both be correct. Solubility is not the same for all materials.",
@@ -542,7 +542,7 @@
     },
     {
       "id": "seb-MX.46b.385.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Nigel made solutions in the bottles as shown below. Solution A was 2 spoons solute in 50 milliliters water and was clear with no material on the bottom. Solution B was 4 spoons solute in 100 milliliters water and was clear with no material on the bottom. Nigel took 50 milliliters of solution from bottle A and put it in cup A and 50 milliliters of solution from bottle B and put it into cup B. He put the cups on each side of the balance. Which picture shows what would happen? A is heavier than B, B is heavier than A, (A and B are the same weight). Explain your choice.",
       "model_answer": "The solutions have the same concentration (2 spoons in 50 milliliters is the same as 4 spoons in 100 milliliters) so the mass would also be the same.",
@@ -553,7 +553,7 @@
     },
     {
       "id": "seb-ME.17e.111.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Denise made a circuit to light a bulb or run a motor. She used a special switch. Below is the schematic diagram of her circuit. The switch is inside the dotted box. Can she run both the light and the motor at the same time? Why or why not?",
       "model_answer": "No. Only one circuit can be complete at a time.",
@@ -564,7 +564,7 @@
     },
     {
       "id": "seb-FN.19b.424.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Susan has samples of 5 different foods. Using only the results of her experiment, how will Susan know which food contains the most sugar?",
       "model_answer": "Susan should compare the amount of gas in each bag. The bag with the most gas contains the food with the most sugar.",
@@ -575,7 +575,7 @@
     },
     {
       "id": "seb-VB.29.462.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "When conducting a controlled experiment, why do you use a standard?",
       "model_answer": "A standard is used for comparison to determine how changing one variable changes the results.",
@@ -586,7 +586,7 @@
     },
     {
       "id": "seb-II.20b.457.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "When Sarah did the chromatography test, she saw that one black ink stayed black and didn't separate. She discovered that she had used a permanent marker. She wondered what would happen if she used a different liquid. She wrote in her science notebook, What if I used vinegar in place of the water? Can I get the pigments in permanent ink to separate? How will Sarah know if vinegar separated the permanent ink?",
       "model_answer": "Seeing multiple colors would show that vinegar can separate the permanent ink.",
@@ -597,7 +597,7 @@
     },
     {
       "id": "seb-MS.39.115.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Why is it important to use a standard unit when making a measurement?",
       "model_answer": "So people know exactly what the measurement means. A standard is necessary so everyone measures using the same unit and everyone gets the same measurement.",
@@ -608,7 +608,7 @@
     },
     {
       "id": "seb-EM.16b.593.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Ms. Teridann, a geologist, made a chart showing the scratch-test data for 3 minerals (Mineral X, Mineral Y, and Mineral Z). She wrote \"yes\" if the tool scratched the mineral and wrote \"no\" if it did not scratch it. Topaz is a mineral that cannot be scratched by a fingernail, a penny, or a paperclip. How hard is topaz compared to minerals X, Y, and Z? Explain how you know.",
       "model_answer": "Topaz would be the hardest of the 4 minerals because none of the tools could scratch topaz and at least one tool could scratch each of the other minerals.",
@@ -619,7 +619,7 @@
     },
     {
       "id": "seb-MX.19.381.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "When Amy added water to a mixture of baking soda and citric acid, the mixture began fizzing. Amy concluded there was a chemical reaction because it fizzed. Why is fizzing evidence of a chemical reaction?",
       "model_answer": "The fizzing indicates a gas, a new material, is produced. When a new material is produced, a chemical reaction has occurred.",
@@ -630,7 +630,7 @@
     },
     {
       "id": "seb-LF.39.394.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Don wants to make a map of his neighborhood that fits into his notebook. He has a photograph of the neighborhood but it is too large. Complete the description of how Don can draw an accurate map that fits into his notebook: 1. Put an overlay grid over the model. 2. ____ 3. Draw a smaller grid with the same number of squares in your notebook. 4. ____ 5. Create a key to go with the map.",
       "model_answer": "2: Trace the features from the photograph onto the overlay grid. 4: Transfer the features to the matching squares on the smaller grid in your notebook.",
@@ -641,7 +641,7 @@
     },
     {
       "id": "seb-MX.18.176.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "A solution of water and material A is clear. A solution of water and material B is also clear. When the 2 solutions are mixed, a white solid settles to the bottom, leaving a clear liquid. What does the white solid indicate?",
       "model_answer": "A chemical reaction occurred. [The white solid is a precipitate (a new material) which indicates the reaction.]",
@@ -652,7 +652,7 @@
     },
     {
       "id": "seb-ME.78b.159.1",
-      "level": "incomplete",
+      "level": "seb incomplete",
       "kind": "card",
       "question": "Look at the picture of the circuit to the right. What will happen to the motor if the light bulb burns out?",
       "model_answer": "The motor will continue to run because the motor still has a pathway to the D-cell.",
@@ -663,7 +663,7 @@
     },
     {
       "id": "seb-SE.4a.327.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "What is a heat sink?",
       "model_answer": "A heat sink is any material that absorbs (a lot of) heat.",
@@ -674,7 +674,7 @@
     },
     {
       "id": "seb-LF.39.443.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Don wants to make a map of his neighborhood that fits into his notebook. He has a photograph of the neighborhood but it is too large. Complete the description of how Don can draw an accurate map that fits into his notebook: 1. Put an overlay grid over the model. 2. ____ 3. Draw a smaller grid with the same number of squares in your notebook. 4. ____ 5. Create a key to go with the map.",
       "model_answer": "2: Trace the features from the photograph onto the overlay grid. 4: Transfer the features to the matching squares on the smaller grid in your notebook.",
@@ -685,7 +685,7 @@
     },
     {
       "id": "seb-VB.5a.466.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Explain in one sentence what each graph tells you. Graph A) number of tree rings versus time.",
       "model_answer": "As time increases, the number of tree rings also increases.",
@@ -696,7 +696,7 @@
     },
     {
       "id": "seb-SE.45.424.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Betty was puzzled. In the morning the shadow of the bus sign is in the street. In the afternoon the shadow of the bus sign points the opposite direction. Explain to Betty why this happens.",
       "model_answer": "In the morning the Sun is in the east so shadows point west. In the afternoon the Sun is in the west so shadows point east.",
@@ -707,7 +707,7 @@
     },
     {
       "id": "seb-LF.34b.254.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Draw an arrow to show which direction the water flows in the river. (Rose Mountain is on the left and Happy Valley is on the right in the drawing.) Why do you think the water flows in that direction?",
       "model_answer": "Water will always flow downhill (mountain to valley).",
@@ -718,7 +718,7 @@
     },
     {
       "id": "seb-VB.5b.423.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Explain in one sentence what each graph tells you. Graph B) speed of light versus time.",
       "model_answer": "As time increases, the speed of light stays the same (remains constant).",
@@ -729,7 +729,7 @@
     },
     {
       "id": "seb-LP.16d.116.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Look at the illustration of the pulley system at the right to answer the questions. What additional disadvantages might there be to this system compared to a single fixed pulley system?",
       "model_answer": "You have to pull up in this system.  In the single fixed pulley system, you get a directional advantage.",
@@ -740,7 +740,7 @@
     },
     {
       "id": "seb-EM.43b.569.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "If Phil, a geologist, wants to test for calcite while in the field, what should he bring with him? (an acid such as vinegar). Describe what Phil should do to test for calcite and what he would observe.",
       "model_answer": "Put acid on a rock. If the acid fizzes, Phil would know that the rock has calcite.",
@@ -751,7 +751,7 @@
     },
     {
       "id": "seb-MX.47b.493.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Tabby made 2 solutions using the same solute and water. [Cup one has 6 spoons solute in 50 milliliters water. Cup 2 has 8 spoons solute in 50 milliliters water. Both solutions are clear with material on the bottom.] Which sentence below describes the concentrations of the 2 solutions? (A. The solutions in the cups have the same concentration.) B. Cup one has the more concentrated solution. C. Cup 2 has the more concentrated solution. D. There is not enough information to answer the question. Explain your choice.",
       "model_answer": "Both solutions are saturated (as indicated by the material on the bottom) so, even though one cup has more spoonfuls of sugar, both have the same (maximum) concentration.",
@@ -762,7 +762,7 @@
     },
     {
       "id": "seb-MX.36a.176.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Grace set up a science experiment. Here's what she wrote in her notebook. First I put eggshells into a cup and covered them with vinegar. After a while, small bubbles appeared on the surface of the eggshells. The next day there were more bubbles. In a couple of days, the eggshells were gone and the liquid was clear. I think I made a solution and a reaction. Explain why Grace thinks she made a solution.",
       "model_answer": "A solution was created when the eggshells disappeared (dissolved) and the mixture ended up as a clear liquid.",
@@ -773,7 +773,7 @@
     },
     {
       "id": "seb-FN.17a.210.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Paula wants to test a food to see if it contains acid and/or sugar. When Paula added water and yeast to a sample of the food and put the mixture in a warm water bath, the mixture began to fizz and bubble. What does this chemical reaction indicate?",
       "model_answer": "The food contains sugar.",
@@ -784,7 +784,7 @@
     },
     {
       "id": "seb-ME.30.146.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Sometimes a red stoplight changes to green only when a car stops at the light. A type of magnet hidden under the surface of the road triggers the light to turn green. What is it about the car that could trigger a magnet to send a signal to the light?",
       "model_answer": "A car is made of a lot of iron or steel.",
@@ -795,7 +795,7 @@
     },
     {
       "id": "seb-FN.24c.466.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Diva's father told her she should not eat so many cookies because they were pure sugar. Diva decided to investigate the amount of sugar in Fruity Cream cookies. She performed the sugar test on 4 grams of pure sugar and on 4 grams of Fruity Cream cookies. The results are pictured at the right. Why did Diva need to test pure sugar?",
       "model_answer": "Diva needs to know how much gas pure sugar produced in order to decide whether the cookies are pure sugar. Diva needs to make a controlled experiment.",
@@ -806,7 +806,7 @@
     },
     {
       "id": "seb-EM.45c.385.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "You used several methods to separate and identify the substances in mock rocks. How did you know the crystals were salt?",
       "model_answer": "The crystals were square with Xs on the surface.",
@@ -817,7 +817,7 @@
     },
     {
       "id": "seb-EM.47.563.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "The sand and flour in the gray material from mock rocks is separated by mixing with water and allowing the mixture to settle. Explain why the sand and flour separate.",
       "model_answer": "The sand particles are larger and settle first. The flour particles are smaller and therefore settle more slowly.",
@@ -828,7 +828,7 @@
     },
     {
       "id": "seb-II.20b.400.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "When Sarah did the chromatography test, she saw that one black ink stayed black and didn't separate. She discovered that she had used a permanent marker. She wondered what would happen if she used a different liquid. She wrote in her science notebook, What if I used vinegar in place of the water? Can I get the pigments in permanent ink to separate? How will Sarah know if vinegar separated the permanent ink?",
       "model_answer": "Seeing multiple colors would show that vinegar can separate the permanent ink.",
@@ -839,7 +839,7 @@
     },
     {
       "id": "seb-MX.53.528.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Adam's friend gave him a cup filled with a water solution. Adam did not know what solid material was used to make it. He evaporated the solution and found crystals in the dish after all of the water was gone. How will the crystals help him decide what solid material was used to make the solution?",
       "model_answer": "Crystals of different materials have different shapes. So the shape will help identify the material.",
@@ -850,7 +850,7 @@
     },
     {
       "id": "seb-MX.42a.601.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Joanne mixed material R and material D together, added water, and stirred. After a few minutes, the liquid was clear and there was a solid on the bottom of the cup. Joanne used a paper filter to separate the solid from the liquid. Why does the solid stay in the filter when the liquid goes through?",
       "model_answer": "The particles of the solid are too big to go through the holes in the paper filter.",
@@ -861,7 +861,7 @@
     },
     {
       "id": "seb-LP.16d.351.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Look at the illustration of the pulley system at the right to answer the questions. What additional disadvantages might there be to this system compared to a single fixed pulley system?",
       "model_answer": "You have to pull up in this system.  In the single fixed pulley system, you get a directional advantage.",
@@ -872,7 +872,7 @@
     },
     {
       "id": "seb-LF.28a2.810.1",
-      "level": "irrelevant",
+      "level": "seb irrelevant",
       "kind": "card",
       "question": "Use the \"slope\" and \"no slope\" stream-table maps and logs on the facing page to answer these questions. What information do you get from the stream-table logs that you do not get from the stream-table maps?",
       "model_answer": "You can see how much time is taken for the earth materials to move.",
@@ -883,7 +883,7 @@
     },
     {
       "id": "seb-LF.26a2.481.1",
-      "level": "non_domain",
+      "level": "seb non_domain",
       "kind": "card",
       "question": "Pam and her family were planning a hike. Pam found 2 maps of the same area. Her friend recommended she use the topographic map when they went to the lake. Why would Pam's friend recommend using the topographic map for the hike?",
       "model_answer": "She recommended the topographic map because the map shows the elevations along the trail. Pam would know where the trail was the steepest.",
@@ -894,7 +894,7 @@
     },
     {
       "id": "seb-ME.69b.682.1",
-      "level": "non_domain",
+      "level": "seb non_domain",
       "kind": "card",
       "question": "A magnet attracted another magnet even when a foam block was placed between them (see box A below). What do you think would happen if 2 foam blocks were placed between the 2 magnets (see box B). A. The magnets will stick. B. The magnets will not stick. (C. It might stick, but it might not.) Explain why you chose that answer.",
       "model_answer": "You can not tell because we do not know the strength of the magnets. If the magnets are weak, the second piece of foam might put too much distance between the 2 magnets for the interaction to hold the magnets in place. If the magnets are strong the magnets might stay in place.",
@@ -905,7 +905,7 @@
     },
     {
       "id": "seb-MX.19.540.1",
-      "level": "non_domain",
+      "level": "seb non_domain",
       "kind": "card",
       "question": "When Amy added water to a mixture of baking soda and citric acid, the mixture began fizzing. Amy concluded there was a chemical reaction because it fizzed. Why is fizzing evidence of a chemical reaction?",
       "model_answer": "The fizzing indicates a gas, a new material, is produced. When a new material is produced, a chemical reaction has occurred.",

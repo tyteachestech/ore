@@ -16,7 +16,7 @@ Ore's grader proposes 1–4 and the eval draws its line between Hard (2) and Goo
 
 - SAF `Correct` → right; `Partially correct` and `Incorrect` → wrong. `why` is the teachers' own feedback, with their score.
 - SciEntsBank `correct` → right; `contradictory`, `partially_correct_incomplete`, `irrelevant`, `non_domain` → wrong.
-- `level` keeps the dataset's own label (`correct`, `partial`, `incorrect`; `correct`, `contradictory`, `incomplete`, `irrelevant`, `non_domain`), so the report's "by level" shows where a grader fails: the literature (Cong et al. 2026) and SAF's authors both find partly-correct answers are where graders disagree.
+- `level` keeps the dataset's own label behind its name (`saf correct`, `saf partial`, `saf incorrect`; `seb correct`, `seb contradictory`, `seb incomplete`, `seb irrelevant`, `seb non_domain`), so the report's "by level" shows where a grader fails: the literature (Cong et al. 2026) and SAF's authors both find partly-correct answers are where graders disagree.
 - SQuAD: an answer is right when the reply holds any annotator's span (joined as alternatives); the citation is right when a quote from the article holds it. Unanswerable questions go in `absent`: right means the reply says the article doesn't hold it. SQuAD's known noise stays: a few questions only make sense beside their paragraph ("When was the colony destroyed?") and annotators sometimes marked different spans.
 
 These are not Ore's cards: the reference answers are long and have no rubric, the students were graded on a course's standard, and SciEntsBank's are children's sentences. So a miss here is a reading, not a bug, until a case is checked by hand. The split is skewed (29% right), which is why the report carries Cohen's kappa beside accuracy.

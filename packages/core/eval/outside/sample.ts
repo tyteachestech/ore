@@ -40,7 +40,8 @@ const write = (name: string, data: unknown) => writeFileSync(join(out, name), JS
   const by = (v: string) => all.filter((x) => x.verification_feedback === v);
   const q = (x: Record<string, unknown>) => String(x.question);
   const picks = [...spread(by("Correct"), 20, q, r), ...spread(by("Partially correct"), 20, q, r), ...spread(by("Incorrect"), 20, q, r)];
-  const level: Record<string, string> = { Correct: "correct", "Partially correct": "partial", Incorrect: "incorrect" };
+  // Levels carry the set's name, so the report's "by level" keeps SAF's correct apart from SciEntsBank's.
+  const level: Record<string, string> = { Correct: "saf correct", "Partially correct": "saf partial", Incorrect: "saf incorrect" };
   write("grade-saf.json", {
     about: "60 of the 375 test_unseen_answers rows of the SAF communication-networks set (Filighera et al., ACL 2022; CC BY 4.0): 20 Correct, 20 Partially correct, 20 Incorrect, at most two per question. right = the teachers' Correct; Partially correct is wrong, as in Ore (a required point missing is Hard). `why` is the teachers' own feedback. Drawn by sample.ts, seed 1.",
     cases: picks.map((x) => ({
@@ -56,7 +57,7 @@ const write = (name: string, data: unknown) => writeFileSync(join(out, name), JS
 {
   const r = rng(2);
   const all = await rows("seb.parquet");
-  const names = ["correct", "contradictory", "incomplete", "irrelevant", "non_domain"];
+  const names = ["correct", "contradictory", "incomplete", "irrelevant", "non_domain"].map((n) => `seb ${n}`);
   const by = (i: number) => all.filter((x) => Number(x.label) === i);
   const q = (x: Record<string, unknown>) => String(x.question);
   const picks = [0, 1, 2, 3, 4].flatMap((i) => spread(by(i), 20, q, r));

@@ -49,10 +49,10 @@ describe("grading eval", () => {
   test("the outside slices load as cases: SAF 60 (20 correct, 20 partial, 20 incorrect), SciEntsBank 83 (20 each, 3 non_domain), ids unique across all sets, every label a reason", () => {
     const [saf, seb] = OUTSIDE.map((p) => loadCases(p)) as [Case[], Case[]];
     const count = (cs: Case[]) => Object.fromEntries([...new Set(cs.map((c) => c.level))].map((l) => [l, cs.filter((c) => c.level === l).length]));
-    expect(count(saf)).toEqual({ correct: 20, partial: 20, incorrect: 20 });
-    expect(count(seb)).toEqual({ correct: 20, contradictory: 20, incomplete: 20, irrelevant: 20, non_domain: 3 });
+    expect(count(saf)).toEqual({ "saf correct": 20, "saf partial": 20, "saf incorrect": 20 });
+    expect(count(seb)).toEqual({ "seb correct": 20, "seb contradictory": 20, "seb incomplete": 20, "seb irrelevant": 20, "seb non_domain": 3 });
     // The datasets' own verdicts map onto Ore's line: only their "correct" is right.
-    for (const c of [...saf, ...seb]) expect(c.label).toBe(c.level === "correct" ? "right" : "wrong");
+    for (const c of [...saf, ...seb]) expect(c.label).toBe(c.level.endsWith(" correct") ? "right" : "wrong");
     const all = loadSets([join(import.meta.dir, "../eval/grade-cases.json"), ...OUTSIDE]);
     expect(all).toHaveLength(20 + 60 + 83);
     expect(() => loadSets([OUTSIDE[0]!, OUTSIDE[0]!])).toThrow("unique across sets");
