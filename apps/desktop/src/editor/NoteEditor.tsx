@@ -770,7 +770,7 @@ function imagePaste(live: Live) {
             const text = d.getData("text/plain").trim();
             const files = [...d.files].filter((f) => f.type.startsWith("image/") && f.size > 0);
             // Words copied with a picture paste as words; an image alone (a screenshot, Copy Image's
-            // bare <img>, a Finder copy that names it) pastes as the image.
+            // bare img tag, a Finder copy that names it) pastes as the image.
             const words = !!d.getData("text/html").replace(/<[^>]*>/g, "").trim() || (!!text && !text.split("\n").every((l) => /^[^/]+\.[a-z0-9]{1,5}$/i.test(l))); // not a copied file's names
             if (words) return false;
             e.preventDefault();
