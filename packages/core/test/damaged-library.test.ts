@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -125,6 +126,38 @@ describe("a damaged library", () => {
       index.close();
     }
   });
+
+  test("reindex builds a damaged index from scratch", async () => {
+    const lib = await tempLibrary();
+    await addSnippet(lib, { text: "Interleaving mixes problem types." });
+    openIndex(lib).close();
+    writeFileSync(paths.index(lib), "not a database ".repeat(400));
+    for (const f of [`${paths.index(lib)}-wal`, `${paths.index(lib)}-shm`]) rmSync(f, { force: true });
+    expect(rebuildIndex(lib).errors).toEqual([]);
+    const index = openIndex(lib);
+    try {
+      expect(index.search("interleaving")).not.toEqual([]);
+    } finally {
+      index.close();
+    }
+  });
+
+  // Deleting the file from under another \`ore\` that holds it fails that one with "disk I/O error".
+  test("reindex while another process holds the index's write lock waits, then fails without deleting it", async () => {
+    const lib = await tempLibrary();
+    openIndex(lib).close();
+    const other = new Database(paths.index(lib));
+    other.exec("pragma busy_timeout = 0");
+    other.exec("begin immediate");
+    try {
+      expect(() => rebuildIndex(lib)).toThrow(/locked|busy/i);
+      expect(existsSync(paths.index(lib))).toBe(true);
+      expect(other.query("select count(*) as n from files").get()).toBeDefined();
+    } finally {
+      other.exec("rollback");
+      other.close();
+    }
+  }, 20_000);
 
   test("reindexes run at once all succeed", async () => {
     const lib = await tempLibrary();
