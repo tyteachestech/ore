@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { spriteSize } from "../src/icons";
+import { DOT, dots } from "../src/dots";
 
 // The UI sprites (icons.tsx, PixelIcon.tsx) as their rows, read from the source like a lint.
 const sprites = new Map(
@@ -21,16 +21,6 @@ test("every sprite is 16 rows of 16", () => {
   for (const [name, rows] of sprites) expect(rows.length ? `${name} ${rows.length}` : name).toBe(`${name} 16`);
 });
 
-// 2026-11-09 icon pass: a sprite off the centre by a whole pixel sits visibly high or to one side next to its label
-// (the note and graduation cap sat a row high, the hand and thumb a column left). An open lock leans on purpose.
-test("sprites sit centred on the grid", () => {
-  for (const [name, rows] of sprites) {
-    if (name === "LockSimpleOpen") continue;
-    const b = box(rows);
-    expect(Math.abs((b.x0 + b.x1) / 2 - 7.5) > 0.5 || Math.abs((b.y0 + b.y1) / 2 - 7.5) > 0.5 ? name : "centred").toBe("centred");
-  }
-});
-
 // A single dot out of place on a symmetric subject reads as a flaw at 20px (the gear had one, the keyboard's keys
 // were uneven). These mirror left to right about their own box.
 test("symmetric sprites mirror left to right", () => {
@@ -41,8 +31,16 @@ test("symmetric sprites mirror left to right", () => {
   }
 });
 
-// D170: at 20px a dot fell on 2.5 device pixels of a Retina screen, so alternate columns drew dim and the dots
-// smeared into a plaid. Every size a sprite draws at puts each dot on whole device pixels at 2×.
-test("sprite sizes give each dot whole device pixels at 2×", () => {
-  for (const asked of [10, 12, 14, 16, 20, 24, 32]) expect(Number.isInteger((spriteSize(asked) * 2) / 16) ? "whole" : `${asked} → ${spriteSize(asked)}`).toBe("whole");
+// D171: a drawing that leaves more room on one side sat off its label's line (Tyler: "the AI and terminal sit off").
+// dots() centres every sprite by its ink, in whole cells so each dot keeps the same place in the pixel grid.
+test("dots centre a sprite by its ink, in whole cells", () => {
+  const corner = ["##" + ".".repeat(14), "#." + ".".repeat(14), ...Array(14).fill(".".repeat(16))];
+  const centres = [...dots(corner).matchAll(/M([\d.]+) ([\d.]+)/g)].map((m) => [Number(m[1]) - 0.5, Number(m[2]) + DOT - 0.5]);
+  expect(centres).toEqual([[7, 7], [8, 7], [7, 8]]);
+  for (const [name, rows] of sprites) {
+    const xs = [...dots(rows).matchAll(/M([\d.]+) ([\d.]+)/g)].map((m) => Number(m[1]) - 0.5);
+    const ys = [...dots(rows).matchAll(/M([\d.]+) ([\d.]+)/g)].map((m) => Number(m[2]) + DOT - 0.5);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    expect(Math.abs(cx - 7.5) <= 0.5 && Math.abs(cy - 7.5) <= 0.5 && xs.every(Number.isInteger) ? "centred" : name).toBe("centred");
+  }
 });

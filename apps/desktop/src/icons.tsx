@@ -4,18 +4,18 @@ import type { JSX, SVGProps } from "react";
    redrawn on a 16-pixel grid, so they keep MingCute's weight and roundness but read as 8-bit. Each was converted from the
    fill SVG and then cleaned by hand; edit a sprite here, a row per line, `#` for a pixel. They keep the names of the
    Phosphor icons they first replaced, so call sites keep theirs. Since 2026-11-08 (Tyler's pick E of six sets) each pixel
-   draws as a round dot, as Nothing's glyphs do, and the sprite is drawn bigger than asked: 24px for 16 (40px at 24 and
-   up). 24 puts each dot on 3 device pixels of a Retina screen (40 on 5); at 20 a dot fell on 2.5, so every other column
-   drew dimmer and the dots smeared into a plaid (D170). There is no fill weight: a selected icon shows by its row,
-   never a second drawing. */
+   draws as a round dot, as Nothing's glyphs do, and the sprite is a quarter bigger than asked: 20px for 16 (40px at 24
+   and up), so its ink stands about one and a half times a label's capitals (D171, after 24px read too big). The dot is
+   0.38 of a cell (D170), small enough that the gaps stay even at 20px, and each drawing is centred by its ink
+   (dots.ts). There is no fill weight: a selected icon shows by its row, never a second drawing. */
 export type IconProps = Omit<SVGProps<SVGSVGElement>, "ref" | "children"> & { size?: number; weight?: string };
 export type Icon = (props: IconProps) => JSX.Element;
 
 import { dots } from "./dots";
 export { dots };
 
-/** The size a sprite draws at, in two steps, each a whole number of device pixels per dot on a 2× screen (D170). */
-export const spriteSize = (size: number) => (size >= 24 ? 40 : 24);
+/** The size a sprite draws at: a quarter over what is asked, in two steps (D171). */
+export const spriteSize = (size: number) => (size >= 24 ? 40 : 20);
 
 function sprite(rows: readonly string[]): Icon {
   const d = dots(rows);
@@ -1176,18 +1176,18 @@ export const PlayCircle = sprite([
 export const Plus = sprite([
   "................",
   "................",
+  "................",
   ".......##.......",
   ".......##.......",
   ".......##.......",
   ".......##.......",
-  ".......##.......",
-  "..############..",
-  "..############..",
-  ".......##.......",
+  "...##########...",
+  "...##########...",
   ".......##.......",
   ".......##.......",
   ".......##.......",
   ".......##.......",
+  "................",
   "................",
   "................",
 ]);
