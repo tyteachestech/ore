@@ -35,6 +35,7 @@ cards/<id>.md                  one review item per file; kind card (Q --- A) or 
 cards/<id>.variants.jsonl      remixed versions of that card, append-only; write only through `ore`
 reviews/<yyyy>-<mm>[.<device>].jsonl   append-only review log, one file per device; the source of truth for scheduling
 sessions/<yyyy>-<mm>[.<device>].jsonl  review session start/end receipts
+chats/<id>.json                his tutor chats as the app shows them (title, @ context, turns); written only through `ore chat`
 inbox/                         unused (no watcher); add files with `ore add`
 .index/library.sqlite          search index and cached card states (gitignored)
 .ore/                          lock, open-session marker, background logs (gitignored)

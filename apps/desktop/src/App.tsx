@@ -38,7 +38,7 @@ import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChip, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
-import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, type Entry, type FileKind } from "./paste";
+import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
 import { errorText, load, save } from "./util";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
@@ -614,7 +614,8 @@ export function App() {
         void copiedFiles().then((list) => (list.length ? add(list) : notify("Couldn't read the copied file. Drag it in, or pick it with ⌘O.", "error")));
         return;
       }
-      const list = entries(d?.getData("text/uri-list") || d?.getData("text/plain") || "");
+      const text = d?.getData("text/uri-list") || d?.getData("text/plain") || "";
+      const list = withHtml(entries(text), { text, html: pastedHtml(d) });
       if (!list.length) return;
       e.preventDefault();
       add(list);
