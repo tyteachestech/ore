@@ -253,8 +253,8 @@ export function App() {
     const from = tutorFrom.current;
     // The ✦ that opened it is hidden while the tutor is open: focus goes to the one that comes back.
     flushSync(() => setTutorOpen(false));
-    // So is the bubble it said a reply from (D159): focus goes to the owl beside it.
-    (from?.isConnected ? from : from?.matches(".tutor-bubble, .owl-says-text") ? document.querySelector<HTMLElement>(".tutor-bubble") : null)?.focus?.();
+    // So is the bubble it said a reply from (D159): focus goes to the mole beside it.
+    (from?.isConnected ? from : from?.matches(".tutor-bubble, .mole-says-text") ? document.querySelector<HTMLElement>(".tutor-bubble") : null)?.focus?.();
   };
   const [adding, setAdding] = useState(false);
   const [help, setHelp] = useState(false);
@@ -2168,7 +2168,7 @@ export function App() {
             </Hint>
           </div>
         )}
-        {/* The tutor's owl floats at the bottom right (D160). Its live line stays when the owl hides (an overlay),
+        {/* The tutor's mole floats at the bottom right (D160). Its live line stays when the mole hides (an overlay),
             so VoiceOver hears a reply that lands then (D159). */}
         {tutorButton}
         <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
