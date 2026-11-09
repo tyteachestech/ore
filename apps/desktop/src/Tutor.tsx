@@ -1,11 +1,12 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowDown, ArrowUp, Check, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
+import { ArrowDown, ArrowUp, Check, Circle, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
 import { citeRuns, siteName } from "./cite-pills";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Evidence } from "./Evidence";
 import { Grow } from "./Grow";
 import { escTaken, Hint, onlyTabbed } from "./Hint";
 import { useSideWidth } from "./Notes";
@@ -26,7 +27,9 @@ export type TutorCard = { kind: "card" | "prompt"; content_type: string; questio
 type Ai = { vendor: string; model: string; prompt_version: string };
 /** An open exercise (D128.6): its heading in his note, the placeholder lines under it, and the card it
  *  becomes if he misses (D158), committed before he answers and never shown until then. */
-export type Exercise = { heading: string; prompts: string[]; card: TutorCard };
+export type Exercise = { heading: string; prompts: string[]; card: TutorCard; cases?: string[] };
+/** Feedback on an exercise (D162): each point of its committed card, whether his answer covered it, and his words that did. */
+export type Mark = { point: string; covered: boolean; quote: string };
 export type TutorTurn = {
   /** Unique across chats: a reply lands only on the turn that asked for it. */
   id: string;
@@ -40,10 +43,12 @@ export type TutorTurn = {
   reply?: string; citations?: AnyCitation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
   /** A worked answer's steps, shown one at a time (D142); empty for any other reply. */
   steps?: string[];
+  /** Feedback on his answer to an exercise: its card's points, marked (D162); empty for any other reply. */
+  marks?: Mark[];
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
 };
-type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; steps?: string[]; ai: Ai };
+type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; steps?: string[]; marks?: Mark[]; ai: Ai };
 /** What he has typed and not sent yet, with the @-mentions in it. */
 export type TutorDraft = { input: string; mentions: Mention[] };
 export type TutorChat = ReturnType<typeof useTutorChat>;
@@ -84,7 +89,7 @@ export function useTutorChat(notify: Notify) {
     try {
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
       const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
-      patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined });
+      patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], marks: r.marks ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined });
     } catch (e) {
       patch(t.id, { error: errorText(e, "answer that"), partial: undefined, searching: undefined });
     } finally {
@@ -216,6 +221,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     setBelow(false);
   };
   const busy = turns.some((t) => t.reply === undefined && !t.error);
+  /** The point of an exercise's feedback under the pointer or focus: its words are underlined in his answer (D162). */
+  const [lit, setLit] = useState<{ turn: string; quote: string } | null>(null);
   const { width, dragging, divider } = useSideWidth("ore.tutorwidth", 380, 300);
 
   /** `typed`: the message is what is in the box, so the box empties; a starter or Show me leaves his draft. */
@@ -324,7 +331,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           const last = i === turns.length - 1 && !busy;
           return (
           <div key={t.id} className="library-turn">
-            <p className="ask-me">{marked(t.message, t.mentions ?? [])}</p>
+            <p className="ask-me">{lit?.turn === t.id ? <Evidence answer={t.message} quote={lit.quote} /> : marked(t.message, t.mentions ?? [])}</p>
             <div className="ask-ai">
               <Sparkle className="ask-mark" size={14} aria-hidden="true" />
               <div className="ask-text">
@@ -343,6 +350,32 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                 ) : (
                   <>
                     <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />
+                    {t.exercise?.cases?.length === 2 && (
+                      <Cases cases={t.exercise.cases} open={last} onSend={(text) => send(text)} />
+                    )}
+                    {!!t.marks?.length && (
+                      <ul className="quiz-points tutor-points" aria-label="Key points">
+                        {t.marks.map((m, j) => {
+                          const show = () => setLit(m.quote ? { turn: t.id, quote: m.quote } : null);
+                          const hide = () => setLit((l) => (l?.turn === t.id ? null : l));
+                          return (
+                            <li
+                              key={j}
+                              className={m.covered ? "got" : "missed"}
+                              tabIndex={0}
+                              aria-label={m.covered ? `Got: ${m.point}${m.quote ? `, from “${m.quote}”` : ""}` : `Missed: ${m.point}`}
+                              onMouseEnter={show}
+                              onMouseLeave={hide}
+                              onFocus={show}
+                              onBlur={hide}
+                            >
+                              <span className="quiz-mark" aria-hidden="true">{m.covered ? <Check size={14} weight="bold" /> : <Circle size={14} weight="bold" />}</span>
+                              <span className="quiz-point">{m.point}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                     {((last && (t.hint || (t.exercise && t.item))) || (t.card && (firstSource(t.citations) ?? t.item))) && (
                       <div className="tutor-acts">
                         {last && t.hint && <button onClick={() => send("Show me")}>Show me</button>}
@@ -652,3 +685,41 @@ export function TutorBubble({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+
+/** A tell apart's two cases side by side (D163, after assistant-ui's comparison card): comparing two cases
+ *  teaches the difference when they are seen together, so each sits in its own column, A and B, with a line
+ *  under it for which idea fits and what decides it. Enter in A goes to B; Enter in B sends both as one
+ *  answer ("A: … B: …"); ⇧Enter is a new line. The chat field still takes an answer written any other way.
+ *  Once he has answered (`open` false) the cases stay, without their lines. */
+function Cases({ cases, open, onSend }: { cases: string[]; open: boolean; onSend: (text: string) => void }) {
+  const [said, setSaid] = useState(["", ""]);
+  const second = useRef<HTMLTextAreaElement>(null);
+  const answer = said.map((x, i) => (x.trim() ? `${"AB"[i]}: ${x.trim()}` : "")).filter(Boolean).join("\n");
+  return (
+    <div className="tutor-cases">
+      {cases.map((c, i) => (
+        <section key={i} className="tutor-case" aria-label={`Case ${"AB"[i]}`}>
+          <span className="tutor-case-tag" aria-hidden="true">{"AB"[i]}</span>
+          <p>{c}</p>
+          {open && (
+            <Grow
+              ref={i ? second : undefined}
+              rows={1}
+              className="field"
+              aria-label={`Case ${"AB"[i]}: which idea fits, and what decides it`}
+              placeholder="Which idea fits, and why…"
+              value={said[i]}
+              onChange={(e) => { const v = e.target.value; setSaid((s) => s.map((x, j) => (j === i ? v : x))); }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+                e.preventDefault();
+                if (!i) return second.current?.focus();
+                if (answer) onSend(answer);
+              }}
+            />
+          )}
+        </section>
+      ))}
+    </div>
+  );
+}

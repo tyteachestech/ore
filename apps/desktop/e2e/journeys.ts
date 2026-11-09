@@ -901,6 +901,51 @@ journey("tutor Practice: an exercise is written in the source note with the sour
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor Practice: a tell apart's two cases sit side by side with a line each; Enter in A goes to B, Enter in B sends both (D163); the feedback marks each point and underlines his words (D162)", async (page) => {
+  await openSource(page, AGENTS);
+  const card = { kind: "prompt", content_type: "concept", question: "Which fits each: a support bot that follows fixed steps, or one that picks its own tools?", answer: "The first is a workflow, the second an agent.", rubric: ["Fixed steps make a workflow", "Choosing its own tools makes an agent"] };
+  const cases = ["A support bot answers refunds by running the same four steps every time.", "A research bot decides which tools to call and when it is done."];
+  const exercise = { heading: "Which idea fits each case, and what decides it?", prompts: ["Case A", "Case B"], card, cases };
+  const replies = [
+    { reply: "Tell these two apart.", citations: [], general: false, hint: false, exercise, card: null, marks: [] },
+    { reply: "A is right. B: who decides the steps?", citations: [], general: false, hint: false, exercise: null, card, marks: [{ point: card.rubric[0], covered: true, quote: "same steps each time" }, { point: card.rubric[1], covered: false, quote: "" }] },
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@10" } }));
+  const asked: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    asked.push((JSON.parse(body) as { args: string[] }).args[1]!);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click();
+  await tutor.getByRole("button", { name: "Practice", exact: true }).click();
+  const a = tutor.getByRole("region", { name: "Case A" }), b = tutor.getByRole("region", { name: "Case B" });
+  await a.getByText(cases[0]!).waitFor();
+  await b.getByText(cases[1]!).waitFor();
+  const [boxA, boxB] = [await a.boundingBox(), await b.boundingBox()];
+  if (!boxA || !boxB || Math.abs(boxA.y - boxB.y) > 2) throw new Error("the cases aren't side by side");
+  await a.getByRole("textbox").click();
+  await page.keyboard.type("A workflow: same steps each time");
+  await page.keyboard.press("Enter");
+  await until("Enter in A goes to B", async () => await b.getByRole("textbox").evaluate((el) => el === document.activeElement));
+  await page.keyboard.type("An agent");
+  await page.keyboard.press("Enter");
+  await tutor.getByText("A is right. B: who decides the steps?").waitFor();
+  if (asked[1] !== "A: A workflow: same steps each time\nB: An agent") throw new Error(`sent: ${JSON.stringify(asked[1])}`);
+  if (await a.getByRole("textbox").count()) throw new Error("the answer lines stay once he has answered");
+  const got = tutor.getByRole("listitem", { name: /^Got: Fixed steps make a workflow/ });
+  await got.hover();
+  await tutor.locator(".ask-me .quiz-evidence", { hasText: "same steps each time" }).waitFor();
+  await tutor.getByRole("listitem", { name: "Missed: Choosing its own tools makes an agent" }).focus();
+  await until("a missed point marks nothing", async () => (await tutor.locator(".ask-me .quiz-evidence").count()) === 0);
+  await tutor.getByRole("button", { name: /^Add card/ }).waitFor(); // the committed card, offered after the miss (D158)
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).

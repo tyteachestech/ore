@@ -2629,6 +2629,19 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor.float .tutor-head { top: 8px; right: 8px; }
 /* Under a reply: Show me (the hint ladder's last rung) and + Card (keep this idea in review). */
 .tutor-acts { display: flex; gap: 6px; margin-top: 10px; }
+/* A tell apart's cases side by side (D163): each a label over a rule, never framed; they stack when the tutor is too narrow for two. */
+.tutor-cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 14px; margin-top: 10px; }
+.tutor-case { min-width: 0; border-top: 1px solid var(--border); padding-top: 8px; }
+.tutor-case-tag { display: block; font: 11px var(--mono); letter-spacing: 0.06em; color: var(--faint); }
+.tutor-case p { margin: 4px 0 8px; }
+.tutor-case .field { width: 100%; font-size: 13px; }
+/* Feedback on an exercise (D162): Review's key point marks, read-only; hover or focus underlines his words. */
+.tutor-points { margin-top: 10px; }
+.tutor-points li { padding-right: 6px; cursor: default; }
+.tutor-points li:hover, .tutor-points li:focus-visible { background: var(--bg-hover); outline: none; }
+.tutor-points .quiz-mark { height: 22px; }
+.tutor-points .quiz-point { padding: 2px 0; color: var(--muted); }
+.tutor-points .got .quiz-point { color: var(--text); }
 /* Step track (D150): 4px marks on a 2px grid; a shown step is a 12px mark, the current one a 24px bar, the
    rest 4px dots. A mark grows into the bar in one short ease-out (Rare UI's step player); none under reduced motion. */
 .step-track { display: flex; align-items: center; gap: 4px; height: 4px; margin: 12px 0 0; }
