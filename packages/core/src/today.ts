@@ -153,7 +153,7 @@ export function today(lib: Library, now = new Date()): Today {
     const w = loadParams(lib);
     const skills = loadSkills(lib).skills.map((k) => {
       const { explain: _, ...st } = strength(cards, reviews, k.id, w, now);
-      return { skill: k.id, due: queue.filter((e) => e.skills.includes(k.id)).length, ...st };
+      return { skill: k.id, due: k.archived ? 0 : queue.filter((e) => e.skills.includes(k.id)).length, ...st };
     });
     return {
       ...s,

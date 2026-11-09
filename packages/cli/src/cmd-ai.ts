@@ -1,8 +1,8 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, listChats, readChat, saveChat, deleteChat, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
-import { int, need, str, strs } from "./util.ts";
+import { int, need, readStdin, str, strs } from "./util.ts";
 
 function enrichText(r: EnrichResult): string {
   if (r.skipped) return `${r.title}: skipped (${r.skipped})`;
@@ -122,6 +122,31 @@ export const aiCommands: Record<string, Command> = {
       const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill), onProgress });
       const text = [withSteps(r), ...(r.exercise?.cases ?? []).map((c, i) => `  ${"AB"[i]}: ${c}`), ...r.marks.map((m) => `  ${m.covered ? "got" : "missed"}: ${m.point}${m.quote ? ` (“${m.quote}”)` : ""}`), ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
       return { data: r, text };
+    },
+  },
+
+  chat: {
+    usage: "[<id> [--set [--keep-time] | --delete]]   The tutor's saved chats (D172), chats/<id>.json: list them (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back)",
+    options: { set: { type: "boolean" }, "keep-time": { type: "boolean" }, delete: { type: "boolean" } },
+    async run([id], f) {
+      const lib = openLibrary();
+      if (f.set) {
+        const json = await readStdin();
+        const given = (() => { try { return (JSON.parse(json) as { id?: unknown }).id; } catch { return undefined; } })();
+        if (id && given !== id) throw new Error(`the chat on stdin is ${String(given)}, not ${id}`);
+        const c = await saveChat(lib, json, { touch: !f["keep-time"] });
+        return { data: c, text: `Saved chat ${c.id}` };
+      }
+      if (f.delete) {
+        const c = await deleteChat(lib, need(id, "<id>"));
+        return { data: c, text: `Deleted chat ${c.id}` };
+      }
+      if (id) {
+        const c = readChat(lib, id);
+        return { data: c, text: [c.title, ...c.turns.map((t) => `\n> ${t.message}\n${typeof t.reply === "string" ? t.reply : ""}`)].join("\n") };
+      }
+      const rows = listChats(lib);
+      return { data: rows, text: rows.map((r) => `${r.id}  ${r.updated.slice(0, 16).replace("T", " ")}  ${r.title}`).join("\n") || "No chats yet." };
     },
   },
 

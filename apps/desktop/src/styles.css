@@ -1333,6 +1333,17 @@ body.resizing iframe { pointer-events: none; }
 .skill-page:not([data-color]) { --skill: var(--accent); }
 .skill-hero { flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 26px 32px 20px; }
 .skill-title { flex: 1 1 220px; min-width: 0; }
+/* D173: the importance bars sit after the name, quiet until hovered (Linear's priority on an issue). */
+.skill-name-row { display: flex; align-items: center; gap: 6px; min-width: 0; margin-left: -6px; }
+/* The name's button keeps its hover inset by the row's margin instead of its own, which in a flex row
+   shrank the name by 6px and wrapped it at a hyphen. */
+.skill-name-row > .skill-name { min-width: 0; }
+.skill-name-row > .skill-name button { margin-left: 0; }
+.skill-importance { flex: none; width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
+.skill-importance:hover, .skill-importance[aria-expanded="true"] { color: var(--text); background: var(--bg-hover); }
+.skill-importance:focus-visible, .skill-unarchive:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.skill-unarchive { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; color: var(--muted); font-size: 13px; }
+.skill-unarchive:hover { color: var(--text); background: var(--bg-hover); }
 .skill-cols { flex: 1; min-height: 0; display: grid; padding: 0 32px; }
 .skill-cols.dragging { user-select: none; -webkit-user-select: none; cursor: col-resize; }
 /* The bar between the columns, like the source note's divider (D44): a line shows on hover. */
@@ -2716,10 +2727,23 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-acts button:hover:not(:disabled), .tutor-acts button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
 .tutor-acts button.done { border-color: transparent; color: var(--faint); }
 /* Quiz me (D128): his due cards in Review, for the skills in view. The panel's one text control. */
-.tutor-quiz { position: absolute; top: 7px; left: 12px; z-index: 6; }
-.tutor.float .tutor-quiz { top: 8px; left: 10px; }
-.tutor-quiz button { height: 26px; padding: 0 10px; border-radius: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
-.tutor-quiz button:hover, .tutor-quiz button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
+.tutor-quiz { height: 26px; padding: 0 10px; border-radius: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.tutor-quiz:hover, .tutor-quiz:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
+/* The chat's name, which opens the list of saved chats (D172, Notion AI's switcher). */
+.tutor-title { position: absolute; top: 7px; left: 12px; z-index: 6; display: inline-flex; align-items: center; gap: 4px; height: 26px; max-width: calc(100% - 200px); padding: 0 6px 0 8px; border-radius: 6px; color: var(--text); font-size: 12px; font-weight: 600; }
+.tutor.float .tutor-title { top: 8px; left: 8px; }
+.tutor-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor-title svg { flex: none; color: var(--faint); }
+.tutor-title:hover, .tutor-title[data-state="open"] { background: var(--bg-hover); }
+.tutor-chats { width: 300px; }
+.tutor-chats [cmdk-list] { max-height: 320px; }
+.tutor-chats [cmdk-item] { gap: 6px; }
+.tutor-chats [cmdk-item] .menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor-chats [cmdk-item] .check { margin-left: 0; }
+.tutor-chat-del { flex: none; width: 22px; height: 22px; visibility: hidden; color: var(--faint); }
+.tutor-chats [cmdk-item]:hover .tutor-chat-del, .tutor-chats [cmdk-item][data-selected="true"] .tutor-chat-del { visibility: visible; }
+.tutor-chat-del:hover { color: var(--text); }
+.tutor-chats-none { padding: 10px 12px; color: var(--faint); font-size: 12px; }
 /* A piece of his answer: reads as text, one click edits it in place. */
 .qa-piece { all: unset; cursor: text; border-radius: 3px; }
 .qa-piece:hover { background: var(--bg-hover); }
@@ -2729,7 +2753,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* Keyboard focus (WCAG 2.4.7): these controls share their hover fill with focus and once switched the outline off,
    so Tab showed nothing a fill didn't already mean. They get the app's ring back; hover stays the fill alone. */
 :is(.home-gear, .review-passage figcaption button, .review-quotes button, .review-tools button, .ask-starters button, .cite, .tutor-sources,
-  .library-sources button, .settings-back, .tutor-chip button, .tutor-acts button, .tutor-quiz button):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .library-sources button, .settings-back, .tutor-chip button, .tutor-acts button, .tutor-title):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 /* Timeline.tsx (D149): a card's reviews on a line above the ratings. A hairline, 8px dots in the rating's
    colour at their time to scale, and a hollow dot where the rating under the pointer puts the next one.

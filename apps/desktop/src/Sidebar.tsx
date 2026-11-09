@@ -18,6 +18,7 @@ import { layoutOf, skillGroups, UNGROUPED, type SkillLayout } from "./Skills";
 import { errorText, load, save } from "./util";
 
 const CLOSED = "ore.side-closed";
+const ARCHIVED_OPEN = "ore.side-archived-open";
 function closedGroups(): string[] {
   try {
     const v: unknown = JSON.parse(load(CLOSED) ?? "[]");
@@ -69,7 +70,21 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   onDeleteCollection: (collection: string) => void;
 }) {
   const sensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 4 } }));
-  const groups = useMemo(() => skillGroups(skills), [skills]);
+  // D173: archived skills leave the list for a folded Archived group at the bottom; every layout written
+  // puts them back in their collections (`arrange`), so a drag or rename never loses one.
+  const groups = useMemo(() => skillGroups(skills.filter((s) => !s.archived)), [skills]);
+  const archived = skills.filter((s) => s.archived);
+  const [archivedOpen, setArchivedOpen] = useState(() => load(ARCHIVED_OPEN) === "1");
+  const arrange = (layout: SkillLayout, step?: string, renamed?: { from: string; to: string }) => {
+    const out = layout.map((g) => ({ ...g, skills: [...g.skills] }));
+    for (const s of archived) {
+      const c = s.collection && renamed?.from === s.collection ? renamed.to : (s.collection ?? "");
+      const g = out.find((x) => x.collection === c);
+      if (g) g.skills.push(s.id);
+      else out.push({ collection: c, skills: [s.id] });
+    }
+    onArrange(out, step);
+  };
   // While dragging: the layout as it would be if dropped now.
   const [draft, setDraft] = useState<Group[] | null>(null);
   const [active, setActive] = useState<UniqueIdentifier | null>(null);
@@ -144,7 +159,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     setActive(null);
     setDraft(null);
     const layout = layoutOf(next.filter((g) => g.collection || g.skills.length));
-    if (JSON.stringify(layout) !== JSON.stringify(layoutOf(groups.filter((g) => g.collection || g.skills.length)))) onArrange(layout);
+    if (JSON.stringify(layout) !== JSON.stringify(layoutOf(groups.filter((g) => g.collection || g.skills.length)))) arrange(layout);
   };
   const onDragCancel = () => {
     setActive(null);
@@ -156,7 +171,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     const v = tidyCollection(name);
     if (!v || v === g.collection) return;
     if (closed.includes(g.name)) setClosedSaved(closed.map((n) => (n === g.name ? v : n)));
-    onArrange(layoutOf(groups.map((x) => (x === g ? { ...x, collection: v } : x))), `Renamed collection “${g.collection}” to “${v}”`);
+    arrange(layoutOf(groups.map((x) => (x === g ? { ...x, collection: v } : x))), `Renamed collection “${g.collection}” to “${v}”`, { from: g.collection, to: v });
   };
   // Finder's New Folder: the name field opens where collections end, Enter makes it and names its
   // first skill (a collection is the skills in it), Esc or clicking away drops it.
@@ -181,7 +196,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   ];
   const nudge = (g: Group, by: number) => {
     const i = groups.indexOf(g);
-    onArrange(layoutOf(arrayMove(groups, i, i + by)), `Moved “${g.name}” ${by < 0 ? "up" : "down"}`);
+    arrange(layoutOf(arrayMove(groups, i, i + by)), `Moved “${g.name}” ${by < 0 ? "up" : "down"}`);
   };
   const groupMenu = (g: Group): MenuAction[] => {
     const i = named.indexOf(g);
@@ -294,6 +309,17 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
           ))}
           {naming && !shown.some((g) => !g.collection) && namingField}
         </SortableContext>
+        {archived.length > 0 && (
+          <div role="group" aria-label="Archived" className="side-section side-archived">
+            <div className="side-head">
+              <button className="side-label" aria-expanded={archivedOpen} onClick={() => setArchivedOpen((o) => (save(ARCHIVED_OPEN, o ? "" : "1"), !o))}>
+                <span className="side-label-text">Archived</span>
+                <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
+              </button>
+            </div>
+            {archivedOpen && archived.map((s) => <ArchivedRow key={s.id} s={s} on={skill === s.id} drop={drop === s.id} marked={marked} onOpen={onOpen} menu={menu(s)} />)}
+          </div>
+        )}
         {createPortal(
           <DragOverlay dropAnimation={SETTLE}>
             {lifted && "skills" in lifted ? (
@@ -505,6 +531,26 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
         style={{ transform: CSS.Translate.toString(transform), transition }}
       >
         <button className="side-main" aria-pressed={on} {...listeners} onClick={() => onOpen(s.id)}>
+          {marked && (
+            <span className="mark" aria-hidden="true">
+              <SkillIcon icon={s.icon} color={s.color} dot />
+            </span>
+          )}
+          <span className="label">{s.name}</span>
+        </button>
+        <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} hoverOnly />
+      </div>
+    </WithMenu>
+  );
+}
+
+/** An archived skill in the folded Archived group (D173): opens and has its menu like any skill, and
+ *  takes a dropped source (which brings it back), but doesn't drag: Bring back puts it in its place. */
+function ArchivedRow({ s, on, drop, marked, onOpen, menu }: { s: Skill; on: boolean; drop: boolean; marked: boolean; onOpen: (id: string) => void; menu: MenuAction[] }) {
+  return (
+    <WithMenu actions={menu}>
+      <div className={`side-item${on ? " on" : ""}${drop ? " drop-on" : ""}`} data-drop-skill={s.id} data-color={s.color}>
+        <button className="side-main" aria-pressed={on} onClick={() => onOpen(s.id)}>
           {marked && (
             <span className="mark" aria-hidden="true">
               <SkillIcon icon={s.icon} color={s.color} dot />

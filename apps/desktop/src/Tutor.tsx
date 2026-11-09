@@ -1,5 +1,9 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowDown, ArrowUp, Check, Circle, Plus, SidebarRight, Sparkle, Square, X } from "./icons";
+import * as Popover from "@radix-ui/react-popover";
+import { Command } from "cmdk";
+import { ArrowDown, ArrowUp, CaretDown, Check, Circle, Plus, SidebarRight, Sparkle, Square, Trash, X } from "./icons";
+import { chatGroups } from "./chat-groups";
+import { WithMenu } from "./Menu";
 import { citeRuns, siteName } from "./cite-pills";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
@@ -10,7 +14,7 @@ import { Evidence } from "./Evidence";
 import { Grow } from "./Grow";
 import { escTaken, Hint, onlyTabbed } from "./Hint";
 import { useSideWidth } from "./Notes";
-import { ore, opt } from "./ore";
+import { ore, oreWith, opt } from "./ore";
 import { errorText, type Notify } from "./util";
 import { Working } from "./Working";
 import { mentionMatches, type Mention } from "./mentions";
@@ -57,26 +61,73 @@ export type TutorChat = ReturnType<typeof useTutorChat>;
 let turnSeq = 0;
 const turnId = () => `${Date.now().toString(36)}-${++turnSeq}`;
 
-/** The tutor's thread, his draft and its requests, held in App so closing the panel or moving around
- *  the app loses nothing and never asks twice. New chat sets the thread aside: Undo swaps it back. */
+/** A saved chat as `ore chat` lists it (D172). */
+export type ChatRow = { id: string; title: string; updated: string };
+type SavedChat = { id: string; title: string; updated?: string; carry: Mention[]; turns: TutorTurn[] };
+/** A chat's name until its first reply names it: his first message, on one line. */
+const firstLine = (m: string) => { const s = m.replace(/\s+/g, " ").trim(); return s.length > 60 ? `${s.slice(0, 59).trimEnd()}…` : s; };
+/** What is saved of a turn: not the words of a reply still being written. */
+const settled = ({ partial: _p, searching: _s, kept, ...t }: TutorTurn): TutorTurn => (kept && kept !== "adding" ? { ...t, kept } : t);
+
+/** The tutor's chat, his draft and its requests, held in App so closing the panel or moving around the
+ *  app loses nothing and never asks twice. Every chat is saved in the library (D172, `ore chat`) after each
+ *  message and reply, so New chat sets nothing aside to lose: the old one is in the list of chats, and a
+ *  reply still being written for it lands in its file. */
 export function useTutorChat(notify: Notify) {
   const [turns, setTurns] = useState<TutorTurn[]>([]);
   const [draft, setDraft] = useState<TutorDraft>({ input: "", mentions: [] });
   const now = useRef(turns);
   const update = (f: (t: TutorTurn[]) => TutorTurn[]) => setTurns((now.current = f(now.current)));
-  // Every change to a turn, by id, so a thread set aside by New chat comes back with what landed meanwhile.
-  const landed = useRef(new Map<string, Partial<TutorTurn>>());
-  const patch = (id: string, p: Partial<TutorTurn>) => {
-    landed.current.set(id, { ...landed.current.get(id), ...p });
-    update((ts) => ts.map((t) => (t.id === id ? { ...t, ...p } : t)));
+  // The chat on screen: its id (its first turn's) and name; null until he sends its first message.
+  const [meta, setMetaState] = useState<{ id: string; title: string } | null>(null);
+  const metaNow = useRef(meta);
+  const setMeta = (m: { id: string; title: string } | null) => setMetaState((metaNow.current = m));
+  // Turns whose reply is on its way in this run of the app (a turn saved with none was cut off by a quit).
+  const flying = useRef(new Set<string>());
+  // One write at a time, in order, so a reply never lands under an older copy of its chat.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  // Reads of a saved chat wait their turn too, so none reads a copy older than a write already asked for.
+  const serial = <T,>(f: () => Promise<T>): Promise<T> => {
+    const r = queue.current.then(f);
+    queue.current = r.catch(() => {});
+    return r;
+  };
+  const write = (f: () => Promise<unknown>) => serial(f).catch((e) => notify(errorText(e, "save the chat"), "error"));
+  const save = () => {
+    const m = metaNow.current;
+    if (!m || !now.current.length) return;
+    const chat = { ...m, carry: carryNow.current, turns: now.current.map(settled) };
+    void write(() => oreWith(JSON.stringify(chat), "chat", "--set"));
+  };
+  /** A turn's change, in the chat on screen or, once he has moved on, in its own saved chat. */
+  const patch = (chat: string, id: string, p: Partial<TutorTurn>, title?: string) => {
+    if (metaNow.current?.id === chat) {
+      update((ts) => ts.map((t) => (t.id === id ? { ...t, ...p } : t)));
+      if (title) setMeta({ id: chat, title });
+      if (!("partial" in p && p.partial !== undefined) && !p.searching && !p.searched) save();
+      return;
+    }
+    if (p.partial !== undefined || p.searching || p.searched) return;
+    void write(async () => {
+      // Deleted while the reply was on its way: nothing to put it in.
+      const c = await ore<SavedChat>("chat", chat).catch(() => null);
+      if (!c) return;
+      await oreWith(JSON.stringify({ ...c, ...(title ? { title } : {}), turns: c.turns.map((t) => (t.id === id ? settled({ ...t, ...p }) : t)) }), "chat", "--set");
+    });
   };
   // The @ context in effect (D128.3): the last message's own @s carry to later ones until he @s
   // something else, drops one (its chip's ×) or starts a new chat.
   const [carry, setCarryState] = useState<Mention[]>([]);
   const carryNow = useRef(carry);
   const setCarry = (m: Mention[]) => setCarryState((carryNow.current = m));
-  const drop = (m: Mention) => setCarry(carryNow.current.filter((x) => x.kind !== m.kind || x.id !== m.id));
+  const drop = (m: Mention) => {
+    setCarry(carryNow.current.filter((x) => x.kind !== m.kind || x.id !== m.id));
+    save();
+  };
   const run = async (t: TutorTurn, before: TutorTurn[]) => {
+    const chat = metaNow.current!.id;
+    const first = !before.length;
+    flying.current.add(t.id);
     // The steps of a worked answer he has shown are part of what the tutor said, so a follow-up ("why step
     // 2?") can lean on them; the ones still hidden aren't, so his own try at the next step is his (D142).
     const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).slice(0, stepsShown.get(x.id) ?? 1).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
@@ -85,14 +136,16 @@ export function useTutorChat(notify: Notify) {
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
-      if (p.stream === t.id) patch(t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
+      if (p.stream === t.id) patch(chat, t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
     }).catch(() => () => {});
     try {
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
-      const r = await ore<Reply>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
-      patch(t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], marks: r.marks ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined });
+      const r = await ore<Reply & { title?: string }>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
+      flying.current.delete(t.id);
+      patch(chat, t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], marks: r.marks ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined }, first ? r.title?.trim() || undefined : undefined);
     } catch (e) {
-      patch(t.id, { error: errorText(e, "answer that"), partial: undefined, searching: undefined });
+      flying.current.delete(t.id);
+      patch(chat, t.id, { error: errorText(e, "answer that"), partial: undefined, searching: undefined });
     } finally {
       stop();
     }
@@ -102,7 +155,9 @@ export function useTutorChat(notify: Notify) {
     if (turn.mentions?.length) setCarry(turn.mentions);
     const t = { ...turn, ...(carryNow.current.length ? { pointed: carryNow.current } : {}), id: turnId() };
     const before = now.current;
+    if (!metaNow.current) setMeta({ id: t.id, title: firstLine(t.message) });
     update((ts) => [...ts, t]);
+    save();
     void run(t, before);
   };
   const retry = (id: string) => {
@@ -111,7 +166,6 @@ export function useTutorChat(notify: Notify) {
     const { message, item, title, mentions, pointed } = now.current[i]!;
     stepsShown.delete(id); // a new reply starts its steps from the first
     const t = { id, message, item, title, mentions, pointed };
-    landed.current.delete(id);
     update((ts) => ts.map((x) => (x.id === id ? t : x)));
     void run(t, now.current.slice(0, i));
   };
@@ -120,7 +174,8 @@ export function useTutorChat(notify: Notify) {
     const t = now.current.find((x) => x.id === id);
     const item = firstSource(t?.citations) ?? t?.item;
     if (!t?.card || !t.ai || !item || t.kept) return;
-    const mark = (kept: string | undefined) => patch(id, { kept });
+    const chat = metaNow.current!.id;
+    const mark = (kept: string | undefined) => patch(chat, id, { kept });
     mark("adding");
     try {
       const c = await ore<{ id: string }>("tutor-card", item, opt("card", JSON.stringify(t.card)), opt("ai", JSON.stringify(t.ai)));
@@ -158,25 +213,45 @@ export function useTutorChat(notify: Notify) {
       notify(errorText(e, "add that to your note"), "error");
     }
   };
-  /** A new chat, even while one is thinking (its reply goes to its own thread); Undo brings that thread
-   *  back, with its @ context. */
+  /** A new chat, even while one is thinking (its reply lands in its own saved chat). */
   const fresh = () => {
-    let away = now.current;
-    let awayCarry = carryNow.current;
-    if (!away.length) return;
     update(() => []);
     setCarry([]);
-    const swap = () => {
-      const [back, backCarry] = [away, awayCarry];
-      [away, awayCarry] = [now.current, carryNow.current];
-      update(() => back.map((t) => ({ ...t, ...landed.current.get(t.id) })));
-      setCarry(backCarry);
-    };
-    notify("Chat cleared", "info", async () => swap(), async () => swap());
+    setMeta(null);
+  };
+  /** Opens a saved chat where he left it, with its @ context. A turn saved with no reply, and none on its
+   *  way, was cut off by a quit: it says so and offers Try again. */
+  const open = async (id: string) => {
+    if (metaNow.current?.id === id) return;
+    try {
+      const c = await serial(() => ore<SavedChat>("chat", id));
+      update(() => c.turns.map((t) => (t.reply === undefined && !t.error && !flying.current.has(t.id) ? { ...t, error: "No reply came: Ore closed before it did." } : t)));
+      setCarry(c.carry ?? []);
+      setMeta({ id: c.id, title: c.title });
+    } catch (e) {
+      notify(errorText(e, "open that chat"), "error");
+    }
+  };
+  /** Deletes a saved chat; Undo puts it back where it was in the list (and on screen, if it was open). */
+  const remove = async (id: string) => {
+    // Off the screen first, so a reply landing meanwhile can't save it back.
+    const wasOpen = metaNow.current?.id === id;
+    if (wasOpen) fresh();
+    try {
+      const c = await serial(() => ore<SavedChat>("chat", id, "--delete"));
+      notify(
+        "Chat deleted",
+        "info",
+        () => serial(() => oreWith(JSON.stringify(c), "chat", "--set", "--keep-time")).then(() => (wasOpen && !now.current.length ? open(id) : undefined)),
+        () => serial(() => ore("chat", id, "--delete")).then(() => (metaNow.current?.id === id ? fresh() : undefined)),
+      );
+    } catch (e) {
+      notify(errorText(e, "delete that chat"), "error");
+    }
   };
   /** A web page a reply cites, in his browser. */
   const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
-  return { turns, draft, setDraft, carry, drop, ask, retry, keep, quote, fresh, openLink };
+  return { turns, draft, setDraft, carry, drop, ask, retry, keep, quote, fresh, open, remove, current: meta, openLink };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -330,12 +405,11 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           <div className="divider" role="separator" aria-orientation="vertical" aria-label="Resize the tutor" {...divider} />
         </Hint>
       )}
-      <div className="tutor-quiz">
-        <Hint text={quizSkills.length ? `Review your due cards in ${quizSkills.map((s) => skills.find((k) => k.id === s)?.name ?? s).join(", ")}` : "Review your due cards"}>
-          <button onClick={() => onQuiz(quizSkills)}>Quiz me</button>
-        </Hint>
-      </div>
+      <ChatList chat={chat} onPicked={() => field.current?.focus()} />
       <div className="tutor-head">
+        <Hint text={quizSkills.length ? `Review your due cards in ${quizSkills.map((s) => skills.find((k) => k.id === s)?.name ?? s).join(", ")}` : "Review your due cards"}>
+          <button className="tutor-quiz" onClick={() => onQuiz(quizSkills)}>Quiz me</button>
+        </Hint>
         <Hint text="New chat">
           <button className="icon-btn" aria-label="New chat" disabled={!turns.length} onClick={() => { chat.fresh(); field.current?.focus(); }}>
             <Plus size={14} aria-hidden="true" />
@@ -715,6 +789,77 @@ function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; o
         </div>
       )}
     </>
+  );
+}
+
+/** The chat's name, which opens the list of saved chats (D172, Notion AI's chat switcher): find one by
+ *  name, grouped by day, one click opens it where he left off; the bin on a row or its right-click menu
+ *  deletes it, with Undo. */
+function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<ChatRow[] | null>(null);
+  const [query, setQuery] = useState("");
+  const load = () => void ore<ChatRow[]>("chat").then(setRows, () => setRows([]));
+  // The chat on screen as it is now, though its last save may still be on its way.
+  const cur = chat.current;
+  const all = !rows ? [] : cur ? [{ id: cur.id, title: cur.title, updated: rows.find((r) => r.id === cur.id)?.updated ?? new Date().toISOString() }, ...rows.filter((r) => r.id !== cur.id)] : rows;
+  const shown = all.filter((r) => r.title.toLowerCase().includes(query.trim().toLowerCase()));
+  const pick = (id: string) => {
+    setOpen(false);
+    void chat.open(id);
+  };
+  const remove = (id: string) => {
+    setRows((rs) => rs?.filter((r) => r.id !== id) ?? null);
+    void chat.remove(id).then(load); // as the library has it, should the delete fail
+  };
+  const title = chat.current?.title ?? "New chat";
+  return (
+    <Popover.Root open={open} onOpenChange={(o) => { setOpen(o); setQuery(""); if (o) load(); }}>
+      <Hint text="Your chats">
+        <Popover.Trigger asChild>
+          <button className="tutor-title" aria-label={chat.current ? `Chats: ${title}` : "Chats"}>
+            <span>{title}</span>
+            <CaretDown size={14} aria-hidden="true" />
+          </button>
+        </Popover.Trigger>
+      </Hint>
+      <Popover.Portal>
+        <Popover.Content className="popover menu tutor-chats" side="bottom" align="start" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (e.preventDefault(), onPicked())}>
+          <Command
+            label="Chats"
+            loop
+            shouldFilter={false}
+          >
+            <Command.Input className="menu-input" placeholder="Find a chat…" value={query} onValueChange={setQuery} autoFocus />
+            <Command.List>
+              {rows && !shown.length && <Command.Empty className="tutor-chats-none">{query.trim() ? "No chat by that name" : "No chats yet"}</Command.Empty>}
+              {chatGroups(shown).map((g) => (
+                <Command.Group key={g.heading} heading={g.heading}>
+                  {g.rows.map((r) => (
+                    <WithMenu key={r.id} actions={[{ id: "delete", label: "Delete chat", danger: true, run: () => remove(r.id) }]}>
+                      <Command.Item value={r.id} onSelect={() => pick(r.id)}>
+                        <span className="menu-label">{r.title}</span>
+                        {r.id === chat.current?.id && <Check size={12} className="check" aria-label="Open" />}
+                        <Hint text="Delete chat" side="right">
+                          <button
+                            className="icon-btn tutor-chat-del"
+                            aria-label={`Delete “${r.title}”`}
+                            tabIndex={-1}
+                            onClick={(e) => (e.stopPropagation(), remove(r.id))}
+                          >
+                            <Trash size={12} aria-hidden="true" />
+                          </button>
+                        </Hint>
+                      </Command.Item>
+                    </WithMenu>
+                  ))}
+                </Command.Group>
+              ))}
+            </Command.List>
+          </Command>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

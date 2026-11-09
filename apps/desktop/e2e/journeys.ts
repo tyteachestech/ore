@@ -5,6 +5,7 @@
 //   bun run e2e -- highlight         only journeys whose name contains "highlight"
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
+//   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
 import { chromium, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +17,8 @@ const FIXTURES = join(import.meta.dir, "../../../packages/core/test/fixtures/int
 const PORT = Number(process.env.ORE_E2E_PORT ?? 1450);
 const BRIDGE = process.env.E2E_URL ? Number(process.env.E2E_BRIDGE ?? 1421) : Number(process.env.ORE_E2E_MOCK_PORT ?? 1451);
 const only = process.argv[2];
+const [shard, shards] = (process.env.ORE_E2E_SHARD ?? "1/1").split("/").map(Number) as [number, number];
+if (!(Number.isInteger(shard) && Number.isInteger(shards) && shard >= 1 && shard <= shards)) throw new Error(`ORE_E2E_SHARD=${process.env.ORE_E2E_SHARD}: want i/n, as 2/4`);
 /** The seeded library (or, against a mock already running, $ORE_LIBRARY): for state no `ore` command makes. */
 let LIB = process.env.ORE_LIBRARY ?? "";
 
@@ -160,6 +163,23 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.getByLabel("Link, file path or text").fill("# Interleaving in practice\n\nMixing problem types forces you to choose a strategy each time, which is what a test asks of you. Blocked practice feels smoother but teaches less.");
   await page.keyboard.press("Enter");
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
+});
+
+journey("add a pasted ChatGPT answer: its headings and table come in, which its plain text loses", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByLabel("Link, file path or text");
+  const text = "Gaps that work\nReview a little each day, and let the gaps grow as the answers come easily.\nTest in\tBest gap\nOne year\tThree to four weeks";
+  const html = "<meta charset='utf-8'><h2>Gaps that work</h2><p>Review a little each day, and let the gaps grow as the answers come easily.</p><table><thead><tr><th>Test in</th><th>Best gap</th></tr></thead><tbody><tr><td>One year</td><td>Three to four weeks</td></tr></tbody></table>";
+  await box.evaluate((el, [text, html]) => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text!);
+    dt.setData("text/html", html!);
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, [text, html]);
+  await box.fill(text); // a synthetic paste inserts nothing: the text the paste would have put in
+  await page.keyboard.press("Enter");
+  await page.locator(".doc table").getByText("Three to four weeks").waitFor();
+  await page.locator(".doc h2").getByText("Gaps that work").waitFor();
 });
 
 journey("add: File keeps what he typed in the box; cancelling the picker keeps it too, and picked files join it", async (page) => {
@@ -457,7 +477,7 @@ journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources
   await page.keyboard.press("Escape");
   await until("Esc closes it", async () => (await tutor.count()) === 0);
   await page.getByRole("button", { name: "Open the tutor" }).click();
-  await tutor.getByText("Why does this work?").waitFor();
+  await tutor.locator(".ask-me").getByText("Why does this work?").waitFor();
   // It floats by default; docked, it takes the side panel's place, and the panel comes back when it closes.
   const side = page.locator(".mynotes");
   await side.waitFor();
@@ -663,7 +683,7 @@ journey("tutor draft: a half-written message and its @ mention survive closing a
   await page.keyboard.press("Escape");
 });
 
-journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ replaces them, New chat clears them and Undo restores them, × drops one", async (page) => {
+journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ replaces them, New chat clears them and reopening the chat restores them, × drops one", async (page) => {
   const asked: string[][] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
@@ -699,7 +719,9 @@ journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ repla
   if (await chip("learning").count()) throw new Error("the replaced skill still shows");
   await fresh.click();
   await until("New chat clears it", async () => (await chip(AGENTS).count()) === 0);
-  await page.locator(".toast", { hasText: "Chat cleared" }).getByRole("button", { name: "Undo" }).click();
+  // The chat is saved (D172): picking it from the list brings it back with its @ context.
+  await tutor.getByRole("button", { name: /^Chats/ }).click();
+  await page.locator(".tutor-chats [cmdk-item]", { hasText: "Explain @learning spacing" }).first().click();
   await chip(AGENTS).waitFor(); // back with its thread
   await tutor.getByRole("button", { name: `Leave “${AGENTS}” out` }).click();
   await until("× drops it", async () => (await chip(AGENTS).count()) === 0);
@@ -708,7 +730,7 @@ journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ repla
   await page.keyboard.press("Meta+j");
 });
 
-journey("tutor pending: closing mid-reply asks once; a new chat keeps its own reply, the old one lands in the old chat, and Undo brings that chat back", async (page) => {
+journey("tutor pending: closing mid-reply asks once; a new chat keeps its own reply, the old one lands in the old chat, which the list of chats opens with it", async (page) => {
   const asked: string[] = [];
   let release: (() => void) | undefined;
   const reply = (text: string) => JSON.stringify({ reply: text, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } });
@@ -735,7 +757,7 @@ journey("tutor pending: closing mid-reply asks once; a new chat keeps its own re
   if (asked.length !== 1) throw new Error(`reopening asked again: ${asked.length} requests`);
   // A new chat while it thinks: its own question gets its own reply.
   await fresh.click();
-  await page.locator(".toast", { hasText: "Chat cleared" }).getByRole("button", { name: "Undo" }).waitFor();
+  if (await page.locator(".toast", { hasText: "Chat cleared" }).count()) throw new Error("New chat still says it cleared something");
   await field.fill("Second question");
   await page.keyboard.press("Enter");
   await tutor.getByText("Second reply").waitFor();
@@ -745,15 +767,112 @@ journey("tutor pending: closing mid-reply asks once; a new chat keeps its own re
   await page.waitForTimeout(300);
   if (await tutor.getByText("First reply").count()) throw new Error("the old reply landed in the new chat");
   await tutor.getByText("Second reply").waitFor();
-  // Undo puts the old chat back, with the reply that came while it was away; redo returns to the new one.
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press("Meta+z");
+  // The old chat is in the list, with the reply that landed while it was away (D172); the new one is too.
+  const chats = tutor.getByRole("button", { name: /^Chats/ });
+  await chats.click();
+  await page.locator(".tutor-chats [cmdk-item]", { hasText: "First question" }).click();
   await tutor.getByText("First reply").waitFor();
-  if (await tutor.getByText("Second question").count()) throw new Error("undo kept the new chat");
-  await page.keyboard.press("Meta+Shift+z");
+  if (await tutor.getByText("Second question").count()) throw new Error("the old chat opened with the new one's turns");
+  await chats.click();
+  await page.locator(".tutor-chats [cmdk-item]", { hasText: "Second question" }).click();
   await tutor.getByText("Second reply").waitFor();
-  if (await tutor.getByText("First question").count()) throw new Error("redo kept the old chat");
+  if (await tutor.getByText("First question").count()) throw new Error("the new chat opened with the old one's turns");
   await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
+journey("tutor chats: every chat is saved and listed by day under its name; Find narrows the list, a click opens one, a reload keeps them, and a deleted chat comes back with Undo (D172)", async (page) => {
+  const reply = (text: string, title: string) => JSON.stringify({ reply: text, citations: [], general: false, hint: false, exercise: null, card: null, title, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } });
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    const message = JSON.parse(body).args[1] as string;
+    await route.fulfill({ contentType: "application/json", body: message.startsWith("Boxes") ? reply("Leitner boxes space cards out.", "Leitner boxes") : reply("Mixing topics helps you choose.", "Interleaving") });
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const chats = tutor.getByRole("button", { name: /^Chats/ });
+    if ((await chats.textContent()) !== "New chat") throw new Error("an empty chat isn't called New chat");
+    await field.fill("Boxes: how do Leitner boxes work?");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("Leitner boxes space cards out.").waitFor();
+    // The tutor's first reply names the chat.
+    await until("the reply names the chat", async () => (await chats.getAttribute("aria-label")) === "Chats: Leitner boxes");
+    await fresh.click();
+    await field.fill("Why interleave topics?");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("Mixing topics helps you choose.").waitFor();
+    await chats.click();
+    const list = page.locator(".tutor-chats");
+    await list.getByText("Today").waitFor();
+    const rows = () => list.locator("[cmdk-item] .menu-label").allTextContents();
+    const top = (await rows()).slice(0, 2);
+    if (top.join("|") !== "Interleaving|Leitner boxes") throw new Error(`the newest chat isn't first: ${top}`);
+    await page.keyboard.type("leit");
+    await until("Find narrows the list", async () => (await rows()).join("|") === "Leitner boxes");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("Leitner boxes space cards out.").waitFor();
+    // A reload (a quit and relaunch) starts a new chat, and the saved ones are still listed.
+    await page.reload();
+    await page.waitForTimeout(1500);
+    await page.keyboard.press("Meta+j");
+    if ((await chats.textContent()) !== "New chat") throw new Error("a relaunch didn't start a new chat");
+    await chats.click();
+    await list.locator("[cmdk-item]", { hasText: "Interleaving" }).hover();
+    await list.getByRole("button", { name: "Delete “Interleaving”" }).click();
+    await until("the deleted chat leaves the list", async () => !(await rows()).includes("Interleaving"));
+    await page.keyboard.press("Escape");
+    await page.locator(".toast", { hasText: "Chat deleted" }).getByRole("button", { name: "Undo" }).click();
+    await until("Undo puts it back", async () => {
+      const r = await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["chat"] }) }).then((x) => x.json());
+      return (r as { title: string }[]).some((c) => c.title === "Interleaving");
+    });
+    await chats.click();
+    await list.locator("[cmdk-item]", { hasText: "Interleaving" }).click();
+    await tutor.getByText("Mixing topics helps you choose.").waitFor();
+  } finally {
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Meta+j");
+});
+
+journey("tutor chats: deleting a chat while its reply is being written keeps it deleted, with no error, and the new chat goes on (D172)", async (page) => {
+  let release: (() => void) | undefined;
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    await new Promise<void>((ok) => (release = ok));
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Late reply", citations: [], general: false, hint: false, exercise: null, card: null, title: "Doomed chat", ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) });
+  });
+  const listed = async () => ((await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["chat"] }) }).then((x) => x.json())) as { title: string }[]).map((c) => c.title);
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("Doomed question");
+    await page.keyboard.press("Enter");
+    await until("the call is on its way", async () => !!release);
+    await tutor.getByRole("button", { name: /^Chats/ }).click();
+    const row = page.locator(".tutor-chats [cmdk-item]", { hasText: "Doomed question" }).first();
+    await row.hover();
+    await row.getByRole("button", { name: /^Delete/ }).click();
+    await page.keyboard.press("Escape");
+    await until("it is deleted", async () => !(await listed()).includes("Doomed question"));
+    release!();
+    await page.waitForTimeout(800);
+    const names = await listed();
+    if (names.includes("Doomed question") || names.includes("Doomed chat")) throw new Error("the late reply saved the deleted chat back");
+    if (await page.locator(".toast", { hasText: "save the chat" }).count()) throw new Error("the late reply showed a save error");
+    if (await tutor.getByText("Late reply").count()) throw new Error("the late reply landed in the new chat");
+  } finally {
+    release?.();
+    await page.unroute(/\/ore$/);
+  }
   await page.keyboard.press("Meta+j");
 });
 
@@ -996,7 +1115,7 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   const replies = [
     { reply: "Tell these two apart.", citations: [], general: false, hint: false, exercise, card: null, marks: [] },
     { reply: "A is right. B: who decides the steps?", citations: [], general: false, hint: false, exercise: null, card, marks: [{ point: card.rubric[0], covered: true, quote: "same steps each time" }, { point: card.rubric[1], covered: false, quote: "" }] },
-  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@11" } }));
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }));
   const asked: string[] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
@@ -1044,7 +1163,7 @@ journey("tutor: words selected in a reply go into the source note as a quote, Un
     const args = (JSON.parse(body) as { args: string[] }).args;
     asked.push(args[1]!);
     item ||= args.find((a) => a.startsWith("--item="))!.slice(7);
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `${said} That is the whole difference.`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@11" } }) });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `${said} That is the whole difference.`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) });
   });
   await page.keyboard.press("Meta+j");
   const tutor = page.getByRole("complementary", { name: "Tutor" });
@@ -2634,7 +2753,11 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
     await page.mouse.move(box.x + 30, box.y + box.height / 2);
     const g = page.locator(".block-grip");
     await g.waitFor();
-    return { g: (await g.boundingBox())!, box };
+    const at = (await g.boundingBox())!;
+    // On the way left to it, over the bullets and the gutter, the handle stays on this item (it jumped to the list's first).
+    await page.mouse.move(at.x + 10, at.y + 12, { steps: 12 });
+    if ((await g.boundingBox())?.y !== at.y) throw new Error(`the handle left “${text}” on the way to it`);
+    return { g: at, box };
   };
   await openSource(page, TESTING);
   const { g } = await grip("Confidence + correction");
@@ -5458,6 +5581,31 @@ journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the sugges
   }
 });
 
+journey("skill importance (D173): Importance ▸ Focus with ⌘Z, Archive folds it under Archived and out of review, Bring back puts it in its place", async (page) => {
+  type S = { id: string; priority: string; archived?: boolean };
+  const habits = async () => ((await ore("skills")) as S[]).find((s) => s.id === "habits")!;
+  const row = page.locator("nav .side-main", { hasText: "Habits" });
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Importance" }).hover();
+  await page.getByRole("menuitemcheckbox", { name: "Focus" }).click();
+  await until("Habits is Focus", async () => (await habits()).priority === "P1");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back to Light", async () => (await habits()).priority === "P3");
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Archive skill" }).click();
+  await until("Habits is archived", async () => !!(await habits()).archived);
+  const fold = page.getByRole("group", { name: "Archived" });
+  await fold.getByRole("button", { name: "Archived" }).click();
+  await fold.locator(".side-main", { hasText: "Habits" }).click();
+  // Its own cards wait: Start review on Home never offers it.
+  const due = (await ore("due")) as { skills: string[] }[];
+  if (due.some((e) => e.skills.length === 1 && e.skills[0] === "habits")) throw new Error("an archived skill's card is still due");
+  await page.getByRole("button", { name: "Bring back" }).click();
+  await until("Habits is back", async () => !(await habits()).archived);
+  await page.locator(".skill-importance").waitFor();
+  if (await fold.count()) throw new Error("the Archived group stayed with nothing in it");
+});
+
 type Rigged = { __ORE_FAIL?: Record<string, string>; __ORE_SLOW?: Record<string, number> };
 const failNext = (page: Page, command: string, why: string | null) => page.evaluate(([c, why]) => void ((window as unknown as Rigged).__ORE_FAIL = why ? { [c!]: why } : {}), [command, why] as const);
 
@@ -5663,8 +5811,9 @@ journey("a11y: a row is one control with its actions beside it (axe nested-inter
 // —— run ——
 
 let failed = 0;
-for (const [name, run] of journeys) {
-  if (only && !name.includes(only)) continue;
+const picked = journeys.filter(([name]) => !only || name.includes(only));
+const per = Math.ceil(picked.length / shards);
+for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
   const page = await open(url);
   const t0 = Date.now();
   try {
@@ -5683,7 +5832,7 @@ for (const [name, run] of journeys) {
 }
 await browser.close();
 // The style rules a regex can't see (nested frames, off-ramp font sizes), on the same mock.
-if (!only) {
+if (!only && shard === shards) {
   const style = Bun.spawnSync(["bun", join(MOCK, "style-check.ts"), url], { env: { ...process.env, ORE_BRIDGE: String(BRIDGE) }, stdout: "inherit", stderr: "inherit" });
   if (style.exitCode !== 0) { failed++; console.log("FAIL  style-check"); } else console.log("ok    style-check");
 }

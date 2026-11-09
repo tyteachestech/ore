@@ -20,7 +20,7 @@ If you edit `doc.md` body text, run `ore doctor --fix` afterwards so highlights 
 
 ```
 AGENTS.md                      this file (CLAUDE.md links here)
-skills.yaml                    Tyler's skills: id, name, priority P1|P2|P3, hook; optional goal (what he could show he can do; tries are `## Goal try, <date>` in the skill note), icon, color, collection
+skills.yaml                    Tyler's skills: id, name, priority P1 Focus|P2 Normal|P3 Light (new skills start P3), hook; optional archived: true (its cards wait out of review); optional goal (what he could show he can do; tries are `## Goal try, <date>` in the skill note), icon, color, collection
 topics/<slug>.md               frontmatter: id, name, status (active; older research topics are wanted), skills[], aliases[]; body: summary
 items/<yyyy>/<slug>-<id>/
   thumbnail.<ext>              picture shown in lists and the reader (absent for pasted text)
@@ -35,6 +35,7 @@ cards/<id>.md                  one review item per file; kind card (Q --- A) or 
 cards/<id>.variants.jsonl      remixed versions of that card, append-only; write only through `ore`
 reviews/<yyyy>-<mm>[.<device>].jsonl   append-only review log, one file per device; the source of truth for scheduling
 sessions/<yyyy>-<mm>[.<device>].jsonl  review session start/end receipts
+chats/<id>.json                his tutor chats as the app shows them (title, @ context, turns); written only through `ore chat`
 inbox/                         unused (no watcher); add files with `ore add`
 .index/library.sqlite          search index and cached card states (gitignored)
 .ore/                          lock, open-session marker, background logs (gitignored)

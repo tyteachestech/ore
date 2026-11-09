@@ -16,7 +16,8 @@ export function fileKind(path: string): FileKind | null {
   return ext === "html" || ext === "htm" || ext === "pptx" ? "page" : null;
 }
 
-export type Entry = { kind: "link"; url: string } | { kind: "file"; path: string } | { kind: "text"; text: string } | { kind: "tab" };
+/** Text pasted from a page (a ChatGPT answer) carries its HTML too, which keeps what the plain text loses. */
+export type Entry = { kind: "link"; url: string } | { kind: "file"; path: string } | { kind: "text"; text: string; html?: string } | { kind: "tab" };
 
 const FILE = new RegExp(`^(/|~/)\\S.*\\.(${FILE_TYPES.join("|")})$`, "i");
 const WWW = /^www\.[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i;
@@ -49,13 +50,30 @@ export function entries(raw: string): Entry[] {
   return each.every((e) => e) ? (each as Entry[]) : [{ kind: "text", text }];
 }
 
+/** What a paste is, plain and as HTML. */
+export type Pasted = { text: string; html: string | null };
+
+/** The clipboard's HTML when it holds what its plain text loses (images, tables, headings, code, math);
+ *  null for plain or lightly styled text, which reads the same as typed. */
+export function pastedHtml(d: DataTransfer | null): string | null {
+  const html = d?.getData("text/html") ?? "";
+  return /<(img|table|h[1-6]|pre|math)[\s>]/i.test(html) ? html : null;
+}
+
+/** The entries, with the paste's HTML on its text when the text is still the paste as it came. */
+export function withHtml(list: Entry[], pasted: Pasted | null): Entry[] {
+  const e = list.length === 1 ? list[0]! : null;
+  const same = (a: string) => a.replace(/\r\n?/g, "\n").trim();
+  return e?.kind === "text" && pasted?.html && same(e.text) === same(pasted.text) ? [{ ...e, html: pasted.html }] : list;
+}
+
 /** A link Ore adds lesson by lesson (D79): a Claude Academy course or lesson, a YouTube playlist (as core's isCourseUrl). */
 export const isCourseLink = (url: string) =>
   /^https?:\/\/(?:www\.)?academy\.claude\.com\/courses\/[\w-]+(?:\/[\w-]*)?\/?(?:[?#].*)?$/.test(url) || /^https?:\/\/(?:www\.|m\.)?youtube\.com\/playlist\?(?:.*&)?list=[\w-]+/.test(url);
 
 /** `ore add` arguments and stdin for one entry; a course link adds every lesson. */
 export const addArgs = (e: Entry): { args: string[]; stdin: string | null } =>
-  e.kind === "text" ? { args: ["add", "--stdin"], stdin: e.text }
+  e.kind === "text" ? (e.html ? { args: ["add", "--stdin", "--html"], stdin: e.html } : { args: ["add", "--stdin"], stdin: e.text })
   : e.kind === "tab" ? { args: ["add", "--tab"], stdin: null }
   : e.kind === "link" && isCourseLink(e.url) ? { args: ["add", e.url, "--course"], stdin: null }
   : { args: ["add", e.kind === "link" ? e.url : e.path], stdin: null };

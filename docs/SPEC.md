@@ -10,7 +10,7 @@ capture → (AI: prequestions, skills, topics) → read + highlight (one highlig
 
 ```
 AGENTS.md                      # rules for agents editing this folder (CLAUDE.md symlinks to it)
-skills.yaml                    # Tyler's skills: id, name, priority (P1|P2|P3), hook; optional goal (D102), icon (mc:<name>, a pixel skill icon, D157; an emoji or ph:<name> from before it draws nothing), color, collection (D36); optional `review: {goal_minutes, weekdays_only, new_per_day, remix, plan, reminder}` (D60, D66, D67; defaults 10, false, 10, true, "", ""; reminder is local "HH:MM")
+skills.yaml                    # Tyler's skills: id, name, priority (P1 Focus|P2 Normal|P3 Light, D173), hook; optional archived (D173); optional goal (D102), icon (mc:<name>, a pixel skill icon, D157; an emoji or ph:<name> from before it draws nothing), color, collection (D36); optional `review: {goal_minutes, weekdays_only, new_per_day, remix, plan, reminder}` (D60, D66, D67; defaults 10, false, 10, true, "", ""; reminder is local "HH:MM")
 topics/<slug>.md               # frontmatter: id, name, status (active|wanted), skills[], aliases[]; body: AI summary
 items/<yyyy>/<slug>-<id>/
   doc.md                       # canonical text + frontmatter (below)
@@ -29,6 +29,7 @@ cards/<id>.md                  # one review item per file (kind card|prompt)
 cards/<id>.variants.jsonl      # remixed versions of that card (D66), append-only with `rev` like annotations.jsonl
 reviews/<yyyy>-<mm>.<device>.jsonl    # append-only review log, one per device (D78); source of truth for scheduling
 sessions/<yyyy>-<mm>.<device>.jsonl   # session start/end receipts (habit metric)
+chats/<id>.json                # tutor chats (D172): {id, title, created, updated, carry, turns}, the turns as the app shows them; written only through `ore chat`
 inbox/                         # dropped watcher (D95): a file added from here with `ore add` is removed after ingest
 .index/feeds.json              # fetched Feed posts (D107), rebuilt by `ore feed --refresh`
 .index/library.sqlite          # FTS5 index + materialized card states; gitignored; `ore reindex` rebuilds
@@ -129,7 +130,7 @@ Each device appends to its own file (`<device>` is `ORE_DEVICE` or the computer'
 
 ## 3. Scheduling
 - ts-fsrs, FSRS-6 defaults. Desired retention per card = max over its skills' priority (P1 0.92, P2 0.88, P3 0.80; D65).
-- Due queue: all cards with `due <= now` plus drafts never seen. Drafts take every fifth place while due cards last (D144). Order of the due cards: interleave topics round-robin; within a topic, sort by `priority_weight × (1 − retrievability)`; place `concept` items that share a topic adjacent; keep `definition` items from one source together. A draft first comes up the day after it was written; new drafts enter only while the daily goal has room after the due cards, up to `review.new_per_day` (D65).
+- Due queue: all cards with `due <= now` plus drafts never seen, except cards filed only under archived skills (D173). Drafts take every fifth place while due cards last (D144). Order of the due cards: interleave topics round-robin; within a topic, sort by `priority_weight × (1 − retrievability)`; place `concept` items that share a topic adjacent; keep `definition` items from one source together. A draft first comes up the day after it was written; new drafts enter only while the daily goal has room after the due cards, up to `review.new_per_day` (D65).
 - A rating of 1 schedules one relearn pass later in the same session, or the next one that day if the session ends first (the goal closing, D65).
 - Remixing (D66) changes how a card is asked, never when: one FSRS state per card. Variants start after two Good or Easy reviews of the original since the last miss and rotate variant, variant, original; a miss returns to the original; each variant is shown at most twice, never twice in a row.
 - Never compress intervals to catch up. Never alter stability/difficulty for priority.
@@ -140,7 +141,7 @@ All commands accept `--json`. Exit non-zero with a one-line error on failure. Ne
 
 ```
 ore init [path]                       create library skeleton, AGENTS.md, skills.yaml, git init
-ore add <url|path> | --stdin | --tab [--skill s] [--type t] [--for <q>] [--no-enrich]   ingest → items/, status inbox → {id, title, type, path, enrich: started|skipped}; --stdin pasted text as Markdown, --tab the frontmost Safari or Chrome page (D96), --for links it to a question (D75); triggers `enrich` in background unless --no-enrich
+ore add <url|path> | --stdin [--html] | --tab [--skill s] [--type t] [--for <q>] [--no-enrich]   ingest → items/, status inbox → {id, title, type, path, enrich: started|skipped}; --stdin pasted text as Markdown (--html: the paste's HTML, its headings, tables, math, code and images kept, images saved beside it), --tab the frontmost Safari or Chrome page (D96), --for links it to a question (D75); triggers `enrich` in background unless --no-enrich
 ore snippet --text|--stdin [--url] [--app] [--intent] [--note] [--skill s] [--no-enrich]   capture a selection as a snippet item + annotation
 ore ls [--status] [--skill] [--topic] [--archived]   items (archived ones only with --archived); JSON adds dir and source_file (absolute; the original kept at capture, if any), thumbnail (absolute; thumbnail.* beside doc.md, D77) and has_notes (the source note has text)
 ore backfill [item]   fill in missing thumbnails and PDF authors on sources added before D77 (all sources without an item)
@@ -173,8 +174,9 @@ ore course preview <url> | set <course> [--title t] [--skills a,b] | archive <co
 ore feed [--refresh] | find <url> | follow <url> [--skill s] | unfollow <feed> | arrange '["<feed url>",…]' | set <feed> [--name n] [--skill s] | read|unread <post url>… | open <post url> | close <item>   the Feed (D107): posts of the last 14 days; open reads a post as a preview (`preview` set, never listed), close keeps it only if it has a highlight or a source note, else deletes it
 ore edit <item> [--title t] [--author a] [--skills a,b]   rename a source, set its author ("" clears it), or file it under exactly these skills ("" for none); its cards follow, its topics gain new ones
 ore skills                            list skills (id, name, priority, hook, goal, icon, color, collection)
-ore skills set <skill> [--name n] [--icon mc:name] [--color gray|red|orange|yellow|green|teal|blue|purple|pink] [--collection c] [--hook "why"] [--goal "what I could show"]   --name renames it (the ID stays, so links hold); "" clears any other field; hook is his one line on why (≤140 chars, D63), goal what he could show he can do (≤140 chars, D102); edits skills.yaml in place, keeping comments
-ore skills add <name> [--collection c]   new skill at P2 (the sidebar's + on a section header); refuses a name that matches an existing skill
+ore skills set <skill> [--name n] [--priority P1|P2|P3] [--icon mc:name] [--color gray|red|orange|yellow|green|teal|blue|purple|pink] [--collection c] [--hook "why"] [--goal "what I could show"]   --name renames it (the ID stays, so links hold); "" clears any other field; hook is his one line on why (≤140 chars, D63), goal what he could show he can do (≤140 chars, D102); edits skills.yaml in place, keeping comments
+ore skills add <name> [--collection c]   new skill, Light (P3, D173) (the sidebar's + on a section header); refuses a name that matches an existing skill
+ore skills archive <skill> [--undo]   archive a skill (D173): out of the sidebar's list, the due queue (cards filed only under archived skills), Home and enrich; --undo brings it back. Filing a source under it brings it back too
 ore skills arrange '<layout json>'   the sidebar in one write: [{"collection":"Work","skills":["ai",...]},{"collection":"","skills":[...]}], every skill exactly once; sorts skills.yaml into that order (a collection sits where its first skill is) and sets or clears each collection. Drag, Move to, renaming, reordering or deleting a collection, and their Undo all use it
 ore skills rm <skill> [--archive]      delete a skill: drops it from skills.yaml and untags its sources, cards and topics (cards keep reviewing, the skill note stays on disk); --archive also archives sources filed only under it
 ore suggested-skill <item> accept|dismiss|undo <json>   accept creates the suggested skill (P2) if new and files the item, its cards and topics under it; undo takes back an accept (its `undo` record) or a dismiss
@@ -195,6 +197,7 @@ ore grade <card> --answer "<text>" [--variant v]   AI grades against rubric (the
 ore ask <card> --message "<text>" [--answer "<his>"] [--session id] [--variant v]   Ask about this (D61): one chat turn on his plan → reply, proposal (a better card or null; apply with card set), session (pass back to continue)
 ore ask-library "<question>" [--earlier <json>]   Ask your library: retrieves passages through the FTS5 index (no embeddings), the AI answers only from them → {found, answer with [n] markers, citations[{n, item, title, heading, quote, start, end}]}; found false says the library doesn't cover it (no AI call when no source has the words)
 ore tutor "<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--stream <id>]   The tutor (D128): one chat turn over the open source's and the @-mentioned sources' passages first, then the library's (only the @-mentioned skills' sources when any), then the library's → {reply with [n] markers, citations[{n, item, title, heading, quote, start, end} or, from a web search when his sources don't hold it (D137), {n, url, title, site, quote}], general, searched}; general true marks a reply from the AI's own knowledge, hint true a reply that holds back the answer (the app offers Show me), card a card worth keeping or null; practice gets hints, not answers; --stream <id> writes {"progress": {stream: id, reply}} lines on stderr as the reply is written, and {stream: id, searching: true} when a web search starts (D138; claude only)
+ore chat [<id> [--set [--keep-time] | --delete]]   the tutor's saved chats (D172): list (last changed first), print one, replace one with the chat JSON on stdin, or delete one (prints it, for Undo)
 ore tutor-card <source> --card <json> --ai <json>   keep the card a tutor reply proposed: a draft (from: tutor) on that source, with its skills, first topic and the reply's ai stamp
 ore recall <item> --text "<text>"     store free recall (clears old feedback), append to the source note under "Recall" → {item, recall: {text, at}, notes}
 ore recall <item> --feedback          AI feedback on recall + after-answers + section lines, stored in recall.feedback → {item, feedback, questions: [{n, feedback}], missed, section_lines}

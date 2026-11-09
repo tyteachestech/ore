@@ -10,8 +10,8 @@ import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems,
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
-import { setItemSkills } from "../skills.ts";
-import { withImages } from "./assets.ts";
+import { loadSkills, setItemSkills, unarchiveFiled } from "../skills.ts";
+import { saveImages, withImages } from "./assets.ts";
 import { BOT, cleanAuthor, cleanDate, FROM_TAB, refusal, wordCount } from "./check.ts";
 import { isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./course.ts";
 import { pageDraft } from "./page.ts";
@@ -387,7 +387,13 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   const item = same ? await keep(lib, same, opts) : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview });
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same) await makeThumbnail(item);
+  if (!opts.preview) await unarchive(lib, opts.skills); // a Feed post read as a preview isn't filed
   return item;
+}
+
+/** A new source filed under an archived skill brings the skill back (D173). */
+export async function unarchive(lib: Library, skills: string[] | undefined): Promise<void> {
+  if (skills?.length && loadSkills(lib).skills.some((s) => s.archived && skills.includes(s.id))) await withLock(paths.lock(lib), () => unarchiveFiled(lib, skills));
 }
 
 /** The source already here with this text (a file dropped twice, text pasted again), by the hash createItem
@@ -428,6 +434,7 @@ export async function addTab(lib: Library, opts: AddOptions & { tab?: Tab } = {}
   const draft = await tabDraft(tab, host);
   const item = await createItem(lib, { ...(await withImages(draft)), skills: opts.skills });
   await makeThumbnail(item);
+  await unarchive(lib, opts.skills);
   return item;
 }
 
@@ -451,18 +458,61 @@ async function tabDraft(tab: Tab, host: string): Promise<NewItem> {
 
 // Pasted text as a source: a Markdown item titled by its first heading, else its first line.
 // Pasted frontmatter (a copied Obsidian note) fills the title, author and date, as a .md file's does.
+// Pasted HTML (a ChatGPT answer, a page's selection) keeps its headings, tables, math, code and images,
+// which its plain text loses; the images it shows are saved beside it, as a page's are (D96, D122).
 // The same text pasted again (a retry after an add that looked failed) is the source already here, as a file's is.
-export async function addText(lib: Library, text: string, opts: AddOptions = {}): Promise<Item & Partial<Kept>> {
-  const source = text.trim() + "\n";
-  if (!source.trim()) throw new Error("text is empty");
-  const md = markdownFile(source, "");
-  const body = md.body.trim() + "\n";
-  if (!body.trim()) throw new Error("text is empty: only frontmatter, no text to read");
+export async function addText(lib: Library, text: string, opts: AddOptions & { html?: boolean } = {}): Promise<Item & Partial<Kept>> {
+  if (!text.trim()) throw new Error("text is empty");
+  const draft = opts.html ? await pastedDraft(text) : null;
+  const source = draft ? draft.source.data : text.trim() + "\n";
+  const md = draft ?? markdownFile(source, "");
+  if (!md.body.trim()) throw new Error(opts.html ? "the pasted text is empty" : "text is empty: only frontmatter, no text to read");
+  // The same paste again is the source already here, whether or not its images were saved the first time.
+  const before = sameText(lib, md.body.trim() + "\n");
+  if (before) return keep(lib, before, opts);
+  const { body, assets } = await saveImages(md.body.trim() + "\n");
   const same = sameText(lib, body);
   if (same) return keep(lib, same, opts);
   const first = body.split("\n")[0]!.replace(/^#+\s*/, "");
   const title = md.title || (first.length > 80 ? first.slice(0, 77).trimEnd() + "…" : first);
-  return createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: "md", data: source }, skills: opts.skills });
+  const item = await createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: draft ? "html" : "md", data: source }, assets, skills: opts.skills });
+  await unarchive(lib, opts.skills);
+  return item;
+}
+
+/** Pasted HTML as a Markdown source, its paste kept whole as the original (source.html), which a
+ *  reimport reads the same way. */
+async function pastedDraft(html: string): Promise<{ title: string; author?: string; published?: string; body: string; source: { ext: "html"; data: string } }> {
+  // The clipboard holds only the selection's tags (`<meta charset><h1>…`), which a page reader can't place.
+  const page = /<body[\s>]/i.test(html) ? html : `<!doctype html><html><head><meta charset="utf-8"></head><body>${html.replace(/^\s*<meta[^>]*>/i, "")}</body></html>\n`;
+  return { ...(await pastedMarkdown(page)), source: { ext: "html", data: page } };
+}
+
+/** The pasted page as Markdown: read as a page is (math, tables, code), or, when that drops much of
+ *  its text, converted tag by tag. A code block's own header (ChatGPT's language label and Copy
+ *  button) is left out, so the code reads as written. */
+async function pastedMarkdown(html: string): Promise<{ title: string; body: string }> {
+  const { parseHTML } = await import("linkedom");
+  const { document } = parseHTML(html);
+  for (const pre of document.querySelectorAll("pre")) {
+    const code = pre.querySelector("code");
+    if (code && code.parentElement !== pre) pre.replaceChildren(code);
+  }
+  // Buttons (Copy code, Copy table) and what is drawn only for the eye (KaTeX's glyphs beside its TeX).
+  for (const b of document.querySelectorAll('button, [aria-hidden="true"]')) b.remove();
+  // A citation pill's "+2" (two more sources behind it) is a count, not the link's name.
+  for (const n of document.querySelectorAll("a span")) if (/^\+\d+$/.test(n.textContent?.trim() ?? "")) n.remove();
+  // An image with no address of its own (a page's relative one) can't be fetched from a paste.
+  for (const img of document.querySelectorAll("img")) if (!/^https?:\/\//i.test(img.getAttribute("src") ?? "")) img.remove();
+  const page = document.toString();
+  const all = wordCount(document.body?.textContent ?? "");
+  // An image on its own line is its own block, never glued to the math or list beside it.
+  const own = (md: string) => md.replace(/^[ \t]*(!\[[^\]\n]*\]\([^)\n]+\))[ \t]*$/gm, "\n$1\n").replace(/\n{3,}/g, "\n\n");
+  const { htmlToDoc } = await import("./web.ts");
+  const d = await htmlToDoc(page, "file:///pasted", 0).catch(() => null);
+  if (d && wordCount(d.markdown) >= all / 2) return { title: d.title === "file:///pasted" ? "" : d.title, body: own(d.markdown) };
+  const { td } = await import("./markdown.ts");
+  return { title: "", body: own(td.turndown(document.body as unknown as HTMLElement)) };
 }
 
 export interface SnippetInput {
@@ -481,6 +531,7 @@ export async function addSnippet(lib: Library, s: SnippetInput): Promise<{ item:
   const firstLine = body.split("\n")[0]!;
   const title = firstLine.length > 80 ? firstLine.slice(0, 77).trimEnd() + "…" : firstLine;
   const item = await createItem(lib, { type: "snippet", title, body, url: s.url, source_app: s.app, skills: s.skills });
+  await unarchive(lib, s.skills);
   const annotation = addHighlight(item, { exact: item.body.trim(), intent: s.intent ?? "keep", note: s.note });
   return { item, annotation };
 }
@@ -555,7 +606,9 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const kept = url && !(local && copy) ? undefined : copy;
   if (type === "snippet" || (!url && !kept)) throw new Error("Only a source added from a link or a file can be reimported.");
   const regions = read ?? layoutOf(item.dir);
-  const draft = await withImages(course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
+  // A pasted page (source.html beside a Markdown source) is read as it was pasted.
+  const pasted = type === "markdown" && !url && kept === "source.html";
+  const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
   if (!draft.body.trim()) throw new Error("Found no text to read at the original now. It may have moved; open it to check.");
   if (draft.body === item.body) {
     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).

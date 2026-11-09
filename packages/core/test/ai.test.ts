@@ -18,7 +18,7 @@ import { addSnippet } from "../src/ingest/index.ts";
 import { sha256 } from "../src/fsutil.ts";
 import { createItem, findItem, setItemStatus, setPrequestionAttempt, updateItemMeta } from "../src/items.ts";
 import { appendNote, setChapterRecall, setNotes, setRecall } from "../src/notes.ts";
-import { acceptSuggestedSkill, dismissSuggestedSkill, loadSkills, setItemSkills, undoSuggestedSkill } from "../src/skills.ts";
+import { acceptSuggestedSkill, addSkill, archiveSkill, dismissSuggestedSkill, loadSkills, setItemSkills, undoSuggestedSkill } from "../src/skills.ts";
 import { readTopic } from "../src/topics.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -197,7 +197,7 @@ describe("AI adapter", () => {
     expect(readTopic(lib, "agent-workflows")!.meta.status).toBe("active");
     const after = findItem(lib, item.meta.id).meta;
     expect(after.enriched_at).toBeDefined();
-    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@12" });
+    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@13" });
     const cards = listCards(lib);
     expect(cards).toHaveLength(1);
     expect(cards[0]!.meta).toMatchObject({ state: "draft", kind: "prompt", annotation: card.id, topics: ["agent-workflows"], ai: after.ai });
@@ -280,6 +280,25 @@ describe("AI adapter", () => {
     expect(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[1]).toContain("at most 5 drafts from plain highlights alone");
     expect(listCards(lib)).toHaveLength(2);
     expect(findItem(lib, id).meta.planned).toHaveLength(6);
+  });
+
+  test("D173: a Light source drafts at most 2 cards from plain highlights; archived skills aren't offered", async () => {
+    const lib = await tempLibrary();
+    const gtm = await addSkill(lib, "Go-to-market"); // new skills start Light
+    await archiveSkill(lib, "habits", true);
+    const id = (await createItem(lib, { type: "article", title: "Four", body: "A one. B two. C three. D four.", skills: [gtm.id] })).meta.id;
+    await updateItemMeta(lib, id, (m) => ({ ...m, enriched_at: "2026-10-25T00:00:00Z" }));
+    const ids = ["A one.", "B two.", "C three.", "D four."].map((t) => addHighlight(findItem(lib, id), { exact: t, intent: "keep" }).id);
+    await setItemStatus(lib, id, "done");
+    const out = (ds: object[]) => ({ ...enrichOut(["Q1?", "Q2?"], ds), skills: [gtm.id] });
+    fakeClaude([out(ids.slice(0, 3).map(draft)), out(ids.slice(0, 2).map(draft))]);
+    await enrichItem(lib, id);
+    const lines = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
+    const sent = JSON.parse(lines[0]![1]!.slice(lines[0]![1]!.indexOf("{"), lines[0]![1]!.lastIndexOf("}") + 1));
+    expect(sent.plain_cap).toBe(2);
+    expect(sent.skills.map((s: { id: string }) => s.id)).not.toContain("habits");
+    expect(lines[1]!.join(" ")).toContain("at most 2 drafts from plain highlights alone");
+    expect(listCards(lib)).toHaveLength(2);
   });
 
   test("enrich matches a new source to his open questions only with a quote it can find (D75)", async () => {
@@ -411,7 +430,7 @@ describe("AI adapter", () => {
 
     const r = await acceptSuggestedSkill(lib, item.meta.id);
     expect(r.created).toBe(true);
-    expect(r.skill).toEqual({ id: "web-development", name: "Web Development", priority: "P2", hook: suggestion.hook });
+    expect(r.skill).toEqual({ id: "web-development", name: "Web Development", priority: "P3", hook: suggestion.hook });
     expect(loadSkills(lib).skills.at(-1)).toEqual(r.skill);
     expect(readFileSync(join(lib.root, "skills.yaml"), "utf8")).toContain("# Skills (D25)");
     expect(findItem(lib, item.meta.id).meta.suggested_skill).toBeUndefined();

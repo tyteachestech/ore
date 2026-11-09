@@ -26,12 +26,13 @@ let seen: Today | null = null;
 export const rememberToday = (t: Today) => void (seen = t);
 export const lastToday = () => seen;
 
-/** Skills with cards due, most due first: the ones a session would help most. */
+/** Skills with cards due, Focus first, then most due first: the ones a session would help most. */
 export const dueSkills = (today: Today, skills: Skill[]) =>
   today.skills
     .filter((x) => x.due > 0)
-    .sort((a, b) => b.due - a.due)
-    .flatMap((x) => skills.filter((s) => s.id === x.skill).map((s) => ({ skill: s, due: x.due })));
+    .flatMap((x) => skills.filter((s) => s.id === x.skill && !s.archived).map((s) => ({ skill: s, due: x.due })))
+    // Focus first, then Normal, then Light (D173), most due first within each.
+    .sort((a, b) => (a.skill.priority ?? "P2").localeCompare(b.skill.priority ?? "P2") || b.due - a.due);
 
 /** Whether the skill list names every skill with cards due. Today's numbers can land before the
  *  skills do; until then there is no telling whether to ask what to review. */
