@@ -8,7 +8,8 @@ import { Gem } from "./Gem";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
-import { ore, opt, PHONE, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today } from "./ore";
+import { ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { PixelTry } from "./PixelIcon";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, type Notify } from "./util";
@@ -31,7 +32,8 @@ const CUT_SHOWN = 8;
 type Phase = "answer" | "checked" | "edit";
 type Rating = 1 | 2 | 3 | 4;
 /** The session receipt, and today before and after it (for the ring and level-ups). */
-type End = { session: SessionEnd; today: Today; before: Today | null };
+/** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
+type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null };
 
 /** The remixed version shown, for the CLI calls that act on it (D66). */
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
@@ -299,7 +301,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         notify(nothingDue(before.current, pick));
         return onClose();
       }
-      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current });
+      // The try line is a nicety: the end screen never waits on or fails for it.
+      const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
+      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current, next: await next });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
@@ -857,7 +861,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick)}</p>}
 
-        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} />}
+        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
 
         {!end && card && entry && (
           <div className="review-card" key={`${card.id}-${done}-${left}`}>
@@ -1200,7 +1204,7 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
 
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
-function EndScreen({ end, skills, quick, onDone, onAgain }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void }) {
+function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void }) {
   const { session: s, today: t, before: b } = end;
   const part = (x: Today | null) => (!x ? 0 : x.met ? 1 : x.goal_ms ? x.active_ms / x.goal_ms : 0);
   const closed = t.met && !!b && !b.met;
@@ -1239,7 +1243,7 @@ function EndScreen({ end, skills, quick, onDone, onAgain }: { end: End; skills: 
         // A session of misses is still the work that makes them stick (D62: no guilt copy).
         <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>
       )}
-      {s.rescued > 0 && (
+      {rescuedWorthSaying(s) && (
         <p className="review-rescued">
           {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}
         </p>
@@ -1258,6 +1262,18 @@ function EndScreen({ end, skills, quick, onDone, onAgain }: { end: End; skills: 
         </Hint>
       )}
       {!t.met && t.counts && <p className="quiz-faint">{minutesText(Math.max(0, t.goal_ms - t.active_ms))} min to today’s goal</p>}
+      {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
+      {end.next && (
+        <Hint text="To try on your own work · opens the passage">
+          <button className="review-try" onClick={() => onTry(end.next!)}>
+            <PixelTry size={16} aria-hidden="true" />
+            <span>
+              <span className="review-try-plan">{end.next.note || `“${end.next.exact.replace(/\s+/g, " ").trim()}”`}</span>
+              <span className="review-try-from">{end.next.item_title}</span>
+            </span>
+          </button>
+        </Hint>
+      )}
       <div className="review-foot center">
         {t.due > 0 && (
           <button className="quiz-ghost" onClick={onAgain}>

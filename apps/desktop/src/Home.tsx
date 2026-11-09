@@ -240,9 +240,10 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
             {reading.map((i) => {
               const at = Number(load(`ore.pos.${i.id}`) ?? 0) || 0;
               return (
-                // A row that opens on click, holding the skill picker's own button, so not a <button> itself.
+                // The title is the row's one control (a button inside a button reads as one to a screen reader);
+                // the skill chips and ⋯ sit beside it. A click anywhere else on the row still opens it.
                 <WithMenu key={i.id} actions={sourceMenu ? () => withRename(sourceMenu(i), i) : []}>
-                <div className="home-read" data-id={i.id} role="button" tabIndex={0} onClick={() => onOpenSource(i.id)} onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpenSource(i.id))}>
+                <div className="home-read" data-id={i.id} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpenSource(i.id)}>
                   <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
                     <input
@@ -257,7 +258,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                         // Focus goes back to the row, as the sources list's rename does, so Tab carries on from it;
                         // after this key, so a held Enter's repeat doesn't open the source.
                         const row = e.currentTarget.closest<HTMLElement>(".home-read");
-                        const back = () => setTimeout(() => row?.focus({ preventScroll: true }));
+                        const back = () => setTimeout(() => row?.querySelector<HTMLElement>(".home-open")?.focus({ preventScroll: true }));
                         if (e.key === "Enter") {
                           setRenaming(null);
                           onRename?.(i, e.currentTarget.value);
@@ -271,7 +272,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                       onBlur={() => setRenaming(null)}
                     />
                   ) : (
-                    <span className="title">{i.title}</span>
+                    <button className="title home-open" onClick={() => onOpenSource(i.id)}>{i.title}</button>
                   )}
                   {i.course && <span className="course-of">{i.course.title}</span>}
                   {onRefile && onCreateSkill && (
@@ -328,7 +329,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
 
 /** One skill's strength (D62, D63): its level, which never drops, and the way to the next one. */
 // The rest (ref and handlers) comes from the right-click menu's trigger.
-// A tile that opens on click, holding its ⋯ button, so not a <button> itself (as the reading rows).
+// The name is the tile's one control, its ⋯ beside it (as the reading rows); a click anywhere else on the tile opens it too.
 function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }: { skill: Skill; strength?: Today["skills"][number]; onOpen: () => void; onStart: () => void; more?: ReactNode } & ComponentProps<"div">) {
   const lv = k?.level ?? 0;
   const p = levelProgress({ solid: k?.solid ?? 0, level: lv, next_level_at: k?.next_level_at ?? 5 });
@@ -336,12 +337,12 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
   const [fan, setFan] = useState<DueEntry[] | null>(null);
   const due = k?.due ?? 0;
   const tile = (
-    <div {...trigger} className="home-skill" data-color={s.color} role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}>
+    <div {...trigger} className="home-skill" data-color={s.color} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpen()}>
       <span className="home-skill-top">
         <span className={`mark${s.icon && s.color ? " tile" : ""}`} data-color={s.color} aria-hidden="true">
           <SkillIcon icon={s.icon} color={s.color} dot />
         </span>
-        <span className="home-skill-name">{s.name}</span>
+        <button className="home-skill-name home-open" onClick={onOpen}>{s.name}</button>
         {more}
       </span>
       <Hint text={k ? gemHint(k, p.line) : p.line}>

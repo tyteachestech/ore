@@ -55,7 +55,8 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
   const back = useRef(document.activeElement as HTMLElement | null);
   useSwipeDown(box, onClose, PHONE);
   useEffect(() => {
-    box.current?.focus();
+    // The first row takes focus (a Mac sheet's first control), so Space ticks and ↓ moves at once; the panel only when there is none.
+    (box.current?.querySelector<HTMLElement>(".pick-row") ?? box.current)?.focus();
     const to = back.current;
     return () => to?.focus?.();
   }, []);

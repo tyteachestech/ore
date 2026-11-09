@@ -162,6 +162,8 @@ export type Annotation = {
   point?: boolean;
   /** Apply (D127): how it went, written when he checked the try off. */
   reflection?: string;
+  /** Apply (D148): the rounds before this one, oldest first, each with his plan and how it went. */
+  uses?: { ts: string; plan?: string; reflection?: string }[];
 };
 
 /** `ore tries`: an Apply highlight (D127), a technique he plans to try on his own work; `note` is his
@@ -298,6 +300,10 @@ export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; ne
 export type Grade = { rating: 1 | 2 | 3 | 4; gaps: string[]; feedback: string; covered: boolean[]; evidence?: string[] };
 
 /** `ore session end` (D62). */
+/** The end screen says how many were rescued only when they are a minority of the session: over a backlog
+ *  (the normal state, docs/design/daily-session.md) nearly every card is, so the line would say nothing. */
+export const rescuedWorthSaying = (s: { reviews: number; rescued: number }) => s.rescued > 0 && s.rescued * 2 < s.reviews;
+
 export type SessionEnd = {
   id: string; reviews: number; kept: number; rescued: number; caught_up?: boolean;
   /** Cards that became solid this session, as each one's first skill (D90): one cut gem each. */

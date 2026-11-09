@@ -2,7 +2,7 @@
 // and the skills, as in Obsidian; a source and Review open full screen over it, with a way back.
 // Everything inside the screens is the Mac app's own code.
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { BookOpen, CaretLeft, CaretRight, House, MagnifyingGlass, SidebarSimple } from "../icons";
+import { Archive, BookOpen, CaretLeft, CaretRight, House, MagnifyingGlass, SidebarSimple } from "../icons";
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
@@ -188,7 +188,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
   }, [mainRef, cueRef]);
 }
 
-type TabId = "today" | "sources";
+type TabId = "today" | "sources" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
 type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; review: { pick: string[] | null } | null };
@@ -211,20 +211,25 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   const ref = useRef<HTMLButtonElement>(null);
   const swiped = useRef(false);
   const [side, setSide] = useState<"left" | "right" | null>(null);
+  /** An archived row only restores, to the left. */
+  const only = (dx: number) => (item.archived_at ? Math.min(0, dx) : dx);
   useHorizontalDrag(ref, {
     accept: (t) => ((swiped.current = false), t.clientX > 24),
-    begin: () => {
+    begin: (dx) => {
+      if (item.archived_at && dx > 0) return false; // Archived: only Restore, to the left.
       swiped.current = true;
       ref.current!.style.transition = "none";
     },
-    move: (dx) => {
+    move: (raw) => {
+      const dx = only(raw);
       setSide(dx < 0 ? "left" : "right");
       ref.current!.style.transform = `translateX(${dx}px)`;
     },
-    end: (dx, flick, cancelled) => {
+    end: (raw, flick, cancelled) => {
+      const dx = only(raw);
       const el = ref.current!;
       const w = el.offsetWidth;
-      const go = !cancelled && (Math.abs(dx) > w * 0.4 || Math.abs(flick) > 0.5);
+      const go = !cancelled && dx !== 0 && (Math.abs(dx) > w * 0.4 || Math.abs(flick) > 0.5);
       el.style.transition = "transform 200ms cubic-bezier(.2, .9, .3, 1)";
       el.style.transform = go ? `translateX(${dx < 0 ? -w : w}px)` : "";
       setTimeout(() => {
@@ -238,7 +243,7 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   return (
     <WithMenu actions={() => row.menu(item)}>
       <li>
-        {side && <span className={`phone-swipe ${side}`}>{side === "left" ? "Archive" : item.status === "done" ? "To read" : "Done"}</span>}
+        {side && <span className={`phone-swipe ${side}`}>{side === "left" ? (item.archived_at ? "Restore" : "Archive") : item.status === "done" ? "To read" : "Done"}</span>}
         <button ref={ref} onClick={() => swiped.current || onOpen(item.id)}>
           <Thumb item={item} className="thumb phone-thumb" />
           <span className="phone-title">{item.title}</span>
@@ -249,7 +254,7 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
 }
 
 /** Sources by To read and Done, as one list. */
-function SourceList({ title, items, onOpen, row, head }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode }) {
+function SourceList({ title, items, onOpen, row, head, empty = "Nothing here yet. Sources you add on the Mac come to the phone with its next install." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; empty?: string }) {
   const toRead = (items ?? []).filter((i) => i.status !== "done").sort((a, b) => touched(b).localeCompare(touched(a)));
   const done = (items ?? []).filter((i) => i.status === "done");
   return (
@@ -257,7 +262,7 @@ function SourceList({ title, items, onOpen, row, head }: { title: string; items:
       <h1>{title}</h1>
       {head}
       {items === null ? null : !items.length ? (
-        <p className="phone-empty">Nothing here yet. Sources you add on the Mac come to the phone with its next install.</p>
+        <p className="phone-empty">{empty}</p>
       ) : (
         ([
           ["To read", toRead],
@@ -304,6 +309,7 @@ export function PhoneApp() {
   const [start] = useState(loadPlace);
   const [tab, setTab] = useState<TabId>(start.tab);
   const [items, setItems] = useState<Item[] | null>(null);
+  const [archived, setArchived] = useState<Item[] | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skill, setSkill] = useState<string | null>(start.skill);
   const [skillNote, setSkillNote] = useState(!!start.skillNote);
@@ -340,16 +346,21 @@ export function PhoneApp() {
       localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, review: reviewing && { pick: reviewing.pick } } satisfies Place));
     } catch {}
   }, [tab, skill, skillNote, openId, noting, reviewing]);
+  const tabNow = useRef(tab);
+  tabNow.current = tab;
   const refresh = useCallback(async () => {
     try {
       const [all, sk] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills")]);
       setItems(all);
       setSkills(sk);
       setError(null);
+      // The Archive list, only while it shows: listed twice on every change otherwise.
+      if (tabNow.current === "archive") setArchived(await ore<Item[]>("ls", "--archived"));
     } catch (e) {
       setError(errorText(e));
     }
   }, []);
+  useEffect(() => void (tab === "archive" && refresh()), [tab, refresh]);
   useEffect(() => void refresh(), [refresh]);
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
@@ -434,11 +445,21 @@ export function PhoneApp() {
     void refresh();
   };
   const fileUnder = (item: Item, k: Skill) => refile(item, item.skills.includes(k.id) ? item.skills.filter((s) => s !== k.id) : [...item.skills, k.id], item.skills, k);
+  /** From the Archive list, at once and with Undo, as archiving is. */
+  const restore = (item: Item) => {
+    setArchived((all) => all?.filter((i) => i.id !== item.id) ?? all);
+    const apply = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"])).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+    notify(`Restored “${item.title}”`, "info", () => void apply(true), () => void apply(false));
+    void apply(false);
+  };
   const row: RowActions = {
-    archive: (item) => void archive(item),
+    archive: (item) => (item.archived_at ? restore(item) : void archive(item)),
     toggle: (item) => void moveTo(item, item.status === "done" ? "reading" : "done"),
     // Long-press: the Mac row menu, less what needs a Finder or a keyboard.
-    menu: (item) => [
+    menu: (item) => item.archived_at ? [
+      { id: "open", label: "Open", run: () => open(item.id) },
+      { id: "restore", label: "Restore", run: () => restore(item) },
+    ] : [
       { id: "open", label: "Open", run: () => open(item.id) },
       { id: "move", label: item.status === "done" ? "Move to To read" : "Move to Done", run: () => row.toggle(item) },
       ...(item.url ? [{ id: "original", label: "Open original", run: () => void openUrl(item.url!).catch((e) => notify(errorText(e), "error")) }] : []),
@@ -471,7 +492,7 @@ export function PhoneApp() {
         </Boundary>
       </Screen>
     ) : openId ? (
-      <Screen className="phone-full phone-reader" onBack={() => setOpenId(null)} onForward={setNoting}>
+      <Screen className="phone-full phone-reader phone-source" onBack={() => setOpenId(null)} onForward={setNoting}>
         {/* From the note, Back returns to the source, as the left-edge swipe does. */}
         <Back label={noting ? "Source" : "Back"} onClick={() => (noting ? setNoting(false) : setOpenId(null))} />
         <Boundary onBack={() => setOpenId(null)}>
@@ -488,7 +509,7 @@ export function PhoneApp() {
             onToggleSide={() => setNoting((v) => !v)}
             renameSource={0}
             actionsRef={actions}
-            onArchive={(item) => void archive(item)}
+            onArchive={(item) => (item.archived_at ? (setOpenId(null), restore(item)) : void archive(item))}
             lessons={(() => {
               const c = (items ?? []).find((i) => i.id === openId)?.course;
               return c ? lessonsOf(items ?? [], c.id) : undefined;
@@ -545,7 +566,13 @@ export function PhoneApp() {
                 notify={notify}
               />
             ) : (
-              <SourceList title="Sources" items={items} onOpen={open} row={row} />
+              <SourceList
+                title={tab === "archive" ? "Archive" : "Sources"}
+                items={tab === "archive" ? archived : items}
+                onOpen={open}
+                row={row}
+                empty={tab === "archive" ? "Nothing archived. Swipe a source left to archive it." : undefined}
+              />
             )}
           </main>
         </div>
@@ -558,6 +585,10 @@ export function PhoneApp() {
           <button className={tab === "sources" ? "on" : ""} onClick={() => go("sources")}>
             <BookOpen size={16} weight={tab === "sources" ? "fill" : "regular"} aria-hidden="true" />
             <span className="phone-title">Sources</span>
+          </button>
+          <button className={tab === "archive" ? "on" : ""} onClick={() => go("archive")}>
+            <Archive size={16} aria-hidden="true" />
+            <span className="phone-title">Archive</span>
           </button>
           {skillGroups(skills).map((g) => (
             <section key={g.collection}>

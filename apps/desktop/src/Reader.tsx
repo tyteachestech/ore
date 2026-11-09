@@ -1,5 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
+import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Children, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
@@ -406,6 +406,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** ⌘F: open with the bump that refocuses it; the query stays for the next ⌘F, as in Safari. `note`:
    *  opened by ⌘K on a match in the source note, so it searches only there. */
   const [find, setFind] = useState<{ open: boolean; focus: number; query: string; note?: boolean }>({ open: false, focus: 0, query: "" });
+  const [barsHidden, setBarsHidden] = useState(false);
+  const lastTop = useRef(0);
+  const lastTouch = useRef(0);
+  // The Finish step has its own screen: the bars are back for it.
+  useEffect(() => void (closedBook && setBarsHidden(false)), [closedBook]);
   // The toolbar sits at the reader's top right. With the sidebar hidden a narrow reader would push it over
   // the sidebar toggle and Back, which are fixed at the window's left: Collected gives way instead, a
   // chip per type, then one chip for all, then none (the side panel's Collected tab lists them all).
@@ -1957,6 +1962,16 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   const onScroll = () => {
     if (tip) setTip(null);
+    if (PHONE && scrollRef.current && performance.now() - lastTouch.current < 2000) {
+      // The bars go as he scrolls down to read and come back as he scrolls up, and at either end (Books, Obsidian).
+      // Only his finger's scroll: coming back to a saved place or a jump to a passage keeps them.
+      const el = scrollRef.current;
+      const moved = el.scrollTop - lastTop.current;
+      if (Math.abs(moved) > 8) {
+        setBarsHidden(moved > 0 && el.scrollTop > 40 && el.scrollTop + el.clientHeight < el.scrollHeight - 40);
+        lastTop.current = el.scrollTop;
+      }
+    }
     if ((words || listen) && !following.current) updateAway();
     if (!ready) return;
     clearTimeout(scrollTimer.current);
@@ -2344,12 +2359,17 @@ function ReaderView(p: Props & { reload: () => void }) {
           setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
           p.onPin(doc);
         } }]),
-        { id: "archive", label: "Archive", hint: label(keys.archive), danger: true, divider: true, run: () => p.onArchive(doc) },
+        { id: "archive", label: doc.archived_at ? "Restore" : "Archive", hint: label(keys.archive), danger: !doc.archived_at, divider: true, run: () => p.onArchive(doc) },
       ];
   p.actionsRef.current = closedBook ? [] : actions;
   // The phone has no Finder, no side panel and no sidebar to pin to yet.
   const menuActions = actions.filter((a) => !a.paletteOnly);
-  const shownActions = PHONE ? menuActions.filter((a) => !["reveal", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url)).map((a, i) => (i ? a : { ...a, divider: false })) : menuActions;
+  const canFinish = !!doc && doc.status !== "done" && !doc.preview;
+  // On the phone Finish lives here and at the end of the source; the top bar stays Back and ⋯ (D156).
+  const phoneActions = menuActions.filter((a) => !["reveal", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url));
+  const shownActions = PHONE
+    ? [...phoneActions.filter((a) => a.id === "finish").map((a) => ({ ...a, label: "Finish", hint: undefined })), ...phoneActions.filter((a) => a.id !== "finish")].map((a, i) => (i ? a : { ...a, divider: false }))
+    : menuActions;
 
   if (error)
     return (
@@ -2466,7 +2486,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     : undefined;
 
   return (
-    <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}`} ref={readerRef}>
+    <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
       <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
@@ -2494,14 +2514,6 @@ function ReaderView(p: Props & { reload: () => void }) {
               </Hint>
             </div>
           )}
-          {/* The phone has no side panel toggle: its note slides in from the right. */}
-          {PHONE && (
-            <Hint text={notes.text?.trim() ? "Open the source note" : "Add a source note"} keys="notes">
-              <button className={`note-toggle${notes.text?.trim() ? " has" : ""}`} onClick={() => p.onShowSide("note")}>
-                {notes.text?.trim() ? "Note" : "+ Note"}
-              </button>
-            </Hint>
-          )}
           {/* A Feed post isn't saved until he keeps something from it; this says so, where Finish sits. */}
           {doc?.preview && (
             <Hint text="Not in your library yet. A highlight or a note keeps it; leave with neither and it’s gone.">
@@ -2518,7 +2530,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               </button>
             </Hint>
           )}
-          {doc && doc.status !== "done" && !doc.preview && (
+          {!PHONE && canFinish && (
             <Hint text="Quiz yourself, then finish" keys="finish-source">
               <button className="note-toggle" onClick={() => p.setFinishing(true)}>
                 Finish
@@ -2570,7 +2582,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           })}
         </div>
       )}
-      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll}>
+      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's
@@ -2689,6 +2701,11 @@ function ReaderView(p: Props & { reload: () => void }) {
             <p className="doc-empty">
               {video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
             </p>
+          )}
+          {PHONE && ready && canFinish && !closedBook && (
+            <div className="phone-finish">
+              <button onClick={() => p.setFinishing(true)}>Finish</button>
+            </div>
           )}
           {away === "down" && !cardMode && (
             <div className="follow-down">
@@ -2843,7 +2860,17 @@ function ReaderView(p: Props & { reload: () => void }) {
           {tip.text}
         </div>
       )}
-      {PHONE && !closedBook && away !== "down" && collected}
+      {PHONE && !closedBook && !find.open && (
+        <div className="phone-tools">
+          {away !== "down" && collected}
+          <button className={notes.text?.trim() ? "has" : ""} onClick={() => p.onShowSide("note")}>
+            {notes.text?.trim() ? "Note" : "+ Note"}
+          </button>
+          <button aria-label="Find in source" onClick={openFind}>
+            <MagnifyingGlass size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       </div>
       {closedBook && hidden && (
         <div className="hidden-chip">
