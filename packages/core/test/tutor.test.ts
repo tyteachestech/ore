@@ -82,7 +82,7 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@8" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@9" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
@@ -309,17 +309,51 @@ describe("tutor: hints and cards", () => {
 });
 
 describe("tutor: practice", () => {
-  test("Practice sets an open exercise with a heading for his note; an exercise with a card goes back to fix", async () => {
+  const key: TutorCard = { kind: "prompt", content_type: "concept", question: "In the Leitner system, why does a missed card go back to box one?", answer: "A miss means the memory is weak, so the card is seen again soonest.", rubric: ["A miss shows the memory is weak", "Box one is reviewed most often"] };
+  const exercise = { heading: "Why does a missed card go back to box one?", prompts: ["What happens to it next", "Why that helps"], card: key };
+  const out = (over: object) => ({ reply: "Explain why a missed card goes back to box one.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, ...over });
+
+  test("Practice sets an open exercise with a heading for his note and the card committed with it; an exercise with a card, a heading that isn't a question, or a thin key goes back to fix", async () => {
     const { lib, a } = await library();
-    const exercise = { heading: "Why does a missed card go back to box one?", prompts: ["What happens to it next", "Why that helps"] };
     const card: TutorCard = { kind: "card", content_type: "fact", question: "In the Leitner system, where does a missed card go?", answer: "Back to the first box.", rubric: [] };
-    fakeClaude([
-      { reply: "Explain why a missed card goes back to box one.", citations: [], general: false, hint: false, steps: [], exercise, card },
-      { reply: "Explain why a missed card goes back to box one.", citations: [], general: false, hint: false, steps: [], exercise, card: null },
-    ]);
+    fakeClaude([out({ exercise, card }), out({ exercise })]);
     const r = await tutor(lib, "Practice", { item: a.meta.id });
     expect(r).toMatchObject({ exercise, card: null, hint: false });
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("propose no card with it");
+    fakeClaude([out({ exercise: { ...exercise, heading: "The Leitner system" } }), out({ exercise })]);
+    await tutor(lib, "Practice", { item: a.meta.id });
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("exercise.heading: the task as a short question");
+    fakeClaude([out({ exercise: { ...exercise, card: { ...key, rubric: ["one"] } } }), out({ exercise })]);
+    await tutor(lib, "Practice", { item: a.meta.id });
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("exercise.card: a prompt card with 2 to 4 rubric points");
+    expect(sent()[0]).not.toHaveProperty("exercise"); // nothing open yet
+  });
+
+  test("the open exercise reaches the tutor with its card, and feedback that finds a point missing offers that card, never one written after his answer (D158)", async () => {
+    const { lib, a } = await library();
+    const earlier = [{ message: "Practice", reply: "Explain why a missed card goes back to box one.", exercise }, { message: "wait, what's box one?", reply: "The box reviewed most often." }];
+    const late: TutorCard = { kind: "card", content_type: "fact", question: "Where does a missed card go?", answer: "Box one.", rubric: [] };
+    fakeClaude([
+      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P1", quote: "goes back to the first box" }], covered: [false, true], card: late }),
+      out({ reply: "Both points, nicely put. What about a card you get right?", covered: [true, true] }),
+      out({ reply: "Both points.", covered: [true] }),
+      out({ reply: "Both points.", covered: [true, true] }),
+    ]);
+    const r = await tutor(lib, "Because you see it again soon", { item: a.meta.id, earlier });
+    expect(r.card).toEqual(key);
+    const seen = sent()[0]!;
+    expect(seen).toMatchObject({ exercise: { heading: exercise.heading, card: key } });
+    expect(seen.earlier).toEqual([{ message: "Practice", reply: "Explain why a missed card goes back to box one." }, { message: "wait, what's box one?", reply: "The box reviewed most often." }]);
+    expect((await tutor(lib, "A miss shows the memory is weak, and box one comes round most often", { item: a.meta.id, earlier })).card).toBeNull();
+    expect((await tutor(lib, "Both", { item: a.meta.id, earlier })).card).toBeNull();
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("covered: one boolean per rubric point (2)");
+  });
+
+  test("covered marks with no open exercise go back to fix", async () => {
+    const { lib, a } = await library();
+    fakeClaude([out({ reply: "Good.", covered: [true] }), out({ reply: "Good." })]);
+    expect((await tutor(lib, "Box one", { item: a.meta.id, earlier: [{ message: "hi", reply: "hello" }] })).card).toBeNull();
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("covered: [] when there is no open exercise");
   });
 
   test("a diagram he drew in his note reaches the tutor as lines: labels, then arrows", async () => {

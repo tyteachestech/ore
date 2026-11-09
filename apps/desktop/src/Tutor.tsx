@@ -23,8 +23,9 @@ const firstSource = (cs: AnyCitation[] | undefined) => cs?.find((c): c is Citati
 /** One exchange. `item`/`title` is the source it was asked about (the context chip at the time). */
 export type TutorCard = { kind: "card" | "prompt"; content_type: string; question: string; answer: string; rubric: string[] };
 type Ai = { vendor: string; model: string; prompt_version: string };
-/** An open exercise (D128.6): its heading in his note and the placeholder lines under it. */
-export type Exercise = { heading: string; prompts: string[] };
+/** An open exercise (D128.6): its heading in his note, the placeholder lines under it, and the card it
+ *  becomes if he misses (D158), committed before he answers and never shown until then. */
+export type Exercise = { heading: string; prompts: string[]; card: TutorCard };
 export type TutorTurn = {
   /** Unique across chats: a reply lands only on the turn that asked for it. */
   id: string;
@@ -72,7 +73,8 @@ export function useTutorChat(notify: Notify) {
     // The steps of a worked answer he has shown are part of what the tutor said, so a follow-up ("why step
     // 2?") can lean on them; the ones still hidden aren't, so his own try at the next step is his (D142).
     const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).slice(0, stepsShown.get(x.id) ?? 1).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
-    const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: said(x) }] : []));
+    // A turn that set an exercise carries it, so the feedback judges against the card committed then (D158).
+    const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: said(x), ...(x.exercise ? { exercise: x.exercise } : {}) }] : []));
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
@@ -162,7 +164,7 @@ const STARTERS = ["What have I been learning?", "Explain something I saved", "Pr
 export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, onClose, onQuiz, onWrite }: {
   chat: TutorChat;
   /** Write an exercise's answer in the note of the source it was asked about, the source hidden (D128.6). */
-  onWrite: (exercise: Exercise, source: { id: string; title: string }) => void;
+  onWrite: (exercise: { heading: string; prompts: string[] }, source: { id: string; title: string }) => void;
   /** Quiz me: Review on his due cards in these skills (none: all of them). */
   onQuiz: (skills: string[]) => void;
   /** Docked at the right, in the side panel's place; else floating over the bottom right corner. */
@@ -345,7 +347,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                         {last && t.hint && <button onClick={() => send("Show me")}>Show me</button>}
                         {last && t.exercise && t.item && (
                           <Hint text="Source hidden · send it back" keys="finish">
-                            <button onClick={() => onWrite(t.exercise!, { id: t.item!, title: t.title ?? "" })}>Write it in your note</button>
+                            <button onClick={() => onWrite({ heading: t.exercise!.heading, prompts: t.exercise!.prompts }, { id: t.item!, title: t.title ?? "" })}>Write it in your note</button>
                           </Hint>
                         )}
                         {t.card && (firstSource(t.citations) ?? t.item) && (

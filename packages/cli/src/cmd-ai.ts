@@ -107,13 +107,13 @@ export const aiCommands: Record<string, Command> = {
   },
 
   tutor: {
-    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply}], --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching} when a web search starts or ends)',
+    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply, exercise?}] (a turn that set an exercise carries it, so feedback judges against its card), --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching} when a web search starts or ends)',
     options: { item: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" }, stream: { type: "string" } },
     async run(words, f) {
       const lib = openLibrary();
       let earlier: TutorTurn[] = [];
       if (str(f.earlier)) {
-        try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply}]"); }
+        try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply, exercise?}]"); }
       }
       // --stream <id>: the reply as it is written, and a web search starting, as `{"progress": {stream, …}}`
       // lines on stderr, which the app shows on the turn with that id (claude only).

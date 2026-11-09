@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { addUsage, runAgent, type Usage, type Vendor } from "../src/ai/adapter.ts";
 import type { Library } from "../src/library.ts";
-import { tutor, withSteps } from "../src/ai/tutor.ts";
+import { Exercise, tutor, withSteps } from "../src/ai/tutor.ts";
 import { usePromptText } from "../src/ai/prompts.ts";
 import { addGolden } from "./ask.ts";
 import { columns, costText, pct, pool, range, resultPath, setId, wilson, withVendor } from "./grade.ts";
@@ -18,6 +18,8 @@ const Expect = z.strictObject({
   gives: z.array(z.string()).optional(),
   withholds: z.array(z.string()).optional(),
   exercise: z.boolean().optional(),
+  /** It offers a card: after exercise feedback that found a point missing, the committed one (D158). */
+  card: z.boolean().optional(),
   /** A worked answer split into steps he reveals one at a time (D142). */
   steps: z.boolean().optional(),
   asks: z.boolean().optional(),
@@ -30,7 +32,7 @@ const Expect = z.strictObject({
 });
 const TutorCase = z.strictObject({
   id: z.string(), message: z.string(), reading: z.string().optional(),
-  earlier: z.array(z.strictObject({ message: z.string(), reply: z.string() })).optional(),
+  earlier: z.array(z.strictObject({ message: z.string(), reply: z.string(), exercise: Exercise.optional() })).optional(),
   expect: Expect,
 });
 export type TutorCase = z.infer<typeof TutorCase>;
@@ -38,11 +40,14 @@ export type TutorCase = z.infer<typeof TutorCase>;
 export const loadTutorCases = (path = join(import.meta.dir, "tutor-cases.json")) => z.object({ cases: z.array(TutorCase) }).parse(JSON.parse(readFileSync(path, "utf8"))).cases;
 
 /** What a reply did, for the checks. */
-export interface Reply { reply: string; hint: boolean; exercise: boolean; steps: number; cited: number; searched: boolean }
+export interface Reply { reply: string; hint: boolean; exercise: boolean; card?: boolean; steps: number; cited: number; searched: boolean }
 
 // A score, grade or rating of his answer ("7/10", "8 out of 10", "B+", "you scored"): he rates his own
 // cards (D21). A fraction from the material ("about 1/4 is left") is not one.
 const SCORE = /\b\d+\s*(?:\/|out of)\s*(?:5|10|100)\b(?!\s*%)|\b(?:you )?scored?\b|\bgrade (?:of|is|:)|\brat(?:e|ing) (?:it|this|your answer)\b|\b[A-F][+-](?=\s|$)/i;
+
+/** The earlier turns as he saw them: a committed exercise card (D158) is hidden from him, so from the judge too. */
+const shown = (earlier: { message: string; reply: string }[]) => earlier.map(({ message, reply }) => ({ message, reply }));
 
 /** The checks a reply fails, by name; none means it passed. */
 export function failures(e: z.infer<typeof Expect>, r: Reply): string[] {
@@ -51,6 +56,7 @@ export function failures(e: z.infer<typeof Expect>, r: Reply): string[] {
   for (const p of e.gives ?? []) if (!new RegExp(p, "i").test(r.reply)) out.push(`no /${p}/`);
   for (const p of e.withholds ?? []) if (new RegExp(p, "i").test(r.reply)) out.push(`gave /${p}/`);
   if (e.exercise !== undefined && r.exercise !== e.exercise) out.push(e.exercise ? "no exercise" : "an exercise");
+  if (e.card !== undefined && !!r.card !== e.card) out.push(e.card ? "no card" : "a card");
   if (e.steps !== undefined && r.steps > 0 !== e.steps) out.push(e.steps ? "no steps" : "steps");
   // Asks: it puts a question to him ("Is that a sign of weak minds? Explain…" counts).
   // A question mark inside a quote ("you said … 'how much is recalled?'") isn't one put to him.
@@ -71,7 +77,7 @@ export async function judged(lib: Library, c: TutorCase, reply: string): Promise
   const checks = c.expect.judge ?? [];
   const { data, usage } = await runAgent(lib, {
     prompt: "judge", cwd: lib.root, schema: Verdicts,
-    input: { learner: c.message, ...(c.earlier?.length ? { earlier: c.earlier } : {}), reply, checks },
+    input: { learner: c.message, ...(c.earlier?.length ? { earlier: shown(c.earlier) } : {}), reply, checks },
     check: (d) => (d.checks.length === checks.length ? null : `return ${checks.length} checks, one per check`),
   });
   return { failed: checks.filter((_, i) => !data.checks[i]!.passed).map((k) => `judge: ${k}`), evidence: data.checks.map((v) => v.evidence), usage };
@@ -131,7 +137,7 @@ export function compareTutor(vendor: Vendor, model: string | undefined, oldRaw: 
       try {
         const { data, usage } = await runAgent(lib, {
           prompt: "compare", cwd: lib.root, schema: Better,
-          input: { learner: c.message, ...(c.earlier?.length ? { earlier: c.earlier } : {}), ...(c.expect.judge?.length ? { checks: c.expect.judge } : {}), A, B },
+          input: { learner: c.message, ...(c.earlier?.length ? { earlier: shown(c.earlier) } : {}), ...(c.expect.judge?.length ? { checks: c.expect.judge } : {}), A, B },
         });
         return { id: c.id, pick: unblind(data.better, flipped), why: data.why, new: a.said, old: b.said, usage: addUsage(addUsage(a.usage, b.usage), usage) };
       } catch (e) {
@@ -158,7 +164,7 @@ export function runTutorEval(vendor: Vendor, model?: string, runs = 1, concurren
       try {
         const { r, said } = await replyTo(lib, c, id);
         stamp = r.ai;
-        const failed = failures(c.expect, { reply: said, hint: r.hint, exercise: !!r.exercise, steps: r.steps.length, cited: r.citations.length, searched: r.searched });
+        const failed = failures(c.expect, { reply: said, hint: r.hint, exercise: !!r.exercise, card: !!r.card, steps: r.steps.length, cited: r.citations.length, searched: r.searched });
         const ms = Math.round(performance.now() - start); // the tutor's reply time, not the judge's
         if (!c.expect.judge?.length) return { id: c.id, ok: !failed.length, failed, reply: said, ms, usage: r.usage };
         const j = await judged(lib, c, said);
