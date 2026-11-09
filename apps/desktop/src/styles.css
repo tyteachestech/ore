@@ -2598,7 +2598,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .draw-colour-hex input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--text); font: inherit; text-transform: uppercase; }
 .draw-style-chip { display: block; width: 14px; height: 14px; border: 2px solid; }
 /* A sheet narrower than the tools bar's labels (a small window): Map and Matrix keep their icons (and hints). */
-@container diagram (max-width: 720px) { .draw-tool.wide .draw-tool-label { display: none; } }
+@container diagram (max-width: 720px) { .draw-tool.wide .draw-tool-label { display: none; } .diagram-name { width: 160px; } }
 
 /* The reader's title renames on one click (Reader.tsx): the text cursor says it can be typed in. */
 .doc-head h1.renamable { cursor: text; }

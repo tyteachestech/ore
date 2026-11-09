@@ -2886,6 +2886,16 @@ journey("diagram: opens in a sheet centred over the window, ⇧⌘↵ gives it t
   // The next open is the sheet again, and a press outside it closes it.
   await page.locator(".note-editor .note-diagram").click();
   await sheet.waitFor();
+  // Tab stays in the sheet (the note behind it can't take keys), and a right-click outside leaves it open.
+  await page.locator(".diagram-done").focus();
+  for (let i = 0; i < 6; i++) await page.keyboard.press("Tab");
+  if (!(await page.evaluate(() => !!document.activeElement?.closest(".diagram")))) throw new Error("Tab left the sheet");
+  await page.mouse.click(vw.width * 0.05, vw.height * 0.9, { button: "right" });
+  await Bun.sleep(200);
+  if (!(await sheet.count())) throw new Error("a right-click outside closed it");
+  await page.keyboard.press("Escape").catch(() => {});
+  if (!(await sheet.count())) await page.locator(".note-editor .note-diagram").click();
+  await sheet.waitFor();
   await page.mouse.click(vw.width * 0.05, vw.height * 0.9);
   await until("a click outside closes it", async () => (await page.locator(".diagram").count()) === 0);
   if (!(await page.locator(".doc").count())) throw new Error("the click outside reached the reader");

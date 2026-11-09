@@ -7,6 +7,7 @@ import Editor from "./draw/Editor";
 import { svgMarkup } from "./draw/export";
 import { fromScene, toScene, type El } from "./draw/model";
 import { Hint } from "./Hint";
+import { Trap } from "./Trap";
 import { Collapse, CornersOut, Expand } from "./icons";
 import { ore, oreWith, PHONE, type Diagram } from "./ore";
 import { errorText, type Notify } from "./util";
@@ -54,9 +55,9 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
   const timer = useRef(0);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   // The parent's callbacks change identity with its state; read them here so the effects below run once.
-  const props = useRef({ notify, onClose, onFirstSave, onRenamed });
+  const props = useRef({ notify, onClose, onFirstSave, onRenamed, close: async () => false as boolean });
   const key = args.join(" ");
-  props.current = { notify, onClose, onFirstSave, onRenamed };
+  props.current = { ...props.current, notify, onClose, onFirstSave, onRenamed };
   // Each open starts in the sheet, as asked; the full window is a step for this drawing only.
   const [full, setFull] = useState(PHONE);
   const box = useRef<HTMLDivElement>(null);
@@ -165,9 +166,8 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
       )),
     [save],
   );
+  props.current.close = close;
 
-  const closeRef = useRef(close);
-  closeRef.current = close;
   useEffect(() => {
     const prev = document.activeElement;
     // The editor handles its own keys; stopping them at document keeps the app's window-level keys
@@ -175,7 +175,8 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
     // Esc on the head's buttons (after a click on ⤢) closes it too, as it does on the canvas.
     const contain = (e: KeyboardEvent) => {
       e.stopPropagation();
-      if (e.key === "Escape" && !(e.target instanceof Element && e.target.closest(".diagram-canvas"))) void closeRef.current();
+      const t = e.target instanceof Element ? e.target : null;
+      if (e.key === "Escape" && t?.closest(".diagram-head button:not(.diagram-failed button)")) void props.current.close();
     };
     document.addEventListener("keydown", contain);
     return () => {
@@ -186,8 +187,9 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
 
   return createPortal(
     // The app shows dimmed around the sheet, and a press there closes it, as Settings does.
-    <div className={`diagram-scrim${full ? " full" : ""}`} onMouseDown={(e) => e.target === e.currentTarget && void close()}>
+    <div className={`diagram-scrim${full ? " full" : ""}`} onMouseDown={(e) => e.button === 0 && e.target === e.currentTarget && void close()}>
     <div className="titlebar" data-tauri-drag-region />
+    <Trap>
     <div ref={box} className="diagram" role="dialog" aria-modal="true" aria-label="Diagram">
       <div className="diagram-head">
         {/* Rename in place (Linear's title): Enter saves, Esc or clicking away keeps the old name. */}
@@ -246,6 +248,7 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
         )}
       </div>
     </div>
+    </Trap>
     </div>,
     document.body,
   );

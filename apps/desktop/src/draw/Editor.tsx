@@ -1916,6 +1916,9 @@ function CustomColour({ label, value, presets, used, onPick, onDone }: { label: 
           collisionPadding={8}
           aria-label={`Custom ${label} colour`}
           onCloseAutoFocus={(e) => e.preventDefault()}
+          // The hex field takes the caret once the popover's focus scope is up, so the diagram sheet's trap
+          // has let go (an autoFocus would land first, and the trap would pull it back).
+          onOpenAutoFocus={(e) => (e.preventDefault(), (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>(".draw-colour-hex input")?.focus())}
           onPointerDown={stop} onMouseDown={stop} onClick={stop} onContextMenu={stop} onWheel={stop}
           onKeyDown={(e) => {
             e.stopPropagation();
@@ -1930,7 +1933,7 @@ function CustomColour({ label, value, presets, used, onPick, onDone }: { label: 
           )}
           <label className="draw-colour-hex">
             <span aria-hidden="true">#</span>
-            <HexColorInput color={custom ? value : ""} onChange={onPick} aria-label="Hex colour" spellCheck={false} autoFocus />
+            <HexColorInput color={custom ? value : ""} onChange={onPick} aria-label="Hex colour" spellCheck={false} />
           </label>
         </Popover.Content>
       </Popover.Portal>
