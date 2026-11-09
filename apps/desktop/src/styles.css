@@ -692,6 +692,15 @@ img.thumb { filter: brightness(0.86); }
 .figure-zoom.open { background: var(--bg); }
 .figure-zoom img { position: fixed; max-width: none; border-radius: 6px; transform-origin: 0 0; transition: transform 250ms cubic-bezier(0.77, 0, 0.175, 1); }
 @media (prefers-reduced-motion: reduce) { .figure-zoom, .figure-zoom img { transition: none; } }
+/* D166: boxes over a figure, each a card; the one being drawn, and the field for what's under it. */
+.figure-zoom img.drawable { cursor: crosshair; }
+.figure-box { position: fixed; pointer-events: none; border-radius: 2px; }
+/* Two rings, light in dark, so a box reads on a white figure and a black one alike. */
+.figure-box.saved { background: color-mix(in srgb, var(--bg) 30%, transparent); box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 1.5px var(--bg); }
+.figure-box.draft { box-shadow: inset 0 0 0 2px var(--text), 0 0 0 2px var(--bg); }
+.figure-label.popover { position: fixed; z-index: 1; padding: 6px; cursor: default; }
+.figure-label .field { width: 220px; }
+.figure-tip { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); color: var(--faint); font-family: var(--mono); font-size: 11px; pointer-events: none; }
 .doc hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
 .doc table { border-collapse: collapse; font-size: 0.92em; display: block; overflow-x: auto; }
 .doc th, .doc td { border: 1px solid var(--border); padding: 4px 8px; }
@@ -1931,6 +1940,12 @@ button.home-plan:hover { color: var(--text); }
 .review .quiz-points .got .quiz-mark svg, .review .quiz-points .missed .quiz-mark svg { animation: tick 220ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both; }
 @keyframes tick { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
 .review .quiz-point, .review .quiz-point:hover { cursor: default; color: var(--text); } /* plain text here, not a button: no hover tint */
+/* D166: a figure card's figure, its box covered until the answer shows. */
+.review-figure { display: flex; justify-content: center; margin: 14px 0 4px; }
+.review-figure-frame { position: relative; display: inline-block; max-width: 100%; }
+.review-figure-frame img { display: block; max-width: 100%; max-height: 46vh; border-radius: 6px; }
+.review-figure-box { position: absolute; border-radius: 2px; background: var(--bg-raised); box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 1.5px var(--bg); }
+.review-figure-box.shown { background: transparent; }
 /* D165: three pixel bars, one per tap; cells are square so the 8-bit grid stays sharp. */
 .review-calibration { margin: 10px 0 0; display: grid; gap: 4px; justify-items: center; color: var(--muted); font-size: 13px; }
 .review-calibration-label { color: var(--faint); font-family: var(--mono); font-size: 11px; }

@@ -33,7 +33,7 @@ import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } fr
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
-import { INTENTS, ore, opt, PHONE, visible, type Annotation, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
+import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
@@ -142,7 +142,7 @@ const withImages = (base: Components, dir: string): Components => ({
   ...base,
   img: ({ src, alt }) => {
     const s = typeof src === "string" ? src : "";
-    return <img src={/^(https?:|data:)/i.test(s) ? s : convertFileSrc(`${dir}/${decodeURI(s)}`)} alt={alt ?? ""} loading="lazy" draggable={false} />;
+    return <img src={/^(https?:|data:)/i.test(s) ? s : convertFileSrc(`${dir}/${decodeURI(s)}`)} data-src={s} alt={alt ?? ""} loading="lazy" draggable={false} />;
   },
 });
 
@@ -158,23 +158,78 @@ function zoomable(t: EventTarget | null, doc: HTMLElement | null): Zoomed | null
   return Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height) > 1.1 ? { img, from } : null;
 }
 
+type Box = [number, number, number, number];
+type FigureCard = { id: string; answer: string; box: Box };
+const plainSrc = (s: string) => {
+  try {
+    return decodeURI(s);
+  } catch {
+    return s;
+  }
+};
+
 /** A figure, slide or chart drawn at the column's width opens to fill the window, so labels too small to
  *  read there can be read (Medium, Readwise Reader). It grows from where it sits; a click or a scroll puts it
- *  back the same way, Esc at once (keys don't animate). While it is open no key reaches the page behind. */
-function FigureZoom({ fig, onClose }: { fig: Zoomed; onClose: () => void }) {
+ *  back the same way, Esc at once (keys don't animate). While it is open no key reaches the page behind.
+ *  D166: a drag over part of it draws a box, and the box with what's under it becomes a Fact card that hides
+ *  that part in review (image occlusion, after Mischief's redaction, MIT); the figure's cards show as boxes. */
+function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string; notify: Notify; onClose: () => void }) {
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const [open, setOpen] = useState(still);
   const leaving = useRef(false);
   const close = useRef(onClose);
   close.current = onClose;
+  const src = fig.img.dataset.src ?? "";
+  const [cards, setCards] = useState<FigureCard[]>([]);
+  const [draft, setDraft] = useState<Box | null>(null);
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ x: number; y: number; drew: boolean } | null>(null);
+  const drew = useRef(false);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const back = () => {
     if (leaving.current) return;
     leaving.current = true;
+    setDraft(null);
     if (still || !open) close.current(); // not grown yet: nothing to animate back
     else setOpen(false);
   };
   const backRef = useRef(back);
   backRef.current = back;
+  useEffect(() => {
+    if (!src || !item) return;
+    let live = true;
+    ore<CardFull[]>("cards", opt("item", item))
+      .then((all) => live && setCards(all.filter((c) => c.figure && c.state !== "retired" && plainSrc(c.figure.src) === plainSrc(src)).map((c) => ({ id: c.id, answer: c.answer, box: c.figure!.box }))))
+      .catch(() => {});
+    return () => void (live = false);
+  }, [src, item]);
+  const save = async () => {
+    const box = draftRef.current;
+    if (!box || !label.trim() || busy) return;
+    setBusy(true);
+    try {
+      const c = await ore<CardFull>("card", "figure", item, opt("src", src), opt("box", box.map((n) => n.toFixed(4)).join(",")), opt("answer", label.trim()));
+      const made = { id: c.id, answer: c.answer, box: c.figure!.box };
+      setCards((cs) => [...cs, made]);
+      setDraft(null);
+      setLabel("");
+      notify(
+        "Card made",
+        "info",
+        () => void ore("card", "retire", c.id).then(() => setCards((cs) => cs.filter((x) => x.id !== c.id))),
+        () => void ore("card", "restore", c.id, "--state=draft").then(() => setCards((cs) => [...cs.filter((x) => x.id !== c.id), made])),
+      );
+    } catch (e) {
+      notify(`Couldn’t make the card: ${errorText(e)}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const saveRef = useRef(save);
+  saveRef.current = save;
   useLayoutEffect(() => {
     fig.img.style.visibility = "hidden";
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));
@@ -185,9 +240,15 @@ function FigureZoom({ fig, onClose }: { fig: Zoomed; onClose: () => void }) {
   }, [fig]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      e.preventDefault();
       e.stopImmediatePropagation();
-      if (e.key === "Escape") close.current();
+      // Typing what's under a box: the field takes the keys; Enter makes the card, Esc drops the box.
+      if (draftRef.current && e.target instanceof HTMLInputElement && e.target.closest(".figure-zoom")) {
+        if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) e.preventDefault(), void saveRef.current();
+        else if (e.key === "Escape") e.preventDefault(), setDraft(null), setLabel("");
+        return;
+      }
+      e.preventDefault();
+      if (e.key === "Escape") draftRef.current ? (setDraft(null), setLabel("")) : close.current();
     };
     const onWheel = (e: WheelEvent) => (e.preventDefault(), backRef.current());
     const onResize = () => close.current();
@@ -208,15 +269,63 @@ function FigureZoom({ fig, onClose }: { fig: Zoomed; onClose: () => void }) {
   const left = (innerWidth - w) / 2;
   const top = (innerHeight - h) / 2;
   const stop = (e: MouseEvent) => e.stopPropagation();
+  const at = (e: { clientX: number; clientY: number }) => ({ x: Math.min(1, Math.max(0, (e.clientX - left) / w)), y: Math.min(1, Math.max(0, (e.clientY - top) / h)) });
+  const place = (b: Box) => ({ left: left + b[0] * w, top: top + b[1] * h, width: b[2] * w, height: b[3] * h });
+  const shown = open && !leaving.current && !!src && !!item;
+  const below = draft && top + (draft[1] + draft[3]) * h + 44 < innerHeight;
   return createPortal(
-    <div className={`figure-zoom${open ? " open" : ""}`} onClick={(e) => (stop(e), back())} onMouseDown={stop} onMouseUp={stop} onMouseMove={stop}>
+    <div
+      className={`figure-zoom${open ? " open" : ""}`}
+      onClick={(e) => {
+        stop(e);
+        if (drew.current) return void (drew.current = false);
+        if (draftRef.current) return setDraft(null), setLabel("");
+        back();
+      }}
+      onMouseDown={stop}
+      onMouseUp={stop}
+      onMouseMove={stop}
+    >
       <img
         src={fig.img.currentSrc || fig.img.src}
         alt={fig.img.alt}
         draggable={false}
+        className={shown ? "drawable" : undefined}
         style={{ left, top, width: w, height: h, transform: open ? "none" : `translate(${from.left - left}px, ${from.top - top}px) scale(${1 / scale})` }}
         onTransitionEnd={(e) => e.propertyName === "transform" && leaving.current && close.current()}
+        onPointerDown={(e) => {
+          if (!shown || e.button !== 0 || draftRef.current) return;
+          const p = at(e);
+          drag.current = { ...p, drew: false };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const p = at(e);
+          if (!d.drew && Math.hypot((p.x - d.x) * w, (p.y - d.y) * h) < 5) return;
+          if (!d.drew) setDragging(true);
+          d.drew = true;
+          setDraft([Math.min(d.x, p.x), Math.min(d.y, p.y), Math.abs(p.x - d.x), Math.abs(p.y - d.y)]);
+        }}
+        onPointerUp={() => {
+          const d = drag.current;
+          drag.current = null;
+          if (!d?.drew) return;
+          drew.current = true;
+          setDragging(false);
+          const b = draftRef.current;
+          if (b && (b[2] * w < 6 || b[3] * h < 6)) setDraft(null); // a slip, not a box
+        }}
       />
+      {shown && cards.map((c) => <div key={c.id} className="figure-box saved" style={place(c.box)} aria-label={`Card: ${c.answer}`} role="img" />)}
+      {shown && draft && <div className="figure-box draft" style={place(draft)} />}
+      {shown && draft && !dragging && (
+        <div className="popover figure-label" style={{ left: left + (draft[0] + draft[2] / 2) * w, top: below ? top + (draft[1] + draft[3]) * h + 8 : top + draft[1] * h - 8, translate: below ? "-50% 0" : "-50% -100%" }} onClick={stop}>
+          <input className="field" autoFocus aria-label="What’s under the box" placeholder="What’s under it?" value={label} disabled={busy} onChange={(e) => setLabel(e.target.value)} />
+        </div>
+      )}
+      {shown && !draft && <div className="figure-tip">Drag over a part to make a card of it</div>}
     </div>,
     document.body,
   );
@@ -2979,7 +3088,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           onNotes={notes.apply}
         />
       ) : null}
-      {zoom && <FigureZoom fig={zoom} onClose={() => setZoom(null)} />}
+      {zoom && <FigureZoom fig={zoom} item={doc?.id ?? ""} notify={p.notify} onClose={() => setZoom(null)} />}
     </div>
   );
 }

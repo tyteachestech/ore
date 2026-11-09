@@ -19,6 +19,7 @@ import { Trap } from "./Trap";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
 import { Evidence } from "./Evidence";
+import { Occluded } from "./Occluded";
 
 const SURE = ["Guess", "Think so", "Sure"] as const;
 const KEY_POINTS_CHANGED = "The key points changed.";
@@ -887,6 +888,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
             ) : (
               <h1 className="review-q">{card.question}</h1>
             )}
+            {card.figure && card.figure_file && phase !== "edit" && <Occluded file={card.figure_file} box={card.figure.box} shown={phase === "checked"} />}
 
             {phase === "answer" && card.kind === "prompt" && (
               <>

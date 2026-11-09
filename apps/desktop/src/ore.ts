@@ -290,6 +290,10 @@ export type CardFull = {
   in_head_ok?: boolean;
   /** A card from a line he typed (Card here, D99): the passages that answer it, found in the source. */
   evidence?: { exact: string; start: number; end: number }[];
+  /** A card from part of a figure (D166): the image as the source names it and the box hidden in review, as
+   *  fractions of its size; `figure_file` is where the image is (show only). */
+  figure?: { src: string; box: [number, number, number, number] };
+  figure_file?: string;
   /** Its reviews and where each rating puts the next one (D149); with --review only. */
   history?: CardHistory;
 };

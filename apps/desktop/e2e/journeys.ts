@@ -1169,6 +1169,46 @@ journey("figure zoom: a click opens a figure to fill the window and keys don't r
   if ((await page.locator(".reader-scroll").evaluate((el) => el.scrollTop)) !== top) throw new Error("the scroll that put the figure back moved the page too");
 });
 
+journey("figure cards: a drag over a zoomed figure draws a box, what's under it makes a Fact card that hides it, Undo takes it back (D166)", async (page) => {
+  await openSource(page, AGENTS);
+  const fig = page.locator(".doc img").first();
+  await fig.scrollIntoViewIfNeeded();
+  await fig.click();
+  const big = page.locator(".figure-zoom.open img");
+  await big.waitFor();
+  await page.waitForTimeout(400);
+  const b = (await big.boundingBox())!;
+  // A plain click still puts it back; a drag draws a box instead.
+  await page.mouse.move(b.x + b.width * 0.2, b.y + b.height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * 0.35, b.y + b.height * 0.4, { steps: 6 });
+  await page.mouse.move(b.x + b.width * 0.4, b.y + b.height * 0.5, { steps: 6 });
+  await page.mouse.up();
+  const field = page.getByRole("textbox", { name: "What’s under the box" });
+  await field.waitFor();
+  if (!(await page.locator(".figure-zoom").count())) throw new Error("the drag put the figure back");
+  // Keys typed there go to the field, not the page or the zoom.
+  await field.pressSequentially("Router j");
+  if ((await field.inputValue()) !== "Router j") throw new Error(`typed: ${await field.inputValue()}`);
+  await field.press("Backspace");
+  await field.press("Backspace");
+  await field.press("Enter");
+  await page.getByText("Card made").waitFor();
+  const saved = page.locator(".figure-box.saved");
+  await saved.first().waitFor();
+  const id = ((await ore("cards", "--state", "draft")) as { id: string; answer: string; figure?: object }[]).find((c) => c.figure && c.answer === "Router")?.id;
+  if (!id) throw new Error("no figure card was made");
+  const card = (await ore("card", "show", id, "--review")) as { kind: string; figure: { src: string; box: number[] }; figure_file: string };
+  if (card.kind !== "card" || card.figure.src !== "assets/patterns.svg" || !card.figure_file.endsWith("assets/patterns.svg")) throw new Error(JSON.stringify(card));
+  const [x, y, w, h] = card.figure.box;
+  if (Math.abs(x! - 0.2) > 0.02 || Math.abs(y! - 0.3) > 0.02 || Math.abs(w! - 0.2) > 0.02 || Math.abs(h! - 0.2) > 0.02) throw new Error(`box ${card.figure.box}`);
+  // Esc with no box open puts the figure back; Undo takes the card back.
+  await page.keyboard.press("Escape");
+  await page.locator(".figure-zoom").waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "Undo" }).click();
+  await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
+});
+
 journey("highlight note: a long note's hover preview stays inside the window", async (page) => {
   await openSource(page, AGENTS);
   const popup = page.getByRole("dialog", { name: "Highlight" });

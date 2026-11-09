@@ -32,6 +32,9 @@ export const CardMetaSchema = z.object({
   ai: AiStamp.optional(),
   // A card from a line he typed ("Card here"): the passages of the source that answer it, found in the text.
   evidence: z.array(Evidence).optional(),
+  // D166: a card from a figure: the image as its source's doc.md names it, and the box hidden in review, as
+  // fractions of the image's width and height (x, y, w, h), so it fits the figure at any size.
+  figure: z.object({ src: z.string().min(1), box: z.tuple([z.number(), z.number(), z.number(), z.number()]) }).optional(),
 });
 export type CardMeta = z.infer<typeof CardMetaSchema>;
 
@@ -127,6 +130,7 @@ export interface NewCard extends CardContent {
   content_type: ContentType;
   ai?: AiStamp;
   evidence?: Evidence[];
+  figure?: CardMeta["figure"];
 }
 
 // Caller holds the library lock when writing several files together.
@@ -146,6 +150,7 @@ export function writeNewCard(lib: Library, c: NewCard): Card {
     created: nowIso(),
     ai: c.ai,
     evidence: c.evidence?.length ? c.evidence : undefined,
+    figure: c.figure,
   };
   const path = paths.card(lib, meta.id);
   const content = { question: c.question, answer: c.answer, rubric: c.rubric };
