@@ -512,16 +512,16 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     let ts = r.ts;
     again?.setTs(ts);
     const setTs = (t: string) => void (ts = t);
-    const forget =
+    const forget: () => void =
       again?.forget ??
       notify(
         "Rating",
         "quiet",
         // With Review closed, only the log changes (its session stays ended), and Home reads its numbers again.
-        () => {
+        (): Promise<unknown> => {
           return (mounted.current && undoNow.current(ts)) || ore("review", id, opt("undo", ts)).then(() => onLogged?.());
         },
-        () => {
+        (): Promise<unknown> => {
           // Given again after Review closed: its session has ended, so the rating goes in with none.
           return (
             (mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })) ||
@@ -583,7 +583,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       notify(
         entry?.state === "draft" ? "Card deleted" : "Card retired",
         "info",
-        () => {
+        async () => {
           if (state === "retired") return;
           dropAhead();
           return ore("card", "restore", id, opt("state", state)).then(() => {

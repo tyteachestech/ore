@@ -17,7 +17,8 @@ import { levelProgress, ore, opt, type Question, type Research, type Skill, type
 import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
-import { errorText, load, save, useFocusBack, useFocusWhileMounted, type Notify } from "./util";
+import { errorText, load, save, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { Trap } from "./Trap";
 
 type Props = {
   skill: Skill;
@@ -502,6 +503,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
   const askRef = useRef<HTMLButtonElement>(null);
   useFocusBack(asking, askRef);
   const [version, setVersion] = useState(0);
+  const changes = useLibraryChanges();
   const reload = () => setVersion((v) => v + 1);
 
   useEffect(() => {
@@ -513,7 +515,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
     return () => {
       live = false;
     };
-  }, [skill, notify, version]);
+  }, [skill, notify, version, changes]);
 
   const { setStatus, remove } = useQuestionEdits(setQs, notify);
 
@@ -581,6 +583,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
   const [reflecting, setReflecting] = useState<string | null>(null);
   // Tries he checked off while here stay in view under Used, so what he wrote doesn't vanish (Things, Todoist).
   const [recent, setRecent] = useState<string[]>([]);
+  const changes = useLibraryChanges();
   useEffect(() => {
     let live = true;
     ore<Try[]>("tries", opt("skill", skill)).then(
@@ -590,7 +593,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
     return () => {
       live = false;
     };
-  }, [skill, notify]);
+  }, [skill, notify, changes]);
 
   const put = (id: string, patch: Partial<Try>) => setTs((l) => l && l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   /** One change to a try: what the row shows before and after, and the `ore tried` calls (their args
@@ -1018,6 +1021,7 @@ function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill:
   });
 
   return (
+    <Trap>
     <div className="overlay recall" data-color={skill.color} onMouseDown={(e) => e.target === e.currentTarget && !text.trim() && onClose()}>
       <section className="panel skill-recall" role="dialog" aria-modal="true" aria-labelledby="skill-recall-title">
         <header className="skill-recall-head">
@@ -1039,5 +1043,6 @@ function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill:
         </div>
       </section>
     </div>
+    </Trap>
   );
 }

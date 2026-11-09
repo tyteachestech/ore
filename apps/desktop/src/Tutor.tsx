@@ -172,7 +172,7 @@ export function useTutorChat(notify: Notify) {
       update(() => back.map((t) => ({ ...t, ...landed.current.get(t.id) })));
       setCarry(backCarry);
     };
-    notify("Chat cleared", "info", swap, swap);
+    notify("Chat cleared", "info", async () => swap(), async () => swap());
   };
   /** A web page a reply cites, in his browser. */
   const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));

@@ -8,6 +8,7 @@ import { courseThumb, lessonsOf, nextLesson, ore, opt, PHONE, touched, type Inte
 import { Thumb } from "./Thumb";
 import { useSwipeDown } from "./phone/sheet";
 import { errorText, useFocusWhileMounted } from "./util";
+import { Trap } from "./Trap";
 
 export type Action = { id: string; label: string; hint?: string; keywords?: string[]; run: () => void };
 
@@ -290,6 +291,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   const placeholder = !page ? "Search sources or run a command…" : page.kind === "collection" ? "Name the collection…" : page.collection ? `Name the first skill in ${page.collection}…` : "Name the skill…";
 
   return (
+    <Trap>
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Command
         ref={sheet}
@@ -387,6 +389,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
         </div>
       </Command>
     </div>
+    </Trap>
   );
 }
 

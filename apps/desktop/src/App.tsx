@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, Mag
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
+import { TitleField } from "./TitleField";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -702,9 +703,14 @@ export function App() {
   /** Feed posts open as previews; leaving one keeps it if he highlighted or wrote in it, else drops it. */
   const previews = useRef(new Map<string, string>());
   const [feedTick, setFeedTick] = useState(0);
+  const opening = useRef(0);
   const openPost = useCallback(async (post: FeedPost) => {
+    const from = viewRef.current;
+    const mine = ++opening.current;
     try {
       const r = await ore<{ id: string; title: string; preview: boolean }>("feed", "open", post.url);
+      // He went elsewhere, or opened another post, while it loaded: it never opens over that, and its preview goes.
+      if (viewRef.current !== from || opening.current !== mine) return void (r.preview && ore("feed", "close", r.id).catch(() => {}));
       if (r.preview) previews.current.set(r.id, r.title);
       openSource(r.id);
     } catch (e) {
@@ -888,8 +894,10 @@ export function App() {
   }, [openId, sideQuest]);
   const learnAdd = useCallback(
     async (urls: string[], to: string[], question: string, now: boolean, from: { id: string; title: string }) => {
+      const here = viewRef.current;
       const r = await addSources(urls.map((url) => ({ kind: "link" as const, url })), to, true, false, question);
-      if (!now || !r.first) return;
+      // Read now, unless he went elsewhere while it was added.
+      if (!now || !r.first || viewRef.current !== here) return;
       setSideQuest({ to: r.first, from, question });
       openSource(r.first);
       // His question waits in the panel, at the top as "May be answered here": what he writes there answers it (D75).
@@ -1291,21 +1299,24 @@ export function App() {
 
   /** A source row's title edited in place (Finder's Rename): optimistic, put back if the write fails. */
   const [renamingRow, setRenamingRow] = useState<string | null>(null);
-  const renameRow = async (item: Item, title: string) => {
+  /** A rename field closed: the list takes the keys again. */
+  const doneRenaming = () => {
     setRenamingRow(null);
     listRef.current?.focus({ preventScroll: true });
-    await retitle(item.id, item.title, title.trim());
   };
+  /** False when the write failed (and a toast said why), so the field keeps what he typed. */
   const retitle = async (id: string, before: string, t: string, undoable = true) => {
-    if (!t || t === before) return;
+    if (!t || t === before) return true;
     setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: t } : i)) ?? all);
     try {
       await ore("edit", id, "--title", t);
       if (undoable) notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
+      return true;
     } catch (e) {
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
+      return false;
     } finally {
       void refresh();
     }
@@ -1405,21 +1416,18 @@ export function App() {
 
   type CourseLine = Extract<Line, { kind: "course" }>;
   /** Renames a course on every lesson: optimistic, put back if the write fails. On the history, as a source's rename is. */
-  const renameCourse = async (c: CourseLine, title: string) => {
-    setRenamingRow(null);
-    listRef.current?.focus({ preventScroll: true });
-    await recourse(c.id, c.title, title.trim());
-  };
   const recourse = async (id: string, before: string, t: string, undoable = true) => {
-    if (!t || t === before) return;
+    if (!t || t === before) return true;
     setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: t } } : i)) ?? all);
     try {
       await ore("course", "set", id, opt("title", t));
       if (undoable) notify(`Renamed to “${t}”`, "quiet", () => recourse(id, t, before, false), () => recourse(id, before, t, false));
+      return true;
     } catch (e) {
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
+      return false;
     } finally {
       void refresh();
     }
@@ -1766,8 +1774,8 @@ export function App() {
   const view = <ViewMenu status={status} archived={archivedInSkill.length > 0} go={go} details={details} toggle={toggleDetail} />;
   // What a row's handlers and menus call, read when they run: a row re-renders only when what it
   // shows changes (below), so ↑↓ through a long list repaints two rows, not all of them.
-  const live = useRef({ openSource, pickRange, pickToggle, renameRow, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked });
-  live.current = { openSource, pickRange, pickToggle, renameRow, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked };
+  const live = useRef({ openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked });
+  live.current = { openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked };
   /** A row's optional details last, at fixed widths, so they line up down the list whatever the chips.
    *  A course takes its lessons' author and its first added date. */
   const detailCols = (r: { url?: string }, captured: string[]) => {
@@ -1842,25 +1850,7 @@ export function App() {
           );
         })()}
         {renamingRow === r.id ? (
-          <input
-            className="row-rename"
-            aria-label="Title"
-            autoFocus
-            defaultValue={r.title}
-            onFocus={(e) => e.currentTarget.select()}
-            onClick={(e) => e.stopPropagation()}
-            data-no-drag
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter") void live.current.renameRow(r, e.currentTarget.value);
-              else if (e.key === "Escape") {
-                setRenamingRow(null);
-                listRef.current?.focus({ preventScroll: true });
-              }
-            }}
-            // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
-            onBlur={() => setRenamingRow(null)}
-          />
+          <TitleField value={r.title} onSave={(t) => live.current.retitle(r.id, r.title, t.trim())} onClose={() => live.current.doneRenaming()} />
         ) : (
           // Two lines (D114): the title at full width, then the other skills it is under as icons (the
           // page's own is left out), or, matched in its text, highlights or note, the line that says why.
@@ -1937,24 +1927,7 @@ export function App() {
           </span>
         )}
         {renamingRow === key ? (
-          <input
-            className="row-rename"
-            aria-label="Course title"
-            autoFocus
-            defaultValue={c.title}
-            onFocus={(e) => e.currentTarget.select()}
-            onClick={(e) => e.stopPropagation()}
-            data-no-drag
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter") void renameCourse(c, e.currentTarget.value);
-              else if (e.key === "Escape") {
-                setRenamingRow(null);
-                listRef.current?.focus({ preventScroll: true });
-              }
-            }}
-            onBlur={() => setRenamingRow(null)}
-          />
+          <TitleField value={c.title} label="Course title" onSave={(t) => recourse(c.id, c.title, t.trim())} onClose={doneRenaming} />
         ) : (
           <span className="row-main">
             <span className="row-line">
@@ -2270,7 +2243,7 @@ export function App() {
             // Home renames its own rows (onRename); the shortcuts act on the list's selected row, so
             // Home shows none.
             sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => ({ ...a, hint: undefined }))}
-            onRename={(i, t) => void retitle(i.id, i.title, t.trim())}
+            onRename={(i, t) => retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
             onRetry={reload}
             notify={notify}

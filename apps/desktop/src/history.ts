@@ -1,7 +1,8 @@
 /** One step he can take back: what the toast said, its inverse, and (when it can be done again) the
- *  step itself. Both go through `ore`, never a snapshot of the library. Either may return its write's
- *  promise: if that fails, the step goes back where it was and `onFail` says why. */
-export type Step = { message: string; undo: () => unknown; redo?: () => unknown };
+ *  step itself. Both go through `ore`, never a snapshot of the library, and return the write's promise
+ *  (a type error otherwise, so a write can't fail unseen): if it fails, the step goes back where it was
+ *  and `onFail` says why; once it lands, `onLanded` lets screens opened since read their data again. */
+export type Step = { message: string; undo: () => Promise<unknown>; redo?: () => Promise<unknown> };
 
 const LIMIT = 50;
 
@@ -11,12 +12,14 @@ export class History {
   private past: Step[] = [];
   private future: Step[] = [];
 
-  constructor(private onFail?: (step: Step, error: unknown, what: "undo" | "redo") => void) {}
+  constructor(
+    private onFail?: (step: Step, error: unknown, what: "undo" | "redo") => void,
+    private onLanded?: (step: Step) => void,
+  ) {}
 
   /** A write that failed leaves the library as it was, so its step goes back: ⌘Z (or ⇧⌘Z) tries it again. */
-  private watch(step: Step, run: unknown, what: "undo" | "redo") {
-    if (!(run instanceof Promise)) return;
-    run.catch((e) => {
+  private watch(step: Step, run: Promise<unknown>, what: "undo" | "redo") {
+    run.then(() => this.onLanded?.(step), (e) => {
       const [from, to] = what === "undo" ? [this.future, this.past] : [this.past, this.future];
       const i = from.indexOf(step);
       if (i >= 0) from.splice(i, 1);

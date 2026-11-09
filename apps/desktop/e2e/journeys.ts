@@ -5458,6 +5458,135 @@ journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the sugges
   }
 });
 
+type Rigged = { __ORE_FAIL?: Record<string, string>; __ORE_SLOW?: Record<string, number> };
+const failNext = (page: Page, command: string, why: string | null) => page.evaluate(([c, why]) => void ((window as unknown as Rigged).__ORE_FAIL = why ? { [c!]: why } : {}), [command, why] as const);
+
+journey("delete skill dialog: ⇧Tab stays in it, Esc closes it, nothing behind it is reachable", async (page) => {
+  const k = (await ore("skills", "add", "Joinery")) as { id: string };
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--skill", k.id], stdin: "# Mortise and tenon\n\nCut the mortise first." }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Joinery" }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete skill…" }).click();
+    const dialog = page.getByRole("alertdialog", { name: "Delete Joinery" });
+    await dialog.waitFor();
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("Shift+Tab");
+      if (!(await dialog.evaluate((d) => d.contains(document.activeElement)))) throw new Error("⇧Tab left the dialog for the page behind it");
+    }
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached", timeout: 1500 });
+  } finally {
+    await ore("skills", "rm", k.id);
+    await ore("archive", made.id);
+  }
+});
+
+journey("skill rename: a ⌘Z whose save fails stays on the history, so the next ⌘Z takes it back", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Habits" });
+  await dialog.getByLabel("Rename Habits").fill("Habit loops");
+  await page.keyboard.press("Enter");
+  await dialog.waitFor({ state: "detached" });
+  const named = (n: string) => page.locator(".sidebar .side-item", { hasText: n }).count().then((c) => c > 0);
+  await until("renamed", () => named("Habit loops"));
+  await failNext(page, "skills", "The library is read-only.");
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: "Couldn’t undo" }).waitFor();
+  await failNext(page, "skills", null);
+  await page.keyboard.press("Meta+z");
+  await until("the next ⌘Z takes it back", () => named("Habits"));
+});
+
+journey("delete skill: a delete whose save fails can be tried again from the same menu", async (page) => {
+  const k = (await ore("skills", "add", "Empty for now")) as { id: string };
+  try {
+    await page.reload();
+    const item = page.locator(".sidebar .side-item", { hasText: "Empty for now" }).first();
+    await failNext(page, "skills", "The library is read-only.");
+    await item.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete skill…" }).click();
+    await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+    await failNext(page, "skills", null);
+    await item.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete skill…" }).click();
+    await until("the second try deletes it", async () => (await page.locator(".sidebar .side-item", { hasText: "Empty for now" }).count()) === 0);
+  } finally {
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
+journey("feed: a post that opens slowly never takes him away from where he went meanwhile", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml" ? new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Slow Notes</title><link>http://localhost/</link><item><title>A slow post</title><link>http://localhost:${server.port}/a.html</link><pubDate>${day}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) : new Response(`<html><head><title>A slow post</title></head><body><article><h1>A slow post</h1>${"<p>Spacing beats cramming, as study after study has found over many decades of work.</p>".repeat(8)}</article></body></html>`, { headers: { "content-type": "text/html" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", feed);
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const post = page.locator(".row.post", { hasText: "A slow post" });
+    await post.waitFor();
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { feed: 1500 }));
+    await post.click();
+    await page.getByRole("button", { name: /^Home/ }).click();
+    await page.waitForTimeout(2200);
+    if (await page.locator(".doc-head h1").count()) throw new Error("the post opened over Home after he went there");
+  } finally {
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
+journey("settings: ⌘Z after closing and reopening Settings shows the goal it put back", async (page) => {
+  const open = async () => {
+    await page.keyboard.press("Meta+Comma");
+    await page.getByRole("tab", { name: "Review" }).click();
+  };
+  const minutes = page.getByRole("group", { name: "Minutes a day" }).or(page.getByRole("radiogroup", { name: "Minutes a day" }));
+  const on = async () => (await minutes.locator("[data-state=on]").innerText()).trim();
+  await open();
+  const was = await on();
+  const other = was === "30" ? "5" : "30";
+  await minutes.getByText(other, { exact: true }).click();
+  await until("the new goal shows", async () => (await on()) === other);
+  await page.waitForTimeout(300); // the save lands and goes on the history
+  await page.keyboard.press("Escape");
+  await open();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z shows the old goal in the Settings now open", async () => (await on()) === was);
+  await page.keyboard.press("Escape");
+});
+
+journey("reader: ⌘Z of a rename made before leaving and coming back shows the old title", async (page) => {
+  await openSource(page, AGENTS);
+  const title = () => page.locator(".doc-head h1").innerText();
+  await page.locator(".doc-head h1").click();
+  await page.getByLabel("Title").fill("Agents, for now");
+  await page.keyboard.press("Enter");
+  await until("renamed", async () => (await title()) === "Agents, for now");
+  await openSource(page, "Agents, for now");
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await until("the reader shows the old title", async () => (await title()) === AGENTS);
+});
+
+journey("source rename: a save that fails keeps the title he typed, in the field, to try again", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row", { hasText: AGENTS }).first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  const field = page.locator(".row-rename");
+  await field.fill("Agents, carefully retitled");
+  await failNext(page, "edit", "The library is read-only.");
+  await field.press("Enter");
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await failNext(page, "edit", null);
+  await until("the field is back with his words", async () => (await field.count()) === 1 && (await field.inputValue()) === "Agents, carefully retitled");
+  await page.keyboard.press("Escape");
+});
+
 journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {
   const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { edit: why } : {}), why);
   await openSource(page, AGENTS);

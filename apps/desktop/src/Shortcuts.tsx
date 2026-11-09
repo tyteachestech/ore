@@ -32,7 +32,7 @@ function step(notify: Notify, message: string, run: () => void) {
   const before = saved();
   run();
   const after = saved();
-  notify(message, "info", () => restore(before), () => restore(after));
+  notify(message, "info", async () => restore(before), async () => restore(after));
 }
 
 const NONE = { current: null };

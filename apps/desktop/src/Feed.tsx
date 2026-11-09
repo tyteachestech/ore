@@ -1,6 +1,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { closestCenter, DndContext, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
+import { TitleField } from "./TitleField";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -11,7 +12,7 @@ import { is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { ore, opt, type Skill } from "./ore";
 import { SkillChip, SkillPicker, unfile } from "./Skills";
-import { errorText, load, save, type Notify } from "./util";
+import { errorText, load, save, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
 
 export type FeedPost = { feed: string; url: string; title: string; author?: string; published?: string; image?: string; read: boolean; feed_title: string; preview?: string };
@@ -108,11 +109,12 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       setChecking(false);
     }
   }, [notify]);
+  const changes = useLibraryChanges();
   useEffect(() => {
     void read().then((d) => {
       if (d?.feeds.some((f) => !f.checked_at || Date.now() - Date.parse(f.checked_at) > STALE_MS)) void check();
     });
-  }, [read, check, tick]);
+  }, [read, check, tick, changes]);
   useEffect(() => listRef.current?.focus({ preventScroll: true }), []);
 
   const feeds = data?.feeds ?? [];
@@ -166,21 +168,18 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     if (i + by >= 0 && i + by < feeds.length) arrange(arrayMove(feeds, i, i + by));
   };
 
-  const rename = (f: FeedInfo, title: string) => {
-    setRenaming(null);
-    retitle(f, f.title, title.replace(/\s+/g, " ").trim());
-    listRef.current?.focus({ preventScroll: true });
-  };
-  const retitle = (f: FeedInfo, before: string, t: string, undoable = true) => {
-    if (!t || t === before) return;
+  /** False when the write failed (and a toast said why), so the field keeps what he typed. */
+  const retitle = async (f: FeedInfo, before: string, t: string, undoable = true): Promise<boolean> => {
+    if (!t || t === before) return true;
     const put = (name: string) => setData((d) => d && { feeds: d.feeds.map((x) => (x.url === f.url ? { ...x, title: name } : x)), posts: d.posts.map((p) => (p.feed === f.url ? { ...p, feed_title: name } : p)) });
     put(t);
     return ore("feed", "set", f.url, opt("name", t)).then(
-      () => void (undoable && notify(`Renamed to “${t}”`, "quiet", () => retitle(f, t, before, false), () => retitle(f, before, t, false))),
+      () => (undoable && notify(`Renamed to “${t}”`, "quiet", () => retitle(f, t, before, false), () => retitle(f, before, t, false)), true),
       (e) => {
         put(before);
         if (!undoable) throw e;
         notify(errorText(e), "error");
+        return false;
       },
     );
   };
@@ -332,7 +331,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
               feed={g.feed}
               menu={() => feedActions(g.feed)}
               renaming={renaming === g.feed.url}
-              onRename={(t) => rename(g.feed, t)}
+              onRename={(t) => retitle(g.feed, g.feed.title, t.replace(/\s+/g, " ").trim())}
               onCancelRename={() => (setRenaming(null), listRef.current?.focus({ preventScroll: true }))}
               skillsPicker={
                 <SkillPicker skills={skills} value={g.feed.skills} title={g.feed.title} onChange={(next) => refile(g.feed, next)} onCreate={onCreateSkill}>
@@ -389,7 +388,7 @@ function FeedGroup({ feed, menu, renaming, onRename, onCancelRename, skillsPicke
   feed: FeedInfo;
   menu: () => MenuAction[];
   renaming: boolean;
-  onRename: (title: string) => void;
+  onRename: (title: string) => Promise<boolean>;
   onCancelRename: () => void;
   skillsPicker: ReactNode;
   error: ReactNode;
@@ -403,20 +402,7 @@ function FeedGroup({ feed, menu, renaming, onRename, onCancelRename, skillsPicke
         <div className="list-group feed-head" role="row" ref={setActivatorNodeRef} {...a11y} {...listeners}>
           <span role="gridcell" className="cell">
           {renaming ? (
-            <input
-              className="row-rename"
-              aria-label="Feed name"
-              autoFocus
-              defaultValue={feed.title}
-              onFocus={(e) => e.currentTarget.select()}
-              data-no-drag
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                if (e.key === "Enter") onRename(e.currentTarget.value);
-                else if (e.key === "Escape") onCancelRename();
-              }}
-              onBlur={onCancelRename}
-            />
+            <TitleField value={feed.title} label="Feed name" onSave={onRename} onClose={onCancelRename} />
           ) : (
             <span className="feed-name">
               {feed.title}

@@ -5,7 +5,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
-import { errorText, useFocusWhileMounted, type Notify } from "./util";
+import { errorText, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 
 // D75: answering a question where the answer turns up. One answer model on the skill page and in the
 // reader: pieces of his answer ("contributions"), each naming the source it was written from, so
@@ -328,7 +328,7 @@ export function AskQuestion({ skills, onDone, notify }: { skills: string[]; onDo
       const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
       onDone(true);
       // Asking goes on the history: ⌘Z takes the question back, ⇧⌘Z asks it again.
-      const set = (status: string) => void ore("annotate", r.annotation.id, "--status", status).then(() => onDone(true), (e) => notify(errorText(e), "error"));
+      const set = (status: string) => ore("annotate", r.annotation.id, "--status", status).then(() => onDone(true));
       notify("Question added", "quiet", () => set("deleted"), () => set("open"));
     } catch (e) {
       setError(errorText(e));
@@ -390,6 +390,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   const [all, setAll] = useState(false);
   const [asking, setAsking] = useState(false);
   const [version, setVersion] = useState(0);
+  const changes = useLibraryChanges();
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   /** Why the list didn't load; Try again reloads it. */
   const [failed, setFailed] = useState<string | null>(null);
@@ -408,13 +409,13 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
     return () => {
       live = false;
     };
-  }, [item, version]);
+  }, [item, version, changes]);
 
   const dismiss = async (q: Question) => {
     setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x)));
     try {
       await ore("match", item, q.id, "--drop");
-      const set = (drop: boolean) => void ore("match", item, q.id, ...(drop ? ["--drop"] : [])).then(reload, (e) => notify(errorText(e), "error"));
+      const set = (drop: boolean) => ore("match", item, q.id, ...(drop ? ["--drop"] : [])).then(reload);
       notify("Not answered here", "info", () => set(false), () => set(true));
     } catch (e) {
       notify(errorText(e), "error");

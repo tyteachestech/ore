@@ -40,7 +40,8 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, inOrder, load, save, useFocusBack, type Notify } from "./util";
+import { errorText, inOrder, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
+import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
 import { Working } from "./Working";
@@ -815,6 +816,9 @@ function ReaderView(p: Props & { reload: () => void }) {
   // Leaving the source, or opening another, stops the voice.
   useEffect(() => () => stopListening(), [p.id]);
 
+  // Read again when a ⌘Z lands; `opened` keeps that from counting as opening it again.
+  const changes = useLibraryChanges();
+  const opened = useRef<string | null>(null);
   useEffect(() => {
     let live = true;
     ore<Doc>("show", p.id, "--annotations").then(
@@ -825,14 +829,15 @@ function ReaderView(p: Props & { reload: () => void }) {
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
         setAnns((d.annotations ?? []).filter(visible));
         // Opening starts it and moves it up To read (D110); a preview isn't listed, so it's left alone.
-        if (!d.preview) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
+        if (!d.preview && opened.current !== p.id) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
+        opened.current = p.id;
       },
       (e) => live && setError(errorText(e)),
     );
     return () => {
       live = false;
     };
-  }, [p.id]);
+  }, [p.id, changes]);
 
   // Enrichment runs in the background after `ore add`; poll for prequestions for up to ~3 minutes
   // (`ore ls` carries the frontmatter without the body, which can be megabytes for a book).
@@ -1402,7 +1407,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     // On the history at once, so a ⌘Z right after the drag takes this highlight back, not the step
     // before it; the step acts on the saved highlight once the write is back.
     let step: ReturnType<typeof annStep> | undefined;
-    const act = (f: "remove" | "bring") => () => void promise.then((ann) => (step ??= annStep(ann.id, ann))[f](), () => {});
+    const act = (f: "remove" | "bring") => () => promise.then((ann) => (step ??= annStep(ann.id, ann))[f](), () => {});
     const forget = p.notify("Highlight", "quiet", act("remove"), act("bring"));
     promise.then(
       (ann) => {
@@ -1719,11 +1724,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       p.onChanged();
       const n = c.removed.length;
       const what = `Removed ${c.section ? "the section, " : ""}${c.words} ${c.words === 1 ? "word" : "words"}${n ? ` and ${n} ${n === 1 ? "highlight" : "highlights"}` : ""}`;
-      const step = (flag: string) => () =>
-        void ore("cut", d.id, flag, c.id).then(
-          () => (p.reload(), p.onChanged()),
-          (e) => p.notify(errorText(e), "error"),
-        );
+      const step = (flag: string) => () => ore("cut", d.id, flag, c.id).then(() => (p.reload(), p.onChanged()));
       p.notify(what, "info", step("--undo"), step("--redo"));
     } catch (e) {
       p.notify(errorText(e), "error");
@@ -2331,22 +2332,20 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
 
   /** Saves a new title in place (Notion's page title): optimistic, put back if the write fails. */
-  const rename = async (title: string) => {
-    setRenaming(false);
-    if (doc) await retitle(doc.id, doc.title, title.trim());
-  };
   async function retitle(id: string, before: string, t: string, undoable = true) {
-    if (!t || t === before) return;
+    if (!t || t === before) return true;
     setDoc((cur) => cur && cur.id === id ? { ...cur, title: t } : cur);
     try {
       await inOrder(id, () => ore("edit", id, "--title", t));
       p.onChanged();
       if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
+      return true;
     } catch (e) {
       setDoc((cur) => cur && cur.id === id ? { ...cur, title: before } : cur);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       p.notify(errorText(e), "error");
+      return false;
     }
   }
 
@@ -2722,20 +2721,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               </Hint>
             )}
             {renaming ? (
-              <input
-                className="title-edit"
-                aria-label="Title"
-                autoFocus
-                defaultValue={doc.title}
-                onFocus={(e) => e.currentTarget.select()}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === "Enter") void rename(e.currentTarget.value);
-                  else if (e.key === "Escape") setRenaming(false);
-                }}
-                // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
-                onBlur={() => setRenaming(false)}
-              />
+              <TitleField className="title-edit" value={doc.title} onSave={(t) => retitle(doc.id, doc.title, t.trim())} onClose={() => setRenaming(false)} />
             ) : (
               <WithMenu actions={PHONE ? [] : shownActions}>
                 {/* One click renames it in place, as the skill page's name does (Notion's page title);

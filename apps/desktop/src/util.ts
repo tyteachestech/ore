@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FocusEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type RefObject } from "react";
 
 /** A toast; `undo` adds an Undo button and puts the step on the app's history (⌘Z), and `redo`,
  *  the step again, lets ⇧⌘Z repeat it after an undo (AGENTS.md: delete acts at once, then offers Undo).
@@ -11,7 +11,7 @@ import { useEffect, useRef, type FocusEvent, type RefObject } from "react";
 /** `show`: the toast's one action: Show on a result, Try again on an error. */
 /** `stay`: an error toast that stays until its Try again is pressed or its × dismisses it, for a failure only that toast can recover. */
 /** `slot`: one toast at a time for it; a new one takes the place of the one showing (a retry that failed again). */
-export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => void, redo?: () => void, show?: () => void, stay?: boolean, slot?: string) => () => void;
+export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => Promise<unknown>, redo?: () => Promise<unknown>, show?: () => void, stay?: boolean, slot?: string) => () => void;
 
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never
  *  reaches the UI as "Cannot read properties of null". */
@@ -103,3 +103,27 @@ export const focusPicked = (e: FocusEvent<HTMLElement>) => {
   const to = row.querySelector<HTMLElement>('[aria-checked="true"]') ?? (e.target === row ? row.querySelector<HTMLElement>('[role="radio"]') : null);
   if (to && to !== e.target) to.focus();
 };
+
+/** ⌘Z and ⇧⌘Z run a step made by whatever screen was open then. That screen updates what it shows itself,
+ *  but it may since have closed and opened again as a new copy that never hears of it (Settings, a reader,
+ *  Feed, a skill page). So a step that lands wakes the screens opened after it was made, and only those:
+ *  each loads its own copy of the library's data again. The one that made the step is left alone, so a
+ *  reload never lands over an edit he makes right after. */
+let clock = 0;
+const made = new WeakMap<object, number>();
+const screens = new Map<() => void, number>();
+export const stepMade = (step: object) => void made.set(step, ++clock);
+export const stepLanded = (step: object) => {
+  const at = made.get(step) ?? 0;
+  for (const [wake, since] of screens) if (since > at) wake();
+};
+/** Changes when a step made before this screen opened lands: a dependency of the effect that loads its data. */
+export function useLibraryChanges(): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const wake = () => setN((x) => x + 1);
+    screens.set(wake, ++clock);
+    return () => void screens.delete(wake);
+  }, []);
+  return n;
+}

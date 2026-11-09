@@ -14,7 +14,8 @@ import { SkillChip, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
 import { Roll } from "./Roll";
-import { errorText, load, type Notify } from "./util";
+import { errorText, load, useLibraryChanges, type Notify } from "./util";
+import { TitleField } from "./TitleField";
 
 const day = () => new Date().toLocaleDateString("sv-SE");
 
@@ -61,7 +62,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
    *  Left out (the phone), a row has no menu at all: a long-press must not open an empty one. */
   sourceMenu?: (item: Item) => MenuAction[];
   /** Saves a source's title, typed in place on its row from Rename…. */
-  onRename?: (item: Item, title: string) => void;
+  onRename?: (item: Item, title: string) => Promise<boolean>;
   skillMenu?: (skill: Skill) => MenuAction[];
   /** Try again also reloads what failed with today's numbers: the sources and the skills. */
   onRetry?: () => void;
@@ -85,7 +86,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
       (e) => setError(errorText(e)),
     );
   }, []);
-  useEffect(refresh, [refresh, reload]);
+  const changes = useLibraryChanges();
+  useEffect(refresh, [refresh, reload, changes]);
 
   const [picking, setPicking] = useState(false);
   /** Start review shows once the skill list has loaded too: a click before it would start every skill unasked. */
@@ -243,30 +245,12 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 <div className="home-read" data-id={i.id} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpenSource(i.id)}>
                   <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
-                    <input
-                      className="row-rename"
-                      aria-label="Title"
-                      autoFocus
-                      defaultValue={i.title}
-                      onFocus={(e) => e.currentTarget.select()}
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => {
-                        e.stopPropagation();
-                        // Focus goes back to the row, as the sources list's rename does, so Tab carries on from it;
-                        // after this key, so a held Enter's repeat doesn't open the source.
-                        const row = e.currentTarget.closest<HTMLElement>(".home-read");
-                        const back = () => setTimeout(() => row?.querySelector<HTMLElement>(".home-open")?.focus({ preventScroll: true }));
-                        if (e.key === "Enter") {
-                          setRenaming(null);
-                          onRename?.(i, e.currentTarget.value);
-                          back();
-                        } else if (e.key === "Escape") {
-                          setRenaming(null);
-                          back();
-                        }
-                      }}
-                      // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
-                      onBlur={() => setRenaming(null)}
+                    <TitleField
+                      value={i.title}
+                      onSave={(t) => onRename!(i, t)}
+                      // Focus goes back to the row, as the sources list's rename does, so Tab carries on from it;
+                      // after this key, so a held Enter's repeat doesn't open the source.
+                      onClose={() => (setRenaming(null), setTimeout(() => document.querySelector<HTMLElement>(`.home-read[data-id="${i.id}"] .home-open`)?.focus({ preventScroll: true })))}
                     />
                   ) : (
                     <button className="title home-open" onClick={() => onOpenSource(i.id)}>{i.title}</button>

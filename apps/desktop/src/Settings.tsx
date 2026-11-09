@@ -15,7 +15,7 @@ import { setTray, trayOn } from "./quick";
 import { ShortcutEditor } from "./Shortcuts";
 import { setStyleControls, STYLE_CONTROLS, useStyleControls, type StyleControls } from "./draw/quick";
 import { CHIP_LOOKS, chipLook, setChipLook, type ChipLook } from "./Skills";
-import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
+import { errorText, load, save, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, SIZES, smaller, useReading, WIDTHS, type Font, type Page, type Width } from "./reading";
 import * as RadioGroup from "@radix-ui/react-radio-group";
 
@@ -57,9 +57,10 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   const ref = useRef<HTMLDivElement>(null);
   useFocusWhileMounted(ref);
 
+  const changes = useLibraryChanges();
   useEffect(() => {
     ore<Data>("settings").then(setData, (e) => setError(errorText(e)));
-  }, []);
+  }, [changes]);
 
   // The models to pick from, asked of the provider's own CLI each time Settings opens or the provider
   // changes, so a new model shows up by itself. Until it answers, the menu shows only the saved pick.
@@ -93,7 +94,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   /** Shows the change at once and rolls it back if the CLI refuses it. Once it lands it goes on the
    *  app history, so ⌘Z takes it back (and ⇧⌘Z gives it again) like any other change he makes;
    *  those replays pass no `step`. */
-  const change = async (next: Data, run: () => Promise<unknown>, step?: { message: string; undo: () => unknown; redo: () => unknown }) => {
+  const change = async (next: Data, run: () => Promise<unknown>, step?: { message: string; undo: () => Promise<unknown>; redo: () => Promise<unknown> }) => {
     const prev = dataRef.current;
     setData(next);
     dataRef.current = next;
@@ -111,7 +112,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   };
   /** What each goal setting is called in an Undone toast. */
   const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New cards a day", plan: "When you review", remix: "Remix cards" };
-  const setGoal = <K extends keyof Review>(key: K, flag: string, value: Review[K], record = true): Promise<void> | undefined => {
+  const setGoal = async <K extends keyof Review>(key: K, flag: string, value: Review[K], record = true): Promise<void> => {
     const d = dataRef.current;
     if (!d) return;
     const was = d.review[key];
@@ -119,7 +120,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   };
 
   /** The reminder lives in skills.yaml and in a LaunchAgent that fires with the app closed (D67). */
-  const setReminder = (t: string, record = true): Promise<void> | undefined => {
+  const setReminder = async (t: string, record = true): Promise<void> => {
     const d = dataRef.current;
     if (!d) return;
     const was = d.review.reminder;
@@ -136,7 +137,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       record ? { message: "Changed the reminder", undo: () => setReminder(was, false), redo: () => setReminder(t, false) } : undefined,
     );
   };
-  const setVendor = (v: Vendor, record = true): Promise<void> | undefined => {
+  const setVendor = async (v: Vendor, record = true): Promise<void> => {
     const d = dataRef.current;
     if (!d) return;
     const was = { ai: d.ai, model: d.model };
@@ -144,9 +145,9 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       const r = await ore<Data>("settings", opt("ai", v));
       setData(r);
       dataRef.current = r;
-    }, record ? { message: "Changed the AI provider", undo: () => setVendor(was.ai, false)?.then(() => setModel(was.model, false)), redo: () => setVendor(v, false) } : undefined);
+    }, record ? { message: "Changed the AI provider", undo: () => setVendor(was.ai, false).then(() => setModel(was.model, false)), redo: () => setVendor(v, false) } : undefined);
   };
-  const setModel = (m: string, record = true): Promise<void> | undefined => {
+  const setModel = async (m: string, record = true): Promise<void> => {
     const d = dataRef.current;
     if (!d) return;
     const was = d.model;
@@ -419,7 +420,11 @@ function QuizShortcut({ notify }: { notify: Notify }) {
             onClick={() => {
               const was = combo;
               set("");
-              notify("Turned off the quick quiz shortcut", "info", () => void rebind("quick-quiz", was), () => void rebind("quick-quiz", ""));
+              const to = (c: string) => async () => {
+                const why = rebind("quick-quiz", c);
+                if (why) throw new Error(why);
+              };
+              notify("Turned off the quick quiz shortcut", "info", to(was), to(""));
             }}
           >
             <X size={12} weight="bold" aria-hidden="true" />
