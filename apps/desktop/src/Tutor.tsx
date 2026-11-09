@@ -15,6 +15,7 @@ import { errorText, type Notify } from "./util";
 import { Working } from "./Working";
 import { mentionMatches, type Mention } from "./mentions";
 import { Owl } from "./Owl";
+import { firstWords, landedClosed } from "./owl-says";
 
 export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
 /** A web page the tutor's search found (D128, Tyler 2026-11-08): cited like a passage, opened in the browser. */
@@ -725,24 +726,21 @@ function reveal(step: Element) {
   else if (s.bottom > b.bottom) box.scrollTop += s.bottom - b.bottom;
 }
 
-/** The owl at the bottom right that opens the tutor (D160, after Notion AI's bubble); it faces him on hover. */
-export function TutorBubble({ onOpen }: { onOpen: () => void }) {
-  const [look, setLook] = useState(false);
-  return (
-    <Hint text="Tutor" keys="tutor" side="left">
-      <button
-        className="tutor-bubble"
-        aria-label="Open the tutor"
-        onClick={onOpen}
-        onPointerEnter={() => setLook(true)}
-        onPointerLeave={() => setLook(false)}
-        onFocus={() => setLook(true)}
-        onBlur={() => setLook(false)}
-      >
-        <Owl look={look} />
-      </button>
-    </Hint>
-  );
+/** The reply the owl says until he opens the tutor or waves it off (D159). */
+export function useUnheard(turns: TutorTurn[], open: boolean) {
+  const asked = useRef(new Set<string>());
+  const [id, setId] = useState<string | null>(null);
+  useEffect(() => {
+    const t = landedClosed(turns, asked.current, open);
+    if (open) setId(null);
+    else if (t) setId(t.id);
+  }, [turns, open]);
+  // Gone with its thread (New chat), or sent again (Try again) and waiting: nothing to say.
+  const said = useMemo(() => {
+    const t = id ? turns.find((x) => x.id === id) : undefined;
+    return (t && (t.reply !== undefined || t.error) && firstWords(t)) || null;
+  }, [id, turns]);
+  return { said, hush: () => setId(null) };
 }
 
 
@@ -781,5 +779,47 @@ function Cases({ cases, open, onSend }: { cases: string[]; open: boolean; onSend
         </section>
       ))}
     </div>
+  );
+}
+
+/** The tutor's button (D160, after Notion AI's bubble at the bottom right): the owl, where the floating tutor
+ *  opens. A reply that landed while it was closed comes out of it as a speech bubble (D159, after Cult UI's
+ *  speech bubble): a click opens the tutor at it. */
+export function TutorBubble({ onOpen, said = null, onHush }: { onOpen: () => void; said?: string | null; onHush?: () => void }) {
+  const [look, setLook] = useState(false);
+  const owl = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      {said && (
+        <div className="owl-says">
+          <Hint text="Open the tutor" keys="tutor" side="top">
+            <button className="owl-says-text" onClick={onOpen}>{said}</button>
+          </Hint>
+          <Hint text="Dismiss" side="top">
+            <button className="icon-btn owl-says-x" aria-label="Dismiss the reply" onClick={(e) => (onHush?.(), e.detail === 0 && owl.current?.focus())}>
+              <X size={10} aria-hidden="true" />
+            </button>
+          </Hint>
+          {/* The tail, a stair of 3px steps pointing at the owl: the one pixel part, since it says who is speaking. */}
+          <svg className="owl-says-tail" width="9" height="15" viewBox="0 0 9 15" aria-hidden="true">
+            <path d="M0 0h3v3h3v3h3v3h-3v3h-3v3h-3z" />
+          </svg>
+        </div>
+      )}
+      <Hint text="Tutor" keys="tutor" side={said ? "top" : "left"}>
+        <button
+          ref={owl}
+          className="tutor-bubble"
+          aria-label="Open the tutor"
+          onClick={onOpen}
+          onPointerEnter={() => setLook(true)}
+          onPointerLeave={() => setLook(false)}
+          onFocus={() => setLook(true)}
+          onBlur={() => setLook(false)}
+        >
+          <Owl look={look || !!said} />
+        </button>
+      </Hint>
+    </>
   );
 }

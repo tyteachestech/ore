@@ -12,7 +12,7 @@ import { copiedFiles, pastesFiles, watchCopies } from "./copied";
 import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type Question as QuestionView, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
-import { Tutor, TutorBubble, useTutorChat } from "./Tutor";
+import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Reader, type PracticeRef } from "./Reader";
 import type { SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
@@ -253,7 +253,8 @@ export function App() {
     const from = tutorFrom.current;
     // The ✦ that opened it is hidden while the tutor is open: focus goes to the one that comes back.
     flushSync(() => setTutorOpen(false));
-    (from?.isConnected ? from : from?.matches(".tutor-bubble") ? document.querySelector<HTMLElement>(".tutor-bubble") : null)?.focus?.();
+    // So is the bubble it said a reply from (D159): focus goes to the owl beside it.
+    (from?.isConnected ? from : from?.matches(".tutor-bubble, .owl-says-text") ? document.querySelector<HTMLElement>(".tutor-bubble") : null)?.focus?.();
   };
   const [adding, setAdding] = useState(false);
   const [help, setHelp] = useState(false);
@@ -290,6 +291,7 @@ export function App() {
   const rowSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const { notify, progress, clear: clearToast, view: toast } = useToast();
   const tutor = useTutorChat(notify);
+  const unheard = useUnheard(tutor.turns, tutorOpen);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Which list reads land, against the writes around them (reads.ts).
@@ -2097,7 +2099,7 @@ export function App() {
     </>
   );
 
-  const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} />;
+  const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} said={unheard.said} onHush={unheard.hush} />;
   return (
     <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
@@ -2166,8 +2168,10 @@ export function App() {
             </Hint>
           </div>
         )}
-        {/* The tutor's owl floats at the bottom right (D160). */}
+        {/* The tutor's owl floats at the bottom right (D160). Its live line stays when the owl hides (an overlay),
+            so VoiceOver hears a reply that lands then (D159). */}
         {tutorButton}
+        <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
         <Boundary key={`${openId}-${skill}-${place}`} onBack={goHome}>
         {openId ? (
           <Reader
