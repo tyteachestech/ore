@@ -1,6 +1,6 @@
 # Makes files/vocab.xlsx: a learner's vocabulary workbook written for Ore (D122 gap 8): shared and
-# inline strings, a date, a formula's saved value, a blank row and column to drop, an empty sheet,
-# and its own title and author. Run: python3 make-sheets.py (needs openpyxl and LibreOffice, which
+# inline strings, a date, a formula's saved value, percents (one a formula's, one to a decimal), a
+# blank row and column to drop, an empty sheet, and its own title and author. Run: python3 make-sheets.py (needs openpyxl and LibreOffice, which
 # resaves it the way Excel writes one: shared strings, formulas' values).
 from datetime import date
 from openpyxl import Workbook
@@ -15,6 +15,10 @@ ws.append(["hornear", "to bake, to roast", "Hornear es esperar | de verdad.", da
 ws.append([])
 ws.append(["hervir", "to boil", None, date(2025, 3, 6), None])
 ws["E5"] = "=E2+E3"
+ws["F1"] = "Right"
+for cell, v, fmt in [("F2", 0.75, "0%"), ("F3", "=5/8", "0%"), ("F5", 1 / 3, "0.0%")]:
+    ws[cell] = v
+    ws[cell].number_format = fmt
 wb.create_sheet("Empty")
 notes = wb.create_sheet("Grammar")
 notes.append(["Rule", "Example"])

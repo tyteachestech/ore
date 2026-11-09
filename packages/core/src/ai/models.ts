@@ -3,7 +3,7 @@ import { loadYaml } from "../frontmatter.ts";
 import { writeAtomic } from "../fsutil.ts";
 import { paths, type Library } from "../library.ts";
 import { withLock } from "../lock.ts";
-import { loadSkills, SkillsFileSchema } from "../skills.ts";
+import { loadSkills, parseSkillsFile } from "../skills.ts";
 import type { Vendor } from "./adapter.ts";
 
 export interface ModelOption { id: string; label: string; description?: string }
@@ -50,7 +50,7 @@ export async function setAiModel(lib: Library, vendor: Vendor, model: string): P
       doc.deleteIn(["models", vendor]);
       if (!Object.keys((doc.toJSON() as { models?: object }).models ?? {}).length) doc.delete("models");
     }
-    SkillsFileSchema.parse(doc.toJSON());
+    parseSkillsFile(doc.toJSON());
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     return id || DEFAULT[vendor];
   });

@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
-import { viteStaticCopy } from "vite-plugin-static-copy";
 import { dots } from "./src/dots";
 import { FIXES } from "./src/skill-icon-fixes";
 
@@ -96,19 +95,13 @@ const textImports: Plugin = {
 };
 
 // Tauri expects a fixed dev port and no screen clearing (it prints its own logs).
-// The icon picker's data ships with the app, so it works offline: Emojibase for emoji, MingCute's icons (pixelSkillIcons),
-// and Phosphor's for icons picked before MingCute (still drawn, no longer offered).
+// The icon picker's icons ship with the app, so it works offline: the pixel skill icons (pixelSkillIcons, D157).
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     pixelSkillIcons,
     ...(PHONE ? [phoneLibrary, textImports] : []),
-    viteStaticCopy({
-      targets: [
-        { src: "node_modules/@phosphor-icons/core/assets/fill/*.svg", dest: "icons", rename: { stripBase: true } },
-      ],
-    }),
   ],
   clearScreen: false,
   // Imported only by the lazy diagram chunk: found late, Vite would re-bundle and reload the page the

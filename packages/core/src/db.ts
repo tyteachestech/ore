@@ -361,8 +361,10 @@ export function rebuildIndex(lib: Library): SyncReport {
     } finally {
       db.close();
     }
-  } catch {
+  } catch (e) {
     // An index too damaged to open ("database disk image is malformed") is deleted and built from scratch.
+    // Another `ore` holding the lock past busy_timeout leaves the file alone: deleting it fails that one.
+    if (/^SQLITE_(BUSY|LOCKED)/.test(String((e as { code?: unknown }).code))) throw e;
     const path = paths.index(lib);
     for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) unlinkSync(f);
   }

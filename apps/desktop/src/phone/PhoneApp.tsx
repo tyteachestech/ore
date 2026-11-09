@@ -370,9 +370,10 @@ export function PhoneApp() {
   const archive = async (item: Item) => {
     setOpenId(null);
     setItems((all) => all?.filter((i) => i.id !== item.id) ?? all);
+    // Undo and Redo return the write, so a failed one goes back on the history and says why.
     const apply = (on: boolean) => {
       if (on) setItems((all) => all?.filter((i) => i.id !== item.id) ?? all);
-      ore("archive", item.id, ...(on ? [] : ["--undo"])).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
+      return ore("archive", item.id, ...(on ? [] : ["--undo"])).finally(refresh);
     };
     notify(`Archived “${item.title}”`, "info", () => apply(false), () => apply(true));
     try {
@@ -388,29 +389,36 @@ export function PhoneApp() {
     try {
       // Back to Done (an Undo): it keeps the finish date it had.
       await ore("status", item.id, to, ...(to === "done" && item.status === "done" && item.finished_at ? [opt("at", item.finished_at)] : []));
-      if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => void moveTo(item, item.status, false), () => void moveTo(item, to, false));
+      if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => moveTo(item, item.status, false), () => moveTo(item, to, false));
     } catch (e) {
+      // From the history (Undo or Redo): it puts the step back and says why.
+      if (!undoable) throw e;
       notify(errorText(e), "error");
+    } finally {
+      void refresh();
     }
-    void refresh();
   };
   const refile = async (item: Item, next: string[], before: string[], changed?: Skill) => {
     try {
       await ore("edit", item.id, "--skills", next.join(","));
       if (changed)
-        notify(next.includes(changed.id) ? `Filed “${item.title}” under ${changed.name}` : `Removed “${item.title}” from ${changed.name}`, "info", () => void refile(item, before, next), () => void refile(item, next, before));
+        notify(next.includes(changed.id) ? `Filed “${item.title}” under ${changed.name}` : `Removed “${item.title}” from ${changed.name}`, "info", () => refile(item, before, next), () => refile(item, next, before));
     } catch (e) {
+      // From the history (Undo or Redo, with no `changed`): it puts the step back and says why.
+      if (!changed) throw e;
       notify(errorText(e), "error");
+    } finally {
+      void refresh();
     }
-    void refresh();
   };
   const fileUnder = (item: Item, k: Skill) => refile(item, item.skills.includes(k.id) ? item.skills.filter((s) => s !== k.id) : [...item.skills, k.id], item.skills, k);
   /** From the Archive list, at once and with Undo, as archiving is. */
   const restore = (item: Item) => {
     setArchived((all) => all?.filter((i) => i.id !== item.id) ?? all);
-    const apply = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"])).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
-    notify(`Restored “${item.title}”`, "info", () => void apply(true), () => void apply(false));
-    void apply(false);
+    // Undo and Redo return the write, so a failed one goes back on the history and says why.
+    const apply = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"])).finally(refresh);
+    notify(`Restored “${item.title}”`, "info", () => apply(true), () => apply(false));
+    apply(false).catch((e) => notify(errorText(e), "error"));
   };
   const row: RowActions = {
     archive: (item) => (item.archived_at ? restore(item) : void archive(item)),

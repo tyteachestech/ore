@@ -10,7 +10,7 @@ capture → (AI: prequestions, skills, topics) → read + highlight (one highlig
 
 ```
 AGENTS.md                      # rules for agents editing this folder (CLAUDE.md symlinks to it)
-skills.yaml                    # Tyler's skills: id, name, priority (P1|P2|P3), hook; optional goal (D102), icon (mc:<name>, a pixel skill icon, D157; emoji and ph:<name> from before it still draw), color, collection (D36); optional `review: {goal_minutes, weekdays_only, new_per_day, remix, plan, reminder}` (D60, D66, D67; defaults 10, false, 10, true, "", ""; reminder is local "HH:MM")
+skills.yaml                    # Tyler's skills: id, name, priority (P1|P2|P3), hook; optional goal (D102), icon (mc:<name>, a pixel skill icon, D157; an emoji or ph:<name> from before it draws nothing), color, collection (D36); optional `review: {goal_minutes, weekdays_only, new_per_day, remix, plan, reminder}` (D60, D66, D67; defaults 10, false, 10, true, "", ""; reminder is local "HH:MM")
 topics/<slug>.md               # frontmatter: id, name, status (active|wanted), skills[], aliases[]; body: AI summary
 items/<yyyy>/<slug>-<id>/
   doc.md                       # canonical text + frontmatter (below)

@@ -5,7 +5,7 @@ title: Mixing topics in practice
 author: Ada Learner
 published: 2025-03-04
 captured_at: <time>
-text_sha256: d06f4c5d5451c248ac9a8a284ba54bd9c7f0d6447e0a2c6b13e83a9009f58321
+text_sha256: 180646986139e686449f229534702b76ab2283218a1bf010c5289dec1b0765f3
 status: inbox
 skills: []
 topics: []
@@ -28,6 +28,11 @@ In Japanese the idea is 間隔反復 (spaced repetition), and its root word is �
 Scores on the mixed test:
 
 ![](assets/bae1c44904c6b66d.png)
+
+1. Mix two kinds of problem.
+1. Add a third next week.
+
+Keep a log of each session so you see the spread.
 
 That's all for this week.
 

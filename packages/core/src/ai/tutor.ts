@@ -18,7 +18,7 @@ import { quoteIn } from "./grade.ts";
 // @-mentions, as context.
 
 /** One earlier turn. A turn that set an exercise carries it, with the card committed then (D158). */
-export interface TutorTurn { message: string; reply: string; exercise?: Exercise }
+export interface TutorTurn { message: string; reply: string; exercise?: z.input<typeof Exercise> }
 
 /** A reply with its worked answer's steps numbered under it (D142): what it said, as text. */
 export const withSteps = (r: { reply: string; steps: string[] }) => [r.reply, ...r.steps.map((s, i) => `${i + 1}. ${s}`)].join("\n");
@@ -39,7 +39,7 @@ export const Exercise = z.strictObject({
   prompts: z.array(z.string().min(1)).max(3),
   card: TutorCard,
   // A tell apart's two cases, each in full, which the app shows side by side with an answer line under each (D163).
-  cases: z.array(z.string().min(1)).optional(),
+  cases: z.array(z.string().min(1)).nullable().default(null),
 });
 export type Exercise = z.infer<typeof Exercise>;
 
@@ -57,9 +57,9 @@ export const TutorOutput = z.strictObject({
   // A worked answer in its steps, which the app shows one at a time (D142); [] for any other reply.
   steps: z.array(z.string().min(1)).max(8),
   // Feedback on the open exercise (D158): one boolean per rubric point of its card, true when his answer covers it.
-  covered: z.array(z.boolean()).optional(),
+  covered: z.array(z.boolean()).default([]),
   // With `covered`: per rubric point, the shortest stretch of his answer that states it, word for word; "" when not covered (D162).
-  evidence: z.array(z.string()).optional(),
+  evidence: z.array(z.string()).default([]),
 });
 
 /** His message with each diagram from his source note written out as lines, so a map he drew from
@@ -175,12 +175,12 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
         if (d.exercise.card.kind !== "prompt" || d.exercise.card.rubric.length < 2 || d.exercise.card.rubric.length > 4) return "exercise.card: a prompt card with 2 to 4 rubric points";
         const problem = cardTextProblem(d.exercise.card);
         if (problem) return `exercise.card: ${problem}`;
-        if (d.exercise.cases && d.exercise.cases.length !== 2) return "exercise.cases: a tell apart's two cases, each in full; leave it out for any other kind";
+        if (d.exercise.cases && d.exercise.cases.length !== 2) return "exercise.cases: a tell apart's two cases, each in full; null for any other kind";
       }
-      if (d.covered?.length) {
+      if (d.covered.length) {
         if (!open) return "covered: [] when there is no open exercise";
         if (d.covered.length !== open.card.rubric.length) return `covered: one boolean per rubric point (${open.card.rubric.length})`;
-        if (d.evidence && d.evidence.length !== d.covered.length) return `evidence: one per rubric point (${d.covered.length}), "" where not covered`;
+        if (d.evidence.length !== d.covered.length) return `evidence: one per rubric point (${d.covered.length}), "" where not covered`;
       }
       return d.card ? cardTextProblem(d.card) : null;
     },
@@ -200,11 +200,11 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
     return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
   });
   // Feedback that found a point missing offers the exercise's own card (D158), never one the model wrote after his answer.
-  const missed = !!open && !!data.covered?.length && data.covered.some((c) => !c);
+  const missed = !!open && data.covered.length > 0 && data.covered.some((c) => !c);
   const card = missed ? open.card : data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null;
   // Each point of the committed card with its mark and the words of his that earned it (D162), as Review's
   // check shows them (D141): a quote is kept only for a covered point and only when it is in what he wrote.
-  const marks = open && data.covered?.length ? open.card.rubric.map((point, i) => ({ point, covered: data.covered![i]!, quote: data.covered![i] ? quoteIn(message.trim(), data.evidence?.[i] ?? "") : "" })) : [];
+  const marks = open && data.covered.length ? open.card.rubric.map((point, i) => ({ point, covered: data.covered[i]!, quote: data.covered[i] ? quoteIn(message.trim(), data.evidence[i] ?? "") : "" })) : [];
   return { message: m, reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, ai, usage: usage as Usage };
 }
 

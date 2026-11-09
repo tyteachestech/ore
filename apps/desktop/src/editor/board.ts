@@ -11,7 +11,7 @@ const Z = [0.25, 8] as const;
 export const MIN: Size = { w: 160, h: 64 };
 const MAX_H = 1600;
 /** A press that moves less than this is a click, and opens the diagram. */
-export const SLOP = 4;
+const SLOP = 4;
 
 /** The size a diagram link's alt text keeps (`Diagram|640x320`), or null for the preview's own size. */
 export function sizeOf(alt: string): Size | null {

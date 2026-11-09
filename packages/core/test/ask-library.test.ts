@@ -72,6 +72,8 @@ describe("Ask your library: retrieval", () => {
     expect(queryTerms("carry carries carried")).toEqual(["carr"]);
     expect(queryTerms("added add")).toEqual(["add"]);
     expect(queryTerms("very many only notes miss")).toEqual(["very", "many", "only", "note", "miss"]);
+    // -ying is cut only after a consonant (studying): playing stayed "pla", a prefix of plan and place.
+    expect(queryTerms("playing play staying stay")).toEqual(["play", "stay"]);
   });
 
   test("BM25: a short passage about the question beats a long one that mentions its words once, wherever it sits", async () => {

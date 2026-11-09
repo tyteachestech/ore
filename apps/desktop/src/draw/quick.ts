@@ -11,7 +11,7 @@ export const STYLE_CONTROLS: { id: StyleControls; label: string }[] = [
 const KEY = "ore.diagram.style";
 const subs = new Set<() => void>();
 
-export const styleControls = (): StyleControls => (load(KEY) === "panel" ? "panel" : "pointer");
+const styleControls = (): StyleControls => (load(KEY) === "panel" ? "panel" : "pointer");
 export function setStyleControls(v: StyleControls) {
   save(KEY, v);
   subs.forEach((f) => f());

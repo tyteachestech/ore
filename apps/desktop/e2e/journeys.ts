@@ -89,6 +89,17 @@ async function select(page: Page, phrase: string) {
   await page.mouse.up();
 }
 
+/** Waits until every title is back in the library, not only on screen: rows come back the moment ⌘Z is
+ *  pressed, while its write may still wait behind the archive's. A journey that ended there closed its
+ *  page first, the queued Undo was never sent, and the next journeys lost those sources (“The Testing
+ *  Effect” from To read, failing the hang and a11y journeys on CI). */
+async function inLibrary(titles: string[]) {
+  await until("the library has them all back", async () => {
+    const live = new Set(((await ore("ls")) as { title: string }[]).map((i) => i.title));
+    return titles.every((t) => live.has(t));
+  });
+}
+
 /** Waits until a check holds, for a step that saves in the background. */
 async function until(what: string, ok: () => Promise<boolean>, ms = 5000) {
   for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(100)) if (await ok()) return;
@@ -971,7 +982,7 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   const replies = [
     { reply: "Tell these two apart.", citations: [], general: false, hint: false, exercise, card: null, marks: [] },
     { reply: "A is right. B: who decides the steps?", citations: [], general: false, hint: false, exercise: null, card, marks: [{ point: card.rubric[0], covered: true, quote: "same steps each time" }, { point: card.rubric[1], covered: false, quote: "" }] },
-  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@10" } }));
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@11" } }));
   const asked: string[] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
@@ -1019,7 +1030,7 @@ journey("tutor: words selected in a reply go into the source note as a quote, Un
     const args = (JSON.parse(body) as { args: string[] }).args;
     asked.push(args[1]!);
     item ||= args.find((a) => a.startsWith("--item="))!.slice(7);
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `${said} That is the whole difference.`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@10" } }) });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `${said} That is the whole difference.`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@11" } }) });
   });
   await page.keyboard.press("Meta+j");
   const tutor = page.getByRole("complementary", { name: "Tutor" });
@@ -2486,6 +2497,23 @@ journey("home: a reading row and a skill tile show ⋯ on hover; it opens their 
   await until("its menu is open", async () => (await page.getByRole("menuitem").count()) > 0);
   await page.keyboard.press("Escape");
   await until("still on Home", async () => (await page.locator(".home-skill").count()) > 0);
+});
+
+// #193 made a tile's name its one focusable control, and the arrows went on looking for focus on the tile.
+journey("home: arrows move between skill tiles and Continue reading, from the focused name", async (page) => {
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".home-skill").nth(1).waitFor();
+  const focused = () => page.evaluate(() => document.activeElement?.closest(".home-skill, .home-read")?.querySelector(".home-open")?.textContent ?? null);
+  const names = await page.locator(".home .home-skill .home-open").allTextContents();
+  await page.locator(".home-skill .home-open").first().focus();
+  await page.keyboard.press("ArrowRight");
+  await until("→ moves to the next tile", async () => (await focused()) === names[1]);
+  if (!(await page.evaluate(() => document.activeElement?.classList.contains("home-open")))) throw new Error("focus is not on the tile's name");
+  await page.keyboard.press("ArrowLeft");
+  await until("← moves back", async () => (await focused()) === names[0]);
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await page.keyboard.press("ArrowDown");
+  await until("an arrow with nothing focused picks the first", async () => (await focused()) !== null);
 });
 
 journey("feed: ⌘K offers the selected post's actions, named for it, once the keyboard picks it", async (page) => {
@@ -4232,6 +4260,7 @@ journey("undo that fails: the toast says why, and ⌘Z tries the same step again
   await page.locator(".list").click({ position: { x: 5, y: 5 } }).catch(() => {});
   await page.keyboard.press("Meta+z");
   await row.waitFor();
+  await inLibrary([AGENTS]);
 });
 
 journey("settings: a Review setting goes on the history; ⌘Z takes it back, ⇧⌘Z gives it again", async (page) => {
@@ -4979,6 +5008,7 @@ journey("list archive: A selects the row after the archived one, so a second A a
   await page.keyboard.press("Meta+z");
   await until("⌘Z ⌘Z bring both back", async () => (await titles()).length === before.length);
   for (const t of before) if (!(await titles()).includes(t)) throw new Error(`“${t}” did not come back`);
+  await inLibrary(before);
 });
 
 journey("list archive Undo selects the source it put back, as Finder does, though the row was never selected", async (page) => {
@@ -5215,6 +5245,7 @@ journey("stacked Undo: each ⌘Z's toast comes to the front and names the source
   await until("the second ⌘Z's toast is in front, naming the one it put back", async () => (await front()) === `Undone: Archived “${before[1]}”`);
   await page.keyboard.press("Meta+z");
   await until("all three are back", async () => (await titles()).length === before.length);
+  await inLibrary(before);
 });
 
 journey("delete skill: with nothing to decide it deletes at once, and ⌘Z puts it back (no Are you sure)", async (page) => {

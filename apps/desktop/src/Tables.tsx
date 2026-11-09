@@ -25,7 +25,7 @@ const useStep = () =>
     () => null,
   );
 
-export function installReader(): Promise<void> {
+function installReader(): Promise<void> {
   if (installing) return installing;
   step = "";
   installing = (async () => {
@@ -46,7 +46,7 @@ export function installReader(): Promise<void> {
 }
 
 /** Stops the download; what it fetched so far is thrown away on the next one. */
-export const cancelInstall = () => cancelOre(JOB);
+const cancelInstall = () => cancelOre(JOB);
 
 const what = (s: string[]) => (s.includes("tables") && s.includes("formulas") ? "Formulas and tables" : s.includes("tables") ? "Tables" : "Formulas");
 

@@ -51,7 +51,7 @@ export const mathRule = $inputRule(
 );
 
 /** The equation as KaTeX draws it; an empty one says so, a broken one shows its TeX in red (KaTeX). */
-export function drawMath(dom: HTMLElement, tex: string, display: boolean) {
+function drawMath(dom: HTMLElement, tex: string, display: boolean) {
   dom.classList.toggle("empty", !tex.trim());
   if (!tex.trim()) return void (dom.textContent = display ? "Empty equation: click to write it" : "Equation");
   dom.innerHTML = katex.renderToString(tex, { displayMode: display, throwOnError: false });

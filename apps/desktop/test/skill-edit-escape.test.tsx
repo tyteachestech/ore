@@ -21,12 +21,12 @@ type Skill = import("../src/Skills").Skill;
 const esc = (target: Element) => void target.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
 
 /** The Edit skill dialog for Habits; `closed` counts the Escapes that closed it. */
-async function withEditor(run: (t: { panel: HTMLElement; closed: () => number }) => void) {
+async function withEditor(run: (t: { panel: HTMLElement; closed: () => number }) => void, look: Partial<Skill> = {}) {
   const div = document.createElement("div");
   document.body.append(div);
   const root = createRoot(div);
   let closed = 0;
-  const skill = { id: "habits", name: "Habits" } as unknown as Skill;
+  const skill = { id: "habits", name: "Habits", ...look } as unknown as Skill;
   try {
     act(() => root.render(
       <HintProvider>
@@ -64,3 +64,10 @@ describe("Edit skill: Esc", () => {
       portal.remove();
     }));
 });
+
+// D157: core takes only "mc:" icons, and an emoji from before draws nothing. The editor reads it as no
+// icon, so ⌘Z after picking one clears the icon instead of writing back the emoji, which always failed.
+test("Edit skill: an emoji icon from before D157 reads as no icon", () =>
+  withEditor(({ panel }) => {
+    expect(panel.querySelector('button[aria-label="Add icon"]')).not.toBeNull();
+  }, { icon: "🎓" } as Partial<Skill>));

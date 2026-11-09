@@ -7,39 +7,49 @@ export const Lite = createContext(false);
 export const useLite = () => useContext(Lite);
 
 // One observer per scrolling list, reaching a screen's height past its edges, so a row has its menus
-// before it scrolls into reach.
-const observers = new Map<Element | null, IntersectionObserver>();
+// before it scrolls into reach. It goes once it watches no row, so a list that mounts again (a screen
+// switch) never leaves the old one holding its detached rows.
+const observers = new Map<Element | null, { io: IntersectionObserver; rows: Set<Element> }>();
 const waiting = new Map<Element, Set<() => void>>();
 const scroller = (el: Element): Element | null => {
   for (let p = el.parentElement; p; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return p;
   return null;
 };
+/** Stops watching a row; the list's observer goes with its last one. */
+const stop = (root: Element | null, row: Element) => {
+  const o = observers.get(root);
+  waiting.delete(row);
+  if (!o?.rows.delete(row)) return;
+  o.io.unobserve(row);
+  if (o.rows.size) return;
+  o.io.disconnect();
+  observers.delete(root);
+};
 const watch = (el: Element, on: () => void) => {
   const root = scroller(el);
-  let io = observers.get(root);
-  if (!io) {
-    io = new IntersectionObserver(
+  let o = observers.get(root);
+  if (!o) {
+    const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
           if (!e.isIntersecting) continue;
           for (const f of waiting.get(e.target) ?? []) f();
-          waiting.delete(e.target);
-          io!.unobserve(e.target);
+          stop(root, e.target);
         }
       },
       { root, rootMargin: "100% 0px" },
     );
-    observers.set(root, io);
+    o = { io, rows: new Set() };
+    observers.set(root, o);
   }
   const set = waiting.get(el) ?? new Set();
   set.add(on);
   waiting.set(el, set);
-  io.observe(el);
+  o.rows.add(el);
+  o.io.observe(el);
   return () => {
     set.delete(on);
-    if (set.size) return;
-    waiting.delete(el);
-    io.unobserve(el);
+    if (!set.size) stop(root, el);
   };
 };
 

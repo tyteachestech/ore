@@ -66,8 +66,9 @@ export function kappa(cases: { label: "right" | "wrong"; got?: "right" | "wrong"
   const n = cases.length;
   if (!n) return 0;
   const agree = cases.filter((c) => c.got === c.label).length / n;
-  const pr = (k: "label" | "got") => cases.filter((c) => c[k] === "right").length / n;
-  const chance = pr("label") * pr("got") + (1 - pr("label")) * (1 - pr("got"));
+  // An error (no verdict) is its own answer, so it agrees with neither label by chance either.
+  const pr = (k: "label" | "got", v: "right" | "wrong") => cases.filter((c) => c[k] === v).length / n;
+  const chance = pr("label", "right") * pr("got", "right") + pr("label", "wrong") * pr("got", "wrong");
   return chance === 1 ? 1 : (agree - chance) / (1 - chance);
 }
 

@@ -82,7 +82,7 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@10" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@11" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
@@ -145,6 +145,18 @@ describe("tutor: the web", () => {
     await expect(tutor(lib, "When was Ebbinghaus born?")).rejects.toThrow("is not in what the web search returned");
     expect(sent()).toHaveLength(2);
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("is not a page your web search returned");
+  });
+
+  // The retry's reason lists what the first run's search returned and asks for one of those; the retry
+  // that cites one without searching again holds, since the search did return it.
+  test("a retry may cite a page the first run's search returned", async () => {
+    const { lib } = await library();
+    const out = (passage: string) => ({ reply: "Born in 1850 [1].", citations: [{ passage, quote: "born on January 24, 1850" }], general: false, hint: false, steps: [], exercise: null, card: null });
+    fakeClaude([{ web: searched([BRIT], "Hermann Ebbinghaus was born on January 24, 1850, in Barmen."), out: out("https://en.wikipedia.org/wiki/Hermann_Ebbinghaus") }, { web: [{ type: "system", subtype: "init", model: "claude-main-1" }], out: out(BRIT.url) }]);
+    const r = await tutor(lib, "When was Ebbinghaus born?");
+    expect(sent()).toHaveLength(2);
+    expect(r.searched).toBe(true);
+    expect(r.citations[0]).toMatchObject({ url: BRIT.url, title: BRIT.title, quote: "born on January 24, 1850" });
   });
 
   test("a quote of a page's title with quotes in it holds, though the search lists titles JSON-escaped", async () => {
@@ -334,10 +346,10 @@ describe("tutor: practice", () => {
     const earlier = [{ message: "Practice", reply: "Explain why a missed card goes back to box one.", exercise }, { message: "wait, what's box one?", reply: "The box reviewed most often." }];
     const late: TutorCard = { kind: "card", content_type: "fact", question: "Where does a missed card go?", answer: "Box one.", rubric: [] };
     fakeClaude([
-      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P1", quote: "goes back to the first box" }], covered: [false, true], card: late }),
-      out({ reply: "Both points, nicely put. What about a card you get right?", covered: [true, true] }),
-      out({ reply: "Both points.", covered: [true] }),
-      out({ reply: "Both points.", covered: [true, true] }),
+      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P1", quote: "goes back to the first box" }], covered: [false, true], evidence: ["", "you see it again soon"], card: late }),
+      out({ reply: "Both points, nicely put. What about a card you get right?", covered: [true, true], evidence: ["memory is weak", "comes round most often"] }),
+      out({ reply: "Both points.", covered: [true], evidence: ["Both"] }),
+      out({ reply: "Both points.", covered: [true, true], evidence: ["", ""] }),
     ]);
     const r = await tutor(lib, "Because you see it again soon", { item: a.meta.id, earlier });
     expect(r.card).toEqual(key);
@@ -386,7 +398,7 @@ describe("tutor: practice", () => {
 
   test("covered marks with no open exercise go back to fix", async () => {
     const { lib, a } = await library();
-    fakeClaude([out({ reply: "Good.", covered: [true] }), out({ reply: "Good." })]);
+    fakeClaude([out({ reply: "Good.", covered: [true], evidence: [""] }), out({ reply: "Good." })]);
     expect((await tutor(lib, "Box one", { item: a.meta.id, earlier: [{ message: "hi", reply: "hello" }] })).card).toBeNull();
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("covered: [] when there is no open exercise");
   });

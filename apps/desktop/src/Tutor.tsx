@@ -19,18 +19,18 @@ import { firstWords, landedClosed } from "./mole-says";
 
 export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
 /** A web page the tutor's search found (D128, Tyler 2026-11-08): cited like a passage, opened in the browser. */
-export type WebCitation = { n: number; url: string; title: string; site: string; quote: string; text: string };
+type WebCitation = { n: number; url: string; title: string; site: string; quote: string; text: string };
 type AnyCitation = Citation | WebCitation;
 /** The first of his own sources a reply cites: where a card from it belongs. */
 const firstSource = (cs: AnyCitation[] | undefined) => cs?.find((c): c is Citation => !("url" in c))?.item;
 /** One exchange. `item`/`title` is the source it was asked about (the context chip at the time). */
-export type TutorCard = { kind: "card" | "prompt"; content_type: string; question: string; answer: string; rubric: string[] };
+type TutorCard = { kind: "card" | "prompt"; content_type: string; question: string; answer: string; rubric: string[] };
 type Ai = { vendor: string; model: string; prompt_version: string };
 /** An open exercise (D128.6): its heading in his note, the placeholder lines under it, and the card it
  *  becomes if he misses (D158), committed before he answers and never shown until then. */
-export type Exercise = { heading: string; prompts: string[]; card: TutorCard; cases?: string[] };
+type Exercise = { heading: string; prompts: string[]; card: TutorCard; cases?: string[] | null };
 /** Feedback on an exercise (D162): each point of its committed card, whether his answer covered it, and his words that did. */
-export type Mark = { point: string; covered: boolean; quote: string };
+type Mark = { point: string; covered: boolean; quote: string };
 export type TutorTurn = {
   /** Unique across chats: a reply lands only on the turn that asked for it. */
   id: string;
@@ -150,8 +150,9 @@ export function useTutorChat(notify: Notify) {
       notify(
         "Added to your note",
         "info",
-        () => void ore("notes", item, opt("set", before), opt("base", after)).then(written, (e) => notify(errorText(e), "error")),
-        () => void ore("notes", item, opt("append", lines), opt("heading", "From the tutor")).then(written, (e) => notify(errorText(e), "error")),
+        // A failed write puts the step back and says why (history.ts).
+        () => ore("notes", item, opt("set", before), opt("base", after)).then(written),
+        () => ore("notes", item, opt("append", lines), opt("heading", "From the tutor")).then(written),
       );
     } catch (e) {
       notify(errorText(e, "add that to your note"), "error");

@@ -127,3 +127,15 @@ test("the history keeps the newest 50 steps; the oldest fall off", () => {
   expect(undone[0]).toBe("55");
   expect(undone.at(-1)).toBe("6");
 });
+
+// A step that throws its write's promise away can't fail: the history counts it done, and a failed
+// write (the figure card's Undo) was an unhandled rejection with no message. Each returns its write.
+test("no undo or redo step throws away its write's promise", async () => {
+  const { Glob } = await import("bun");
+  const found: string[] = [];
+  for await (const f of new Glob("**/*.tsx").scan(`${import.meta.dir}/../src`)) {
+    const lines = (await Bun.file(`${import.meta.dir}/../src/${f}`).text()).split("\n");
+    lines.forEach((l, i) => /(?:^|, )\s*\(\) => void (?:ore|apply)\(/.test(l) && found.push(`${f}:${i + 1}`));
+  }
+  expect(found).toEqual([]);
+});
