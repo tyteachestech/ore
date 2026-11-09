@@ -392,7 +392,7 @@ journey("highlight popup open: typing writes the note, and no letter runs a shor
   if (after !== words + "2") throw new Error(`a 2 typed after the note became “${after}”`);
 });
 
-journey("tutor owl: it sits at the bottom right on every screen, pages keep room to scroll clear of it, and a quiz panel hides it (D158)", async (page) => {
+journey("tutor owl: it sits at the bottom right on every screen, pages keep room to scroll clear of it, and a quiz panel hides it (D160)", async (page) => {
   const button = page.getByRole("button", { name: "Open the tutor" });
   const vp = page.viewportSize()!;
   const check = async (where: string, scroller: string) => {
