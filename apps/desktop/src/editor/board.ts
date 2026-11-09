@@ -58,7 +58,7 @@ export function board(
     inner.style.transform = moved(v) ? `translate(${v.x}px, ${v.y}px) scale(${v.z})` : "";
     dom.classList.toggle("moved", moved(v));
   };
-  fit.addEventListener("pointerdown", (e) => (e.preventDefault(), e.stopPropagation()));
+  fit.addEventListener("pointerdown", (e) => e.preventDefault());
   fit.addEventListener("click", (e) => {
     e.stopPropagation();
     set(HOME);
@@ -71,7 +71,6 @@ export function board(
     g.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      e.stopPropagation();
       const r = dom.getBoundingClientRect();
       const col = (dom.parentElement?.getBoundingClientRect().right ?? r.right) - r.left;
       const start = { x: e.clientX, y: e.clientY, w: r.width, h: r.height };
@@ -106,6 +105,7 @@ export function board(
   // Drag pans (left or middle button); a left press that never moves is a click, which opens it.
   let dragged = false;
   dom.addEventListener("pointerdown", (e) => {
+    if (e.target === fit || grips.includes(e.target as HTMLElement)) return;
     if (e.pointerType === "touch" || (e.button !== 0 && e.button !== 1)) return;
     // Taken here, the press never reaches the note as a node drag or a text selection.
     e.preventDefault();

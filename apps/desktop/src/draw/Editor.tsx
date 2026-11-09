@@ -1916,7 +1916,7 @@ function CustomColour({ label, value, presets, used, onPick, onDone }: { label: 
           collisionPadding={8}
           aria-label={`Custom ${label} colour`}
           onCloseAutoFocus={(e) => e.preventDefault()}
-          onPointerDown={stop} onMouseDown={stop} onClick={stop} onContextMenu={stop} onWheel={stop}
+          onMouseDown={stop} onClick={stop} onContextMenu={stop} onWheel={stop}
           onKeyDown={(e) => {
             e.stopPropagation();
             if (e.key === "Enter") close();

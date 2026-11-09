@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { DndContext, PointerSensor, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
+import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
+import { RowSensor } from "./drag";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -288,7 +289,7 @@ export function App() {
   const [rowDrag, setRowDrag] = useState<{ item: Item; course?: Extract<Line, { kind: "course" }>; many?: Item[]; skill: string | null; at: { x: number; y: number } } | null>(null);
   /** Where a dragged pinned row would land among the pinned (Raycast's pinned reorder). */
   const [pinDrop, setPinDrop] = useState<PinGap | null>(null);
-  const rowSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const rowSensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }));
   const { notify, progress, clear: clearToast, view: toast } = useToast();
   const tutor = useTutorChat(notify);
   const unheard = useUnheard(tutor.turns, tutorOpen);
@@ -1848,7 +1849,7 @@ export function App() {
             defaultValue={r.title}
             onFocus={(e) => e.currentTarget.select()}
             onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
+            data-no-drag
             onKeyDown={(e) => {
               e.stopPropagation();
               if (e.key === "Enter") void live.current.renameRow(r, e.currentTarget.value);
@@ -1922,7 +1923,7 @@ export function App() {
               e.stopPropagation();
               toggleCourse(c.id);
             }}
-            onPointerDown={(e) => e.stopPropagation()}
+            data-no-drag
           >
             <CaretRight size={11} weight="bold" aria-hidden="true" />
           </button>
@@ -1943,7 +1944,7 @@ export function App() {
             defaultValue={c.title}
             onFocus={(e) => e.currentTarget.select()}
             onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
+            data-no-drag
             onKeyDown={(e) => {
               e.stopPropagation();
               if (e.key === "Enter") void renameCourse(c, e.currentTarget.value);

@@ -1,5 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { closestCenter, DndContext, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { RowSensor } from "./drag";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -275,7 +276,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     </div>
   );
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  const sensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const onDragEnd = (e: DragEndEvent) => {
     const from = feeds.findIndex((f) => f.url === e.active.id);
     const to = feeds.findIndex((f) => f.url === e.over?.id);
@@ -408,7 +409,7 @@ function FeedGroup({ feed, menu, renaming, onRename, onCancelRename, skillsPicke
               autoFocus
               defaultValue={feed.title}
               onFocus={(e) => e.currentTarget.select()}
-              onPointerDown={(e) => e.stopPropagation()}
+              data-no-drag
               onKeyDown={(e) => {
                 e.stopPropagation();
                 if (e.key === "Enter") onRename(e.currentTarget.value);
@@ -422,7 +423,7 @@ function FeedGroup({ feed, menu, renaming, onRename, onCancelRename, skillsPicke
             </span>
           )}
           {error}
-          <span className="feed-tools" onPointerDown={(e) => e.stopPropagation()}>
+          <span className="feed-tools" data-no-drag>
             {skillsPicker}
             <MoreButton label={`Actions for ${feed.title}`} actions={menu} />
           </span>

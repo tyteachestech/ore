@@ -5093,6 +5093,45 @@ journey("list: back from a source opened low in To read, its row is selected and
   if (!seen) throw new Error(`the selected row “${title}” is scrolled out of the list`);
 });
 
+journey("a popover closes on any click outside it, even after a press inside it or on a control that stops the event", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  // As in WebKit: a click moves no focus, so the popover's close-on-focus-loss can't hide a missed click.
+  await page.addScriptTag({ content: `document.addEventListener("mousedown", (e) => e.preventDefault(), true)` });
+  const picker = page.locator(".skill-picker");
+  const open = async () => {
+    await page.getByRole("button", { name: `Skills for ${TESTING}` }).click();
+    await picker.waitFor();
+  };
+  const closed = async (where: string) => {
+    await picker.waitFor({ state: "detached", timeout: 1500 }).catch(() => {
+      throw new Error(`the skill picker stayed open after a click ${where}`);
+    });
+  };
+  // A press inside first: it must not eat the next click outside.
+  await open();
+  await picker.getByPlaceholder("Find or create a skill…").click();
+  await page.mouse.click(1100, 790);
+  await closed("on empty space, after a press inside it");
+  // A control that keeps its press from dragging the row.
+  await open();
+  await page.getByRole("button", { name: `Skills for ${AGENTS}` }).click();
+  await until("one skill picker open", async () => (await page.locator(".skill-picker[data-state=open]").count()) === 1);
+  await page.keyboard.press("Escape");
+  await closed("on another row's skills (it opens that row's)");
+  await open();
+  const row = page.locator(".row", { hasText: AGENTS }).first();
+  await row.hover();
+  await row.getByRole("button", { name: `Actions for ${AGENTS}` }).click();
+  await closed("on another row's ⋯ menu");
+  await page.keyboard.press("Escape");
+  // A control that stops its click.
+  await open();
+  await page.locator(".side-head-tools .side-tool").first().click({ force: true });
+  await closed("on a sidebar tool");
+  await page.keyboard.press("Escape");
+  await page.reload();
+});
+
 journey("skill picker: a skill with a long name still shows its tick", async (page) => {
   const long = "Quantum error correction for people who never took physics and want to read the papers anyway, slowly";
   const k = (await ore("skills", "add", long)) as { id: string };

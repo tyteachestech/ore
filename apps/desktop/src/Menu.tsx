@@ -158,7 +158,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   // Off screen in a long list (Lite.tsx): the same button as the trigger renders, its menu and hint once it scrolls in.
   const lite = useLite() && !open;
   const button = (
-    <button ref={self} {...(lite && { type: "button", "aria-haspopup": "menu", "aria-expanded": false })} className={className} aria-label={label} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => (onPointerDown?.(e), e.stopPropagation())}>
+    <button ref={self} {...(lite && { type: "button", "aria-haspopup": "menu", "aria-expanded": false })} className={className} aria-label={label} data-no-drag onClick={(e) => e.stopPropagation()} onPointerDown={onPointerDown}>
       {icon ?? <DotsThree size={16} aria-hidden="true" />}
     </button>
   );
@@ -260,7 +260,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   };
   return (
     <>
-      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; e.preventDefault(); e.stopPropagation(); }}>
+      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} data-no-drag onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; e.preventDefault(); }}>
         {icon ?? <DotsThree size={16} aria-hidden="true" />}
       </button>
       {open && (
