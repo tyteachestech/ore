@@ -182,9 +182,14 @@ kbd {
 .sidebar.within .side-item.on:not(.drop-on) { background: var(--bg-hover); box-shadow: none; }
 .sidebar.within .side-item.on[data-color]:not(.drop-on) { background: color-mix(in srgb, var(--skill) 11%, var(--bg-side)); }
 /* "…" edits the skill; it takes the count's place on hover. */
-.side-more { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px; display: none; place-items: center; color: var(--faint); }
+/* Hidden by opacity, not display (as the collection's tools): → focuses it from the skill, and between the skill's
+   blur and its focus neither has focus, so a ⋯ that is only rendered while focused can't take it. */
+.side-more { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); opacity: 0; }
 .side-more:hover { color: var(--text); background: var(--bg-active); }
-.side-item:hover .side-more, .side-more:focus-visible, .side-more[aria-expanded="true"] { display: grid; }
+.side-item:hover .side-more, .side-more:focus-visible, .side-more[aria-expanded="true"] { opacity: 1; }
+/* With the keyboard on a skill, its ⋯ shows so → can reach it (and the collection's tools, the same). */
+.side-item:has(> .side-main:focus-visible) .side-more { opacity: 1; }
+.side-head:has(> .side-label:focus-visible) .side-head-tools { opacity: 1; }
 .side-more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 
 /* Skill icons: an emoji, a Phosphor glyph masked and filled with the skill color, or a color dot. */
@@ -251,7 +256,7 @@ img.thumb { filter: brightness(0.86); }
    full width, then the other skills it is under by name, muted (or, matched in its text, why). Author, site
    and date stay columns on the right, so they line up down the list. A lesson keeps one line: its
    skills are its course's. */
-.row:has(> .row-main):not(.lesson) { height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
+.row:has(.row-main):not(.lesson) { height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; }
 .list .row:not(.lesson) .thumb { width: 64px; height: 36px; }
 .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 /* Source lists are Readwise Reader's (D130, Tyler's pick B of five; All sources too since D135): a 96×54
@@ -259,7 +264,7 @@ img.thumb { filter: brightness(0.86); }
    since they only show when there are any. On a skill page a question mark at the row's right, centred, marks a
    source that may answer an open question (D75); its hint lists them. */
 .list .row:not(.lesson):not(.post) .thumb { width: 96px; height: 54px; }
-.row:has(> .row-main):not(.lesson):not(.post) { min-height: 70px; gap: 12px; }
+.row:has(.row-main):not(.lesson):not(.post) { min-height: 70px; gap: 12px; }
 .list .row:not(.post) .row-main { gap: 2px; }
 .list .row:not(.post) .title { font-weight: 500; }
 .row .kind-line { color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -287,6 +292,7 @@ img.thumb { filter: brightness(0.86); }
   display: flex; align-items: center; gap: 12px;
   height: var(--row); padding: 0 12px; border-radius: var(--radius);
 }
+.row > .cell, .feed-head > .cell { display: contents; } /* the grid row's one cell; the row lays its parts out */
 .row:hover { background: var(--bg-hover); }
 .row.on, .row.sel { background: var(--bg-active); }
 .list:focus-visible { outline: none; }
@@ -1836,7 +1842,10 @@ button.home-plan:hover { color: var(--text); }
 .home-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
 .home-skill { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); text-align: left; color: var(--text); min-width: 0;; box-shadow: var(--lift); }
 .home-skill:hover { background: var(--bg-hover); }
-.home-skill:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+/* The name is the tile's control; its focus ring is drawn on the whole tile, as before. */
+.home-skill:has(.home-open:focus-visible) { box-shadow: 0 0 0 2px var(--focus); }
+.home-open { text-align: left; }
+.home-open:focus-visible { outline: none; }
 .home-skill-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .home-skill .mark { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; }
 .home-skill .mark.tile .skill-icon { font-size: 14px; } /* a few px of tile around the emoji */
@@ -1865,7 +1874,7 @@ button.home-plan:hover { color: var(--text); }
 .home-read:hover .more, .home-read .more:focus-visible, .home-read .more[aria-expanded="true"] { display: grid; }
 .home-read .more:hover, .home-read .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 .home-read:is(:hover, :has(.more[aria-expanded="true"])) .home-meter.small { visibility: hidden; }
-.home-read:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
+.home-read:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 1px var(--focus); }
 /* The title comes first: long skill pills give way to it, ending in … (DESIGN: long text). */
 .home-read .chips-button { max-width: 40%; overflow: hidden; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
