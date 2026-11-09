@@ -90,7 +90,7 @@ describe("tutor: replies", () => {
     expect(sent()[0]!.reading).toEqual({ title: "Flashcard boxes" });
   });
 
-  test("the first reply names the chat (D171); later ones don't rename it", async () => {
+  test("the first reply names the chat (D172); later ones don't rename it", async () => {
     const { lib, a } = await library();
     const out = (title: string) => ({ reply: "Box one.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title });
     fakeClaude([out(" Leitner boxes "), out("Something else")]);

@@ -126,7 +126,7 @@ export const aiCommands: Record<string, Command> = {
   },
 
   chat: {
-    usage: "[<id> [--set [--keep-time] | --delete]]   The tutor's saved chats (D171), chats/<id>.json: list them (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back)",
+    usage: "[<id> [--set [--keep-time] | --delete]]   The tutor's saved chats (D172), chats/<id>.json: list them (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back)",
     options: { set: { type: "boolean" }, "keep-time": { type: "boolean" }, delete: { type: "boolean" } },
     async run([id], f) {
       const lib = openLibrary();

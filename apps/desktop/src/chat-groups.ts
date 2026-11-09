@@ -1,4 +1,4 @@
-/** Saved tutor chats under the day headings Notion AI's list uses (D171): Today, Yesterday, Past 7 days,
+/** Saved tutor chats under the day headings Notion AI's list uses (D172): Today, Yesterday, Past 7 days,
  *  Older, by the local calendar day each was last changed, newest first within each. */
 export const GROUPS = ["Today", "Yesterday", "Past 7 days", "Older"] as const;
 

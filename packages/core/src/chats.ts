@@ -6,7 +6,7 @@ import { nowIso } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 
-// D171: every tutor chat is saved in the library, one file each (chats/<id>.json), so + starts a new one
+// D172: every tutor chat is saved in the library, one file each (chats/<id>.json), so + starts a new one
 // without losing the old and a restart loses nothing. The app keeps the turns as it shows them; core
 // checks the shape it relies on (an id, a title, his messages) and keeps the rest as given.
 

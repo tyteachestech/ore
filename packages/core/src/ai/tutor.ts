@@ -60,7 +60,7 @@ export const TutorOutput = z.strictObject({
   covered: z.array(z.boolean()).default([]),
   // With `covered`: per rubric point, the shortest stretch of his answer that states it, word for word; "" when not covered (D162).
   evidence: z.array(z.string()).default([]),
-  // A short name for the chat, written with its first reply (D171), so the list of chats reads by topic; "" after that.
+  // A short name for the chat, written with its first reply (D172), so the list of chats reads by topic; "" after that.
   title: z.string().max(80).default(""),
 });
 

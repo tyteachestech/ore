@@ -61,7 +61,7 @@ export type TutorChat = ReturnType<typeof useTutorChat>;
 let turnSeq = 0;
 const turnId = () => `${Date.now().toString(36)}-${++turnSeq}`;
 
-/** A saved chat as `ore chat` lists it (D171). */
+/** A saved chat as `ore chat` lists it (D172). */
 export type ChatRow = { id: string; title: string; updated: string };
 type SavedChat = { id: string; title: string; updated?: string; carry: Mention[]; turns: TutorTurn[] };
 /** A chat's name until its first reply names it: his first message, on one line. */
@@ -70,7 +70,7 @@ const firstLine = (m: string) => { const s = m.replace(/\s+/g, " ").trim(); retu
 const settled = ({ partial: _p, searching: _s, ...t }: TutorTurn) => t;
 
 /** The tutor's chat, his draft and its requests, held in App so closing the panel or moving around the
- *  app loses nothing and never asks twice. Every chat is saved in the library (D171, `ore chat`) after each
+ *  app loses nothing and never asks twice. Every chat is saved in the library (D172, `ore chat`) after each
  *  message and reply, so New chat sets nothing aside to lose: the old one is in the list of chats, and a
  *  reply still being written for it lands in its file. */
 export function useTutorChat(notify: Notify) {
@@ -787,7 +787,7 @@ function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; o
   );
 }
 
-/** The chat's name, which opens the list of saved chats (D171, Notion AI's chat switcher): find one by
+/** The chat's name, which opens the list of saved chats (D172, Notion AI's chat switcher): find one by
  *  name, grouped by day, one click opens it where he left off; the bin on a row, its right-click menu or
  *  ⌘⌫ deletes it, with Undo. */
 function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void }) {

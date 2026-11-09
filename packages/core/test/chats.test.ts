@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { deleteChat, listChats, readChat, saveChat } from "../src/chats.ts";
 import { tempLibrary } from "./helpers.ts";
 
-// D171: the tutor's chats are saved in the library, one file each.
+// D172: the tutor's chats are saved in the library, one file each.
 
 const chat = (id: string, title: string, extra: object = {}) =>
   JSON.stringify({ id, title, carry: [{ kind: "skill", id: "memory", name: "Memory" }], turns: [{ id, message: "what is a Leitner box?", reply: "A box of cards [1].", citations: [{ n: 1 }] }], ...extra });

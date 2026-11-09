@@ -685,7 +685,7 @@ journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ repla
   if (await chip("learning").count()) throw new Error("the replaced skill still shows");
   await fresh.click();
   await until("New chat clears it", async () => (await chip(AGENTS).count()) === 0);
-  // The chat is saved (D171): picking it from the list brings it back with its @ context.
+  // The chat is saved (D172): picking it from the list brings it back with its @ context.
   await tutor.getByRole("button", { name: /^Chats/ }).click();
   await page.locator(".tutor-chats [cmdk-item]", { hasText: "Explain @learning spacing" }).first().click();
   await chip(AGENTS).waitFor(); // back with its thread
@@ -733,7 +733,7 @@ journey("tutor pending: closing mid-reply asks once; a new chat keeps its own re
   await page.waitForTimeout(300);
   if (await tutor.getByText("First reply").count()) throw new Error("the old reply landed in the new chat");
   await tutor.getByText("Second reply").waitFor();
-  // The old chat is in the list, with the reply that landed while it was away (D171); the new one is too.
+  // The old chat is in the list, with the reply that landed while it was away (D172); the new one is too.
   const chats = tutor.getByRole("button", { name: /^Chats/ });
   await chats.click();
   await page.locator(".tutor-chats [cmdk-item]", { hasText: "First question" }).click();
@@ -747,7 +747,7 @@ journey("tutor pending: closing mid-reply asks once; a new chat keeps its own re
   await page.keyboard.press("Meta+j");
 });
 
-journey("tutor chats: every chat is saved and listed by day under its name; Find narrows the list, a click opens one, a reload keeps them, and a deleted chat comes back with Undo (D171)", async (page) => {
+journey("tutor chats: every chat is saved and listed by day under its name; Find narrows the list, a click opens one, a reload keeps them, and a deleted chat comes back with Undo (D172)", async (page) => {
   const reply = (text: string, title: string) => JSON.stringify({ reply: text, citations: [], general: false, hint: false, exercise: null, card: null, title, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } });
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { chatGroups } from "../src/chat-groups";
 
-// D171: the tutor's list of chats groups them by the day each was last changed, as Notion AI's does.
+// D172: the tutor's list of chats groups them by the day each was last changed, as Notion AI's does.
 test("chats fall under Today, Yesterday, Past 7 days and Older by local calendar day, newest first", () => {
   const now = new Date(2026, 10, 9, 9, 0); // 9 Nov, 9 am local
   const at = (d: number, h: number) => new Date(2026, 10, d, h).toISOString();
