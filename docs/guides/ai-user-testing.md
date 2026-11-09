@@ -51,7 +51,7 @@ Main places and features:
 - **Add** (⌘N): paste a URL, YouTube link or text, or drop a file (PDF, EPUB). ⌘O opens a file.
 - **Reader**: one comfortable column, a thin position bar, a floating outline at the right edge (hover to expand, click to jump), text size ⌘= / ⌘−, reading width and a light page in Settings (⌘,). Select text → popup to mark it as **Highlight (1)**, **Key point (2)**, **Question (3)** or **Try it (4)**; typing right after a highlight writes its note, Tab also opens the note, Backspace removes it. **H** highlights the focused paragraph (↑/↓ move the focus). **L** reads aloud. **⌘F** finds in the source. **R** renames the source, **A** archives it.
 - **Side panel** (⌥⌘S, right of the reader): **Collected** (C, everything you highlighted), **Questions** (Q) and the **source note** (N, your own notes; it can hide the source while you write with ⌥H). **M** recalls the chapter you're in. **Finish** (⇧⌘↵) opens the quiz: free recall first, then each prequestion with confidence and Check (⌘↵), which reveals supporting passages (↑/↓ to step through them).
-- **Tutor** (✦ in the title bar, ⌘J): a chat about the open source or your library.
+- **Tutor** (the owl at the bottom right, ⌘J): a chat about the open source or your library.
 - **Video and audio sources**: player above the transcript, Space play/pause, ←/→ skip, [ ] speed, the transcript follows playback.
 - **Skill page** (click a skill): the skill note, its questions and its reading list.
 - **⌘K** command palette for everything; **⌘/** shows and rebinds all shortcuts. Every control with a shortcut should show it in a hover hint.

@@ -2156,20 +2156,18 @@ export function App() {
       />
 
       <main className="main">
-        {/* Add stays in sight on Home and All sources (Raindrop's + Add); a skill page has its own in Sources.
-            The tutor's ✦ sits in the title bar left of it, or of the reader's panel toggle (D136). */}
-        {!openId && !onSkillPage ? (
+        {/* Add stays in sight on Home and All sources (Raindrop's + Add); a skill page has its own in Sources. */}
+        {!openId && !onSkillPage && (
           <div className="main-tools">
-            {tutorButton}
             <Hint text="Add a link, file or text" keys="add">
               <button className="note-toggle" onClick={() => setAdding(true)}>
                 + Add
               </button>
             </Hint>
           </div>
-        ) : (
-          tutorButton
         )}
+        {/* The tutor's owl floats at the bottom right (D160). */}
+        {tutorButton}
         <Boundary key={`${openId}-${skill}-${place}`} onBack={goHome}>
         {openId ? (
           <Reader
