@@ -282,10 +282,10 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     if (from >= 0 && to >= 0 && from !== to) arrange(arrayMove(feeds, from, to));
   };
 
-  /** The posts: a grid, not a listbox, since a row holds its own ⋯ (ARIA's layout grid); ↑↓ move the
-   *  selection from the grid itself, so it is the view's one Tab stop. */
+  /** The posts: a grid, not a listbox, since a row holds its own ⋯ (ARIA's layout grid). The list around it
+   *  keeps the focus and the keys, so an empty Feed takes focus too. */
   const grid = (rows: ReactNode) => (
-    <div ref={listRef} className="feed-grid" tabIndex={0} role="grid" aria-label="Feed" aria-activedescendant={current ? `post-${current.url}` : undefined} onKeyDown={onKey}>
+    <div role="grid" aria-label="Posts">
       {rows}
     </div>
   );
@@ -366,7 +366,16 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       </div>
       {/* Right-click on the list offers its create action (Finder's New Folder), as the sources list does. */}
       <WithMenu actions={[{ id: "follow", label: "Follow a blog or newsletter…", hint: label(keys.add), run: onFollow }]}>
-        <div className="list feed-list" onPointerMove={() => keyed && setKeyed(false)}>
+        <div
+          className="list feed-list"
+          ref={listRef}
+          tabIndex={0}
+          role="group"
+          aria-label="Feed"
+          aria-activedescendant={current ? `post-${current.url}` : undefined}
+          onKeyDown={onKey}
+          onPointerMove={() => keyed && setKeyed(false)}
+        >
           {body}
         </div>
       </WithMenu>

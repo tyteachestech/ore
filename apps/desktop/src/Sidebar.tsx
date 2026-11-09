@@ -423,7 +423,8 @@ const ITEMS = "button.side-main, button.side-label";
 const TOOLS = ".side-tool, .side-more";
 /** One Tab stop for the whole sidebar (VS Code's tree, Finder's sidebar): the view shown, or the item last
  *  focused, keeps tabindex 0 and the rest -1, so Tab goes on to the content. ↑↓ (and Home, End) move
- *  between items, → reaches the row's own ⋯ and + tools, ← comes back. Fields (a new name) keep their keys. */
+ *  between items, → reaches the row's own ⋯ and + tools, ← comes back; on a collection's name → and ← open
+ *  and close it, and ← on a skill goes up to its collection (a tree's keys). Fields (a new name) keep their keys. */
 function useRoving(nav: RefObject<HTMLElement | null>) {
   const last = useRef<HTMLElement | null>(null);
   const apply = () => {
@@ -457,8 +458,11 @@ function useRoving(nav: RefObject<HTMLElement | null>) {
     else if (e.key === "ArrowUp") to = step(-1);
     else if (e.key === "Home") to = items[0];
     else if (e.key === "End") to = items[items.length - 1];
+    else if (e.key === "ArrowRight" && t === item && t.getAttribute("aria-expanded") === "false") return t.click(); // a closed collection opens (a tree's →)
     else if (e.key === "ArrowRight") to = tools[t === item ? 0 : tools.indexOf(t) + 1];
-    else if (e.key === "ArrowLeft") to = t === item ? undefined : tools[tools.indexOf(t) - 1] ?? item;
+    else if (e.key === "ArrowLeft" && t === item && t.getAttribute("aria-expanded") === "true") return t.click(); // an open one closes
+    else if (e.key === "ArrowLeft" && t === item) to = t.closest(".side-section")?.querySelector<HTMLElement>("button.side-label") ?? undefined; // a skill: to its collection
+    else if (e.key === "ArrowLeft") to = tools[tools.indexOf(t) - 1] ?? item;
     else return;
     e.preventDefault();
     to?.focus();

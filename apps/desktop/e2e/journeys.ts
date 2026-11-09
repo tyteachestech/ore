@@ -1596,7 +1596,7 @@ journey("Home: Continue reading rows rename from their menu, in place; Esc keeps
   await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
   await page.keyboard.press("Escape");
   await until("Esc keeps the old title", async () => (await title()) === TESTING);
-  await until("and gives the row its focus back", () => row.evaluate((el) => el === document.activeElement));
+  await until("and gives the row its focus back", () => row.locator(".home-open").evaluate((el) => el === document.activeElement));
   await row.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
   await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
@@ -3716,13 +3716,13 @@ journey("focus comes back to what opened it: the tutor's ✦ after Esc, and a Co
   await page.keyboard.press("Escape");
   await until("focus is back on the ✦", () => on(".tutor-bubble"));
   const row = page.locator(".home-read").first();
-  await row.focus();
+  await row.locator(".home-open").focus();
   const title = (await row.innerText()).split("\n")[0]!;
   await page.keyboard.press("Enter");
   await page.locator(".doc").waitFor();
   await page.keyboard.press("Escape");
   await page.locator(".home-read").first().waitFor();
-  await until(`focus is back on “${title}”`, async () => (await on(".home-read")) && (await page.evaluate(() => (document.activeElement as HTMLElement).innerText.split("\n")[0])) === title);
+  await until(`focus is back on “${title}”`, async () => (await on(".home-read .home-open")) && (await page.evaluate(() => (document.activeElement as HTMLElement).innerText.split("\n")[0])) === title);
   // Opened from Home but left another way (All sources, another source, ⌘0): no old row takes focus later.
   await page.keyboard.press("Enter");
   await page.locator(".doc").waitFor();
@@ -3824,7 +3824,7 @@ journey("sidebar: closing a hover-only ⋯ or + gives focus to its row, and ⇧�
   await page.getByRole("menu").waitFor();
   await page.mouse.move(0, 0);
   await page.keyboard.press("Escape");
-  await until("Home's tile ⋯ gives focus to its tile", () => tile.evaluate((el) => el === document.activeElement));
+  await until("Home's tile ⋯ gives focus to its tile's name", () => tile.locator(".home-open").evaluate((el) => el === document.activeElement));
 });
 
 journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
@@ -5006,8 +5006,8 @@ journey("a11y: a row is one control with its actions beside it (axe nested-inter
   // axe-core (MPL-2.0) runs in the page on the rules a row's shape can break: a button inside a button or an
   // option, and a grid's rows and cells. The whole app under every rule is another pass (keyboard-a11y memo).
   const rules = ["nested-interactive", "aria-required-children", "aria-required-parent", "aria-allowed-attr", "aria-allowed-role"];
+  await page.addScriptTag({ path: join(import.meta.dir, "../../../node_modules/axe-core/axe.min.js") });
   const check = async (where: string) => {
-    await page.addScriptTag({ path: join(import.meta.dir, "../../../node_modules/axe-core/axe.min.js") });
     const bad = await page.evaluate(async (rules) => {
       const r = await (window as unknown as { axe: { run: (c: Element, o: unknown) => Promise<{ violations: { id: string; nodes: { target: string[]; failureSummary: string; any: { relatedNodes: { html: string }[] }[] }[] }[] }> } }).axe.run(document.body, { runOnly: rules });
       return r.violations.flatMap((v) => v.nodes.map((n) => `${v.id} ${n.target.join(" ")} (${n.failureSummary.replace(/\s+/g, " ")}: ${n.any.flatMap((a) => a.relatedNodes.map((r) => r.html.slice(0, 120))).join(" | ")})`));
