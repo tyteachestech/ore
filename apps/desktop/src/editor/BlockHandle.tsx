@@ -33,7 +33,9 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
       if (!v || busy.current || dragging.current) return;
       const r = v.dom.getBoundingClientRect();
       if (e.clientY < r.top || e.clientY > r.bottom) return setAt(null);
-      const hit = v.posAtCoords({ left: Math.min(Math.max(e.clientX, r.left + 1), r.right - 1), top: e.clientY });
+      // The block on the pointer's line, read at least halfway across: left of the text (a list's bullets, the
+      // gutter on the way to the handle) the editor answers with the list's first item, so the handle jumped there.
+      const hit = v.posAtCoords({ left: Math.min(Math.max(e.clientX, r.left + r.width / 2), r.right - 1), top: e.clientY });
       const b = hit && blockAt(v.state.doc, hit.pos);
       setAt(b ? place(v, el, b) : null);
     };

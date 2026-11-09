@@ -8,6 +8,8 @@
 // `long` the main thread's long tasks (ms). --calls lists each call's start and length; --compiled runs a compiled CLI.
 //   --check bench-baseline.json   fails when a step's median is over 1.5× its baseline (+150 ms, so a short step's
 //   jitter doesn't trip it), or a step fails; CI runs this. Without the file it prints one to save from that machine.
+//   Shared CI runners differ: one ran every step 2–8× over (#209). So the bench also times a fixed piece of work no
+//   Ore code touches (RUNNER), and a runner slower at it than the baseline's gets that much more room on every step.
 import { chromium, type Page } from "playwright";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -53,6 +55,30 @@ const PROBE = `
   };
   wrap(); document.addEventListener("DOMContentLoaded", wrap);
 `;
+
+/** The runner's speed, in ms: fixed work in a page of its own (sorting and copying numbers, laying out a list), and
+ *  starting a process 5 times (each `ore` call is one), as the steps do both. */
+const RUNNER = "runner: fixed work";
+async function runnerMs(browser: Awaited<ReturnType<typeof chromium.launch>>): Promise<number[]> {
+  const page = await browser.newPage();
+  const ms: number[] = [];
+  for (let i = 0; i < 5; i++) ms.push(await page.evaluate(() => {
+    const t0 = performance.now();
+    const a = Array.from({ length: 300_000 }, (_, i) => (i * 7919) % 100_003);
+    JSON.parse(JSON.stringify(a.sort((x, y) => x - y)));
+    const list = document.createElement("div");
+    for (let i = 0; i < 3000; i++) list.appendChild(document.createElement("div")).textContent = `row ${i}`;
+    document.body.replaceChildren(list);
+    void list.offsetHeight;
+    return performance.now() - t0;
+  }) + (() => {
+    const t0 = performance.now();
+    for (let i = 0; i < 5; i++) Bun.spawnSync(["bun", "-e", "0"]);
+    return performance.now() - t0;
+  })());
+  await page.close();
+  return ms;
+}
 
 type Result = { ms: number; calls: number; cli: number; long: number; slowest?: string; log?: string[] };
 /** Runs `act`, then waits until no call is in flight and nothing ran long for 300 ms. */
@@ -154,10 +180,12 @@ if (ONLY && !steps.some(([n]) => n.includes(ONLY))) {
 }
 const runs = new Map<string, Result[]>();
 const failed: string[] = [];
+const runner: number[] = [];
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 try {
   browser = await chromium.launch();
   for (let r = 0; r < ROUNDS; r++) {
+    runner.push(...(await runnerMs(browser)));
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     page.setDefaultTimeout(30000);
     await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
@@ -177,6 +205,7 @@ try {
     }
     await page.close();
   }
+  runner.push(...(await runnerMs(browser)));
 } finally {
   await browser?.close();
   bridge.kill();
@@ -192,15 +221,21 @@ for (const [name, rs] of runs) {
   if (process.argv.includes("--calls")) for (const l of rs.at(-1)!.log ?? []) console.log(`    ${l}`);
 }
 
+console.log(`${RUNNER.padEnd(28)} ${String(Math.round(median(runner))).padStart(6)}`);
+
 if (CHECK) {
   const medians = Object.fromEntries([...runs].map(([name, rs]) => [name, median(rs.map((r) => r.ms))]));
+  medians[RUNNER] = Math.round(median(runner));
   if (!existsSync(CHECK)) {
     console.log(`\nno baseline at ${CHECK}; this machine's, to save there:\n${JSON.stringify(medians, null, 2)}`);
   } else {
-    const base: Record<string, number> = await Bun.file(CHECK).json();
+    const { [RUNNER]: baseRunner, ...base }: Record<string, number> = await Bun.file(CHECK).json();
+    // Never stricter than the baseline: a fast runner keeps the plain 1.5×.
+    const slower = baseRunner ? Math.max(1, medians[RUNNER]! / baseRunner) : 1;
+    if (slower > 1.2) console.log(`\nthis runner is ${slower.toFixed(1)}× slower than the baseline's at fixed work; every step gets that much more room`);
     const slow = Object.entries(base).flatMap(([name, ms]) => {
       const now = medians[name];
-      return now !== undefined && now > Math.max(ms * 1.5, ms + 150) ? [`${name}: ${now} ms, baseline ${ms}`] : [];
+      return now !== undefined && now > Math.max(ms * 1.5, ms + 150) * slower ? [`${name}: ${now} ms, baseline ${ms}${slower > 1.2 ? ` (×${slower.toFixed(1)} for the runner)` : ""}`] : [];
     });
     const missing = Object.keys(base).filter((n) => !(n in medians) && !failed.includes(n));
     for (const l of [...failed.map((n) => `${n}: failed`), ...slow, ...missing.map((n) => `${n}: not run`)]) console.error(`✗ ${l}`);
