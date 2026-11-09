@@ -25,7 +25,7 @@ With a backlog that never empties, the question is never "how do I finish?" but 
 | Step | What happens | Built as |
 | --- | --- | --- |
 | 1. Cue | Their own plan, "After my morning coffee, I review", and one reminder a day while the goal is unmet | D67 |
-| 2. Open | Home shows today's slice in minutes, "About N min of your most urgent cards". ↵ starts | D58, D65.4, D80 |
+| 2. Open | Home shows minutes done of the goal beside the ring; the due count waits in Start review's hint. ↵ starts | D58, D65.4, D80 |
 | 3. Review | One card at a time, full window. The most valuable due cards first, with new cards mixed in at a fixed share (below) | D59, D22, D24 |
 | 4. A new card | Shows the **New** label on first sight, so they read it with care. Answering it approves it; E edits it; ⇧⌘⌫ deletes it. Its FSRS schedule starts from that first answer, like any card | D65.3, D9 |
 | 5. Close | When the goal closes, the end screen: memories kept, rescued just before forgetting, a gem for each card that became solid. Keep going goes on | D62, D90, D65.4 |
