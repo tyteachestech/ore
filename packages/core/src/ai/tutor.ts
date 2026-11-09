@@ -16,7 +16,8 @@ import { PASSAGES, plainText, retrieve, splitPassages, type Citation, type Passa
 // instead of answers on practice, and uses the source he has open, and the sources and skills he
 // @-mentions, as context.
 
-export interface TutorTurn { message: string; reply: string }
+/** One earlier turn. A turn that set an exercise carries it, with the card committed then (D158). */
+export interface TutorTurn { message: string; reply: string; exercise?: Exercise }
 
 /** A reply with its worked answer's steps numbered under it (D142): what it said, as text. */
 export const withSteps = (r: { reply: string; steps: string[] }) => [r.reply, ...r.steps.map((s, i) => `${i + 1}. ${s}`)].join("\n");
@@ -30,6 +31,11 @@ export const TutorCard = z.strictObject({
 });
 export type TutorCard = z.infer<typeof TutorCard>;
 
+/** An open exercise (D128.6) and, since D158, the review card it becomes if he misses: its model answer
+ *  and rubric points are written before he answers, so the feedback judges against something fixed. */
+export const Exercise = z.strictObject({ heading: z.string().min(1).max(100), prompts: z.array(z.string().min(1)).max(3), card: TutorCard });
+export type Exercise = z.infer<typeof Exercise>;
+
 export const TutorOutput = z.strictObject({
   reply: z.string().min(1),
   // `passage` is a passage id, or the URL of a page the web search returned.
@@ -39,10 +45,12 @@ export const TutorOutput = z.strictObject({
   hint: z.boolean(),
   // One idea from this reply worth keeping, as a card he can add with one click; null when none.
   card: TutorCard.nullable(),
-  // An open exercise for him to write (D128.6): its heading in his note, and placeholder lines under it.
-  exercise: z.strictObject({ heading: z.string().min(1).max(100), prompts: z.array(z.string().min(1)).max(3) }).nullable(),
+  // An open exercise for him to write (D128.6): its heading in his note, placeholder lines under it, and its card.
+  exercise: Exercise.nullable(),
   // A worked answer in its steps, which the app shows one at a time (D142); [] for any other reply.
   steps: z.array(z.string().min(1)).max(8),
+  // Feedback on the open exercise (D158): one boolean per rubric point of its card, true when his answer covers it.
+  covered: z.array(z.boolean()).optional(),
 });
 
 /** His message with each diagram from his source note written out as lines, so a map he drew from
@@ -106,7 +114,9 @@ const pageWords = (page: { title: string; text: string }) => `${page.title}\n${p
 export async function tutor(lib: Library, message: string, { earlier = [], onProgress, ...focus }: { earlier?: TutorTurn[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
   const m = withDiagrams(lib, focus.item, message.trim());
   if (!m) throw new Error("message is empty");
-  const recent = earlier.slice(-6);
+  const recent = earlier.slice(-6).map(({ message, reply }) => ({ message, reply }));
+  // The exercise he is answering: the last one set, however long ago, with the card committed then.
+  const open = earlier.flatMap((t) => { const e = Exercise.safeParse(t.exercise); return e.success ? [e.data] : []; }).at(-1);
   const reading = focus.item ? findItem(lib, focus.item).meta.title : undefined;
   const skillNames = new Map(loadSkills(lib).skills.map((s) => [s.id, s.name]));
   for (const s of focus.skills ?? []) if (!skillNames.has(s)) throw new Error(`no skill "${s}"`);
@@ -127,7 +137,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
       if (reply) (last = Date.now()), onProgress({ reply });
     }),
     schema: TutorOutput,
-    input: { message: m, earlier: recent, ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
+    input: { message: m, earlier: recent, ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
     check: (d, seen) => {
       for (const c of d.citations) {
         if (isWebUrl(c.passage)) {
@@ -151,6 +161,16 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
       if (top > d.citations.length) return `marker [${top}] has no citation`;
       if (d.card && d.card.kind === "prompt" && !d.card.rubric.length) return "a prompt card needs 2 to 4 rubric points";
       if (d.exercise && d.card) return "an exercise is for him to answer: propose no card with it";
+      if (d.exercise) {
+        if (!d.exercise.heading.trim().endsWith("?")) return "exercise.heading: the task as a short question";
+        if (d.exercise.card.kind !== "prompt" || d.exercise.card.rubric.length < 2 || d.exercise.card.rubric.length > 4) return "exercise.card: a prompt card with 2 to 4 rubric points";
+        const problem = cardTextProblem(d.exercise.card);
+        if (problem) return `exercise.card: ${problem}`;
+      }
+      if (d.covered?.length) {
+        if (!open) return "covered: [] when there is no open exercise";
+        if (d.covered.length !== open.card.rubric.length) return `covered: one boolean per rubric point (${open.card.rubric.length})`;
+      }
       return d.card ? cardTextProblem(d.card) : null;
     },
   });
@@ -168,7 +188,10 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
     const quote = p.text.slice(at.start, at.end);
     return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
   });
-  return { message: m, reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card: data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null, ai, usage: usage as Usage };
+  // Feedback that found a point missing offers the exercise's own card (D158), never one the model wrote after his answer.
+  const missed = !!open && !!data.covered?.length && data.covered.some((c) => !c);
+  const card = missed ? open.card : data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null;
+  return { message: m, reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, ai, usage: usage as Usage };
 }
 
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the

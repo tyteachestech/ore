@@ -33,6 +33,15 @@ describe("tutor pedagogy eval", () => {
     expect(failures(worked, reply({ reply: "The next gap is 10 days.", hint: false }))).toEqual(["no steps"]);
   });
 
+  test("exercise feedback that found a miss offers the committed card; the exercise turn carries it (D158)", () => {
+    const c = loadTutorCases().find((c) => c.id === "exercise-feedback")!;
+    expect(c.earlier?.[0]?.exercise?.card.rubric.length).toBe(3);
+    const fb = reply({ reply: "Right that it shows what you don't know [1]. Missing: each recall makes the path easier. What happens on the second recall?", hint: false, cited: 1 });
+    expect(failures(c.expect, { ...fb, card: true })).toEqual([]);
+    expect(failures(c.expect, { ...fb, card: false })).toEqual(["no card"]);
+    expect(failures({ card: false }, { ...fb, card: true })).toEqual(["a card"]);
+  });
+
   test("feedback must ask him something and never score him; a worked example's own numbers aren't the answer", () => {
     expect(failures({ asks: true, no_score: true }, reply({ reply: "Not quite: it's 25% [1]. Next: which review matters most?" }))).toEqual([]);
     expect(failures({ asks: true, no_score: true }, reply({ reply: "Good answer, 7/10." }))).toEqual(["doesn't ask", "a score"]);

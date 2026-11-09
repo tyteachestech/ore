@@ -865,7 +865,7 @@ journey("tutor Quiz me: opens Review on the due cards of the source's skills, an
 
 journey("tutor Practice: an exercise is written in the source note with the source hidden, and ⌘↵ sends it back for feedback", async (page) => {
   await openSource(page, AGENTS); // not TESTING: the note block journey counts that note's headings
-  const exercise = { heading: "Why does an agent need a stopping condition?", prompts: ["What goes wrong without one"] };
+  const exercise = { heading: "Why does an agent need a stopping condition?", prompts: ["What goes wrong without one"], card: { kind: "prompt", content_type: "concept", question: "Why does an agent loop need a stopping condition?", answer: "Without one it runs until something else stops it.", rubric: ["It would run on without end", "The result is never returned"] } };
   const replies = [
     { reply: "Explain why the tested group remembered more, from memory.", citations: [], general: false, hint: false, exercise, card: null },
     { reply: "Right: recalling it is what made it last. What would change after a month?", citations: [], general: false, hint: false, exercise: null, card: null },

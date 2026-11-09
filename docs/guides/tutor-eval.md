@@ -35,6 +35,11 @@ bun run eval:tutor --vendor claude --against 85e22fb   # blind A/B: today's tuto
 
 - tutor@8 says a fact plainly with steps [] and keeps steps for working (a calculation, a function traced); `flashcard-show-me` and `flashcard-two-tries` now check for no steps. Then 26/26 over 2 runs, and against tutor@7 over 2 runs: new 8, old 9, same 9, $0.86. That is even: the wins on both sides were quiz and practice replies, whose rules neither version changed, and the same pair (`flashcard-show-me`) went to steps in one run and to the plain answer in the other. Read the comparator's reasons and its counts over several runs, not one verdict.
 
+## The committed card (2026-11-09, tutor@9, D158)
+
+- An exercise now carries the card it becomes (model answer, 2 to 4 rubric points), written before he answers; feedback marks each point `covered` and the app offers that card after a miss. `exercise-feedback` carries the committed card in its `earlier` turn and expects a card; the judge and the comparator see the earlier turns as he did, without the card.
+- Two new cases: `practice-tell-apart` (two look-alike cases, which idea fits each) and `practice-new-case-unnamed`; both are judged on never naming the idea they test.
+
 ## Limits
 
 - 13 cases, written for this eval. Five carry judge checks; the rest are still a regex and a flag, so a hint there that gives the answer away in other words passes.
