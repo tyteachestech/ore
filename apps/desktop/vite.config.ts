@@ -6,15 +6,13 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { dots } from "./src/dots";
 import { FIXES } from "./src/skill-icon-fixes";
 
 // Skill icons (D157) on the UI icons' 16-pixel grid (D129), each pixel a round dot (2026-11-08): each MingCute icon of
 // src/skill-icon-set.ts as redrawn by scripts/pixel-skill-icons.ts, or by hand in src/skill-icon-fixes.ts, served as
 // /mingcute-px/<name>.svg in dev and written into the build.
-const pixelSvg = (rows: readonly string[]) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="${rows
-    .flatMap((row, y) => [...row].map((c, x) => (c === "#" ? `M${x + 0.5} ${y + 0.06}a.44 .44 0 1 0 0 .88a.44 .44 0 1 0 0-.88z` : "")))
-    .join("")}"/></svg>`;
+const pixelSvg = (rows: readonly string[]) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="${dots(rows)}"/></svg>`;
 let pixelCache: Record<string, string> | undefined;
 function pixelIcons(): Record<string, string> {
   if (pixelCache) return pixelCache;

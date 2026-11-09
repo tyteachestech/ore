@@ -2,7 +2,7 @@ import type { SVGProps } from "react";
 import { dots, spriteSize } from "./icons";
 
 // Highlight-type and section icons, drawn like the UI icons in icons.tsx: 16-grid sprites after MingCute's filled set,
-// in the current colour, each pixel a round dot, a quarter bigger than asked (20px for 16, 40px at 24 and up).
+// in the current colour, each pixel a round dot, drawn bigger than asked (24px for 16, 40px at 24 and up, D170).
 
 type Props = Omit<SVGProps<SVGSVGElement>, "ref"> & { size?: number; weight?: string };
 
@@ -87,6 +87,8 @@ export const PixelTry = sprite([
 /** Your note: a notepad with written lines. */
 export const PixelNote = sprite([
   "................",
+  "................",
+  "................",
   "...##########...",
   "..############..",
   "..############..",
@@ -98,8 +100,6 @@ export const PixelNote = sprite([
   "..############..",
   "..############..",
   "...##########...",
-  "................",
-  "................",
   "................",
   "................",
 ]);
