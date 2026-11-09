@@ -253,8 +253,11 @@ export function useAudio(file: string | undefined, id: string): Player {
   const [duration, setDuration] = useState(0);
   const [rate, setRateState] = useState(savedRate);
   const [elapsed, setElapsed] = useState(start);
+  // A stamp clicked before the file's metadata is read: that is where it plays from, not the saved place.
+  const moved = useRef(false);
   useEffect(() => {
     if (!file) return;
+    moved.current = false;
     const a = new Audio(/^(https?:|data:|blob:)/i.test(file) ? file : convertFileSrc(file));
     a.preload = "metadata";
     a.playbackRate = savedRate();
@@ -265,7 +268,7 @@ export function useAudio(file: string | undefined, id: string): Player {
     const on: Record<string, () => void> = {
       loadedmetadata: () => {
         setDuration(a.duration || 0);
-        if (start && start < a.duration) a.currentTime = start;
+        if (start && start < a.duration && !moved.current) a.currentTime = start;
         loaded = true;
         setReady(true);
       },
@@ -293,6 +296,7 @@ export function useAudio(file: string | undefined, id: string): Player {
   const seek = useCallback((t: number) => {
     const a = el.current;
     if (!a) return;
+    moved.current = true;
     a.currentTime = Math.max(0, Math.min(t, a.duration || t));
     setElapsed(Math.floor(a.currentTime));
     setStarted(true);
