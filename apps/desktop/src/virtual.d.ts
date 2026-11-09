@@ -1,9 +1,3 @@
-declare module "virtual:mingcute" {
-  /** [name, category] for each MingCute fill icon (vite.config.ts). */
-  const icons: [string, string][];
-  export default icons;
-}
-
 /** The CLI's command table, run in-process on iPhone (src/phone/core.ts; aliased in vite.config.ts). */
 declare module "ore-commands" {
   type Command = { usage: string; options?: Record<string, { type: "string" | "boolean"; multiple?: boolean; short?: string }>; run(positionals: string[], flags: Record<string, unknown>): Promise<{ data: unknown }> };

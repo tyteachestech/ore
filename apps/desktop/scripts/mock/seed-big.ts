@@ -26,19 +26,19 @@ for (const [name, collection] of [["Spanish", "Life"], ["Piano", "Life"], ["Dist
   await addSkill(lib, name, collection);
 const looks: [string, Record<string, string>][] = [
   ["ai", { icon: "mc:ai", color: "purple", collection: "Ty Teaches Tech" }],
-  ["learning", { icon: "🧠", color: "pink", collection: "Ty Teaches Tech" }],
+  ["learning", { icon: "mc:brain", color: "pink", collection: "Ty Teaches Tech" }],
   ["teaching", { icon: "mc:black_board", color: "blue", collection: "Ty Teaches Tech" }],
-  ["creator-business", { icon: "💼", color: "orange", collection: "Ty Teaches Tech" }],
-  ["storytelling-writing", { icon: "✍️", collection: "Craft" }],
-  ["creativity", { icon: "🎨", color: "yellow", collection: "Craft" }],
+  ["creator-business", { icon: "mc:briefcase", color: "orange", collection: "Ty Teaches Tech" }],
+  ["storytelling-writing", { icon: "mc:pen_2", collection: "Craft" }],
+  ["creativity", { icon: "mc:palette", color: "yellow", collection: "Craft" }],
   ["distributed-systems", { icon: "mc:server", color: "teal" }],
   ["habits", { icon: "mc:leaf", color: "green", collection: "Life" }],
-  ["focus-attention", { icon: "🎯", color: "red", collection: "Life" }],
-  ["self-regulation-motivation", { icon: "🔋", collection: "Life" }],
-  ["spanish", { icon: "🇪🇸", color: "red" }],
-  ["piano", { icon: "🎹", color: "gray" }],
-  ["personal-finance", { icon: "💰", color: "green" }],
-  ["stoicism", { icon: "🏛️", color: "gray" }],
+  ["focus-attention", { icon: "mc:target", color: "red", collection: "Life" }],
+  ["self-regulation-motivation", { icon: "mc:battery_2", collection: "Life" }],
+  ["spanish", { icon: "mc:translate", color: "red" }],
+  ["piano", { icon: "mc:music", color: "gray" }],
+  ["personal-finance", { icon: "mc:coin", color: "green" }],
+  ["stoicism", { icon: "mc:bank", color: "gray" }],
 ];
 for (const [id, look] of looks) await setSkillLook(lib, id, look);
 

@@ -527,7 +527,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   skills: {
-    usage: `[add <name> [--collection c] | rm <skill> [--archive] | restore '<json from rm>' | set <skill> [--name n] [--icon emoji|mc:name] [--color ${SkillColor.options.join("|")}] [--collection c] [--hook "why I'm learning this"] [--goal "what I could show I can do"] | arrange '[{"collection":"Work","skills":["ai"]},{"collection":"","skills":[...]}]']   list skills, add one, delete one (untags its sources and cards, which stay; --archive also archives sources filed only under it), undo a delete (restore takes the "removed" that rm printed with --json), rename one, set how one looks ("" clears), or lay out the sidebar (collections and skills in order, every skill once)`,
+    usage: `[add <name> [--collection c] | rm <skill> [--archive] | restore '<json from rm>' | set <skill> [--name n] [--icon mc:name] [--color ${SkillColor.options.join("|")}] [--collection c] [--hook "why I'm learning this"] [--goal "what I could show I can do"] | arrange '[{"collection":"Work","skills":["ai"]},{"collection":"","skills":[...]}]']   list skills, add one, delete one (untags its sources and cards, which stay; --archive also archives sources filed only under it), undo a delete (restore takes the "removed" that rm printed with --json), rename one, set how one looks ("" clears), or lay out the sidebar (collections and skills in order, every skill once)`,
     options: { archive: { type: "boolean" }, name: { type: "string" }, icon: { type: "string" }, color: { type: "string" }, collection: { type: "string" }, hook: { type: "string" }, goal: { type: "string" } },
     async run([sub, id], f) {
       const lib = openLibrary();

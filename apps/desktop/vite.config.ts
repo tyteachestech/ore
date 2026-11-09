@@ -8,22 +8,9 @@ import { defineConfig, type Plugin } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import { FIXES } from "./src/skill-icon-fixes";
 
-// MingCute's fill icons as [name, category] pairs for the picker's search; the SVGs themselves are copied below.
-const MINGCUTE = "node_modules/mingcute_icon/svg";
-const mingcuteList: Plugin = {
-  name: "mingcute-list",
-  resolveId: (id) => (id === "virtual:mingcute" ? "\0virtual:mingcute" : undefined),
-  load(id) {
-    if (id !== "\0virtual:mingcute") return;
-    const icons = readdirSync(MINGCUTE).flatMap((category) =>
-      readdirSync(`${MINGCUTE}/${category}`).flatMap((f) => (f.endsWith("_fill.svg") ? [[f.slice(0, -9), category]] : [])),
-    );
-    return `export default ${JSON.stringify(icons)};`;
-  },
-};
-
-// Skill icons on the UI icons' 16-pixel grid (D129), each pixel a round dot (2026-11-08): each MingCute icon as redrawn by scripts/pixel-skill-icons.ts, or by
-// hand in src/skill-icon-fixes.ts, served as /mingcute-px/<name>.svg in dev and written into the build.
+// Skill icons (D157) on the UI icons' 16-pixel grid (D129), each pixel a round dot (2026-11-08): each MingCute icon of
+// src/skill-icon-set.ts as redrawn by scripts/pixel-skill-icons.ts, or by hand in src/skill-icon-fixes.ts, served as
+// /mingcute-px/<name>.svg in dev and written into the build.
 const pixelSvg = (rows: readonly string[]) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="${rows
     .flatMap((row, y) => [...row].map((c, x) => (c === "#" ? `M${x + 0.5} ${y + 0.06}a.44 .44 0 1 0 0 .88a.44 .44 0 1 0 0-.88z` : "")))
@@ -117,12 +104,10 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    mingcuteList,
     pixelSkillIcons,
     ...(PHONE ? [phoneLibrary, textImports] : []),
     viteStaticCopy({
       targets: [
-        { src: "node_modules/emojibase-data/en/{data,messages}.json", dest: "emojibase/en", rename: { stripBase: true } },
         { src: "node_modules/@phosphor-icons/core/assets/fill/*.svg", dest: "icons", rename: { stripBase: true } },
       ],
     }),

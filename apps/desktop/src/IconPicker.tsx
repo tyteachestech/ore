@@ -1,37 +1,24 @@
 import * as RadioGroup from "@radix-ui/react-radio-group";
-import * as Tabs from "@radix-ui/react-tabs";
-import { defaultEmojiDataResolver, EmojiPicker } from "frimousse";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Hint } from "./Hint";
 import { Shuffle } from "./icons";
 import { SKILL_COLORS, type SkillColor } from "./ore";
+import { SKILL_ICON_SET } from "./skill-icon-set";
 import { load, save } from "./util";
 
-// A skill icon is one emoji or "mc:<name>", a MingCute fill icon tinted with the skill color (D36), drawn on the
-// UI icons' 16-pixel grid (vite.config.ts, pixelSkillIcons).
-// "ph:<name>" (Phosphor) icons picked before MingCute still draw. Emoji data and the icon SVGs ship
-// with the app (vite.config.ts), so the picker works offline.
-const EMOJIBASE = "/emojibase";
-const iconUrl = (icon: string) =>
-  icon.startsWith("mc:") ? `url(/mingcute-px/${icon.slice(3)}.svg)` : icon.startsWith("ph:") ? `url(/icons/${icon.slice(3)}-fill.svg)` : null;
-const isIcon = (icon: string) => iconUrl(icon) !== null;
+// A skill icon is "mc:<name>", one of the set in skill-icon-set.ts (D157): a MingCute fill glyph redrawn on the
+// UI icons' 16-pixel grid (vite.config.ts, pixelSkillIcons), tinted with the skill colour (D36). The SVGs ship
+// with the app, so the picker works offline. Anything else stored (an emoji from before D157, a hand edit) draws nothing.
+const iconUrl = (icon: string) => (icon.startsWith("mc:") ? `url(/mingcute-px/${icon.slice(3)}.svg)` : null);
 
-/** Draws a skill's icon. Without one it draws nothing, or a color dot with `dot`; a stored value it
- *  can't draw (a hand-edited skills.yaml) counts as no icon. */
+/** Draws a skill's icon. Without one it draws nothing, or a colour dot with `dot`; a stored value it
+ *  can't draw counts as no icon. */
 export function SkillIcon({ icon, color, dot, className = "" }: { icon?: string; color?: SkillColor | ""; dot?: boolean; className?: string }) {
   const none = dot ? <span className={`skill-icon dot ${className}`} data-color={color || undefined} aria-hidden="true" /> : null;
-  if (!icon) return none;
-  const mask = iconUrl(icon);
-  if (mask) {
-    const style: CSSProperties = { maskImage: mask, WebkitMaskImage: mask };
-    return <span className={`skill-icon glyph ${className}`} data-color={color || undefined} style={style} aria-hidden="true" />;
-  }
-  if ([...new Intl.Segmenter().segment(icon)].length !== 1) return none;
-  return (
-    <span className={`skill-icon emoji ${className}`} aria-hidden="true">
-      {icon}
-    </span>
-  );
+  const mask = icon && iconUrl(icon);
+  if (!mask) return none;
+  const style: CSSProperties = { maskImage: mask, WebkitMaskImage: mask };
+  return <span className={`skill-icon glyph ${className}`} data-color={color || undefined} style={style} aria-hidden="true" />;
 }
 
 const RECENTS = "ore.recent-icons";
@@ -70,7 +57,7 @@ export function Swatches({ className, small, value, onPick }: { className: strin
   );
 }
 
-/** Notion-style picker: Emoji and Icons tabs, search, recents, random, remove; icons take the skill color. */
+/** Notion-style icon picker: search, recents, random, remove; icons take the skill colour. */
 export function IconPicker({ value, color, onPick, onColor, onRemove }: {
   value?: string;
   color: SkillColor | "";
@@ -87,137 +74,52 @@ export function IconPicker({ value, color, onPick, onColor, onRemove }: {
   };
 
   return (
-    <Tabs.Root className="picker" defaultValue={value && isIcon(value) ? "icons" : "emoji"}>
+    <div className="picker">
       <div className="picker-head">
-        <Tabs.List className="picker-tabs" aria-label="Icon type">
-          <Tabs.Trigger value="emoji">Emoji</Tabs.Trigger>
-          <Tabs.Trigger value="icons">Icons</Tabs.Trigger>
-        </Tabs.List>
+        <Swatches className="picker-colors" small value={color} onPick={onColor} />
         <button className="picker-remove" disabled={!value} onClick={onRemove}>
           Remove
         </button>
       </div>
-      <Swatches className="picker-colors" small value={color} onPick={onColor} />
-      <Tabs.Content value="emoji" className="picker-body">
-        <EmojiTab recent={recent.filter((r) => !isIcon(r))} onPick={pick} />
-      </Tabs.Content>
-      <Tabs.Content value="icons" className="picker-body">
-        <IconsTab recent={recent.filter(isIcon)} color={color} onPick={pick} />
-      </Tabs.Content>
-    </Tabs.Root>
-  );
-}
-
-function EmojiTab({ recent, onPick }: { recent: string[]; onPick: (icon: string) => void }) {
-  const [query, setQuery] = useState("");
-  const shuffle = async () => {
-    const data = await defaultEmojiDataResolver("en", { emojibaseUrl: EMOJIBASE });
-    const e = random(data.emojis);
-    if (e) onPick(e.emoji);
-  };
-  return (
-    <EmojiPicker.Root className="emoji-root" columns={12} emojibaseUrl={EMOJIBASE} onEmojiSelect={(e) => onPick(e.emoji)}>
-      <div className="picker-tools">
-        <EmojiPicker.Search className="field picker-search" placeholder="Filter…" autoFocus onChange={(e) => setQuery(e.target.value)} />
-        <Hint text="Random emoji">
-          <button className="picker-tool" aria-label="Random emoji" onClick={() => void shuffle()}>
-            <Shuffle size={16} aria-hidden="true" />
-          </button>
-        </Hint>
-        <EmojiPicker.SkinToneSelector className="picker-tool tone" aria-label="Skin tone" title="Skin tone" />
+      <div className="picker-body">
+        <IconsTab recent={recent.filter((r) => iconUrl(r) !== null)} color={color} onPick={pick} />
       </div>
-      {!query && recent.length > 0 && (
-        <div className="picker-section recent">
-          <div className="picker-label">Recent</div>
-          <div className="picker-grid">
-            {recent.slice(0, 12).map((e) => (
-              <button key={e} className="picker-cell emoji" aria-label={e} onClick={() => onPick(e)}>
-                {e}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      <EmojiPicker.Viewport className="picker-scroll">
-        <EmojiPicker.Loading className="picker-note">Loading…</EmojiPicker.Loading>
-        <EmojiPicker.Empty className="picker-note">No emoji found.</EmojiPicker.Empty>
-        <EmojiPicker.List
-          className="emoji-list"
-          components={{
-            CategoryHeader: ({ category, ...props }) => (
-              <div className="picker-label" {...props}>
-                {category.label}
-              </div>
-            ),
-            Row: ({ children, ...props }) => (
-              <div className="picker-grid" {...props}>
-                {children}
-              </div>
-            ),
-            Emoji: ({ emoji, ...props }) => (
-              <button className="picker-cell emoji" data-active={emoji.isActive || undefined} {...props}>
-                {emoji.emoji}
-              </button>
-            ),
-          }}
-        />
-      </EmojiPicker.Viewport>
-    </EmojiPicker.Root>
+    </div>
   );
 }
 
-/** `words`: the name as words ("book 2 ai"); `terms`: its category, both lowercased, for search. */
-type McIcon = { name: string; words: string; terms: string };
-let mcIcons: Promise<McIcon[]> | null = null;
-// Unfiltered, the grid starts with the subjects a skill is likely about and ends with UI glyphs and brand logos.
-const ORDER = "education nature food sport design development media device building transport weather emoji user contact business crypto file editor map zodiac shape other part system arrow logo".split(" ");
-const categoryRank = (category: string) => (ORDER.includes(category) ? ORDER.indexOf(category) : ORDER.length);
-const loadIcons = () =>
-  (mcIcons ??= import("virtual:mingcute").then((m) =>
-    m.default
-      .map(([name, category]): McIcon => ({ name, words: name.replaceAll("_", " ").toLowerCase(), terms: category }))
-      .sort((a, b) => categoryRank(a.terms) - categoryRank(b.terms)),
-  ));
+/** `words`: the name as words plus the words that find it ("book 2 read"), lowercased, for search. */
+type McIcon = { name: string; words: string };
+const ICONS: McIcon[] = SKILL_ICON_SET.map(([name, words = ""]) => ({ name, words: `${name.replaceAll("_", " ")} ${words}`.toLowerCase() }));
 
 const COLS = 12;
-const PAGE = COLS * 12;
 const label = (icon: string) => icon.slice(3).replaceAll(/[-_]/g, " ");
 
 function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillColor | ""; onPick: (icon: string) => void }) {
-  const [all, setAll] = useState<McIcon[] | null>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  useEffect(() => void loadIcons().then(setAll), []);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!all || !q) return all ?? [];
-    // Exact name, then names starting with the query, then a word starting with it, then names containing it, then categories.
-    const rank = (i: McIcon) =>
-      i.words === q ? 0 : i.words.startsWith(q) ? 1 : i.words.includes(` ${q}`) ? 2 : i.words.includes(q) ? 3 : i.terms.includes(q) ? 4 : 5;
-    return all
-      .map((i) => ({ i, r: rank(i) }))
-      .filter((x) => x.r < 5)
+    if (!q) return ICONS;
+    // Exact name, then names starting with the query, then a word starting with it, then names containing it.
+    const name = (i: McIcon) => i.name.replaceAll("_", " ");
+    const rank = (i: McIcon) => (name(i) === q ? 0 : name(i).startsWith(q) ? 1 : i.words.includes(` ${q}`) ? 2 : i.words.includes(q) ? 3 : 4);
+    return ICONS.map((i) => ({ i, r: rank(i) }))
+      .filter((x) => x.r < 4)
       .sort((a, b) => a.r - b.r)
       .map((x) => x.i);
-  }, [all, query]);
+  }, [query]);
   useEffect(() => setActive(0), [query]);
-  // The grid draws a page of rows at a time, more as it scrolls or the arrows go past them: each icon
-  // is an SVG mask of up to 256 dots, and drawing all ~1,700 at once held the page for seconds.
-  const [limit, setLimit] = useState(PAGE);
-  useEffect(() => setLimit(PAGE), [query]);
-  useEffect(() => void (active >= limit && setLimit(active + PAGE - (active % COLS))), [active, limit]);
-  const more = (el: HTMLElement) => el.scrollTop + el.clientHeight > el.scrollHeight - 200 && limit < shown.length && setLimit((l) => l + PAGE);
   // The arrows move the active cell; keep it in view as they leave the visible rows (not on hover).
   const scroll = useRef<HTMLDivElement>(null);
   const keyed = useRef(false);
-  // An arrow past the drawn rows lands on a cell that draws a render later, with the next page: scroll then.
   useEffect(() => {
     const cell = keyed.current && scroll.current?.querySelector<HTMLElement>("[data-active]");
     if (!cell) return;
     cell.scrollIntoView({ block: "nearest" });
     keyed.current = false;
-  }, [active, limit]);
+  }, [active]);
 
   const onKey = (e: ReactKeyboardEvent) => {
     const move = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: COLS, ArrowUp: -COLS }[e.key];
@@ -231,7 +133,7 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
     }
   };
 
-  /** `icon` is the stored value, "mc:<name>" (or "ph:<name>" in recents). */
+  /** `icon` is the stored value, "mc:<name>". */
   const cell = (icon: string, i?: number) => (
     <button
       key={icon}
@@ -256,19 +158,17 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
           </button>
         </Hint>
       </div>
-      <div className="picker-scroll" ref={scroll} onScroll={(e) => more(e.currentTarget)}>
+      <div className="picker-scroll" ref={scroll}>
         {!query && recent.length > 0 && (
           <div className="picker-section">
             <div className="picker-label">Recent</div>
             <div className="picker-grid">{recent.slice(0, 12).map((r) => cell(r))}</div>
           </div>
         )}
-        {!all ? (
-          <div className="picker-note">Loading…</div>
-        ) : shown.length ? (
+        {shown.length ? (
           <div className="picker-section">
             {!query && <div className="picker-label">Icons</div>}
-            <div className="picker-grid">{shown.slice(0, limit).map((i, n) => cell(`mc:${i.name}`, n))}</div>
+            <div className="picker-grid">{shown.map((i, n) => cell(`mc:${i.name}`, n))}</div>
           </div>
         ) : (
           <div className="picker-note">No icons found.</div>

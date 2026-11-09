@@ -1,19 +1,22 @@
 import { expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
 import auto from "../src/skill-icons.json";
 import { FIXES } from "../src/skill-icon-fixes";
+import { SKILL_ICON_SET } from "../src/skill-icon-set";
 
-// Every MingCute icon the picker offers has its 16-grid drawing (scripts/pixel-skill-icons.ts), so none falls back to nothing.
-test("every MingCute fill icon has a pixel drawing", () => {
-  const dir = new URL("../node_modules/mingcute_icon/svg/", import.meta.url).pathname;
-  const names = readdirSync(dir).flatMap((c) => readdirSync(dir + c).filter((f) => f.endsWith("_fill.svg")).map((f) => f.slice(0, -9)));
-  const drawn = auto as Record<string, string[]>;
+const drawn = auto as Record<string, string[]>;
+
+// Every icon the picker offers has its 16-grid drawing (scripts/pixel-skill-icons.ts), so none falls back to nothing,
+// and nothing outside the set is shipped.
+test("the skill icon set and its drawings match", () => {
+  const names = SKILL_ICON_SET.map(([n]) => n);
+  expect(new Set(names).size).toBe(names.length);
   expect(names.filter((n) => !drawn[n] || drawn[n]!.length !== 16 || drawn[n]!.some((r) => !/^[0-9a-f]{4}$/.test(r)))).toEqual([]);
+  expect(Object.keys(drawn).filter((n) => !names.includes(n))).toEqual([]);
 });
 
-test("hand fixes are 16x16 sprites of MingCute icons", () => {
+test("hand fixes are 16x16 sprites of icons in the set", () => {
   for (const [name, rows] of Object.entries(FIXES)) {
-    expect((auto as Record<string, unknown>)[name]).toBeDefined();
+    expect(drawn[name]).toBeDefined();
     expect(rows.length).toBe(16);
     for (const r of rows) expect(r).toMatch(/^[#.]{16}$/);
   }
