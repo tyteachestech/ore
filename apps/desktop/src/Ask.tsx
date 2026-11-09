@@ -1,13 +1,15 @@
 import { ArrowUp, Sparkle } from "./icons";
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
 import { ore, opt, type CardFull } from "./ore";
 import { errorText } from "./util";
+import { wordDiff } from "./worddiff";
 
 type Proposal = { question: string; answer: string };
-type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null };
+/** `was`: the card as it stood when the proposal came, so the change it shows survives Use this card (D161). */
+type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null; was?: Proposal };
 type Reply = { reply: string; proposal: Proposal | null; session: string };
 
 const STARTERS = ["Why is this the answer?", "Give me an example", "Make this card clearer"];
@@ -48,7 +50,7 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
         opt("message", message),
         ...(chat.session ? [opt("session", chat.session)] : [opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : [])]),
       );
-      setChat((c) => ({ ...c, session: r.session, busy: false, failed: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal }] }));
+      setChat((c) => ({ ...c, session: r.session, busy: false, failed: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal, was: { question: card.question, answer: card.answer } }] }));
     } catch (e) {
       setChat((c) => ({ ...c, busy: false, error: errorText(e, "answer that"), failed: message }));
     } finally {
@@ -82,8 +84,8 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
                 {t.proposal && (
                   <div className="ask-card">
                     <div className="quiz-kicker">Suggested card</div>
-                    <p className="ask-card-q">{t.proposal.question}</p>
-                    <p className="ask-card-a">{t.proposal.answer}</p>
+                    <p className="ask-card-q"><Changes was={t.was?.question} now={t.proposal.question} /></p>
+                    <p className="ask-card-a"><Changes was={t.was?.answer} now={t.proposal.answer} /></p>
                     <button className="ask-use" disabled={applied === t.proposal} onClick={() => void onApply(t.proposal!).then(() => setChat((c) => ({ ...c, applied: t.proposal! })), () => {})}>
                       {applied === t.proposal ? "Card updated" : "Use this card"}
                     </button>
@@ -142,5 +144,33 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
         </button>
       </div>
     </section>
+  );
+}
+
+/** A proposed card's text as a change to the card he has (D161, after drift-ui's diff viewer): words
+ *  it drops struck through, words it adds underlined, the rest as it was. A rewrite should ask the same
+ *  thing more clearly; seeing only what changed shows at a glance when it asks something else, which
+ *  his review history wouldn't fit. */
+function Changes({ was, now }: { was?: string; now: string }) {
+  if (was === undefined) return <>{now}</>;
+  return (
+    <>
+      {wordDiff(was, now).map((p, i) => {
+        if (p.kind === "same") return p.text;
+        // Spaces at a change's edges stay outside its mark, so a strike or underline never runs past a word.
+        const [, lead, words, trail] = p.text.match(/^(\s*)([\s\S]*?)(\s*)$/)!;
+        const Mark = p.kind === "del" ? "del" : "ins";
+        return (
+          <Fragment key={i}>
+            {lead}
+            <Mark className={p.kind === "del" ? "diff-del" : "diff-add"}>
+              <span className="sr-only">{p.kind === "del" ? "removed: " : "added: "}</span>
+              {words}
+            </Mark>
+            {trail}
+          </Fragment>
+        );
+      })}
+    </>
   );
 }

@@ -3,7 +3,7 @@ import * as Popover from "@radix-ui/react-popover";
 import * as Slider from "@radix-ui/react-slider";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { Hint } from "./Hint";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { load, save } from "./util";
 
 // The YouTube player for a video source (D48, D50), driven over the embed's postMessage protocol
@@ -19,7 +19,7 @@ const PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const clampRate = (r: number) => Math.min(MAX_RATE, Math.max(MIN_RATE, Math.round(r * 20) / 20));
 const savedRate = () => clampRate(Number(load(RATE_KEY)) || 1);
 
-type Player = {
+export type Player = {
   frame: RefObject<HTMLIFrameElement | null>;
   src: string;
   ready: boolean;
@@ -237,6 +237,78 @@ export function useYouTube(video: string | undefined, id: string): Player {
   return { frame, src, ready, playing, started, ended, error, blocked, duration, rate, elapsed, time, toggle, play, seek, skip, setRate };
 }
 
+/** A kept podcast or recording (D167): the same player as a video's, on the Mac's own audio element, so the
+ *  transcript follows it, stamps seek it and the keys drive it as they do a video (D48 to D50). The
+ *  position is saved per source and the rate shared with videos. */
+export function useAudio(file: string | undefined, id: string): Player {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const posKey = `ore.video.${id}`;
+  const [start] = useState(() => Math.max(0, Math.floor(Number(load(posKey)) || 0)));
+  const el = useRef<HTMLAudioElement | null>(null);
+  const [ready, setReady] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [started, setStarted] = useState(start > 0);
+  const [ended, setEnded] = useState(false);
+  const [error, setError] = useState<number | null>(null);
+  const [duration, setDuration] = useState(0);
+  const [rate, setRateState] = useState(savedRate);
+  const [elapsed, setElapsed] = useState(start);
+  useEffect(() => {
+    if (!file) return;
+    const a = new Audio(/^(https?:|data:|blob:)/i.test(file) ? file : convertFileSrc(file));
+    a.preload = "metadata";
+    a.playbackRate = savedRate();
+    el.current = a;
+    // Only once the file is read: before then currentTime is 0, not where he stopped.
+    let loaded = false;
+    const persist = () => loaded && save(posKey, String(resumeAt(a.currentTime, a.duration || 0, a.ended)));
+    const on: Record<string, () => void> = {
+      loadedmetadata: () => {
+        setDuration(a.duration || 0);
+        if (start && start < a.duration) a.currentTime = start;
+        loaded = true;
+        setReady(true);
+      },
+      play: () => (setPlaying(true), setStarted(true), setEnded(false)),
+      pause: () => (setPlaying(false), persist()),
+      ended: () => (setPlaying(false), setEnded(true), persist()),
+      timeupdate: () => setElapsed(Math.floor(a.currentTime)),
+      ratechange: () => setRateState(a.playbackRate),
+      error: () => setError(-2),
+    };
+    for (const [k, f] of Object.entries(on)) a.addEventListener(k, f);
+    // As a video's: saved every few seconds while it plays, so a quit or crash keeps the place.
+    const every = setInterval(() => !a.paused && persist(), 5000);
+    return () => {
+      clearInterval(every);
+      persist();
+      a.pause();
+      for (const [k, f] of Object.entries(on)) a.removeEventListener(k, f);
+      el.current = null;
+    };
+  }, [file, posKey, start]);
+  const time = useCallback(() => el.current?.currentTime ?? 0, []);
+  const play = useCallback(() => void el.current?.play().catch(() => {}), []);
+  const toggle = useCallback(() => (el.current?.paused ? play() : el.current?.pause()), [play]);
+  const seek = useCallback((t: number) => {
+    const a = el.current;
+    if (!a) return;
+    a.currentTime = Math.max(0, Math.min(t, a.duration || t));
+    setElapsed(Math.floor(a.currentTime));
+    setStarted(true);
+    setEnded(false);
+    if (a.duration) save(posKey, String(resumeAt(a.currentTime, a.duration, false)));
+  }, [posKey]);
+  const skip = useCallback((by: number) => seek(time() + by), [seek, time]);
+  const setRate = useCallback((r: number) => {
+    const next = clampRate(r);
+    if (el.current) el.current.playbackRate = next;
+    setRateState(next);
+    save(RATE_KEY, String(next));
+  }, []);
+  return { frame, src: "", ready, playing, started, ended, error, blocked: false, duration, rate, elapsed, time, toggle, play, seek, skip, setRate };
+}
+
 export function clock(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
   const h = Math.floor(s / 3600);
@@ -319,7 +391,7 @@ function useVideoWidth(box: RefObject<HTMLDivElement | null>) {
 /** The pinned video and its control row (D48). Copies Eleven Reader's player: a full-width scrubber,
  *  then back 15, a round play button and forward 30 in the middle, time on the left and speed on
  *  the right. YouTube's own controls are off. Every control shows its shortcut on hover (Hint). */
-export function VideoPlayer({ player, title, onFinish, onOpen }: { player: Player; title: string; onFinish: () => void; onOpen: () => void }) {
+export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ticks = [] }: { player: Player; title: string; onFinish: () => void; onOpen: () => void; audio?: boolean; ticks?: number[] }) {
   const [scrub, setScrub] = useState<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const size = useVideoWidth(box);
@@ -327,7 +399,10 @@ export function VideoPlayer({ player, title, onFinish, onOpen }: { player: Playe
   const total = player.duration;
   const off = !player.ready;
   return (
-    <div className="player" ref={box} style={size.fit ? { width: size.fit.width, marginLeft: size.fit.left } : undefined}>
+    <div className={`player${audio ? " audio" : ""}`} ref={box} style={size.fit && !audio ? { width: size.fit.width, marginLeft: size.fit.left } : undefined}>
+      {audio ? (
+        player.error !== null && <div className="video-error">This recording won’t play here. Its transcript is below.</div>
+      ) : (
       <div className="video-frame">
         <iframe
           ref={player.frame}
@@ -357,6 +432,7 @@ export function VideoPlayer({ player, title, onFinish, onOpen }: { player: Playe
           </Hint>
         ))}
       </div>
+      )}
       <Slider.Root
         className="scrub"
         min={0}
@@ -374,6 +450,8 @@ export function VideoPlayer({ player, title, onFinish, onOpen }: { player: Playe
         <Slider.Track className="scrub-track">
           <Slider.Range className="scrub-range" />
         </Slider.Track>
+        {/* His highlights where they are spoken (D167), so he can go back to the moments he marked. */}
+        {total > 0 && ticks.filter((t) => t <= total).map((t, i) => <span key={i} className="scrub-tick" style={{ left: `${(t / total) * 100}%` }} aria-hidden="true" />)}
         <Slider.Thumb className="scrub-thumb" aria-valuetext={`${clock(shown)} of ${clock(total)}`} />
       </Slider.Root>
       <div className="controls">

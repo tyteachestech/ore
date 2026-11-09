@@ -120,7 +120,7 @@ export const aiCommands: Record<string, Command> = {
       const stream = str(f.stream);
       const onProgress = stream ? (p: TutorProgress) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
       const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill), onProgress });
-      const text = [withSteps(r), ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
+      const text = [withSteps(r), ...(r.exercise?.cases ?? []).map((c, i) => `  ${"AB"[i]}: ${c}`), ...r.marks.map((m) => `  ${m.covered ? "got" : "missed"}: ${m.point}${m.quote ? ` (“${m.quote}”)` : ""}`), ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
       return { data: r, text };
     },
   },

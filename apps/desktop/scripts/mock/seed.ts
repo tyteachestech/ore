@@ -1,7 +1,8 @@
 // Seeds a realistic scratch library for screenshots: bun seed.ts <root>
 import { addMess } from "./mess.ts";
 import { $ } from "bun";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   addSkill, addText, addTutorCard, findItem, initLibrary, readAnnotations, recordReview, setItemStatus, setSkillLook, skillNotesPath, updateItemMeta, writeCardMeta, writeNewCard, startSession, endSession,
@@ -67,6 +68,36 @@ writeFileSync(join(a2.dir, "assets", "patterns.svg"), PATTERNS);
 const a3 = await mk(story, ["storytelling-writing"]);
 await mk(article("A very long title about the neuroscience of habit formation and why cue-routine-reward loops are harder to break than to build", [["Loops", [para("Habits form when a cue reliably predicts a reward.")]]]), ["habits"]);
 const a5 = await mk(article("Notes on spaced repetition scheduling (FSRS)", [["Stability", [para("FSRS models stability and difficulty for each card.")]]]), ["learning"]);
+
+// A recorded lecture kept whole (D167): a minute of quiet tone as a WAV, heard by a stand-in for the Mac's
+// transcriber (ORE_TRANSCRIBE, as the intake tests do), so it imports through the real audio path.
+const LECTURE_VTT = "WEBVTT\n\n" + [
+  [0, "Today we look at why testing yourself beats rereading."],
+  [9, "When you pull an answer out of memory, the memory gets stronger."],
+  [19, "Rereading feels fluent, so it feels like learning, but little of it lasts."],
+  [30, "The gap only shows after a delay of a day or more."],
+  [41, "So space your practice tests, and check each answer right away."],
+  [52, "That's the whole lecture: retrieve, wait, retrieve again."],
+].map(([t, w], i, all) => `00:00:${String(t).padStart(2, "0")}.000 --> 00:00:${String(all[i + 1]?.[0] ?? 60).padStart(2, "0")}.000\n${w}`).join("\n\n") + "\n";
+{
+  const rate = 8000, n = rate * 60;
+  const wav = new Uint8Array(44 + n);
+  const v = new DataView(wav.buffer);
+  const str = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, "RIFF"); v.setUint32(4, 36 + n, true); str(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, "data"); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) wav[44 + i] = 128 + Math.round(6 * Math.sin((2 * Math.PI * 220 * i) / rate));
+  const tmp = mkdtempSync(join(tmpdir(), "ore-seed-"));
+  const file = join(tmp, "Lecture 4 - the testing effect.wav");
+  writeFileSync(file, wav);
+  writeFileSync(join(tmp, "lecture.vtt"), LECTURE_VTT);
+  writeFileSync(join(tmp, "transcribe"), `#!/bin/sh\ncat '${join(tmp, "lecture.vtt")}'\n`, { mode: 0o755 });
+  const out = await $`bun ${CLI} add ${file} --skill learning --no-enrich --json`.env({ ...process.env, ORE_TRANSCRIBE: join(tmp, "transcribe") }).quiet();
+  const lecture = JSON.parse(out.stdout.toString()) as { id: string };
+  await $`bun ${CLI} highlight ${lecture.id} --exact ${"the memory gets stronger"} --intent keep`.quiet();
+  await $`bun ${CLI} highlight ${lecture.id} --exact ${"The gap only shows after a delay"} --intent question`.quiet();
+  await $`rm -rf ${tmp}`.quiet();
+}
 
 await updateItemMeta(lib, a1.meta.id, (m) => ({ ...m, prequestions: [
   { q: "Why does rereading feel effective even when it isn't?" },

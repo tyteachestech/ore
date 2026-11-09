@@ -201,7 +201,7 @@ export type Research = { sources: { title: string; url: string; site: string; ty
 export type Transcript = { video: string; words: [number, string][] };
 
 /** `reached` and `leave_out`: what his last partway finish covered (D100). */
-export type Doc = Item & { body: string; annotations?: Annotation[]; transcript?: Transcript | null; reached?: number; leave_out?: { text: string } };
+export type Doc = Item & { body: string; annotations?: Annotation[]; transcript?: Transcript | null; audio?: { file: string; words: [number, string][] }; reached?: number; leave_out?: { text: string } };
 
 export const SKILL_COLORS = ["gray", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink"] as const;
 export type SkillColor = (typeof SKILL_COLORS)[number];
@@ -290,6 +290,10 @@ export type CardFull = {
   in_head_ok?: boolean;
   /** A card from a line he typed (Card here, D99): the passages that answer it, found in the source. */
   evidence?: { exact: string; start: number; end: number }[];
+  /** A card from part of a figure (D166): the image as the source names it and the box hidden in review, as
+   *  fractions of its size; `figure_file` is where the image is (show only). */
+  figure?: { src: string; box: [number, number, number, number] };
+  figure_file?: string;
   /** Its reviews and where each rating puts the next one (D149); with --review only. */
   history?: CardHistory;
 };
@@ -309,7 +313,7 @@ export type SessionEnd = {
   /** Cards that became solid this session, as each one's first skill (D90): one cut gem each. */
   cut?: string[];
   /** On the week's first end screen (D69): of Explain answers marked Sure, the share the key-point check passed. */
-  calibration?: { sure_n: number; sure_right: number } | null;
+  calibration?: { sure_n: number; sure_right: number; levels: { confidence: 1 | 2 | 3; n: number; right: number | null }[] } | null;
 };
 
 /** When he last added or opened a source: To read lists the last touched first (D110). */

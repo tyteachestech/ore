@@ -18,6 +18,8 @@ import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
+import { Evidence } from "./Evidence";
+import { Occluded } from "./Occluded";
 
 const SURE = ["Guess", "Think so", "Sure"] as const;
 const KEY_POINTS_CHANGED = "The key points changed.";
@@ -886,6 +888,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
             ) : (
               <h1 className="review-q">{card.question}</h1>
             )}
+            {card.figure && card.figure_file && phase !== "edit" && <Occluded file={card.figure_file} box={card.figure.box} shown={phase === "checked"} />}
 
             {phase === "answer" && card.kind === "prompt" && (
               <>
@@ -1256,10 +1259,22 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
           </p>
         );
       })}
+      {/* D165: how often he is right at each of his three taps, so he sees whether they mean anything, not only whether Sure is too sure. */}
       {s.calibration && (
-        <Hint text={`From ${s.calibration.sure_n} Explain answers marked Sure in the last 12 weeks`}>
-          <p className="review-calibration">When you say Sure, you’re right {Math.round(s.calibration.sure_right * 100)}% of the time.</p>
-        </Hint>
+        <div className="review-calibration" role="group" aria-label="When you say">
+          <span className="review-calibration-label">When you say</span>
+          {s.calibration.levels.filter((l) => l.right !== null).map((l) => (
+            <Hint key={l.confidence} text={`Right ${Math.round(l.right! * l.n)} of ${l.n} Explain answers in the last 12 weeks`}>
+              <span className="review-calibration-row" tabIndex={0} aria-label={`${SURE[l.confidence - 1]}: right ${Math.round(l.right! * 100)}%`}>
+                <span className="review-calibration-name">{SURE[l.confidence - 1]}</span>
+                <span className="review-calibration-bar" aria-hidden="true">
+                  {Array.from({ length: 10 }, (_, i) => <i key={i} data-on={i < Math.round(l.right! * 10) || undefined} />)}
+                </span>
+                <span className="review-calibration-pct">{Math.round(l.right! * 100)}%</span>
+              </span>
+            </Hint>
+          ))}
+        </div>
       )}
       {!t.met && t.counts && <p className="quiz-faint">{minutesText(Math.max(0, t.goal_ms - t.active_ms))} min to today’s goal</p>}
       {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
@@ -1290,26 +1305,3 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
   );
 }
 
-/** His answer with the words that earned the key point under the pointer underlined (D141): the grader's
- *  quote, found as he wrote it. A quote that isn't there (an edited answer) marks nothing. */
-function Evidence({ answer, quote }: { answer: string; quote: string }) {
-  const ref = useRef<HTMLElement>(null);
-  const at = quote ? answer.indexOf(quote) : -1;
-  // The answer box scrolls past nine lines: bring the words into it, scrolling only that box, so the
-  // page never moves the key point out from under the pointer.
-  useEffect(() => {
-    const m = ref.current, box = m?.parentElement;
-    if (!m || !box) return;
-    const top = m.offsetTop - box.offsetTop, bottom = top + m.offsetHeight;
-    if (top < box.scrollTop) box.scrollTop = top;
-    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
-  }, [quote]);
-  if (at < 0) return <>{answer}</>;
-  return (
-    <>
-      {answer.slice(0, at)}
-      <mark ref={ref} className="quiz-evidence">{quote}</mark>
-      {answer.slice(at + quote.length)}
-    </>
-  );
-}

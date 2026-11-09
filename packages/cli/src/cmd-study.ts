@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
-  CardState, cardStates, calibration, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
+  CardState, cardStates, calibration, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
   readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
@@ -9,6 +9,15 @@ import type { Command } from "./types.ts";
 import { int, need, oneOf, str, strs, table } from "./util.ts";
 
 const cardJson = (lib: Library, c: Card, state = cardStates(lib)(c)) => ({ ...c.meta, state, question: c.question, answer: c.answer, rubric: c.rubric, path: relative(lib.root, c.path) });
+/** With a figure card (D166), where its image is, so review can show it. */
+const figureJson = (lib: Library, c: Card) => {
+  if (!c.meta.figure) return {};
+  try {
+    return { figure_file: figureFile(findItem(lib, c.meta.item), c.meta.figure.src) };
+  } catch {
+    return {}; // its source is gone: the card's text stands alone (D166)
+  }
+};
 // A card as a variant shows it (D66): the variant's question, answer and key points, typed and
 // graded like an Explain card, with the original alongside.
 const variantJson = (lib: Library, c: Card, v: Variant) => ({
@@ -41,19 +50,24 @@ export const studyCommands: Record<string, Command> = {
   },
 
   card: {
-    usage: 'show|edit|set|retire|restore <id> [--review] [--variant v] [--question "<q>"] [--answer "<a>"] [--point "<key point>"]... [--state draft|live]   show parses the card (--review: the version review shows now, a variant in its turn, D66); edit opens $EDITOR; set replaces the question, answer or key points (--point, one per key point, in order: the whole rubric an Explain card is graded against; --variant edits that variant, its points one for one); retire removes it from review; restore undoes a retire, back to --state',
-    options: { question: { type: "string" }, answer: { type: "string" }, point: { type: "string", multiple: true }, state: { type: "string" }, review: { type: "boolean" }, variant: { type: "string" } },
+    usage: 'show|edit|set|retire|restore <id> [--review] [--variant v] [--question "<q>"] [--answer "<a>"] [--point "<key point>"]... [--state draft|live]   show parses the card (--review: the version review shows now, a variant in its turn, D66); edit opens $EDITOR; set replaces the question, answer or key points (--point, one per key point, in order: the whole rubric an Explain card is graded against; --variant edits that variant, its points one for one); retire removes it from review; restore undoes a retire, back to --state; figure <source> --src <image> --box x,y,w,h --answer <label>: a Fact card that hides that box of one of the source’s figures (fractions of its size, D166)',
+    options: { question: { type: "string" }, answer: { type: "string" }, point: { type: "string", multiple: true }, state: { type: "string" }, review: { type: "boolean" }, variant: { type: "string" }, src: { type: "string" }, box: { type: "string" } },
     async run([sub, ref], f) {
-      if (!["show", "edit", "set", "retire", "restore"].includes(sub ?? "")) throw new Error("usage: ore card show|edit|set|retire|restore <id>");
+      if (!["show", "edit", "set", "retire", "restore", "figure"].includes(sub ?? "")) throw new Error("usage: ore card show|edit|set|retire|restore <id> | figure <source>");
       const lib = openLibrary();
       const id = need(ref, "<id>");
+      if (sub === "figure") {
+        const box = need(str(f.box), "--box x,y,w,h").split(",").map((n) => (n.trim() === "" ? NaN : Number(n)));
+        const c = await addFigureCard(lib, id, { src: need(str(f.src), "--src <image>"), box, label: need(str(f.answer), "--answer <what’s under the box>") });
+        return { data: { ...cardJson(lib, c), ...figureJson(lib, c) }, text: `Made card ${c.meta.id}: ${c.answer}` };
+      }
       if (sub === "show") {
         const c = findCard(lib, id);
         const v = f.review ? reviewVersion(lib, c) : f.variant ? findVariant(lib, c.meta.id, str(f.variant)!) : null;
         if (v) return { data: { ...variantJson(lib, c, v), ...(f.review ? { history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)} · variant ${v.id} (${v.type})\n\n${v.question}\n---\n${v.answer}\n${v.rubric.map((p) => `- ${p}`).join("\n")}` };
         // in_head_ok: review may offer "In my head" on this Explain card (D68); history: its reviews and
         // where each rating puts the next (D149).
-        return { data: { ...cardJson(lib, c), ...(f.review ? { in_head_ok: inHeadOk(lib, c), history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)}\n\n${readFileSync(c.path, "utf8")}` };
+        return { data: { ...cardJson(lib, c), ...figureJson(lib, c), ...(f.review ? { in_head_ok: inHeadOk(lib, c), history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)}\n\n${readFileSync(c.path, "utf8")}` };
       }
       if (sub === "edit") {
         const c = findCard(lib, id);
@@ -71,7 +85,7 @@ export const studyCommands: Record<string, Command> = {
           return { data: variantJson(lib, findCard(lib, id), v), text: `Saved variant ${v.id}` };
         }
         const c = await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, id), { question, answer, rubric }));
-        return { data: cardJson(lib, c), text: `Saved ${c.meta.id}` };
+        return { data: { ...cardJson(lib, c), ...figureJson(lib, c) }, text: `Saved ${c.meta.id}` };
       }
       if (sub === "retire" || sub === "restore") {
         const state = sub === "retire" ? "retired" : need(oneOf(f.state, ["draft", "live"] as const, "state"), "--state draft|live");
@@ -80,7 +94,7 @@ export const studyCommands: Record<string, Command> = {
           writeCardMeta(c, { ...c.meta, state });
           return findCard(lib, id);
         });
-        return { data: cardJson(lib, c), text: `${sub === "retire" ? "Retired" : "Restored"} ${c.meta.id}` };
+        return { data: { ...cardJson(lib, c), ...figureJson(lib, c) }, text: `${sub === "retire" ? "Retired" : "Restored"} ${c.meta.id}` };
       }
       throw new Error("usage: ore card show|edit|set|retire|restore <id>");
     },
