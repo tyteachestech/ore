@@ -1541,8 +1541,10 @@ export function App() {
     async (item: Item, to: Item["status"], undoable = true) => {
       try {
         await ore("status", item.id, ...back(item, to));
-        await refresh();
+        // The step goes on the history before the lists are read again: a ⌘Z pressed during that read
+        // (slow on a big library, or CI under load) must take this move back, not the one before it.
         if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => moveSource(item, item.status, false), () => moveSource(item, to, false));
+        await refresh();
       } catch (e) {
         // From the history (undo or redo): it puts the step back and says why.
         if (!undoable) throw e;
