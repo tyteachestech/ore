@@ -418,7 +418,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <div className="quiz-kicker">Recall</div>
           <h2 className="quiz-q">What do you remember from “{doc.title}”?</h2>
           <p className="quiz-sub">{upTo ? `Everything up to ${upTo}, in your own words.` : "Everything, in your own words."}</p>
-          <Grow ref={field} className="field quiz-answer tall" aria-label="Free recall" value={recall} onChange={(e) => setRecall(e.target.value)} placeholder="In your own words…" />
+          <Grow ref={field} className="field quiz-answer tall" aria-label="Free recall" value={recall} onChange={(e) => setRecall(e.target.value)} readOnly={busy} placeholder="In your own words…" />
           {qs.length > 0 && (
             <input
               className="field quiz-leave"
@@ -426,6 +426,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
               placeholder="Leave anything out? Like “the coding part”"
               value={leave}
               onChange={(e) => setLeave(e.target.value)}
+              readOnly={busy}
             />
           )}
           <div className="quiz-grow" />
@@ -628,7 +629,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <label className="quiz-label" htmlFor="quiz-use">
             Where would you use this, and what does it connect to? <span className="quiz-faint">Optional</span>
           </label>
-          <Grow ref={field} id="quiz-use" className="field quiz-answer short" value={use} onChange={(e) => setUse(e.target.value)} />
+          <Grow ref={field} id="quiz-use" className="field quiz-answer short" value={use} onChange={(e) => setUse(e.target.value)} readOnly={busy} />
           <div className="quiz-grow" />
           <div className="quiz-foot">
             {!marked && (

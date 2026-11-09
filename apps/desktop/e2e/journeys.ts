@@ -2593,8 +2593,17 @@ journey("reader questions: ask one, ⌘Z takes it back; its ⋯ menu marks it an
   await line.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete question" }).click();
   await until("it is gone", async () => (await rows()) === 0);
+  // A ⌘Z whose save fails shows no row that isn't there, and the next ⌘Z brings back one, not two.
+  await page.locator(".toast", { hasText: "Question deleted" }).waitFor();
+  await page.evaluate(() => void ((window as unknown as { __ORE_FAIL?: object }).__ORE_FAIL = { annotate: "The library is read-only." }));
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: "Couldn’t undo" }).waitFor();
+  if ((await rows()) !== 0) throw new Error("a failed ⌘Z shows the question it couldn't bring back");
+  await page.evaluate(() => void ((window as unknown as { __ORE_FAIL?: object }).__ORE_FAIL = {}));
   await page.keyboard.press("Meta+z");
   await until("⌘Z puts it back", async () => (await rows()) === 1);
+  await page.waitForTimeout(300);
+  if ((await rows()) !== 1) throw new Error(`⌘Z after a failed one shows ${await rows()} copies of the question`);
   // Leave the library as it was.
   await line.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete question" }).click();
@@ -4180,6 +4189,90 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   }, AGENTS);
 });
 
+journey("bulk filing under an archived skill brings it back in the sidebar, and ⌘Z archives it again (D173)", async (page) => {
+  const k = (await ore("skills", "add", "Lathe work")) as { id: string };
+  await ore("skills", "archive", k.id);
+  const archived = async () => !!((await ore("skills")) as { id: string; archived?: boolean }[]).find((s) => s.id === k.id)?.archived;
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const rows = page.locator(".row");
+    await rows.nth(0).click({ modifiers: ["Meta"] });
+    await rows.nth(1).click({ modifiers: ["Meta"] });
+    await page.keyboard.press("Meta+k");
+    await page.locator("[cmdk-input]").fill("under Lathe work");
+    await page.locator("[cmdk-item]", { hasText: "under Lathe work" }).first().click();
+    await until("filing brings the skill back", async () => !(await archived()));
+    await until("the sidebar lists it among the skills", async () => (await page.locator(".sidebar .side-item[data-drop-skill]", { hasText: "Lathe work" }).count()) === 1);
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z archives it again", archived);
+  } finally {
+    const all = (await ore("ls")) as { id: string; skills: string[] }[];
+    for (const i of all.filter((x) => x.skills.includes(k.id))) await ore("edit", i.id, "--skills", i.skills.filter((s) => s !== k.id).join(","));
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
+journey("skill page Find: a question's words are found, though the question is a button", async (page) => {
+  const q = (await ore("snippet", "--text=Does interleaving help with watercolour washes?", "--intent=question", "--skill=learning")) as { annotation: { id: string } };
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+    await page.getByText("Does interleaving help with watercolour washes?").first().waitFor();
+    await page.keyboard.press("Meta+f");
+    await page.locator(".find-bar input").fill("watercolour");
+    await page.waitForTimeout(400);
+    const said = (await page.locator(".find-bar").innerText()).trim();
+    if (/not found/i.test(said)) throw new Error(`Find says “${said}” for a word on the page`);
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("annotate", q.annotation.id, "--status", "deleted").catch(() => {});
+  }
+});
+
+journey("skill recall: a warm-up saved to the skill note is a step, so ⌘Z takes it out and ⇧⌘Z puts it back", async (page) => {
+  const k = (await ore("skills", "add", "Whittling")) as { id: string };
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Whittling" }).first().click();
+    await page.locator(".warm-up").getByRole("button").first().click();
+    const dialog = page.getByRole("dialog").filter({ hasText: "Warm up from memory" });
+    await dialog.getByRole("textbox").fill("Cut away from yourself, with the grain.");
+    await dialog.getByRole("button", { name: /Save as first draft/ }).click();
+    await dialog.waitFor({ state: "detached" });
+    const note = async () => ((await ore("notes", `--skill=${k.id}`)) as { text: string }).text;
+    await until("the recall is in the note", async () => (await note()).includes("with the grain"));
+    await page.locator(".skill-page h1, .skill-head").first().click({ position: { x: 4, y: 4 } }).catch(() => {});
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes the recall out of the note", async () => !(await note()).includes("with the grain"));
+    await page.keyboard.press("Shift+Meta+z");
+    await until("⇧⌘Z puts it back", async () => (await note()).includes("with the grain"));
+  } finally {
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
+journey("finish: nothing can be typed into the recall while it saves, so no words are lost behind a save", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Recall while saving\n\nA page whose recall saves slowly.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A page whose recall saves slowly").waitFor();
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  const box = page.getByLabel("Free recall");
+  await box.fill("First saved recall.");
+  await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { recall: 1200 }));
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await box.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Added while it saves.");
+  const shown = await box.inputValue().catch(() => "First saved recall.");
+  await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+  await page.getByRole("button", { name: "Keep reading" }).click();
+  if (shown !== "First saved recall.") throw new Error(`the box took ${JSON.stringify(shown)} while saving, and saved only the first sentence`);
+});
+
 journey("finish again: the recall box holds the last recall with the caret at its end, and the note holds it once", async (page) => {
   const title = "Recall twice";
   await page.getByRole("button", { name: "+ Add" }).click();
@@ -5716,9 +5809,9 @@ journey("delete skill: a delete whose save fails can be tried again from the sam
   }
 });
 
-journey("feed: a post that opens slowly never takes him away from where he went meanwhile", async (page) => {
+journey("feed: a post that opens slowly never takes him away from where he went meanwhile; Forward goes dim once a preview is dropped", async (page) => {
   const day = new Date(Date.now() - 864e5).toUTCString();
-  const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml" ? new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Slow Notes</title><link>http://localhost/</link><item><title>A slow post</title><link>http://localhost:${server.port}/a.html</link><pubDate>${day}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) : new Response(`<html><head><title>A slow post</title></head><body><article><h1>A slow post</h1>${"<p>Spacing beats cramming, as study after study has found over many decades of work.</p>".repeat(8)}</article></body></html>`, { headers: { "content-type": "text/html" } }) });
+  const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml" ? new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Slow Notes</title><link>http://localhost/</link><item><title>A slow post</title><link>http://localhost:${server.port}/a.html</link><pubDate>${day}</pubDate></item><item><title>Another post</title><link>http://localhost:${server.port}/b.html</link><pubDate>${day}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) : new Response(`<html><head><title>${r.url.endsWith("b.html") ? "Another post" : "A slow post"}</title></head><body><article><h1>${r.url.endsWith("b.html") ? "Another post" : "A slow post"}</h1>${"<p>Spacing beats cramming, as study after study has found over many decades of work.</p>".repeat(8)}</article></body></html>`, { headers: { "content-type": "text/html" } }) });
   const feed = `http://localhost:${server.port}/feed.xml`;
   try {
     await ore("feed", "follow", feed);
@@ -5730,6 +5823,21 @@ journey("feed: a post that opens slowly never takes him away from where he went 
     await page.getByRole("button", { name: /^Home/ }).click();
     await page.waitForTimeout(2200);
     if (await page.locator(".doc-head h1").count()) throw new Error("the post opened over Home after he went there");
+    // A preview he only looked at is dropped when he goes back, so Forward has nowhere to go and says so.
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const other = page.locator(".row.post", { hasText: "Another post" });
+    await other.click();
+    await page.locator(".doc-head h1", { hasText: "Another post" }).waitFor();
+    await page.keyboard.press("Meta+BracketLeft");
+    await page.locator(".feed, .row.post, .list").first().waitFor();
+    const forward = page.locator(".nav-arrows button").nth(1);
+    await page.waitForTimeout(600); // the preview is dropped
+    if (await forward.isEnabled()) {
+      await forward.click();
+      await page.waitForTimeout(300);
+      if (!(await page.locator(".doc-head h1").count()) && (await forward.isEnabled())) throw new Error("Forward stays lit and does nothing after a dropped preview");
+    }
   } finally {
     await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
     await ore("feed", "unfollow", feed).catch(() => {});

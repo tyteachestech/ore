@@ -283,7 +283,7 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
   const remove = useCallback(
     async (q: Question) => {
       let at = -1;
-      const back = () => setQs((l) => l && [...l.slice(0, at < 0 ? l.length : at), q, ...l.slice(at < 0 ? l.length : at)]);
+      const back = () => setQs((l) => l && (l.some((x) => x.id === q.id) ? l : [...l.slice(0, at < 0 ? l.length : at), q, ...l.slice(at < 0 ? l.length : at)]));
       setQs((l) => {
         at = l ? l.findIndex((x) => x.id === q.id) : -1;
         return l && l.filter((x) => x.id !== q.id);
@@ -293,14 +293,9 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
       const forget = notify(
         "Question deleted",
         "info",
-        () => {
-          back();
-          return write.catch(() => {}).then(() => ore("annotate", q.id, "--status", q.status));
-        },
-        () => {
-          setQs((l) => l && l.filter((x) => x.id !== q.id));
-          return ore("annotate", q.id, "--status", "deleted");
-        },
+        // The list follows the write, so one that fails leaves no row that isn't in the library.
+        () => write.catch(() => {}).then(() => ore("annotate", q.id, "--status", q.status)).then(back),
+        () => ore("annotate", q.id, "--status", "deleted").then(() => setQs((l) => l && l.filter((x) => x.id !== q.id))),
       );
       try {
         await write;

@@ -67,6 +67,9 @@ has to ask for something obvious, add a row here in the same PR.**
 | Title edited in place | One field everywhere (`TitleField.tsx`): Enter saves, Esc or a click away keeps the old one, and a save that fails leaves what he typed in the field to try again | Finder, Notion |
 | Whole app | An Undo or Redo returns its write's promise (the `Notify` type refuses one that doesn't), so a failed one says why and stays on the history; a screen that keeps its own copy of the data reads it again when a step made before it opened lands (`useLibraryChanges`) | Every Mac app |
 | Whole app | Something that finishes loading never opens over the screen he has moved to since (a slow feed post, Read now): compare `viewRef.current` before and after the wait | Safari, Mail |
+| Any field that saves | Read-only while its save is in flight, so nothing typed behind a save is lost when the screen moves on | Notion, Linear |
+| Back and Forward | A place that no longer exists (a deleted source, a dropped feed preview) leaves the history, so an arrow with nowhere to go is dim, never lit and dead | Safari, Finder |
+| Find on a page | Searches every word of his on the page, including ones that sit in a button (`data-find`) | Safari |
 | Set of pills or tags | Clicking the set opens a multi-select: search, toggle with a click or Enter, create a new one from the query | Notion |
 | Command palette | ⌘1–⌘9 run the visible rows; recent items first with an empty query; actions on the open or selected object; Esc clears the query first, then goes back a page, then closes | Raycast |
 | Reading page | ⌘F finds in the page with a match count, ⌘G/⇧⌘G or Enter/⇧Enter step, Esc closes and keeps the place | Safari, Books |

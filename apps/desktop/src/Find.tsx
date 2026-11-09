@@ -31,8 +31,9 @@ export function findAll(hay: string, needle: string): number[] {
   return at;
 }
 
-// Text that is not the source or the note: overlays, controls, the find bar.
-const SKIP = ".marks, .margin, .popup, .tip, .player-pin, .find-bar, button, [aria-hidden=true]";
+// Text that is not the source or the note: overlays, controls, the find bar. A button whose words are his
+// own (a question, a try's passage) says data-find, and is searched like any text.
+const SKIP = ".marks, .margin, .popup, .tip, .player-pin, .find-bar, button:not([data-find]), [aria-hidden=true]";
 const BLOCK = "p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td, th, figcaption, dt, dd, div";
 // Never inside a match: it stops one from running across two paragraphs.
 const BREAK = "\u0000";

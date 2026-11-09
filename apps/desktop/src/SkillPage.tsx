@@ -663,7 +663,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
   };
   const remove = async (t: Try) => {
     let at = -1;
-    const back = () => setTs((l) => l && [...l.slice(0, at < 0 ? l.length : at), t, ...l.slice(at < 0 ? l.length : at)]);
+    const back = () => setTs((l) => l && (l.some((x) => x.id === t.id) ? l : [...l.slice(0, at < 0 ? l.length : at), t, ...l.slice(at < 0 ? l.length : at)]));
     setTs((l) => {
       at = l ? l.findIndex((x) => x.id === t.id) : -1;
       return l && l.filter((x) => x.id !== t.id);
@@ -677,8 +677,9 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
     notify(
       "Removed",
       "info",
-      () => (back(), ore("annotate", t.id, "--status", t.status)),
-      () => (setTs((l) => l && l.filter((x) => x.id !== t.id)), ore("annotate", t.id, "--status", "deleted")),
+      // The list follows the write, so one that fails leaves no row that isn't in the library.
+      () => ore("annotate", t.id, "--status", t.status).then(back),
+      () => ore("annotate", t.id, "--status", "deleted").then(() => setTs((l) => l && l.filter((x) => x.id !== t.id))),
     );
   };
 
@@ -741,7 +742,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
           </Hint>
         )}
         <Hint text="Open this passage">
-          <button className="question-quote try-quote" onClick={onPassage}>
+          <button className="question-quote try-quote" data-find="" onClick={onPassage}>
             {!history && t.note && <span className="note">{t.note}</span>}
             <span className="exact">“{t.exact.replace(/\s+/g, " ").trim()}”</span>
             <span className="from">{t.item_title}</span>
@@ -756,7 +757,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
           ))}
         {done && t.reflection && !reflecting && (
           <Hint text="Edit how it went">
-            <button className="try-reflection" onClick={() => onReflect(true)}>{t.reflection}</button>
+            <button className="try-reflection" data-find="" onClick={() => onReflect(true)}>{t.reflection}</button>
           </Hint>
         )}
         <div className="question-actions">
@@ -906,13 +907,13 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
         </button>
       </Hint>
       {own ? (
-        <button className="question-quote" onKeyDown={moveRow} onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
+        <button className="question-quote" data-find="" onKeyDown={moveRow} onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
           <span className="note">{exact}</span>
         </button>
       ) : (
         // The passage it came from is in the hint and one click away; the row keeps to the question and its source.
         <Hint text={q.note ? `“${exact}”` : "Open this passage"}>
-          <button className="question-quote" onKeyDown={moveRow} onClick={() => onQuestion(q)}>
+          <button className="question-quote" data-find="" onKeyDown={moveRow} onClick={() => onQuestion(q)}>
             <span className={q.note ? "note" : "note passage"}>{q.note || exact}</span>
             <span className="from">{q.item_title}</span>
           </button>

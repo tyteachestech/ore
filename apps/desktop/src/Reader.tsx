@@ -2398,11 +2398,15 @@ function ReaderView(p: Props & { reload: () => void }) {
   const fileUnder = async (skills: string[], changed?: Skill, fromHistory = false) => {
     if (!doc) return;
     const before = doc.skills;
+    // Filing under an archived skill brings it back (D173, as App's refile); Undo archives it again.
+    const revived = skills.filter((id) => !before.includes(id) && p.skills.some((s) => s.id === id && s.archived));
     setDoc((cur) => cur && { ...cur, skills });
     try {
       await ore("edit", doc.id, "--skills", skills.join(","));
       p.onChanged();
-      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true), () => fileUnder(skills, undefined, true));
+      if (revived.length) p.onSkillsChanged();
+      const rearchive = () => Promise.all(revived.map((id) => ore("skills", "archive", id))).finally(p.onSkillsChanged);
+      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true).then(rearchive), () => fileUnder(skills, undefined, true));
     } catch (e) {
       setDoc((cur) => cur && { ...cur, skills: unfile(cur.skills, skills, before) });
       // From the history (undo or redo): it puts the step back and says why.

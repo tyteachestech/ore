@@ -1518,7 +1518,11 @@ export function App() {
 
   /** Writes each picked source in turn (the CLI owns the library), as one step with one Undo and
    *  Redo. `patch` shows the result at once: the source as it will be, or null when it leaves the list. */
-  const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null) => {
+  /** Filing under an archived skill brings it back (D173, the CLI does that); taking the filing back archives
+   *  it again. Either way the sidebar reads the skills again. */
+  const rearchive = (ids: string[]) => Promise.all(ids.map((id) => ore("skills", "archive", id))).finally(reloadSkills);
+  /** `after`: what follows the writes each way (a skill a filing brought back). */
+  const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null, after?: (forward: boolean) => unknown) => {
     const sel = many;
     const ids = new Set(sel.map((i) => i.id));
     const was = cursor;
@@ -1529,6 +1533,7 @@ export function App() {
       try {
         await queue(async () => {
           for (const i of sel) await write(i, forward);
+          await after?.(forward);
         });
       } catch (e) {
         if (fromHistory) throw e;
@@ -1555,6 +1560,7 @@ export function App() {
       on ? `Filed ${sourcesN(many.length)} under ${k.name}` : `Removed ${sourcesN(many.length)} from ${k.name}`,
       (i, f) => ore("edit", i.id, "--skills", (f ? next(i) : i.skills).join(",")),
       (i) => ({ ...i, skills: next(i) }),
+      on && k.archived ? (forward) => (forward ? reloadSkills() : rearchive([k.id])) : undefined,
     );
   };
   /** The picked sources' actions: the same as one row's that make sense for many, named for the count. */
@@ -1647,12 +1653,11 @@ export function App() {
     setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
     // Filing under an archived skill brings it back (D173); Undo archives it again.
     const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
-    const rearchive = () => Promise.all(revived.map((id) => ore("skills", "archive", id))).finally(reloadSkills);
     try {
       await what.write(next);
       if (changed) {
         const on = next.includes(changed.id);
-        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true).then(rearchive), () => refile(what, next, before, undefined, true));
+        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true).then(() => rearchive(revived)), () => refile(what, next, before, undefined, true));
       }
     } catch (e) {
       // From the history (undo or redo): it puts the step back and says why.
@@ -2456,12 +2461,18 @@ function useHistory(view: View, restore: (v: View) => boolean) {
   }, [view.openId, view.skill, view.status, view.place]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const step = useCallback((by: -1 | 1) => {
-    const { stack, at: from } = h.current;
-    for (let at = from + by; at >= 0 && at < stack.length; at += by) {
+    const { stack } = h.current;
+    let from = h.current.at;
+    for (let at = from + by; at >= 0 && at < stack.length; ) {
       h.current.at = at; // set first, so the view change it causes is not recorded as a new step
-      if (restoreRef.current(stack[at]!)) return rerender();
+      if (restoreRef.current(stack[at]!)) break;
+      // Gone since (a source deleted, a feed preview dropped): it leaves the history, so an arrow with
+      // nowhere left to go goes dim instead of doing nothing.
+      stack.splice(at, 1);
+      if (by < 0) (from--, at--);
       h.current.at = from;
     }
+    rerender();
   }, []);
 
   const back = useCallback(() => step(-1), [step]);
