@@ -10,7 +10,8 @@ import { findItem, listItems } from "../src/items.ts";
 import { openLibrary, paths } from "../src/library.ts";
 import { readReviews } from "../src/reviews.ts";
 import { loadParams } from "../src/scheduler.ts";
-import { addSkill, loadSkills, matchSkill } from "../src/skills.ts";
+import { setAiModel } from "../src/ai/models.ts";
+import { addSkill, arrangeSkills, loadSkills, matchSkill, setSkillLook } from "../src/skills.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // The library as a real Mac, iCloud and a text editor leave it (stress test 2026-11-08).
@@ -54,6 +55,19 @@ describe("a damaged library", () => {
     expect(ai.priority).toBe("P2");
     const report = await doctor(lib);
     expect(report.issues.filter((i) => i.path === "skills.yaml").map((i) => i.message).join("\n")).toContain('color "violet"');
+  });
+
+  // Every screen read it, but a drag in the sidebar saved and then failed, and Settings › AI › Model and
+  // renaming that skill failed outright: the writes still read the file strictly.
+  test("skills.yaml with one bad look value can still be written", async () => {
+    const lib = await tempLibrary();
+    writeFileSync(paths.skills(lib), readFileSync(paths.skills(lib), "utf8").replace("priority: P1", "priority: P1\n    color: violet"));
+    const ids = loadSkills(lib).skills.map((s) => s.id);
+    const moved = await arrangeSkills(lib, [{ collection: "", skills: [...ids.slice(1), ids[0]!] }]);
+    expect(moved.map((s) => s.id)).toEqual([...ids.slice(1), ids[0]!]);
+    expect((await setSkillLook(lib, "ai", { name: "Machine learning" })).name).toBe("Machine learning");
+    expect(await setAiModel(lib, "claude", "claude-sonnet-5-5")).toBe("claude-sonnet-5-5");
+    expect(readFileSync(paths.skills(lib), "utf8")).toContain("color: violet"); // his line, left for him to fix
   });
 
   test("skills.yaml that can't be read says which skill and what to do", async () => {

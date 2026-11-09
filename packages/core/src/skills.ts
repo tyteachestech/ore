@@ -105,7 +105,7 @@ const LENIENT = new Set(["color", "icon", "priority", "hook", "goal", "collectio
 
 /** Reads skills.yaml's data, dropping fields a hand edit got wrong (named in `dropped`); a file that still
  *  can't be read says which skill and field, with the fix, instead of zod's raw path. */
-function parseSkillsFile(data: unknown): { file: SkillsFile; dropped: string[] } {
+export function parseSkillsFile(data: unknown): { file: SkillsFile; dropped: string[] } {
   if (data == null) throw new Error("skills.yaml in your library is empty. Restore it from the library's history, or run `ore init` in a new folder for a fresh one.");
   const first = SkillsFileSchema.safeParse(data);
   if (first.success) return { file: first.data, dropped: [] };
@@ -220,7 +220,8 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
       if (v) node.set(key, v);
       else node.delete(key);
     }
-    const skill = SkillSchema.parse(node.toJSON());
+    // Read as loadSkills reads it: a bad value he typed elsewhere in the file doesn't stop this change.
+    const skill = parseSkillsFile(doc.toJSON()).file.skills.find((s) => s.id === id)!;
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     return skill;
   });
@@ -267,8 +268,9 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
     const missing = [...byId.keys()].filter((id) => !seen.has(id));
     if (missing.length) throw new Error(`layout leaves out ${missing.map((id) => `"${id}"`).join(", ")}`);
     list.items = order;
+    const skills = parseSkillsFile(doc.toJSON()).file.skills;
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
-    return order.map((m) => SkillSchema.parse(m.toJSON()));
+    return skills;
   });
 }
 

@@ -18,7 +18,7 @@ import { quoteIn } from "./grade.ts";
 // @-mentions, as context.
 
 /** One earlier turn. A turn that set an exercise carries it, with the card committed then (D158). */
-export interface TutorTurn { message: string; reply: string; exercise?: Exercise }
+export interface TutorTurn { message: string; reply: string; exercise?: z.input<typeof Exercise> }
 
 /** A reply with its worked answer's steps numbered under it (D142): what it said, as text. */
 export const withSteps = (r: { reply: string; steps: string[] }) => [r.reply, ...r.steps.map((s, i) => `${i + 1}. ${s}`)].join("\n");
