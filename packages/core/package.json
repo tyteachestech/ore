@@ -23,6 +23,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/turndown": "^5.0.6"
+    "@types/turndown": "^5.0.6",
+    "hyparquet": "^1.33.0"
   }
 }

@@ -1,6 +1,8 @@
 // Grading eval: runs Ore's grader on the golden cards in grade-cases.json with each AI vendor and
 // scores it against the labels. It spends real AI usage, so it runs only by hand: `bun run eval:grade`
-// (never in CI). Flags: --vendor claude|codex (repeatable, default both), --model <id> (with one vendor).
+// (never in CI). Flags: --vendor claude|codex (repeatable, default both), --model <id> (with one vendor),
+// --cases <file> (repeatable; default the golden set; outside/*.json are the public slices), --runs N (each
+// vendor N times: mean accuracy, its spread, and the cases whose verdict flipped between runs).
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,7 +14,7 @@ import { initLibrary } from "../src/init.ts";
 
 const Case = z.strictObject({
   id: z.string(),
-  level: z.enum(["easy", "partial", "tricky"]),
+  level: z.string().min(1), // golden: easy|partial|tricky; outside sets keep their dataset's own label names
   kind: z.enum(["card", "prompt"]),
   question: z.string(),
   model_answer: z.string(),
@@ -28,6 +30,16 @@ export function loadCases(path = join(import.meta.dir, "grade-cases.json")): Cas
     .parse(JSON.parse(readFileSync(path, "utf8"))).cases;
 }
 
+/** The public slices beside the golden set (provenance: outside/README.md). */
+export const OUTSIDE = ["saf", "scientsbank"].map((n) => join(import.meta.dir, "outside", `grade-${n}.json`));
+
+/** Several case files as one set; ids must stay unique across them. */
+export function loadSets(paths: string[]): Case[] {
+  const cases = paths.flatMap((p) => loadCases(p));
+  if (new Set(cases.map((c) => c.id)).size !== cases.length) throw new Error("case ids must be unique across sets");
+  return cases;
+}
+
 /** A short fingerprint of the case set, saved with each result: scores from different sets don't compare. */
 export const setId = (cases: unknown[]) => createHash("sha256").update(JSON.stringify(cases)).digest("hex").slice(0, 8);
 
@@ -35,7 +47,7 @@ export const setId = (cases: unknown[]) => createHash("sha256").update(JSON.stri
 export const verdict = (rating: number) => (rating >= 3 ? "right" : "wrong");
 
 export interface CaseResult { id: string; level: Case["level"]; label: Case["label"]; rating?: number; got?: "right" | "wrong"; correct: boolean; feedback?: string; ms: number; usage?: Usage; error?: string }
-export interface VendorRun { vendor: Vendor; model: string; prompt_version: string; accuracy: number; ci95: [number, number]; correct: number; total: number; false_pass: number; false_fail: number; by_level: Record<string, string>; errors: number; wall_s: number; cost_usd?: number; input_tokens: number; output_tokens: number; cases: CaseResult[] }
+export interface VendorRun { vendor: Vendor; model: string; prompt_version: string; accuracy: number; ci95: [number, number]; kappa: number; correct: number; total: number; false_pass: number; false_fail: number; by_level: Record<string, string>; errors: number; wall_s: number; cost_usd?: number; input_tokens: number; output_tokens: number; cases: CaseResult[] }
 
 /** The 95% Wilson interval for k right out of n: with 20 cases one miss moves accuracy 5 points, so a
  *  score is only as sharp as this range (20/20 means at least 84%). */
@@ -46,21 +58,34 @@ export function wilson(k: number, n: number, z = 1.96): [number, number] {
   return [Math.max(0, mid - half), Math.min(1, mid + half)];
 }
 
+/** Cohen's kappa between the grader's verdicts and the labels: agreement beyond what the two would reach
+ *  by chance given how often each says "right". On a set that is 70% wrong, a grader saying "wrong" every
+ *  time scores 70% accuracy and kappa 0; Husain and the grading literature report kappa for this reason.
+ *  Above 0.8 is near-perfect, 0.6–0.8 substantial (Landis and Koch). */
+export function kappa(cases: { label: "right" | "wrong"; got?: "right" | "wrong" }[]): number {
+  const n = cases.length;
+  if (!n) return 0;
+  const agree = cases.filter((c) => c.got === c.label).length / n;
+  const pr = (k: "label" | "got") => cases.filter((c) => c[k] === "right").length / n;
+  const chance = pr("label") * pr("got") + (1 - pr("label")) * (1 - pr("got"));
+  return chance === 1 ? 1 : (agree - chance) / (1 - chance);
+}
+
 /** Scores one vendor's results: an error counts as a miss. A false pass (a wrong answer graded right)
  *  is the costly miss: the card is scheduled far out while he doesn't know it. A false fail brings it
  *  back too soon. */
 export function score(vendor: Vendor, model: string, prompt_version: string, cases: CaseResult[], wall_s: number): VendorRun {
   const correct = cases.filter((c) => c.correct).length;
   const by_level: Record<string, string> = {};
-  for (const lvl of ["easy", "partial", "tricky"]) {
+  for (const lvl of [...new Set(cases.map((c) => c.level))]) {
     const of = cases.filter((c) => c.level === lvl);
-    if (of.length) by_level[lvl] = `${of.filter((c) => c.correct).length}/${of.length}`;
+    by_level[lvl] = `${of.filter((c) => c.correct).length}/${of.length}`;
   }
   const costs = cases.map((c) => c.usage?.cost_usd).filter((x): x is number => x !== undefined);
   const sum = (k: "input_tokens" | "output_tokens") => cases.reduce((n, c) => n + (c.usage?.[k] ?? 0), 0);
   return {
     vendor, model, prompt_version,
-    accuracy: cases.length ? correct / cases.length : 0, ci95: wilson(correct, cases.length), correct, total: cases.length,
+    accuracy: cases.length ? correct / cases.length : 0, ci95: wilson(correct, cases.length), kappa: Math.round(kappa(cases) * 1000) / 1000, correct, total: cases.length,
     false_pass: cases.filter((c) => c.label === "wrong" && c.got === "right").length,
     false_fail: cases.filter((c) => c.label === "right" && c.got === "wrong").length,
     by_level,
@@ -141,11 +166,24 @@ export const costText = (r: { cost_usd?: number; input_tokens: number; output_to
   r.cost_usd === undefined ? `${r.input_tokens + r.output_tokens} tokens` : `$${r.cost_usd.toFixed(3)}`;
 
 export function table(runs: VendorRun[]): string {
-  return columns(["vendor", "model", "accuracy", "95% CI", "false pass", "false fail", "by level", "cost", "time", "errors"], runs.map((r) => [
-    r.vendor, r.model, `${pct(r.accuracy)} (${r.correct}/${r.total})`, range(r.ci95), String(r.false_pass), String(r.false_fail),
+  return columns(["vendor", "model", "accuracy", "95% CI", "kappa", "false pass", "false fail", "by level", "cost", "time", "errors"], runs.map((r) => [
+    r.vendor, r.model, `${pct(r.accuracy)} (${r.correct}/${r.total})`, range(r.ci95), r.kappa.toFixed(2), String(r.false_pass), String(r.false_fail),
     Object.entries(r.by_level).map(([k, v]) => `${k} ${v}`).join(", "),
     costText(r), `${r.wall_s}s`, String(r.errors),
   ]));
+}
+
+/** Repeated runs of one vendor, read together (skill-creator's benchmark: mean and spread over runs, and
+ *  which cases are flaky): a case that flips between runs is one the grader is unsure of, and a prompt
+ *  change that moves accuracy by less than the spread has not been shown to do anything. */
+export function summarize(runs: VendorRun[]): { mean: number; sd: number; flips: string[]; missed: string[] } {
+  const acc = runs.map((r) => r.accuracy);
+  const mean = acc.reduce((a, b) => a + b, 0) / (acc.length || 1);
+  const sd = acc.length > 1 ? Math.sqrt(acc.reduce((a, b) => a + (b - mean) ** 2, 0) / (acc.length - 1)) : 0;
+  const ids = [...new Set(runs.flatMap((r) => r.cases.map((c) => c.id)))];
+  const flips = ids.filter((id) => new Set(runs.map((r) => r.cases.find((c) => c.id === id)?.got)).size > 1);
+  const missed = ids.filter((id) => runs.some((r) => r.cases.find((c) => c.id === id)?.correct === false));
+  return { mean, sd, flips, missed };
 }
 
 export function columns(head: string[], rows: string[][]): string {
@@ -160,24 +198,35 @@ if (import.meta.main) {
   if (vendors.some((v) => v !== "claude" && v !== "codex")) throw new Error("--vendor must be claude or codex");
   const pick: Vendor[] = vendors.length ? vendors : ["claude", "codex"];
   if (args.includes("--model") && pick.length > 1) throw new Error("--model needs one --vendor");
-  const cases = loadCases();
+  const files = args.flatMap((a, i) => (args[i - 1] === "--cases" ? [a] : []));
+  const times = args.includes("--runs") ? Number(args[args.indexOf("--runs") + 1]) : 1;
+  if (!Number.isInteger(times) || times < 1) throw new Error("--runs needs a whole number");
+  const cases = files.length ? loadSets(files) : loadCases();
   const runs: VendorRun[] = [];
+  const summary: Record<string, ReturnType<typeof summarize>> = {};
   for (const v of pick) {
-    console.error(`Grading ${cases.length} cards with ${v}…`);
-    const r = await runVendor(v, cases, args.includes("--model") ? model : undefined);
-    // Each miss with the label's reason and the grader's, to read side by side (error analysis).
-    for (const c of r.cases.filter((c) => !c.correct)) {
-      console.error(`  miss ${c.id}: labeled ${c.label}, ${c.error ? `error: ${c.error}` : `rated ${c.rating}`}`);
-      console.error(`    label: ${cases.find((x) => x.id === c.id)?.why}${c.feedback ? `\n    grader: ${c.feedback}` : ""}`);
+    const mine: VendorRun[] = [];
+    for (let n = 1; n <= times; n++) {
+      console.error(`Grading ${cases.length} cards with ${v}${times > 1 ? ` (run ${n} of ${times})` : ""}…`);
+      const r = await runVendor(v, cases, args.includes("--model") ? model : undefined);
+      // Each miss with the label's reason and the grader's, to read side by side (error analysis).
+      for (const c of r.cases.filter((c) => !c.correct)) {
+        console.error(`  miss ${c.id}: labeled ${c.label}, ${c.error ? `error: ${c.error}` : `rated ${c.rating}`}`);
+        console.error(`    label: ${cases.find((x) => x.id === c.id)?.why}${c.feedback ? `\n    grader: ${c.feedback}` : ""}`);
+      }
+      mine.push(r);
     }
-    runs.push(r);
+    runs.push(...mine);
+    if (times > 1) summary[v] = summarize(mine);
   }
   const base = baseline(cases);
   const dir = join(import.meta.dir, "results");
   mkdirSync(dir, { recursive: true });
   const out = resultPath(dir);
-  writeFileSync(out, JSON.stringify({ eval: "grade", date: new Date().toISOString(), cases: cases.length, set: setId(cases), baseline: base, runs }, null, 2) + "\n");
+  writeFileSync(out, JSON.stringify({ eval: "grade", date: new Date().toISOString(), cases: cases.length, sets: files.length ? files.map((f) => f.replace(/^.*\//, "")) : ["grade-cases.json"], set: setId(cases), baseline: base, runs, ...(times > 1 ? { summary } : {}) }, null, 2) + "\n");
   console.log(table(runs));
+  for (const [v, s] of Object.entries(summary))
+    console.log(`\n${v} over ${times} runs: mean ${pct(s.mean)} ± ${Math.round(s.sd * 100)} points; ${s.flips.length} of ${cases.length} verdicts flipped between runs${s.flips.length ? ` (${s.flips.join(", ")})` : ""}; missed in some run: ${s.missed.length}`);
   console.log(`\nNo-AI baseline (answer contains the model answer): ${pct(base.correct / base.total)} (${base.correct}/${base.total})`);
   console.log(`Saved ${out}`);
 }

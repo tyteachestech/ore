@@ -6,7 +6,7 @@ import { codexUsage } from "../src/ai/adapter.ts";
 import { writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { recordReview } from "../src/study.ts";
-import { baseline, type Case, loadCases, resultPath, runVendor, setId, table, verdict, wilson } from "../eval/grade.ts";
+import { baseline, type Case, kappa, loadCases, loadSets, OUTSIDE, resultPath, runVendor, setId, summarize, table, verdict, wilson } from "../eval/grade.ts";
 import { disagreements } from "../eval/mine.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -46,6 +46,41 @@ describe("grading eval", () => {
     for (const c of cases) if (c.kind === "prompt") expect(c.rubric.length).toBeGreaterThan(0);
   });
 
+  test("the outside slices load as cases: SAF 60 (20 correct, 20 partial, 20 incorrect), SciEntsBank 83 (20 each, 3 non_domain), ids unique across all sets, every label a reason", () => {
+    const [saf, seb] = OUTSIDE.map((p) => loadCases(p)) as [Case[], Case[]];
+    const count = (cs: Case[]) => Object.fromEntries([...new Set(cs.map((c) => c.level))].map((l) => [l, cs.filter((c) => c.level === l).length]));
+    expect(count(saf)).toEqual({ correct: 20, partial: 20, incorrect: 20 });
+    expect(count(seb)).toEqual({ correct: 20, contradictory: 20, incomplete: 20, irrelevant: 20, non_domain: 3 });
+    // The datasets' own verdicts map onto Ore's line: only their "correct" is right.
+    for (const c of [...saf, ...seb]) expect(c.label).toBe(c.level === "correct" ? "right" : "wrong");
+    const all = loadSets([join(import.meta.dir, "../eval/grade-cases.json"), ...OUTSIDE]);
+    expect(all).toHaveLength(20 + 60 + 83);
+    expect(() => loadSets([OUTSIDE[0]!, OUTSIDE[0]!])).toThrow("unique across sets");
+  });
+
+  test("Cohen's kappa: a grader that says wrong to everything on a mostly-wrong set scores 0, perfect agreement 1", () => {
+    const mk = (label: "right" | "wrong", got: "right" | "wrong") => ({ label, got });
+    expect(kappa([mk("wrong", "wrong"), mk("wrong", "wrong"), mk("wrong", "wrong"), mk("right", "wrong")])).toBe(0); // 75% accuracy, no skill
+    expect(kappa([mk("wrong", "wrong"), mk("right", "right")])).toBe(1);
+    expect(kappa([mk("wrong", "right"), mk("right", "wrong")])).toBe(-1);
+    expect(kappa([])).toBe(0);
+    // A missing verdict (an error) counts as disagreement, not as "right".
+    expect(kappa([mk("wrong", "wrong"), mk("right", "right"), { label: "right" }])).toBeCloseTo(0.4);
+  });
+
+  test("repeated runs summarize to mean, spread, flipped verdicts and cases missed in any run", () => {
+    const run = (verdicts: Record<string, "right" | "wrong">): Parameters<typeof summarize>[0][number] => {
+      const cases = Object.entries(verdicts).map(([id, got]) => ({ id, level: "easy", label: "right" as const, got, correct: got === "right", ms: 1 }));
+      return { accuracy: cases.filter((c) => c.correct).length / cases.length, cases } as Parameters<typeof summarize>[0][number];
+    };
+    const s = summarize([run({ a: "right", b: "right", c: "wrong" }), run({ a: "right", b: "wrong", c: "wrong" })]);
+    expect(s.mean).toBeCloseTo(0.5);
+    expect(s.sd).toBeCloseTo(0.2357);
+    expect(s.flips).toEqual(["b"]);
+    expect(s.missed).toEqual(["b", "c"]);
+    expect(summarize([run({ a: "right" })]).sd).toBe(0);
+  });
+
   test("Good and Easy count as right, Again and Hard as wrong", () => {
     expect([1, 2, 3, 4].map(verdict)).toEqual(["wrong", "wrong", "right", "right"]);
   });
@@ -70,6 +105,8 @@ describe("grading eval", () => {
     expect(process.env.ORE_AI).toBeUndefined(); // the vendor pick doesn't leak out of the run
     expect(table([r])).toContain("60% (3/5)");
     expect(table([r])).toContain("23–88%");
+    expect(r.kappa).toBe(0.167); // 60% accuracy on a 60%-right set with one false pass and one error: little beyond chance
+    expect(table([r])).toContain("0.17");
   });
 
   test("loadCases refuses duplicate ids; the baseline never passes an empty model answer", () => {

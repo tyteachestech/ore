@@ -3,7 +3,8 @@
 // answer accuracy, citation accuracy and whether it says so when the library doesn't hold the answer.
 // It asks the tutor (D128), the chat the app ships; `--chat ask` asks `ore ask-library` instead. It
 // spends real AI usage, so it runs only by hand: `bun run eval:ask` (never in CI). Flags as for
-// eval:grade: --vendor claude|codex, --model <id>; --library big adds seed-big's ~240 sources around the golden docs.
+// eval:grade: --vendor claude|codex, --model <id>; --library big adds seed-big's ~240 sources around the golden docs;
+// --cases <file> asks another set, whose `docs` folder (beside it) replaces the golden docs: outside/ask-squad.json.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { z } from "zod";
@@ -29,7 +30,9 @@ const Absent = z.strictObject({ id: z.string(), question: z.string(), outside: z
 export type AskCase = z.infer<typeof Case>;
 
 export function loadAskCases(path = join(import.meta.dir, "ask-cases.json")) {
-  return z.object({ cases: z.array(Case), hard: z.array(Case.required({ group: true })), absent: z.array(Absent) }).parse(JSON.parse(readFileSync(path, "utf8")));
+  const set = z.object({ cases: z.array(Case), hard: z.array(Case.required({ group: true })), absent: z.array(Absent), docs: z.string().optional() }).parse(JSON.parse(readFileSync(path, "utf8")));
+  // The sources the questions are over: the golden docs unless the set brings its own folder.
+  return { ...set, docs: set.docs ? join(path, "..", set.docs) : GOLDEN };
 }
 
 export const GOLDEN = join(import.meta.dir, "../test/golden");
@@ -135,12 +138,12 @@ export function scoreAnswer(c: AskCase | z.infer<typeof Absent>, r: Answer, name
 
 export interface AskRun { vendor: Vendor; chat: Chat; library: "golden" | "big"; model: string; prompt_version: string; retrieval: string; answer_accuracy: number; answer_ci95: [number, number]; citation_accuracy: number; citation_ci95: [number, number]; says_absent: string; then_answers: number; web_cited: number; searched_needlessly: number; harder: { retrieval: string; answered: string; cited: string; groups: Record<string, { retrieval: string; answered: string; cited: string }> }; answered: string; cited: string; errors: number; wall_s: number; median_ms: { answerable: number; absent: number }; cost_usd?: number; input_tokens: number; output_tokens: number; cases: AskResult[] }
 
-export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", concurrency = 4, big = false): Promise<AskRun> {
-  const { cases, hard, absent } = loadAskCases();
+export function runAsk(vendor: Vendor, model?: string, chat: Chat = "tutor", concurrency = 4, big = false, casesPath?: string): Promise<AskRun> {
+  const { cases, hard, absent, docs } = loadAskCases(casesPath);
   return withVendor(vendor, model, async (root) => {
     const lib = { root };
     if (big) addBig(root);
-    const names = await addGolden(lib);
+    const names = await addGolden(lib, docs);
     const bodies = new Map<string, string>();
     const body = (id: string) => bodies.get(id) ?? bodies.set(id, findItem(lib, id).body).get(id)!;
     let stamp = { model: model ?? "", prompt_version: "" };
@@ -211,10 +214,11 @@ if (import.meta.main) {
   if (chat !== "tutor" && chat !== "ask") throw new Error("--chat must be tutor or ask");
   const library = args.includes("--library") ? args[args.indexOf("--library") + 1] : "golden";
   if (library !== "golden" && library !== "big") throw new Error("--library must be golden or big");
+  const casesPath = args.includes("--cases") ? args[args.indexOf("--cases") + 1] : undefined;
   const runs: AskRun[] = [];
   for (const v of pick) {
     console.error(`Asking the ${chat} with ${v}…`);
-    const r = await runAsk(v, model, chat, 4, library === "big");
+    const r = await runAsk(v, model, chat, 4, library === "big", casesPath);
     for (const c of r.cases.filter((c) => !c.answer_ok || !c.citation_ok))
       console.error(`  miss ${c.id}: ${c.error ? `error: ${c.error}` : `${c.retrieved === false ? "retrieval " : ""}${c.answer_ok ? "" : "answer "}${c.citation_ok ? "" : "citation "}| ${c.answer?.slice(0, 160)} | ${c.cited?.join(" / ").slice(0, 160)}`}`);
     runs.push(r);
@@ -223,7 +227,7 @@ if (import.meta.main) {
   const dir = join(import.meta.dir, "results");
   mkdirSync(dir, { recursive: true });
   const out = resultPath(dir, new Date(), "ask");
-  writeFileSync(out, JSON.stringify({ eval: "ask", date: new Date().toISOString(), set: setId([loadAskCases()]), runs }, null, 2) + "\n");
+  writeFileSync(out, JSON.stringify({ eval: "ask", date: new Date().toISOString(), cases: casesPath?.replace(/^.*\//, "") ?? "ask-cases.json", set: setId([{ ...loadAskCases(casesPath), docs: undefined }]), runs }, null, 2) + "\n");
   console.log(askTable(runs));
   console.log(`\nSaved ${out}`);
 }

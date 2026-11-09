@@ -1,0 +1,387 @@
+{
+  "about": "Ask-your-library questions from SQuAD 2.0 dev (Rajpurkar et al. 2018; CC BY-SA 4.0): 6 Wikipedia articles (squad-docs/, imported as sources), 5 questions each that one paragraph answers in at most three words (any annotator's span counts) and 2 each written to look answered by the article but not be (`absent`). Drawn by sample.ts, seed 3.",
+  "docs": "squad-docs",
+  "cases": [
+    {
+      "id": "squad-warsaw-1",
+      "question": "What does the Museum of the Polish Army portray the history of?",
+      "sources": [
+        "warsaw"
+      ],
+      "answer": [
+        "(?:arms|history of arms)"
+      ],
+      "evidence": "(?:arms|history of arms)"
+    },
+    {
+      "id": "squad-warsaw-2",
+      "question": "How many professors does the Warsaw University of Technology employ?",
+      "sources": [
+        "warsaw"
+      ],
+      "answer": [
+        "2,000"
+      ],
+      "evidence": "2,000"
+    },
+    {
+      "id": "squad-warsaw-3",
+      "question": "Where did John Paul II celebrate Mass in Warsaw?",
+      "sources": [
+        "warsaw"
+      ],
+      "answer": [
+        "(?:Victory Square|1979)"
+      ],
+      "evidence": "(?:Victory Square|1979)"
+    },
+    {
+      "id": "squad-warsaw-4",
+      "question": "The house of the Baryczko merchant family is a notable example of what type of architecture?",
+      "sources": [
+        "warsaw"
+      ],
+      "answer": [
+        "Renaissance"
+      ],
+      "evidence": "Renaissance"
+    },
+    {
+      "id": "squad-warsaw-5",
+      "question": "In what year did Warszowa become the official capital of the Masovian Duchy?",
+      "sources": [
+        "warsaw"
+      ],
+      "answer": [
+        "1413"
+      ],
+      "evidence": "1413"
+    },
+    {
+      "id": "squad-huguenot-6",
+      "question": "Huguenots in Killeshandra and County Cavan expanded what agricultural industry?",
+      "sources": [
+        "huguenot"
+      ],
+      "answer": [
+        "(?:flax cultivation|flax)"
+      ],
+      "evidence": "(?:flax cultivation|flax)"
+    },
+    {
+      "id": "squad-huguenot-7",
+      "question": "When was the colony destroyed?",
+      "sources": [
+        "huguenot"
+      ],
+      "answer": [
+        "1565"
+      ],
+      "evidence": "1565"
+    },
+    {
+      "id": "squad-huguenot-8",
+      "question": "When did Ribault first establish a settlement in South Carolina?",
+      "sources": [
+        "huguenot"
+      ],
+      "answer": [
+        "(?:1562|1564)"
+      ],
+      "evidence": "(?:1562|1564)"
+    },
+    {
+      "id": "squad-huguenot-9",
+      "question": "In what year was the agreement to allow the Saarland settlement reached?",
+      "sources": [
+        "huguenot"
+      ],
+      "answer": [
+        "1604"
+      ],
+      "evidence": "1604"
+    },
+    {
+      "id": "squad-huguenot-10",
+      "question": "How did the revocation restrict Huguenot travel?",
+      "sources": [
+        "huguenot"
+      ],
+      "answer": [
+        "prohibited emigration"
+      ],
+      "evidence": "prohibited emigration"
+    },
+    {
+      "id": "squad-private-school-11",
+      "question": "Along with sport and art, what is a type of talent scholarship?",
+      "sources": [
+        "private-school"
+      ],
+      "answer": [
+        "academic"
+      ],
+      "evidence": "academic"
+    },
+    {
+      "id": "squad-private-school-12",
+      "question": "About many students attend Kunskapsskolan schools?",
+      "sources": [
+        "private-school"
+      ],
+      "answer": [
+        "(?:10,000|nearly 10,000)"
+      ],
+      "evidence": "(?:10,000|nearly 10,000)"
+    },
+    {
+      "id": "squad-private-school-13",
+      "question": "In the Philippines, what percentage of secondary school students attend private schools?",
+      "sources": [
+        "private-school"
+      ],
+      "answer": [
+        "(?:32|32%)"
+      ],
+      "evidence": "(?:32|32%)"
+    },
+    {
+      "id": "squad-private-school-14",
+      "question": "What is another term used for year 13?",
+      "sources": [
+        "private-school"
+      ],
+      "answer": [
+        "upper sixth"
+      ],
+      "evidence": "upper sixth"
+    },
+    {
+      "id": "squad-private-school-15",
+      "question": "The prospect of what event compelled the protection of German private schools?",
+      "sources": [
+        "private-school"
+      ],
+      "answer": [
+        "(?:second Gleichschaltung|a second Gleichschaltung)"
+      ],
+      "evidence": "(?:second Gleichschaltung|a second Gleichschaltung)"
+    },
+    {
+      "id": "squad-french-and-indian-war-16",
+      "question": "What native chief travelled to French fort and threatened Marin?",
+      "sources": [
+        "french-and-indian-war"
+      ],
+      "answer": [
+        "(?:Tanaghrisson|the Mingo)"
+      ],
+      "evidence": "(?:Tanaghrisson|the Mingo)"
+    },
+    {
+      "id": "squad-french-and-indian-war-17",
+      "question": "When was Spanish takeover of Louisiana Territory complete?",
+      "sources": [
+        "french-and-indian-war"
+      ],
+      "answer": [
+        "1769"
+      ],
+      "evidence": "1769"
+    },
+    {
+      "id": "squad-french-and-indian-war-18",
+      "question": "Where did Montcalm move his heaquarter to show strategic advancement?",
+      "sources": [
+        "french-and-indian-war"
+      ],
+      "answer": [
+        "Ticonderoga"
+      ],
+      "evidence": "Ticonderoga"
+    },
+    {
+      "id": "squad-french-and-indian-war-19",
+      "question": "When was the deportation of Acadians?",
+      "sources": [
+        "french-and-indian-war"
+      ],
+      "answer": [
+        "1755"
+      ],
+      "evidence": "1755"
+    },
+    {
+      "id": "squad-french-and-indian-war-20",
+      "question": "What was the ratio of British settler to French?",
+      "sources": [
+        "french-and-indian-war"
+      ],
+      "answer": [
+        "20 to 1"
+      ],
+      "evidence": "20 to 1"
+    },
+    {
+      "id": "squad-packet-switching-21",
+      "question": "WHen did ARPNET and SITA become operational",
+      "sources": [
+        "packet-switching"
+      ],
+      "answer": [
+        "1969"
+      ],
+      "evidence": "1969"
+    },
+    {
+      "id": "squad-packet-switching-22",
+      "question": "What did Davies call the System",
+      "sources": [
+        "packet-switching"
+      ],
+      "answer": [
+        "packet switching"
+      ],
+      "evidence": "packet switching"
+    },
+    {
+      "id": "squad-packet-switching-23",
+      "question": "This network influenced  later models of",
+      "sources": [
+        "packet-switching"
+      ],
+      "answer": [
+        "(?:later ARPANET architecture|ARPANET)"
+      ],
+      "evidence": "(?:later ARPANET architecture|ARPANET)"
+    },
+    {
+      "id": "squad-packet-switching-24",
+      "question": "What did Davies call his system",
+      "sources": [
+        "packet-switching"
+      ],
+      "answer": [
+        "packet switching"
+      ],
+      "evidence": "packet switching"
+    },
+    {
+      "id": "squad-packet-switching-25",
+      "question": "X.25 uses what type network type",
+      "sources": [
+        "packet-switching"
+      ],
+      "answer": [
+        "(?:User Datagram Protocol|the datagram model|UDP)"
+      ],
+      "evidence": "(?:User Datagram Protocol|the datagram model|UDP)"
+    },
+    {
+      "id": "squad-harvard-university-26",
+      "question": "What UN secretary went to Harvard?",
+      "sources": [
+        "harvard-university"
+      ],
+      "answer": [
+        "(?:General Ban Ki-moon|Ban Ki-moon)"
+      ],
+      "evidence": "(?:General Ban Ki-moon|Ban Ki-moon)"
+    },
+    {
+      "id": "squad-harvard-university-27",
+      "question": "What Shakespeare Scholar is a faculty member at Harvard?",
+      "sources": [
+        "harvard-university"
+      ],
+      "answer": [
+        "Stephen Greenblatt"
+      ],
+      "evidence": "Stephen Greenblatt"
+    },
+    {
+      "id": "squad-harvard-university-28",
+      "question": "In what year was a set of significant rule changes introduced including the forward pass?",
+      "sources": [
+        "harvard-university"
+      ],
+      "answer": [
+        "1906"
+      ],
+      "evidence": "1906"
+    },
+    {
+      "id": "squad-harvard-university-29",
+      "question": "When was the divestment from South Africa movement?",
+      "sources": [
+        "harvard-university"
+      ],
+      "answer": [
+        "(?:late 1980s|1980s)"
+      ],
+      "evidence": "(?:late 1980s|1980s)"
+    },
+    {
+      "id": "squad-harvard-university-30",
+      "question": "What conviction motivated Eliot to move towards secularization?",
+      "sources": [
+        "harvard-university"
+      ],
+      "answer": [
+        "Transcendentalist Unitarian"
+      ],
+      "evidence": "Transcendentalist Unitarian"
+    }
+  ],
+  "hard": [],
+  "absent": [
+    {
+      "id": "squad-warsaw-none-1",
+      "question": "What year did Kind Vilnius move his court to Warsaw?"
+    },
+    {
+      "id": "squad-warsaw-none-2",
+      "question": "What type of theatre is the Katyn Fotoplastikon?"
+    },
+    {
+      "id": "squad-huguenot-none-3",
+      "question": "What prominent South African family had a vineyard in France?"
+    },
+    {
+      "id": "squad-huguenot-none-4",
+      "question": "In what year did Frederick William of Prussia become the Great Elector?"
+    },
+    {
+      "id": "squad-private-school-none-5",
+      "question": "How quickly were Christian academies supposed to be segregated?"
+    },
+    {
+      "id": "squad-private-school-none-6",
+      "question": "What term does the UK, Australia and Canada always use when referring to universities?"
+    },
+    {
+      "id": "squad-french-and-indian-war-none-7",
+      "question": "Was wasn't the plan for Langlades mission?"
+    },
+    {
+      "id": "squad-french-and-indian-war-none-8",
+      "question": "What led to Newcastle's fall from power as political advisor?"
+    },
+    {
+      "id": "squad-packet-switching-none-9",
+      "question": "Packet switching communication has what kind of bit rate?"
+    },
+    {
+      "id": "squad-packet-switching-none-10",
+      "question": "What suite uses UDP?"
+    },
+    {
+      "id": "squad-harvard-university-none-11",
+      "question": "What college was founded during World War II?"
+    },
+    {
+      "id": "squad-harvard-university-none-12",
+      "question": "Who founded Cambridge in 1650?"
+    }
+  ]
+}

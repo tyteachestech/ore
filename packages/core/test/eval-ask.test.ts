@@ -2,7 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { findItem } from "../src/items.ts";
+import { parseFrontmatter } from "../src/frontmatter.ts";
 import { addBig, addGolden, ask, asked, loadAskCases, passagesFor, retrieved, saysNotThere, scoreAnswer } from "../eval/ask.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -30,6 +32,29 @@ describe("ask-your-library eval", () => {
     expect(new Set([...cases, ...hard, ...absent].map((c) => c.id)).size).toBe(cases.length + hard.length + absent.length);
     for (const c of [...cases, ...hard]) for (const p of [...c.answer, c.evidence]) expect(() => new RegExp(p)).not.toThrow();
     for (const c of absent) for (const p of c.outside ?? []) expect(() => new RegExp(p)).not.toThrow();
+  });
+
+  test("the SQuAD slice: 6 Wikipedia articles as sources, 30 questions one answers in a short span, 12 written to look answered but not be; each answer is really in its article; the golden set stays on the golden docs", async () => {
+    const squad = loadAskCases(join(import.meta.dir, "../eval/outside/ask-squad.json"));
+    expect(squad.docs).toBe(join(import.meta.dir, "../eval/outside/squad-docs"));
+    expect(loadAskCases().docs).toBe(join(import.meta.dir, "../test/golden"));
+    expect([squad.cases.length, squad.hard.length, squad.absent.length]).toEqual([30, 0, 12]);
+    expect(new Set([...squad.cases, ...squad.absent].map((c) => c.id)).size).toBe(42);
+    const slugs = new Set(squad.cases.map((c) => c.sources[0]!));
+    expect(slugs.size).toBe(6);
+    for (const slug of slugs) {
+      const { data, body } = parseFrontmatter<{ title?: string; author?: string; url?: string }>(readFileSync(join(squad.docs, `${slug}.md`), "utf8"));
+      expect(data.title).toBeTruthy();
+      expect(data.author).toBe("Wikipedia contributors"); // attribution, CC BY-SA
+      expect(data.url).toMatch(/^https:\/\/en\.wikipedia\.org\/wiki\//);
+      for (const c of squad.cases.filter((c) => c.sources[0] === slug)) for (const p of [...c.answer, c.evidence]) expect({ id: c.id, p, inDoc: new RegExp(p).test(body) }).toEqual({ id: c.id, p, inDoc: true });
+    }
+    // Imported as sources, the articles' search finds each question's answer before any AI is asked.
+    const lib = await tempLibrary();
+    const names = await addGolden(lib, squad.docs);
+    expect(names.size).toBe(6);
+    const found = squad.cases.filter((c) => retrieved(c, passagesFor(lib, "tutor", asked(c, names)), names)).length;
+    expect(found).toBeGreaterThanOrEqual(27); // a short question out of context ("When was the colony destroyed?") can miss
   });
 
   test("retrieval puts each question's evidence in front of the AI, for both chats, the harder set too: follow-ups, the open source, paraphrases (the eval then measures the AI, not the search)", async () => {
