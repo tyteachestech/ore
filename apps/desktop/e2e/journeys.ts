@@ -1138,6 +1138,12 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   await page.keyboard.press("Enter");
   await until("Enter in A goes to B", async () => await b.getByRole("textbox").evaluate((el) => el === document.activeElement));
   await page.keyboard.type("An agent");
+  // Closing the tutor mid-answer keeps both lines, as it keeps the chat box's draft.
+  await tutor.getByRole("button", { name: "Close the tutor" }).click();
+  await page.keyboard.press("Meta+j");
+  if ((await a.getByRole("textbox").inputValue()) !== "A workflow: same steps each time" || (await b.getByRole("textbox").inputValue()) !== "An agent") throw new Error("closing the tutor lost the answers he was writing");
+  await b.getByRole("textbox").click();
+  await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await tutor.getByText("A is right. B: who decides the steps?").waitFor();
   if (asked[1] !== "A: A workflow: same steps each time\nB: An agent") throw new Error(`sent: ${JSON.stringify(asked[1])}`);
@@ -5024,6 +5030,12 @@ journey("review Ask: a suggested card shows only what it changes, struck and und
   await card.getByRole("button", { name: "Use this card" }).click();
   await card.getByRole("button", { name: "Card updated" }).waitFor();
   if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("using the card dropped the change it shows");
+  // ⌘Z puts the old card back, so the suggestion can be used again.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await card.getByRole("button", { name: "Use this card" }).waitFor({ timeout: 3000 }).catch(() => {
+    throw new Error("after ⌘Z the suggestion still says Card updated");
+  });
   await ore("card", "set", id, `--question=${was.question}`, `--answer=${was.answer}`);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
@@ -5733,6 +5745,44 @@ journey("source rename: a save that fails keeps the title he typed, in the field
   await failNext(page, "edit", null);
   await until("the field is back with his words", async () => (await field.count()) === 1 && (await field.inputValue()) === "Agents, carefully retitled");
   await page.keyboard.press("Escape");
+});
+
+journey("resize drags: Esc mid-drag puts the size back and stays on the page; nothing is left stuck after", async (page) => {
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ meta: { id: string } }> };
+  const made = await createItem({ root: LIB }, { type: "youtube", title: "A talk on spacing", url: "https://www.youtube.com/watch?v=spacingTalk1", body: "[00:00] Spacing works.\n\n[00:30] Test yourself after a pause.", source: { ext: "vtt", data: "WEBVTT\n\n00:00:00.000 --> 00:00:30.000\nSpacing works.\n\n00:00:30.000 --> 00:01:00.000\nTest yourself after a pause.\n" } });
+  try {
+    await page.reload();
+    await openSource(page, "A talk on spacing");
+    const edge = page.locator(".video-edge.right");
+    await edge.waitFor();
+    const frame = page.locator(".video-frame");
+    const w0 = (await frame.boundingBox())!.width;
+    const at = (await edge.boundingBox())!;
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(at.x - 90, at.y + at.height / 2, { steps: 4 });
+    await until("the drag resizes the video", async () => Math.abs((await frame.boundingBox())!.width - w0) > 40);
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    if (!(await page.locator(".doc-head h1").count())) throw new Error("Esc during the drag left the source");
+    await until("Esc puts the width back", async () => Math.abs((await frame.boundingBox())!.width - w0) < 2);
+    if (await page.evaluate(() => document.body.classList.contains("resizing"))) throw new Error("the page is still in its resizing state (no text can be selected)");
+    // The note's divider, the same way.
+    await page.getByRole("tab", { name: "Source note" }).click().catch(() => {});
+    const divider = page.getByRole("separator", { name: /Resize/ }).filter({ visible: true }).last();
+    const d = (await divider.boundingBox())!;
+    const col = () => page.evaluate(() => document.querySelector<HTMLElement>(".doc-head")!.getBoundingClientRect().width);
+    const c0 = await col();
+    await page.mouse.move(d.x + d.width / 2, d.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(d.x - 120, d.y + 200, { steps: 4 });
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    if (!(await page.locator(".doc-head h1").count())) throw new Error("Esc during the divider drag left the source");
+    await until("Esc puts the divider back", async () => Math.abs((await col()) - c0) < 2);
+  } finally {
+    await ore("archive", made.meta.id).catch(() => {});
+  }
 });
 
 journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {

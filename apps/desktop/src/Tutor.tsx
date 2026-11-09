@@ -55,7 +55,8 @@ export type TutorTurn = {
 };
 type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; steps?: string[]; marks?: Mark[]; ai: Ai };
 /** What he has typed and not sent yet, with the @-mentions in it. */
-export type TutorDraft = { input: string; mentions: Mention[] };
+/** `cases`: what he has written under a tell-apart exercise's two cases, not yet sent. */
+export type TutorDraft = { input: string; mentions: Mention[]; cases?: string[] };
 export type TutorChat = ReturnType<typeof useTutorChat>;
 
 let turnSeq = 0;
@@ -218,6 +219,7 @@ export function useTutorChat(notify: Notify) {
     update(() => []);
     setCarry([]);
     setMeta(null);
+    setDraft((d) => ({ ...d, cases: undefined }));
   };
   /** Opens a saved chat where he left it, with its @ context. A turn saved with no reply, and none on its
    *  way, was cut off by a quit: it says so and offers Try again. */
@@ -228,6 +230,7 @@ export function useTutorChat(notify: Notify) {
       update(() => c.turns.map((t) => (t.reply === undefined && !t.error && !flying.current.has(t.id) ? { ...t, error: "No reply came: Ore closed before it did." } : t)));
       setCarry(c.carry ?? []);
       setMeta({ id: c.id, title: c.title });
+      setDraft((d) => ({ ...d, cases: undefined }));
     } catch (e) {
       notify(errorText(e, "open that chat"), "error");
     }
@@ -363,7 +366,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     if (!at) return;
     const word = `@${m.name} `;
     const text = input.slice(0, at.start) + word + input.slice(at.start + 1 + at.query.length).replace(/^ /, "");
-    setDraft((d) => ({ input: text, mentions: [...d.mentions, m] }));
+    setDraft((d) => ({ ...d, input: text, mentions: [...d.mentions, m] }));
     setAt(null);
     caretAt.current = at.start + word.length;
   };
@@ -468,7 +471,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                       <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />
                     </div>
                     {t.exercise?.cases?.length === 2 && (
-                      <Cases cases={t.exercise.cases} open={last} onSend={(text) => send(text)} />
+                      <Cases cases={t.exercise.cases} open={last} said={chat.draft.cases ?? NO_CASES} onSaid={(cases) => setDraft((d) => ({ ...d, cases }))} onSend={(text) => (setDraft((d) => ({ ...d, cases: undefined })), send(text))} />
                     )}
                     {!!t.marks?.length && (
                       <ul className="quiz-points tutor-points" aria-label="Key points">
@@ -898,8 +901,9 @@ export function useUnheard(turns: TutorTurn[], open: boolean) {
  *  under it for which idea fits and what decides it. Enter in A goes to B; Enter in B sends both as one
  *  answer ("A: … B: …"); ⇧Enter is a new line. The chat field still takes an answer written any other way.
  *  Once he has answered (`open` false) the cases stay, without their lines. */
-function Cases({ cases, open, onSend }: { cases: string[]; open: boolean; onSend: (text: string) => void }) {
-  const [said, setSaid] = useState(["", ""]);
+const NO_CASES = ["", ""];
+/** `said` lives with the chat's draft, so closing the tutor mid-answer keeps it. */
+function Cases({ cases, open, said, onSaid, onSend }: { cases: string[]; open: boolean; said: string[]; onSaid: (said: string[]) => void; onSend: (text: string) => void }) {
   const second = useRef<HTMLTextAreaElement>(null);
   const answer = said.map((x, i) => (x.trim() ? `${"AB"[i]}: ${x.trim()}` : "")).filter(Boolean).join("\n");
   return (
@@ -916,7 +920,7 @@ function Cases({ cases, open, onSend }: { cases: string[]; open: boolean; onSend
               aria-label={`Case ${"AB"[i]}: which idea fits, and what decides it`}
               placeholder="Which idea fits, and why…"
               value={said[i]}
-              onChange={(e) => { const v = e.target.value; setSaid((s) => s.map((x, j) => (j === i ? v : x))); }}
+              onChange={(e) => onSaid(said.map((x, j) => (j === i ? e.target.value : x)))}
               onKeyDown={(e) => {
                 if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
                 e.preventDefault();

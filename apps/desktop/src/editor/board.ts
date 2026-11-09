@@ -2,6 +2,7 @@
 // Notion: drag to pan, pinch or ⌘-scroll to zoom at the pointer, a plain scroll still scrolls the note,
 // a click without a drag opens the editor. The right and bottom edges resize it (Notion's image
 // handles), and the size is kept in the link's alt text, Obsidian's `![Diagram|640x320](…)`.
+import { resizeDrag } from "../drag";
 
 export type Size = { w: number; h: number };
 export type View = { x: number; y: number; z: number };
@@ -75,22 +76,18 @@ export function board(
       const col = (dom.parentElement?.getBoundingClientRect().right ?? r.right) - r.left;
       const start = { x: e.clientX, y: e.clientY, w: r.width, h: r.height };
       let size: Size | null = null;
-      g.setPointerCapture(e.pointerId);
       dom.classList.add("resizing");
-      const move = (m: PointerEvent) => {
-        size = clampSize({ w: axis === "h" ? start.w : start.w + m.clientX - start.x, h: axis === "w" ? start.h : start.h + m.clientY - start.y }, col);
-        opts.resize(size);
-      };
-      const up = () => {
-        g.removeEventListener("pointermove", move);
-        g.removeEventListener("pointerup", up);
-        g.removeEventListener("pointercancel", up);
-        dom.classList.remove("resizing");
-        if (size) opts.commit(size);
-      };
-      g.addEventListener("pointermove", move);
-      g.addEventListener("pointerup", up);
-      g.addEventListener("pointercancel", up);
+      resizeDrag({ pointerId: e.pointerId, currentTarget: g }, {
+        move: (m) => {
+          size = clampSize({ w: axis === "h" ? start.w : start.w + m.clientX - start.x, h: axis === "w" ? start.h : start.h + m.clientY - start.y }, col);
+          opts.resize(size);
+        },
+        end: (ev) => {
+          dom.classList.remove("resizing");
+          if (!ev) opts.resize(opts.size());
+          else if (size) opts.commit(size);
+        },
+      });
     });
     // Double-click an edge: back to the preview's own size (Figma's double-click on a handle).
     g.addEventListener("dblclick", (e) => {

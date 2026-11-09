@@ -1,4 +1,5 @@
 import { PixelNote, PixelStack } from "./PixelIcon";
+import { resizeDrag } from "./drag";
 import * as Tabs from "@radix-ui/react-tabs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
@@ -309,22 +310,18 @@ export function useSideWidth(key: string, initial: number, min = 280) {
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    const el = e.currentTarget;
-    el.setPointerCapture(e.pointerId);
-    const right = el.parentElement!.getBoundingClientRect().right;
+    const right = e.currentTarget.parentElement!.getBoundingClientRect().right;
+    const before = width;
     let w = width;
     setDragging(true);
-    const move = (m: PointerEvent) => setWidth((w = clamp(right - m.clientX)));
-    const up = () => {
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", up);
-      el.removeEventListener("pointercancel", up);
-      setDragging(false);
-      save(key, String(w));
-    };
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
+    resizeDrag(e, {
+      move: (m) => setWidth((w = clamp(right - m.clientX))),
+      end: (ev) => {
+        setDragging(false);
+        if (ev) save(key, String(w));
+        else setWidth(before);
+      },
+    });
   };
   const onDoubleClick = () => {
     setWidth(clamp(initial));
