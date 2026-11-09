@@ -6,6 +6,7 @@ import { Archive, BookOpen, CaretLeft, CaretRight, House, MagnifyingGlass, Sideb
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
+import { trackDrag, type Drag } from "./drag";
 import { Home } from "../Home";
 import { SkillIcon } from "../IconPicker";
 import { NoteBody, useNotes, type SideTab } from "../Notes";
@@ -21,56 +22,10 @@ import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
 import { errorText, type Notify } from "../util";
 
-/** A one-finger horizontal drag, shared by every swipe on the phone. `accept` decides at touch down; a touch that
- *  turns vertical first is left to scrolling. `begin` runs when it locks horizontal, and can refuse it. A cancelled
- *  touch (a notification, the app switcher) calls `end` with `cancelled`: springs back, never commits. */
-type Drag = {
-  accept: (t: Touch) => boolean;
-  begin?: (dx: number) => boolean | void;
-  move: (dx: number) => void;
-  end: (dx: number, flick: number, cancelled: boolean) => void;
-};
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
   now.current = drag;
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    let x0 = 0, y0 = 0, t0 = 0, dx = 0, state: "idle" | "maybe" | "drag" = "idle";
-    const start = (e: TouchEvent) => {
-      const t = e.touches[0];
-      if (!t || e.touches.length !== 1 || !now.current.accept(t)) return;
-      [x0, y0, t0, dx, state] = [t.clientX, t.clientY, e.timeStamp, 0, "maybe"];
-    };
-    const move = (e: TouchEvent) => {
-      const t = e.touches[0];
-      if (state === "idle" || !t) return;
-      dx = t.clientX - x0;
-      if (state === "maybe") {
-        if (Math.abs(t.clientY - y0) > 10 && Math.abs(t.clientY - y0) > Math.abs(dx)) return void (state = "idle");
-        if (Math.abs(dx) < 10) return;
-        if (now.current.begin?.(dx) === false) return void (state = "idle");
-        state = "drag";
-      }
-      e.preventDefault();
-      now.current.move(dx);
-    };
-    const end = (e: TouchEvent) => {
-      if (state !== "drag") return void (state = "idle");
-      state = "idle";
-      now.current.end(dx, dx / Math.max(1, e.timeStamp - t0), e.type === "touchcancel");
-    };
-    el.addEventListener("touchstart", start, { passive: true });
-    el.addEventListener("touchmove", move, { passive: false });
-    el.addEventListener("touchend", end);
-    el.addEventListener("touchcancel", end);
-    return () => {
-      el.removeEventListener("touchstart", start);
-      el.removeEventListener("touchmove", move);
-      el.removeEventListener("touchend", end);
-      el.removeEventListener("touchcancel", end);
-    };
-  }, [ref]);
+  useEffect(() => (ref.current ? trackDrag(ref.current, () => now.current) : undefined), [ref]);
 }
 
 /** iOS's edge swipes. From the left edge the screen moves with the finger; let go past a third of
@@ -215,6 +170,11 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   const only = (dx: number) => (item.archived_at ? Math.min(0, dx) : dx);
   useHorizontalDrag(ref, {
     accept: (t) => ((swiped.current = false), t.clientX > 24),
+    // iOS's half second, not the menu library's 700 ms (D145.4): Radix's trigger opens on contextmenu, and clears its own timer.
+    hold: (clientX, clientY) => {
+      swiped.current = true; // Letting go after the menu opened is not a tap on the row.
+      ref.current!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX, clientY }));
+    },
     begin: (dx) => {
       if (item.archived_at && dx > 0) return false; // Archived: only Restore, to the left.
       swiped.current = true;
@@ -244,7 +204,7 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
     <WithMenu actions={() => row.menu(item)}>
       <li>
         {side && <span className={`phone-swipe ${side}`}>{side === "left" ? (item.archived_at ? "Restore" : "Archive") : item.status === "done" ? "To read" : "Done"}</span>}
-        <button ref={ref} onClick={() => swiped.current || onOpen(item.id)}>
+        <button ref={ref} onClick={() => swiped.current || onOpen(item.id)} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
           <Thumb item={item} className="thumb phone-thumb" />
           <span className="phone-title">{item.title}</span>
         </button>
