@@ -392,21 +392,27 @@ journey("highlight popup open: typing writes the note, and no letter runs a shor
   if (after !== words + "2") throw new Error(`a 2 typed after the note became “${after}”`);
 });
 
-journey("tutor button: it sits in the title bar on every screen, beside Add or the panel toggle, never over the page", async (page) => {
+journey("tutor owl: it sits at the bottom right on every screen, pages keep room to scroll clear of it, and a quiz panel hides it (D158)", async (page) => {
   const button = page.getByRole("button", { name: "Open the tutor" });
-  const check = async (where: string, beside: string) => {
+  const vp = page.viewportSize()!;
+  const check = async (where: string, scroller: string) => {
     const b = (await button.boundingBox())!;
-    if (b.y + b.height > 38) throw new Error(`${where}: the tutor button sits at y ${b.y}, below the title bar`);
-    const n = (await page.locator(beside).first().boundingBox())!;
-    if (b.x + b.width > n.x || Math.abs(b.y + b.height / 2 - (n.y + n.height / 2)) > 1) throw new Error(`${where}: the tutor button is not just left of ${beside}`);
+    if (Math.abs(vp.width - (b.x + b.width) - 16) > 1 || Math.abs(vp.height - (b.y + b.height) - 16) > 1) throw new Error(`${where}: the owl is not 16px in from the bottom right corner (${b.x}, ${b.y})`);
+    // The last line of what scrolls under it can come up above it.
+    const room = await page.locator(scroller).first().evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
+    if (room < vp.height - b.y) throw new Error(`${where}: ${scroller} keeps ${room}px at its foot, less than the owl's ${vp.height - b.y}px`);
   };
-  await check("Home", ".main-tools .note-toggle");
+  await check("Home", ".home");
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   await page.locator(".skill-page").waitFor();
-  const b = (await button.boundingBox())!;
-  if (b.y + b.height > 38) throw new Error(`skill page: the tutor button sits at y ${b.y}, below the title bar`);
+  await check("skill page", ".skill-col");
   await openSource(page, TESTING);
-  await check("reader", ".panel-toggle");
+  await check("reader", ".mynotes-text");
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.locator("section.quiz").waitFor();
+  await until("the quiz panel's corner is its own", async () => !(await button.isVisible()));
+  await page.keyboard.press("Escape");
+  await button.waitFor();
 });
 
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
