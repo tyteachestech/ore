@@ -707,17 +707,21 @@ export function App() {
   /** Feed posts open as previews; leaving one keeps it if he highlighted or wrote in it, else drops it. */
   const previews = useRef(new Map<string, string>());
   const [feedTick, setFeedTick] = useState(0);
-  const opening = useRef(0);
+  const opening = useRef<string | null>(null);
   const openPost = useCallback(async (post: FeedPost) => {
+    // A second click or Enter on the post already loading waits for the first.
+    if (opening.current === post.url) return;
     const from = viewRef.current;
-    const mine = ++opening.current;
+    opening.current = post.url;
     try {
       const r = await ore<{ id: string; title: string; preview: boolean }>("feed", "open", post.url);
       // He went elsewhere, or opened another post, while it loaded: it never opens over that, and its preview goes.
-      if (viewRef.current !== from || opening.current !== mine) return void (r.preview && ore("feed", "close", r.id).catch(() => {}));
+      if (viewRef.current !== from || opening.current !== post.url) return void (r.preview && ore("feed", "close", r.id).catch(() => {}));
+      opening.current = null;
       if (r.preview) previews.current.set(r.id, r.title);
       openSource(r.id);
     } catch (e) {
+      if (opening.current === post.url) opening.current = null;
       notify(errorText(e), "error");
     }
   }, [openSource, notify]);
@@ -1304,9 +1308,9 @@ export function App() {
   /** A source row's title edited in place (Finder's Rename): optimistic, put back if the write fails. */
   const [renamingRow, setRenamingRow] = useState<string | null>(null);
   /** A rename field closed: the list takes the keys again. */
-  const doneRenaming = () => {
+  const doneRenaming = (byKey: boolean) => {
     setRenamingRow(null);
-    listRef.current?.focus({ preventScroll: true });
+    if (byKey) listRef.current?.focus({ preventScroll: true });
   };
   /** False when the write failed (and a toast said why), so the field keeps what he typed. */
   const retitle = async (id: string, before: string, t: string, undoable = true) => {
@@ -1317,6 +1321,7 @@ export function App() {
       if (undoable) notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
       return true;
     } catch (e) {
+      setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: before } : i)) ?? all);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
@@ -1458,6 +1463,7 @@ export function App() {
       if (undoable) notify(`Renamed to “${t}”`, "quiet", () => recourse(id, t, before, false), () => recourse(id, before, t, false));
       return true;
     } catch (e) {
+      setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: before } } : i)) ?? all);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
@@ -1893,7 +1899,7 @@ export function App() {
           );
         })()}
         {renamingRow === r.id ? (
-          <TitleField value={r.title} onSave={(t) => live.current.retitle(r.id, r.title, t.trim())} onClose={() => live.current.doneRenaming()} />
+          <TitleField value={r.title} onSave={(t) => live.current.retitle(r.id, r.title, t.trim())} onClose={(byKey) => live.current.doneRenaming(byKey)} />
         ) : (
           // Two lines (D114): the title at full width, then the other skills it is under as icons (the
           // page's own is left out), or, matched in its text, highlights or note, the line that says why.

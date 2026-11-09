@@ -55,8 +55,8 @@ export type TutorTurn = {
 };
 type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; steps?: string[]; marks?: Mark[]; ai: Ai };
 /** What he has typed and not sent yet, with the @-mentions in it. */
-/** `cases`: what he has written under a tell-apart exercise's two cases, not yet sent. */
-export type TutorDraft = { input: string; mentions: Mention[]; cases?: string[] };
+/** `cases`: what he has written under a tell-apart exercise's two cases, not yet sent, and the turn that asked. */
+export type TutorDraft = { input: string; mentions: Mention[]; cases?: { turn: TutorTurn["id"]; said: string[] } };
 export type TutorChat = ReturnType<typeof useTutorChat>;
 
 let turnSeq = 0;
@@ -471,7 +471,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                       <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />
                     </div>
                     {t.exercise?.cases?.length === 2 && (
-                      <Cases cases={t.exercise.cases} open={last} said={chat.draft.cases ?? NO_CASES} onSaid={(cases) => setDraft((d) => ({ ...d, cases }))} onSend={(text) => (setDraft((d) => ({ ...d, cases: undefined })), send(text))} />
+                      <Cases cases={t.exercise.cases} open={last} said={chat.draft.cases?.turn === t.id ? chat.draft.cases.said : NO_CASES} onSaid={(said) => setDraft((d) => ({ ...d, cases: { turn: t.id, said } }))} onSend={(text) => send(text)} />
                     )}
                     {!!t.marks?.length && (
                       <ul className="quiz-points tutor-points" aria-label="Key points">

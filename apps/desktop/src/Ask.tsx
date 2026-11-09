@@ -25,7 +25,7 @@ export const NO_ASK: AskChat = { turns: [], input: "", busy: false, error: null 
 export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: CardFull; answer: string; chat: AskChat; setChat: (f: (c: AskChat) => AskChat) => void; onApply: (p: Proposal) => Promise<void>; onClose: () => void }) {
   const { turns, input, busy, error } = chat;
   /** Read off the card itself, never remembered: an undo or a later edit makes a suggestion usable again. */
-  const applied = (p: Proposal) => p.question === card.question && p.answer === card.answer;
+  const applied = (p: Proposal) => p.question.trim() === card.question.trim() && p.answer.trim() === card.answer.trim();
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
 

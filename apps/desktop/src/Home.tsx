@@ -251,7 +251,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                       onSave={(t) => onRename!(i, t)}
                       // Focus goes back to the row, as the sources list's rename does, so Tab carries on from it;
                       // after this key, so a held Enter's repeat doesn't open the source.
-                      onClose={() => (setRenaming(null), setTimeout(() => document.querySelector<HTMLElement>(`.home-read[data-id="${i.id}"] .home-open`)?.focus({ preventScroll: true })))}
+                      onClose={(byKey) => (setRenaming(null), byKey && setTimeout(() => document.querySelector<HTMLElement>(`.home-read[data-id="${i.id}"] .home-open`)?.focus({ preventScroll: true })))}
                     />
                   ) : (
                     <button className="title home-open" onClick={() => onOpenSource(i.id)}>{i.title}</button>

@@ -816,14 +816,18 @@ function ReaderView(p: Props & { reload: () => void }) {
   // Leaving the source, or opening another, stops the voice.
   useEffect(() => () => stopListening(), [p.id]);
 
-  // Read again when a ⌘Z lands; `opened` keeps that from counting as opening it again.
+  // Read again when a ⌘Z lands. `opened` keeps that from counting as opening it again, and a text that
+  // changed (a cut or a reimport undone) starts the reader over, since every highlight is placed on the text.
   const changes = useLibraryChanges();
   const opened = useRef<string | null>(null);
+  const shownBodyOf = useRef<string | null>(null);
   useEffect(() => {
     let live = true;
     ore<Doc>("show", p.id, "--annotations").then(
       (d) => {
         if (!live) return;
+        if (opened.current === p.id && shownBodyOf.current !== null && shownBodyOf.current !== d.body) return p.reload();
+        shownBodyOf.current = d.body;
         setDoc(d);
         // Enrich runs once, right after `ore add`: long after that with nothing to show, it failed.
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);

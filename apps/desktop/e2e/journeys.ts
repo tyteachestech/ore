@@ -47,23 +47,31 @@ async function open(url: string): Promise<Page> {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
-  await page.addInitScript(STOPPED_PRESSES);
+  await page.addInitScript(HYGIENE);
   await page.goto(url);
   await page.locator(".side-item").first().waitFor();
   return page;
 }
 
-// A press stopped on its way to the document leaves an open popover deaf to it (Radix listens there), and one
-// stopped inside a popover makes the next press outside count as inside: every journey fails on one.
-const STOPPED_PRESSES = `(() => {
-  window.__stoppedPresses = [];
+// Two rules every journey checks as it runs, whatever it is about:
+// - A press stopped on its way to the document leaves an open popover deaf to it (Radix listens there), and one
+//   stopped inside a popover makes the next press outside count as inside.
+// - A modal dialog keeps Tab inside it (<Trap>, which marks its panel data-trap): without one, ⇧Tab reaches the
+//   page behind, where Esc no longer closes the dialog and Enter runs what is under it.
+const HYGIENE = `(() => {
+  const found = (window.__hygiene = new Set());
   for (const m of ["stopPropagation", "stopImmediatePropagation"]) {
     const was = Event.prototype[m];
     Event.prototype[m] = function () {
-      if (this.type === "pointerdown") window.__stoppedPresses.push((this.target?.className?.baseVal ?? this.target?.className ?? this.target?.nodeName) + "");
+      if (this.type === "pointerdown") found.add("a press was stopped before it reached the document, on: " + (this.target?.className?.baseVal ?? this.target?.className ?? this.target?.nodeName));
       return was.call(this);
     };
   }
+  const modals = () => {
+    for (const el of document.querySelectorAll('[aria-modal="true"]'))
+      if (!el.closest("[data-trap]") && !el.querySelector("[data-trap]")) found.add("a modal dialog with no focus trap: " + (el.getAttribute("aria-label") ?? el.className));
+  };
+  addEventListener("DOMContentLoaded", () => new MutationObserver(modals).observe(document.body, { childList: true, subtree: true }));
 })()`;
 
 const errors: string[] = [];
@@ -5868,8 +5876,8 @@ for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
   const t0 = Date.now();
   try {
     await run(page);
-    const stopped = (await page.evaluate(() => (window as any).__stoppedPresses as string[]).catch(() => [])) ?? [];
-    if (stopped.length) throw new Error(`a press was stopped before it reached the document, on: ${[...new Set(stopped)].join(", ")}`);
+    const broke = await page.evaluate(() => [...((window as unknown as { __hygiene?: Set<string> }).__hygiene ?? [])]).catch(() => []);
+    if (broke.length) throw new Error(broke.join("; "));
     console.log(`ok    ${name} (${Date.now() - t0} ms)`);
   } catch (e) {
     failed++;
