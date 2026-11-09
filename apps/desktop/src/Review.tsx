@@ -14,6 +14,7 @@ import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, type Notify } from "./util";
 import { Working } from "./Working";
+import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
@@ -29,6 +30,7 @@ const ACTIVE_CAP_MS = 3 * 60_000;
 const CUT_SHOWN = 8;
 
 type Phase = "answer" | "checked" | "edit";
+type Rating = 1 | 2 | 3 | 4;
 /** The session receipt, and today before and after it (for the ring and level-ups). */
 /** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
 type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null };
@@ -104,6 +106,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     }
   };
   const [asking, setAsking] = useState(false);
+  /** The rating under the pointer or focus, for where the timeline puts the next review (D149). */
+  const [preview, setPreview] = useState<number | undefined>();
   /** Each card's Ask chat, kept while he closes and reopens it. */
   const [asks, setAsks] = useState<Record<string, AskChat>>({});
   const [end, setEnd] = useState<End | null>(null);
@@ -228,6 +232,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setPassage(null);
     setPassageGone(null);
     setAsking(false);
+    setPreview(undefined);
   };
 
   /** The next card, loaded while he answers this one, so a rating moves on without waiting for it. Only
@@ -1038,10 +1043,12 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                   </figure>
                 )}
 
-                <div className="review-rate" role="group" aria-label="How well did you remember it?">
+                {/* Its reviews so far and where the rating under the pointer puts the next (D149); a card never reviewed has nothing to show. */}
+                {card.history && card.history.reviews.length > 0 && <Timeline history={card.history} rating={(preview ?? suggested ?? 3) as Rating} />}
+                <div className="review-rate" role="group" aria-label="How well did you remember it?" onMouseLeave={() => setPreview(undefined)} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setPreview(undefined)}>
                   {RATINGS.map((r, i) => (
                     <Hint key={r} text={<>{i + 1 === suggested ? `${r}, suggested` : r} <kbd>{i + 1}</kbd>{i + 1 === suggested && <kbd>↵</kbd>}</>} side="top">
-                      <button className={`rate-${i + 1}${i + 1 === suggested ? " suggested" : ""}`} disabled={busy} onClick={() => void rate(i + 1)}>
+                      <button className={`rate-${i + 1}${i + 1 === suggested ? " suggested" : ""}`} disabled={busy} onClick={() => void rate(i + 1)} onMouseEnter={() => setPreview(i + 1)} onFocus={() => setPreview(i + 1)}>
                         {r}
                       </button>
                     </Hint>

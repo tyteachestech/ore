@@ -5,10 +5,11 @@ import { Grow } from "./Grow";
 import { PixelStar } from "./PixelIcon";
 import { Hint } from "./Hint";
 import { is } from "./keys";
-import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion } from "./ore";
+import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
 import { stampBefore } from "./transcript";
 import { errorText, focusPicked, type Notify } from "./util";
 import { Matrix, useLate, Working } from "./Working";
+import { PixelBurst } from "./Burst";
 
 /** What Finish and ChapterRecall need from the source note: wait for a pending edit before the CLI
  *  appends to notes.md, then take the text it returns. */
@@ -28,6 +29,8 @@ type Props = NotesSync & {
   keyPoint?: { on: boolean; toggle: () => void };
   onCancel: () => void;
   onDone: () => void;
+  /** The library's skills, for the colour of the finished burst (D153). */
+  skills?: Skill[];
   /** In a course (D79): the lesson to read next, which the closing card can open instead of going back. */
   nextLesson?: { title: string; open: () => void };
   notify: Notify;
@@ -57,7 +60,9 @@ function sayUndrafted(notify: Notify, why: string) {
 /** The finish step as a quiz panel beside the blurred source (D52 to D56): free recall first, then
  *  each prequestion is answered, rated for confidence and checked against its key points, with the
  *  source shown only after the attempt. */
-export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, nextLesson, notify, flushNotes, onNotes }: Props) {
+export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, nextLesson, notify, flushNotes, onNotes, skills }: Props) {
+  // The finished badge bursts in the colour of the source's first coloured skill (D153).
+  const burstColor = doc.skills.map((id) => skills?.find((s) => s.id === id)?.color).find(Boolean);
   const draft = drafts.get(doc.id);
   const [qs, setQs] = useState<Prequestion[]>(draft?.qs ?? doc.prequestions ?? []);
   /** "Leave anything out?" (D100): his words, sent to the AI with the recall. */
@@ -571,8 +576,9 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
 
       {step > n && moment && (
         <div className="quiz-done moment" role="status">
-          <span className="quiz-done-badge" aria-hidden="true">
+          <span className="quiz-done-badge" data-color={burstColor} aria-hidden="true">
             <Check size={24} weight="bold" />
+            <PixelBurst />
           </span>
           <h2>Source finished</h2>
           <p>New cards start in tomorrow’s review.</p>
@@ -583,8 +589,9 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
         <>
           <div className="quiz-done">
             {marked && (
-              <span className="quiz-done-badge" aria-hidden="true">
+              <span className="quiz-done-badge" data-color={burstColor} aria-hidden="true">
                 <Check size={24} weight="bold" />
+                <PixelBurst />
               </span>
             )}
             <h2>{marked ? "Source finished" : "Done with this source?"}</h2>

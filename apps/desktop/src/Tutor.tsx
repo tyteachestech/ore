@@ -589,13 +589,21 @@ function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; o
     if (!shown.current) return;
     shown.current = false;
     const step = list.current?.lastElementChild;
-    const box = step?.closest(".tutor-turns");
-    if (!step || !box) return;
-    const over = step.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom;
-    if (over > 0) box.scrollTop += over;
+    if (step) reveal(step);
   }, [n]);
   return (
     <>
+      {/* Where he is in the working (D150): the steps shown are short marks, the current one a bar, the rest
+          dots, so he knows how many moves are left; a shown mark scrolls back to its step. */}
+      <div className="step-track" role="group" aria-label={`Step ${n} of ${steps.length}`}>
+        {steps.map((_, i) =>
+          i < n ? (
+            <button key={i} className={i === n - 1 ? "now" : undefined} aria-label={`Step ${i + 1}`} aria-current={i === n - 1 ? "step" : undefined} onClick={() => { const li = list.current?.children[i]; if (li) reveal(li); }} />
+          ) : (
+            <i key={i} />
+          ),
+        )}
+      </div>
       <ol className="tutor-steps" ref={list}>
         {steps.slice(0, n).map((s, i) => (
           <li key={i}>{children(s)}</li>
@@ -610,6 +618,15 @@ function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; o
       )}
     </>
   );
+}
+
+/** Scrolls a step into view inside the log only, never the page under a floating tutor. */
+function reveal(step: Element) {
+  const box = step.closest(".tutor-turns");
+  if (!box) return;
+  const s = step.getBoundingClientRect(), b = box.getBoundingClientRect();
+  if (s.top < b.top) box.scrollTop -= b.top - s.top;
+  else if (s.bottom > b.bottom) box.scrollTop += s.bottom - b.bottom;
 }
 
 /** The ✦ in the title bar that opens the tutor (D136): beside Add, or the reader's panel toggle. */

@@ -94,12 +94,17 @@ Animated counter (rolling pixel digits), Web Search (the tutor's source pills, D
 - **Why:** reviewing a lecture means going back to the moments he marked.
 - **From:** Rare UI's Voice note for the bar (waveform fills as it plays, tap the time to change speed). Waits for
   audio to play in place at all (D122); same call as the first round's 10.
+- **Status (2026-11-08):** not built. Ore has no in-place audio player yet (a podcast imports as its transcript);
+  the waveform comes with the player, the day audio plays in place.
 
 ## 7 A card opens out of its row
 
 - **Adds:** clicking a card in a list grows it into the editor from where it sits, and Esc folds it back into its row.
 - **Why:** he sees which card he is editing and where it goes back to, in a list of near-identical questions.
 - **From:** Motion Primitives `morphing-dialog` (MIT); Cult UI's Expandable screen is the same idea.
+- **Status (2026-11-08):** not built. Ore has no list of cards to open one from: a card is only edited inside
+  Review, where the editor already takes the card's place (the daily-session doc keeps it that way: a draft card
+  is approved, edited or deleted when it first comes up). It applies the day a card list exists.
 
 ## 8 Next due questions fan out from a skill
 
@@ -112,6 +117,7 @@ Animated counter (rolling pixel digits), Web Search (the tutor's source pills, D
 - **Adds:** on the iPhone, Add and a source's menu become one sheet that changes height and content between steps
   (pick → skill → done) instead of sheets on top of sheets.
 - **From:** Cult UI `family-drawer` (MIT), Rare UI's Family drawer. iPhone work needs Tyler at the Mac.
+- **Built (D155):** a source's ⋯ menu on the phone; Add joins it when adding lands on the phone (waits on sync).
 
 ## 10 A pixel burst when a source is finished
 

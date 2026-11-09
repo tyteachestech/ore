@@ -67,3 +67,33 @@ describe("retention metric (Anki-adapted)", () => {
     expect(m.retention).toBeCloseTo(0.8);
   });
 });
+
+describe("card history (D149)", async () => {
+  const { tempLibrary } = await import("./helpers.ts");
+  const { addSnippet } = await import("../src/ingest/index.ts");
+  const { writeNewCard } = await import("../src/cards.ts");
+  const { recordReview, cardHistory } = await import("../src/study.ts");
+  const lib = await tempLibrary();
+  const { item } = await addSnippet(lib, { text: "Retrieval practice strengthens memory." });
+  const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: ["learning"], topics: [], content_type: "fact", question: "q", answer: "a", rubric: [] });
+
+  test("a new card has no reviews and four next dates, Again soonest and Easy furthest", () => {
+    const h = cardHistory(lib, card.meta.id, new Date(T0));
+    expect(h.reviews).toEqual([]);
+    const d = [1, 2, 3, 4].map((r) => Date.parse(h.next[r as 1 | 2 | 3 | 4]));
+    expect(d[0]).toBeLessThanOrEqual(d[1]!); // a new card's Again and Hard both come back within the day
+    expect(d[1]).toBeLessThanOrEqual(d[2]!);
+    expect(d[2]).toBeLessThan(d[3]!);
+    for (const t of d) expect(t).toBeGreaterThan(T0);
+  });
+
+  test("after reviews, the log's dates and ratings come back oldest first and the next gap is from the last review", async () => {
+    await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, now: new Date(T0) });
+    await recordReview(lib, card.meta.id, { rating: 1, confidence: 2, now: new Date(T0 + 3 * DAY) });
+    await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, now: new Date(T0 + 4 * DAY) });
+    const h = cardHistory(lib, card.meta.id, new Date(T0 + 10 * DAY));
+    expect(h.reviews.map((r) => r.rating)).toEqual([3, 1, 3]);
+    expect(h.reviews.map((r) => Date.parse(r.ts))).toEqual([T0, T0 + 3 * DAY, T0 + 4 * DAY]);
+    expect(Date.parse(h.next[3])).toBeGreaterThan(T0 + 10 * DAY);
+  });
+});

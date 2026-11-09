@@ -1,10 +1,13 @@
-import { CaretRight, Check, DotsThree } from "./icons";
+import { CaretLeft, CaretRight, Check, DotsThree } from "./icons";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Fragment, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
 import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
+import { PHONE } from "./ore";
+import { useSwipeDown } from "./phone/sheet";
+import { Trap } from "./Trap";
 
 /** A picked action runs once the menu has closed and handed focus back (its onCloseAutoFocus), so a
  *  field or dialog the action opens keeps the caret: run on a timer, it raced Radix's own focus return,
@@ -160,6 +163,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
     </button>
   );
   if (lite) return button;
+  if (PHONE) return <ActionSheet label={label} actions={actions} className={className} icon={icon} open={open} onOpenChange={onOpenChange} onPointerDown={onPointerDown} keepFocus={keepFocus} />;
   return (
     <DropdownMenu.Root modal={false} open={open} onOpenChange={onOpenChange}>
       <Hint text={hint}>
@@ -209,5 +213,85 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+  );
+}
+
+/** On the phone the ⋯ menu is one bottom sheet that steps through (D155; Cult UI's family drawer, Apple's
+ *  action sheets): the actions as 44pt rows, and a submenu ("Skills") swaps into the same sheet behind a
+ *  back row, the sheet's height easing between the two, instead of a menu over a menu. Shortcuts stay off
+ *  it. A pick closes the sheet and runs; a `keep` tick stays. Swipe down, a tap outside or Esc closes it. */
+function ActionSheet({ label, actions, className, icon, open: controlled, onOpenChange, onPointerDown, keepFocus }: { label: string; actions: Actions; className: string; icon?: ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void; onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void; keepFocus?: boolean }) {
+  const [own, setOwn] = useState(false);
+  const open = controlled ?? own;
+  // The press that opens it keeps focus where it is (a note's text under the keyboard bar), as Radix's
+  // trigger does; an owner that preventDefault()s the press keeps it from opening (the drag handle).
+  const held = useRef(false);
+  const [stepId, setStepId] = useState<string | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number>();
+  const back = useRef<HTMLElement | null>(null);
+  const show = (on: boolean) => {
+    if (on) back.current = document.activeElement as HTMLElement | null;
+    setOwn(on);
+    if (!on) {
+      setStepId(null);
+      if (!keepFocus) back.current?.focus?.();
+    }
+    onOpenChange?.(on);
+  };
+  const close = () => show(false);
+  useSwipeDown(box, close, open);
+  useEffect(() => {
+    if (open) box.current?.focus();
+  }, [open]);
+  // The sheet's height follows the step it shows: measured after each swap, so the change eases.
+  useLayoutEffect(() => {
+    if (open) setHeight(inner.current?.offsetHeight);
+  }, [open, stepId]);
+  const list = open ? listOf(actions) : [];
+  const step = stepId ? list.find((a) => a.id === stepId) : undefined;
+  const rows = step?.sub ?? list;
+  const pick = (a: MenuAction) => {
+    if (a.sub) return setStepId(a.id);
+    if (a.keep) return a.run();
+    close();
+    setTimeout(a.run, 0);
+  };
+  return (
+    <>
+      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; e.preventDefault(); e.stopPropagation(); }}>
+        {icon ?? <DotsThree size={16} aria-hidden="true" />}
+      </button>
+      {open && (
+        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+          <Trap>
+            <div ref={box} className="panel sheet action-sheet" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); step ? setStepId(null) : close(); } }}>
+              <div className="sheet-steps" style={{ height }}>
+                <div ref={inner} key={step?.id ?? "top"} className="pick-list">
+                  {step && (
+                    <button className="pick-row sheet-back" onClick={() => setStepId(null)}>
+                      <CaretLeft size={12} weight="bold" aria-hidden="true" />
+                      <span className="name">{step.label}</span>
+                    </button>
+                  )}
+                  {rows.map((a) => (
+                    <Fragment key={a.id}>
+                      {a.divider && !step && <div className="sheet-sep" role="separator" />}
+                      <button className={`pick-row${a.danger ? " danger" : ""}`} role={a.checked === undefined ? undefined : "checkbox"} aria-checked={a.checked} onClick={() => pick(a)}>
+                        {step && <span className="menu-tick">{a.checked && <Check size={12} weight="bold" />}</span>}
+                        {a.icon}
+                        <span className="name">{a.label}</span>
+                        {a.sub && <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />}
+                      </button>
+                    </Fragment>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Trap>
+        </div>
+      )}
+    </>
   );
 }

@@ -781,9 +781,15 @@ journey("tutor steps: Show me's worked answer shows one step at a time, Next ste
     const shown = tutor.locator(".tutor-steps li");
     await shown.first().waitFor();
     if ((await shown.count()) !== 1) throw new Error(`Show me opened with ${await shown.count()} steps, not one`);
+    // The step track (D150): one mark per step, the current one marked, the hidden ones plain dots.
+    const track = tutor.getByRole("group", { name: "Step 1 of 3" });
+    await track.waitFor();
+    if ((await track.locator("button").count()) !== 1 || (await track.locator("i").count()) !== 2) throw new Error("the track didn't show one step of three");
     const next = tutor.getByRole("button", { name: "Next step" });
     await next.click();
     await until("Next step shows the second", async () => (await shown.count()) === 2 && (await shown.nth(1).innerText()).includes("stronger"));
+    await until("the track moved to step 2", async () => (await tutor.getByRole("group", { name: "Step 2 of 3" }).locator("[aria-current=step]").getAttribute("aria-label")) === "Step 2");
+    await tutor.getByRole("button", { name: "Step 1", exact: true }).click(); // a shown mark is a way back to its step
     // Closed and opened again, the steps he showed stay shown.
     await page.keyboard.press("Escape");
     await page.keyboard.press("Meta+j");

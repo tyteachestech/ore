@@ -110,6 +110,9 @@ const cards = [
 // Some history: review three cards a few days ago so they become live and some are due.
 const past = (d: number) => new Date(Date.now() - d * 86400_000);
 for (const [i, c] of cards.slice(0, 4).entries()) await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: past(6 + i) });
+// One card with a history for its timeline (D149): kept with the gaps widening, slipped, kept, slipped
+// again just before the loop's Good above, so it is due today.
+for (const [d, rating] of [[60, 3], [57, 3], [50, 1], [49, 3], [42, 3], [30, 3], [9, 1]] as const) await recordReview(lib, cards[2]!.meta.id, { rating, confidence: 2, now: past(d) });
 await startSession(lib); await recordReview(lib, cards[4]!.meta.id, { rating: 3, confidence: 3 }); await endSession(lib);
 // A card the tutor kept yesterday: it knows its source but no passage in it, and is new in review today.
 const kept = await addTutorCard(lib, a3.meta.id, { kind: "card", content_type: "fact", question: "Which word links the Story Spine's middle beats?", answer: "Because.", rubric: [] }, { vendor: "claude", model: "mock", prompt_version: "tutor@3" });

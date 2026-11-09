@@ -42,19 +42,26 @@ export interface ReviewResult {
 
 // Log one review. A draft's first review is its finishing step (D20): the
 // card goes live. FSRS state before the review is replayed from the log.
+/** Where a card stands before a review at `now`: its retention and params, its prior reviews, the state
+ *  they replay to, and the moment to rate it at. A review synced from a device whose clock ran ahead can
+ *  be dated after now: the review is logged now, and FSRS counts the time since that one as none, rather
+ *  than refusing time that runs backwards. Shared by the review itself and the timeline's lookahead. */
+function stateBefore(lib: Library, card: ReturnType<typeof findCard>, now: Date) {
+  const retention = desiredRetention(card.meta.skills, loadSkills(lib).skills);
+  const w = loadParams(lib);
+  const prior = readReviews(lib).filter((r) => r.card === card.meta.id);
+  const before = replay(prior, retention, w) ?? emptyState(now);
+  const last = before.last_review ? new Date(before.last_review) : now;
+  return { retention, w, prior, before, at: last > now ? last : now };
+}
+
 export async function recordReview(lib: Library, cardRef: string, input: ReviewInput): Promise<ReviewResult> {
   return withLock(paths.lock(lib), () => {
     const card = findCard(lib, cardRef);
     if (card.meta.state === "retired") throw new Error(`card ${card.meta.id} is retired`);
-    const retention = desiredRetention(card.meta.skills, loadSkills(lib).skills);
-    const w = loadParams(lib);
-    const prior = readReviews(lib).filter((r) => r.card === card.meta.id);
     const now = input.now ?? new Date();
-    const before = replay(prior, retention, w) ?? emptyState(now);
-    // A review synced from a device whose clock ran ahead can be dated after now. The review is logged
-    // now; FSRS counts the time since that one as none, rather than refusing time that runs backwards.
-    const last = before.last_review ? new Date(before.last_review) : now;
-    const after = nextState(before, last > now ? last : now, input.rating, retention, w);
+    const { retention, w, prior, before, at } = stateBefore(lib, card, now);
+    const after = nextState(before, at, input.rating, retention, w);
     // A draft's first review finishes it; it counts as live from then on (the index reads that from the
     // log), so the card file is only written when its text changes.
     const finishing = card.meta.state === "draft" && prior.length === 0;
@@ -252,4 +259,13 @@ export function libraryStats(lib: Library, open?: LibraryIndex): { skills: Skill
     const skills = loadSkills(lib).skills.map((s) => ({ skill: s.id, name: s.name, priority: s.priority, ...compute((xs) => xs.includes(s.id)) }));
     return { skills, total: { skill: "all", ...compute(() => true), session_starts: starts.size } };
   });
+}
+
+/** A card's reviews in time and where each rating would put the next one (D149): the dates the review
+ *  screen draws as a line of dots, so he sees the gaps widen while recall holds. Read from the log,
+ *  nothing new stored. `now` for tests. */
+export function cardHistory(lib: Library, cardRef: string, now = new Date()): { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string> } {
+  const { retention, w, prior, before, at } = stateBefore(lib, findCard(lib, cardRef), now);
+  const due = (rating: 1 | 2 | 3 | 4) => nextState(before, at, rating, retention, w).due;
+  return { reviews: prior.map((r) => ({ ts: r.ts, rating: r.rating as 1 | 2 | 3 | 4 })), next: { 1: due(1), 2: due(2), 3: due(3), 4: due(4) } };
 }
