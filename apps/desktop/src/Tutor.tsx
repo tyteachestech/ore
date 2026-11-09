@@ -14,7 +14,7 @@ import { ore, opt } from "./ore";
 import { errorText, type Notify } from "./util";
 import { Working } from "./Working";
 import { mentionMatches, type Mention } from "./mentions";
-import { Mole } from "./Mole";
+import { Mole, type Mood } from "./Mole";
 import { firstWords, landedClosed } from "./mole-says";
 
 export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
@@ -740,7 +740,10 @@ export function useUnheard(turns: TutorTurn[], open: boolean) {
     const t = id ? turns.find((x) => x.id === id) : undefined;
     return (t && (t.reply !== undefined || t.error) && firstWords(t)) || null;
   }, [id, turns]);
-  return { said, hush: () => setId(null) };
+  // The mole thinks while a reply is being written with the tutor closed, and is pleased when one lands (D169).
+  const thinking = !open && turns.some((t) => t.reply === undefined && t.error === undefined);
+  const failed = !!(id && turns.find((x) => x.id === id)?.error);
+  return { said, failed, thinking, hush: () => setId(null) };
 }
 
 
@@ -785,8 +788,14 @@ function Cases({ cases, open, onSend }: { cases: string[]; open: boolean; onSend
 /** The tutor's button (D160, after Notion AI's bubble at the bottom right): the mole, where the floating tutor
  *  opens. A reply that landed while it was closed comes out of it as a speech bubble (D159, after Cult UI's
  *  speech bubble): a click opens the tutor at it. */
-export function TutorBubble({ onOpen, said = null, onHush }: { onOpen: () => void; said?: string | null; onHush?: () => void }) {
+/** The mole comes out of its hole once a launch, not each time the tutor closes (⌘J is a 100-times-a-day key). */
+let peeked = false;
+
+export function TutorBubble({ onOpen, said = null, failed = false, thinking = false, onHush }: { onOpen: () => void; said?: string | null; failed?: boolean; thinking?: boolean; onHush?: () => void }) {
   const [look, setLook] = useState(false);
+  // Out of its hole once a launch; thinking while a reply is written; a hop when one lands, a jolt for an error.
+  const [first] = useState<Mood>(() => (peeked ? "idle" : ((peeked = true), "peek")));
+  const mood: Mood = thinking ? "thinking" : said ? (failed ? "surprised" : "happy") : first;
   const mole = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -817,7 +826,7 @@ export function TutorBubble({ onOpen, said = null, onHush }: { onOpen: () => voi
           onFocus={() => setLook(true)}
           onBlur={() => setLook(false)}
         >
-          <Mole look={look || !!said} />
+          <Mole mood={mood} cue={said} look={look || !!said} />
         </button>
       </Hint>
     </>

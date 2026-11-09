@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Gem } from "./Gem";
+import { Mole } from "./Mole";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
@@ -1217,6 +1218,8 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
   const ups = t.skills.filter((k) => k.level > (b?.skills.find((x) => x.skill === k.skill)?.level ?? k.level));
   return (
     <div className="review-end" role="status">
+      {/* D169: the tutor's mole cheers from the top of the ring, once, at the end of a session (not in the quick quiz). */}
+      {!quick && <span className="review-mole"><Mole bare size={64} mood="cheer" /></span>}
       <Ring value={part(t)} from={part(b)} met={t.met} burst={closed} size={quick ? 72 : 120} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
       <h2>{title}</h2>
       {/* "Caught up" never hides the new cards the daily limits hold back (D65). */}

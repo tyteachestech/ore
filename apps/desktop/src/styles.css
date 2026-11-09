@@ -2011,6 +2011,8 @@ button.home-plan:hover { color: var(--text); }
 .review-keys { flex: none; display: flex; justify-content: center; gap: 18px; height: 38px; align-items: center; border-top: 1px solid var(--border); background: var(--bg-side); color: var(--faint); font-size: 12px; }
 .review-keys kbd { margin-right: 4px; }
 .review-end { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4vh auto 0; max-width: 420px; animation: card-in 300ms ease-out both; }
+/* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
+.review-mole { display: block; line-height: 0; margin-bottom: 2px; }
 .review-end h2 { font-family: var(--round); margin: 22px 0 0; font-size: 24px; }
 .review-kept { margin: 10px 0 0; font-size: 16px; color: var(--muted); }
 .review-kept b { font-family: var(--round); color: var(--text); font-size: 24px; font-variant-numeric: tabular-nums; }
@@ -2638,10 +2640,15 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-bubble:active { transform: scale(0.96); }
 .tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .app:has(.quiz) .tutor-bubble { display: none; }
-.mole-body { fill: var(--faint); }
-.mole-shade { fill: color-mix(in srgb, var(--faint) 50%, var(--bg-raised)); }
-.mole-face { fill: var(--text-read); }
-.mole-pupil { fill: var(--text); }
+/* The mole's tones (D169): grey fur, a lighter muzzle, white paws, black eyes with a
+   white glint, a pink nose (its one colour) and a dim row of dirt. */
+.mole-fur { fill: var(--faint); }
+.mole-muzzle { fill: color-mix(in srgb, var(--faint) 45%, var(--text-read)); }
+.mole-white { fill: var(--text-read); }
+.mole-paw, .mole-glint { fill: var(--text); }
+.mole-eye { fill: #060607; }
+.mole-nose { fill: #f096ac; }
+.mole-dirt { fill: color-mix(in srgb, var(--faint) 55%, var(--bg-raised)); }
 @media (prefers-reduced-motion: reduce) { .tutor-bubble { transition: none; } }
 /* The mole says a reply that landed while the tutor was closed (D159, after Cult UI's speech bubble): its first
    lines in a raised bubble left of the mole, the tail a stair of 3px steps pointing at it. It grows out of the mole once. */
