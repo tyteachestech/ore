@@ -946,6 +946,53 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor: words selected in a reply go into the source note as a quote, Undo takes them out; Card asks the tutor for a card from them (D164)", async (page) => {
+  await openSource(page, AGENTS);
+  const said = "An agent decides its own next step, and a workflow follows steps written in advance.";
+  const asked: string[] = [];
+  let item = "";
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    const args = (JSON.parse(body) as { args: string[] }).args;
+    asked.push(args[1]!);
+    item ||= args.find((a) => a.startsWith("--item="))!.slice(7);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `${said} That is the whole difference.`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@10" } }) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click();
+  await tutor.getByRole("textbox", { name: "Message the tutor" }).fill("agent or workflow?");
+  await page.keyboard.press("Enter");
+  const reply = tutor.locator("[data-reply] p").filter({ hasText: said }).last();
+  await reply.waitFor();
+  const pick = () => reply.evaluate((p, words) => {
+    const node = p.firstChild!;
+    const at = node.textContent!.indexOf(words);
+    const r = document.createRange();
+    r.setStart(node, at);
+    r.setEnd(node, at + words.length);
+    const sel = document.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }, said);
+  await pick();
+  const bar = tutor.getByRole("toolbar", { name: "Selected words" });
+  await bar.getByRole("button", { name: "Into note" }).click();
+  await page.locator(".toast", { hasText: "Added to your note" }).waitFor();
+  if (await bar.count()) throw new Error("the toolbar stays after Into note");
+  const note = async () => ((await ore("notes", item)) as { text: string }).text;
+  await until("the note has the quote under From the tutor", async () => (await note()).includes(`## From the tutor\n\n> ${said}`));
+  await page.locator(".toast", { hasText: "Added to your note" }).getByRole("button", { name: "Undo" }).click();
+  await until("Undo takes it out", async () => !(await note()).includes(said));
+  await pick();
+  await bar.getByRole("button", { name: "Card" }).click();
+  await until("Card asks the tutor for a card from the words", async () => asked.at(-1) === `Make a card from this: “${said}”`);
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).

@@ -2584,7 +2584,12 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-down { position: sticky; bottom: 4px; align-self: center; margin-top: -10px; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--muted); font-size: 12px; box-shadow: var(--lift); }
 .tutor-down:hover { color: var(--text); background: var(--bg-hover); }
 .tutor-down:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--focus); }
-.tutor-turns { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 16px 4px; display: flex; flex-direction: column; gap: 18px; }
+.tutor-turns { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 16px 4px; display: flex; flex-direction: column; gap: 18px; }
+/* Words he selected in a reply (D164): a small toolbar just above them, as the reader's highlight popup sits. */
+.tutor-sel { position: absolute; z-index: 5; transform: translate(-50%, calc(-100% - 6px)); display: flex; gap: 2px; padding: 3px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-raised); box-shadow: var(--lift); }
+.tutor-sel.below { transform: translate(-50%, 6px); }
+.tutor-sel button { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.tutor-sel button:hover, .tutor-sel button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
 .tutor-starters { margin-top: auto; }
 .tutor-foot { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 12px; }
 .tutor-chip { align-self: flex-start; max-width: 100%; display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 2px 0 8px; border-radius: 6px; background: var(--bg-active); color: var(--muted); font-size: 12px; }
