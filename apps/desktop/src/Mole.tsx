@@ -5,14 +5,14 @@ import { dots } from "./icons";
    sprite drawn as round dots like the UI icons, in four tones. It never leaves the grid: now and then it blinks, and
    every 15 to 20 s it glances one column to a side and back, in steps, as an 8-bit sprite would. Still under reduced
    motion and while the window is hidden.
-   Legend: # fur, + shade (helmet, burrow), o snout and paws, P eyes, nose and the helmet's lamp. */
+   Legend: # fur, + shade (helmet, burrow), o snout and paws, P eyes (round, 2 by 2), nose and the helmet's lamp. */
 export const MOLE = [
   "................",
   "....++++++++....",
   "...++++PP++++...",
   "...##########...",
-  "..###P####P###..",
-  "..############..",
+  "..##PP####PP##..",
+  "..##PP####PP##..",
   "..#####oo#####..",
   "..####oPPo####..",
   "..#####oo#####..",
@@ -24,7 +24,7 @@ export const MOLE = [
   "................",
   "................",
 ];
-/** Eyes shut: their glints go. */
+/** Eyes shut: their top row goes, leaving a slit. */
 export const MOLE_BLINK = MOLE.map((r, y) => (y === 4 ? r.replaceAll("P", "#") : r));
 /** Glancing to his left (-1) or right (1): eyes, snout and nose slide a column inside the head. */
 export const moleTurned = (dir: -1 | 1, rows: readonly string[] = MOLE) =>
