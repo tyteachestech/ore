@@ -28,7 +28,7 @@ export type TutorCard = { kind: "card" | "prompt"; content_type: string; questio
 type Ai = { vendor: string; model: string; prompt_version: string };
 /** An open exercise (D128.6): its heading in his note, the placeholder lines under it, and the card it
  *  becomes if he misses (D158), committed before he answers and never shown until then. */
-export type Exercise = { heading: string; prompts: string[]; card: TutorCard; cases?: string[] };
+export type Exercise = { heading: string; prompts: string[]; card: TutorCard; cases?: string[] | null };
 /** Feedback on an exercise (D162): each point of its committed card, whether his answer covered it, and his words that did. */
 export type Mark = { point: string; covered: boolean; quote: string };
 export type TutorTurn = {

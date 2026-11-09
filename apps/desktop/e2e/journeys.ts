@@ -971,7 +971,7 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   const replies = [
     { reply: "Tell these two apart.", citations: [], general: false, hint: false, exercise, card: null, marks: [] },
     { reply: "A is right. B: who decides the steps?", citations: [], general: false, hint: false, exercise: null, card, marks: [{ point: card.rubric[0], covered: true, quote: "same steps each time" }, { point: card.rubric[1], covered: false, quote: "" }] },
-  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@10" } }));
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@11" } }));
   const asked: string[] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
@@ -1019,7 +1019,7 @@ journey("tutor: words selected in a reply go into the source note as a quote, Un
     const args = (JSON.parse(body) as { args: string[] }).args;
     asked.push(args[1]!);
     item ||= args.find((a) => a.startsWith("--item="))!.slice(7);
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `${said} That is the whole difference.`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@10" } }) });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `${said} That is the whole difference.`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@11" } }) });
   });
   await page.keyboard.press("Meta+j");
   const tutor = page.getByRole("complementary", { name: "Tutor" });
