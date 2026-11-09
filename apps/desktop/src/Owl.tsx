@@ -34,12 +34,13 @@ export const owlTurned = (dir: -1 | 1, rows: readonly string[] = OWL) =>
     return dir < 0 ? row.slice(0, 13) + "#" + row.slice(14) : row.slice(0, 2) + "#" + row.slice(3);
   });
 
-const TONES = { shade: "+", body: "#", face: "o", beak: "B", pupil: "P" } as const;
+/** Each tone's dots: the beak shares the wings' shade, dark on the light face. */
+const TONES = { shade: "+B", body: "#", face: "o", pupil: "P" } as const;
 type Frame = "front" | "blink" | "left" | "right";
 const FRAMES: Record<Frame, readonly string[]> = { front: OWL, blink: OWL_BLINK, left: owlTurned(-1), right: owlTurned(1) };
 /** Each frame as one dot path per tone, made once. */
 const PATHS = Object.fromEntries(
-  Object.entries(FRAMES).map(([f, rows]) => [f, Object.entries(TONES).map(([tone, c]) => [tone, dots(rows.map((r) => [...r].map((x) => (x === c ? "#" : ".")).join("")))])]),
+  Object.entries(FRAMES).map(([f, rows]) => [f, Object.entries(TONES).map(([tone, c]) => [tone, dots(rows.map((r) => [...r].map((x) => (c.includes(x) ? "#" : ".")).join("")))])]),
 ) as Record<Frame, [string, string][]>;
 
 const BLINK_MS = 130, LOOK_MS = 900;
@@ -49,13 +50,19 @@ const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 /** The owl, `size` px square. `look` (hover or focus on its button) turns it back to face him, with a blink. */
 export function Owl({ size = 40, look = false }: { size?: number; look?: boolean }) {
   const [frame, setFrame] = useState<Frame>("front");
+  const looking = useRef(look);
+  looking.current = look;
   const blink = useRef<() => void>(() => {});
 
   useEffect(() => {
-    const timers: number[] = [];
+    const timers = new Set<number>();
     let alive = true;
-    const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(fn, ms));
-    const quiet = () => document.hidden || still();
+    const later = (fn: () => void, ms: number) => {
+      const id = window.setTimeout(() => { timers.delete(id); fn(); }, ms);
+      timers.add(id);
+    };
+    // Still while hovered or focused (it is facing him), hidden, or asked for less motion.
+    const quiet = () => looking.current || document.hidden || still();
     /** Shows `f` for `ms`, then faces him again (unless something else took over meanwhile). */
     const show = (f: Frame, ms: number) => {
       setFrame(f);
@@ -69,7 +76,7 @@ export function Owl({ size = 40, look = false }: { size?: number; look?: boolean
         if (!quiet()) {
           const first: Frame = Math.random() < 0.5 ? "left" : "right";
           show(first, LOOK_MS);
-          if (Math.random() < 0.5) later(() => show(first === "left" ? "right" : "left", LOOK_MS), LOOK_MS + 400);
+          if (Math.random() < 0.5) later(() => { if (!quiet()) show(first === "left" ? "right" : "left", LOOK_MS); }, LOOK_MS + 400);
         }
         if (alive) turns();
       }, between(15000, 20000));

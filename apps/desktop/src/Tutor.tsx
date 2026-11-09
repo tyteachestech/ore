@@ -646,7 +646,7 @@ export function TutorBubble({ onOpen }: { onOpen: () => void }) {
         onFocus={() => setLook(true)}
         onBlur={() => setLook(false)}
       >
-        <Owl size={36} look={look} />
+        <Owl look={look} />
       </button>
     </Hint>
   );

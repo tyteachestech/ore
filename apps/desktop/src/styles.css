@@ -18,7 +18,7 @@
   --focus: rgba(142, 166, 255, 0.55);
   --halo: 0 0 0 3px rgba(142, 166, 255, 0.18); /* with an accent border: focus on fields */
   --lift: inset 0 1px 0 rgba(255, 255, 255, 0.045); /* top highlight on anything raised */
-  --owl-room: 80px; /* the tutor's owl and its margins (D160) */
+  --owl-room: 84px; /* the tutor's owl and its margins (D160) */
   --float: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.45);
   --error: #ff7b7b;
 
@@ -1453,7 +1453,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 @media (max-width: 1000px) {
   .skill-page { display: block; overflow-y: auto; }
   .skill-hero { padding: 20px 20px 16px; }
-  .skill-cols { display: flex; flex-direction: column; gap: 20px; padding: 0 20px 40px; }
+  .skill-cols { display: flex; flex-direction: column; gap: 20px; padding: 0 20px var(--owl-room); }
   .col-divider, .note-widen { display: none; }
   .skill-cols.wide > .skill-col.side { display: flex; }
   .skill-col { overflow: visible; padding-bottom: 0; }
@@ -2592,8 +2592,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
    Hidden while a quiz panel holds that corner. Scrolling pages keep --owl-room at their foot so their last line
    can scroll clear of it. */
 .tutor-bubble {
-  position: fixed; right: 16px; bottom: 16px; z-index: 11;
-  width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
+  position: fixed; right: 16px; bottom: 16px; z-index: 6; /* under the highlight popup (10) and floating panels */
+  width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
   background: var(--bg-raised); box-shadow: var(--float); transition: transform 160ms ease-out;
 }
 .tutor-bubble:hover { background: var(--bg-hover); }
@@ -2601,7 +2601,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .app:has(.quiz) .tutor-bubble { display: none; }
 .owl-body { fill: var(--faint); }
-.owl-shade, .owl-beak { fill: color-mix(in srgb, var(--faint) 50%, var(--bg-raised)); }
+.owl-shade { fill: color-mix(in srgb, var(--faint) 50%, var(--bg-raised)); }
 .owl-face { fill: var(--text-read); }
 .owl-pupil { fill: var(--text); }
 @media (prefers-reduced-motion: reduce) { .tutor-bubble { transition: none; } }
