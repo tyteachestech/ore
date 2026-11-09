@@ -58,7 +58,7 @@ Tyler wants the daily session to be something people get hooked on in a good way
 | Wins during | The card springs in, rubric marks tick in, the words that earned each key point light up; a new card every few for variety | D62, D141 | Informational feedback (Deci, Koestner & Ryan 1999) |
 | A good ending | The goal ring closes; gems drop in for cards that became solid; "rescued" names near-misses saved | D62, D90 | Small wins noticed (`research/skill-metrics-motivation.md`) |
 | Growth over weeks | Gems and levels that never drop; calibration once a week | D63, D90, D69 | Progress monitoring, d ≈ 0.40 (Harkin 2016) |
-| Forgiveness | No streak; this week's met days and the total; weekdays only if they like; nothing resets | D60, D23 | Hard resets raise quitting (Kang 2022) |
+| Forgiveness | No streak; this week's met days and the total; weekdays only if they like; nothing resets | D60, D23 | Broken streaks drop below baseline (Silverman & Barasch 2022) |
 
 **Never**, on top of D62's list (no XP, badges, hard-reset streaks, random rewards, leaderboards, guilt copy):
 
@@ -72,7 +72,7 @@ Each needs Tyler's call before it is built. None touches FSRS math (D22). `learn
 
 1. **Drop the full due count from Home's hover hint** (D65.4). Under a standing backlog it only grows, and nothing in the session changes because of it (purpose rule). The slice in minutes already says what today asks.
 2. **Start on a likely win.** The first card of a session is one they will probably recall, so the first ten seconds feel good. Order within today's slice only.
-3. **End on a win.** When the goal closes right after a miss, one more likely-recalled card first, so the session's last moment is a success (the peak-end rule, Kahneman et al. 1993; not yet in Ore's research briefs, check before building).
+3. **End on a win.** When the goal closes right after a miss, one more likely-recalled card first, so the session's last moment is a success (the peak-end rule, Kahneman et al. 1993; in the field, hard tasks that came last or back to back raised quitting, Kang, Daniels & Schweitzer 2022, `research/brief-learning-science.md` §10).
 4. **The glowing gem as a one-click review** of the cards it stands for (D90's "later").
 
 ## Related

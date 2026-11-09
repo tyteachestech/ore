@@ -69,7 +69,7 @@ Stages 2 to 7 are the strongest part of Ore. The two gaps that would reshape rew
 - **The end screen.** It may carry the one try line (B).
 - **"The daily goal counts review only."** Holds while tries happen away from the desk; revisit if written practice (D128.6) joins the session.
 - **Idea 4, the glowing gem as one-click review.** What a gem stands for may widen.
-- **Idea 3, end on a win.** Not in the research briefs yet; cheap to wait.
+- **Idea 3, end on a win.** Now has field support (hard tasks last or back to back raise quitting, Kang 2022, brief §10); still cheap to wait.
 
 ## Open questions for Tyler (round 1)
 
