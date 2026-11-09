@@ -73,6 +73,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const [draft, setDraft] = useState<Group[] | null>(null);
   const [active, setActive] = useState<UniqueIdentifier | null>(null);
   const [closed, setClosed] = useState(closedGroups);
+  // The group whose New skill field is open, by collection ("" is the ungrouped one): a name can change
+  // under it (the lone "Skills" group becomes "Other" once the skills load), a collection can't.
   const [adding, setAdding] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   // A group that exists only while its first skill is named: a new collection, or "Other" when
@@ -91,7 +93,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     save(CLOSED, JSON.stringify(next));
   };
   const toggle = (name: string) => setClosedSaved(closed.includes(name) ? closed.filter((n) => n !== name) : [...closed, name]);
-  const isOpen = (g: Group) => !closed.includes(g.name) || adding === g.name;
+  const isOpen = (g: Group) => !closed.includes(g.name) || adding === g.collection;
 
   const groupOf = (list: Group[], id: UniqueIdentifier) =>
     isGroup(id) ? list.findIndex((g) => groupId(g.collection) === id) : list.findIndex((g) => g.skills.some((s) => s.id === id));
@@ -165,12 +167,11 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     if (isOther(v)) return newSkill();
     const existing = groups.find((g) => g.collection.toLowerCase() === v.toLowerCase());
     if (!existing) setFresh(v);
-    setAdding(existing?.name ?? v);
+    setAdding(existing?.collection ?? v);
   };
   const newSkill = () => {
-    const rest = groups.find((g) => !g.collection);
-    if (!rest) setFresh("");
-    setAdding(rest?.name ?? UNGROUPED);
+    if (!groups.some((g) => !g.collection)) setFresh("");
+    setAdding("");
   };
   // Right-click on the sidebar around the rows, as on Finder's or Notion's sidebar.
   const spaceMenu: MenuAction[] = [
@@ -184,7 +185,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const groupMenu = (g: Group): MenuAction[] => {
     const i = named.indexOf(g);
     return [
-      { id: "new", label: "New skill", run: () => setAdding(g.name) },
+      { id: "new", label: "New skill", run: () => setAdding(g.collection) },
       ...(g.collection
         ? [
             { id: "rename", label: "Rename…", run: () => setRenaming(g.collection) },
@@ -261,7 +262,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
               renaming={renaming === g.collection && !!g.collection}
               menu={g === freshGroup ? [] : groupMenu(g)}
               onToggle={() => toggle(g.name)}
-              onAdd={() => setAdding(g.name)}
+              onAdd={() => setAdding(g.collection)}
               taken={(name) => isOther(name) || groups.some((x) => x !== g && !!x.collection && x.collection.toLowerCase() === name.toLowerCase())}
               onRename={(name) => rename(g, name)}
               onCancelRename={() => setRenaming(null)}
@@ -272,7 +273,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
                     <SkillRow key={s.id} s={s} on={skill === s.id} drop={drop === s.id} marked={marked} onOpen={onOpen} menu={menu(s)} />
                   ))}
               </SortableContext>
-              {adding === g.name && (
+              {adding === g.collection && (
                 <NewSkill
                   skills={skills}
                   collection={g.collection}
