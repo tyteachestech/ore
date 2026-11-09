@@ -87,6 +87,7 @@ keeps its headings and lists.
 | ⌘⇧H puts the last text colour or highlight on the selection | missing | added |
 | A pasted screenshot or copied image goes into the note | fail (nothing) | fixed |
 | An image dropped from Finder on a note goes into it, a line showing where | fail (added as a source) | fixed |
+| `/equation` (inline) and `/math` (block), and `$$x$$` typed, make equations drawn with KaTeX | missing (TeX stayed text; a `$$` block's `_` saved as `\_`) | added |
 
 Left out: ⌘/ (Ore's shortcut list) and `/color` names (the format bar's colour menu does it).
 

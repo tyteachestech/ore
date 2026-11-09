@@ -1253,6 +1253,13 @@ body.resizing iframe { pointer-events: none; }
 .note-editor .note-diagram svg { display: block; width: auto; height: auto; max-width: 100%; max-height: 240px; }
 /* The preview is a small board (board.ts): drag pans, pinch or ⌘-scroll zooms, the edges resize it. */
 .note-editor .note-diagram { position: relative; overflow: hidden; user-select: none; }
+/* Equations (Notion's /equation, /math): drawn by KaTeX; a click opens the TeX under it. */
+.note-editor .note-math { cursor: pointer; border-radius: 4px; padding: 0 2px; }
+.note-editor .note-math.block { display: block; margin: 8px 0; padding: 4px 0; text-align: center; overflow-x: auto; }
+.note-editor .note-math.empty { color: var(--faint); }
+.note-editor .note-math:hover, .note-editor .ProseMirror-selectednode.note-math { background: var(--bg-hover); }
+.math-field { width: 320px; }
+.math-field textarea.menu-input { height: auto; padding: 6px 8px; border: 0; resize: none; font: 13px/1.5 var(--mono); }
 .note-editor .note-diagram-view { transform-origin: 0 0; }
 .note-editor .note-diagram.sized { display: flex; align-items: center; justify-content: center; max-width: 100%; }
 .note-editor .note-diagram.sized .note-diagram-view { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }

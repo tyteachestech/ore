@@ -390,3 +390,30 @@ describe("toggles open and close from the keyboard (Notion)", () => {
     expect(await md(TWO.replace("One‸", "‹One").replace("first", "fi›rst"), "{Mod-Alt-t}", "X")).toMatch(/^<details><summary>OneX<\/summary>\n\nfirst\n/);
   });
 });
+
+describe("equations (Notion's /equation and /math), stored as the reader reads them", () => {
+  test("$$…$$ and a $$ block load as equations and save back byte for byte; a single $ stays a dollar", async () => {
+    const note = "Energy $$E = m_1 c^2$$ costs $5 or $10.\n\n$$\n\\sum_{i=1}^n x_i\n$$\n\nAfter.";
+    expect(await md(note + "‸")).toBe(note);
+    const kinds = (await run(note, [], (state) => {
+      const k: string[] = [];
+      state.doc.descendants((n) => void (n.type.name.startsWith("math_") && k.push(`${n.type.name}:${n.attrs.value}`)));
+      return k.join(" | ");
+    })).hint;
+    expect(kinds).toBe("math_inline:E = m_1 c^2 | math_block:\\sum_{i=1}^n x_i");
+  });
+
+  test("typing $$x^2$$ makes an inline equation; in code, and with nothing between, it stays text", async () => {
+    const kinds = async (start: string, typed: string) =>
+      (await run(start, [typed], (state) => {
+        let k = "";
+        state.doc.descendants((n) => void (n.type.name === "math_inline" && (k = n.attrs.value)));
+        return k;
+      })).hint;
+    expect(await kinds("‸", "Area $$\\pi r^2$$")).toBe("\\pi r^2");
+    expect(await md("‸", "Area $$\\pi r^2$$ grows")).toBe("Area $$\\pi r^2$$ grows");
+    expect(await kinds("```\n‸\n```", "$$x$$")).toBe("");
+    expect(await kinds("‸", "$$ $$")).toBe("");
+    expect(await md("Run `echo ‸ now`", "$$PID$$")).toBe("Run `echo $$PID$$ now`");
+  });
+});
