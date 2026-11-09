@@ -39,6 +39,7 @@ bun run eval:tutor --vendor claude --against 85e22fb   # blind A/B: today's tuto
 
 - An exercise now carries the card it becomes (model answer, 2 to 4 rubric points), written before he answers; feedback marks each point `covered` and the app offers that card after a miss. `exercise-feedback` carries the committed card in its `earlier` turn and expects a card; the judge and the comparator see the earlier turns as he did, without the card.
 - Two new cases: `practice-tell-apart` (two look-alike cases, which idea fits each) and `practice-new-case-unnamed`; both are judged on never naming the idea they test.
+- First run (Sonnet 5.5, 2 runs): 30/30 (89–100%), nothing passed only some runs, $0.66. Against tutor@8 (one run): new 4, old 6, same 5. The Practice cases went new 2, same 2, old 0. Five of the old wins were tightness (the new reply said the same in more words); one was a slip, "one year later" for an 18-month gap between 22.04 and 23.10, in a case neither version's rules changed. One run, so counts, not a verdict.
 
 ## Limits
 
