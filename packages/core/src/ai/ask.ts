@@ -21,7 +21,7 @@ export function queryTerms(text: string): string[] {
  *  A stem keeps at least three letters, and -y only goes after four, so "very" and "added" don't shrink
  *  to prefixes of unrelated words ("ver", "ad"). */
 export function stem(w: string): string {
-  const ies = w.replace(/(?<=\p{L}{3})(?:ies|ied|ying)$/u, "");
+  const ies = w.replace(/(?<=\p{L}{3})(?:ies|ied)$|(?<=\p{L}{2}[^aeiou])ying$/u, "");
   if (ies !== w) return ies;
   // A doubled last letter left by -ing or -ed goes back to one (quizz, stopp), except ll and ss (call, miss) and when two letters would be left (add).
   const ing = w.replace(/(?<=\p{L}{3})(?:ing|ed)$/u, "");
