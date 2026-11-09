@@ -1334,8 +1334,11 @@ body.resizing iframe { pointer-events: none; }
 .skill-hero { flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 26px 32px 20px; }
 .skill-title { flex: 1 1 220px; min-width: 0; }
 /* D173: the importance bars sit after the name, quiet until hovered (Linear's priority on an issue). */
-.skill-name-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.skill-name-row { display: flex; align-items: center; gap: 6px; min-width: 0; margin-left: -6px; }
+/* The name's button keeps its hover inset by the row's margin instead of its own, which in a flex row
+   shrank the name by 6px and wrapped it at a hyphen. */
 .skill-name-row > .skill-name { min-width: 0; }
+.skill-name-row > .skill-name button { margin-left: 0; }
 .skill-importance { flex: none; width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
 .skill-importance:hover, .skill-importance[aria-expanded="true"] { color: var(--text); background: var(--bg-hover); }
 .skill-importance:focus-visible, .skill-unarchive:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

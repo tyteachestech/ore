@@ -5403,6 +5403,31 @@ journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the sugges
   }
 });
 
+journey("skill importance (D173): Importance ▸ Focus with ⌘Z, Archive folds it under Archived and out of review, Bring back puts it in its place", async (page) => {
+  type S = { id: string; priority: string; archived?: boolean };
+  const habits = async () => ((await ore("skills")) as S[]).find((s) => s.id === "habits")!;
+  const row = page.locator("nav .side-main", { hasText: "Habits" });
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Importance" }).hover();
+  await page.getByRole("menuitemcheckbox", { name: "Focus" }).click();
+  await until("Habits is Focus", async () => (await habits()).priority === "P1");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back to Light", async () => (await habits()).priority === "P3");
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Archive skill" }).click();
+  await until("Habits is archived", async () => !!(await habits()).archived);
+  const fold = page.getByRole("group", { name: "Archived" });
+  await fold.getByRole("button", { name: "Archived" }).click();
+  await fold.locator(".side-main", { hasText: "Habits" }).click();
+  // Its own cards wait: Start review on Home never offers it.
+  const due = (await ore("due")) as { skills: string[] }[];
+  if (due.some((e) => e.skills.length === 1 && e.skills[0] === "habits")) throw new Error("an archived skill's card is still due");
+  await page.getByRole("button", { name: "Bring back" }).click();
+  await until("Habits is back", async () => !(await habits()).archived);
+  await page.locator(".skill-importance").waitFor();
+  if (await fold.count()) throw new Error("the Archived group stayed with nothing in it");
+});
+
 journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {
   const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { edit: why } : {}), why);
   await openSource(page, AGENTS);
