@@ -5,6 +5,7 @@
 //   bun run e2e -- highlight         only journeys whose name contains "highlight"
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
+//   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
 import { chromium, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +17,7 @@ const FIXTURES = join(import.meta.dir, "../../../packages/core/test/fixtures/int
 const PORT = Number(process.env.ORE_E2E_PORT ?? 1450);
 const BRIDGE = process.env.E2E_URL ? Number(process.env.E2E_BRIDGE ?? 1421) : Number(process.env.ORE_E2E_MOCK_PORT ?? 1451);
 const only = process.argv[2];
+const [shard, shards] = (process.env.ORE_E2E_SHARD ?? "1/1").split("/").map(Number) as [number, number];
 /** The seeded library (or, against a mock already running, $ORE_LIBRARY): for state no `ore` command makes. */
 let LIB = process.env.ORE_LIBRARY ?? "";
 
@@ -5483,8 +5485,9 @@ journey("a11y: a row is one control with its actions beside it (axe nested-inter
 // —— run ——
 
 let failed = 0;
-for (const [name, run] of journeys) {
-  if (only && !name.includes(only)) continue;
+const picked = journeys.filter(([name]) => !only || name.includes(only));
+const per = Math.ceil(picked.length / shards);
+for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
   const page = await open(url);
   const t0 = Date.now();
   try {
@@ -5501,7 +5504,7 @@ for (const [name, run] of journeys) {
 }
 await browser.close();
 // The style rules a regex can't see (nested frames, off-ramp font sizes), on the same mock.
-if (!only) {
+if (!only && shard === shards) {
   const style = Bun.spawnSync(["bun", join(MOCK, "style-check.ts"), url], { env: { ...process.env, ORE_BRIDGE: String(BRIDGE) }, stdout: "inherit", stderr: "inherit" });
   if (style.exitCode !== 0) { failed++; console.log("FAIL  style-check"); } else console.log("ok    style-check");
 }

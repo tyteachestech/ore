@@ -25,19 +25,29 @@ jobs:
       # The iPhone bundle has its own Vite setup (D78): a core import only Bun understands breaks it and nothing else.
       - run: mkdir -p /tmp/empty-library && cd apps/desktop && ORE_PHONE=1 ORE_PHONE_LIBRARY=/tmp/empty-library bunx vite build
       - run: bun apps/desktop/scripts/mock/impeccable-gate.ts
+  # The journeys in four runners side by side, each a quarter of them in order on its own fresh library: one runner
+  # took 14 min. A shard that fails leaves the others running, so one run shows every failing journey.
   e2e:
+    name: e2e (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps chromium
+      # Headless runs use the headless shell only, so the full Chrome download is skipped.
+      - run: bunx playwright install --with-deps --only-shell chromium
       - run: bun run e2e
+        env:
+          ORE_E2E_SHARD: ${{ matrix.shard }}/4
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-screenshots
+          name: e2e-screenshots-${{ matrix.shard }}
           path: /tmp/ore-e2e-*.png
