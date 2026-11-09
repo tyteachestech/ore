@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { REWRITTEN } from "../eval/ask.ts";
-import { addSource } from "../src/ingest/index.ts";
+import { addSource, addText } from "../src/ingest/index.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // Golden imports (D122): one saved example of each kind of source, and the whole doc.md Ore makes
@@ -48,7 +48,7 @@ const HTML = "text/html; charset=utf-8";
 // question there can crowd out that question's evidence, so pick a fixture's subject apart from theirs.
 // A page whose markup is kept and words rewritten (rewrite-page.ts) is marked `rewritten`: its random
 // learning words would crowd out every question's evidence, so the eval leaves it out (REWRITTEN).
-const CASES: { name: string; add: string; serve?: Record<string, [string, string]>; rewritten?: true }[] = [
+const CASES: { name: string; add: string; serve?: Record<string, [string, string]>; rewritten?: true; paste?: true }[] = [
   { name: "pdf-hazards", add: join(FIX, "files/hazards.pdf") }, // footnotes, powers, hyphens, running heads
   { name: "pdf-outline", add: join(FIX, "files/outline.pdf") }, // the PDF outline as chapters
   { name: "pdf-textbook", add: join(FIX, "files/textbook.pdf") }, // margin notes, numbered headings, lists
@@ -68,6 +68,8 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "web-hn-thread", add: "https://news.ycombinator.com/item?id=11408447", serve: { "https://news.ycombinator.com/item?id=11408447": ["web/hn-thread.html", HTML] }, rewritten: true },
   { name: "web-speakerdeck", add: "https://speakerdeck.com/jennybc/how-to-name-files", serve: { "https://speakerdeck.com/jennybc/how-to-name-files": ["web/speakerdeck.html", HTML] }, rewritten: true },
   { name: "web-discourse", add: "https://meta.discourse.org/t/discourse-new-user-guide/96331", serve: { "https://meta.discourse.org/t/discourse-new-user-guide/96331": ["web/discourse-topic.html", HTML] }, rewritten: true },
+  // A ChatGPT answer pasted as HTML (ore add --stdin --html), written for Ore in the shape its page copies.
+  { name: "pasted-chatgpt", add: join(FIX, "files/chatgpt-copy.html"), paste: true, serve: { "https://images.example.org/starter-rise.png": ["files/screenshot.png", "image/png"] } },
   { name: "web-python-docs", add: "https://docs.python.org/3/tutorial/classes.html", serve: { "https://docs.python.org/3/tutorial/classes.html": ["web/docs-python.html", HTML] } },
 ];
 
@@ -78,7 +80,7 @@ test("golden: the Ask eval leaves out exactly the pages whose words were rewritt
 for (const c of CASES)
   test(`golden: ${c.name}`, async () => {
     if (c.serve) serve(c.serve);
-    const item = await addSource(await tempLibrary(), c.add);
+    const item = c.paste ? await addText(await tempLibrary(), readFileSync(c.add, "utf8"), { html: true }) : await addSource(await tempLibrary(), c.add);
     // Only the id and the time of capture change from run to run.
     const doc = readFileSync(join(item.dir, "doc.md"), "utf8")
       .replace(/^id: .+$/m, "id: <id>")

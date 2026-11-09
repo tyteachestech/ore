@@ -455,22 +455,28 @@ async function tabDraft(tab: Tab, host: string): Promise<NewItem> {
 // which its plain text loses; the images it shows are saved beside it, as a page's are (D96, D122).
 // The same text pasted again (a retry after an add that looked failed) is the source already here, as a file's is.
 export async function addText(lib: Library, text: string, opts: AddOptions & { html?: boolean } = {}): Promise<Item & Partial<Kept>> {
-  const source = opts.html ? pastedPage(text) : text.trim() + "\n";
   if (!text.trim()) throw new Error("text is empty");
-  const md = opts.html ? { ...(await pastedMarkdown(source)), author: undefined, published: undefined } : markdownFile(source, "");
+  const draft = opts.html ? await pastedDraft(text) : null;
+  const source = draft ? draft.source.data : text.trim() + "\n";
+  const md = draft ?? markdownFile(source, "");
   if (!md.body.trim()) throw new Error(opts.html ? "the pasted text is empty" : "text is empty: only frontmatter, no text to read");
+  // The same paste again is the source already here, whether or not its images were saved the first time.
+  const before = sameText(lib, md.body.trim() + "\n");
+  if (before) return keep(lib, before, opts);
   const { body, assets } = await saveImages(md.body.trim() + "\n");
   const same = sameText(lib, body);
   if (same) return keep(lib, same, opts);
   const first = body.split("\n")[0]!.replace(/^#+\s*/, "");
   const title = md.title || (first.length > 80 ? first.slice(0, 77).trimEnd() + "…" : first);
-  return createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: opts.html ? "html" : "md", data: source }, assets, skills: opts.skills });
+  return createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: draft ? "html" : "md", data: source }, assets, skills: opts.skills });
 }
 
-/** A pasted fragment as a whole page, kept as the source's original: the clipboard holds only the
- *  selection's tags (`<meta charset><h1>…`), which a page reader can't place. */
-function pastedPage(html: string): string {
-  return /<body[\s>]/i.test(html) ? html : `<!doctype html><html><head><meta charset="utf-8"></head><body>${html.replace(/^\s*<meta[^>]*>/i, "")}</body></html>\n`;
+/** Pasted HTML as a Markdown source, its paste kept whole as the original (source.html), which a
+ *  reimport reads the same way. */
+async function pastedDraft(html: string): Promise<{ title: string; author?: string; published?: string; body: string; source: { ext: "html"; data: string } }> {
+  // The clipboard holds only the selection's tags (`<meta charset><h1>…`), which a page reader can't place.
+  const page = /<body[\s>]/i.test(html) ? html : `<!doctype html><html><head><meta charset="utf-8"></head><body>${html.replace(/^\s*<meta[^>]*>/i, "")}</body></html>\n`;
+  return { ...(await pastedMarkdown(page)), source: { ext: "html", data: page } };
 }
 
 /** The pasted page as Markdown: read as a page is (math, tables, code), or, when that drops much of
@@ -483,18 +489,21 @@ async function pastedMarkdown(html: string): Promise<{ title: string; body: stri
     const code = pre.querySelector("code");
     if (code && code.parentElement !== pre) pre.replaceChildren(code);
   }
-  for (const b of document.querySelectorAll("button")) b.remove();
+  // Buttons (Copy code, Copy table) and what is drawn only for the eye (KaTeX's glyphs beside its TeX).
+  for (const b of document.querySelectorAll('button, [aria-hidden="true"]')) b.remove();
   // A citation pill's "+2" (two more sources behind it) is a count, not the link's name.
   for (const n of document.querySelectorAll("a span")) if (/^\+\d+$/.test(n.textContent?.trim() ?? "")) n.remove();
+  // An image with no address of its own (a page's relative one) can't be fetched from a paste.
+  for (const img of document.querySelectorAll("img")) if (!/^https?:\/\//i.test(img.getAttribute("src") ?? "")) img.remove();
   const page = document.toString();
   const all = wordCount(document.body?.textContent ?? "");
-  const { htmlToDoc } = await import("./web.ts");
-  const d = await htmlToDoc(page, "file:///pasted", 0).catch(() => null);
   // An image on its own line is its own block, never glued to the math or list beside it.
   const own = (md: string) => md.replace(/^[ \t]*(!\[[^\]\n]*\]\([^)\n]+\))[ \t]*$/gm, "\n$1\n").replace(/\n{3,}/g, "\n\n");
+  const { htmlToDoc } = await import("./web.ts");
+  const d = await htmlToDoc(page, "file:///pasted", 0).catch(() => null);
   if (d && wordCount(d.markdown) >= all / 2) return { title: d.title === "file:///pasted" ? "" : d.title, body: own(d.markdown) };
   const { td } = await import("./markdown.ts");
-  return { title: "", body: td.turndown(document.body as unknown as HTMLElement) };
+  return { title: "", body: own(td.turndown(document.body as unknown as HTMLElement)) };
 }
 
 export interface SnippetInput {
@@ -587,7 +596,9 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const kept = url && !(local && copy) ? undefined : copy;
   if (type === "snippet" || (!url && !kept)) throw new Error("Only a source added from a link or a file can be reimported.");
   const regions = read ?? layoutOf(item.dir);
-  const draft = await withImages(course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
+  // A pasted page (source.html beside a Markdown source) is read as it was pasted.
+  const pasted = type === "markdown" && !url && kept === "source.html";
+  const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
   if (!draft.body.trim()) throw new Error("Found no text to read at the original now. It may have moved; open it to check.");
   if (draft.body === item.body) {
     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).

@@ -176,6 +176,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
           autoCapitalize="off"
           onChange={(e) => {
             setValue(e.target.value);
+            if (!e.target.value.trim()) setPasted(null);
             setError(null);
           }}
           onPaste={(e) => {

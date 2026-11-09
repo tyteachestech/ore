@@ -71,6 +71,7 @@ export const itemCommands: Record<string, Command> = {
       }
       // Transcribing audio takes minutes: it reports how far it has got (the app shows it on the add bar).
       const onProgress = (done: number, label?: string) => progress(Math.round(done * 100), 100, label ?? "Transcribing the audio", label ?? `Transcribing… ${Math.round(done * 100)}%`);
+      if (f.html && !f.stdin) throw new Error("--html reads a paste on stdin: give --stdin too");
       const item: Awaited<ReturnType<typeof addSource>> = f.stdin
         ? await addText(lib, await readStdin(), { skills: strs(f.skill), html: !!f.html })
         : f.tab

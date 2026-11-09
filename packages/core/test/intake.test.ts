@@ -701,26 +701,33 @@ describe("import coverage: awkward files", () => {
   test("a pasted ChatGPT answer keeps its headings, tables, math, code and images", async () => {
     // What ⌘C on a ChatGPT answer puts on the clipboard as HTML (ore add --stdin --html).
     const png = readFileSync(file("screenshot.png"));
-    serve({ "https://images.example.org/forgetting-curve.png": { body: png, type: "image/png" } });
+    serve({ "https://images.example.org/starter-rise.png": { body: png, type: "image/png" } });
     const lib = await tempLibrary();
-    const item = await addText(lib, readFileSync(file("chatgpt-copy.html"), "utf8"), { html: true });
-    expect(item.meta).toMatchObject({ type: "markdown", title: "How spacing makes memories last" });
-    for (const p of ["opens with the main claim: reviews spread over days", "A memory fades along a curve", "let the gaps grow as the answers come easily."]) expect(item.body).toContain(p);
-    expect(item.body.match(/^#{2,3} .+$/gm)).toEqual(["## What the studies show", "## Gaps that work", "### A tiny scheduler"]);
-    expect(item.body).toContain("| One year | Three to four weeks |");
-    expect(item.body).toContain("$$\nR = e^{-t/S}\n$$");
-    expect(item.body).toContain("recall after $$t$$ days");
+    const paste = readFileSync(file("chatgpt-copy.html"), "utf8");
+    const item = await addText(lib, paste, { html: true });
+    expect(item.meta).toMatchObject({ type: "markdown", title: "How sourdough rises" });
+    for (const p of ["opens with the main claim: a starter's wild yeast", "Yeast numbers grow along a curve", "bake when it has doubled."]) expect(item.body).toContain(p);
+    expect(item.body.match(/^#{2,3} .+$/gm)).toEqual(["## What the starter does", "## Proof times that work", "### A feeding calculator"]);
+    expect(item.body).toContain("| 26 °C | Four to five hours |");
+    expect(item.body).toContain("$$\nN = N_0 e^{rt}\n$$");
+    expect(item.body).toContain("population after $$t$$ hours");
     // The code reads as written: no "python" label or "Copy code" button glued to it.
-    expect(item.body).toContain("```python\ndef next_gap(gap, ok):\n");
+    expect(item.body).toContain("```python\ndef feed(starter):\n");
     expect(item.body).not.toMatch(/Copy (code|table)/);
     // A citation pill is its source's link, without its "+1".
-    expect(item.body).toContain("[example.org](https://example.org/spacing-review)");
-    const [curve] = images(item.body);
-    expect(curve?.alt).toBe("A forgetting curve that flattens after each review");
-    expect(readFileSync(join(item.dir, curve!.path))).toEqual(png);
-    expect(item.body).toMatch(/\n\n!\[A forgetting curve[^\n]*\)\n\n- \*\*Spacing effect/);
-    // The paste is kept whole as the original.
-    expect(readFileSync(join(item.dir, "source.html"), "utf8")).toContain('<td data-start="870" data-end="900">Three to four weeks</td>');
+    expect(item.body).toContain("[example.org](https://example.org/sourdough-science)");
+    const [rise] = images(item.body);
+    expect(rise?.alt).toBe("A starter doubling in its jar over six hours");
+    expect(readFileSync(join(item.dir, rise!.path))).toEqual(png);
+    expect(item.body).toMatch(/\n\n!\[A starter doubling[^\n]*\)\n\n- \*\*Yeast/);
+    // The paste is kept whole as the original, and a reimport reads it as it was pasted.
+    expect(readFileSync(join(item.dir, "source.html"), "utf8")).toContain("Four to five hours</td>");
+    expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+    // Pasted again (a retry), it is the source already here.
+    expect((await addText(lib, paste, { html: true })).meta.id).toBe(item.meta.id);
+    // A short paste keeps its table too, and an image with no address of its own is left out.
+    const short = await addText(lib, "<h2>Proof</h2><p>Warm dough rises faster.</p><img src='/rel.png'><table><tr><th>At</th><th>Hours</th></tr><tr><td>26 °C</td><td>4</td></tr></table>", { html: true });
+    expect(short.body).toBe("## Proof\n\nWarm dough rises faster.\n\n| At | Hours |\n| --- | --- |\n| 26 °C | 4 |\n");
   });
 
   test("pasted Markdown's images are saved beside it", async () => {
