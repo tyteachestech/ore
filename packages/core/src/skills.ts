@@ -27,6 +27,7 @@ export const SkillSchema = z.object({
   icon: z.string().optional(), // "mc:<name>", a pixel skill icon (D36, D157); emoji and "ph:" from before D157 draw nothing
   color: SkillColor.optional(),
   collection: z.string().optional(), // sidebar group, e.g. "Ty Teaches Tech"
+  archived: z.boolean().optional(), // D173: out of sight: off the sidebar's list, out of review, Home and enrich
 });
 export type Skill = z.infer<typeof SkillSchema>;
 
@@ -69,6 +70,8 @@ export const HOOK_MAX = 140; // one line under the skill's name
 export const RETENTION: Record<Priority, number> = { P1: 0.92, P2: 0.88, P3: 0.8 };
 export const PRIORITY_WEIGHT: Record<Priority, number> = { P1: 3, P2: 2, P3: 1 };
 const DEFAULT_PRIORITY: Priority = "P2";
+/** D173: a skill he makes starts Light; he raises it once it matters. */
+export const NEW_SKILL_PRIORITY: Priority = "P3";
 
 export function defaultSkillsYaml(): string {
   return (
@@ -101,7 +104,7 @@ export const skillsFileProblems = (lib: Library): string[] => parseSkillsFile(pa
 
 // Fields a hand edit can get wrong without the skill itself being unreadable: each falls back to its
 // default (no colour, no icon, P2), so one typo like `color: violet` doesn't blank every screen.
-const LENIENT = new Set(["color", "icon", "priority", "hook", "goal", "collection"]);
+const LENIENT = new Set(["color", "icon", "priority", "hook", "goal", "collection", "archived"]);
 
 /** Reads skills.yaml's data, dropping fields a hand edit got wrong (named in `dropped`); a file that still
  *  can't be read says which skill and field, with the fix, instead of zod's raw path. */
@@ -138,11 +141,20 @@ export function parseSkillsFile(data: unknown): { file: SkillsFile; dropped: str
   throw new Error(`skills.yaml in your library: ${where}. Fix it in a text editor.`);
 }
 
-// A card's priority is the highest priority among its skills.
+// A card's priority is the highest priority among its skills; an archived skill counts only when all of
+// them are archived (D173).
 export function cardPriority(skillIds: string[], skills: Skill[]): Priority {
-  const ps = skillIds.flatMap((id) => skills.filter((s) => s.id === id).map((s) => s.priority));
+  const own = skills.filter((s) => skillIds.includes(s.id));
+  const live = own.filter((s) => !s.archived);
+  const ps = (live.length ? live : own).map((s) => s.priority);
   return ps.length ? ps.sort()[0]! : DEFAULT_PRIORITY;
 }
+
+/** Filed only under archived skills (D173): its cards wait out of review, its sources off Home. */
+export const archivedOnly = (skillIds: string[], skills: Skill[]): boolean => {
+  const own = skills.filter((s) => skillIds.includes(s.id));
+  return own.length > 0 && own.every((s) => s.archived);
+};
 
 export const desiredRetention = (skillIds: string[], skills: Skill[]): number =>
   RETENTION[cardPriority(skillIds, skills)];
@@ -196,7 +208,7 @@ export async function setAiVendor(lib: Library, vendor: "claude" | "codex"): Pro
 // Rename a skill, or set its icon, color, collection, hook (his "why I'm learning this", D63) or goal (D101) in
 // skills.yaml; an empty string clears the field (never the name). The ID stays, so links survive (D39).
 // Edits the YAML document in place so Tyler's comments and ordering survive.
-export async function setSkillLook(lib: Library, id: string, look: Partial<Record<"name" | "icon" | "color" | "collection" | "hook" | "goal", string>>): Promise<Skill> {
+export async function setSkillLook(lib: Library, id: string, look: Partial<Record<"name" | "icon" | "color" | "collection" | "hook" | "goal" | "priority", string>>): Promise<Skill> {
   return withLock(paths.lock(lib), () => {
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
     const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
@@ -208,6 +220,11 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
       const other = loadSkills(lib).skills.find((s) => s.id !== id && sameName(s.name, name));
       if (other) throw new Error(`skill "${other.name}" already exists`);
       node.set("name", name);
+    }
+    if (look.priority !== undefined) {
+      const p = Priority.safeParse(look.priority.trim().toUpperCase());
+      if (!p.success) throw new Error("priority must be P1 (Focus), P2 (Normal) or P3 (Light)");
+      node.set("priority", p.data);
     }
     for (const key of ["icon", "color", "collection", "hook", "goal"] as const) {
       const raw = look[key];
@@ -225,6 +242,37 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     return skill;
   });
+}
+
+/** Archives a skill, or brings it back (D173): only the flag changes; its sources, cards and FSRS
+ *  state stay as they are, so bringing it back is the same call with `false`. */
+export async function archiveSkill(lib: Library, id: string, archived: boolean): Promise<Skill> {
+  return withLock(paths.lock(lib), () => {
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    if (!setArchived(doc, id, archived)) throw new Error(`unknown skill "${id}"`);
+    const skill = parseSkillsFile(doc.toJSON()).file.skills.find((s) => s.id === id)!;
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    return skill;
+  });
+}
+
+function setArchived(doc: YAMLLib.Document, id: string, archived: boolean): boolean {
+  const node = (doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>).items.find((m) => m.get("id") === id);
+  if (!node) return false;
+  if (archived) node.set("archived", true);
+  else node.delete("archived");
+  return true;
+}
+
+/** Filing a source under an archived skill brings the skill back (D173): he is learning it again.
+ *  Call inside the library lock. Returns the ids it brought back. */
+export function unarchiveFiled(lib: Library, ids: string[]): string[] {
+  const back = loadSkills(lib).skills.filter((s) => s.archived && ids.includes(s.id)).map((s) => s.id);
+  if (!back.length) return back;
+  const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+  for (const id of back) setArchived(doc, id, false);
+  writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+  return back;
 }
 
 // A collection's name as saved; a collection named Other would show as a second Other (collection-name.ts).
@@ -274,7 +322,7 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
   });
 }
 
-// Create a skill Tyler named (D25), at the default priority, optionally in a sidebar collection.
+// Create a skill Tyler named (D25), Light (D173), optionally in a sidebar collection.
 export async function addSkill(lib: Library, name: string, collection = ""): Promise<Skill> {
   return withLock(paths.lock(lib), () => {
     const n = name.normalize("NFC").trim().replace(/\s+/g, " ");
@@ -285,15 +333,15 @@ export async function addSkill(lib: Library, name: string, collection = ""): Pro
     if (existing) throw new Error(`skill "${existing.name}" already exists`);
     const id = newSkillId(skills, n);
     const c = collectionName(collection);
-    const skill: Skill = { id, name: n, priority: DEFAULT_PRIORITY, ...(c ? { collection: c } : {}) };
+    const skill: Skill = { id, name: n, priority: NEW_SKILL_PRIORITY, ...(c ? { collection: c } : {}) };
     (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     return skill;
   });
 }
 
-// Accept an item's suggested skill: create it in skills.yaml at the default priority unless it
-// already exists, then file the item, its cards and its topics under it. Tyler creates skills; AI only suggests (D25).
+// Accept an item's suggested skill: create it in skills.yaml, Light (D173), unless it already exists
+// (an archived one comes back), then file the item, its cards and its topics under it. Tyler creates skills; AI only suggests (D25).
 export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{ skill: Skill; created: boolean; item: ItemMeta; undo: SuggestionUndo }> {
   return withLock(paths.lock(lib), () => {
     const item = findItem(lib, ref);
@@ -303,12 +351,14 @@ export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{
     let skill = matchSkill(skills, s.name);
     const created = !skill;
     if (!skill) {
-      skill = { id: newSkillId(skills, s.name), name: s.name, priority: DEFAULT_PRIORITY, ...(s.hook ? { hook: s.hook } : {}) };
+      skill = { id: newSkillId(skills, s.name), name: s.name, priority: NEW_SKILL_PRIORITY, ...(s.hook ? { hook: s.hook } : {}) };
       const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
       (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
       writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     }
     const id = skill.id;
+    if (skill.archived) skill = { ...skill, archived: undefined };
+    unarchiveFiled(lib, [id]);
     const cards: string[] = [], topics: string[] = [];
     const undo = { suggestion: s, skill: id, created, filed: !item.meta.skills.includes(id), cards, topics };
     const meta = ItemMetaSchema.parse({ ...item.meta, skills: [...new Set([...item.meta.skills, id])], suggested_skill: undefined });
@@ -381,6 +431,7 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[]): P
     const removed = item.meta.skills.filter((id) => !next.includes(id));
     const meta = ItemMetaSchema.parse({ ...item.meta, skills: next });
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
+    unarchiveFiled(lib, added);
     for (const c of listCards(lib).filter((c) => c.meta.item === meta.id)) {
       const skills = [...new Set([...c.meta.skills.filter((s) => !removed.includes(s)), ...added])];
       if (skills.join() !== c.meta.skills.join()) writeCardMeta(c, { ...c.meta, skills });

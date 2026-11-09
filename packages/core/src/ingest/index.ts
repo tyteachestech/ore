@@ -10,7 +10,7 @@ import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems,
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
-import { setItemSkills } from "../skills.ts";
+import { setItemSkills, unarchiveFiled } from "../skills.ts";
 import { withImages } from "./assets.ts";
 import { BOT, cleanAuthor, cleanDate, FROM_TAB, refusal, wordCount } from "./check.ts";
 import { isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./course.ts";
@@ -387,7 +387,13 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   const item = same ? await keep(lib, same, opts) : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview });
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same) await makeThumbnail(item);
+  await unarchive(lib, opts.skills);
   return item;
+}
+
+/** A new source filed under an archived skill brings the skill back (D173). */
+export async function unarchive(lib: Library, skills: string[] | undefined): Promise<void> {
+  if (skills?.length) await withLock(paths.lock(lib), () => unarchiveFiled(lib, skills));
 }
 
 /** The source already here with this text (a file dropped twice, text pasted again), by the hash createItem
@@ -428,6 +434,7 @@ export async function addTab(lib: Library, opts: AddOptions & { tab?: Tab } = {}
   const draft = await tabDraft(tab, host);
   const item = await createItem(lib, { ...(await withImages(draft)), skills: opts.skills });
   await makeThumbnail(item);
+  await unarchive(lib, opts.skills);
   return item;
 }
 
@@ -462,7 +469,9 @@ export async function addText(lib: Library, text: string, opts: AddOptions = {})
   if (same) return keep(lib, same, opts);
   const first = body.split("\n")[0]!.replace(/^#+\s*/, "");
   const title = md.title || (first.length > 80 ? first.slice(0, 77).trimEnd() + "…" : first);
-  return createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: "md", data: source }, skills: opts.skills });
+  const item = await createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: "md", data: source }, skills: opts.skills });
+  await unarchive(lib, opts.skills);
+  return item;
 }
 
 export interface SnippetInput {
