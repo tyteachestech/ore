@@ -69,7 +69,21 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   onDeleteCollection: (collection: string) => void;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
-  const groups = useMemo(() => skillGroups(skills), [skills]);
+  // D173: archived skills leave the list for a folded Archived group at the bottom; every layout written
+  // puts them back in their collections (`arrange`), so a drag or rename never loses one.
+  const groups = useMemo(() => skillGroups(skills.filter((s) => !s.archived)), [skills]);
+  const archived = skills.filter((s) => s.archived);
+  const [archivedOpen, setArchivedOpen] = useState(() => load(ARCHIVED_OPEN) === "1");
+  const arrange = (layout: SkillLayout, step?: string, renamed?: { from: string; to: string }) => {
+    const out = layout.map((g) => ({ ...g, skills: [...g.skills] }));
+    for (const s of archived) {
+      const c = s.collection && renamed?.from === s.collection ? renamed.to : (s.collection ?? "");
+      const g = out.find((x) => x.collection === c);
+      if (g) g.skills.push(s.id);
+      else out.push({ collection: c, skills: [s.id] });
+    }
+    onArrange(out, step);
+  };
   // While dragging: the layout as it would be if dropped now.
   const [draft, setDraft] = useState<Group[] | null>(null);
   const [active, setActive] = useState<UniqueIdentifier | null>(null);
@@ -88,12 +102,6 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const last = base.length - (base.at(-1)?.collection ? 0 : 1);
   const shown = freshGroup ? (fresh ? [...base.slice(0, last), freshGroup, ...base.slice(last)] : [...base, freshGroup]) : base;
   const named = groups.filter((g) => g.collection);
-  // D173: archived skills keep their place in skills.yaml (so a drag or rename writes them where they
-  // were) but leave the list for a folded Archived group at the bottom, closed until he opens it.
-  const live = (g: Group) => g.skills.filter((s) => !s.archived);
-  const listed = shown.filter((g) => g === freshGroup || !g.skills.length || live(g).length > 0);
-  const archived = skills.filter((s) => s.archived);
-  const [archivedOpen, setArchivedOpen] = useState(() => load(ARCHIVED_OPEN) === "1");
 
   const setClosedSaved = (next: string[]) => {
     setClosed(next);
@@ -150,7 +158,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     setActive(null);
     setDraft(null);
     const layout = layoutOf(next.filter((g) => g.collection || g.skills.length));
-    if (JSON.stringify(layout) !== JSON.stringify(layoutOf(groups.filter((g) => g.collection || g.skills.length)))) onArrange(layout);
+    if (JSON.stringify(layout) !== JSON.stringify(layoutOf(groups.filter((g) => g.collection || g.skills.length)))) arrange(layout);
   };
   const onDragCancel = () => {
     setActive(null);
@@ -162,7 +170,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     const v = tidyCollection(name);
     if (!v || v === g.collection) return;
     if (closed.includes(g.name)) setClosedSaved(closed.map((n) => (n === g.name ? v : n)));
-    onArrange(layoutOf(groups.map((x) => (x === g ? { ...x, collection: v } : x))), `Renamed collection “${g.collection}” to “${v}”`);
+    arrange(layoutOf(groups.map((x) => (x === g ? { ...x, collection: v } : x))), `Renamed collection “${g.collection}” to “${v}”`, { from: g.collection, to: v });
   };
   // Finder's New Folder: the name field opens where collections end, Enter makes it and names its
   // first skill (a collection is the skills in it), Esc or clicking away drops it.
@@ -187,7 +195,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   ];
   const nudge = (g: Group, by: number) => {
     const i = groups.indexOf(g);
-    onArrange(layoutOf(arrayMove(groups, i, i + by)), `Moved “${g.name}” ${by < 0 ? "up" : "down"}`);
+    arrange(layoutOf(arrayMove(groups, i, i + by)), `Moved “${g.name}” ${by < 0 ? "up" : "down"}`);
   };
   const groupMenu = (g: Group): MenuAction[] => {
     const i = named.indexOf(g);
@@ -261,8 +269,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
         <span className="label">All sources</span>
       </button>
       <DndContext sensors={sensors} collisionDetection={collide} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-        <SortableContext items={listed.map((g) => groupId(g.collection))} strategy={verticalListSortingStrategy}>
-          {listed.map((g) => (
+        <SortableContext items={shown.map((g) => groupId(g.collection))} strategy={verticalListSortingStrategy}>
+          {shown.map((g) => (
             <Fragment key={g.collection}>
             {naming && !g.collection && namingField}
             <Section
@@ -277,9 +285,9 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
               onRename={(name) => rename(g, name)}
               onCancelRename={() => setRenaming(null)}
             >
-              <SortableContext items={live(g).map((s) => s.id)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={g.skills.map((s) => s.id)} strategy={verticalListSortingStrategy}>
                 {isOpen(g) &&
-                  live(g).map((s) => (
+                  g.skills.map((s) => (
                     <SkillRow key={s.id} s={s} on={skill === s.id} drop={drop === s.id} marked={marked} onOpen={onOpen} menu={menu(s)} />
                   ))}
               </SortableContext>

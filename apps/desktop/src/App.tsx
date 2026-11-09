@@ -1402,9 +1402,10 @@ export function App() {
   };
   /** Picks a level; picking one on an archived skill brings it back too. */
   const setImportance = (s: Skill, p: Priority) => {
-    const before = { priority: s.priority ?? "P2", archived: !!s.archived };
-    const after = { priority: p, archived: false };
-    if (before.priority === p && !before.archived) return;
+    // Archived only when it changes: a live skill's level is one write.
+    const before = { priority: s.priority ?? "P2", ...(s.archived && { archived: true }) };
+    const after = { priority: p, ...(s.archived && { archived: false }) };
+    if (before.priority === p && !s.archived) return;
     void changeSkill(s.id, after);
     notify(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, before.archived ? "info" : "quiet", () => changeSkill(s.id, before, true), () => changeSkill(s.id, after, true));
   };
@@ -1628,11 +1629,14 @@ export function App() {
    *  optimistic, with Undo back to `before`. */
   const refile = async (what: { title: string; ids: Set<string>; write: (skills: string[]) => Promise<unknown> }, next: string[], before: string[], changed?: Skill, fromHistory = false) => {
     setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
+    // Filing under an archived skill brings it back (D173); Undo archives it again.
+    const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
+    const rearchive = () => Promise.all(revived.map((id) => ore("skills", "archive", id))).finally(reloadSkills);
     try {
       await what.write(next);
       if (changed) {
         const on = next.includes(changed.id);
-        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true), () => refile(what, next, before, undefined, true));
+        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true).then(rearchive), () => refile(what, next, before, undefined, true));
       }
     } catch (e) {
       // From the history (undo or redo): it puts the step back and says why.

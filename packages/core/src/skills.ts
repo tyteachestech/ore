@@ -156,8 +156,10 @@ export const archivedOnly = (skillIds: string[], skills: Skill[]): boolean => {
   return own.length > 0 && own.every((s) => s.archived);
 };
 
+// Archived or not, as a card's skills were: archiving changes only what is listed and due, never a
+// card's retention, so its review history replays to the same schedule (D22, D173).
 export const desiredRetention = (skillIds: string[], skills: Skill[]): number =>
-  RETENTION[cardPriority(skillIds, skills)];
+  RETENTION[cardPriority(skillIds, skills.map((s) => (s.archived ? { ...s, archived: undefined } : s)))];
 
 /** A new skill's id: its name's slug, numbered when another skill holds it ("C#" after "C++"). A name with
  *  no Latin letters or digits keeps its own letters ("日本語", "русский") instead of "untitled": the id names

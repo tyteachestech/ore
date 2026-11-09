@@ -2,9 +2,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { writeNewCard } from "../src/cards.ts";
-import { addSnippet, addText } from "../src/ingest/index.ts";
+import { addSnippet, addSource, addText } from "../src/ingest/index.ts";
 import { paths } from "../src/library.ts";
-import { acceptSuggestedSkill, addSkill, archiveSkill, cardPriority, loadSkills, setItemSkills, setSkillLook } from "../src/skills.ts";
+import { acceptSuggestedSkill, addSkill, archiveSkill, cardPriority, desiredRetention, loadSkills, setItemSkills, setSkillLook } from "../src/skills.ts";
 import { updateItemMeta } from "../src/items.ts";
 import { dueQueue } from "../src/study.ts";
 import { today } from "../src/today.ts";
@@ -77,6 +77,23 @@ describe("skill importance (D173)", () => {
     const file = paths.skills(lib);
     const text = readFileSync(file, "utf8").replace("name: Habits\n", "name: Habits\n    archived: maybe\n");
     await Bun.write(file, text);
+    expect(loadSkills(lib).skills.find((s) => s.id === "habits")!.archived).toBeUndefined();
+  });
+
+  test("archiving never changes a card's retention, so its history replays to the same schedule", async () => {
+    const lib = await tempLibrary();
+    await archiveSkill(lib, "ai", true);
+    expect(desiredRetention(["ai", "habits"], loadSkills(lib).skills)).toBe(0.92);
+  });
+
+  test("a snippet filed under an archived skill brings it back; a preview doesn't", async () => {
+    const lib = await tempLibrary();
+    await archiveSkill(lib, "habits", true);
+    const file = `${lib.root}/page.md`;
+    await Bun.write(file, "# Cues\n\nA cue starts the habit.\n");
+    await addSource(lib, file, { skills: ["habits"], preview: true });
+    expect(loadSkills(lib).skills.find((s) => s.id === "habits")!.archived).toBe(true);
+    await addSnippet(lib, { text: "Tiny habits start small.", skills: ["habits"] });
     expect(loadSkills(lib).skills.find((s) => s.id === "habits")!.archived).toBeUndefined();
   });
 });
