@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export const COLS = 22, ROWS = 18;
 const MID = (COLS - 1) / 2;
 
-export type Tone = "fur" | "lit" | "muzzle" | "white" | "paw" | "eye" | "glint" | "nose" | "dirt";
+export type Tone = "fur" | "muzzle" | "white" | "paw" | "eye" | "glint" | "nose" | "dirt";
 export type Pose = {
   /** Head: half width in dots, top row, and how square its dome is (2 round, 4 boxy). */
   rx: number; top: number; ex: number;
@@ -22,9 +22,9 @@ export type Pose = {
   /** Rows the head and paws have sunk into the hole. */
   y: number;
 };
-export const REST: Pose = { rx: 10.2, top: 0.3, ex: 2.4, eyes: "open", lx: 0, ly: 0, nose2: false, paw: 5, pawL: 0, pawR: 0, y: 0 };
+export const REST: Pose = { rx: 10.2, top: -0.3, ex: 2.6, eyes: "open", lx: 0, ly: 0, nose2: false, paw: 5, pawL: 0, pawR: 0, y: 0 };
 
-const PAWS = { 5: [".ppp.", "ppppp", "p.p.p"], 6: [".pppp.", "pppppp", "p.pp.p"] } as const;
+const PAWS = { 5: [".ppp.", "ppppp", "ppppp"], 6: [".pppp.", "pppppp", "pppppp"] } as const;
 
 /** The pose as a grid of tones, null where there is no dot. The last row is the dirt; nothing goes below it. */
 export function moleGrid(pose: Partial<Pose> = {}): (Tone | null)[][] {
@@ -36,7 +36,7 @@ export function moleGrid(pose: Partial<Pose> = {}): (Tone | null)[][] {
   const bottom = ROWS - 1.5, ry = bottom - p.top;
   for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) {
     const dx = (c - MID) / p.rx, dy = (r - p.y + 0.5 - bottom) / ry;
-    if (Math.abs(dx) ** p.ex + Math.abs(dy) ** p.ex <= 1) g[r]![c] = c - MID < -2 && dy < -0.55 ? "lit" : "fur";
+    if (Math.abs(dx) ** p.ex + Math.abs(dy) ** p.ex <= 1) g[r]![c] = "fur";
   }
   // The muzzle: a light bell from between the eyes to the dirt, whitest in the middle.
   const my = 12.2 + p.y;
@@ -47,7 +47,7 @@ export function moleGrid(pose: Partial<Pose> = {}): (Tone | null)[][] {
   const eL = 5 + p.lx, eR = 15 + p.lx, er = 7 + p.ly + p.y;
   if (p.eyes === "arc") {
     // Happy: each eye a ∩, four dots wide.
-    for (const c0 of [eL - 1, eR]) for (const [dc, dr] of [[0, 1], [1, 0], [2, 0], [3, 1]] as const) face(er + 1 + dr, c0 + dc, "eye");
+    for (const c0 of [eL - 1, eR - 1]) for (const [dc, dr] of [[0, 1], [1, 0], [2, 0], [3, 1]] as const) face(er + 1 + dr, c0 + dc, "eye");
   } else if (p.eyes === "shut") {
     for (const c0 of [eL, eR]) { face(er + 2, c0, "eye"); face(er + 2, c0 + 1, "eye"); }
   } else {
@@ -60,15 +60,16 @@ export function moleGrid(pose: Partial<Pose> = {}): (Tone | null)[][] {
   }
   const nr = 11 + p.y;
   for (const c of [10, 11]) { face(nr, c, "nose"); if (p.nose2) face(nr + 1, c, "nose"); }
-  // The paws hook over the dirt with their toes split; a one-dot gap keeps them apart from the head.
+  // The paws: solid white, rounded at the top, hooked over the dirt. A one-dot gap that follows each paw's edge
+  // keeps it apart from the head; its rounded corners keep the fur behind them.
   for (const side of [0, 1]) {
     const w = p.paw, c0 = side ? COLS - w : 0, lift = side ? p.pawR : p.pawL, top = ROWS - 4 - lift + p.y;
-    const gap = side ? c0 - 1 : c0 + w;
-    for (let r = top; r < top + 3; r++) if (g[r]?.[gap] === "fur" || g[r]?.[gap] === "lit" || g[r]?.[gap] === "muzzle") g[r]![gap] = null;
-    PAWS[w].forEach((row, i) => [...row].forEach((ch, j) => {
-      if (ch === "p") put(top + i, c0 + j, "paw");
-      else if (!lift) put(top + i, c0 + j, null);
-    }));
+    PAWS[w].forEach((row, i) => {
+      const cols = [...row].flatMap((ch, j) => (ch === "p" ? [c0 + j] : []));
+      const gap = side ? Math.min(...cols) - 1 : Math.max(...cols) + 1;
+      if (g[top + i]?.[gap] === "fur" || g[top + i]?.[gap] === "muzzle") put(top + i, gap, null);
+      for (const c of cols) put(top + i, c, "paw");
+    });
   }
   g[ROWS - 1]!.fill("dirt");
   return g;
@@ -80,7 +81,7 @@ export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer
 type Move = { keys: [ms: number, pose: Partial<Pose>][]; end: number; loop?: boolean; still: Partial<Pose> };
 const HAPPY: Partial<Pose> = { eyes: "arc", nose2: true, paw: 6, ex: 3.6, rx: 10, top: 1 };
 const CHEER: Partial<Pose> = { eyes: "arc", nose2: true, ex: 3 };
-const WIDE: Partial<Pose> = { eyes: "tall", nose2: true, rx: 10.6, top: 2 };
+const WIDE: Partial<Pose> = { eyes: "tall", nose2: true, rx: 10.4, top: 2 };
 const UP_R: Partial<Pose> = { lx: 1, ly: -1 }, UP_L: Partial<Pose> = { lx: -1, ly: -1 };
 export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // Out of the hole: rises in three steps, overshoots a dot, settles, blinks.
@@ -104,7 +105,7 @@ function paths(g: (Tone | null)[][]): [Tone, string][] {
     by.get(t)!.push(`M${x.toFixed(2)} ${y}a${rad} ${rad} 0 1 0 ${2 * rad} 0a${rad} ${rad} 0 1 0 ${-2 * rad} 0`);
   }));
   // Painted back to front: eyes over the face, glints over the eyes.
-  const order: Tone[] = ["dirt", "fur", "lit", "muzzle", "white", "paw", "nose", "eye", "glint"];
+  const order: Tone[] = ["dirt", "fur", "muzzle", "white", "paw", "nose", "eye", "glint"];
   return order.filter((t) => by.has(t)).map((t) => [t, by.get(t)!.join("")]);
 }
 const cache = new Map<string, [Tone, string][]>();

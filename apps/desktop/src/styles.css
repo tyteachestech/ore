@@ -2640,10 +2640,9 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-bubble:active { transform: scale(0.96); }
 .tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .app:has(.quiz) .tutor-bubble { display: none; }
-/* The mole's tones (D169): grey fur lit a step at the upper left, a lighter muzzle, white paws, black eyes with a
+/* The mole's tones (D169): grey fur, a lighter muzzle, white paws, black eyes with a
    white glint, a pink nose (its one colour) and a dim row of dirt. */
 .mole-fur { fill: var(--faint); }
-.mole-lit { fill: color-mix(in srgb, var(--faint) 85%, var(--text)); }
 .mole-muzzle { fill: color-mix(in srgb, var(--faint) 45%, var(--text-read)); }
 .mole-white { fill: var(--text-read); }
 .mole-paw, .mole-glint { fill: var(--text); }
