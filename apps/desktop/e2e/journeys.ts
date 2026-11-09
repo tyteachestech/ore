@@ -2863,7 +2863,7 @@ journey("note format bar: select words, highlight them blue from the bar, and it
   await until("the highlight survives a reload", marked);
 });
 
-journey("diagram: draws beside the source, and a new one stays linked when the panel switches tab", async (page) => {
+journey("diagram: opens in a sheet centred over the window, ⇧⌘↵ gives it the full window and back, a click outside closes it, and a new one stays linked when its note closes under it", async (page) => {
   await openSource(page, AGENTS);
   const note = page.locator(".note-editor [contenteditable=true]").first();
   // Typed into the reader instead, "/diagram" would run its keys (A archives the source).
@@ -2873,34 +2873,64 @@ journey("diagram: draws beside the source, and a new one stays linked when the p
   await page.keyboard.type("/diagram");
   await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
   await page.keyboard.press("Enter");
-  const docked = page.locator(".diagram.docked");
-  await docked.waitFor().catch(async (e) => {
+  const sheet = page.locator(".diagram-scrim:not(.full) .diagram");
+  await sheet.waitFor().catch(async (e) => {
     // Say where it went instead: a toast's error, or the screen it landed on.
     const seen = await page.evaluate(() => [...document.querySelectorAll("[role=status], [role=alert], .toast")].map((n) => n.textContent).join(" | "));
-    throw new Error(`no docked diagram (full window: ${await page.locator(".diagram").count()}, reader: ${await page.locator(".doc").count()}, says: ${seen || "nothing"}): ${(e as Error).message}`);
+    throw new Error(`no diagram sheet (full window: ${await page.locator(".diagram-scrim.full").count()}, reader: ${await page.locator(".doc").count()}, says: ${seen || "nothing"}): ${(e as Error).message}`);
   });
-  await until("the source stays in view beside it", () => page.locator(".doc").isVisible());
-  const canvas = await docked.locator(".draw").boundingBox();
-  await docked.locator(".draw").focus();
+  // The window's shape, 15% of it showing on every side (Tyler 2026-11-09).
+  const vw = page.viewportSize()!;
+  const r = (await sheet.boundingBox())!;
+  const near = (a: number, b: number) => Math.abs(a - b) <= 2;
+  if (!(near(r.x, vw.width * 0.15) && near(r.y, vw.height * 0.15) && near(r.width, vw.width * 0.7) && near(r.height, vw.height * 0.7)))
+    throw new Error(`the sheet is ${JSON.stringify(r)} in a ${vw.width}×${vw.height} window`);
+  const canvas = await sheet.locator(".draw").boundingBox();
+  await sheet.locator(".draw").focus();
   await page.keyboard.press("r");
-  await page.mouse.move(canvas!.x + 260, canvas!.y + 520);
+  await page.mouse.move(canvas!.x + 160, canvas!.y + 200);
   await page.mouse.down();
-  await page.mouse.move(canvas!.x + 420, canvas!.y + 600, { steps: 5 });
+  await page.mouse.move(canvas!.x + 320, canvas!.y + 280, { steps: 5 });
   await page.mouse.up();
   await until("the note links it once it is saved", () => page.locator(".note-editor .note-diagram").count().then((n) => n === 1), 6000);
-  await page.getByRole("tab", { name: "Collected" }).click(); // closes the drawing without Done
+  // The note closes under it (the source closes, a quit): it still saves, and the link stays.
+  await page.getByRole("tab", { name: "Collected" }).dispatchEvent("mousedown");
+  await until("the drawing goes with its note", async () => (await page.locator(".diagram").count()) === 0);
   await page.getByRole("tab", { name: "Source note" }).click();
   await until("the link is still in the note", async () => (await page.locator(".note-editor .note-diagram-view > svg").count()) === 1);
   await page.locator(".note-editor .note-diagram").click();
-  await docked.waitFor();
+  await sheet.waitFor();
   await page.keyboard.press("Shift+Meta+Enter");
-  await page.locator(".diagram:not(.docked)").waitFor();
+  const full = page.locator(".diagram-scrim.full .diagram");
+  await full.waitFor();
+  const f = (await full.boundingBox())!;
+  if (!(near(f.x, 0) && near(f.width, vw.width) && near(f.y + f.height, vw.height))) throw new Error(`full window is ${JSON.stringify(f)}`);
+  await page.keyboard.press("Shift+Meta+Enter");
+  await sheet.waitFor();
+  await page.getByRole("button", { name: "Full window" }).click();
+  await full.waitFor();
   await page.keyboard.press("Escape");
   await until("Esc closes it", async () => (await page.locator(".diagram").count()) === 0);
+  // The next open is the sheet again, and a press outside it closes it.
+  await page.locator(".note-editor .note-diagram").click();
+  await sheet.waitFor();
+  // Tab stays in the sheet (the note behind it can't take keys), and a right-click outside leaves it open.
+  await page.locator(".diagram-done").focus();
+  for (let i = 0; i < 6; i++) await page.keyboard.press("Tab");
+  if (!(await page.evaluate(() => !!document.activeElement?.closest(".diagram")))) throw new Error("Tab left the sheet");
+  await page.mouse.click(vw.width * 0.05, vw.height * 0.9, { button: "right" });
+  await Bun.sleep(200);
+  if (!(await sheet.count())) throw new Error("a right-click outside closed it");
+  await page.keyboard.press("Escape").catch(() => {});
+  if (!(await sheet.count())) await page.locator(".note-editor .note-diagram").click();
+  await sheet.waitFor();
+  await page.mouse.click(vw.width * 0.05, vw.height * 0.9);
+  await until("a click outside closes it", async () => (await page.locator(".diagram").count()) === 0);
+  if (!(await page.locator(".doc").count())) throw new Error("the click outside reached the reader");
   // Its preview's right-click menu opens it, and takes it out of the note; ⌘Z puts it back.
   await page.locator(".note-editor .note-diagram").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Open diagram" }).click();
-  await page.locator(".diagram").waitFor(); // full window still, as it was left
+  await sheet.waitFor();
   await page.keyboard.press("Escape");
   await until("Esc closes it again", async () => (await page.locator(".diagram").count()) === 0);
   await page.locator(".note-editor .note-diagram").click({ button: "right" });
@@ -2962,7 +2992,7 @@ async function openDone(page: Page, title: string) {
   await page.locator(".doc-head").filter({ hasText: title }).waitFor();
 }
 
-/** Opens a new diagram from the note's / menu, docked beside the source, and draws a box in it. */
+/** Opens a new diagram from the note's / menu, in its sheet over the source, and draws a box in it. */
 async function drawNew(page: Page, before?: () => Promise<void>) {
   const note = page.locator(".note-editor [contenteditable=true]").first();
   // On its first line: lower down may be a diagram already, which a click opens.
@@ -2972,11 +3002,11 @@ async function drawNew(page: Page, before?: () => Promise<void>) {
   await page.keyboard.type("/diagram");
   await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
   await page.keyboard.press("Enter");
-  const docked = page.locator(".diagram.docked");
-  await docked.waitFor();
+  const sheet = page.locator(".diagram");
+  await sheet.waitFor();
   await before?.();
-  const canvas = (await docked.locator(".draw").boundingBox())!;
-  await docked.locator(".draw").focus();
+  const canvas = (await sheet.locator(".draw").boundingBox())!;
+  await sheet.locator(".draw").focus();
   await page.keyboard.press("r");
   await page.mouse.move(canvas.x + 60, canvas.y + 120);
   await page.mouse.down();
@@ -2988,15 +3018,16 @@ journey("diagram: a new one left before its first save comes back is linked once
   type W = { __ORE_SLOW?: object; __ORE_FAIL?: object };
   await openDone(page, "The Story Spine"); // no other journey draws here
   const drawings = page.locator(".note-editor .note-diagram-view > svg");
-  // The first save is slow, and the panel switches tab right after drawing: its note closes first.
+  // The first save is slow, and the note closes under the drawing right after (the source closes, a
+  // quit; the sheet covers the tabs, so the tab is pressed from code).
   await drawNew(page, () => page.evaluate(() => void ((window as unknown as W).__ORE_SLOW = { diagram: 1500 })));
-  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.getByRole("tab", { name: "Collected" }).dispatchEvent("mousedown");
   await page.getByRole("tab", { name: "Source note" }).click();
   await until("the note links the drawing once its save is back", async () => (await drawings.count()) === 1, 8000);
   await page.evaluate(() => void ((window as unknown as W).__ORE_SLOW = undefined));
   // The next one's save fails: it is kept, and Try again saves and links it.
   await drawNew(page, () => page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = { diagram: "The disk is full." })));
-  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.getByRole("tab", { name: "Collected" }).dispatchEvent("mousedown");
   const alert = page.locator(".toast[role=alert]").filter({ hasText: "The disk is full." });
   await alert.waitFor();
   await Bun.sleep(9000); // past an error toast's 8 s: this one is the only way back to the drawing
@@ -3008,7 +3039,7 @@ journey("diagram: a new one left before its first save comes back is linked once
   await Bun.sleep(1200); // the note saves
   // A third one's save fails too, and he lets it go: its × closes the toast, and the drawing is gone.
   await drawNew(page, () => page.evaluate(() => void ((window as unknown as W).__ORE_FAIL = { diagram: "The disk is still full." })));
-  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.getByRole("tab", { name: "Collected" }).dispatchEvent("mousedown");
   const third = page.locator(".toast[role=alert]").filter({ hasText: "The disk is still full." });
   await third.waitFor();
   await third.getByRole("button", { name: "Dismiss" }).click();
@@ -3054,7 +3085,7 @@ journey("diagram: S styles at the pointer, keys stay on the canvas, Space never 
   const draw = page.locator(".diagram .draw");
   await draw.focus();
   await page.keyboard.press("Shift+Meta+Enter");
-  await page.locator(".diagram:not(.docked)").waitFor();
+  await page.locator(".diagram-scrim.full").waitFor();
   await draw.focus();
   const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
   await page.keyboard.press("r");
@@ -3141,7 +3172,7 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
   const draw = page.locator(".diagram .draw");
   await draw.focus();
   await page.keyboard.press("Shift+Meta+Enter");
-  await page.locator(".diagram:not(.docked)").waitFor();
+  await page.locator(".diagram-scrim.full").waitFor();
   await draw.focus();
   const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
   await page.keyboard.press("r");
@@ -3216,8 +3247,8 @@ journey("diagram: align and space from keys and the picker, drags snap to edges 
   }
   const draw = page.locator(".diagram .draw");
   await draw.focus();
-  if (await page.locator(".diagram.docked").count()) await page.keyboard.press("Shift+Meta+Enter");
-  await page.locator(".diagram:not(.docked)").waitFor();
+  if (!(await page.locator(".diagram-scrim.full").count())) await page.keyboard.press("Shift+Meta+Enter");
+  await page.locator(".diagram-scrim.full").waitFor();
   await draw.focus();
   await page.keyboard.press("Meta+a");
   await page.keyboard.press("Backspace");

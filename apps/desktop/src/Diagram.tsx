@@ -7,11 +7,11 @@ import Editor from "./draw/Editor";
 import { svgMarkup } from "./draw/export";
 import { fromScene, toScene, type El } from "./draw/model";
 import { Hint } from "./Hint";
+import { Trap } from "./Trap";
 import { Collapse, CornersOut, Expand } from "./icons";
-import { ore, oreWith, type Diagram } from "./ore";
-import { errorText, load, save as remember, type Notify } from "./util";
+import { ore, oreWith, PHONE, type Diagram } from "./ore";
+import { errorText, type Notify } from "./util";
 
-const FULL = "ore.diagram.full";
 /** Tells the open note (Notes.tsx) its file changed outside its editor; detail is the note's CLI args, joined. */
 const NOTE_WRITTEN = "ore:note-written";
 
@@ -26,16 +26,15 @@ export function preview(scene: Scene): string {
 /** The note preview's "show the whole diagram" button, the editor's zoom-to-fit icon. */
 export const FIT_ICON = renderToStaticMarkup(createElement(CornersOut, { size: 16, "aria-hidden": true }));
 
-/** The editor, over the window or, given `dock` (the reader's side panel), over the panel's sheet so the
- *  source stays readable beside it; ⤢ (⇧⌘↵) swaps the two, remembered. Autosaves through `ore diagram --set` (D30) 1 s after a change;
+/** The editor in a sheet centred over the window (Notion's centre peek), the window's shape with 15% of it
+ *  showing on every side so he keeps his place in the app; ⤢ (⇧⌘↵) takes it to the full window and back,
+ *  and the phone has only the full window. A click outside, Esc or Done saves and closes. Autosaves through `ore diagram --set` (D30) 1 s after a change;
  *  Esc or Done saves and closes, and `onClose` gets the scene on disk (null when nothing was ever saved). */
-export default function DiagramEditor({ args, name, loaded, dock, notify, onClose, onFirstSave, onRenamed, onLink }: {
+export default function DiagramEditor({ args, name, loaded, notify, onClose, onFirstSave, onRenamed, onLink }: {
   args: string[];
   name: string;
   /** The file as the note's preview last read it; saves reading it again on open. */
   loaded?: Diagram;
-  /** The side panel to draw in, beside the source. */
-  dock?: HTMLElement | null;
   notify: Notify;
   onClose: (scene: Scene | null, name: string) => void;
   /** The first write of a new diagram, so the note links it even if the panel closes before Done; false
@@ -56,35 +55,16 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
   const timer = useRef(0);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   // The parent's callbacks change identity with its state; read them here so the effects below run once.
-  const props = useRef({ notify, onClose, onFirstSave, onRenamed });
+  const props = useRef({ notify, onClose, onFirstSave, onRenamed, close: async () => false as boolean });
   const key = args.join(" ");
-  props.current = { notify, onClose, onFirstSave, onRenamed };
-  const [full, setFull] = useState(() => !dock || load(FULL) === "1");
+  props.current = { ...props.current, notify, onClose, onFirstSave, onRenamed };
+  // Each open starts in the sheet, as asked; the full window is a step for this drawing only.
+  const [full, setFull] = useState(PHONE);
   const box = useRef<HTMLDivElement>(null);
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const docked = !!dock && !full;
   const toggle = useCallback(() => {
-    setFull((f) => (remember(FULL, f ? "0" : "1"), !f));
+    setFull((f) => !f);
     requestAnimationFrame(() => box.current?.querySelector<HTMLElement>(".draw")?.focus());
   }, []);
-
-  // Docked, it sits over the panel's sheet and follows it as the panel is resized; the panel widens
-  // to fit the tools while it does. One portal for both places, so the drawing and its undo survive the swap.
-  useEffect(() => {
-    if (!docked || !dock) return;
-    const sheet = (dock.querySelector(".mynotes-text") as HTMLElement | null) ?? dock;
-    const measure = () => setRect(sheet.getBoundingClientRect());
-    dock.classList.add("drawing");
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(sheet);
-    window.addEventListener("resize", measure);
-    return () => {
-      dock.classList.remove("drawing");
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [docked, dock]);
 
   useEffect(() => {
     let live = true;
@@ -186,15 +166,17 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
       )),
     [save],
   );
+  props.current.close = close;
 
   useEffect(() => {
     const prev = document.activeElement;
     // The editor handles its own keys; stopping them at document keeps the app's window-level keys
     // (palette, finish, Esc back to sources) out while it is open.
-    // Docked, keys outside it (reading the source) are the reader's.
+    // Esc on the head's buttons (after a click on ⤢) closes it too, as it does on the canvas.
     const contain = (e: KeyboardEvent) => {
-      if (box.current?.classList.contains("docked") && !box.current.contains(e.target as Node)) return;
       e.stopPropagation();
+      const t = e.target instanceof Element ? e.target : null;
+      if (e.key === "Escape" && t?.closest(".diagram-head button:not(.diagram-failed button)")) void props.current.close();
     };
     document.addEventListener("keydown", contain);
     return () => {
@@ -204,13 +186,11 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
   }, []);
 
   return createPortal(
-    <div
-      ref={box}
-      className={`diagram${docked ? " docked" : ""}`}
-      role="dialog"
-      aria-label="Diagram"
-      style={docked && rect ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : undefined}
-    >
+    // The app shows dimmed around the sheet, and a press there closes it, as Settings does.
+    <div className={`diagram-scrim${full ? " full" : ""}`} onMouseDown={(e) => e.button === 0 && e.target === e.currentTarget && void close()}>
+    <div className="titlebar" data-tauri-drag-region />
+    <Trap>
+    <div ref={box} className="diagram" role="dialog" aria-modal="true" aria-label="Diagram">
       <div className="diagram-head">
         {/* Rename in place (Linear's title): Enter saves, Esc or clicking away keeps the old name. */}
         <input
@@ -238,9 +218,9 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
             <button onClick={() => void save().catch(() => {})}>Retry</button>
           </span>
         )}
-        {dock && (
-          <Hint text={full ? "Back beside the source" : "Full window"} keys="d-expand">
-            <button className="diagram-expand" aria-label={full ? "Back beside the source" : "Full window"} onClick={toggle}>
+        {!PHONE && (
+          <Hint text={full ? "Exit full window" : "Full window"} keys="d-expand">
+            <button className="diagram-expand" aria-label={full ? "Exit full window" : "Full window"} onClick={toggle}>
               {full ? <Collapse size={16} aria-hidden="true" /> : <Expand size={16} aria-hidden="true" />}
             </button>
           </Hint>
@@ -262,11 +242,13 @@ export default function DiagramEditor({ args, name, loaded, dock, notify, onClos
               timer.current = window.setTimeout(() => void save().catch((e) => props.current.notify(`Diagram not saved: ${errorText(e)}`, "error")), 1000);
             }}
             onDone={() => void close()}
-            expand={dock ? { full, toggle } : undefined}
+            expand={PHONE ? undefined : { full, toggle }}
             onLink={(href) => (/^ore:/.test(href) ? void close().then((closed) => closed && onLink?.(href)) : onLink?.(href))}
           />
         )}
       </div>
+    </div>
+    </Trap>
     </div>,
     document.body,
   );
