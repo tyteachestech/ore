@@ -60,6 +60,8 @@ export const TutorOutput = z.strictObject({
   covered: z.array(z.boolean()).default([]),
   // With `covered`: per rubric point, the shortest stretch of his answer that states it, word for word; "" when not covered (D162).
   evidence: z.array(z.string()).default([]),
+  // A short name for the chat, written with its first reply (D172), so the list of chats reads by topic; "" after that.
+  title: z.string().default(""),
 });
 
 /** His message with each diagram from his source note written out as lines, so a map he drew from
@@ -205,7 +207,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
   // Each point of the committed card with its mark and the words of his that earned it (D162), as Review's
   // check shows them (D141): a quote is kept only for a covered point and only when it is in what he wrote.
   const marks = open && data.covered.length ? open.card.rubric.map((point, i) => ({ point, covered: data.covered[i]!, quote: data.covered[i] ? quoteIn(message.trim(), data.evidence[i] ?? "") : "" })) : [];
-  return { message: m, reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, ai, usage: usage as Usage };
+  return { message: m, title: earlier.length ? "" : data.title.trim().slice(0, 80), reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, ai, usage: usage as Usage };
 }
 
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the
