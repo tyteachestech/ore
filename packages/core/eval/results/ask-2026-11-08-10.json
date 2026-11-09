@@ -1,0 +1,953 @@
+{
+  "eval": "ask",
+  "date": "2026-11-08T23:57:16.572Z",
+  "cases": "ask-squad.json",
+  "set": "cda95365",
+  "runs": [
+    {
+      "vendor": "claude",
+      "chat": "tutor",
+      "library": "big",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@8",
+      "retrieval": "30/30",
+      "answer_accuracy": 0.9666666666666667,
+      "answer_ci95": [
+        0.8332924860304112,
+        0.9940915620051425
+      ],
+      "citation_accuracy": 0.9,
+      "citation_ci95": [
+        0.7437855868473339,
+        0.9654007400402839
+      ],
+      "answered": "29/30",
+      "cited": "27/30",
+      "says_absent": "9/12",
+      "then_answers": 8,
+      "web_cited": 1,
+      "searched_needlessly": 0,
+      "median_ms": {
+        "answerable": 4523,
+        "absent": 8417.5
+      },
+      "harder": {
+        "retrieval": "0/0",
+        "answered": "0/0",
+        "cited": "0/0",
+        "groups": {}
+      },
+      "errors": 0,
+      "wall_s": 81.3,
+      "cost_usd": 1.5067885000000003,
+      "input_tokens": 813320,
+      "output_tokens": 26860,
+      "cases": [
+        {
+          "id": "squad-warsaw-1",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "It portrays the history of arms. Your Warsaw source lists it among the city's most prestigious museums, and says its set \"portrays the history of arms\" [1].",
+          "cited": [
+            "warsaw: Museum of the Polish Army whose set portrays the history of arms."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4329,
+          "usage": {
+            "input_tokens": 17230,
+            "output_tokens": 332,
+            "cost_usd": 0.072236
+          }
+        },
+        {
+          "id": "squad-warsaw-2",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Your Warsaw source says it employs 2,000 professors [1]. It calls the school the second academic school of technology in the country and one of the largest in East-Central Europe.",
+          "cited": [
+            "warsaw: Warsaw University of Technology is the second academic school of technology in the country, and one of the largest in East-Central Europe, employing 2,000 professors."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4146,
+          "usage": {
+            "input_tokens": 17857,
+            "output_tokens": 368,
+            "cost_usd": 0.075104
+          }
+        },
+        {
+          "id": "squad-warsaw-3",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "In Victory Square. In 1979, less than a year after becoming pope, John Paul II celebrated Mass there and ended his sermon with a call to \"renew the face\" of Poland [1].",
+          "cited": [
+            "warsaw: John Paul celebrated Mass in Victory Square in Warsaw and ended his sermon with a call to \"renew the face\" of Poland"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4223,
+          "usage": {
+            "input_tokens": 18692,
+            "output_tokens": 376,
+            "cost_usd": 0.078524
+          }
+        },
+        {
+          "id": "squad-warsaw-4",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "It's an example of **Renaissance** architecture. Your Warsaw source lists the Baryczko merchant family's house (1562) among the most notable Renaissance examples in the city, next to \"The Negro\" and the Salwator tenement [1].",
+          "cited": [
+            "warsaw: The most notable examples of Renaissance architecture in the city are the house of Baryczko merchant family (1562)"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 6724,
+          "usage": {
+            "input_tokens": 18067,
+            "output_tokens": 539,
+            "cost_usd": 0.077654
+          }
+        },
+        {
+          "id": "squad-warsaw-5",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "1413. Your Warsaw source says the settlement became one of the seats of the Dukes of Masovia in the early 14th century, \"becoming the official capital of Masovian Duchy in 1413\" [1].",
+          "cited": [
+            "warsaw: becoming the official capital of Masovian Duchy in 1413"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 3804,
+          "usage": {
+            "input_tokens": 18131,
+            "output_tokens": 343,
+            "cost_usd": 0.0286859
+          }
+        },
+        {
+          "id": "squad-huguenot-6",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Flax. The Huguenots in smaller settlements like Killeshandra in County Cavan contributed to the expansion of flax cultivation, which in turn helped the growth of the Irish linen industry [1].",
+          "cited": [
+            "huguenot: Smaller settlements, which included Killeshandra in County Cavan, contributed to the expansion of flax cultivation and the growth of the Irish linen industry."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4419,
+          "usage": {
+            "input_tokens": 17908,
+            "output_tokens": 408,
+            "cost_usd": 0.028443899999999998
+          }
+        },
+        {
+          "id": "squad-huguenot-7",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": true,
+          "general": false,
+          "searched": false,
+          "answer": "Your sources mention two Huguenot colonies, so I'm not sure which you mean.\n\n- **France Antarctique** (Brazil, founded 1555): the Portuguese destroyed its fort, Fort Coligny, in 1560 [1].\n- **Fort Caroline** (Florida, founded 1564): the Spanish commander Menendez wiped out its garrison after the failed French naval attack of September 1565 [2].\n\nWhich one were you asking about?",
+          "cited": [
+            "huguenot: The fort was destroyed in 1560 by the Portuguese, who captured part of the Huguenots.",
+            "huguenot: Menendez proceeded to massacre the defenseless Huguenots, after which he wiped out the Fort Caroline garrison."
+          ],
+          "answer_ok": true,
+          "citation_ok": false,
+          "ms": 7299,
+          "usage": {
+            "input_tokens": 17739,
+            "output_tokens": 861,
+            "cost_usd": 0.0322979
+          }
+        },
+        {
+          "id": "squad-huguenot-8",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "In 1562, according to your Huguenot source: Ribault founded the outpost of Charlesfort on Parris Island, South Carolina [1]. It didn't last, because the Wars of Religion kept him from returning and the outpost was abandoned [1]. His better-known colony, Fort Caroline in Florida, came two years later, in 1564 [2].",
+          "cited": [
+            "huguenot: In 1562, naval officer Jean Ribault led an expedition that explored Florida and the present-day Southeastern U.S., and founded the outpost of Charlesfort on Parris Island, South Carolina.",
+            "huguenot: In 1564 a group of Norman Huguenots under the leadership of Jean Ribault established the small colony of Fort Caroline on the banks of the St. Johns River in what is today Jacksonville, Florida."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4918,
+          "usage": {
+            "input_tokens": 17687,
+            "output_tokens": 542,
+            "cost_usd": 0.0288999
+          }
+        },
+        {
+          "id": "squad-huguenot-9",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "1604. Prince Louis de Condé, with his sons Daniel and Osias, arranged with Count Ludwig von Nassau-Saarbrücken to set up a Huguenot community in present-day Saarland that year [1]. The Count welcomed skilled immigrants whatever their religion [1].",
+          "cited": [
+            "huguenot: arranged with Count Ludwig von Nassau-Saarbrücken to establish a Huguenot community in present-day Saarland in 1604.",
+            "huguenot: The Count supported mercantilism and welcomed technically skilled immigrants into his lands, regardless of their religion."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4486,
+          "usage": {
+            "input_tokens": 17548,
+            "output_tokens": 483,
+            "cost_usd": 0.0277539
+          }
+        },
+        {
+          "id": "squad-huguenot-10",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "The revocation banned leaving France: it \"prohibited emigration\" [1]. That made departure illegal, so the hundreds of thousands of Protestants who left had to flee illegally [1]. Those who stayed became Catholics and were called \"new converts\" [1].",
+          "cited": [
+            "huguenot: The revocation forbade Protestant services, required education of children as Catholics, and prohibited emigration.",
+            "huguenot: resulted in the illegal flight from the country of hundreds of thousands of Protestants",
+            "huguenot: Those Huguenots who stayed in France became Catholics and were called \"new converts\"."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4629,
+          "usage": {
+            "input_tokens": 16951,
+            "output_tokens": 482,
+            "cost_usd": 0.0253559
+          }
+        },
+        {
+          "id": "squad-private-school-11",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "An academic scholarship. Your Private school source lists it right alongside the other two, as scholarships that depend on a talent the student may have, e.g. sport, art, or academic [1]. The same sentence also names financial need and tax credit scholarships as other routes, but those aren't talent-based.",
+          "cited": [
+            "private-school: depending on a talent the student may have (e.g. sport scholarship, art scholarship, academic scholarship)"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4368,
+          "usage": {
+            "input_tokens": 17565,
+            "output_tokens": 389,
+            "cost_usd": 0.0268819
+          }
+        },
+        {
+          "id": "squad-private-school-12",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": true,
+          "searched": false,
+          "answer": "Your \"Private school\" source says Kunskapsskolan (\"The Knowledge School\") is Sweden's biggest school chain and teaches nearly 10,000 pupils across 30 schools [1]. That figure is from an older snapshot of the article, so today's number is likely different.",
+          "cited": [
+            "private-school: the biggest school chain, Kunskapsskolan (“The Knowledge School”), offers 30 schools and a web-based environment, has 700 employees and teaches nearly 10,000 pupils"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4523,
+          "usage": {
+            "input_tokens": 17422,
+            "output_tokens": 442,
+            "cost_usd": 0.0268399
+          }
+        },
+        {
+          "id": "squad-private-school-13",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": true,
+          "general": false,
+          "searched": false,
+          "answer": "About 32%. Your source says private schools account for \"32% of secondary enrollment\" in the Philippines [1]. For comparison, the same passage puts private schools at about 7.5% of primary enrollment and about 80% of tertiary, so the private share rises steeply with level [1]. The passage doesn't give a year, so the figure may be dated.",
+          "cited": [
+            "private-school: accounting for about 7.5% of primary enrollment, 32% of secondary enrollment and about 80% of tertiary enrollment"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4592,
+          "usage": {
+            "input_tokens": 17815,
+            "output_tokens": 442,
+            "cost_usd": 0.0284119
+          }
+        },
+        {
+          "id": "squad-private-school-14",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Year 13 is also called **upper sixth**. Your Private school source says secondary level runs through year 12 (known as lower sixth) and \"year 13 (upper sixth)\" [1].",
+          "cited": [
+            "private-school: The secondary level includes schools offering years 7 through 12 (year twelve is known as lower sixth) and year 13 (upper sixth)."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4155,
+          "usage": {
+            "input_tokens": 17548,
+            "output_tokens": 370,
+            "cost_usd": 0.026623900000000002
+          }
+        },
+        {
+          "id": "squad-private-school-15",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "A second *Gleichschaltung*, or a similar event, was the worry. Germany's protection of private schools is unusual: the right to create them can't be suspended even in a state of emergency, and it can't be abolished [1]. The Gleichschaltung was the Nazi-era forced alignment of institutions, so the rule is meant to stop a future regime from taking over the schools the same way. That last bit is general background, not from your source.",
+          "cited": [
+            "private-school: This unusual protection of private schools was implemented to protect these schools from a second Gleichschaltung or similar event in the future."
+          ],
+          "answer_ok": false,
+          "citation_ok": true,
+          "ms": 5193,
+          "usage": {
+            "input_tokens": 17796,
+            "output_tokens": 494,
+            "cost_usd": 0.0288559
+          }
+        },
+        {
+          "id": "squad-french-and-indian-war-16",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "It was Tanaghrisson, a chief of the Mingo. He travelled to Fort Le Boeuf and threatened the French with military action, which Marin contemptuously dismissed. [1] He had a grudge too: he intensely disliked the French. [2]",
+          "cited": [
+            "french-and-indian-war: Traveling to Fort Le Boeuf, he threatened the French with military action, which Marin contemptuously dismissed.",
+            "french-and-indian-war: He intensely disliked the French (whom he accused of killing and eating his father)."
+          ],
+          "answer_ok": true,
+          "citation_ok": false,
+          "ms": 4683,
+          "usage": {
+            "input_tokens": 17937,
+            "output_tokens": 459,
+            "cost_usd": 0.0290699
+          }
+        },
+        {
+          "id": "squad-french-and-indian-war-17",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": true,
+          "general": false,
+          "searched": false,
+          "answer": "It was completed in 1769. Your French and Indian War source says the Spanish takeover \"was not completed until 1769\" [1]. That's years after France handed Louisiana west of the Mississippi (including New Orleans) to Spain as compensation for Spain losing Florida to Britain [2].",
+          "cited": [
+            "french-and-indian-war: Although the Spanish takeover of the Louisiana territory (which was not completed until 1769) had modest repercussions",
+            "french-and-indian-war: It ceded French Louisiana west of the Mississippi River (including New Orleans) to its ally Spain, in compensation for Spain's loss to Britain of Florida"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4636,
+          "usage": {
+            "input_tokens": 16397,
+            "output_tokens": 459,
+            "cost_usd": 0.0229099
+          }
+        },
+        {
+          "id": "squad-french-and-indian-war-18",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "He moved it to Ticonderoga. It was a feint: the move made it look like another attack along Lake George was coming [1]. With Abercrombie pinned down at Albany, Montcalm slipped away and led the successful attack on Oswego in August [1].",
+          "cited": [
+            "french-and-indian-war: Montcalm executed a strategic feint by moving his headquarters to Ticonderoga, as if to presage another attack along Lake George.",
+            "french-and-indian-war: With Abercrombie pinned down at Albany, Montcalm slipped away and led the successful attack on Oswego in August."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4738,
+          "usage": {
+            "input_tokens": 17530,
+            "output_tokens": 494,
+            "cost_usd": 0.027791899999999998
+          }
+        },
+        {
+          "id": "squad-french-and-indian-war-19",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": true,
+          "searched": false,
+          "answer": "The deportation began in 1755. Your French and Indian War source says it followed the British capture of Fort Beauséjour in June of that year [1]. It also says the orders came from William Shirley, Commander-in-Chief, North America, without direction from Great Britain [2]. Your source only says it began in 1755 [3]. The removals ran on for years, so it wasn't a single event.",
+          "cited": [
+            "french-and-indian-war: Colonel Monckton, in the sole British success that year, captured Fort Beauséjour in June 1755",
+            "french-and-indian-war: Orders for the deportation were given by William Shirley, Commander-in-Chief, North America, without direction from Great Britain.",
+            "french-and-indian-war: The deportation of Acadians beginning in 1755 resulted in land made available to migrants from Europe and the colonies further south."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4914,
+          "usage": {
+            "input_tokens": 15309,
+            "output_tokens": 532,
+            "cost_usd": 0.0192879
+          }
+        },
+        {
+          "id": "squad-french-and-indian-war-20",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Your source gives two different answers. One passage says British settlers outnumbered the French **20 to 1**, with about 1.5 million British settlers [1]. Another says the French colonies had roughly 60,000 settlers against 2 million in the British colonies [2]. That works out to about 33 to 1.\n\nThe two passages disagree, so I'd remember it as \"roughly 20 to 1, or even more lopsided.\" Either way, the outnumbered French leaned heavily on their Native American allies [3].",
+          "cited": [
+            "french-and-indian-war: British settlers outnumbered the French 20 to 1 with a population of about 1.5 million ranged along the eastern coast of the continent",
+            "french-and-indian-war: At the start of the war, the French North American colonies had a population of roughly 60,000 European settlers, compared with 2 million in the British North American colonies.",
+            "french-and-indian-war: The outnumbered French particularly depended on the Indians."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 9108,
+          "usage": {
+            "input_tokens": 18539,
+            "output_tokens": 1007,
+            "cost_usd": 0.0369579
+          }
+        },
+        {
+          "id": "squad-packet-switching-21",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Both became operational in 1969. Your Packet switching source says so directly. [1]",
+          "cited": [
+            "packet-switching: ARPANET and SITA HLN became operational in 1969."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 3762,
+          "usage": {
+            "input_tokens": 16837,
+            "output_tokens": 295,
+            "cost_usd": 0.0230299
+          }
+        },
+        {
+          "id": "squad-packet-switching-22",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Davies called it **packet switching**. He chose it as a more accessible name than Baran's [1], and he's credited with coining the modern name [2]. Baran's own term was \"Distributed Adaptive Message Block Switching.\"",
+          "cited": [
+            "packet-switching: He called it packet switching, a more accessible name than Baran's",
+            "packet-switching: Davies is credited with coining the modern name packet switching"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4407,
+          "usage": {
+            "input_tokens": 18148,
+            "output_tokens": 426,
+            "cost_usd": 0.0295839
+          }
+        },
+        {
+          "id": "squad-packet-switching-23",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Your message cuts off, but I'm guessing you mean CYCLADES. Your source says its concepts influenced later ARPANET architecture [1]. The main idea was that the hosts, not the network, are responsible for reliable delivery, using unreliable datagrams and end-to-end protocols [2]. If you meant a different network, tell me which one and I'll look at that.\n\nDo you want to see how this datagram approach differs from the X.25 \"virtual call\" approach?",
+          "cited": [
+            "packet-switching: Concepts of this network influenced later ARPANET architecture.",
+            "packet-switching: It was the first network to make the hosts responsible for reliable delivery of data, rather than the network itself, using unreliable datagrams and associated end-to-end protocol mechanisms."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 6749,
+          "usage": {
+            "input_tokens": 16724,
+            "output_tokens": 905,
+            "cost_usd": 0.0286779
+          }
+        },
+        {
+          "id": "squad-packet-switching-24",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Davies called it **packet switching**. He picked it as a more accessible name than Baran's [1], and he's credited with coining the modern name [2]. Baran's own term was the much clunkier \"distributed adaptive message block switching.\"",
+          "cited": [
+            "packet-switching: He called it packet switching, a more accessible name than Baran's",
+            "packet-switching: Davies is credited with coining the modern name packet switching"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4483,
+          "usage": {
+            "input_tokens": 17409,
+            "output_tokens": 426,
+            "cost_usd": 0.0266279
+          }
+        },
+        {
+          "id": "squad-packet-switching-25",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "X.25 uses the **virtual call** network type. In that system, the network itself guarantees sequenced delivery of data to the host [1]. That makes the host interface simpler than in the datagram model, where the hosts must ensure orderly delivery themselves (UDP is the example) [2]. X.25 is also connection-oriented. It requires a handshake between the two parties before any user packets are sent [3].",
+          "cited": [
+            "packet-switching: In the virtual call system, the network guarantees sequenced delivery of data to the host.",
+            "packet-switching: In the datagram system, the hosts have the responsibility to ensure orderly delivery of packets.",
+            "packet-switching: X.25 requires a handshake between the communicating parties before any user packets are transmitted."
+          ],
+          "answer_ok": true,
+          "citation_ok": false,
+          "ms": 4911,
+          "usage": {
+            "input_tokens": 17865,
+            "output_tokens": 544,
+            "cost_usd": 0.0296319
+          }
+        },
+        {
+          "id": "squad-harvard-university-26",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Ban Ki-moon. Your Harvard source lists \"U.N. Secretary General Ban Ki-moon\" among its notable alumni in politics [1].",
+          "cited": [
+            "harvard-university: Politics: U.N. Secretary General Ban Ki-moon"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4024,
+          "usage": {
+            "input_tokens": 17891,
+            "output_tokens": 341,
+            "cost_usd": 0.0277059
+          }
+        },
+        {
+          "id": "squad-harvard-university-27",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "It's Stephen Greenblatt. Your Harvard source lists him as the \"Shakespeare scholar\" among the university's faculty [1].",
+          "cited": [
+            "harvard-university: Shakespeare scholar Stephen Greenblatt"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 3794,
+          "usage": {
+            "input_tokens": 17379,
+            "output_tokens": 332,
+            "cost_usd": 0.025567899999999998
+          }
+        },
+        {
+          "id": "squad-harvard-university-28",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "It was 1906. Walter Camp backed a set of revolutionary new rules for the 1906 season, and they included legalizing the forward pass, which your Harvard source calls \"perhaps the most significant rule change in the sport's history.\" [1]",
+          "cited": [
+            "harvard-university: Camp would instead support revolutionary new rules for the 1906 season."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4042,
+          "usage": {
+            "input_tokens": 17800,
+            "output_tokens": 369,
+            "cost_usd": 0.0276219
+          }
+        },
+        {
+          "id": "squad-harvard-university-29",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "Your Harvard source puts it in the late 1980s [1]. That's the Harvard angle only: students built a symbolic \"shantytown\" on Harvard Yard, and the university eventually cut its South African holdings by $230 million out of $400 million [1]. The wider movement ran longer and wider than that. Your sources don't cover its full timeline.",
+          "cited": [
+            "harvard-university: During the divestment from South Africa movement in the late 1980s, student activists erected a symbolic \"shantytown\" on Harvard Yard"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 4523,
+          "usage": {
+            "input_tokens": 17755,
+            "output_tokens": 457,
+            "cost_usd": 0.0283219
+          }
+        },
+        {
+          "id": "squad-harvard-university-30",
+          "absent": false,
+          "retrieved": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Eliot's push toward secularization came from Transcendentalist Unitarian convictions, not from a wish to secularize for its own sake [1]. Those ideas came from William Ellery Channing and Ralph Waldo Emerson. They centered on the dignity and worth of human nature, each person's right and ability to perceive truth, and the indwelling God in each person [1]. That fits what he did: he removed Christianity's favored place in the curriculum and opened it to student self-direction [1].",
+          "cited": [
+            "harvard-university: he was motivated not by a desire to secularize education, but by Transcendentalist Unitarian convictions",
+            "harvard-university: the dignity and worth of human nature, the right and ability of each person to perceive truth, and the indwelling God in each person",
+            "harvard-university: eliminated the favored position of Christianity from the curriculum while opening it to student self-direction"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 5623,
+          "usage": {
+            "input_tokens": 18292,
+            "output_tokens": 701,
+            "cost_usd": 0.032909900000000006
+          }
+        },
+        {
+          "id": "squad-warsaw-none-1",
+          "absent": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Small fix first: it wasn't a king of Vilnius. It was King Sigismund III Vasa, and he moved his court from Kraków to Warsaw in 1596 [1]. Warsaw sat between the two Commonwealth capitals, Kraków and Vilnius, which is why it made sense as the new capital [2].",
+          "cited": [
+            "warsaw: King Sigismund III Vasa moved his court from Kraków to Warsaw in 1596",
+            "warsaw: Due to its central location between the Polish–Lithuanian Commonwealth's capitals of Kraków and Vilnius"
+          ],
+          "answer_ok": false,
+          "citation_ok": true,
+          "ms": 4441,
+          "usage": {
+            "input_tokens": 18577,
+            "output_tokens": 482,
+            "cost_usd": 0.0318599
+          }
+        },
+        {
+          "id": "squad-warsaw-none-2",
+          "absent": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "The passages call it a stereoscopic theatre, but the name in your question is a mix-up. It's the Warsaw Fotoplastikon, not a \"Katyn\" one. Your source says the Warsaw Uprising Museum \"also operates a rare preserved and operating historic stereoscopic theatre, the Warsaw Fotoplastikon\" [1]. The Katyń Museum is a separate place, and it \"preserves the memory of the crime\" [2].\n\nA stereoscopic theatre shows 3D-looking images, with each eye seeing a slightly different picture.",
+          "cited": [
+            "warsaw: The Warsaw Uprising Museum also operates a rare preserved and operating historic stereoscopic theatre, the Warsaw Fotoplastikon.",
+            "warsaw: the Katyń Museum which preserves the memory of the crime"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8540,
+          "usage": {
+            "input_tokens": 18231,
+            "output_tokens": 905,
+            "cost_usd": 0.0347059
+          }
+        },
+        {
+          "id": "squad-huguenot-none-3",
+          "absent": true,
+          "found": true,
+          "outside": true,
+          "general": false,
+          "searched": true,
+          "answer": "Your sources don't name a family. The Huguenot article only says the wine industry in South Africa \"owes a significant debt to the Huguenots, some of whom had vineyards in France\" [1]. It lists many surnames of Huguenot descent, like de Villiers, Joubert, du Toit and Malan [2], but it doesn't tie any one of them to a French vineyard.\n\nI ran one web search and it didn't settle it either. It pointed loosely at the Joubert and de Villiers families, but nothing I found said that a particular family owned a vineyard in France. I wouldn't write either name down as the answer.\n\nWhere did the question come from? If it's from a card or a quiz, the exact wording there would tell us which family it expects. It may also be asking about the Huguenot settlers as a group.",
+          "cited": [
+            "huguenot: The wine industry in South Africa owes a significant debt to the Huguenots, some of whom had vineyards in France, or were brandy distillers, and used their skills in their new home.",
+            "huguenot: Examples include: Blignaut, Cilliers, de Klerk (Le Clercq), de Villiers, du Plessis"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 17752,
+          "usage": {
+            "input_tokens": 37166,
+            "output_tokens": 1443,
+            "cost_usd": 0.058545200000000006
+          }
+        },
+        {
+          "id": "squad-huguenot-none-4",
+          "absent": true,
+          "found": false,
+          "outside": true,
+          "general": true,
+          "searched": true,
+          "answer": "Your Huguenot passages don't give the year, so I searched. He became Elector of Brandenburg in **1640**, when his father died. His reign is listed as \"1 December 1640 – 29 April 1688\" ([Wikipedia](https://en.wikipedia.org/wiki/Frederick_William,_the_Great_Elector)) [1]. \"Great Elector\" is a title given to him in hindsight, not a separate date he took office.\n\nYour Huguenot source ties him to 1685, when he welcomed refugees through the Edict of Potsdam. Do you want to work out why he would take them in?",
+          "cited": [
+            "https://en.wikipedia.org/wiki/Frederick_William,_the_Great_Elector: 1 December 1640 – 29 April 1688"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 11667,
+          "usage": {
+            "input_tokens": 37510,
+            "output_tokens": 1018,
+            "cost_usd": 0.0547534
+          }
+        },
+        {
+          "id": "squad-private-school-none-5",
+          "absent": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "The question has it backwards. The academies weren't ordered to segregate. They were set up in response to the order to desegregate.\n\n*Brown v. Board of Education* (1954) demanded that US schools desegregate \"with all deliberate speed\" [1]. That phrase gives no fixed deadline, only a vague call to move steadily. In response, local families organized a wave of private \"Christian academies\" [2]. In much of the South, many white students moved to them, and public schools became more heavily African-American [3]. That's why they're often called \"segregation academies\".\n\nYour source doesn't say how fast any individual academy opened. Did you mean how fast public schools were expected to desegregate?",
+          "cited": [
+            "private-school: Brown v. Board of Education of Topeka that demanded United States schools desegregate \"with all deliberate speed\"",
+            "private-school: local families organized a wave of private \"Christian academies\"",
+            "private-school: many white students migrated to the academies, while public schools became in turn more heavily concentrated with African-American students"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8405,
+          "usage": {
+            "input_tokens": 17776,
+            "output_tokens": 1109,
+            "cost_usd": 0.0349259
+          }
+        },
+        {
+          "id": "squad-private-school-none-6",
+          "absent": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "Your sources don't name a term that those countries \"always\" use for universities. They say the opposite: in the UK and several Commonwealth countries, including Australia and Canada, \"private school\" is generally restricted to primary and secondary levels, and \"it is almost never used of universities and other tertiary institutions\" [1]. In North America, by contrast, private education covers everything from pre-school to tertiary level [1].\n\nFrom general knowledge, those countries just say \"university\", or \"tertiary institution\" for universities and colleges together.\n\nIs this from a flashcard, or are you comparing how the words differ by country?",
+          "cited": [
+            "private-school: it is almost never used of universities and other tertiary institutions"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 7069,
+          "usage": {
+            "input_tokens": 17774,
+            "output_tokens": 800,
+            "cost_usd": 0.0318279
+          }
+        },
+        {
+          "id": "squad-french-and-indian-war-none-7",
+          "absent": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "The plan was a punitive raid. Longueuil sent Langlade out with 300 men, French-Canadians and Ottawa warriors [1]. His objective was to punish the Miami people of Pickawillany for not following Céloron's orders to stop trading with the British [2]. It worked as a strike: on June 21 they attacked the trading centre, captured three traders and killed 14 Miami, including Old Briton [3].\n\nThe wider context was continuing British activity in the Ohio territories, which is what prompted the expedition [4].",
+          "cited": [
+            "french-and-indian-war: Langlade was given 300 men, including French-Canadians and warriors of the Ottawa.",
+            "french-and-indian-war: His objective was to punish the Miami people of Pickawillany for not following Céloron's orders to cease trading with the British.",
+            "french-and-indian-war: On June 21, the French war party attacked the trading centre at Pickawillany, capturing three traders and killing 14 people of the Miami nation, including Old Briton.",
+            "french-and-indian-war: The continuing British activity in the Ohio territories prompted Longueuil to dispatch another expedition to the area under the command of Charles Michel de Langlade"
+          ],
+          "answer_ok": false,
+          "citation_ok": true,
+          "ms": 5538,
+          "usage": {
+            "input_tokens": 17453,
+            "output_tokens": 681,
+            "cost_usd": 0.0293539
+          }
+        },
+        {
+          "id": "squad-french-and-indian-war-none-8",
+          "absent": true,
+          "found": true,
+          "outside": false,
+          "general": false,
+          "searched": false,
+          "answer": "Your French and Indian War source says it was British failures in North America, combined with other failures in the European theater, that brought down Newcastle and his principal military advisor, the Duke of Cumberland. [1] Some of those failures trace back to Newcastle's own choices: his government sent Braddock's 1755 expedition against Fort Duquesne, [2] and it ended in disaster, with Braddock killed and roughly 1,000 British soldiers killed or injured. [3] He also replaced the commander in 1756 with Loudoun and Abercrombie, who had less campaign experience than the French officers sent against them. [4] After that, Newcastle had to enter an uneasy coalition with Pitt, who dominated the military planning. [5]",
+          "cited": [
+            "french-and-indian-war: The British failures in North America, combined with other failures in the European theater, led to the fall from power of Newcastle and his principal military advisor, the Duke of Cumberland.",
+            "french-and-indian-war: They chose Major General Edward Braddock to lead the expedition.",
+            "french-and-indian-war: Approximately 1,000 British soldiers were killed or injured.",
+            "french-and-indian-war: Neither of these men had as much campaign experience as the trio of officers France sent to North America.",
+            "french-and-indian-war: Newcastle and Pitt joined in an uneasy coalition in which Pitt dominated the military planning."
+          ],
+          "answer_ok": false,
+          "citation_ok": true,
+          "ms": 6009,
+          "usage": {
+            "input_tokens": 17726,
+            "output_tokens": 772,
+            "cost_usd": 0.0313559
+          }
+        },
+        {
+          "id": "squad-packet-switching-none-9",
+          "absent": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "Your source doesn't say it outright, but it implies it: circuit switching gives each session \"a constant bit rate and latency between nodes\" [1], and packet switching is the contrast. So packet switching has a **variable** bit rate. Packets share the network and are forwarded through buffers and queues [2], so the rate and delay can change with traffic.\n\n\"Variable\" is my own general knowledge. The passage only gives you the constant-rate side.",
+          "cited": [
+            "packet-switching: each having a constant bit rate and latency between nodes",
+            "packet-switching: Packets are normally forwarded by intermediate network nodes asynchronously using first-in, first-out buffering"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8568,
+          "usage": {
+            "input_tokens": 16131,
+            "output_tokens": 810,
+            "cost_usd": 0.0253559
+          }
+        },
+        {
+          "id": "squad-packet-switching-none-10",
+          "absent": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "Your source doesn't name a suite that uses UDP. It only says that \"The User Datagram Protocol (UDP) is an example of a datagram protocol.\" [1] The suite it does name is X.25, and that one goes the other way: \"The X.25 protocol suite uses this network type.\" [2] \"This network type\" is the virtual call system, where the network guarantees ordered delivery.\n\nFrom general knowledge, UDP belongs to the Internet protocol suite (TCP/IP), alongside TCP and IP. Hosts using UDP handle any ordering or retransmission themselves, which matches the datagram model your source describes.\n\nAre you trying to separate datagram from virtual-call networks, or just placing UDP in a suite?",
+          "cited": [
+            "packet-switching: The User Datagram Protocol (UDP) is an example of a datagram protocol.",
+            "packet-switching: The X.25 protocol suite uses this network type."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8246,
+          "usage": {
+            "input_tokens": 16877,
+            "output_tokens": 1061,
+            "cost_usd": 0.0308499
+          }
+        },
+        {
+          "id": "squad-harvard-university-none-11",
+          "absent": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "Your sources don't answer this. The Harvard passages say it's the United States' oldest institution of higher learning [1], so it isn't the one you want. Many colleges were founded between 1939 and 1945, so the question needs narrowing. One example from my own knowledge is Fairleigh Dickinson University in New Jersey, which opened in 1942. Which country or kind of college do you mean, or is this from a quiz?",
+          "cited": [
+            "harvard-university: Harvard is the United States' oldest institution of higher learning"
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 26698,
+          "usage": {
+            "input_tokens": 54152,
+            "output_tokens": 2028,
+            "cost_usd": 0.0862114
+          }
+        },
+        {
+          "id": "squad-harvard-university-none-12",
+          "absent": true,
+          "found": true,
+          "outside": true,
+          "general": true,
+          "searched": false,
+          "answer": "I think 1650 is mixing up two events. Nobody founded Cambridge then, but your Harvard source has a 1650 date. Harvard \"was formed in 1636 by vote of the Great and General Court of the Massachusetts Bay Colony\" [1]. In 1650, \"The charter creating the Harvard Corporation was granted\" [2]. So 1650 is when Harvard's governing corporation got its charter, not when a place or school called Cambridge began.\n\nIf you meant the University of Cambridge in England, it's much older, from the early 1200s. That's from my own knowledge, not your sources.\n\nWere you thinking of the Harvard Corporation, or the English university?",
+          "cited": [
+            "harvard-university: Harvard was formed in 1636 by vote of the Great and General Court of the Massachusetts Bay Colony.",
+            "harvard-university: The charter creating the Harvard Corporation was granted in 1650."
+          ],
+          "answer_ok": true,
+          "citation_ok": true,
+          "ms": 8430,
+          "usage": {
+            "input_tokens": 16179,
+            "output_tokens": 1133,
+            "cost_usd": 0.028777900000000002
+          }
+        }
+      ]
+    }
+  ]
+}
