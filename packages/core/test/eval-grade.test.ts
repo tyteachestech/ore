@@ -64,8 +64,9 @@ describe("grading eval", () => {
     expect(kappa([mk("wrong", "wrong"), mk("right", "right")])).toBe(1);
     expect(kappa([mk("wrong", "right"), mk("right", "wrong")])).toBe(-1);
     expect(kappa([])).toBe(0);
-    // A missing verdict (an error) counts as disagreement, not as "right".
-    expect(kappa([mk("wrong", "wrong"), mk("right", "right"), { label: "right" }])).toBeCloseTo(0.4);
+    // A missing verdict (an error) is a third answer: never agreement, and not a "wrong" in the chance term either.
+    expect(kappa([mk("wrong", "wrong"), mk("right", "right"), { label: "right" }])).toBeCloseTo(0.5);
+    expect(kappa([mk("wrong", "wrong"), mk("right", "right"), { label: "wrong" }])).toBeCloseTo(0.5);
   });
 
   test("repeated runs summarize to mean, spread, flipped verdicts and cases missed in any run", () => {
@@ -105,8 +106,8 @@ describe("grading eval", () => {
     expect(process.env.ORE_AI).toBeUndefined(); // the vendor pick doesn't leak out of the run
     expect(table([r])).toContain("60% (3/5)");
     expect(table([r])).toContain("23–88%");
-    expect(r.kappa).toBe(0.167); // 60% accuracy on a 60%-right set with one false pass and one error: little beyond chance
-    expect(table([r])).toContain("0.17");
+    expect(r.kappa).toBe(0.286); // 60% accuracy on a 60%-right set with one false pass and one error: only fair beyond chance
+    expect(table([r])).toContain("0.29");
   });
 
   test("loadCases refuses duplicate ids; the baseline never passes an empty model answer", () => {
