@@ -290,7 +290,8 @@ export function useAudio(file: string | undefined, id: string): Player {
       el.current = null;
     };
   }, [file, posKey, start]);
-  const time = useCallback(() => el.current?.currentTime ?? 0, []);
+  // Before the file is read (and no stamp moved it), it is at the saved place, though currentTime says 0.
+  const time = useCallback(() => (el.current && (el.current.duration || moved.current) ? el.current.currentTime : start), [start]);
   const play = useCallback(() => void el.current?.play().catch(() => {}), []);
   const toggle = useCallback(() => (el.current?.paused ? play() : el.current?.pause()), [play]);
   const seek = useCallback((t: number) => {

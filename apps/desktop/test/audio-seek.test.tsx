@@ -58,3 +58,15 @@ test("with no seek first, it picks up at the saved place", () => {
   expect(FakeAudio.last.currentTime).toBe(720);
   act(() => root.unmount());
 });
+
+test("a skip before the metadata loads goes from the saved place", () => {
+  localStorage.setItem("ore.video.pod3", "1500");
+  let player: ReturnType<typeof useAudio> | undefined;
+  const Probe = () => ((player = useAudio("data:audio/mpeg;base64,", "pod3")), null);
+  const root = createRoot(document.createElement("div"));
+  act(() => root.render(<Probe />));
+  act(() => player!.skip(10));
+  act(() => FakeAudio.last.loaded(3600));
+  expect(FakeAudio.last.currentTime).toBe(1510);
+  act(() => root.unmount());
+});

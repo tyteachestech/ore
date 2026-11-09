@@ -15,31 +15,31 @@ const scroller = (el: Element): Element | null => {
   for (let p = el.parentElement; p; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return p;
   return null;
 };
+/** Stops watching a row; the list's observer goes with its last one. */
+const stop = (root: Element | null, row: Element) => {
+  const o = observers.get(root);
+  waiting.delete(row);
+  if (!o?.rows.delete(row)) return;
+  o.io.unobserve(row);
+  if (o.rows.size) return;
+  o.io.disconnect();
+  observers.delete(root);
+};
 const watch = (el: Element, on: () => void) => {
   const root = scroller(el);
   let o = observers.get(root);
-  const stop = (row: Element) => {
-    waiting.delete(row);
-    o!.io.unobserve(row);
-    o!.rows.delete(row);
-    if (o!.rows.size) return;
-    o!.io.disconnect();
-    if (observers.get(root) === o) observers.delete(root);
-  };
   if (!o) {
-    o = {
-      io: new IntersectionObserver(
-        (entries) => {
-          for (const e of entries) {
-            if (!e.isIntersecting) continue;
-            for (const f of waiting.get(e.target) ?? []) f();
-            stop(e.target);
-          }
-        },
-        { root, rootMargin: "100% 0px" },
-      ),
-      rows: new Set(),
-    };
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          for (const f of waiting.get(e.target) ?? []) f();
+          stop(root, e.target);
+        }
+      },
+      { root, rootMargin: "100% 0px" },
+    );
+    o = { io, rows: new Set() };
     observers.set(root, o);
   }
   const set = waiting.get(el) ?? new Set();
@@ -49,7 +49,7 @@ const watch = (el: Element, on: () => void) => {
   o.io.observe(el);
   return () => {
     set.delete(on);
-    if (!set.size && o.rows.has(el)) stop(el);
+    if (!set.size) stop(root, el);
   };
 };
 
