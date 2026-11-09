@@ -148,6 +148,23 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("add a pasted ChatGPT answer: its headings and table come in, which its plain text loses", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByLabel("Link, file path or text");
+  const text = "Gaps that work\nReview a little each day, and let the gaps grow as the answers come easily.\nTest in\tBest gap\nOne year\tThree to four weeks";
+  const html = "<meta charset='utf-8'><h2>Gaps that work</h2><p>Review a little each day, and let the gaps grow as the answers come easily.</p><table><thead><tr><th>Test in</th><th>Best gap</th></tr></thead><tbody><tr><td>One year</td><td>Three to four weeks</td></tr></tbody></table>";
+  await box.evaluate((el, [text, html]) => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text!);
+    dt.setData("text/html", html!);
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, [text, html]);
+  await box.fill(text); // a synthetic paste inserts nothing: the text the paste would have put in
+  await page.keyboard.press("Enter");
+  await page.locator(".doc table").getByText("Three to four weeks").waitFor();
+  await page.locator(".doc h2").getByText("Gaps that work").waitFor();
+});
+
 journey("add: File keeps what he typed in the box; cancelling the picker keeps it too, and picked files join it", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   const box = page.getByLabel("Link, file path or text");

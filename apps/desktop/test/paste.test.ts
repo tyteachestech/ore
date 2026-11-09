@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { addArgs, copiedEntry, copiedWhat, dropPoint, entries, fileKind, imageExt, manyAdded, noteImage } from "../src/paste";
+import { addArgs, copiedEntry, copiedWhat, dropPoint, entries, fileKind, imageExt, manyAdded, noteImage, pastedHtml, withHtml } from "../src/paste";
 
 test("a list's toast counts only what went in", () => {
   expect(manyAdded(3, 0)).toBe("Added 3 sources");
@@ -36,6 +36,19 @@ describe("add box entries", () => {
     expect(addArgs({ kind: "text", text: "x" })).toEqual({ args: ["add", "--stdin"], stdin: "x" });
     expect(addArgs({ kind: "file", path: "/a.pdf" })).toEqual({ args: ["add", "/a.pdf"], stdin: null });
     expect(addArgs({ kind: "tab" })).toEqual({ args: ["add", "--tab"], stdin: null });
+  });
+
+  test("a page's text pasted goes in as its HTML, until he edits it", () => {
+    const clip = (html: string) => ({ getData: (t: string) => (t === "text/html" ? html : "") }) as unknown as DataTransfer;
+    const html = "<meta charset='utf-8'><h2>Gaps</h2><p>Spread reviews out.</p><img src='https://x.org/a.png'>";
+    expect(pastedHtml(clip(html))).toBe(html);
+    // Styled words alone (Notes, Mail) read the same as plain text: no HTML.
+    expect(pastedHtml(clip("<span style='font: 12px'>Spread reviews out.</span>"))).toBeNull();
+    const pasted = { text: "Gaps\r\nSpread reviews out.", html };
+    const [e] = withHtml(entries("Gaps\nSpread reviews out."), pasted);
+    expect(addArgs(e!)).toEqual({ args: ["add", "--stdin", "--html"], stdin: html });
+    expect(withHtml(entries("Gaps\nSpread reviews out. My note."), pasted)).toEqual([{ kind: "text", text: "Gaps\nSpread reviews out. My note." }]);
+    expect(withHtml(entries("https://a.com"), { text: "https://a.com", html })).toEqual([{ kind: "link", url: "https://a.com" }]);
   });
 });
 

@@ -55,6 +55,8 @@ function serve(pages: Record<string, { body: BodyInit; type: string }>) {
 }
 const HTML = "text/html; charset=utf-8";
 
+/** The saved images a body shows, in order. */
+const images = (body: string) => [...body.matchAll(/!\[([^\]]*)\]\((assets\/[0-9a-f]{16}\.\w+)\)/g)].map((m) => ({ alt: m[1], path: m[2]! }));
 const count = (s: string, re: RegExp) => (s.match(re) ?? []).length;
 const words = (s: string) => s.split(/\s+/).filter((w) => /\w/.test(w)).length;
 
@@ -696,6 +698,47 @@ describe("import coverage: awkward files", () => {
     expect(rule.body).toContain("Just prose after a rule.");
   });
 
+  test("a pasted ChatGPT answer keeps its headings, tables, math, code and images", async () => {
+    // What ⌘C on a ChatGPT answer puts on the clipboard as HTML (ore add --stdin --html).
+    const png = readFileSync(file("screenshot.png"));
+    serve({ "https://images.example.org/starter-rise.png": { body: png, type: "image/png" } });
+    const lib = await tempLibrary();
+    const paste = readFileSync(file("chatgpt-copy.html"), "utf8");
+    const item = await addText(lib, paste, { html: true });
+    expect(item.meta).toMatchObject({ type: "markdown", title: "How sourdough rises" });
+    for (const p of ["opens with the main claim: a starter's wild yeast", "Yeast numbers grow along a curve", "bake when it has doubled."]) expect(item.body).toContain(p);
+    expect(item.body.match(/^#{2,3} .+$/gm)).toEqual(["## What the starter does", "## Proof times that work", "### A feeding calculator"]);
+    expect(item.body).toContain("| 26 °C | Four to five hours |");
+    expect(item.body).toContain("$$\nN = N_0 e^{rt}\n$$");
+    expect(item.body).toContain("population after $$t$$ hours");
+    // The code reads as written: no "python" label or "Copy code" button glued to it.
+    expect(item.body).toContain("```python\ndef feed(starter):\n");
+    expect(item.body).not.toMatch(/Copy (code|table)/);
+    // A citation pill is its source's link, without its "+1".
+    expect(item.body).toContain("[example.org](https://example.org/sourdough-science)");
+    const [rise] = images(item.body);
+    expect(rise?.alt).toBe("A starter doubling in its jar over six hours");
+    expect(readFileSync(join(item.dir, rise!.path))).toEqual(png);
+    expect(item.body).toMatch(/\n\n!\[A starter doubling[^\n]*\)\n\n- \*\*Yeast/);
+    // The paste is kept whole as the original, and a reimport reads it as it was pasted.
+    expect(readFileSync(join(item.dir, "source.html"), "utf8")).toContain("Four to five hours</td>");
+    expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+    // Pasted again (a retry), it is the source already here.
+    expect((await addText(lib, paste, { html: true })).meta.id).toBe(item.meta.id);
+    // A short paste keeps its table too, and an image with no address of its own is left out.
+    const short = await addText(lib, "<h2>Proof</h2><p>Warm dough rises faster.</p><img src='/rel.png'><table><tr><th>At</th><th>Hours</th></tr><tr><td>26 °C</td><td>4</td></tr></table>", { html: true });
+    expect(short.body).toBe("## Proof\n\nWarm dough rises faster.\n\n| At | Hours |\n| --- | --- |\n| 26 °C | 4 |\n");
+  });
+
+  test("pasted Markdown's images are saved beside it", async () => {
+    const png = readFileSync(file("screenshot.png"));
+    serve({ "https://images.example.org/curve.png": { body: png, type: "image/png" } });
+    const item = await addText(await tempLibrary(), "# Spacing\n\nForgetting makes the next recall harder.\n\n![curve](https://images.example.org/curve.png)\n");
+    const [curve] = images(item.body);
+    expect(curve?.path).toMatch(/^assets\/[0-9a-f]{16}\.png$/);
+    expect(readFileSync(join(item.dir, curve!.path))).toEqual(png);
+  });
+
   test("Finder's own files are refused, not saved as a source", async () => {
     const lib = await tempLibrary();
     await expect(addSource(lib, put(".DS_Store", new Uint8Array([0, 0, 0, 1, 0x42, 0x75, 0x64, 0x31])))).rejects.toThrow(/Finder keeps for itself.*Add the file you meant/);
@@ -1209,7 +1252,6 @@ describe("import coverage: figures and slide pictures", () => {
     writeFileSync(f, readFileSync(join(FIX, "files", name)));
     return f;
   };
-  const images = (body: string) => [...body.matchAll(/!\[([^\]]*)\]\((assets\/[0-9a-f]{16}\.\w+)\)/g)].map((m) => ({ alt: m[1], path: m[2]! }));
 
   test("PowerPoint: each slide's pictures after its text, a logo on every slide left out", async () => {
     const item = await addSource(await tempLibrary(), file("deck-pictures.pptx"));
