@@ -2054,11 +2054,20 @@ journey("a row's ⋯ menu in a short window stays inside it, scrolling, as its r
   const rows = page.locator(".row");
   await rows.nth(2).waitFor();
   const last = rows.last();
-  await last.scrollIntoViewIfNeeded();
-  await last.hover();
-  await last.getByRole("button", { name: /^Actions for/ }).click();
   const menu = page.locator(".menu-list").last();
-  await menu.waitFor();
+  // A row first renders lite and is redrawn in full once it is on screen (Lite.tsx's OnScreen), so the row
+  // found a moment ago can be gone by the time it is scrolled to: try again on the row that replaced it.
+  await until("the last row's ⋯ opens its menu", async () => {
+    try {
+      await last.scrollIntoViewIfNeeded({ timeout: 1000 });
+      await last.hover({ timeout: 1000 });
+      await last.getByRole("button", { name: /^Actions for/ }).click({ timeout: 1000 });
+      await menu.waitFor({ timeout: 1000 });
+      return true;
+    } catch {
+      return false;
+    }
+  });
   await page.waitForTimeout(200);
   const box = (await menu.boundingBox())!;
   if (box.y < 0 || box.y + box.height > 480) throw new Error(`the menu runs out of the window: top ${box.y}, bottom ${box.y + box.height}`);
