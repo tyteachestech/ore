@@ -659,7 +659,11 @@ export function App() {
     setOpenId(null);
     setFinishing(false);
     setSkill(id);
-    if (!id) setPlace("sources");
+    if (!id) {
+      setPlace("sources");
+      // From Home the list was not on screen: it takes the keys at once, as `go` does (⌘K → All sources, then ↓ ↵).
+      requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
+    }
   }, []);
 
   const goHome = useCallback(() => {

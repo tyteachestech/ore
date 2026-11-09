@@ -136,6 +136,17 @@ describe("questions (D47)", () => {
     expect(inside.id).not.toBe(h.id);
   });
 
+  test("highlighting an already highlighted passage with a note keeps one highlight, now with that intent and note", async () => {
+    // `ore highlight --intent apply --note "<plan>"` over a passage he already marked (the /ore skill, the CLI):
+    // the plan must not vanish silently, and the passage never gets a second highlight (one highlight per idea).
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: TEXT });
+    const h = addHighlight(item, { exact: "Retrieval practice strengthens memory", intent: "question" });
+    const tried = addHighlight(findItem(lib, item.meta.id), { exact: "Retrieval practice strengthens memory", intent: "apply", note: "Open the next lesson with a quiz" });
+    expect(tried).toMatchObject({ id: h.id, rev: 2, intent: "apply", note: "Open the next lesson with a quiz" });
+    expect(readAnnotations(findItem(lib, item.meta.id)).filter((a) => a.id === h.id)).toHaveLength(1);
+  });
+
   test("selecting past a highlight's edge grows that highlight instead of stacking a second", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: TEXT });
