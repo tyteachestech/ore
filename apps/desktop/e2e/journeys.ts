@@ -901,6 +901,98 @@ journey("tutor Practice: an exercise is written in the source note with the sour
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor Practice: a tell apart's two cases sit side by side with a line each; Enter in A goes to B, Enter in B sends both (D163); the feedback marks each point and underlines his words (D162)", async (page) => {
+  await openSource(page, AGENTS);
+  const card = { kind: "prompt", content_type: "concept", question: "Which fits each: a support bot that follows fixed steps, or one that picks its own tools?", answer: "The first is a workflow, the second an agent.", rubric: ["Fixed steps make a workflow", "Choosing its own tools makes an agent"] };
+  const cases = ["A support bot answers refunds by running the same four steps every time.", "A research bot decides which tools to call and when it is done."];
+  const exercise = { heading: "Which idea fits each case, and what decides it?", prompts: ["Case A", "Case B"], card, cases };
+  const replies = [
+    { reply: "Tell these two apart.", citations: [], general: false, hint: false, exercise, card: null, marks: [] },
+    { reply: "A is right. B: who decides the steps?", citations: [], general: false, hint: false, exercise: null, card, marks: [{ point: card.rubric[0], covered: true, quote: "same steps each time" }, { point: card.rubric[1], covered: false, quote: "" }] },
+  ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@10" } }));
+  const asked: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    asked.push((JSON.parse(body) as { args: string[] }).args[1]!);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(replies.shift()) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click();
+  await tutor.getByRole("button", { name: "Practice", exact: true }).click();
+  const a = tutor.getByRole("region", { name: "Case A" }), b = tutor.getByRole("region", { name: "Case B" });
+  await a.getByText(cases[0]!).waitFor();
+  await b.getByText(cases[1]!).waitFor();
+  const [boxA, boxB] = [await a.boundingBox(), await b.boundingBox()];
+  if (!boxA || !boxB || Math.abs(boxA.y - boxB.y) > 2) throw new Error("the cases aren't side by side");
+  await a.getByRole("textbox").click();
+  await page.keyboard.type("A workflow: same steps each time");
+  await page.keyboard.press("Enter");
+  await until("Enter in A goes to B", async () => await b.getByRole("textbox").evaluate((el) => el === document.activeElement));
+  await page.keyboard.type("An agent");
+  await page.keyboard.press("Enter");
+  await tutor.getByText("A is right. B: who decides the steps?").waitFor();
+  if (asked[1] !== "A: A workflow: same steps each time\nB: An agent") throw new Error(`sent: ${JSON.stringify(asked[1])}`);
+  if (await a.getByRole("textbox").count()) throw new Error("the answer lines stay once he has answered");
+  const got = tutor.getByRole("listitem", { name: /^Got: Fixed steps make a workflow/ });
+  await got.hover();
+  await tutor.locator(".ask-me .quiz-evidence", { hasText: "same steps each time" }).waitFor();
+  await tutor.getByRole("listitem", { name: "Missed: Choosing its own tools makes an agent" }).focus();
+  await until("a missed point marks nothing", async () => (await tutor.locator(".ask-me .quiz-evidence").count()) === 0);
+  await tutor.getByRole("button", { name: /^Add card/ }).waitFor(); // the committed card, offered after the miss (D158)
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
+journey("tutor: words selected in a reply go into the source note as a quote, Undo takes them out; Card asks the tutor for a card from them (D164)", async (page) => {
+  await openSource(page, AGENTS);
+  const said = "An agent decides its own next step, and a workflow follows steps written in advance.";
+  const asked: string[] = [];
+  let item = "";
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    const args = (JSON.parse(body) as { args: string[] }).args;
+    asked.push(args[1]!);
+    item ||= args.find((a) => a.startsWith("--item="))!.slice(7);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `${said} That is the whole difference.`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@10" } }) });
+  });
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click();
+  await tutor.getByRole("textbox", { name: "Message the tutor" }).fill("agent or workflow?");
+  await page.keyboard.press("Enter");
+  const reply = tutor.locator("[data-reply] p").filter({ hasText: said }).last();
+  await reply.waitFor();
+  const pick = () => reply.evaluate((p, words) => {
+    const node = p.firstChild!;
+    const at = node.textContent!.indexOf(words);
+    const r = document.createRange();
+    r.setStart(node, at);
+    r.setEnd(node, at + words.length);
+    const sel = document.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }, said);
+  await pick();
+  const bar = tutor.getByRole("toolbar", { name: "Selected words" });
+  await bar.getByRole("button", { name: "Into note" }).click();
+  await page.locator(".toast", { hasText: "Added to your note" }).waitFor();
+  if (await bar.count()) throw new Error("the toolbar stays after Into note");
+  const note = async () => ((await ore("notes", item)) as { text: string }).text;
+  await until("the note has the quote under From the tutor", async () => (await note()).includes(`## From the tutor\n\n> ${said}`));
+  await page.locator(".toast", { hasText: "Added to your note" }).getByRole("button", { name: "Undo" }).click();
+  await until("Undo takes it out", async () => !(await note()).includes(said));
+  await pick();
+  await bar.getByRole("button", { name: "Card" }).click();
+  await until("Card asks the tutor for a card from the words", async () => asked.at(-1) === `Make a card from this: “${said}”`);
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Meta+j");
+});
+
 journey("Collected row menu: change a highlight's type and remove it without opening it, ⌘Z takes each back", async (page) => {
   await openSource(page, TESTING);
   // Its own highlight, so it never leans on what an earlier journey left (or took back).
@@ -1075,6 +1167,66 @@ journey("figure zoom: a click opens a figure to fill the window and keys don't r
   await page.mouse.wheel(0, 200);
   await shut();
   if ((await page.locator(".reader-scroll").evaluate((el) => el.scrollTop)) !== top) throw new Error("the scroll that put the figure back moved the page too");
+});
+
+journey("figure cards: a drag over a zoomed figure draws a box, what's under it makes a Fact card that hides it, Undo takes it back (D166)", async (page) => {
+  await openSource(page, AGENTS);
+  const fig = page.locator(".doc img").first();
+  await fig.scrollIntoViewIfNeeded();
+  await fig.click();
+  const big = page.locator(".figure-zoom.open img");
+  await big.waitFor();
+  await page.waitForTimeout(400);
+  const b = (await big.boundingBox())!;
+  // A plain click still puts it back; a drag draws a box instead.
+  await page.mouse.move(b.x + b.width * 0.2, b.y + b.height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * 0.35, b.y + b.height * 0.4, { steps: 6 });
+  await page.mouse.move(b.x + b.width * 0.4, b.y + b.height * 0.5, { steps: 6 });
+  await page.mouse.up();
+  const field = page.getByRole("textbox", { name: "What’s under the box" });
+  await field.waitFor();
+  if (!(await page.locator(".figure-zoom").count())) throw new Error("the drag put the figure back");
+  // Keys typed there go to the field, not the page or the zoom.
+  await field.pressSequentially("Router j");
+  if ((await field.inputValue()) !== "Router j") throw new Error(`typed: ${await field.inputValue()}`);
+  await field.press("Backspace");
+  await field.press("Backspace");
+  await field.press("Enter");
+  await page.getByText("Card made").waitFor();
+  const saved = page.locator(".figure-box.saved");
+  await saved.first().waitFor();
+  const id = ((await ore("cards", "--state", "draft")) as { id: string; answer: string; figure?: object }[]).find((c) => c.figure && c.answer === "Router")?.id;
+  if (!id) throw new Error("no figure card was made");
+  const card = (await ore("card", "show", id, "--review")) as { kind: string; figure: { src: string; box: number[] }; figure_file: string };
+  if (card.kind !== "card" || card.figure.src !== "assets/patterns.svg" || !card.figure_file.endsWith("assets/patterns.svg")) throw new Error(JSON.stringify(card));
+  const [x, y, w, h] = card.figure.box;
+  if (Math.abs(x! - 0.2) > 0.02 || Math.abs(y! - 0.3) > 0.02 || Math.abs(w! - 0.2) > 0.02 || Math.abs(h! - 0.2) > 0.02) throw new Error(`box ${card.figure.box}`);
+  // An edit in review hands back the card with its figure, so the figure stays on screen.
+  if (!((await ore("card", "set", id, "--answer", "Routing")) as { figure_file?: string }).figure_file) throw new Error("editing a figure card lost its figure");
+  // Esc with no box open puts the figure back; Undo takes the card back.
+  await page.keyboard.press("Escape");
+  await page.locator(".figure-zoom").waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "Undo" }).click();
+  await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
+});
+
+journey("a recording plays in place: its player over the transcript, his highlights as ticks, a stamp seeks it, Space plays and pauses (D167)", async (page) => {
+  await openSource(page, "Lecture 4");
+  const player = page.locator(".player.audio");
+  await player.waitFor();
+  if (await player.locator("iframe").count()) throw new Error("a recording drew a video frame");
+  await until("its length is read from the file", async () => (await player.locator(".time").innerText()).includes("1:00"));
+  await until("both highlights are ticks on the bar", async () => (await player.locator(".scrub-tick").count()) === 2);
+  const lefts = await player.locator(".scrub-tick").evaluateAll((ts) => ts.map((t) => parseFloat((t as HTMLElement).style.left)));
+  // "the memory gets stronger" is spoken at about 0:15 (word times spread over its cue), "The gap only shows" at 0:30.
+  if (!(lefts[0]! > 15 && lefts[0]! < 32 && lefts[1]! > 45 && lefts[1]! < 55)) throw new Error(`ticks at ${lefts}`);
+  await page.locator(".doc .ts").filter({ hasText: "00:30" }).click();
+  await until("the stamp seeks the recording", async () => /^0:3\d/.test((await player.locator(".time").innerText()).trim()));
+  await until("and plays it", async () => (await player.getByRole("button", { name: "Pause" }).count()) === 1);
+  await page.mouse.click(5, 300);
+  await page.keyboard.press("Space");
+  await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
 journey("highlight note: a long note's hover preview stays inside the window", async (page) => {
@@ -4592,6 +4744,65 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   await page.waitForTimeout(300);
   if (asked.length !== 2) throw new Error(`a double click on Try again asked ${asked.length - 1} times`);
   await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review Ask: a suggested card shows only what it changes, struck and underlined, and keeps showing it once used (D161)", async (page) => {
+  let id = "";
+  let was = { question: "", answer: "" };
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
+    id = (JSON.parse(body) as { args: string[] }).args[1]!;
+    const question = was.question.replace(/\?$/, "") + ", in one line?";
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Tighter, and it asks for one line.", proposal: { question, answer: "Short answer." }, session: "s1" }) });
+  });
+  await startReview(page, null);
+  was = { question: (await page.locator(".review-q").innerText()).trim(), answer: "" };
+  await reveal(page);
+  was.answer = (await page.locator(".review-answer").first().innerText()).trim();
+  await page.getByRole("button", { name: "Ask about this" }).click();
+  await page.locator(".ask-starters").getByRole("button", { name: "Make this card clearer" }).click();
+  const card = page.locator(".ask-card");
+  await card.waitFor();
+  const q = card.locator(".ask-card-q");
+  if ((await q.locator(".diff-del").count()) !== 0) throw new Error("the question's kept words were struck");
+  if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("the added words aren't marked");
+  if (!(await card.locator(".ask-card-a .diff-add").allInnerTexts()).join("").includes("Short")) throw new Error("the new answer isn't marked as added");
+  await page.unroute(/\/ore$/);
+  await card.getByRole("button", { name: "Use this card" }).click();
+  await card.getByRole("button", { name: "Card updated" }).waitFor();
+  if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("using the card dropped the change it shows");
+  await ore("card", "set", id, `--question=${was.question}`, `--answer=${was.answer}`);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review end: calibration shows a bar for each tap with enough answers, the counts on hover (D165)", async (page) => {
+  const levels = [{ confidence: 1, n: 12, right: 0.5 }, { confidence: 2, n: 4, right: null }, { confidence: 3, n: 30, right: 0.9 }];
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"args":["session","end"')) return route.fallback();
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), calibration: { sure_n: 30, sure_right: 0.9, levels } } });
+  });
+  const app = oreCalls(page);
+  try {
+    await startReview(page, /^\s*AI\b/);
+    await page.keyboard.press("2");
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    const cal = page.getByRole("group", { name: "When you say" });
+    await cal.waitFor();
+    const rows = await cal.locator(".review-calibration-row").evaluateAll((es) => es.map((e) => e.getAttribute("aria-label")));
+    if (rows.join("|") !== "Guess: right 50%|Sure: right 90%") throw new Error(`rows: ${rows.join("|")}`);
+    if ((await cal.locator(".review-calibration-row").last().locator("i[data-on]").count()) !== 9) throw new Error("Sure's bar isn't 9 of 10");
+    await cal.locator(".review-calibration-row").first().hover();
+    await page.getByText("Right 6 of 12 Explain answers in the last 12 weeks").waitFor();
+  } finally {
+    await page.unroute(/\/ore$/);
+    await app.undoAll();
+  }
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
 });

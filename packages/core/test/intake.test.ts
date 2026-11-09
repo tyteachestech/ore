@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, tr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
-import { addSource, addTab, addText, reimportSource } from "../src/ingest/index.ts";
+import { addSource, addTab, addText, audioOf, reimportSource } from "../src/ingest/index.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
@@ -1027,7 +1027,11 @@ describe("import coverage: audio and podcasts", () => {
     const item = await addSource(await tempLibrary(), mp3(), { onProgress: (d) => seen.push(d) });
     expect(item.meta.title).toBe("Huberman on sleep");
     expect(item.body).toBe("[00:00] Welcome back to the show. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n");
-    expect(readFileSync(join(item.dir, "source.vtt"), "utf8")).toBe(VTT);
+    // D167: the audio is kept as the original, to play in place; the transcript beside it.
+    expect(readFileSync(join(item.dir, "source.mp3")).length).toBe(2048);
+    expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(VTT);
+    expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.mp3") });
+    expect(audioOf(item)!.words[0]).toEqual([0, "Welcome"]);
     expect(seen).toEqual([0.5, 1]);
   });
 

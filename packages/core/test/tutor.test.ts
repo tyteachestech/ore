@@ -82,7 +82,7 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@9" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@10" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
@@ -347,6 +347,41 @@ describe("tutor: practice", () => {
     expect((await tutor(lib, "A miss shows the memory is weak, and box one comes round most often", { item: a.meta.id, earlier })).card).toBeNull();
     expect((await tutor(lib, "Both", { item: a.meta.id, earlier })).card).toBeNull();
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("covered: one boolean per rubric point (2)");
+  });
+
+  test("feedback marks each point of the committed card with the words of his that earned it; a quote he didn't write is dropped (D162)", async () => {
+    const { lib, a } = await library();
+    const earlier = [{ message: "Practice", reply: "Explain why a missed card goes back to box one.", exercise }];
+    const answer = "A miss says the memory is weak, so it starts over";
+    fakeClaude([
+      out({ reply: "Good on weak memory.", covered: [true, false], evidence: ["the memory is weak"] }),
+      out({ reply: "Good on weak memory.", covered: [true, false], evidence: ["the memory is weak", ""] }),
+      out({ reply: "Both.", covered: [true, true], evidence: ["the memory is   WEAK", "reviewed most often"] }),
+    ]);
+    const r = await tutor(lib, answer, { item: a.meta.id, earlier });
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("evidence: one per rubric point (2)");
+    expect(r.marks).toEqual([{ point: key.rubric[0]!, covered: true, quote: "the memory is weak" }, { point: key.rubric[1]!, covered: false, quote: "" }]);
+    // Case and spacing are folded as Review's grader does; a quote that isn't in his answer marks nothing.
+    expect((await tutor(lib, answer, { item: a.meta.id, earlier })).marks).toEqual([{ point: key.rubric[0]!, covered: true, quote: "the memory is weak" }, { point: key.rubric[1]!, covered: true, quote: "" }]);
+  });
+
+  test("a reply with no open exercise has no marks", async () => {
+    const { lib, a } = await library();
+    fakeClaude([out({ reply: "Hello." })]);
+    expect((await tutor(lib, "hi", { item: a.meta.id })).marks).toEqual([]);
+  });
+
+  test("a tell apart carries its two cases for the app to set side by side; one case, or three, go back to fix (D163)", async () => {
+    const { lib, a } = await library();
+    const cases = ["Ana reviews a card the day after she misses it.", "Ben reviews a card a week after he gets it right."];
+    const apart = { ...exercise, heading: "Which idea fits each case, and what decides it?", cases };
+    fakeClaude([out({ exercise: { ...apart, cases: [cases[0]] } }), out({ exercise: apart })]);
+    expect((await tutor(lib, "Practice", { item: a.meta.id })).exercise).toEqual(apart);
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("exercise.cases: a tell apart's two cases, each in full");
+    // Sent back with the turn, the cases are part of the exercise it judges against.
+    fakeClaude([out({ reply: "Both right.", covered: [true, true], evidence: ["", ""] })]);
+    await tutor(lib, "A: box one. B: a later box.", { item: a.meta.id, earlier: [{ message: "Practice", reply: "Tell these apart.", exercise: apart }] });
+    expect(sent().at(-1)).toMatchObject({ exercise: { heading: apart.heading, card: key } });
   });
 
   test("covered marks with no open exercise go back to fix", async () => {
