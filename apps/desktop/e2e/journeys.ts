@@ -2620,7 +2620,11 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
     await page.mouse.move(box.x + 30, box.y + box.height / 2);
     const g = page.locator(".block-grip");
     await g.waitFor();
-    return { g: (await g.boundingBox())!, box };
+    const at = (await g.boundingBox())!;
+    // On the way left to it, over the bullets and the gutter, the handle stays on this item (it jumped to the list's first).
+    await page.mouse.move(at.x + 10, at.y + 12, { steps: 12 });
+    if ((await g.boundingBox())?.y !== at.y) throw new Error(`the handle left “${text}” on the way to it`);
+    return { g: at, box };
   };
   await openSource(page, TESTING);
   const { g } = await grip("Confidence + correction");
