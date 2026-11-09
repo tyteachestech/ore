@@ -135,13 +135,13 @@ const steps: [string, (page: Page) => Promise<Result>][] = [
     const q = page.locator(".review-q");
     return measure(page, async () => {
       for (let i = 0; i < 5 && (await q.isVisible()); i++) {
-        const was = await q.innerText();
         // An Explain card shows its answer on No idea, a Fact card on how sure he is.
         const noIdea = page.getByRole("button", { name: "No idea" });
         await ((await noIdea.isVisible()) ? noIdea : page.getByRole("radio", { name: "Think so" }).first()).click();
         await page.getByRole("button", { name: "Good", exact: true }).click();
-        // The next card, or the end of the session.
-        await page.waitForFunction((was) => { const el = document.querySelector(".review-q"); return el ? el.textContent !== was : !document.querySelector(".review"); }, was);
+        // The next card (it opens on its answer, so the ratings go), or the end of the session. Not the question's
+        // text: the scaled seed repeats questions, so two cards in a row can read the same and the wait never ends.
+        await page.getByRole("button", { name: "Good", exact: true }).waitFor({ state: "detached" });
       }
     });
   }],
