@@ -24,7 +24,7 @@ export const SkillSchema = z.object({
   priority: Priority,
   hook: z.string().optional(),
   goal: z.string().optional(), // D101: what he could show he can do, tried from memory on the skill page
-  icon: z.string().optional(), // an emoji, "mc:<name>" (a MingCute icon) or "ph:<name>" (Phosphor, older) (D36)
+  icon: z.string().optional(), // "mc:<name>", a pixel skill icon (D36, D157); emoji and "ph:" from before D157 draw nothing
   color: SkillColor.optional(),
   collection: z.string().optional(), // sidebar group, e.g. "Ty Teaches Tech"
 });
@@ -165,13 +165,9 @@ const sameName = (a: string, b: string) => a.normalize("NFC").toLowerCase() === 
 export const matchSkill = (skills: Skill[], name: string): Skill | undefined =>
   skills.find((s) => s.id === name.trim() || sameName(s.name, name.trim().replace(/\s+/g, " ")));
 
-// One emoji (flags and keycaps included), "mc:<file_name>" or "ph:<kebab-name>". Checked on write only, so a
-// hand-edited skills.yaml never stops loading; the app just doesn't draw an icon it can't read.
-export function isSkillIcon(icon: string): boolean {
-  if (/^mc:[A-Za-z0-9]+(_[A-Za-z0-9]+)*$/.test(icon) || /^ph:[a-z0-9]+(-[a-z0-9]+)*$/.test(icon)) return true;
-  const graphemes = [...new Intl.Segmenter().segment(icon)];
-  return graphemes.length === 1 && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(icon);
-}
+// "mc:<file_name>", a pixel skill icon (D157). Checked on write only, so a hand-edited skills.yaml never stops
+// loading; the app just doesn't draw an icon it can't read.
+export const isSkillIcon = (icon: string): boolean => /^mc:[A-Za-z0-9]+(_[A-Za-z0-9]+)*$/.test(icon);
 
 export const reviewSettings = (lib: Library): ReviewSettings => ({ ...REVIEW_DEFAULTS, ...loadSkills(lib).review });
 
@@ -219,7 +215,7 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
       if (v === undefined) continue;
       if (key === "color" && v && !SkillColor.options.includes(v as SkillColor))
         throw new Error(`color must be one of ${SkillColor.options.join("|")}`);
-      if (key === "icon" && v && !isSkillIcon(v)) throw new Error('icon must be one emoji or "mc:<name>"');
+      if (key === "icon" && v && !isSkillIcon(v)) throw new Error('icon must be "mc:<name>"');
       if ((key === "hook" || key === "goal") && v.length > HOOK_MAX) throw new Error(`${key} must be at most ${HOOK_MAX} characters`);
       if (v) node.set(key, v);
       else node.delete(key);

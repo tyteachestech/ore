@@ -174,7 +174,6 @@ kbd {
 .side-item kbd { margin-left: 6px; }
 .side-item .mark { flex: none; display: grid; place-items: center; width: 18px; height: 20px; margin-left: -2px; }
 /* Beside a Geist label an emoji reads ~1px low (measured on his Retina screen, 2026-10-29). */
-.side-item .mark .skill-icon.emoji { transform: translateY(-1px); }
 .side-main:has(.mark) { gap: 9px; }
 /* Icons sit bare (Dia, Notion); the open skill's row takes its color, as Dia tints a space. */
 .side-item.on[data-color] { background: color-mix(in srgb, var(--skill) 24%, var(--bg-side)); }
@@ -194,7 +193,6 @@ kbd {
 
 /* Skill icons: an emoji, a Phosphor glyph masked and filled with the skill color, or a color dot. */
 .skill-icon { display: inline-block; flex: none; width: 1em; height: 1em; line-height: 1; vertical-align: -0.125em; }
-.skill-icon.emoji { width: auto; text-align: center; font-family: "Apple Color Emoji", var(--font); }
 .skill-icon.glyph { background: var(--skill, var(--muted)); mask: center / contain no-repeat; -webkit-mask: center / contain no-repeat; }
 /* A skill's MingCute icon is a 16-grid dot sprite (pixelSkillIcons in vite.config.ts): drawn at 20px, or 40px in the big
    tiles, a quarter over the UI icons' asked sizes, as icons.tsx draws them. */
@@ -416,36 +414,23 @@ img.thumb { filter: brightness(0.86); }
 .menu-input + [cmdk-list]:empty { display: none; }
 
 .picker { width: 392px; display: flex; flex-direction: column; }
-.picker-head { display: flex; align-items: stretch; height: 40px; padding: 0 10px; border-bottom: 1px solid var(--border); }
-.picker-tabs { display: flex; gap: 2px; }
-.picker-tabs button { position: relative; padding: 0 8px; color: var(--muted); font-weight: 500; }
-.picker-tabs button:hover { color: var(--text); }
-.picker-tabs button[data-state="active"] { color: var(--text); }
-.picker-tabs button[data-state="active"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 1px; background: var(--text); }
-.picker-tabs button:focus-visible { outline: none; color: var(--text); background: var(--bg-hover); border-radius: 6px 6px 0 0; }
+.picker-head { display: flex; align-items: center; height: 40px; padding: 0 10px 0 12px; border-bottom: 1px solid var(--border); }
 .picker-remove { margin-left: auto; padding: 0 8px; color: var(--muted); }
 .picker-remove:hover:not(:disabled) { color: var(--text); }
 .picker-remove:disabled { color: var(--faint); opacity: 0.6; }
 .picker-body { display: flex; flex-direction: column; height: 360px; }
-.picker-body:focus-visible { outline: none; }
-.picker-body[hidden] { display: none; }
-.emoji-root { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .picker-tools { display: flex; gap: 6px; padding: 10px 10px 6px; }
 .picker-search { flex: 1; height: 30px; }
 .picker-tool { flex: none; width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; border: 1px solid var(--border); color: var(--muted); font-size: 16px; }
 .picker-tool:hover { background: var(--bg-hover); color: var(--text); }
 .picker-tool:focus-visible { outline: none; border-color: var(--focus); }
-.picker-colors { display: flex; gap: 8px; align-items: center; padding: 10px 12px 2px; }
+.picker-colors { display: flex; gap: 8px; align-items: center; }
 .picker-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 8px; }
-.picker-section.recent { flex: none; padding: 0 6px; }
-.emoji-list { width: 100%; }
-[frimousse-row] > .picker-cell { flex: 0 0 calc(100% / 12); } /* frimousse rows are inline flex; fixed cells keep a short row left-aligned */
 .picker-label { height: 28px; padding: 8px 6px 0; color: var(--faint); font-size: 11px; font-weight: 600; background: var(--bg-raised); }
 .picker-grid { display: grid; grid-template-columns: repeat(12, 1fr); }
 .picker-cell { height: 31px; display: grid; place-items: center; border-radius: 6px; font-size: 20px; line-height: 1; }
 .picker-cell:hover, .picker-cell[data-active] { background: var(--bg-hover); }
 .picker-cell:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
-.picker-cell.emoji { font-family: "Apple Color Emoji", var(--font); }
 .picker-note { display: block; padding: 24px 12px; color: var(--muted); text-align: center; }
 .keys-head { display: flex; align-items: center; gap: 4px; height: 50px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--border); }
 .keys-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
@@ -1308,7 +1293,6 @@ body.resizing iframe { pointer-events: none; }
 }
 .note-menu-row { display: flex; align-items: center; gap: 12px; height: 30px; padding: 0 10px; border-radius: 6px; color: var(--text); }
 .note-menu-row .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.note-menu-row .emoji { width: 20px; margin-right: -4px; text-align: center; font-size: 17px; line-height: 1; flex: none; }
 .note-menu-row.on { background: var(--bg-active); }
 .note-menu-row .sub { margin-left: auto; color: var(--faint); font-family: var(--mono); font-size: 11px; flex: none; }
 .note-menu-empty { padding: 6px 10px; color: var(--faint); }
@@ -2662,7 +2646,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* Keyboard focus (WCAG 2.4.7): these controls share their hover fill with focus and once switched the outline off,
    so Tab showed nothing a fill didn't already mean. They get the app's ring back; hover stays the fill alone. */
 :is(.home-gear, .review-passage figcaption button, .review-quotes button, .review-tools button, .ask-starters button, .cite, .tutor-sources,
-  .library-sources button, .settings-back, .tutor-chip button, .tutor-acts button, .tutor-quiz button, .picker-tabs button):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .library-sources button, .settings-back, .tutor-chip button, .tutor-acts button, .tutor-quiz button):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 /* Timeline.tsx (D149): a card's reviews on a line above the ratings. A hairline, 8px dots in the rating's
    colour at their time to scale, and a hollow dot where the rating under the pointer puts the next one.

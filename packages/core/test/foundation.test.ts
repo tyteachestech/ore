@@ -129,17 +129,18 @@ describe("init", () => {
 describe("skill look", () => {
   test("sets and clears icon, color and collection in skills.yaml, keeping comments", async () => {
     const lib = await tempLibrary();
-    const set = await setSkillLook(lib, "teaching", { icon: "🎓", color: "blue", collection: "Ty Teaches Tech" });
-    expect(set).toMatchObject({ id: "teaching", icon: "🎓", color: "blue", collection: "Ty Teaches Tech", priority: "P1" });
+    const set = await setSkillLook(lib, "teaching", { icon: "mc:mortarboard", color: "blue", collection: "Ty Teaches Tech" });
+    expect(set).toMatchObject({ id: "teaching", icon: "mc:mortarboard", color: "blue", collection: "Ty Teaches Tech", priority: "P1" });
     expect(loadSkills(lib).skills.find((s) => s.id === "teaching")).toEqual(set);
     const cleared = await setSkillLook(lib, "teaching", { color: "", collection: " " });
-    expect(cleared).toEqual({ id: "teaching", name: "Teaching", priority: "P1", hook: "Explaining ideas so they land", icon: "🎓" });
+    expect(cleared).toEqual({ id: "teaching", name: "Teaching", priority: "P1", hook: "Explaining ideas so they land", icon: "mc:mortarboard" });
     expect(readFileSync(join(lib.root, "skills.yaml"), "utf8")).toContain("# Skills (D25)");
     await expect(setSkillLook(lib, "teaching", { color: "mauve" })).rejects.toThrow("color must be one of");
     await expect(setSkillLook(lib, "teaching", { icon: "ffdasdf" })).rejects.toThrow("icon must be");
     await expect(setSkillLook(lib, "teaching", { icon: "🎓🎓" })).rejects.toThrow("icon must be");
     await expect(setSkillLook(lib, "teaching", { icon: "mc:../book" })).rejects.toThrow("icon must be");
-    for (const icon of ["👋🏽", "🇯🇵", "#️⃣", "👩‍💻", "mc:book_2_ai", "mc:IDcard", "ph:book-open"]) expect((await setSkillLook(lib, "teaching", { icon })).icon).toBe(icon);
+    for (const icon of ["🎓", "👩‍💻", "ph:book-open"]) await expect(setSkillLook(lib, "teaching", { icon })).rejects.toThrow("icon must be"); // D157: pixel icons only
+    for (const icon of ["mc:book_2_ai", "mc:IDcard"]) expect((await setSkillLook(lib, "teaching", { icon })).icon).toBe(icon);
     await expect(setSkillLook(lib, "nope", { icon: "x" })).rejects.toThrow('unknown skill "nope"');
   });
 

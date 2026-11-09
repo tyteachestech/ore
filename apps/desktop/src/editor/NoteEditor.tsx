@@ -25,7 +25,6 @@ import { lastPaint, paint } from "./colors";
 import { mathBlockSchema, mathInlineSchema, mathViews } from "./math";
 import * as Popover from "@radix-ui/react-popover";
 import { dateRows } from "./dates";
-import { findEmoji, loadEmoji, type EmojiEntry } from "./emoji";
 import { keepUnedited } from "./preserve";
 import { BlockHandle, nearest, spot, type Spot } from "./BlockHandle";
 import { copiedFiles, pastesFiles } from "../copied";
@@ -133,9 +132,9 @@ const DiagramEditor = lazy(() => import("../Diagram"));
 /** Fired after a diagram is saved, so its preview redraws; detail is `<note dir>/<name>`. */
 const SAVED = "ore:diagram-saved";
 
-type Menu = { kind: "slash" | "link" | "emoji" | "date"; query: string; from: number; to: number; x: number; y: number };
+type Menu = { kind: "slash" | "link" | "date"; query: string; from: number; to: number; x: number; y: number };
 /** `names`: what Notion also takes after `/` for it (`/h1`, `/#`, `/hr`). */
-type Row = { label: string; sub?: string; emoji?: string; names?: string[]; run: () => void };
+type Row = { label: string; sub?: string; names?: string[]; run: () => void };
 
 const LINK_URL = /^ore:(item|skill)\/(.+)$/;
 
@@ -159,7 +158,7 @@ let handoff: { pos: number; at: number } | null = null;
 /** The selection each note (by `place`) had when its editor last closed. */
 const places = new Map<string, { anchor: number; head: number }>();
 
-/** The note editor (D38): Markdown shortcuts, a `/` menu, `[[` links, `:` emoji. No AI anywhere in it (D34.2). */
+/** The note editor (D38): Markdown shortcuts, a `/` menu, `[[` links, `@` dates. No AI anywhere in it (D34.2). */
 export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(p, ref) {
   const root = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -172,7 +171,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [math, setMath] = useState<{ pos: number; x: number; y: number; w: number; h: number } | null>(null);
   /** Where images dragged in from Finder will land: a gap between the note's blocks. */
   const [dropLine, setDropLine] = useState<{ x: number; y: number; w: number } | null>(null);
-  const [emoji, setEmoji] = useState<EmojiEntry[] | null>(null);
   /** The diagram open in the overlay; `at` is where a new one goes once it has a drawing. */
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
   // The editor's plugins live as long as it does; they read the latest props, rows and menu
@@ -359,19 +357,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const rowsFor = (menu: Menu | null): Row[] => {
     if (!menu) return [];
     const q = menu.query.trim().toLowerCase();
-    if (menu.kind === "emoji") {
-      if (!emoji) void loadEmoji().then(setEmoji, () => {});
-      return findEmoji(emoji ?? [], q).map((e) => ({
-        label: e.label,
-        emoji: e.emoji,
-        run: () => {
-          const v = clear(menu);
-          if (!v) return;
-          v.dispatch(v.state.tr.insertText(e.emoji));
-          v.focus();
-        },
-      }));
-    }
     if (menu.kind === "date")
       return dateRows(menu.query).map((d) => ({
         label: d.label,
@@ -710,12 +695,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {!PHONE && <TableControls view={view} host={host} />}
       {PHONE && <KeyboardBar view={view} targets={p.targets} />}
       {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => showSel(null)} askLink={askLink} />}
-      {menu && ((menu.kind !== "emoji" && menu.kind !== "date") || rows.length > 0) && (
+      {menu && (menu.kind !== "date" || rows.length > 0) && (
         <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
             rows.map((r, i) => (
               <div key={r.label + i} role="option" aria-selected={i === index} className={`note-menu-row${i === index ? " on" : ""}`} onMouseMove={() => hover(i)} onClick={r.run}>
-                {r.emoji && <span className="emoji">{r.emoji}</span>}
                 <span className="label">{r.label}</span>
                 {r.sub && <span className="sub">{r.sub}</span>}
               </div>
@@ -786,7 +770,7 @@ function imagePaste(live: Live) {
             const text = d.getData("text/plain").trim();
             const files = [...d.files].filter((f) => f.type.startsWith("image/") && f.size > 0);
             // Words copied with a picture paste as words; an image alone (a screenshot, Copy Image's
-            // bare <img>, a Finder copy that names it) pastes as the image.
+            // bare img tag, a Finder copy that names it) pastes as the image.
             const words = !!d.getData("text/html").replace(/<[^>]*>/g, "").trim() || (!!text && !text.split("\n").every((l) => /^[^/]+\.[a-z0-9]{1,5}$/i.test(l))); // not a copied file's names
             if (words) return false;
             e.preventDefault();
@@ -925,8 +909,8 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
               }
               return false;
             }
-            // An emoji or date query with no match shows nothing, so its keys stay ordinary typing.
-            if ((menu.kind === "emoji" || menu.kind === "date") && !rows.length) return false;
+            // A date query with no match shows nothing, so its keys stay ordinary typing.
+            if (menu.kind === "date" && !rows.length) return false;
             // Keys the menu uses stop here, so the view around the editor (Esc: back) never sees them.
             const used = () => (e.stopPropagation(), true);
             if (e.key === "Escape") {

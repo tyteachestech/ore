@@ -1735,7 +1735,7 @@ export function App() {
         ]
       : []),
     // Display settings last: ⌘K ↵ on an empty query does the likely thing, never flips a setting (2026-11-08).
-    ...CHIP_LOOKS.filter((l) => l.id !== chipLook()).map((l) => ({ id: `chips:${l.id}`, label: `Skill tags: ${l.label}`, keywords: ["chips", "pills", "emoji", "compact"], run: () => setChipLook(l.id) })),
+    ...CHIP_LOOKS.filter((l) => l.id !== chipLook()).map((l) => ({ id: `chips:${l.id}`, label: `Skill tags: ${l.label}`, keywords: ["chips", "pills", "compact"], run: () => setChipLook(l.id) })),
     ...(openId && !finishing ? WIDTHS.filter((w) => w.id !== width).map((w) => ({ id: `width:${w.id}`, label: `Reading width: ${w.label}`, keywords: ["column", "measure"], run: () => setWidth(w.id) })) : []),
     ...(openId && !finishing
       ? [

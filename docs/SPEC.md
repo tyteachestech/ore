@@ -10,7 +10,7 @@ capture → (AI: prequestions, skills, topics) → read + highlight (one highlig
 
 ```
 AGENTS.md                      # rules for agents editing this folder (CLAUDE.md symlinks to it)
-skills.yaml                    # Tyler's skills: id, name, priority (P1|P2|P3), hook; optional goal (D102), icon (an emoji or mc:<name>, a MingCute icon; older ph:<name> Phosphor icons still draw), color, collection (D36); optional `review: {goal_minutes, weekdays_only, new_per_day, remix, plan, reminder}` (D60, D66, D67; defaults 10, false, 10, true, "", ""; reminder is local "HH:MM")
+skills.yaml                    # Tyler's skills: id, name, priority (P1|P2|P3), hook; optional goal (D102), icon (mc:<name>, a pixel skill icon, D157; emoji and ph:<name> from before it still draw), color, collection (D36); optional `review: {goal_minutes, weekdays_only, new_per_day, remix, plan, reminder}` (D60, D66, D67; defaults 10, false, 10, true, "", ""; reminder is local "HH:MM")
 topics/<slug>.md               # frontmatter: id, name, status (active|wanted), skills[], aliases[]; body: AI summary
 items/<yyyy>/<slug>-<id>/
   doc.md                       # canonical text + frontmatter (below)
@@ -173,7 +173,7 @@ ore course preview <url> | set <course> [--title t] [--skills a,b] | archive <co
 ore feed [--refresh] | find <url> | follow <url> [--skill s] | unfollow <feed> | arrange '["<feed url>",…]' | set <feed> [--name n] [--skill s] | read|unread <post url>… | open <post url> | close <item>   the Feed (D107): posts of the last 14 days; open reads a post as a preview (`preview` set, never listed), close keeps it only if it has a highlight or a source note, else deletes it
 ore edit <item> [--title t] [--author a] [--skills a,b]   rename a source, set its author ("" clears it), or file it under exactly these skills ("" for none); its cards follow, its topics gain new ones
 ore skills                            list skills (id, name, priority, hook, goal, icon, color, collection)
-ore skills set <skill> [--name n] [--icon emoji|mc:name] [--color gray|red|orange|yellow|green|teal|blue|purple|pink] [--collection c] [--hook "why"] [--goal "what I could show"]   --name renames it (the ID stays, so links hold); "" clears any other field; hook is his one line on why (≤140 chars, D63), goal what he could show he can do (≤140 chars, D102); edits skills.yaml in place, keeping comments
+ore skills set <skill> [--name n] [--icon mc:name] [--color gray|red|orange|yellow|green|teal|blue|purple|pink] [--collection c] [--hook "why"] [--goal "what I could show"]   --name renames it (the ID stays, so links hold); "" clears any other field; hook is his one line on why (≤140 chars, D63), goal what he could show he can do (≤140 chars, D102); edits skills.yaml in place, keeping comments
 ore skills add <name> [--collection c]   new skill at P2 (the sidebar's + on a section header); refuses a name that matches an existing skill
 ore skills arrange '<layout json>'   the sidebar in one write: [{"collection":"Work","skills":["ai",...]},{"collection":"","skills":[...]}], every skill exactly once; sorts skills.yaml into that order (a collection sits where its first skill is) and sets or clears each collection. Drag, Move to, renaming, reordering or deleting a collection, and their Undo all use it
 ore skills rm <skill> [--archive]      delete a skill: drops it from skills.yaml and untags its sources, cards and topics (cards keep reviewing, the skill note stays on disk); --archive also archives sources filed only under it

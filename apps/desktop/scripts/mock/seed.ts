@@ -14,9 +14,9 @@ const CLI = `${import.meta.dir}/../../../../packages/cli/src/ore.ts`;
 process.env.ORE_LIBRARY = root;
 
 await setSkillLook(lib, "ai", { icon: "mc:ai", color: "purple", collection: "Ty Teaches Tech" });
-await setSkillLook(lib, "learning", { icon: "🧠", color: "pink", collection: "Ty Teaches Tech" });
+await setSkillLook(lib, "learning", { icon: "mc:brain", color: "pink", collection: "Ty Teaches Tech" });
 await setSkillLook(lib, "teaching", { icon: "mc:black_board", color: "blue", collection: "Ty Teaches Tech" });
-await setSkillLook(lib, "storytelling-writing", { icon: "✍️", collection: "Craft" });
+await setSkillLook(lib, "storytelling-writing", { icon: "mc:pen_2", collection: "Craft" });
 await setSkillLook(lib, "habits", { icon: "mc:leaf", color: "green", collection: "Life" });
 await addSkill(lib, "Distributed Systems and Consensus Protocols for Very Large Clusters", "Craft");
 

@@ -12,7 +12,6 @@ import { calloutSchema, remarkBlocks, toggleSchema, toggleSummarySchema } from "
 import { highlightSchema, remarkColors, stringifyColor, textColorSchema, underlineSchema } from "./colors";
 import { blockSelPlugin } from "./blocksel";
 import { tablePlugin, tableView } from "./tables";
-import { emojiTrigger } from "./emoji";
 import { mathBlockSchema, mathInlineSchema, mathRule, remarkNoteMath } from "./math";
 import { emptyHints, foldPlugin, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
 
@@ -76,9 +75,9 @@ const taskRule = $inputRule((ctx) =>
   }),
 );
 
-export type Trigger = { kind: "link" | "slash" | "emoji" | "date"; query: string; /** Characters typed for it, trigger included. */ typed: number };
+export type Trigger = { kind: "link" | "slash" | "date"; query: string; /** Characters typed for it, trigger included. */ typed: number };
 
-/** The menu the text before the caret opens: `[[` for links, `/` for blocks, `:` for emoji. `/` opens
+/** The menu the text before the caret opens: `[[` for links, `/` for blocks, `@` for dates. `/` opens
  *  at a line start, after a space, or right after an inline node such as a diagram ("￼", the
  *  placeholder `textBetween` gives a leaf), which is where the caret lands after ⌃End. */
 export function menuTrigger(before: string): Trigger | null {
@@ -88,9 +87,7 @@ export function menuTrigger(before: string): Trigger | null {
   if (slash) return { kind: "slash", query: slash[1]!, typed: slash[1]!.length + 1 };
   // @ at the start of a word: Notion's dates (an email address has a letter before it).
   const date = before.match(/(?:^|[\s([{])@([a-z0-9 -]{0,16})$/i);
-  if (date) return { kind: "date", query: date[1]!, typed: date[1]!.length + 1 };
-  const emoji = emojiTrigger(before);
-  return emoji ? { kind: "emoji", query: emoji[2]!, typed: emoji[1]!.length } : null;
+  return date ? { kind: "date", query: date[1]!, typed: date[1]!.length + 1 } : null;
 }
 
 /** Whether a `/` menu row answers what was typed after the slash: a part of its label (letters and digits

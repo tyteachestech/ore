@@ -158,7 +158,7 @@ describe("note editor (D38)", () => {
     expect(ed.menuTrigger("a/b")).toBeNull();
     expect(ed.menuTrigger("https://x")).toBeNull();
     expect(ed.menuTrigger("See [[mak")).toEqual({ kind: "link", query: "mak", typed: 5 });
-    expect(ed.menuTrigger("Nice :fir")).toEqual({ kind: "emoji", query: "fir", typed: 4 });
+    expect(ed.menuTrigger("Nice :fir")).toBeNull(); // no `:` emoji menu (D157)
     expect(ed.menuTrigger("at 10:30")).toBeNull();
   });
 

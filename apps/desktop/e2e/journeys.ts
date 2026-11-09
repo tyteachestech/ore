@@ -1853,7 +1853,6 @@ journey("icon picker: it opens with the caret in Filter, so typing searches at o
     await page.keyboard.press("Escape");
     await page.locator(".picker").waitFor({ state: "detached" });
   };
-  // Habits has an icon, so its picker opens on Icons: ~1,700 pixel icons, drawn as they scroll into view.
   await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit skill…" }).click();
   await page.getByRole("dialog", { name: "Edit skill Habits" }).getByRole("button", { name: "Change icon" }).click();
@@ -1997,12 +1996,12 @@ journey("Settings: Esc in the review plan field drops the draft and keeps focus 
   await settings.waitFor({ state: "detached" });
 });
 
-journey("icon picker: ↓ past the rows drawn so far draws the next ones and keeps the picked icon in view", async (page) => {
+journey("icon picker: ↓ past the visible rows scrolls and keeps the picked icon in view", async (page) => {
   await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit skill…" }).click();
   await page.getByRole("dialog", { name: "Edit skill Habits" }).getByRole("button", { name: "Change icon" }).click();
   await page.locator(".picker-cell").nth(100).waitFor();
-  for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowDown"); // onto the first row not drawn yet
+  for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowDown"); // past the rows the box shows
   await until("the picked icon is in view", () =>
     page.evaluate(() => {
       const cell = document.querySelector(".picker-cell[data-active]")?.getBoundingClientRect();
