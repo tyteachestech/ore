@@ -1704,8 +1704,13 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .reader-loading { margin: 48px auto; text-align: center; animation: hint-in .2s 400ms both; }
 .err { color: var(--error); user-select: text; -webkit-user-select: text; cursor: text; }
 
-/* Diagram editor (D40, D103): the in-house editor over the window. */
-.diagram { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; padding-top: var(--titlebar); background: var(--bg); }
+/* Diagram editor (D40, D103, D175): the in-house editor in a sheet centred over the window (Notion's centre peek),
+   the window's shape with 15% of it showing on every side under the Settings scrim; ⤢ gives it the full window. */
+.diagram-scrim { position: fixed; inset: 0; z-index: 20; display: grid; padding: 15vh 15vw; background: rgba(0, 0, 0, 0.5); }
+.diagram-scrim > .titlebar { position: absolute; inset: 0 0 auto; }
+.diagram { container: diagram / inline-size; position: relative; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); border-radius: 12px; box-shadow: var(--float); }
+.diagram-scrim.full { padding: var(--titlebar) 0 0; background: var(--bg); }
+.diagram-scrim.full .diagram { border-radius: 0; box-shadow: none; }
 .diagram-head { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 16px; flex: none; border-bottom: 1px solid var(--border); }
 .diagram-name {
   width: 280px; height: 26px; margin-left: -6px; padding: 0 6px; border: 1px solid transparent; background: transparent;
@@ -1721,10 +1726,6 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 }
 .diagram-done:hover, .diagram-done:focus-visible { background: var(--bg-hover); }
 .diagram-canvas { position: relative; flex: 1; min-height: 0; }
-/* Beside the source (Source note tab): in the note's place until Done; the panel widens to fit the tools. */
-.diagram.docked { padding-top: 0; z-index: 3; margin: 0 8px 8px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.diagram.docked .diagram-name { width: 160px; }
-.mynotes.drawing { min-width: min(560px, 60vw); }
 .diagram-expand {
   margin-left: auto; display: grid; place-items: center; width: 26px; height: 26px; color: var(--muted);
   background: transparent; border: 1px solid transparent; border-radius: 6px;
@@ -2607,8 +2608,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .draw-colour-hex:focus-within { box-shadow: inset 0 0 0 1px var(--paper); }
 .draw-colour-hex input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--text); font: inherit; text-transform: uppercase; }
 .draw-style-chip { display: block; width: 14px; height: 14px; border: 2px solid; }
-/* Beside the source the tools bar is narrower than its labels: Map and Matrix keep their icons (and hints). */
-.diagram.docked .draw-tool.wide .draw-tool-label { display: none; }
+/* A sheet narrower than the tools bar's labels (a small window): Map and Matrix keep their icons (and hints). */
+@container diagram (max-width: 720px) { .draw-tool.wide .draw-tool-label { display: none; } .diagram-name { width: 160px; } }
 
 /* The reader's title renames on one click (Reader.tsx): the text cursor says it can be typed in. */
 .doc-head h1.renamable { cursor: text; }

@@ -712,7 +712,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {peek.view}
       {drawing && (
         <Suspense fallback={null}>
-          <DiagramEditor args={p.noteArgs} name={drawing.name} loaded={lastRead.get(`${p.dir}/${drawing.name}`)} dock={dockOf(root.current)} notify={p.notify} onClose={closeDiagram} onFirstSave={linkDiagram} onRenamed={renamedDiagram} onLink={(href) => {
+          <DiagramEditor args={p.noteArgs} name={drawing.name} loaded={lastRead.get(`${p.dir}/${drawing.name}`)} notify={p.notify} onClose={closeDiagram} onFirstSave={linkDiagram} onRenamed={renamedDiagram} onLink={(href) => {
             const m = href.match(LINK_URL);
             if (m) p.onOpen({ kind: m[1] as LinkTarget["kind"], id: m[2]! });
             else void openUrl(href);
@@ -1082,10 +1082,6 @@ function followRenames(live: Live) {
       }),
   );
 }
-
-/** The reader's side panel the note sits in, where its diagrams open beside the source (not on the phone,
- *  where the panel is a whole screen already). */
-const dockOf = (el: HTMLElement | null) => (PHONE ? null : (el?.closest(".mynotes") as HTMLElement | null) ?? null);
 
 /** The scene each preview last read, so opening it skips reading the file again. */
 const lastRead = new Map<string, Diagram>();

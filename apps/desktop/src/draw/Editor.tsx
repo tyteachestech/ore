@@ -559,7 +559,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     { id: "lock", label: "Lock or unlock", key: "d-lock-el", group: "Arrange", run: lockToggle },
     { id: "all", label: "Select all", key: "d-all", group: "Select", run: () => setSel(live.current.els.filter((e) => !isLabel(e) && !e.locked).map((e) => e.id)) },
     { id: "done", label: "Done", key: "d-done", group: "View", run: () => onDone() },
-    { id: "expand", label: expand?.full ? "Back beside the source" : "Full window", key: "d-expand", group: "View", when: () => !!expand, run: () => expand?.toggle() },
+    { id: "expand", label: expand?.full ? "Exit full window" : "Full window", key: "d-expand", group: "View", when: () => !!expand, run: () => expand?.toggle() },
     { id: "find", label: "Find text", key: "d-find", group: "Select", run: () => setPanel("find") },
     { id: "png", label: "Copy as PNG", key: "d-png", group: "Export", run: exportPng },
     { id: "svg", label: "Copy as SVG", group: "Export", run: exportSvg },
@@ -1916,6 +1916,9 @@ function CustomColour({ label, value, presets, used, onPick, onDone }: { label: 
           collisionPadding={8}
           aria-label={`Custom ${label} colour`}
           onCloseAutoFocus={(e) => e.preventDefault()}
+          // The hex field takes the caret once the popover's focus scope is up, so the diagram sheet's trap
+          // has let go (an autoFocus would land first, and the trap would pull it back).
+          onOpenAutoFocus={(e) => (e.preventDefault(), (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>(".draw-colour-hex input")?.focus())}
           onPointerDown={stop} onMouseDown={stop} onClick={stop} onContextMenu={stop} onWheel={stop}
           onKeyDown={(e) => {
             e.stopPropagation();
@@ -1930,7 +1933,7 @@ function CustomColour({ label, value, presets, used, onPick, onDone }: { label: 
           )}
           <label className="draw-colour-hex">
             <span aria-hidden="true">#</span>
-            <HexColorInput color={custom ? value : ""} onChange={onPick} aria-label="Hex colour" spellCheck={false} autoFocus />
+            <HexColorInput color={custom ? value : ""} onChange={onPick} aria-label="Hex colour" spellCheck={false} />
           </label>
         </Popover.Content>
       </Popover.Portal>
