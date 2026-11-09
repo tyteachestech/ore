@@ -2643,6 +2643,22 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .owl-face { fill: var(--text-read); }
 .owl-pupil { fill: var(--text); }
 @media (prefers-reduced-motion: reduce) { .tutor-bubble { transition: none; } }
+/* The owl says a reply that landed while the tutor was closed (D159, after Cult UI's speech bubble): its first
+   lines in a raised bubble left of the owl, the tail a stair of 3px steps pointing at it. It grows out of the owl once. */
+.owl-says {
+  position: fixed; right: 78px; bottom: 24px; z-index: 6; display: flex; align-items: flex-start; gap: 2px;
+  max-width: min(280px, calc(100vw - 112px)); padding: 7px 5px 7px 12px; border-radius: 12px;
+  background: var(--bg-raised); box-shadow: var(--float);
+  transform-origin: 100% 80%; animation: owl-says 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.owl-says-text { flex: 1; min-width: 0; padding: 0; text-align: left; font-size: 13px; line-height: 1.45; color: var(--text-read); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.owl-says-text:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+.owl-says-x { flex: none; width: 20px; height: 20px; opacity: 0; }
+.owl-says:hover .owl-says-x, .owl-says-x:focus-visible { opacity: 1; }
+.owl-says-tail { position: absolute; right: -9px; bottom: 11px; fill: var(--bg-raised); }
+.app:has(.quiz) .owl-says { display: none; }
+@keyframes owl-says { from { opacity: 0; transform: translateX(6px) scale(0.96); } }
+@media (prefers-reduced-motion: reduce) { .owl-says { animation: none; } }
 .app.tutoring .panel-toggle { right: calc(12px + var(--tutor-w, 0px)); }
 .tutor .ask-input .field { display: block; }
 .tutor-foot { position: relative; }

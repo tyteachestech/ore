@@ -154,6 +154,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`2026-11-08-shadcn-components.md`](docs/reviews/2026-11-08-shadcn-components.md) | shadcn-ecosystem components pitched for the learning loop, and which were picked (D141 to D143) |
 | [`2026-11-08-more-components.md`](docs/reviews/2026-11-08-more-components.md) | Component pitches round 2, in Rare UI's spirit: ten ideas for the learning loop and which were built |
 | [`2026-11-08-stress-test.md`](docs/reviews/2026-11-08-stress-test.md) | Six-area stress test: 84 findings, the PRs that fixed them, and the design calls (D144) |
+| [`2026-11-09-cult-ui.md`](docs/reviews/2026-11-09-cult-ui.md) | Cult UI checked for the learning loop: five fits, the owl's speech bubble built (D159), the paid AI Components registry ruled out (D120) |
 
 
 **Guidebooks** ([`docs/guidebooks/`](docs/guidebooks/)): four evidence-based books the research briefs draw on (Learning Science, Teaching, Gamification, UX and UI Design), each with its paper summaries and source lists.
