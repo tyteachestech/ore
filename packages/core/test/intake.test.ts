@@ -519,6 +519,10 @@ describe("import coverage: files", () => {
     expect(rtf("\\f1 \\'c4\\'e3\\'ba\\'c3\\f0  ok\\par")).toBe("你好 ok\n");
     expect(rtf("\\pard\\ls1\\ilvl0{\\listtext 1.\\tab}First\\par\\pard\\ls1\\ilvl1{\\listtext a.\\tab}Inner\\par\\pard\\ls1\\ilvl0{\\listtext 2.\\tab}Second\\par")).toBe("1. First\n  1. Inner\n1. Second\n");
     expect(rtf("visible{\\v hidden} and {\\deleted gone}kept\\par")).toBe("visible and kept\n");
+    // Word writes a numbered item's {\listtext} before the paragraph's own \pard, which used to make it a bullet.
+    expect(rtf("{\\listtext 1.\\tab}\\pard\\ls1\\ilvl0 First\\par{\\listtext 2.\\tab}\\pard\\ls1\\ilvl0 Second\\par")).toBe("1. First\n1. Second\n");
+    // A comment or a header is skipped, its paragraph and table marks too: they used to split his paragraph and end his heading.
+    expect(rtf("\\pard\\outlinelevel0 Why mixing{\\*\\annotation \\pard\\plain Check this\\par} works\\par\\pard Body{\\header \\pard\\intbl Page\\cell\\row} text\\par")).toBe("# Why mixing works\n\nBody text\n");
     expect(rtf("5*3 and 2*4 are [products]\\par - 5 degrees\\par {\\b bold}{\\b\\i both}{\\i it}\\par")).toBe("5\\*3 and 2\\*4 are \\[products\\]\n\n\\- 5 degrees\n\n**bold*both****it*\n");
   });
 

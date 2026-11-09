@@ -19,6 +19,8 @@ export interface RtfDoc {
 const SKIP = new Set(["colortbl", "stylesheet", "listtable", "listoverridetable", "rsidtbl", "generator", "header", "headerl", "headerr", "headerf", "footer", "footerl", "footerr", "footerf", "xmlnstbl", "themedata", "colorschememapping", "datastore", "latentstyles", "pgdsctbl", "expandedcolortbl", "filetbl", "revtbl", "object", "nonshppict", "bkmkstart", "bkmkend", "annotation", "atnid", "atnauthor", "atrfstart", "atrfend"]);
 /** `\*` groups that hold what Ore reads: Word's pictures and a link's target. */
 const STARRED = new Set(["shppict", "fldinst"]);
+/** Words that end or shape a paragraph or a table row: in a skipped group they would change his text's. */
+const LAYOUT = new Set(["par", "sect", "page", "line", "pard", "outlinelevel", "ls", "ilvl", "intbl", "cell", "row"]);
 const SYMBOL: Record<string, string> = { emdash: "—", endash: "–", bullet: "•", lquote: "‘", rquote: "’", ldblquote: "“", rdblquote: "”", tab: "\t", emspace: " ", enspace: " ", qmspace: " " };
 /** A font's `\fcharset` as the code page its `\'hh` bytes are in. */
 const CHARSET: Record<number, string> = { 77: "macintosh", 128: "shift_jis", 129: "euc-kr", 134: "gbk", 136: "big5", 161: "windows-1253", 162: "windows-1254", 163: "windows-1258", 177: "windows-1255", 178: "windows-1256", 186: "windows-1257", 204: "windows-1251", 222: "windows-874", 238: "windows-1250" };
@@ -105,6 +107,7 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
   let hex = "";
   let pictExt = "";
   let marker = "";
+  let marked = false; // this paragraph's list marker was read
   let field = "";
   let url: string | undefined;
   let bytes: number[] = [];
@@ -150,6 +153,7 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
     if (inTable) return put(" ");
     if (runs.some((r) => r.text.trim())) paras.push({ runs, level, list, ordered, depth });
     runs = [];
+    marked = false;
   };
   const endTable = () => {
     if (rows.length) paras.push({ table: rows });
@@ -216,6 +220,8 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
       st.skip = true;
       continue;
     }
+    // A skipped group's paragraph and table marks (a comment's \par, a header's table) aren't his text's.
+    if (st.skip && LAYOUT.has(word)) continue;
     switch (word) {
       case "ansicpg":
         codepage = CODEPAGE[n ?? 1252] ?? `windows-${n ?? 1252}`;
@@ -301,7 +307,7 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
         st.dest = "listtext";
         marker = "";
         closers.set(stack.length, () => {
-          list = true;
+          list = marked = true;
           ordered = /^\s*\(?(?:\d+|[a-z]|[ivxlc]+)[.)]/i.test(marker);
         });
         break;
@@ -323,7 +329,8 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
       case "pard":
         if (st.dest === "footnote") break;
         level = -1;
-        list = ordered = false;
+        // Word writes an item's {\listtext} before its \pard: that marker is still this paragraph's.
+        if (!marked) list = ordered = false;
         depth = 0;
         leaving = inTable;
         break;
