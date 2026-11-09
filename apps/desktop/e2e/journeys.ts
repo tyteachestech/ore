@@ -356,8 +356,8 @@ journey("⌘K → All sources from Home puts focus on the list, so ↓ and ↵ w
   await page.keyboard.type("All sources");
   await page.locator("[cmdk-item]").filter({ hasText: /^All sources/ }).first().waitFor();
   await page.keyboard.press("Enter");
-  await page.locator("main [role=listbox]").waitFor();
-  await until("the list has focus", () => page.evaluate(() => !!document.activeElement?.closest("main [role=listbox]")));
+  await page.locator("main [role=grid]").waitFor();
+  await until("the list has focus", () => page.evaluate(() => !!document.activeElement?.closest("main .list")));
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await page.locator(".doc-head").waitFor();
