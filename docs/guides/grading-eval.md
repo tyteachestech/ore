@@ -38,10 +38,19 @@ bun run eval:grade --vendor claude --runs 3 \
 - 2026-11-07, first set: Claude and Codex both 20/20, too easy to tell them apart. It also caught a cost bug: each `claude -p` call carried about 368k input tokens of Tyler's MCP server tools. Starting the CLI without them cut a run from $11.21 to $0.18 and 43 s to 17 s, same accuracy.
 - 2026-11-08, harder set: still saturated. Claude Sonnet 5.5 20/20 ($0.185, 18 s), Codex gpt-6-astra 20/20 (526k tokens, 43 s), and Claude Haiku 5.5 20/20 ($0.012, 20 s), against a 55% baseline. So the cases are beyond string matching but not beyond any current model, and Haiku grades this set as well as Sonnet at a fifteenth of the cost. `eval:mine` found no disagreements in Tyler's library yet. The set needs real misses, or many more cases, before it can rank models.
 
+- 2026-11-09, golden plus the 143 outside cases (163 in all; `results/grade-2026-11-09.json`, `-2.json`), two runs each:
+
+  | | accuracy (95% CI) | kappa | golden | SAF | SciEntsBank | false pass / fail | flipped between runs | cost of a run |
+  |---|---|---|---|---|---|---|---|---|
+  | Sonnet 5.5 | 88% (83–92%) both runs | 0.73, 0.72 | 20/20 | 50/60, 48/60 | 74/83, 75/83 | 11 / 8 | 3 of 163 | $1.91, $1.25 |
+  | Haiku 5.5 | 82% (76–87%) both runs | 0.56, 0.57 | 20/20 | 43/60, 44/60 | 71/83, 70/83 | 11 / 18 | 12 of 163 | $0.15, $0.12 |
+
+  The no-AI baseline is 71% here (the set is 71% wrong, so "always wrong" would match it): both models clear it, and kappa is what tells them apart. The outside cases do what the golden set couldn't: Sonnet and Haiku, equal at 20/20 for two days, come apart by 6 points of accuracy, 0.16 of kappa and four times the flipped verdicts, so the earlier finding that Haiku grades as well as Sonnet held only on the easy set. Sonnet's kappa of 0.73 sits where the literature puts GPT-4 against teachers (0.70) and just under teachers against each other (0.75), on other people's labels. Reading the 21 cases Sonnet missed in either run: 14 are partly-correct answers (SAF `Partially correct`, SciEntsBank `incomplete`) that Ore rated Good: the grader is more lenient than the teachers when the reference answer is long and no rubric says which points are required. The other 7 are SciEntsBank `correct` answers rated Hard: short children's sentences the grader wanted a reason or a comparison from, so it is stricter than those labelers. Clear wrong answers (`incorrect`, `contradictory`, `irrelevant`, `non_domain`) are near-perfect on both models. Haiku's extra misses are almost all false fails on `correct` answers (22/40 against Sonnet's 32/40). None of the 20 golden cases moved.
+
 ## Limits
 
-- 20 cases can't separate two good graders; validating a judge well takes closer to 100 labeled cases per kind of failure (Husain). Grow the set with `eval:mine`.
-- One run per case: it doesn't yet measure how often a verdict flips between runs.
+- The golden 20 can't separate two good graders; the outside 143 can, but their labels are another course's standard: a case where the grader and a teacher disagree on a partial answer is an open question about where Ore's line should sit for cards without a rubric, not yet a bug. Validating a judge well takes closer to 100 labeled cases per kind of failure (Husain); the slices give 40 partly-correct and 40 correct outside answers, the two kinds that fail. Grow Ore's own cases with `eval:mine`.
+- `--runs` measures how often a verdict flips, but two runs is the floor: more runs for a tighter spread.
 - One labeler (Tyler's standard, written by Claude); no second labeler to measure agreement.
 - Codex runs on a subscription, so its cost shows as tokens, not dollars.
 
