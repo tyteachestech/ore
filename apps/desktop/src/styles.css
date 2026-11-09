@@ -18,6 +18,7 @@
   --focus: rgba(142, 166, 255, 0.55);
   --halo: 0 0 0 3px rgba(142, 166, 255, 0.18); /* with an accent border: focus on fields */
   --lift: inset 0 1px 0 rgba(255, 255, 255, 0.045); /* top highlight on anything raised */
+  --owl-room: 80px; /* the tutor's owl and its margins (D160) */
   --float: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.45);
   --error: #ff7b7b;
 
@@ -285,7 +286,7 @@ img.thumb { filter: brightness(0.86); }
 .row .snip mark { background: var(--keep); color: var(--text); border-radius: 2px; }
 .show-all { margin: 2px 0 0; padding: 4px 8px; border-radius: 6px; color: var(--muted); font-size: 13px; }
 .show-all:hover { color: var(--text); background: var(--bg-hover); }
-.list { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 6px 10px 16px; }
+.list { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 6px 10px var(--owl-room); }
 .row {
   display: flex; align-items: center; gap: 12px;
   height: var(--row); padding: 0 12px; border-radius: var(--radius);
@@ -1042,7 +1043,7 @@ body.resizing iframe { pointer-events: none; }
 .mynotes-head { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px; flex: none; }
 .mynotes-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .mynotes-text {
-  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; margin: 0; padding: 12px 20px 24px 26px; /* the left room holds the ⋮⋮ block handle */
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; margin: 0; padding: 12px 20px var(--owl-room) 26px; /* the left room holds the ⋮⋮ block handle */
 }
 .mynotes .note-editor { --note-size: 15px; }
 .mynotes .ProseMirror > :first-child { margin-top: 0; }
@@ -1325,7 +1326,7 @@ body.resizing iframe { pointer-events: none; }
 .col-divider::after { content: ""; position: absolute; top: 0; bottom: 40px; left: 9px; width: 2px; border-radius: 1px; background: transparent; transition: background 0.12s ease-out; }
 .col-divider:hover::after, .skill-cols.dragging .col-divider::after { background: var(--accent); }
 .skill-cols.wide > :is(.col-divider, .skill-col.side) { display: none; }
-.skill-col { min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 40px; display: flex; flex-direction: column; gap: 20px; }
+.skill-col { min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: var(--owl-room); display: flex; flex-direction: column; gap: 20px; }
 /* Room for the rows' 6px hover bleed (.fold-body), which would otherwise give the column a horizontal scrollbar. */
 .skill-col { padding-inline: 6px; margin-inline: -6px; }
 .skill-col.side { container-type: inline-size; }
@@ -1780,7 +1781,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .draw-find .field { width: 200px; height: 28px; padding: 0 8px; }
 
 /* Home (D58): Apple Fitness's ring for the goal, Linear's filter chips for the skill pick. */
-.home { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 20px 32px 40px; }
+.home { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 20px 32px var(--owl-room); }
 .home > section, .home-cols { max-width: 1120px; margin: 0 auto; }
 .home-cols { display: grid; margin-top: 28px; }
 .home-cols.dragging { user-select: none; -webkit-user-select: none; cursor: col-resize; }
@@ -2587,16 +2588,23 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-chip button { flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 4px; color: var(--faint); }
 .tutor-chip button:hover, .tutor-chip button:focus-visible { background: var(--bg-hover); color: var(--text); outline: none; }
 .tutor-general { margin: 6px 0 0; font: 600 10px/1.4 var(--mono); letter-spacing: 0.06em; color: var(--faint); }
-/* The tutor's ✦ in the title bar (D136), drawn as the panel toggles: left of Add on Home and All sources (in
-   .main-tools), left of the reader's panel toggle, or alone at the top right. */
+/* The tutor's owl (D160): a round button at the bottom right, where the floating tutor opens (Notion AI's bubble).
+   Hidden while a quiz panel holds that corner. Scrolling pages keep --owl-room at their foot so their last line
+   can scroll clear of it. */
 .tutor-bubble {
-  position: fixed; top: 7px; right: 12px; z-index: 6;
-  width: 26px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--faint);
+  position: fixed; right: 16px; bottom: 16px; z-index: 11;
+  width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg-raised); box-shadow: var(--float); transition: transform 160ms ease-out;
 }
-.main-tools .tutor-bubble { position: static; }
-.app:has(.panel-toggle) .tutor-bubble { right: 44px; }
-.tutor-bubble:hover { background: var(--bg-hover); color: var(--muted); }
-.tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.tutor-bubble:hover { background: var(--bg-hover); }
+.tutor-bubble:active { transform: scale(0.96); }
+.tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.app:has(.quiz) .tutor-bubble { display: none; }
+.owl-body { fill: var(--faint); }
+.owl-shade, .owl-beak { fill: color-mix(in srgb, var(--faint) 50%, var(--bg-raised)); }
+.owl-face { fill: var(--text-read); }
+.owl-pupil { fill: var(--text); }
+@media (prefers-reduced-motion: reduce) { .tutor-bubble { transition: none; } }
 .app.tutoring .panel-toggle { right: calc(12px + var(--tutor-w, 0px)); }
 .tutor .ask-input .field { display: block; }
 .tutor-foot { position: relative; }

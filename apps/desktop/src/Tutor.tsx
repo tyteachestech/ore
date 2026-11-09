@@ -13,6 +13,7 @@ import { ore, opt } from "./ore";
 import { errorText, type Notify } from "./util";
 import { Working } from "./Working";
 import { mentionMatches, type Mention } from "./mentions";
+import { Owl } from "./Owl";
 
 export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
 /** A web page the tutor's search found (D128, Tyler 2026-11-08): cited like a passage, opened in the browser. */
@@ -631,12 +632,21 @@ function reveal(step: Element) {
   else if (s.bottom > b.bottom) box.scrollTop += s.bottom - b.bottom;
 }
 
-/** The ✦ in the title bar that opens the tutor (D136): beside Add, or the reader's panel toggle. */
+/** The owl at the bottom right that opens the tutor (D160, after Notion AI's bubble); it faces him on hover. */
 export function TutorBubble({ onOpen }: { onOpen: () => void }) {
+  const [look, setLook] = useState(false);
   return (
-    <Hint text="Tutor" keys="tutor">
-      <button className="tutor-bubble" aria-label="Open the tutor" onClick={onOpen}>
-        <Sparkle size={16} aria-hidden="true" />
+    <Hint text="Tutor" keys="tutor" side="left">
+      <button
+        className="tutor-bubble"
+        aria-label="Open the tutor"
+        onClick={onOpen}
+        onPointerEnter={() => setLook(true)}
+        onPointerLeave={() => setLook(false)}
+        onFocus={() => setLook(true)}
+        onBlur={() => setLook(false)}
+      >
+        <Owl size={36} look={look} />
       </button>
     </Hint>
   );
