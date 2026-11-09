@@ -11,10 +11,6 @@ import type { JSX, SVGProps } from "react";
 export type IconProps = Omit<SVGProps<SVGSVGElement>, "ref" | "children"> & { size?: number; weight?: string };
 export type Icon = (props: IconProps) => JSX.Element;
 
-/** One path for the whole sprite: no seams between its squares. */
-export const pixels = (rows: readonly string[]) =>
-  rows.map((row, y) => [...row].map((t, x) => (t === "#" ? `M${x} ${y}h1v1h-1z` : "")).join("")).join("");
-
 import { dots } from "./dots";
 export { dots };
 

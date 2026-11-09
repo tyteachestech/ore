@@ -70,7 +70,7 @@ export function failures(e: z.infer<typeof Expect>, r: Reply): string[] {
 
 export interface TutorResult { id: string; ok: boolean; failed: string[]; reply?: string; ms: number; usage?: Usage; error?: string; evidence?: string[] }
 
-const Verdicts = z.object({ checks: z.array(z.object({ passed: z.boolean(), evidence: z.string() })) });
+const Verdicts = z.strictObject({ checks: z.array(z.strictObject({ passed: z.boolean(), evidence: z.string() })) });
 
 /** The judge's checks a reply fails, each named "judge: <check>", with the words that decided each. */
 export async function judged(lib: Library, c: TutorCase, reply: string): Promise<{ failed: string[]; evidence: string[]; usage: Usage }> {
@@ -102,7 +102,7 @@ async function replyTo(lib: Library, c: TutorCase, id: (golden: string) => strin
   return { r, said: withSteps(r) };
 }
 
-const Better = z.object({ better: z.enum(["A", "B", "same"]), why: z.string() });
+const Better = z.strictObject({ better: z.enum(["A", "B", "same"]), why: z.string() });
 export type Pick = "new" | "old" | "same";
 
 /** The comparator saw the new reply as A unless `flipped`: which one it picked. */
