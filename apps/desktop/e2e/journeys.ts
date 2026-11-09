@@ -4590,6 +4590,38 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review Ask: a suggested card shows only what it changes, struck and underlined, and keeps showing it once used (D161)", async (page) => {
+  let id = "";
+  let was = { question: "", answer: "" };
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
+    id = (JSON.parse(body) as { args: string[] }).args[1]!;
+    const question = was.question.replace(/\?$/, "") + ", in one line?";
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Tighter, and it asks for one line.", proposal: { question, answer: "Short answer." }, session: "s1" }) });
+  });
+  await startReview(page, null);
+  was = { question: (await page.locator(".review-q").innerText()).trim(), answer: "" };
+  await reveal(page);
+  was.answer = (await page.locator(".review-answer").first().innerText()).trim();
+  await page.getByRole("button", { name: "Ask about this" }).click();
+  await page.locator(".ask-starters").getByRole("button", { name: "Make this card clearer" }).click();
+  const card = page.locator(".ask-card");
+  await card.waitFor();
+  const q = card.locator(".ask-card-q");
+  if ((await q.locator(".diff-del").count()) !== 0) throw new Error("the question's kept words were struck");
+  if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("the added words aren't marked");
+  if (!(await card.locator(".ask-card-a .diff-add").allInnerTexts()).join("").includes("Short")) throw new Error("the new answer isn't marked as added");
+  await page.unroute(/\/ore$/);
+  await card.getByRole("button", { name: "Use this card" }).click();
+  await card.getByRole("button", { name: "Card updated" }).waitFor();
+  if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("using the card dropped the change it shows");
+  await ore("card", "set", id, `--question=${was.question}`, `--answer=${was.answer}`);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("typing with an input method: Enter that picks a word neither sends an answer nor ends a diagram label", async (page) => {
   const composingEnter = (el: Element) => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", isComposing: true, bubbles: true, cancelable: true }));
   // WKWebView's commit Enter: keyCode 229, isComposing false.
