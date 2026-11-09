@@ -4918,16 +4918,40 @@ journey("list archive Undo selects the source it put back, as Finder does, thoug
   const before = await titles();
   // Nothing picked: the first row stands for the selection. Archive the third from its menu.
   const row = page.locator(".list .row").filter({ has: page.locator(".title", { hasText: before[2]! }) }).first();
-  await row.click({ button: "right" });
-  await page.getByRole("menuitem", { name: /Archive/ }).click();
-  await until("the row leaves the list", async () => !(await titles()).includes(before[2]!));
-  await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
-  await until("Undo brings it back", async () => (await titles()).includes(before[2]!));
+  // Undo while the archive still saves, and the undo slower than a list read: a read begun after
+  // the archive saved, before the undo reached the library, used to land and move the selection on.
+  let release = () => {};
+  let undone = () => {};
+  const undoSaved = new Promise<void>((ok) => (undone = ok));
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"archive",')) return route.fallback();
+    if (body.includes('"--undo"')) {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      await route.fallback();
+      return undone();
+    }
+    await new Promise<void>((ok) => (release = ok));
+    await route.fallback();
+  });
+  try {
+    await row.click({ button: "right" });
+    await page.getByRole("menuitem", { name: /Archive/ }).click();
+    await until("the row leaves the list", async () => !(await titles()).includes(before[2]!));
+    await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
+    await until("Undo brings it back", async () => (await titles()).includes(before[2]!));
+    release();
+    await undoSaved;
+  } finally {
+    release();
+    await page.unroute(/\/ore$/);
+  }
+  await until("the library has it back", async () => ((await ore("ls")) as { title: string }[]).some((i) => i.title === before[2]));
+  await page.waitForTimeout(300);
   // The first ↓ shows the selection where it is.
   await page.locator(".list").focus();
   await page.keyboard.press("ArrowDown");
-  await until(`“${before[2]}” is selected, not “${before[0]}”`, async () => (await selected()) === before[2]);
-  await until("the library has it back", async () => ((await ore("ls")) as { title: string }[]).some((i) => i.title === before[2]));
+  await until(`“${before[2]}” is selected`, async () => (await selected()) === before[2]);
 });
 
 journey("Done: Move to To read and ⌘Z puts the source back in Done with the finish date it had", async (page) => {
