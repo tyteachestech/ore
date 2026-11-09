@@ -307,9 +307,11 @@ export function App() {
       const n = ++queued;
       const p = last.then(write);
       last = p.catch(() => {});
+      // After `writing`'s own count of the settle, or the read would begin before it and never land.
+      writing(p);
       const read = () => void (n === queued && refresh());
       p.then(read, read);
-      return writing(p);
+      return p;
     };
   };
   const refresh = useCallback(async () => {
