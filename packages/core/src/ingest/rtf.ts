@@ -20,7 +20,7 @@ const SKIP = new Set(["colortbl", "stylesheet", "listtable", "listoverridetable"
 /** `\*` groups that hold what Ore reads: Word's pictures and a link's target. */
 const STARRED = new Set(["shppict", "fldinst"]);
 /** Words that end or shape a paragraph or a table row: in a skipped group they would change his text's. */
-const LAYOUT = new Set(["par", "sect", "page", "line", "pard", "outlinelevel", "ls", "ilvl", "intbl", "cell", "row"]);
+const LAYOUT = new Set(["par", "sect", "page", "line", "pard", "outlinelevel", "ls", "ilvl", "intbl", "cell", "row", "listtext"]);
 const SYMBOL: Record<string, string> = { emdash: "—", endash: "–", bullet: "•", lquote: "‘", rquote: "’", ldblquote: "“", rdblquote: "”", tab: "\t", emspace: " ", enspace: " ", qmspace: " " };
 /** A font's `\fcharset` as the code page its `\'hh` bytes are in. */
 const CHARSET: Record<number, string> = { 77: "macintosh", 128: "shift_jis", 129: "euc-kr", 134: "gbk", 136: "big5", 161: "windows-1253", 162: "windows-1254", 163: "windows-1258", 177: "windows-1255", 178: "windows-1256", 186: "windows-1257", 204: "windows-1251", 222: "windows-874", 238: "windows-1250" };
@@ -209,7 +209,7 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
       } else if (next === "~") put(" ");
       else if (next === "_") put("-");
       else if (next === "\\" || next === "{" || next === "}") put(next);
-      else if (next === "\n" || next === "\r") endPara();
+      else if ((next === "\n" || next === "\r") && !st.skip) endPara();
       continue;
     }
     const m = /^\\([a-z]+)(-?\d+)? ?/i.exec(src.slice(i, i + 40))!;
@@ -355,11 +355,13 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
         }
         break;
       case "cell":
+        marked = false;
         if (!inTable) break;
         row.push(markdown(cell).replace(/\n/g, " ").replace(/\|/g, "\\|"));
         cell = [];
         break;
       case "row":
+        marked = false;
         if (!inTable) break;
         rows.push(row);
         row = [];

@@ -496,7 +496,7 @@ describe("import coverage: files", () => {
     expect(b).not.toMatch(/Helvetica|disc|\\/);
   });
 
-  test("RTF from Word: title, author and date, outline headings, a table, a picture, a link, a footnote, Unicode, no header or field codes", async () => {
+  test("RTF from Word: title, author and date, outline headings, a table, a picture, a link, a footnote, Unicode, a numbered list, no header, comment or field codes", async () => {
     const item = await addSource(await tempLibrary(), file("word.rtf"));
     expect(item.meta).toMatchObject({ title: "Mixing topics in practice", author: "Ada Learner", published: "2025-03-04" });
     const b = item.body;
@@ -507,6 +507,9 @@ describe("import coverage: files", () => {
     expect(b).toContain("# A mixed week\n\n| **Day** | **Problems** |\n| --- | --- |\n| Monday | area, volume |\n| Tuesday | volume, angles |\n\nScores on the mixed test:");
     const pic = b.match(/!\[\]\((assets\/[0-9a-f]{16}\.png)\)/)?.[1];
     expect(readFileSync(join(item.dir, pic!)).subarray(1, 4).toString()).toBe("PNG");
+    // Word writes a numbered item's marker before its paragraph, and a comment's own paragraph inside his.
+    expect(b).toContain("1. Mix two kinds of problem.\n1. Add a third next week.\n\nKeep a log of each session so you see the spread.");
+    expect(b).not.toContain("Ask about logs");
     expect(b).toEndWith("That's all for this week.\n\n[^1]: Rohrer and Taylor, 2007.\n");
     expect(b).not.toMatch(/Study guide, draft|HYPERLINK|Times New Roman|Normal;|wordml/);
     expect(readFileSync(join(item.dir, "source.rtf"), "utf8")).toStartWith("{\\rtf1");
@@ -523,21 +526,25 @@ describe("import coverage: files", () => {
     expect(rtf("{\\listtext 1.\\tab}\\pard\\ls1\\ilvl0 First\\par{\\listtext 2.\\tab}\\pard\\ls1\\ilvl0 Second\\par")).toBe("1. First\n1. Second\n");
     // A comment or a header is skipped, its paragraph and table marks too: they used to split his paragraph and end his heading.
     expect(rtf("\\pard\\outlinelevel0 Why mixing{\\*\\annotation \\pard\\plain Check this\\par} works\\par\\pard Body{\\header \\pard\\intbl Page\\cell\\row} text\\par")).toBe("# Why mixing works\n\nBody text\n");
+    expect(rtf("\\pard Why{\\*\\annotation note\\\n more} works\\par")).toBe("Why works\n"); // an escaped line break is a \\par
+    expect(rtf("{\\header \\pard\\plain {\\listtext 1.\\tab}Page 1\\par}\\pard Body text\\par")).toBe("Body text\n");
+    // A list item that ends in a table cell leaves no marker for the paragraph after the table.
+    expect(rtf("\\pard\\intbl\\ls1{\\listtext 1.\\tab}Item\\cell\\row\\pard Plain\\par")).toBe("| Item |\n| --- |\n\nPlain\n");
     expect(rtf("5*3 and 2*4 are [products]\\par - 5 degrees\\par {\\b bold}{\\b\\i both}{\\i it}\\par")).toBe("5\\*3 and 2\\*4 are \\[products\\]\n\n\\- 5 degrees\n\n**bold*both****it*\n");
   });
 
-  test("Excel: each sheet a table under its name, dates as dates, formulas' values, its title and author", async () => {
+  test("Excel: each sheet a table under its name, dates as dates, percents as percents, formulas' values, its title and author", async () => {
     const item = await addSource(await tempLibrary(), file("vocab.xlsx"));
     expect(item.meta).toMatchObject({ type: "article", title: "Spanish vocabulary", author: "Ada Learner" });
     expect(item.body).toBe(
       [
         "## Spanish",
         "",
-        "| Word | Meaning | Example | Added | Reviews |",
-        "| --- | --- | --- | --- | --- |",
-        '| cocinar | to cook | Sin sal, "cocinamos" mal. | 2025-03-04 | 3 |',
-        "| hornear | to bake, to roast | Hornear es esperar \\| de verdad. | 2025-03-05 | 5 |",
-        "| hervir | to boil |  | 2025-03-06 | 8 |",
+        "| Word | Meaning | Example | Added | Reviews | Right |",
+        "| --- | --- | --- | --- | --- | --- |",
+        '| cocinar | to cook | Sin sal, "cocinamos" mal. | 2025-03-04 | 3 | 75% |',
+        "| hornear | to bake, to roast | Hornear es esperar \\| de verdad. | 2025-03-05 | 5 | 63% |",
+        "| hervir | to boil |  | 2025-03-06 | 8 | 33.3% |",
         "",
         "## Grammar",
         "",
@@ -570,6 +577,9 @@ describe("import coverage: files", () => {
     // A cell says what the sheet shows: a percent as a percent, a sum without the float's last-digit noise.
     const shown = '<x:row r="2"><x:c r="B2" s="4"><x:v>0.25</x:v></x:c><x:c r="C2" s="5"><x:v>0.12345</x:v></x:c><x:c r="D2" s="6"><x:v>0.5</x:v></x:c><x:c r="E2"><x:v>0.30000000000000004</x:v></x:c><x:c r="F2"><x:v>12</x:v></x:c></x:row>';
     expect(xlsxToDoc(xml(shown)).body).toBe("## Log\n\n| 25% | 12.35% | 50.0% | 0.3 | 12 |\n| --- | --- | --- | --- | --- |\n");
+    // Half rounds away from zero, as Excel does, though 0.145 × 100 is 14.499999999999998 in a double.
+    const half = '<x:row r="2"><x:c r="B2" s="4"><x:v>0.145</x:v></x:c><x:c r="C2" s="6"><x:v>0.0115</x:v></x:c><x:c r="D2" s="4"><x:v>-0.145</x:v></x:c></x:row>';
+    expect(xlsxToDoc(xml(half)).body).toBe("## Log\n\n| 15% | 1.2% | -15% |\n| --- | --- | --- |\n");
   });
 
   test("CSV and TSV: a table, quotes, commas and line breaks inside cells, Excel's semicolons", async () => {

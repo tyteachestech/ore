@@ -87,6 +87,11 @@ function shown(id: number, code: string | undefined): Shown {
   return day && time ? "datetime" : day ? "date" : time ? "time" : undefined;
 }
 
+/** A number to `d` decimals as Excel shows it: read to its 15 digits first, half away from zero. */
+const round = (n: number, d: number) => {
+  const scaled = Number((Math.abs(n) * 10 ** d).toPrecision(15));
+  return ((Math.sign(n) * Math.round(scaled)) / 10 ** d).toFixed(d);
+};
 const pad = (n: number) => String(n).padStart(2, "0");
 /** A time of day or a duration from its fraction of a day: 0.5208 → 12:30, 1.5 → 36:00. */
 function clock(days: number): string {
@@ -138,7 +143,7 @@ export function xlsxToDoc(data: Uint8Array): SheetDoc {
         const num = (!t || t === "n") && v && !Number.isNaN(Number(v));
         const as = num ? xfs[Number(attr(a, "s") ?? 0)] : undefined;
         if (as === "time") text = clock(Number(v));
-        else if (typeof as === "object") text = `${(Number(v) * 100).toFixed(as.percent)}%`;
+        else if (typeof as === "object") text = `${round(Number(v) * 100, as.percent)}%`;
         else if (as) {
           const iso = new Date(Math.round((Number(v) - epoch) * 86400) * 1000).toISOString();
           text = as === "date" ? iso.slice(0, 10) : iso.slice(0, 16).replace("T", " ");
