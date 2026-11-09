@@ -219,8 +219,8 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
       notify(
         "Card made",
         "info",
-        () => void ore("card", "retire", c.id).then(() => setCards((cs) => cs.filter((x) => x.id !== c.id))),
-        () => void ore("card", "restore", c.id, "--state=draft").then(() => setCards((cs) => [...cs.filter((x) => x.id !== c.id), made])),
+        () => ore("card", "retire", c.id).then(() => setCards((cs) => cs.filter((x) => x.id !== c.id))),
+        () => ore("card", "restore", c.id, "--state=draft").then(() => setCards((cs) => [...cs.filter((x) => x.id !== c.id), made])),
       );
     } catch (e) {
       notify(`Couldn’t make the card: ${errorText(e)}`, "error");

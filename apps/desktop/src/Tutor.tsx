@@ -150,8 +150,9 @@ export function useTutorChat(notify: Notify) {
       notify(
         "Added to your note",
         "info",
-        () => void ore("notes", item, opt("set", before), opt("base", after)).then(written, (e) => notify(errorText(e), "error")),
-        () => void ore("notes", item, opt("append", lines), opt("heading", "From the tutor")).then(written, (e) => notify(errorText(e), "error")),
+        // A failed write puts the step back and says why (history.ts).
+        () => ore("notes", item, opt("set", before), opt("base", after)).then(written),
+        () => ore("notes", item, opt("append", lines), opt("heading", "From the tutor")).then(written),
       );
     } catch (e) {
       notify(errorText(e, "add that to your note"), "error");

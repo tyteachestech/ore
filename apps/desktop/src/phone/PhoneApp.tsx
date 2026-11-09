@@ -408,9 +408,10 @@ export function PhoneApp() {
   /** From the Archive list, at once and with Undo, as archiving is. */
   const restore = (item: Item) => {
     setArchived((all) => all?.filter((i) => i.id !== item.id) ?? all);
-    const apply = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"])).then(refresh, (e) => (notify(errorText(e), "error"), refresh()));
-    notify(`Restored “${item.title}”`, "info", () => void apply(true), () => void apply(false));
-    void apply(false);
+    // Undo and Redo return the write, so a failed one goes back on the history and says why.
+    const apply = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"])).finally(refresh);
+    notify(`Restored “${item.title}”`, "info", () => apply(true), () => apply(false));
+    apply(false).catch((e) => notify(errorText(e), "error"));
   };
   const row: RowActions = {
     archive: (item) => (item.archived_at ? restore(item) : void archive(item)),
