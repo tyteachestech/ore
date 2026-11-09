@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { addHighlight, findAnnotation } from "../src/annotations.ts";
+import { addHighlight, findAnnotation, readAnnotations } from "../src/annotations.ts";
 import { pendingHighlights } from "../src/ai/enrich.ts";
+import { listCards, writeNewCard } from "../src/cards.ts";
 import { addText } from "../src/ingest/index.ts";
 import { findItem } from "../src/items.ts";
-import { listTries, markTried } from "../src/tries.ts";
+import { listTries, markTried, reflections } from "../src/tries.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const ARTICLE = "# Openings\n\nOpen on the moment of change, then rewind to how we got there.\n\nKeep the rest.\n";
@@ -50,5 +51,76 @@ describe("tries: Apply highlights checked off with how it went (D127)", () => {
     const src = await addText(lib, ARTICLE);
     const k = addHighlight(findItem(lib, src.meta.id), { exact: "Keep the rest.", intent: "keep" });
     await expect(markTried(lib, k.id, { reflection: "x" })).rejects.toThrow(/not a try/);
+  });
+
+  test("Next time I'll… closes the round and opens the try again with the new plan; one highlight per idea (D148)", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
+    const it = findItem(lib, src.meta.id);
+    const a = addHighlight(it, { exact: "Open on the moment of change", intent: "apply", note: "My next video's cold open" });
+    const pending = () => pendingHighlights(findItem(lib, src.meta.id), []).map((x) => x.id);
+
+    const { tried, card } = await markTried(lib, a.id, { reflection: "Hooked better; the rewind ran long.", next: "  Cut the rewind to one line  " });
+    expect(card).toBe(true);
+    expect(tried).toMatchObject({ status: "open", note: "Cut the rewind to one line", uses: [{ plan: "My next video's cold open", reflection: "Hooked better; the rewind ran long." }] });
+    expect(tried.reflection).toBeUndefined();
+    // Still the same highlight: the reader paints the passage once, and the record of use is one idea.
+    expect(readAnnotations(findItem(lib, src.meta.id)).filter((x) => x.intent === "apply").map((x) => x.id)).toEqual([a.id]);
+    // The round he wrote up still gets its card, and the card asks after every round's lesson.
+    expect(pending()).toEqual([a.id]);
+    expect(reflections(tried)).toEqual(["Hooked better; the rewind ran long."]);
+
+    // The second round: checked off, written up, re-planned again.
+    await markTried(lib, a.id, { reflection: "One line was enough." });
+    const third = (await markTried(lib, a.id, { reflection: "One line was enough.", next: "Try it on the podcast intro" })).tried;
+    expect(third.uses?.map((u) => u.plan)).toEqual(["My next video's cold open", "Cut the rewind to one line"]);
+    expect(reflections(third)).toEqual(["Hooked better; the rewind ran long.", "One line was enough."]);
+
+    // One step back: the re-plan is undone, the last round is tried again as it was; another step back puts it to try.
+    const back = (await markTried(lib, a.id, { undo: true })).tried;
+    expect(back).toMatchObject({ status: "done", note: "Cut the rewind to one line", reflection: "One line was enough." });
+    expect(back.uses?.length).toBe(1);
+    const open = (await markTried(lib, a.id, { undo: true })).tried;
+    expect(open).toMatchObject({ status: "open", note: "Cut the rewind to one line" });
+    expect(open.reflection).toBeUndefined();
+    expect(open.uses?.length).toBe(1);
+  });
+});
+
+describe("tries: rounds without a write-up, and one card per idea (D148)", () => {
+  test("Next time I'll… with nothing on how it went keeps the round with its plan only, and no card waits; one step back makes it tried as it was", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply", note: "Cold open" });
+    const pending = () => pendingHighlights(findItem(lib, src.meta.id), []).map((x) => x.id);
+    const { tried, card } = await markTried(lib, a.id, { next: "Open on the ending instead" });
+    expect(card).toBe(false);
+    expect(tried).toMatchObject({ status: "open", note: "Open on the ending instead", uses: [{ plan: "Cold open" }] });
+    expect(tried.uses![0]!.reflection).toBeUndefined();
+    expect(reflections(tried)).toEqual([]);
+    expect(pending()).toEqual([]);
+    expect(listTries(lib).map((t) => [t.id, t.status])).toEqual([[a.id, "open"]]);
+    const back = (await markTried(lib, a.id, { undo: true })).tried;
+    expect(back).toMatchObject({ status: "done", note: "Cold open" });
+    expect(back.reflection).toBeUndefined();
+    expect(back.uses).toEqual([]);
+    // A try never tried has nothing to step back to: it stays to try.
+    const b = addHighlight(findItem(lib, src.meta.id), { exact: "Keep the rest.", intent: "apply" });
+    expect((await markTried(lib, b.id, { undo: true })).tried).toMatchObject({ status: "open" });
+  });
+
+  test("an idea gets one card however many rounds it goes: a second write-up after the card is drafted asks for no other", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply", note: "Cold open" });
+    await markTried(lib, a.id, { reflection: "Hooked better.", next: "Shorter" });
+    const cards = () => listCards(lib);
+    expect(pendingHighlights(findItem(lib, src.meta.id), cards()).map((x) => x.id)).toEqual([a.id]);
+    writeNewCard(lib, { kind: "prompt", item: src.meta.id, annotation: a.id, skills: ["storytelling"], topics: ["openings"], content_type: "procedure", question: "Cold open?", answer: "Hook first.", rubric: ["hook"] });
+    expect(pendingHighlights(findItem(lib, src.meta.id), cards())).toEqual([]);
+    const { tried, card } = await markTried(lib, a.id, { reflection: "Shorter worked.", next: "Podcast too" });
+    expect(card).toBe(true); // the CLI starts an enrich, which then finds nothing new to draft for this idea
+    expect(reflections(tried)).toEqual(["Hooked better.", "Shorter worked."]);
+    expect(pendingHighlights(findItem(lib, src.meta.id), cards())).toEqual([]);
   });
 });

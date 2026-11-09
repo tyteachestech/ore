@@ -331,12 +331,36 @@ journey("Tab shows a focus ring on a control whose hover is a fill (Home's gear)
   if (ring !== "solid") throw new Error(`the focused gear shows outline ${ring}`);
 });
 
+journey("What to review by keyboard: it opens on its first row, Space unticks it, ↵ starts with the rest", async (page) => {
+  await page.getByRole("button", { name: "Start review" }).focus();
+  await page.keyboard.press("Enter");
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  await pick.waitFor();
+  await until("the first row has focus", () => page.evaluate(() => !!document.activeElement?.classList.contains("pick-row") && document.activeElement === document.querySelector(".pick-row")));
+  await page.keyboard.press("Space");
+  await until("Space unticked it", async () => (await pick.locator(".pick-row").first().getAttribute("aria-checked")) === "false");
+  await page.keyboard.press("Enter");
+  await page.locator(".review-card").waitFor();
+});
+
 journey("⌘K ↵ on Home starts review, never flips a display setting", async (page) => {
   await page.keyboard.press("Meta+k");
   await page.locator("[cmdk-item]").first().waitFor();
   await page.keyboard.press("Enter");
   // The picker, or straight into review when he picked "everything" before.
   await page.getByRole("dialog", { name: "What to review" }).or(page.locator(".review")).first().waitFor();
+});
+
+journey("⌘K → All sources from Home puts focus on the list, so ↓ and ↵ work at once (as Feed and a skill page do)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("All sources");
+  await page.locator("[cmdk-item]").filter({ hasText: /^All sources/ }).first().waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator("main [role=grid]").waitFor();
+  await until("the list has focus", () => page.evaluate(() => !!document.activeElement?.closest("main .list")));
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head").waitFor();
 });
 
 journey("highlight popup open: typing writes the note, and no letter runs a shortcut (L, O, C, Q, N)", async (page) => {
@@ -671,11 +695,11 @@ journey("tutor pending: closing mid-reply asks once; a new chat keeps its own re
   const fresh = tutor.getByRole("button", { name: "New chat" });
   await field.fill("First question");
   await page.keyboard.press("Enter");
-  await tutor.getByText("Thinking…").waitFor();
+  await tutor.getByText("Reading your sources…").waitFor();
   await page.keyboard.press("Escape");
   await until("Esc closes it", async () => (await tutor.count()) === 0);
   await page.keyboard.press("Meta+j");
-  await tutor.getByText("Thinking…").waitFor();
+  await tutor.getByText("Reading your sources…").waitFor();
   await page.waitForTimeout(400);
   if (asked.length !== 1) throw new Error(`reopening asked again: ${asked.length} requests`);
   // A new chat while it thinks: its own question gets its own reply.
@@ -1618,7 +1642,7 @@ journey("Home: Continue reading rows rename from their menu, in place; Esc keeps
   await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
   await page.keyboard.press("Escape");
   await until("Esc keeps the old title", async () => (await title()) === TESTING);
-  await until("and gives the row its focus back", () => row.evaluate((el) => el === document.activeElement));
+  await until("and gives the row its focus back", () => row.locator(".home-open").evaluate((el) => el === document.activeElement));
   await row.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
   await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
@@ -3517,7 +3541,15 @@ journey("review: a Tutor card with no passage still offers Open in source after 
   await startReview(page, /Storytelling/);
   const q = page.locator(".review-q");
   const question = "Which word links the Story Spine's middle beats?";
-  if ((await q.innerText()) !== question) throw new Error(`the card is ${await q.innerText()}`);
+  // Journeys before this one share the library: a Storytelling card they missed is due again today, and then the
+  // new card is every fifth (D144), not first. Rate Good through the due ones until it comes up.
+  for (let n = 0; (await q.innerText()) !== question; n++) {
+    if (n === 8) throw new Error(`the card is ${await q.innerText()}`);
+    await reveal(page);
+    await page.waitForTimeout(350);
+    await page.getByRole("button", { name: "Good" }).click();
+    await until("the next card", async () => (await q.innerText()) !== "" && (await page.locator(".review-rate").count()) === 0);
+  }
   await reveal(page);
   await page.getByRole("button", { name: /Open in source/ }).click();
   await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
@@ -3622,8 +3654,44 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   await Bun.sleep(500);
   await page.reload();
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
-  await page.locator(".answered-toggle", { hasText: "Tried" }).click();
+  await page.locator(".answered-toggle", { hasText: "Used" }).click();
   await saved.waitFor();
+  // D148: "Next time I'll…" plans the next try: the row is back in To try with that plan, and the round so far is its record under Used.
+  await saved.click();
+  await page.getByLabel("Next time I'll…").fill("Quiz myself before writing, too");
+  await page.keyboard.press("Enter");
+  const again = page.locator(".try:not(.history)").filter({ hasText: "Quiz myself before writing, too" });
+  await again.waitFor();
+  if ((await again.getByRole("checkbox", { name: "Mark tried" }).count()) !== 1) throw new Error("the re-planned try isn't open again");
+  const record = page.locator(".try.history").filter({ hasText: "Quiz myself before each edit session" });
+  await record.waitFor();
+  if (!(await record.innerText()).includes("Caught two gaps before recording")) throw new Error("the record lost how the first round went");
+  // ⌘Z takes the re-plan back: the round is tried again as it was. (A click first: after a reload the
+  // page has no keyboard focus in headless Chromium until something is clicked.)
+  await page.locator(".skill-page, main").first().click({ position: { x: 2, y: 2 } }).catch(() => {});
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the tried round back", async () => (await again.count()) === 0 && (await page.locator(".try.done").filter({ hasText: "Quiz myself before each edit session" }).count()) === 1);
+  await page.waitForTimeout(400);
+  const back = (await ore("tries")) as { note?: string; status: string; uses?: unknown[] }[];
+  const mine = back.find((t) => t.note === "Quiz myself before each edit session");
+  if (!mine || mine.status !== "done" || mine.uses?.length) throw new Error(`the library kept the re-plan: ${JSON.stringify(mine)}`);
+});
+
+journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D148)", async (page) => {
+  const calls = oreCalls(page);
+  await startReview(page, null);
+  await reveal(page);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Escape");
+  const line = page.locator(".review-try");
+  await line.waitFor();
+  if (!(await line.innerText()).includes("Outline Thursday's video on the spine before writing")) throw new Error(`the end screen shows the wrong try: ${await line.innerText()}`);
+  await line.click();
+  await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
+  await page.locator(".review").waitFor({ state: "detached" });
+  await calls.undoAll(); // the rating, for the journeys after this one
 });
 
 journey("archive a source from its row, then Undo from the toast; VoiceOver hears the toast", async (page) => {
@@ -3702,13 +3770,13 @@ journey("focus comes back to what opened it: the tutor's ✦ after Esc, and a Co
   await page.keyboard.press("Escape");
   await until("focus is back on the ✦", () => on(".tutor-bubble"));
   const row = page.locator(".home-read").first();
-  await row.focus();
+  await row.locator(".home-open").focus();
   const title = (await row.innerText()).split("\n")[0]!;
   await page.keyboard.press("Enter");
   await page.locator(".doc").waitFor();
   await page.keyboard.press("Escape");
   await page.locator(".home-read").first().waitFor();
-  await until(`focus is back on “${title}”`, async () => (await on(".home-read")) && (await page.evaluate(() => (document.activeElement as HTMLElement).innerText.split("\n")[0])) === title);
+  await until(`focus is back on “${title}”`, async () => (await on(".home-read .home-open")) && (await page.evaluate(() => (document.activeElement as HTMLElement).innerText.split("\n")[0])) === title);
   // Opened from Home but left another way (All sources, another source, ⌘0): no old row takes focus later.
   await page.keyboard.press("Enter");
   await page.locator(".doc").waitFor();
@@ -3770,6 +3838,47 @@ journey("outline: Tab after the source's head opens it on the current heading, �
   await page.keyboard.press("Escape");
   await until("Esc goes back to the text", () => page.evaluate(() => document.activeElement?.classList.contains("reader-scroll") === true));
   if (!(await page.locator(".doc-head").filter({ hasText: AGENTS }).count())) throw new Error("Esc on the outline left the source");
+});
+
+journey("sidebar: closing a hover-only ⋯ or + gives focus to its row, and ⇧⌘S from the sidebar puts it on the list", async (page) => {
+  const focused = () => page.evaluate(() => { const el = document.activeElement as HTMLElement | null; return el ? `${el.className} ${el.innerText.trim()}` : ""; });
+  const row = page.locator(".sidebar .side-item").filter({ has: page.locator(".side-more") }).first();
+  const name = (await row.locator(".side-main .label").innerText()).trim();
+  await row.hover();
+  await row.locator(".side-more").click();
+  await page.getByRole("menu").waitFor();
+  await page.keyboard.press("Escape");
+  await until(`the ⋯'s menu gives focus to “${name}”`, async () => (await focused()).startsWith("side-main") && (await focused()).endsWith(name));
+  const head = page.locator(".sidebar .side-head").filter({ has: page.locator(".side-tool[aria-label^='New skill in']") }).first();
+  const group = (await head.locator(".side-label-text").innerText()).trim();
+  await head.hover();
+  await head.locator(".side-tool[aria-label^='New skill in']").click();
+  await page.getByRole("textbox", { name: "New skill name" }).waitFor();
+  await page.keyboard.press("Escape");
+  await until(`the + gives focus to “${group}”`, async () => (await focused()).startsWith("side-label") && (await focused()).includes(group));
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".list").waitFor();
+  await page.getByRole("button", { name: /^All sources/ }).focus();
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await until("⇧⌘S puts focus on the list", () => page.evaluate(() => document.activeElement?.classList.contains("list") === true));
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await page.locator(".sidebar .side-item").first().waitFor();
+  // In a source there is no list: the text takes it.
+  await openSource(page, AGENTS);
+  await page.getByRole("button", { name: /^All sources/ }).focus();
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await until("⇧⌘S in a source puts focus on the text", () => page.evaluate(() => document.activeElement?.classList.contains("reader-scroll") === true));
+  await page.keyboard.press("Shift+Meta+KeyS");
+  await page.locator(".sidebar .side-item").first().waitFor();
+  // Every hover-only ⋯ does the same, not only the sidebar's: Home's skill tiles.
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const tile = page.locator(".home-skill").first();
+  await tile.hover();
+  await tile.locator(".more").click();
+  await page.getByRole("menu").waitFor();
+  await page.mouse.move(0, 0);
+  await page.keyboard.press("Escape");
+  await until("Home's tile ⋯ gives focus to its tile's name", () => tile.locator(".home-open").evaluate((el) => el === document.activeElement));
 });
 
 journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
@@ -4083,6 +4192,8 @@ journey("tutor Practice: Write it in your note puts the exercise in the source i
 async function explain(page: Page, phrase: string) {
   await select(page, phrase);
   const popup = page.getByRole("dialog", { name: "Highlight" });
+  // A drag under CI load now and then lands before the page has settled from the last journey: one more drag.
+  if (!(await popup.waitFor({ timeout: 2500 }).then(() => true, () => false))) await select(page, phrase);
   await popup.waitFor();
   await popup.getByRole("button", { name: "Explain", exact: true }).click();
   await page.getByRole("dialog", { name: `Explain ${phrase}` }).waitFor();
@@ -4926,6 +5037,79 @@ journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the sugges
     await ore("skills", "rm", "sleep-science").catch(() => {});
     await ore("archive", made.id);
   }
+});
+
+journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {
+  const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { edit: why } : {}), why);
+  await openSource(page, AGENTS);
+  const title = () => page.locator(".doc-head h1").innerText();
+  await page.locator(".doc-head h1").click();
+  await page.getByLabel("Title").fill("Agents, retitled");
+  await page.keyboard.press("Enter");
+  await until("Enter saves it", async () => (await title()) === "Agents, retitled");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await fail("The library is read-only.");
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: "Couldn’t undo" }).filter({ hasText: "The library is read-only." }).waitFor();
+  await until("the failed undo leaves the new title", async () => (await title()) === "Agents, retitled");
+  await fail(null);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z again takes it back", async () => (await title()) === AGENTS);
+});
+
+journey("a11y: a row is one control with its actions beside it (axe nested-interactive), and the sidebar is one Tab stop", async (page) => {
+  // axe-core (MPL-2.0) runs in the page on the rules a row's shape can break: a button inside a button or an
+  // option, and a grid's rows and cells. The whole app under every rule is another pass (keyboard-a11y memo).
+  const rules = ["nested-interactive", "aria-required-children", "aria-required-parent", "aria-allowed-attr", "aria-allowed-role"];
+  await page.addScriptTag({ path: join(import.meta.dir, "../../../node_modules/axe-core/axe.min.js") });
+  const check = async (where: string) => {
+    const bad = await page.evaluate(async (rules) => {
+      const r = await (window as unknown as { axe: { run: (c: Element, o: unknown) => Promise<{ violations: { id: string; nodes: { target: string[]; failureSummary: string; any: { relatedNodes: { html: string }[] }[] }[] }[] }> } }).axe.run(document.body, { runOnly: rules });
+      return r.violations.flatMap((v) => v.nodes.map((n) => `${v.id} ${n.target.join(" ")} (${n.failureSummary.replace(/\s+/g, " ")}: ${n.any.flatMap((a) => a.relatedNodes.map((r) => r.html.slice(0, 120))).join(" | ")})`));
+    }, rules);
+    if (bad.length) throw new Error(`${where}: ${bad.length} axe findings: ${bad.slice(0, 4).join("; ")}`);
+  };
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".home-read").first().waitFor();
+  await page.locator(".home-skill").first().waitFor();
+  await check("Home");
+  // The whole row still opens on a click: on its picture, not only its title.
+  const read = page.locator(".home-read").first();
+  const r = (await read.boundingBox())!;
+  await page.mouse.click(r.x + 40, r.y + r.height / 2);
+  await page.locator(".reader-scroll").waitFor();
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".list .row").first().waitFor();
+  await check("All sources");
+  // An empty grid (nothing matches) is still a grid.
+  await page.getByRole("searchbox").or(page.locator(".filter input")).first().fill("zzzz-nothing");
+  await page.locator(".list .empty-state").waitFor();
+  await check("All sources, empty");
+  await page.getByRole("searchbox").or(page.locator(".filter input")).first().fill("");
+  // One Tab stop: Tab from inside the sidebar leaves it, ⇧Tab comes back to the item he left, ↑↓ move
+  // between its items, → reaches a row's own ⋯ and + tools, ← comes back (VS Code's tree, Finder's sidebar).
+  const focused = () => page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    return { inSide: !!el?.closest(".sidebar"), label: el?.getAttribute("aria-label") ?? el?.textContent?.trim() ?? "", skill: !!el?.matches(".side-item > .side-main") };
+  });
+  await page.locator(".sidebar .side-item").first().focus();
+  await page.keyboard.press("Tab");
+  if ((await focused()).inSide) throw new Error(`Tab inside the sidebar stopped on another of its items: ${(await focused()).label}`);
+  await page.keyboard.press("Shift+Tab");
+  await until("⇧Tab comes back to the item he left", async () => (await focused()).label === "Home");
+  await page.keyboard.press("ArrowDown");
+  await until("↓ moves to the next item", async () => (await focused()).label === "Feed");
+  // Down to a skill's row, then → to its ⋯.
+  for (let n = 0; n < 12 && !(await focused()).skill; n++) await page.keyboard.press("ArrowDown");
+  const skill = (await focused()).label;
+  await page.keyboard.press("ArrowRight");
+  await until("→ reaches the skill's ⋯", async () => (await focused()).label === `Actions for ${skill}`);
+  await page.keyboard.press("ArrowLeft");
+  await until("← comes back to the skill", async () => (await focused()).label === skill);
+  await page.keyboard.press("Tab");
+  if ((await focused()).inSide) throw new Error("Tab after the arrows stayed in the sidebar");
 });
 
 // —— run ——

@@ -1,5 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
+import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Children, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
@@ -406,6 +406,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** ⌘F: open with the bump that refocuses it; the query stays for the next ⌘F, as in Safari. `note`:
    *  opened by ⌘K on a match in the source note, so it searches only there. */
   const [find, setFind] = useState<{ open: boolean; focus: number; query: string; note?: boolean }>({ open: false, focus: 0, query: "" });
+  const [barsHidden, setBarsHidden] = useState(false);
+  const lastTop = useRef(0);
+  const lastTouch = useRef(0);
+  // The Finish step has its own screen: the bars are back for it.
+  useEffect(() => void (closedBook && setBarsHidden(false)), [closedBook]);
   // The toolbar sits at the reader's top right. With the sidebar hidden a narrow reader would push it over
   // the sidebar toggle and Back, which are fixed at the window's left: Collected gives way instead, a
   // chip per type, then one chip for all, then none (the side panel's Collected tab lists them all).
@@ -745,7 +750,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     p.reload();
     p.onChanged();
     if (!r.changed) return p.notify("Found no tables or formulas to read in this PDF");
-    const step = () => void ore("reimport", id, "--undo").then(() => (p.reload(), p.onChanged()), (e) => p.notify(errorText(e), "error"));
+    const step = () => ore("reimport", id, "--undo").then(() => (p.reload(), p.onChanged()));
     p.notify("Read the tables and formulas into the text", "info", step, step);
   };
 
@@ -1389,13 +1394,15 @@ function ReaderView(p: Props & { reload: () => void }) {
     setAnns((l) => l.map((a) => (a.id === id ? { ...a, intent } : a)));
     const saved = realId(id);
     // On the history at once, so a ⌘Z right after the click takes this change back, not the step before it.
-    const to = (i: Intent) => () => void saved.then((rid) => setIntentOf(rid, i, false), () => {});
+    const to = (i: Intent) => () => saved.then((rid) => setIntentOf(rid, i, false));
     const forget = undoable && was && was !== intent ? p.notify(`Changed to ${LABEL[intent]}`, "quiet", to(was), to(intent)) : undefined;
     try {
       await annotate(await saved, "--intent", intent);
     } catch (e) {
       forget?.();
       setAnns((l) => l.map((a) => (a.id === id && was ? { ...a, intent: was } : a)));
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   }
@@ -1444,11 +1451,12 @@ function ReaderView(p: Props & { reload: () => void }) {
       setAnns((l) => l.map((a) => (a.id === rid ? { ...a, exact: s.exact, start: s.start, end: s.start + s.exact.length } : a)));
       setRepaint((n) => n + 1);
       setPopup((cur) => (cur?.id === rid ? null : cur));
-      annotate(rid, opt("exact", s.exact), "--start", String(s.start)).catch((e) => {
+      // Run only from the history, which says why if the write fails.
+      return annotate(rid, opt("exact", s.exact), "--start", String(s.start)).catch((e) => {
         ranges.current.set(rid, other.range);
         setAnns((l) => l.map((a) => (a.id === rid ? { ...a, exact: other.exact, start: other.start, end: other.start + other.exact.length } : a)));
         setRepaint((n) => n + 1);
-        p.notify(errorText(e), "error");
+        throw e;
       });
     };
     return { back: () => go(from, to), again: () => go(to, from) };
@@ -1500,9 +1508,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     try {
       const rid = await realId(id);
       await annotate(rid, opt("note", note));
-      if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => void setNoteOf(rid, was, false), () => void setNoteOf(rid, note, false));
+      if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {
       setAnns((l) => l.map((a) => (a.id === id ? { ...a, note: was } : a)));
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   }
@@ -1952,6 +1962,16 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   const onScroll = () => {
     if (tip) setTip(null);
+    if (PHONE && scrollRef.current && performance.now() - lastTouch.current < 2000) {
+      // The bars go as he scrolls down to read and come back as he scrolls up, and at either end (Books, Obsidian).
+      // Only his finger's scroll: coming back to a saved place or a jump to a passage keeps them.
+      const el = scrollRef.current;
+      const moved = el.scrollTop - lastTop.current;
+      if (Math.abs(moved) > 8) {
+        setBarsHidden(moved > 0 && el.scrollTop > 40 && el.scrollTop + el.clientHeight < el.scrollHeight - 40);
+        lastTop.current = el.scrollTop;
+      }
+    }
     if ((words || listen) && !following.current) updateAway();
     if (!ready) return;
     clearTimeout(scrollTimer.current);
@@ -2198,9 +2218,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     try {
       await inOrder(id, () => ore("edit", id, "--title", t));
       p.onChanged();
-      if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => void retitle(id, t, before, false), () => void retitle(id, before, t, false));
+      if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
     } catch (e) {
       setDoc((cur) => cur && cur.id === id ? { ...cur, title: before } : cur);
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   }
@@ -2212,13 +2234,15 @@ function ReaderView(p: Props & { reload: () => void }) {
     if ((a ?? "") === (before ?? "")) return;
     setDoc((cur) => cur && cur.id === id ? { ...cur, author: a } : cur);
     // On the history at once, so a quick ⌘Z takes it back; taken off again if the write fails.
-    const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => void reauthor(id, a, before, false), () => void reauthor(id, before, a, false)) : () => {};
+    const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => reauthor(id, a, before, false), () => reauthor(id, before, a, false)) : () => {};
     try {
       await inOrder(id, () => ore("edit", id, "--author", a ?? ""));
       p.onChanged();
     } catch (e) {
       forget();
       setDoc((cur) => cur && cur.id === id ? { ...cur, author: before } : cur);
+      // From the history (undo or redo): it puts the step back and says why.
+      if (!undoable) throw e;
       p.notify(errorText(e), "error");
     }
   }
@@ -2228,11 +2252,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   const reimport = async () => {
     if (!doc) return;
     const d = doc;
-    const swap = () =>
-      ore("reimport", d.id, "--undo").then(
-        () => (p.reload(), p.onChanged()),
-        (e) => p.notify(errorText(e), "error"),
-      );
+    // Run only from the history, which says so if it fails.
+    const swap = () => ore("reimport", d.id, "--undo").then(() => (p.reload(), p.onChanged()));
     p.notify(`Reimporting “${d.title}”…`, "progress");
     try {
       const r = await ore<{ changed: boolean; removed: unknown[] }>("reimport", d.id);
@@ -2241,23 +2262,25 @@ function ReaderView(p: Props & { reload: () => void }) {
       p.onChanged();
       const n = r.removed.length;
       const what = n ? `Reimported. ${n} ${n === 1 ? "highlight is" : "highlights are"} no longer in it, so ${n === 1 ? "it was" : "they were"} removed` : "Reimported with the latest text";
-      p.notify(what, "info", () => void swap(), () => void swap());
+      p.notify(what, "info", swap, swap);
     } catch (e) {
       p.notify(errorText(e, "reimport"), "error");
     }
   };
 
   /** Files the source under exactly `skills` (its cards follow), with Undo naming the one that changed. */
-  const fileUnder = async (skills: string[], changed?: Skill) => {
+  const fileUnder = async (skills: string[], changed?: Skill, fromHistory = false) => {
     if (!doc) return;
     const before = doc.skills;
     setDoc((cur) => cur && { ...cur, skills });
     try {
       await ore("edit", doc.id, "--skills", skills.join(","));
       p.onChanged();
-      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => void fileUnder(before), () => void fileUnder(skills));
+      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true), () => fileUnder(skills, undefined, true));
     } catch (e) {
       setDoc((cur) => cur && { ...cur, skills: unfile(cur.skills, skills, before) });
+      // From the history (undo or redo): it puts the step back and says why.
+      if (fromHistory) throw e;
       p.notify(errorText(e), "error");
     }
   };
@@ -2336,12 +2359,17 @@ function ReaderView(p: Props & { reload: () => void }) {
           setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
           p.onPin(doc);
         } }]),
-        { id: "archive", label: "Archive", hint: label(keys.archive), danger: true, divider: true, run: () => p.onArchive(doc) },
+        { id: "archive", label: doc.archived_at ? "Restore" : "Archive", hint: label(keys.archive), danger: !doc.archived_at, divider: true, run: () => p.onArchive(doc) },
       ];
   p.actionsRef.current = closedBook ? [] : actions;
   // The phone has no Finder, no side panel and no sidebar to pin to yet.
   const menuActions = actions.filter((a) => !a.paletteOnly);
-  const shownActions = PHONE ? menuActions.filter((a) => !["reveal", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url)).map((a, i) => (i ? a : { ...a, divider: false })) : menuActions;
+  const canFinish = !!doc && doc.status !== "done" && !doc.preview;
+  // On the phone Finish lives here and at the end of the source; the top bar stays Back and ⋯ (D156).
+  const phoneActions = menuActions.filter((a) => !["reveal", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url));
+  const shownActions = PHONE
+    ? [...phoneActions.filter((a) => a.id === "finish").map((a) => ({ ...a, label: "Finish", hint: undefined })), ...phoneActions.filter((a) => a.id !== "finish")].map((a, i) => (i ? a : { ...a, divider: false }))
+    : menuActions;
 
   if (error)
     return (
@@ -2458,7 +2486,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     : undefined;
 
   return (
-    <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}`} ref={readerRef}>
+    <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
       <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
@@ -2486,14 +2514,6 @@ function ReaderView(p: Props & { reload: () => void }) {
               </Hint>
             </div>
           )}
-          {/* The phone has no side panel toggle: its note slides in from the right. */}
-          {PHONE && (
-            <Hint text={notes.text?.trim() ? "Open the source note" : "Add a source note"} keys="notes">
-              <button className={`note-toggle${notes.text?.trim() ? " has" : ""}`} onClick={() => p.onShowSide("note")}>
-                {notes.text?.trim() ? "Note" : "+ Note"}
-              </button>
-            </Hint>
-          )}
           {/* A Feed post isn't saved until he keeps something from it; this says so, where Finish sits. */}
           {doc?.preview && (
             <Hint text="Not in your library yet. A highlight or a note keeps it; leave with neither and it’s gone.">
@@ -2510,7 +2530,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               </button>
             </Hint>
           )}
-          {doc && doc.status !== "done" && !doc.preview && (
+          {!PHONE && canFinish && (
             <Hint text="Quiz yourself, then finish" keys="finish-source">
               <button className="note-toggle" onClick={() => p.setFinishing(true)}>
                 Finish
@@ -2562,7 +2582,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           })}
         </div>
       )}
-      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll}>
+      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's
@@ -2681,6 +2701,11 @@ function ReaderView(p: Props & { reload: () => void }) {
             <p className="doc-empty">
               {video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
             </p>
+          )}
+          {PHONE && ready && canFinish && !closedBook && (
+            <div className="phone-finish">
+              <button onClick={() => p.setFinishing(true)}>Finish</button>
+            </div>
           )}
           {away === "down" && !cardMode && (
             <div className="follow-down">
@@ -2833,7 +2858,17 @@ function ReaderView(p: Props & { reload: () => void }) {
           {tip.text}
         </div>
       )}
-      {PHONE && !closedBook && away !== "down" && collected}
+      {PHONE && !closedBook && !find.open && (
+        <div className="phone-tools">
+          {away !== "down" && collected}
+          <button className={notes.text?.trim() ? "has" : ""} onClick={() => p.onShowSide("note")}>
+            {notes.text?.trim() ? "Note" : "+ Note"}
+          </button>
+          <button aria-label="Find in source" onClick={openFind}>
+            <MagnifyingGlass size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       </div>
       {closedBook && hidden && (
         <div className="hidden-chip">
@@ -2863,7 +2898,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                     </div>
                     {!chapterFb.feedback && !chapterFb.error && (
                       <p className="loading">
-                        <Working label="Reading your recall against the chapter…" />
+                        <Working stage="read" label="Reading your recall against the chapter…" />
                       </p>
                     )}
                     {chapterFb.error && (
@@ -3039,7 +3074,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
       <button className="preq-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <CaretRight className={`caret${open ? " open" : ""}`} size={12} aria-hidden="true" />
         What do you already know?
-        {waiting && <span className="quiet"><Working label="Writing prequestions…" slow="Usually under a minute." /></span>}
+        {waiting && <span className="quiet"><Working stage="write" label="Writing prequestions…" slow="Usually under a minute." /></span>}
       </button>
       {open && qs.length > 0 && (
         <ol className="preq-body">

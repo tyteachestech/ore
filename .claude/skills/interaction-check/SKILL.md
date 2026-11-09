@@ -58,6 +58,8 @@ has to ask for something obvious, add a row here in the same PR.**
 | Any list | ⇧-click and ⇧↑↓ extend a selection from its anchor, ⌘-click toggles, ⌘A selects all, Esc clears; ⋯, right-click and ⌘K act on the whole selection with one Undo | Linear, Finder |
 | Any list | Dragging a selection files every item in it | Finder, Things |
 | Any list | ⌘C on a selected row copies it as Markdown with its link | Notion, Linear |
+| Any list or row with actions | One control per row for a screen reader: the title (or the list's own focus) opens it, the row's ⋯ and chips sit beside it, never inside a `button` or `option`; a list whose rows hold controls is a `grid` of `row`s (ARIA's layout grid). A click anywhere on the row still opens it. axe's `nested-interactive` runs in the e2e a11y journey | Linear, WAI-ARIA APG |
+| Sidebar | One Tab stop: the item last focused (or the view shown) keeps it; ↑↓ Home End move between items, → reaches the row’s ⋯ and + (on a closed collection it opens it), ← comes back (on an open collection closes it, on a skill goes up to its collection), Tab goes on to the content | VS Code’s tree, Finder’s sidebar |
 | Any list of sources | Each row starts with the source's thumbnail (`<Thumb>`), or its kind icon, wherever it is listed: All sources, skill page, Home, ⌘K | Raindrop, Readwise Reader |
 | Any list of sources | A source's skill chips open its skill picker on click, wherever the row is listed (All sources, skill page, Home); the row itself still opens on click | Linear labels, Notion multi-select |
 | Set of pills or tags | Clicking the set opens a multi-select: search, toggle with a click or Enter, create a new one from the query | Notion |
@@ -80,6 +82,7 @@ has to ask for something obvious, add a row here in the same PR.**
 | Shortcut editor | Search by name, or switch the field to keys and press a combo to find what uses it; click a shortcut and press new keys; a combo in use asks to Replace (the other is left Not assigned); ↺ resets one, × removes one, Reset all; every one but a plain rebind has Undo; the ⌘/ sheet and Settings are the same editor | ChatGPT, VS Code |
 | Window | Reopens at the size and place he left it, on a screen that still exists | Every Mac app |
 | Whole app | Right-click never shows the webview's page menu (Reload, AutoFill, Camera). Only fields, the note editor, selected text and the reader's text keep the Mac's own menu (Copy, Paste, Look Up); a field inside a row gets the text menu, not the row's (`native-menu.ts`, `WithMenu`) | Finder, Linear |
+| Hover-only controls | A ⋯ or + that shows only on hover gives focus to its row when its menu or field closes, since it can't hold focus itself (`hoverOnly` on `MoreButton`). Hiding the sidebar with focus in it (⇧⌘S) puts focus on the view's list, else the text or the page's first control (Tyler, 2026-11-08) | Finder, Linear |
 | Right-click by surface | Row, card, title or header: the same actions as its ⋯. Sidebar space and Home/All sources rows: New skill, New collection. A list's space and its card (Sources, Questions): that list's create action (Add source, Add a question). Home, Review, Settings, the reader's side panel outside rows: nothing. A new surface picks one of these and adds its row here | Finder, Notion |
 
 ## Detail behind each rule

@@ -8,7 +8,8 @@ import { Gem } from "./Gem";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
-import { ore, opt, PHONE, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today } from "./ore";
+import { ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { PixelTry } from "./PixelIcon";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, type Notify } from "./util";
@@ -29,7 +30,8 @@ const CUT_SHOWN = 8;
 
 type Phase = "answer" | "checked" | "edit";
 /** The session receipt, and today before and after it (for the ring and level-ups). */
-type End = { session: SessionEnd; today: Today; before: Today | null };
+/** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
+type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null };
 
 /** The remixed version shown, for the CLI calls that act on it (D66). */
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
@@ -138,8 +140,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const retired = useRef(new Set<string>());
   /** Ratings go on the app history (⌘Z) with every other step; while Review is open, taking back its
    *  newest rating also shows that card again. */
-  const undoNow = useRef<(ts: string) => boolean>(() => false);
-  const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: () => void; setTs: (ts: string) => void }) => boolean>(() => false);
+  /** The history's undo and redo of a rating while Review shows it: the write's promise, or null when it isn't Review's to do. */
+  const undoNow = useRef<(ts: string) => Promise<void> | null>(() => null);
+  const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: () => void; setTs: (ts: string) => void }) => Promise<void> | null>(() => null);
   /** Counts card showings, so a grade or passage that lands after he moved on is dropped, not shown on the next card. */
   const showing = useRef(0);
   /** Counts grading runs, so a grade still on its way when the key points change is dropped. */
@@ -293,7 +296,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         notify(nothingDue(before.current, pick));
         return onClose();
       }
-      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current });
+      // The try line is a nicety: the end screen never waits on or fails for it.
+      const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
+      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current, next: await next });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
@@ -506,12 +511,14 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         "quiet",
         // With Review closed, only the log changes (its session stays ended), and Home reads its numbers again.
         () => {
-          if (!(mounted.current && undoNow.current(ts))) ore("review", id, opt("undo", ts)).then(() => onLogged?.(), (e) => notify(errorText(e), "error"));
+          return (mounted.current && undoNow.current(ts)) || ore("review", id, opt("undo", ts)).then(() => onLogged?.());
         },
         () => {
           // Given again after Review closed: its session has ended, so the rating goes in with none.
-          if (!(mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })))
-            ore<{ ts: string }>("review", ...args.filter((a) => !a.startsWith("--session="))).then((x) => (setTs(x.ts), onLogged?.()), (e) => notify(errorText(e), "error"));
+          return (
+            (mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })) ||
+            ore<{ ts: string }>("review", ...args.filter((a) => !a.startsWith("--session="))).then((x) => (setTs(x.ts), onLogged?.()))
+          );
         },
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
@@ -523,7 +530,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   /** ⌘Z: takes back the last rating and shows that card again, unanswered. On the end screen it
    *  opens the session again, back on that card (Anki's Undo after Congratulations). */
-  const undoRating = async () => {
+  const undoRating = async (fromHistory = false) => {
     if (!last || busyNow.current) return;
     dropAhead();
     last.forget();
@@ -541,25 +548,20 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       setQueue(last.queue.filter((e) => !retired.current.has(e.id)));
       setUndos((u) => u.slice(0, -1));
     } catch (e) {
+      // From the history (⌘Z): it puts the step back and says why.
+      if (fromHistory) throw e;
       notify(errorText(e), "error");
     } finally {
       setBusy(false);
     }
   };
 
-  undoNow.current = (ts) => {
-    if (last?.ts !== ts) return false;
-    void undoRating();
-    return true;
-  };
+  undoNow.current = (ts) => (last?.ts === ts ? undoRating(true) : null);
   // ⇧⌘Z right after ⌘Z: that card is showing again, so the rating goes in again and Review moves on.
   redoNow.current = (id, args, rating, elapsed, again) => {
-    if (end || busyNow.current || queue?.[0]?.id !== id) return false;
+    if (end || busyNow.current || queue?.[0]?.id !== id) return null;
     setBusy(true);
-    submit(args, rating, elapsed, again)
-      .catch((e) => notify(errorText(e), "error"))
-      .finally(() => setBusy(false));
-    return true;
+    return submit(args, rating, elapsed, again).finally(() => setBusy(false));
   };
 
   const retire = async () => {
@@ -576,15 +578,12 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         () => {
           if (state === "retired") return;
           dropAhead();
-          ore("card", "restore", id, opt("state", state)).then(
-            () => {
-              retired.current.delete(id);
-              notify("Card restored. It comes back in a later review.");
-            },
-            (e) => notify(errorText(e), "error"),
-          );
+          return ore("card", "restore", id, opt("state", state)).then(() => {
+            retired.current.delete(id);
+            notify("Card restored. It comes back in a later review.");
+          });
         },
-        () => (dropAhead(), void ore("card", "retire", id).then(() => void retired.current.add(id), (e) => notify(errorText(e), "error"))),
+        () => (dropAhead(), ore("card", "retire", id).then(() => void retired.current.add(id))),
       );
       advance(false);
     } catch (e) {
@@ -609,8 +608,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       notify(
         "Dropped that version. Here’s the original.",
         "info",
-        () => (dropAhead(), void ore("variant", "restore", id, variant).catch((e) => notify(errorText(e), "error"))),
-        () => (dropAhead(), void ore("variant", "reject", id, variant).catch((e) => notify(errorText(e), "error"))),
+        () => (dropAhead(), ore("variant", "restore", id, variant)),
+        () => (dropAhead(), ore("variant", "reject", id, variant)),
       );
     } catch (e) {
       notify(errorText(e), "error");
@@ -653,7 +652,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       setDraft(loaded.current);
     }
     if (undoable) {
-      const put = (w: typeof was) => () => void setText(c, w.question, w.answer, w.rubric, false).catch((e) => notify(errorText(e), "error"));
+      const put = (w: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false);
       notify("Card edit", "quiet", put(was), put({ question, answer, rubric }));
     }
   };
@@ -794,8 +793,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
 
   return (
-    // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it; the trap lets
-    // go while the palette or the shortcuts sheet is over it, or their field could never take focus (controls-08).
+    // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it. Let go while a
+    // layer sits over it (⌘K, ⌘/) or it is paused on a source, so that layer owns focus and Esc.
     <Trap off={paused || under}>
     <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused}>
       <div className="review-head" data-tauri-drag-region>
@@ -857,7 +856,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick)}</p>}
 
-        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} />}
+        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
 
         {!end && card && entry && (
           <div className="review-card" key={`${card.id}-${done}-${left}`}>
@@ -976,7 +975,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                   </>
                 )}
                 {card.kind === "prompt" && !marks && !gradeError && (
-                  <p className="loading review-grading"><Working label="Checking your answer…" slow="This can take about 20 seconds." /></p>
+                  <p className="loading review-grading"><Working stage="check" label="Checking your answer…" slow="This can take about 20 seconds." /></p>
                 )}
                 {grade?.feedback && <p className="review-feedback">{grade.feedback}</p>}
                 {gradeError && PHONE ? (
@@ -1198,7 +1197,7 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
 
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
-function EndScreen({ end, skills, quick, onDone, onAgain }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void }) {
+function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void }) {
   const { session: s, today: t, before: b } = end;
   const part = (x: Today | null) => (!x ? 0 : x.met ? 1 : x.goal_ms ? x.active_ms / x.goal_ms : 0);
   const closed = t.met && !!b && !b.met;
@@ -1237,7 +1236,7 @@ function EndScreen({ end, skills, quick, onDone, onAgain }: { end: End; skills: 
         // A session of misses is still the work that makes them stick (D62: no guilt copy).
         <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>
       )}
-      {s.rescued > 0 && (
+      {rescuedWorthSaying(s) && (
         <p className="review-rescued">
           {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}
         </p>
@@ -1256,6 +1255,18 @@ function EndScreen({ end, skills, quick, onDone, onAgain }: { end: End; skills: 
         </Hint>
       )}
       {!t.met && t.counts && <p className="quiz-faint">{minutesText(Math.max(0, t.goal_ms - t.active_ms))} min to today’s goal</p>}
+      {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
+      {end.next && (
+        <Hint text="To try on your own work · opens the passage">
+          <button className="review-try" onClick={() => onTry(end.next!)}>
+            <PixelTry size={16} aria-hidden="true" />
+            <span>
+              <span className="review-try-plan">{end.next.note || `“${end.next.exact.replace(/\s+/g, " ").trim()}”`}</span>
+              <span className="review-try-from">{end.next.item_title}</span>
+            </span>
+          </button>
+        </Hint>
+      )}
       <div className="review-foot center">
         {t.due > 0 && (
           <button className="quiz-ghost" onClick={onAgain}>

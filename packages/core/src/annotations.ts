@@ -35,6 +35,9 @@ export const AnnotationSchema = z.object({
   answers: z.array(Contribution).optional(), // Question intent only (D75)
   card: z.boolean().optional(), // Question intent: "Answered + card", so enrich drafts a card from his answer
   reflection: z.string().optional(), // Apply intent (D127): how it went, written when he checked it off
+  // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
+  // (his plan and how it went move here) and the try is open again with the new plan as its note.
+  uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional() })).optional(),
   // A card or question he typed with nothing selected ("Card here"): `exact` is only the sentence where he
   // was; the note is what counts, and a card is drafted from it and the whole source, with quotes.
   point: z.boolean().optional(),
@@ -79,7 +82,8 @@ export function addHighlight(item: Item, input: HighlightInput): Annotation {
   if (!span) throw new Error(`text not found in item ${item.meta.id}: "${input.exact.slice(0, 60)}"`);
   const live = readAnnotations(item).filter((a) => !a.point);
   const same = live.find((a) => a.start === span.start && a.end === span.end);
-  if (same) return same;
+  // With a note (a plan, a question) it is that one highlight, revised: the words he typed never vanish.
+  if (same) return input.note?.trim() ? reviseAnnotation(item, same, { intent: input.intent, note: input.note.trim() }) : same;
   const edge = live.filter((a) => a.start < span.end && a.end > span.start && !(a.start <= span.start && a.end >= span.end));
   if (edge.length === 1) {
     const a = edge[0]!;
@@ -151,7 +155,7 @@ export function isQuestionOnly(item: Item): boolean {
   return all.length > 0 && all.every((a) => a.intent === "question");
 }
 
-export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection">>;
+export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses">>;
 
 // Edits never rewrite history: they append the same id with rev + 1.
 export function reviseAnnotation(item: Item, current: Annotation, patch: AnnotationPatch): Annotation {

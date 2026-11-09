@@ -11,7 +11,7 @@ export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => 
     let y0 = 0, t0 = 0, dy = 0, live = false;
     const start = (e: TouchEvent) => {
       // A list scrolled down scrolls back up first, as in iOS.
-      const list = (e.target as HTMLElement).closest<HTMLElement>(".pick-list");
+      const list = (e.target as HTMLElement).closest<HTMLElement>(".pick-list, [cmdk-list]");
       live = e.touches.length === 1 && !(list && list.scrollTop > 0);
       [y0, t0, dy] = [e.touches[0]!.clientY, e.timeStamp, 0];
     };

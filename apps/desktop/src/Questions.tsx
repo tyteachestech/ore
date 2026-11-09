@@ -243,25 +243,18 @@ function Piece({ text, from, onSave, onEditing }: {
 export function announce(q: Question, s: Saved, how: "contribution" | "done" | "card", notify: Notify, onUndone: () => void) {
   // The piece he added: a redo adds it again under a new time, which the next undo removes.
   let added = s.added;
+  // Run only from the history, which puts the step back and says why if a write fails.
   const undo = async () => {
-    try {
-      if (how !== "contribution") await ore("annotate", q.id, "--status", q.status);
-      if (added) await ore("answer", q.id, opt("remove", added));
-      onUndone();
-    } catch (e) {
-      notify(errorText(e), "error");
-    }
+    if (how !== "contribution") await ore("annotate", q.id, "--status", q.status);
+    if (added) await ore("answer", q.id, opt("remove", added));
+    onUndone();
   };
   const redo = async () => {
-    try {
-      const r = await ore<Saved["question"]>(...s.again!);
-      if (added) added = r.answers?.at(-1)?.ts;
-      onUndone();
-    } catch (e) {
-      notify(errorText(e), "error");
-    }
+    const r = await ore<Saved["question"]>(...s.again!);
+    if (added) added = r.answers?.at(-1)?.ts;
+    onUndone();
   };
-  notify(how === "contribution" ? "Added to your answer" : how === "card" ? "Answered. A card is on its way" : "Answered", "info", () => void undo(), s.again ? () => void redo() : undefined);
+  notify(how === "contribution" ? "Added to your answer" : how === "card" ? "Answered. A card is on its way" : "Answered", "info", undo, s.again ? redo : undefined);
 }
 
 /** Mark answered / Reopen and Delete on a list of questions, the same on the skill page and in the
@@ -273,13 +266,15 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
       setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, status } : x)));
       const was = q.status === "done" ? "done" : "open";
       const forget = undoable
-        ? notify(status === "done" ? "Marked answered" : "Reopened", "quiet", () => void setStatus({ ...q, status }, was, false), () => void setStatus(q, status, false))
+        ? notify(status === "done" ? "Marked answered" : "Reopened", "quiet", () => setStatus({ ...q, status }, was, false), () => setStatus(q, status, false))
         : null;
       try {
         await ore("annotate", q.id, "--status", status);
       } catch (e) {
         forget?.();
         setQs((l) => l && l.map((x) => (x.id === q.id ? q : x)));
+        // From the history (undo or redo): it puts the step back and says why.
+        if (!undoable) throw e;
         notify(errorText(e), "error");
       }
     },
@@ -300,11 +295,11 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
         "info",
         () => {
           back();
-          write.catch(() => {}).then(() => ore("annotate", q.id, "--status", q.status)).catch((e) => notify(errorText(e), "error"));
+          return write.catch(() => {}).then(() => ore("annotate", q.id, "--status", q.status));
         },
         () => {
           setQs((l) => l && l.filter((x) => x.id !== q.id));
-          ore("annotate", q.id, "--status", "deleted").catch((e) => notify(errorText(e), "error"));
+          return ore("annotate", q.id, "--status", "deleted");
         },
       );
       try {

@@ -5,7 +5,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Hint } from "./Hint";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
@@ -73,6 +73,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const [draft, setDraft] = useState<Group[] | null>(null);
   const [active, setActive] = useState<UniqueIdentifier | null>(null);
   const [closed, setClosed] = useState(closedGroups);
+  // The group whose New skill field is open, by collection ("" is the ungrouped one): a name can change
+  // under it (the lone "Skills" group becomes "Other" once the skills load), a collection can't.
   const [adding, setAdding] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   // A group that exists only while its first skill is named: a new collection, or "Other" when
@@ -91,7 +93,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     save(CLOSED, JSON.stringify(next));
   };
   const toggle = (name: string) => setClosedSaved(closed.includes(name) ? closed.filter((n) => n !== name) : [...closed, name]);
-  const isOpen = (g: Group) => !closed.includes(g.name) || adding === g.name;
+  const isOpen = (g: Group) => !closed.includes(g.name) || adding === g.collection;
 
   const groupOf = (list: Group[], id: UniqueIdentifier) =>
     isGroup(id) ? list.findIndex((g) => groupId(g.collection) === id) : list.findIndex((g) => g.skills.some((s) => s.id === id));
@@ -165,12 +167,11 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     if (isOther(v)) return newSkill();
     const existing = groups.find((g) => g.collection.toLowerCase() === v.toLowerCase());
     if (!existing) setFresh(v);
-    setAdding(existing?.name ?? v);
+    setAdding(existing?.collection ?? v);
   };
   const newSkill = () => {
-    const rest = groups.find((g) => !g.collection);
-    if (!rest) setFresh("");
-    setAdding(rest?.name ?? UNGROUPED);
+    if (!groups.some((g) => !g.collection)) setFresh("");
+    setAdding("");
   };
   // Right-click on the sidebar around the rows, as on Finder's or Notion's sidebar.
   const spaceMenu: MenuAction[] = [
@@ -184,7 +185,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const groupMenu = (g: Group): MenuAction[] => {
     const i = named.indexOf(g);
     return [
-      { id: "new", label: "New skill", run: () => setAdding(g.name) },
+      { id: "new", label: "New skill", run: () => setAdding(g.collection) },
       ...(g.collection
         ? [
             { id: "rename", label: "Rename…", run: () => setRenaming(g.collection) },
@@ -208,12 +209,15 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
 
   const nav = useRef<HTMLElement>(null);
   const cursor = useSideCursor(nav, home ? "home" : feed ? "feed" : skill ?? "all");
+  const roving = useRoving(nav);
 
   return (
     <WithMenu actions={spaceMenu}>
     <nav
       ref={nav}
       onPointerDown={cursor.onPointerDown}
+      onFocus={roving.onFocus}
+      onKeyDown={roving.onKeyDown}
       className={`sidebar${peek ? " peek" : ""}${within ? " within" : ""}${active !== null ? " sorting" : ""}`}
       aria-label="Skills"
       hidden={hidden}
@@ -261,7 +265,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
               renaming={renaming === g.collection && !!g.collection}
               menu={g === freshGroup ? [] : groupMenu(g)}
               onToggle={() => toggle(g.name)}
-              onAdd={() => setAdding(g.name)}
+              onAdd={() => setAdding(g.collection)}
               taken={(name) => isOther(name) || groups.some((x) => x !== g && !!x.collection && x.collection.toLowerCase() === name.toLowerCase())}
               onRename={(name) => rename(g, name)}
               onCancelRename={() => setRenaming(null)}
@@ -272,7 +276,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
                     <SkillRow key={s.id} s={s} on={skill === s.id} drop={drop === s.id} marked={marked} onOpen={onOpen} menu={menu(s)} />
                   ))}
               </SortableContext>
-              {adding === g.name && (
+              {adding === g.collection && (
                 <NewSkill
                   skills={skills}
                   collection={g.collection}
@@ -415,6 +419,58 @@ function RenameField({ value, label = "Collection name", placeholder, taken, onS
   );
 }
 
+/** The sidebar's items, one per row (Home, Feed, All sources, a collection's name, a skill), and the tools at a row's right (⋯, +). */
+const ITEMS = "button.side-main, button.side-label";
+const TOOLS = ".side-tool, .side-more";
+/** One Tab stop for the whole sidebar (VS Code's tree, Finder's sidebar): the view shown, or the item last
+ *  focused, keeps tabindex 0 and the rest -1, so Tab goes on to the content. ↑↓ (and Home, End) move
+ *  between items, → reaches the row's own ⋯ and + tools, ← comes back; on a collection's name → and ← open
+ *  and close it, and ← on a skill goes up to its collection (a tree's keys). Fields (a new name) keep their keys. */
+function useRoving(nav: RefObject<HTMLElement | null>) {
+  const last = useRef<HTMLElement | null>(null);
+  const apply = () => {
+    const el = nav.current;
+    if (!el) return;
+    const stops = [...el.querySelectorAll<HTMLElement>(`${ITEMS}, ${TOOLS}`)];
+    const kept = last.current && stops.includes(last.current) ? last.current : null;
+    const current = kept ?? stops.find((s) => s.getAttribute("aria-pressed") === "true") ?? stops.find((s) => s.matches(ITEMS)) ?? null;
+    for (const s of stops) s.tabIndex = s === current ? 0 : -1;
+  };
+  // After every render: new skills and reopened groups come with tabindex -1.
+  useEffect(apply);
+  const onFocus = (e: FocusEvent<HTMLElement>) => {
+    const t = e.target as HTMLElement;
+    if (!t.matches(`${ITEMS}, ${TOOLS}`)) return;
+    // The stop is the row's item, so ⇧Tab back from the content lands on it, not on a hover-only ⋯.
+    last.current = t.matches(ITEMS) ? t : t.closest(".side-item, .side-head")?.querySelector<HTMLElement>(ITEMS) ?? t;
+    apply();
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    const t = e.target as HTMLElement;
+    if (e.metaKey || e.altKey || e.ctrlKey || !t.matches(`${ITEMS}, ${TOOLS}`)) return;
+    const shown = (s: HTMLElement) => s.getClientRects().length > 0;
+    const items = [...nav.current!.querySelectorAll<HTMLElement>(ITEMS)].filter(shown);
+    const row = t.closest<HTMLElement>(".side-item, .side-head");
+    const item = t.matches(ITEMS) ? t : row?.querySelector<HTMLElement>(ITEMS) ?? t;
+    const tools = row ? [...row.querySelectorAll<HTMLElement>(TOOLS)] : [];
+    const step = (d: number) => items[Math.max(0, Math.min(items.length - 1, items.indexOf(item) + d))];
+    let to: HTMLElement | undefined;
+    if (e.key === "ArrowDown") to = step(1);
+    else if (e.key === "ArrowUp") to = step(-1);
+    else if (e.key === "Home") to = items[0];
+    else if (e.key === "End") to = items[items.length - 1];
+    else if (e.key === "ArrowRight" && t === item && t.getAttribute("aria-expanded") === "false") return t.click(); // a closed collection opens (a tree's →)
+    else if (e.key === "ArrowRight") to = tools[t === item ? 0 : tools.indexOf(t) + 1];
+    else if (e.key === "ArrowLeft" && t === item && t.getAttribute("aria-expanded") === "true") return t.click(); // an open one closes
+    else if (e.key === "ArrowLeft" && t === item) to = t.closest(".side-section")?.querySelector<HTMLElement>("button.side-label") ?? undefined; // a skill: to its collection
+    else if (e.key === "ArrowLeft") to = tools[tools.indexOf(t) - 1] ?? item;
+    else return;
+    e.preventDefault();
+    to?.focus();
+  };
+  return { onFocus, onKeyDown };
+}
+
 function SkillFace({ s, marked }: { s: Skill; marked: boolean }) {
   return (
     <span className="side-main">
@@ -455,7 +511,7 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
           )}
           <span className="label">{s.name}</span>
         </button>
-        <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} />
+        <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} hoverOnly />
       </div>
     </WithMenu>
   );
@@ -464,6 +520,8 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
 /** Names a new skill in place, like a new page in Notion's sidebar: Enter creates it through
  *  `ore skills add`, Esc or clicking away drops the name (never saved on blur). */
 function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; collection: string; marked: boolean; onDone: (s: Skill | null) => void }) {
+  // What opened it, read before its field takes focus: Esc gives focus back there.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -512,7 +570,16 @@ function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; col
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 e.stopPropagation();
+                // The + shows only on hover, so from it (or when what opened it is gone) focus goes to the collection's name.
+                const head = e.currentTarget.closest(".side-section")?.querySelector<HTMLElement>(".side-label");
+                const back = opener?.isConnected && opener !== document.body && !opener.closest(".side-head-tools") ? opener : head;
                 onDone(null);
+                // Only if focus has nowhere else to go: a ⌘K pressed in the same instant keeps its field.
+                setTimeout(() => {
+                  const active = document.activeElement;
+                  if (active && active !== document.body) return;
+                  (back?.isConnected ? back : document.querySelector<HTMLElement>(".sidebar .side-label"))?.focus({ preventScroll: true });
+                });
               }
             }}
           />
