@@ -24,13 +24,13 @@ export const SKILL_ICON_SET: readonly (readonly [name: string, words?: string])[
   ["camera", "photography photo"], ["video", "film youtube"], ["film", "movie cinema"], ["clapperboard", "movie film making"], ["movie", "cinema"],
   // Music and sound
   ["music", "song"], ["headphone", "listen podcast audio"], ["mic", "microphone podcast singing"], ["guitar", "instrument"], ["drum", "instrument percussion"],
-  ["disc", "record vinyl dj"], ["radio", ""], ["speaker", "sound"],
+  ["disc", "record vinyl dj"], ["speaker", "sound"],
   // Body and health
-  ["heart", "love health"], ["lungs", "breathing"], ["eye_2", "see vision"], ["ear", "hearing"], ["hand", ""],
+  ["heart", "love health"], ["lungs", "breathing"], ["eye_2", "see vision"], ["ear", "hearing"],
   ["skull", "anatomy"], ["capsule", "medicine pill"], ["first_aid_kit", "medical"], ["dental", "teeth"],
   ["pray", "meditation faith"], ["zazen", "meditation"], ["yoga", ""], ["moon", "sleep night"],
   // Sport and movement
-  ["run", "running"], ["walk", "walking"], ["fitness", "gym"], ["barbell", "weights lifting gym"],
+  ["run", "running"], ["walk", "walking"], ["barbell", "weights lifting gym"],
   ["basketball", ""], ["football", "soccer"], ["american_football", ""], ["baseball", ""], ["badminton", ""], ["pingpong", "table tennis"],
   ["skateboard", ""], ["surfboard", "surf"], ["sword", "fencing martial arts"],
   // Nature and animals
@@ -48,7 +48,7 @@ export const SKILL_ICON_SET: readonly (readonly [name: string, words?: string])[
   ["target", "goal focus aim"], ["trophy", "win achievement"], ["medal", "award"], ["award", "badge"], ["calendar", "planning schedule time"],
   ["clock", "time"], ["presentation_1", "slides pitch"], ["shopping_cart_1", "shopping ecommerce"], ["gift", "present"], ["tag", "price label"],
   ["ticket", "events"], ["flag_1", "milestone"], ["auction", "law gavel"], ["seal", "stamp official"], ["user_1", "person self"], ["group", "people team"],
-  ["contacts", "network relationships"], ["IDcard", "identity"], ["chat_1", "chat conversation talk"], ["mail", "email letter"], ["send_plane", "message"],
+  ["IDcard", "identity"], ["chat_1", "chat conversation talk"], ["mail", "email letter"], ["send_plane", "message"],
   ["phone", "call"],
   // Places and travel
   ["house", "home"], ["school", ""], ["bank", "finance"], ["hospital", "medicine"], ["church", "faith"], ["factory", "industry"], ["store", "shop retail"],
