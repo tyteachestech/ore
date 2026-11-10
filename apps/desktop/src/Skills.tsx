@@ -92,8 +92,8 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
       {...(bare && { type: "button", "aria-haspopup": "dialog", "aria-expanded": false })}
       className={children ? "chips-button" : "chips-add"}
       aria-label={`Skills for ${title}`}
+      data-no-drag
       onClick={stop}
-      onPointerDown={stop}
       onKeyDown={(e) => e.key === "Enter" && stop(e)}
     >
       {children || <Plus size={11} weight="bold" aria-hidden="true" />}
@@ -120,7 +120,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
             if (!returnFocus?.current) return;
             e.preventDefault();
             returnFocus.current.focus();
-          }} onClick={stop} onPointerDown={stop} onKeyDown={stop} onContextMenu={stop}>
+          }} onClick={stop} onKeyDown={stop} onContextMenu={stop}>
           <Command label="Skills" loop shouldFilter={false}>
             <Command.Input className="menu-input" placeholder="Find or create a skill…" value={query} onValueChange={setQuery} autoFocus />
             <Command.List>
@@ -210,8 +210,7 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
     if (!v) return false;
     const close = () => ((refocus.current = true), setDraft(null), true);
     if (v === skill.name) return close();
-    const to = (name: string) => () =>
-      void ore("skills", "set", skill.id, opt("name", name)).then(onRenamed, (e) => notify(errorText(e), "error"));
+    const to = (name: string) => () => ore("skills", "set", skill.id, opt("name", name)).then(onRenamed);
     setSaving((busy.current = true));
     try {
       await ore("skills", "set", skill.id, opt("name", v));
@@ -486,6 +485,8 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
     } catch (e) {
       notify(errorText(e), "error");
       setBusy(false);
+      // With no dialog to try again from, it lets go: Delete skill… starts it over.
+      if (!choice) onDone(false);
     }
   };
 
@@ -501,6 +502,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onDone(false)}>
+      <Trap>
       <div
         ref={panelRef}
         tabIndex={-1}
@@ -550,6 +552,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
           </span>
         </div>
       </div>
+      </Trap>
     </div>
   );
 }

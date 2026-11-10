@@ -13,7 +13,7 @@ import { ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, ty
 import { PixelTry } from "./PixelIcon";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, type Notify } from "./util";
+import { errorText, focusPicked, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
@@ -141,7 +141,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [start, setStart] = useState<Today | null>(null);
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
-  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; forget: () => void }[]>([]);
+  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; forget: Forget }[]>([]);
   const last = undos.at(-1);
   /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
   const retired = useRef(new Set<string>());
@@ -149,7 +149,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
    *  newest rating also shows that card again. */
   /** The history's undo and redo of a rating while Review shows it: the write's promise, or null when it isn't Review's to do. */
   const undoNow = useRef<(ts: string) => Promise<void> | null>(() => null);
-  const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: () => void; setTs: (ts: string) => void }) => Promise<void> | null>(() => null);
+  const redoNow = useRef<(id: string, args: string[], rating: number, elapsed: number, again: { forget: Forget; setTs: (ts: string) => void }) => Promise<void> | null>(() => null);
   /** Counts card showings, so a grade or passage that lands after he moved on is dropped, not shown on the next card. */
   const showing = useRef(0);
   /** Counts grading runs, so a grade still on its way when the key points change is dropped. */
@@ -504,7 +504,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
    *  ⌘Z takes it back and ⇧⌘Z gives it again: the same rating, answer and time. Throws if the write fails. */
-  const submit = async (args: string[], rating: number, elapsed: number, again?: { forget: () => void; setTs: (ts: string) => void }) => {
+  const submit = async (args: string[], rating: number, elapsed: number, again?: { forget: Forget; setTs: (ts: string) => void }) => {
     const was = { queue: queue ?? [], done, activeMs: activeMs.current };
     const r = await ore<{ ts: string }>("review", ...args);
     reviewed.current++;
@@ -512,16 +512,16 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     let ts = r.ts;
     again?.setTs(ts);
     const setTs = (t: string) => void (ts = t);
-    const forget =
+    const forget: Forget =
       again?.forget ??
       notify(
         "Rating",
         "quiet",
         // With Review closed, only the log changes (its session stays ended), and Home reads its numbers again.
-        () => {
+        (): Promise<unknown> => {
           return (mounted.current && undoNow.current(ts)) || ore("review", id, opt("undo", ts)).then(() => onLogged?.());
         },
-        () => {
+        (): Promise<unknown> => {
           // Given again after Review closed: its session has ended, so the rating goes in with none.
           return (
             (mounted.current && redoNow.current(id, args, rating, elapsed, { forget, setTs })) ||
@@ -538,7 +538,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   /** ⌘Z: takes back the last rating and shows that card again, unanswered. On the end screen it
    *  opens the session again, back on that card (Anki's Undo after Congratulations). */
-  const undoRating = async (fromHistory = false) => {
+  const undoRating = async () => {
     if (!last || busyNow.current) return;
     dropAhead();
     last.forget();
@@ -555,16 +555,13 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       setDone(last.done);
       setQueue(last.queue.filter((e) => !retired.current.has(e.id)));
       setUndos((u) => u.slice(0, -1));
-    } catch (e) {
-      // From the history (⌘Z): it puts the step back and says why.
-      if (fromHistory) throw e;
-      notify(errorText(e), "error");
     } finally {
+      // A failure goes to the history, which puts the step back and says why.
       setBusy(false);
     }
   };
 
-  undoNow.current = (ts) => (last?.ts === ts ? undoRating(true) : null);
+  undoNow.current = (ts) => (last?.ts === ts ? undoRating() : null);
   // ⇧⌘Z right after ⌘Z: that card is showing again, so the rating goes in again and Review moves on.
   redoNow.current = (id, args, rating, elapsed, again) => {
     if (end || busyNow.current || queue?.[0]?.id !== id) return null;
@@ -583,7 +580,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       notify(
         entry?.state === "draft" ? "Card deleted" : "Card retired",
         "info",
-        () => {
+        async () => {
           if (state === "retired") return;
           dropAhead();
           return ore("card", "restore", id, opt("state", state)).then(() => {
@@ -828,7 +825,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         )}
         {last && (
           <Hint text="Undo last rating" keys="undo">
-            <button className="quiz-close" aria-label="Undo last rating" disabled={busy} onClick={() => void undoRating()}>
+            <button className="quiz-close" aria-label="Undo last rating" disabled={busy} onClick={() => last?.forget.undo()}>
               <ArrowCounterClockwise size={16} weight="bold" aria-hidden="true" />
             </button>
           </Hint>

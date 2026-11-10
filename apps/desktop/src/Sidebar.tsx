@@ -1,8 +1,9 @@
 import { CaretRight, House, Plus, Rss, Stack } from "./icons";
 import {
-  closestCenter, defaultDropAnimationSideEffects, DndContext, DragOverlay, PointerSensor, pointerWithin, useSensor, useSensors,
+  closestCenter, defaultDropAnimationSideEffects, DndContext, DragOverlay, pointerWithin, useSensor, useSensors,
   type CollisionDetection, type DragEndEvent, type DragOverEvent, type DragStartEvent, type DropAnimation, type UniqueIdentifier,
 } from "@dnd-kit/core";
+import { RowSensor } from "./drag";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Fragment, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
@@ -68,7 +69,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   /** Removes a collection; its skills move to the ungrouped ones. */
   onDeleteCollection: (collection: string) => void;
 }) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 4 } }));
   // D173: archived skills leave the list for a folded Archived group at the bottom; every layout written
   // puts them back in their collections (`arrange`), so a drag or rename never loses one.
   const groups = useMemo(() => skillGroups(skills.filter((s) => !s.archived)), [skills]);
@@ -387,7 +388,7 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, taken, 
             </button>
           )}
           {!renaming && (
-            <span className="side-head-tools" onPointerDown={(e) => e.stopPropagation()}>
+            <span className="side-head-tools" data-no-drag>
               {group.collection && <MoreButton className="side-tool" label={`Actions for ${group.name}`} actions={menu} />}
               <Hint text={label}>
                 <button className="side-tool" aria-label={label} onClick={onAdd}>
@@ -422,7 +423,7 @@ function RenameField({ value, label = "Collection name", placeholder, taken, onS
       aria-invalid={refused ? true : undefined}
       onChange={(e) => (setV(e.target.value), setRefused(null))}
       onBlur={onCancel}
-      onPointerDown={(e) => e.stopPropagation()}
+      data-no-drag
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Enter") {

@@ -1,6 +1,8 @@
 import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { DndContext, PointerSensor, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
+import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
+import { RowSensor } from "./drag";
+import { TitleField } from "./TitleField";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -289,7 +291,7 @@ export function App() {
   const [rowDrag, setRowDrag] = useState<{ item: Item; course?: Extract<Line, { kind: "course" }>; many?: Item[]; skill: string | null; at: { x: number; y: number } } | null>(null);
   /** Where a dragged pinned row would land among the pinned (Raycast's pinned reorder). */
   const [pinDrop, setPinDrop] = useState<PinGap | null>(null);
-  const rowSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const rowSensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }));
   const { notify, progress, clear: clearToast, view: toast } = useToast();
   const tutor = useTutorChat(notify);
   const unheard = useUnheard(tutor.turns, tutorOpen);
@@ -705,12 +707,24 @@ export function App() {
   /** Feed posts open as previews; leaving one keeps it if he highlighted or wrote in it, else drops it. */
   const previews = useRef(new Map<string, string>());
   const [feedTick, setFeedTick] = useState(0);
+  const opening = useRef<{ url: string; from: unknown } | null>(null);
   const openPost = useCallback(async (post: FeedPost) => {
+    const from = viewRef.current;
+    // A second click or Enter on the post already loading waits for the first. (Asked again after going
+    // away and coming back, it is a new ask: the first one is let go.)
+    if (opening.current?.url === post.url && opening.current.from === from) return;
+    const ask = (opening.current = { url: post.url, from });
     try {
       const r = await ore<{ id: string; title: string; preview: boolean }>("feed", "open", post.url);
+      // He went elsewhere, or opened another post, while it loaded: it never opens over that, and its preview goes.
+      const mine = opening.current === ask;
+      if (mine) opening.current = null;
+      // (Unless he has asked for this same post again: that ask opens this preview.)
+      if (viewRef.current !== from || !mine) return void (r.preview && opening.current?.url !== post.url && ore("feed", "close", r.id).catch(() => {}));
       if (r.preview) previews.current.set(r.id, r.title);
       openSource(r.id);
     } catch (e) {
+      if (opening.current === ask) opening.current = null;
       notify(errorText(e), "error");
     }
   }, [openSource, notify]);
@@ -891,8 +905,10 @@ export function App() {
   }, [openId, sideQuest]);
   const learnAdd = useCallback(
     async (urls: string[], to: string[], question: string, now: boolean, from: { id: string; title: string }) => {
+      const here = viewRef.current;
       const r = await addSources(urls.map((url) => ({ kind: "link" as const, url })), to, true, false, question);
-      if (!now || !r.first) return;
+      // Read now, unless he went elsewhere while it was added.
+      if (!now || !r.first || viewRef.current !== here) return;
       setSideQuest({ to: r.first, from, question });
       openSource(r.first);
       // His question waits in the panel, at the top as "May be answered here": what he writes there answers it (D75).
@@ -1294,21 +1310,25 @@ export function App() {
 
   /** A source row's title edited in place (Finder's Rename): optimistic, put back if the write fails. */
   const [renamingRow, setRenamingRow] = useState<string | null>(null);
-  const renameRow = async (item: Item, title: string) => {
+  /** A rename field closed: the list takes the keys again. */
+  const doneRenaming = (byKey: boolean) => {
     setRenamingRow(null);
-    listRef.current?.focus({ preventScroll: true });
-    await retitle(item.id, item.title, title.trim());
+    if (byKey) listRef.current?.focus({ preventScroll: true });
   };
+  /** False when the write failed (and a toast said why), so the field keeps what he typed. */
   const retitle = async (id: string, before: string, t: string, undoable = true) => {
-    if (!t || t === before) return;
+    if (!t || t === before) return true;
     setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: t } : i)) ?? all);
     try {
       await ore("edit", id, "--title", t);
       if (undoable) notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
+      return true;
     } catch (e) {
+      setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: before } : i)) ?? all);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
+      return false;
     } finally {
       void refresh();
     }
@@ -1438,51 +1458,35 @@ export function App() {
 
   type CourseLine = Extract<Line, { kind: "course" }>;
   /** Renames a course on every lesson: optimistic, put back if the write fails. On the history, as a source's rename is. */
-  const renameCourse = async (c: CourseLine, title: string) => {
-    setRenamingRow(null);
-    listRef.current?.focus({ preventScroll: true });
-    await recourse(c.id, c.title, title.trim());
-  };
   const recourse = async (id: string, before: string, t: string, undoable = true) => {
-    if (!t || t === before) return;
+    if (!t || t === before) return true;
     setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: t } } : i)) ?? all);
     try {
       await ore("course", "set", id, opt("title", t));
       if (undoable) notify(`Renamed to “${t}”`, "quiet", () => recourse(id, t, before, false), () => recourse(id, before, t, false));
+      return true;
     } catch (e) {
+      setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: before } } : i)) ?? all);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
+      return false;
     } finally {
       void refresh();
     }
   };
   const courseSkills = (c: CourseLine) => [...new Set(c.lessons.flatMap((l) => l.skills))];
-  const courseFiling = (c: CourseLine) => ({ title: c.title, ids: new Set(c.lessons.map((l) => l.id)), write: (ids: string[]) => ore("course", "set", c.id, opt("skills", ids.join(","))) });
-  /** Files every lesson of a course under a skill, or takes them all off it, from its ⋯ menu. */
-  const fileCourse = (c: CourseLine, k: Skill) => {
-    const had = courseSkills(c);
-    const on = c.lessons.every((l) => l.skills.includes(k.id));
-    void refile(courseFiling(c), on ? had.filter((s) => s !== k.id) : [...had, k.id], had, k);
-  };
-  /** Archives every lesson of a course (files and cards kept), with Undo. */
-  const archiveCourse = async (c: CourseLine) => {
-    const ids = new Set(c.lessons.map((l) => l.id));
-    setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
-    if (openId && ids.has(openId)) setOpenId(null);
-    const queue = inOrder();
-    const apply = (on: boolean) => {
-      if (on) setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
-      else setCursor(`course:${c.id}`);
-      // Run only from the history, which puts a failed step back and says why.
-      return queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"])));
-    };
-    notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
-    try {
-      await queue(() => ore("course", "archive", c.id));
-    } catch (e) {
-      notify(errorText(e), "error");
-    }
+  /** Files every lesson of a course under a skill, or takes them all off it. Lesson by lesson, as for a
+   *  selection: each keeps its other skills, and Undo gives each back exactly what it had. */
+  const fileCourse = (c: CourseLine, k: Skill, on = !c.lessons.every((l) => l.skills.includes(k.id))) => fileItems(wholeCourse(c), `“${c.title}”`, k, on);
+  /** Every listed lesson of the course, whatever the page shows: a skill's page rows hold only that skill's. */
+  const wholeCourse = (c: CourseLine) => (items ?? []).filter((i) => i.course?.id === c.id);
+  /** Archives the lessons of a course that are listed (files and cards kept); Undo brings back those, not
+   *  one he archived before. */
+  const archiveCourse = (c: CourseLine) => {
+    const lessons = wholeCourse(c);
+    if (openId && lessons.some((l) => l.id === openId)) setOpenId(null);
+    batch(`Archived “${c.title}”`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, lessons);
   };
   const courseActions = (c: CourseLine): MenuAction[] => [
     { id: "open", label: c.next && c.next.status !== "inbox" ? "Continue" : "Open", hint: "↵", run: () => openSource(lessonFirst(c).id) },
@@ -1503,8 +1507,11 @@ export function App() {
 
   /** Writes each picked source in turn (the CLI owns the library), as one step with one Undo and
    *  Redo. `patch` shows the result at once: the source as it will be, or null when it leaves the list. */
-  const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null) => {
-    const sel = many;
+  /** Filing under an archived skill brings it back (D173, the CLI does that); taking the filing back archives
+   *  it again. Either way the sidebar reads the skills again. */
+  const rearchive = (ids: string[]) => Promise.all(ids.map((id) => ore("skills", "archive", id))).finally(reloadSkills);
+  /** `after`: what follows the writes each way (a skill a filing brought back). */
+  const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null, after?: (forward: boolean) => unknown, sel = many) => {
     const ids = new Set(sel.map((i) => i.id));
     const was = cursor;
     const queue = inOrder();
@@ -1514,13 +1521,14 @@ export function App() {
       try {
         await queue(async () => {
           for (const i of sel) await write(i, forward);
+          await after?.(forward);
         });
       } catch (e) {
         if (fromHistory) throw e;
         notify(errorText(e), "error");
       }
     };
-    unpick();
+    if (sel === many) unpick();
     void go(true);
     notify(message, "info", () => go(false, true), () => go(true, true));
   };
@@ -1534,12 +1542,16 @@ export function App() {
   const restoreMany = () => batch(`Restored ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])));
   const moveMany = (to: Item["status"]) =>
     batch(`Moved ${sourcesN(many.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }));
-  const fileMany = (k: Skill, on: boolean) => {
+  const fileMany = (k: Skill, on: boolean) => fileItems(many, sourcesN(many.length), k, on);
+  /** Puts `k` on each of these sources, or takes it off, each keeping its other skills. */
+  const fileItems = (sel: Item[], what: string, k: Skill, on: boolean) => {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
     batch(
-      on ? `Filed ${sourcesN(many.length)} under ${k.name}` : `Removed ${sourcesN(many.length)} from ${k.name}`,
+      on ? `Filed ${what} under ${k.name}` : `Removed ${what} from ${k.name}`,
       (i, f) => ore("edit", i.id, "--skills", (f ? next(i) : i.skills).join(",")),
       (i) => ({ ...i, skills: next(i) }),
+      on && k.archived ? (forward) => (forward ? reloadSkills() : rearchive([k.id])) : undefined,
+      sel,
     );
   };
   /** The picked sources' actions: the same as one row's that make sense for many, named for the count. */
@@ -1632,12 +1644,11 @@ export function App() {
     setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
     // Filing under an archived skill brings it back (D173); Undo archives it again.
     const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
-    const rearchive = () => Promise.all(revived.map((id) => ore("skills", "archive", id))).finally(reloadSkills);
     try {
       await what.write(next);
       if (changed) {
         const on = next.includes(changed.id);
-        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true).then(rearchive), () => refile(what, next, before, undefined, true));
+        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true).then(() => rearchive(revived)), () => refile(what, next, before, undefined, true));
       }
     } catch (e) {
       // From the history (undo or redo): it puts the step back and says why.
@@ -1808,8 +1819,8 @@ export function App() {
   const view = <ViewMenu status={status} archived={archivedInSkill.length > 0} go={go} details={details} toggle={toggleDetail} />;
   // What a row's handlers and menus call, read when they run: a row re-renders only when what it
   // shows changes (below), so ↑↓ through a long list repaints two rows, not all of them.
-  const live = useRef({ openSource, pickRange, pickToggle, renameRow, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked });
-  live.current = { openSource, pickRange, pickToggle, renameRow, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked };
+  const live = useRef({ openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked });
+  live.current = { openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked };
   /** A row's optional details last, at fixed widths, so they line up down the list whatever the chips.
    *  A course takes its lessons' author and its first added date. */
   const detailCols = (r: { url?: string }, captured: string[]) => {
@@ -1884,25 +1895,7 @@ export function App() {
           );
         })()}
         {renamingRow === r.id ? (
-          <input
-            className="row-rename"
-            aria-label="Title"
-            autoFocus
-            defaultValue={r.title}
-            onFocus={(e) => e.currentTarget.select()}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter") void live.current.renameRow(r, e.currentTarget.value);
-              else if (e.key === "Escape") {
-                setRenamingRow(null);
-                listRef.current?.focus({ preventScroll: true });
-              }
-            }}
-            // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
-            onBlur={() => setRenamingRow(null)}
-          />
+          <TitleField value={r.title} onSave={(t) => live.current.retitle(r.id, r.title, t.trim())} onClose={(byKey) => live.current.doneRenaming(byKey)} />
         ) : (
           // Two lines (D114): the title at full width, then the other skills it is under as icons (the
           // page's own is left out), or, matched in its text, highlights or note, the line that says why.
@@ -1965,7 +1958,7 @@ export function App() {
               e.stopPropagation();
               toggleCourse(c.id);
             }}
-            onPointerDown={(e) => e.stopPropagation()}
+            data-no-drag
           >
             <CaretRight size={11} weight="bold" aria-hidden="true" />
           </button>
@@ -1979,24 +1972,7 @@ export function App() {
           </span>
         )}
         {renamingRow === key ? (
-          <input
-            className="row-rename"
-            aria-label="Course title"
-            autoFocus
-            defaultValue={c.title}
-            onFocus={(e) => e.currentTarget.select()}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter") void renameCourse(c, e.currentTarget.value);
-              else if (e.key === "Escape") {
-                setRenamingRow(null);
-                listRef.current?.focus({ preventScroll: true });
-              }
-            }}
-            onBlur={() => setRenamingRow(null)}
-          />
+          <TitleField value={c.title} label="Course title" onSave={(t) => recourse(c.id, c.title, t.trim())} onClose={doneRenaming} />
         ) : (
           <span className="row-main">
             <span className="row-line">
@@ -2004,7 +1980,7 @@ export function App() {
             </span>
             <span className="row-line">
               {authorOf({ author: c.lessons.find((l) => l.author)?.author, url: c.url ?? c.lessons[0]?.url })}
-              <SkillPicker skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, before, k) => void refile(courseFiling(c), next, before, k)} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
+              <SkillPicker skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, _, k) => fileCourse(c, k, next.includes(k.id))} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
                 {others.length > 0 && skillsOf(others)}
               </SkillPicker>
               {/* Closed, it says which lesson a click opens; open, the lessons below say it. */}
@@ -2266,6 +2242,7 @@ export function App() {
             }}
             onChanged={() => void refresh()}
             onSkillsChanged={reloadSkills}
+            rearchive={rearchive}
             onDone={() => {
               // The panel showed the moment (D71); the toast takes a mistaken Done back (D106).
               const item = openItem;
@@ -2314,7 +2291,7 @@ export function App() {
             // Home renames its own rows (onRename); the shortcuts act on the list's selected row, so
             // Home shows none.
             sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => ({ ...a, hint: undefined }))}
-            onRename={(i, t) => void retitle(i.id, i.title, t.trim())}
+            onRename={(i, t) => retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
             onRetry={reload}
             notify={notify}
@@ -2476,12 +2453,18 @@ function useHistory(view: View, restore: (v: View) => boolean) {
   }, [view.openId, view.skill, view.status, view.place]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const step = useCallback((by: -1 | 1) => {
-    const { stack, at: from } = h.current;
-    for (let at = from + by; at >= 0 && at < stack.length; at += by) {
+    const { stack } = h.current;
+    let from = h.current.at;
+    for (let at = from + by; at >= 0 && at < stack.length; ) {
       h.current.at = at; // set first, so the view change it causes is not recorded as a new step
-      if (restoreRef.current(stack[at]!)) return rerender();
+      if (restoreRef.current(stack[at]!)) break;
+      // Gone since (a source deleted, a feed preview dropped): it leaves the history, so an arrow with
+      // nowhere left to go goes dim instead of doing nothing.
+      stack.splice(at, 1);
+      if (by < 0) (from--, at--);
       h.current.at = from;
     }
+    rerender();
   }, []);
 
   const back = useCallback(() => step(-1), [step]);

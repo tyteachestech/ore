@@ -5,7 +5,7 @@ import { CHECK, CROSS, Matrix, Sprite } from "./Working";
 import { Hint } from "./Hint";
 import { is } from "./keys";
 import { X } from "./icons";
-import { errorText, type Notify } from "./util";
+import { errorText, stepLanded, stepMade, type Notify } from "./util";
 
 /** `done`: how much of a long step is finished (0 to 1), drawn as a bar along the toast's foot.
  *  `settled`: a long step's toast that turned into its result, which shows a check or a cross where the
@@ -46,7 +46,9 @@ export function useToast() {
   const next = useRef(0);
   /** An undo or redo whose write failed: its toast turns into why, and the step stays where it was. */
   const failed = useRef<(step: Step, e: unknown, what: "undo" | "redo") => void>(() => {});
-  const history = useRef(new History((step, e, what) => failed.current(step, e, what)));
+  /** One step taken back out of order (a toast's Undo, a screen's own Undo button). */
+  const takeBack = useRef<(step: Step) => void>(() => {});
+  const history = useRef(new History((step, e, what) => failed.current(step, e, what), stepLanded));
 
   const commit = useCallback((ts: Toast[]) => {
     for (const id of timers.current.keys()) if (!ts.some((t) => t.id === id)) (clearTimeout(timers.current.get(id)), timers.current.delete(id));
@@ -86,16 +88,17 @@ export function useToast() {
   const notify: Notify = useCallback(
     (message, kind = "info", undo, redo, go, stay, slot) => {
       const step = undo && { message, undo, redo };
-      if (step) history.current.push(step);
+      if (step) (stepMade(step), history.current.push(step));
       // A slot's new toast goes in front, in place of its last one.
       if (slot && kind !== "quiet") commit(list.current.filter((x) => x.slot !== slot));
       if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go, stay: stay && !!go, slot });
-      return () => {
+      const forget = () => {
         if (!step) return;
         history.current.forget(step);
         const t = list.current.find((x) => x.step === step);
         if (t) commit(list.current.map((x) => (x === t ? { ...x, offer: undefined, step: undefined } : x)));
       };
+      return Object.assign(forget, { undo: () => void (step && takeBack.current(step)) });
     },
     [show, commit],
   );
@@ -133,6 +136,7 @@ export function useToast() {
     if (step) redone(step);
   }, [redone]);
   const undoOne = (step?: Step) => (step && history.current.take(step) ? undone(step) : undo());
+  takeBack.current = (step) => void (history.current.take(step) && undone(step));
   const redoOne = (step?: Step) => (step && history.current.again(step) ? redone(step) : redo());
 
   // ⌘Z and ⇧⌘Z walk the history; a text field or the note editor keeps them for its own text.

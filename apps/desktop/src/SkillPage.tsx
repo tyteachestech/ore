@@ -18,7 +18,8 @@ import { levelProgress, ore, opt, type Question, type Research, type Skill, type
 import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
-import { errorText, load, save, useFocusBack, useFocusWhileMounted, type Notify } from "./util";
+import { errorText, load, save, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { Trap } from "./Trap";
 
 type Props = {
   skill: Skill;
@@ -517,6 +518,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
   const askRef = useRef<HTMLButtonElement>(null);
   useFocusBack(asking, askRef);
   const [version, setVersion] = useState(0);
+  const changes = useLibraryChanges();
   const reload = () => setVersion((v) => v + 1);
 
   useEffect(() => {
@@ -528,7 +530,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
     return () => {
       live = false;
     };
-  }, [skill, notify, version]);
+  }, [skill, notify, version, changes]);
 
   const { setStatus, remove } = useQuestionEdits(setQs, notify);
 
@@ -596,6 +598,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
   const [reflecting, setReflecting] = useState<string | null>(null);
   // Tries he checked off while here stay in view under Used, so what he wrote doesn't vanish (Things, Todoist).
   const [recent, setRecent] = useState<string[]>([]);
+  const changes = useLibraryChanges();
   useEffect(() => {
     let live = true;
     ore<Try[]>("tries", opt("skill", skill)).then(
@@ -605,7 +608,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
     return () => {
       live = false;
     };
-  }, [skill, notify]);
+  }, [skill, notify, changes]);
 
   const put = (id: string, patch: Partial<Try>) => setTs((l) => l && l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   /** One change to a try: what the row shows before and after, and the `ore tried` calls (their args
@@ -660,7 +663,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
   };
   const remove = async (t: Try) => {
     let at = -1;
-    const back = () => setTs((l) => l && [...l.slice(0, at < 0 ? l.length : at), t, ...l.slice(at < 0 ? l.length : at)]);
+    const back = () => setTs((l) => l && (l.some((x) => x.id === t.id) ? l : [...l.slice(0, at < 0 ? l.length : at), t, ...l.slice(at < 0 ? l.length : at)]));
     setTs((l) => {
       at = l ? l.findIndex((x) => x.id === t.id) : -1;
       return l && l.filter((x) => x.id !== t.id);
@@ -674,8 +677,9 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
     notify(
       "Removed",
       "info",
-      () => (back(), ore("annotate", t.id, "--status", t.status)),
-      () => (setTs((l) => l && l.filter((x) => x.id !== t.id)), ore("annotate", t.id, "--status", "deleted")),
+      // The list follows the write, so one that fails leaves no row that isn't in the library.
+      () => ore("annotate", t.id, "--status", t.status).then(back),
+      () => ore("annotate", t.id, "--status", "deleted").then(() => setTs((l) => l && l.filter((x) => x.id !== t.id))),
     );
   };
 
@@ -738,7 +742,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
           </Hint>
         )}
         <Hint text="Open this passage">
-          <button className="question-quote try-quote" onClick={onPassage}>
+          <button className="question-quote try-quote" data-find="" onClick={onPassage}>
             {!history && t.note && <span className="note">{t.note}</span>}
             <span className="exact">“{t.exact.replace(/\s+/g, " ").trim()}”</span>
             <span className="from">{t.item_title}</span>
@@ -753,7 +757,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
           ))}
         {done && t.reflection && !reflecting && (
           <Hint text="Edit how it went">
-            <button className="try-reflection" onClick={() => onReflect(true)}>{t.reflection}</button>
+            <button className="try-reflection" data-find="" onClick={() => onReflect(true)}>{t.reflection}</button>
           </Hint>
         )}
         <div className="question-actions">
@@ -903,13 +907,13 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
         </button>
       </Hint>
       {own ? (
-        <button className="question-quote" onKeyDown={moveRow} onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
+        <button className="question-quote" data-find="" onKeyDown={moveRow} onClick={() => !done && setAnswering(!answering)} aria-expanded={answering}>
           <span className="note">{exact}</span>
         </button>
       ) : (
         // The passage it came from is in the hint and one click away; the row keeps to the question and its source.
         <Hint text={q.note ? `“${exact}”` : "Open this passage"}>
-          <button className="question-quote" onKeyDown={moveRow} onClick={() => onQuestion(q)}>
+          <button className="question-quote" data-find="" onKeyDown={moveRow} onClick={() => onQuestion(q)}>
             <span className={q.note ? "note" : "note passage"}>{q.note || exact}</span>
             <span className="from">{q.item_title}</span>
           </button>
@@ -1033,6 +1037,7 @@ function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill:
   });
 
   return (
+    <Trap>
     <div className="overlay recall" data-color={skill.color} onMouseDown={(e) => e.target === e.currentTarget && !text.trim() && onClose()}>
       <section className="panel skill-recall" role="dialog" aria-modal="true" aria-labelledby="skill-recall-title">
         <header className="skill-recall-head">
@@ -1054,5 +1059,6 @@ function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill:
         </div>
       </section>
     </div>
+    </Trap>
   );
 }

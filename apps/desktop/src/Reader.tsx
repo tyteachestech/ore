@@ -40,7 +40,8 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, inOrder, load, save, useFocusBack, type Notify } from "./util";
+import { errorText, inOrder, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
+import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
 import { Working } from "./Working";
@@ -444,6 +445,8 @@ type Props = {
   onBack: () => void;
   onChanged: () => void;
   onSkillsChanged: () => void;
+  /** Archives again the skills a filing brought back (D173), when that filing is undone. */
+  rearchive?: (skills: string[]) => Promise<unknown>;
   onDone: () => void;
   notify: Notify;
 };
@@ -815,24 +818,33 @@ function ReaderView(p: Props & { reload: () => void }) {
   // Leaving the source, or opening another, stops the voice.
   useEffect(() => () => stopListening(), [p.id]);
 
+  // Read again when a ⌘Z lands. `opened` keeps that from counting as opening it again, and a text that
+  // changed (a cut or a reimport undone) starts the reader over, since every highlight is placed on the text.
+  const changes = useLibraryChanges();
+  const opened = useRef<string | null>(null);
+  const shownBodyOf = useRef<string | null>(null);
   useEffect(() => {
     let live = true;
     ore<Doc>("show", p.id, "--annotations").then(
       (d) => {
         if (!live) return;
+        if (opened.current === p.id && shownBodyOf.current !== null && shownBodyOf.current !== d.body) return p.reload();
+        shownBodyOf.current = d.body;
         setDoc(d);
         // Enrich runs once, right after `ore add`: long after that with nothing to show, it failed.
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
         setAnns((d.annotations ?? []).filter(visible));
         // Opening starts it and moves it up To read (D110); a preview isn't listed, so it's left alone.
-        if (!d.preview) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
+        if (!d.preview && opened.current !== p.id) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
+        opened.current = p.id;
       },
-      (e) => live && setError(errorText(e)),
+      // A read again after ⌘Z that fails leaves the page as it is: nothing about the open source failed.
+      (e) => live && opened.current !== p.id && setError(errorText(e)),
     );
     return () => {
       live = false;
     };
-  }, [p.id]);
+  }, [p.id, changes]);
 
   // Enrichment runs in the background after `ore add`; poll for prequestions for up to ~3 minutes
   // (`ore ls` carries the frontmatter without the body, which can be megabytes for a book).
@@ -1402,7 +1414,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     // On the history at once, so a ⌘Z right after the drag takes this highlight back, not the step
     // before it; the step acts on the saved highlight once the write is back.
     let step: ReturnType<typeof annStep> | undefined;
-    const act = (f: "remove" | "bring") => () => void promise.then((ann) => (step ??= annStep(ann.id, ann))[f](), () => {});
+    const act = (f: "remove" | "bring") => () => promise.then((ann) => (step ??= annStep(ann.id, ann))[f](), () => {});
     const forget = p.notify("Highlight", "quiet", act("remove"), act("bring"));
     promise.then(
       (ann) => {
@@ -1719,11 +1731,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       p.onChanged();
       const n = c.removed.length;
       const what = `Removed ${c.section ? "the section, " : ""}${c.words} ${c.words === 1 ? "word" : "words"}${n ? ` and ${n} ${n === 1 ? "highlight" : "highlights"}` : ""}`;
-      const step = (flag: string) => () =>
-        void ore("cut", d.id, flag, c.id).then(
-          () => (p.reload(), p.onChanged()),
-          (e) => p.notify(errorText(e), "error"),
-        );
+      const step = (flag: string) => () => ore("cut", d.id, flag, c.id).then(() => (p.reload(), p.onChanged()));
       p.notify(what, "info", step("--undo"), step("--redo"));
     } catch (e) {
       p.notify(errorText(e), "error");
@@ -2331,42 +2339,41 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
 
   /** Saves a new title in place (Notion's page title): optimistic, put back if the write fails. */
-  const rename = async (title: string) => {
-    setRenaming(false);
-    if (doc) await retitle(doc.id, doc.title, title.trim());
-  };
   async function retitle(id: string, before: string, t: string, undoable = true) {
-    if (!t || t === before) return;
+    if (!t || t === before) return true;
     setDoc((cur) => cur && cur.id === id ? { ...cur, title: t } : cur);
     try {
       await inOrder(id, () => ore("edit", id, "--title", t));
       p.onChanged();
       if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
+      return true;
     } catch (e) {
       setDoc((cur) => cur && cur.id === id ? { ...cur, title: before } : cur);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       p.notify(errorText(e), "error");
+      return false;
     }
   }
 
   /** Sets the author by hand, in place where the byline sits (Readwise Reader's "Edit metadata"): one
    *  that ingest and its PDF metadata missed. Empty clears it. Optimistic, on the history. */
   async function reauthor(id: string, before: string | undefined, a: string | undefined, undoable = true) {
-    setAuthoring(false);
-    if ((a ?? "") === (before ?? "")) return;
+    if ((a ?? "") === (before ?? "")) return true;
     setDoc((cur) => cur && cur.id === id ? { ...cur, author: a } : cur);
     // On the history at once, so a quick ⌘Z takes it back; taken off again if the write fails.
     const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => reauthor(id, a, before, false), () => reauthor(id, before, a, false)) : () => {};
     try {
       await inOrder(id, () => ore("edit", id, "--author", a ?? ""));
       p.onChanged();
+      return true;
     } catch (e) {
       forget();
       setDoc((cur) => cur && cur.id === id ? { ...cur, author: before } : cur);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       p.notify(errorText(e), "error");
+      return false;
     }
   }
 
@@ -2392,14 +2399,20 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
 
   /** Files the source under exactly `skills` (its cards follow), with Undo naming the one that changed. */
+  /** The skills as last saved from here: the Questions list reads again once a filing has landed. */
+  const [filed, setFiled] = useState("");
   const fileUnder = async (skills: string[], changed?: Skill, fromHistory = false) => {
     if (!doc) return;
     const before = doc.skills;
+    // Filing under an archived skill brings it back (D173, as App's refile); Undo archives it again.
+    const revived = skills.filter((id) => !before.includes(id) && p.skills.some((s) => s.id === id && s.archived));
     setDoc((cur) => cur && { ...cur, skills });
     try {
       await ore("edit", doc.id, "--skills", skills.join(","));
+      setFiled(skills.join());
       p.onChanged();
-      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true), () => fileUnder(skills, undefined, true));
+      if (revived.length) p.onSkillsChanged();
+      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true).then(() => p.rearchive?.(revived)), () => fileUnder(skills, undefined, true));
     } catch (e) {
       setDoc((cur) => cur && { ...cur, skills: unfile(cur.skills, skills, before) });
       // From the history (undo or redo): it puts the step back and says why.
@@ -2722,20 +2735,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               </Hint>
             )}
             {renaming ? (
-              <input
-                className="title-edit"
-                aria-label="Title"
-                autoFocus
-                defaultValue={doc.title}
-                onFocus={(e) => e.currentTarget.select()}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === "Enter") void rename(e.currentTarget.value);
-                  else if (e.key === "Escape") setRenaming(false);
-                }}
-                // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
-                onBlur={() => setRenaming(false)}
-              />
+              <TitleField className="title-edit" value={doc.title} onSave={(t) => retitle(doc.id, doc.title, t.trim())} onClose={() => setRenaming(false)} />
             ) : (
               <WithMenu actions={PHONE ? [] : shownActions}>
                 {/* One click renames it in place, as the skill page's name does (Notion's page title);
@@ -2748,22 +2748,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             {(doc.author || authoring || published || doc.skills.length > 0 || suggested || !PHONE) && (
               <div className="chips">
                 {authoring ? (
-                  <input
-                    className="author-edit"
-                    aria-label="Author"
-                    placeholder="Author"
-                    autoFocus
-                    defaultValue={doc.author ?? ""}
-                    size={Math.max(12, (doc.author ?? "").length + 2)}
-                    onFocus={(e) => e.currentTarget.select()}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === "Enter") void reauthor(doc.id, doc.author, e.currentTarget.value.replace(/\s+/g, " ").trim() || undefined);
-                      else if (e.key === "Escape") setAuthoring(false);
-                    }}
-                    // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
-                    onBlur={() => setAuthoring(false)}
-                  />
+                  <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
                 ) : (
                   doc.author &&
                   (PHONE ? (
@@ -3080,6 +3065,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                   onJumpHighlight={(id) => onSource(() => jumpToHighlight(id))}
                   notify={p.notify}
                   ask={ask}
+                  marked={`${filed}|${anns.filter((a) => a.intent === "question").map((a) => a.id).join()}`}
                 />
               }
             />

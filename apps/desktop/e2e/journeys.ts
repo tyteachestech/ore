@@ -47,10 +47,32 @@ async function open(url: string): Promise<Page> {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
+  await page.addInitScript(HYGIENE);
   await page.goto(url);
   await page.locator(".side-item").first().waitFor();
   return page;
 }
+
+// Two rules every journey checks as it runs, whatever it is about:
+// - A press stopped on its way to the document leaves an open popover deaf to it (Radix listens there), and one
+//   stopped inside a popover makes the next press outside count as inside.
+// - A modal dialog keeps Tab inside it (<Trap>, which marks its panel data-trap): without one, ⇧Tab reaches the
+//   page behind, where Esc no longer closes the dialog and Enter runs what is under it.
+const HYGIENE = `(() => {
+  const found = (window.__hygiene = new Set());
+  for (const m of ["stopPropagation", "stopImmediatePropagation"]) {
+    const was = Event.prototype[m];
+    Event.prototype[m] = function () {
+      if (this.type === "pointerdown") found.add("a press was stopped before it reached the document, on: " + (this.target?.className?.baseVal ?? this.target?.className ?? this.target?.nodeName));
+      return was.call(this);
+    };
+  }
+  const modals = () => {
+    for (const el of document.querySelectorAll('[aria-modal="true"]'))
+      if (!el.closest("[data-trap]") && !el.querySelector("[data-trap]")) found.add("a modal dialog with no focus trap: " + (el.getAttribute("aria-label") ?? el.className));
+  };
+  addEventListener("DOMContentLoaded", () => new MutationObserver(modals).observe(document.body, { childList: true, subtree: true }));
+})()`;
 
 const errors: string[] = [];
 const { url, stop } = await start();
@@ -1124,6 +1146,12 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   await page.keyboard.press("Enter");
   await until("Enter in A goes to B", async () => await b.getByRole("textbox").evaluate((el) => el === document.activeElement));
   await page.keyboard.type("An agent");
+  // Closing the tutor mid-answer keeps both lines, as it keeps the chat box's draft.
+  await tutor.getByRole("button", { name: "Close the tutor" }).click();
+  await page.keyboard.press("Meta+j");
+  if ((await a.getByRole("textbox").inputValue()) !== "A workflow: same steps each time" || (await b.getByRole("textbox").inputValue()) !== "An agent") throw new Error("closing the tutor lost the answers he was writing");
+  await b.getByRole("textbox").click();
+  await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await tutor.getByText("A is right. B: who decides the steps?").waitFor();
   if (asked[1] !== "A: A workflow: same steps each time\nB: An agent") throw new Error(`sent: ${JSON.stringify(asked[1])}`);
@@ -2565,8 +2593,17 @@ journey("reader questions: ask one, ⌘Z takes it back; its ⋯ menu marks it an
   await line.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete question" }).click();
   await until("it is gone", async () => (await rows()) === 0);
+  // A ⌘Z whose save fails shows no row that isn't there, and the next ⌘Z brings back one, not two.
+  await page.locator(".toast", { hasText: "Question deleted" }).waitFor();
+  await page.evaluate(() => void ((window as unknown as { __ORE_FAIL?: object }).__ORE_FAIL = { annotate: "The library is read-only." }));
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: "Couldn’t undo" }).waitFor();
+  if ((await rows()) !== 0) throw new Error("a failed ⌘Z shows the question it couldn't bring back");
+  await page.evaluate(() => void ((window as unknown as { __ORE_FAIL?: object }).__ORE_FAIL = {}));
   await page.keyboard.press("Meta+z");
   await until("⌘Z puts it back", async () => (await rows()) === 1);
+  await page.waitForTimeout(300);
+  if ((await rows()) !== 1) throw new Error(`⌘Z after a failed one shows ${await rows()} copies of the question`);
   // Leave the library as it was.
   await line.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete question" }).click();
@@ -3537,6 +3574,11 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   await until("the session counts the rating", async () => (await done()) === before + 1);
   await page.getByRole("button", { name: "Undo last rating" }).click();
   await until("Undo puts the first card back", async () => (await done()) === before && (await q.innerText()) === first);
+  // The button is the same step as ⌘Z: ⇧⌘Z gives the rating again, and ⌘Z takes it back once more.
+  await page.keyboard.press("Shift+Meta+z");
+  await until("⇧⌘Z after the button's Undo rates it again", async () => (await done()) === before + 1);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => (await done()) === before);
   // Leave Review as he would, so its session ends: one left open carries into the journeys after this one.
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
@@ -4150,6 +4192,224 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
     const items = (await ore(["ls"])) as { id: string; title: string }[];
     await ore(["status", items.find((i) => i.title === title)!.id, "reading"]);
   }, AGENTS);
+});
+
+journey("questions: one asked on a source in no skill is listed there; a highlight retyped as a question joins the list at once", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# In no skill yet\n\nOne passage about useful deliberate practice, to ask about.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("One passage about useful").waitFor();
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const head = page.locator(".cp-head", { hasText: "Questions" });
+  if ((await head.locator(".cp-toggle").getAttribute("aria-expanded")) === "false") await head.locator(".cp-toggle").click();
+  await head.getByRole("button", { name: "Ask a question" }).click();
+  await page.getByLabel("New question").fill("Does this hold without a coach?");
+  await page.keyboard.press("Enter");
+  await page.locator(".qp-line", { hasText: "Does this hold without a coach?" }).waitFor({ timeout: 3000 }).catch(() => {
+    throw new Error("the question he asked on a source in no skill is not listed on it");
+  });
+  await select(page, "useful deliberate practice");
+  await page.keyboard.press("3"); // a question highlight
+  await page.locator(".qp-line", { hasText: "useful deliberate practice" }).waitFor({ timeout: 3000 }).catch(() => {
+    throw new Error("a passage marked as a question is missing from Questions until the tab is reopened");
+  });
+});
+
+journey("author: a save that fails keeps the name he typed, in the field", async (page) => {
+  await openSource(page, AGENTS);
+  await page.locator(".doc-head button.by").click();
+  const field = page.getByLabel("Author");
+  await field.fill("A corrected author");
+  await failNext(page, "edit", "The library is read-only.");
+  await field.press("Enter");
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await failNext(page, "edit", null);
+  if (!(await field.count()) || (await field.inputValue()) !== "A corrected author") throw new Error("the failed save lost the author he typed");
+  await page.keyboard.press("Escape");
+});
+
+journey("add box: a feed's own link followed by ↵ at once follows it, without waiting for the preview", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Quick Notes</title><link>http://localhost/</link><item><title>One post</title><link>http://localhost/a.html</link><pubDate>${day}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByLabel("Link, file path or text").fill(feed);
+    await page.keyboard.press("Enter");
+    await until("the feed is followed", async () => ((await ore("feed")) as { feeds: { url: string }[] }).feeds.some((f) => f.url === feed), 6000);
+    if (await page.getByText("not one episode or post").count()) throw new Error("the box refused a feed link it can follow");
+    // The same link, offered as the one he copied: ↵ follows it too.
+    await ore("feed", "unfollow", feed);
+    await page.keyboard.press("Escape");
+    await page.evaluate((u) => (window as unknown as { __copy: (t: string) => Promise<void> }).__copy(u), feed);
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByText("The link you copied").waitFor();
+    await page.keyboard.press("Enter");
+    await until("the copied feed link is followed", async () => ((await ore("feed")) as { feeds: { url: string }[] }).feeds.some((f) => f.url === feed), 6000);
+  } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
+journey("questions on a source: filing it under a skill lists that skill's questions at once; one whose link to the source fails to save is taken back", async (page) => {
+  const k = (await ore("skills", "add", "Glassblowing")) as { id: string };
+  const q = (await ore("snippet", "--text=How hot is the glory hole?", "--intent=question", `--skill=${k.id}`)) as { annotation: { id: string } };
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# A page in no skill\n\nGather, blow, shape, anneal." }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "A page in no skill");
+    await page.getByRole("tab", { name: "Collected" }).click();
+    const head = page.locator(".cp-head", { hasText: "Questions" });
+    if ((await head.locator(".cp-toggle").getAttribute("aria-expanded")) === "false") await head.locator(".cp-toggle").click();
+    // A question whose link to this source fails to save leaves nothing behind.
+    const count = async () => ((await ore("questions")) as unknown[]).length;
+    const before = await count();
+    await head.getByRole("button", { name: "Ask a question" }).click();
+    await page.getByLabel("New question").fill("Which gather comes first?");
+    await failNext(page, "match", "The library is read-only.");
+    await page.keyboard.press("Enter");
+    await page.getByText("The library is read-only.").first().waitFor();
+    await failNext(page, "match", null);
+    await until("the half-saved question is taken back", async () => (await count()) === before);
+    await page.keyboard.press("Escape");
+    // Filing the source under a skill brings that skill's questions.
+    await page.getByRole("button", { name: "Skills for A page in no skill" }).click();
+    await page.locator(".skill-picker [cmdk-item]", { hasText: "Glassblowing" }).click();
+    await page.keyboard.press("Escape");
+    await page.locator(".qp-line", { hasText: "How hot is the glory hole?" }).waitFor({ timeout: 3000 }).catch(() => {
+      throw new Error("the skill's question is missing until the tab is reopened");
+    });
+  } finally {
+    await ore("annotate", q.annotation.id, "--status", "deleted").catch(() => {});
+    await ore("archive", made.id).catch(() => {});
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
+journey("note: words typed just before a save that merges an outside edit comes back are kept", async (page) => {
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# A note two hands write\n\nA page for its note." }) }).then((r) => r.json())) as { id: string };
+  await ore("notes", made.id, "--set=Original.");
+  try {
+    await page.reload();
+    await openSource(page, "A note two hands write");
+    await page.getByRole("tab", { name: "Source note", exact: true }).click();
+    const ed = page.locator(".ProseMirror").filter({ hasText: "Original." });
+    await ed.waitFor();
+    const n = (await ore("notes", made.id)) as { path: string; text: string };
+    writeFileSync(join(LIB, n.path), `${n.text}\n\nOutside line.\n`);
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { notes: 1500 }));
+    await ed.click();
+    await page.keyboard.press("Meta+ArrowRight");
+    const saving = page.waitForRequest((r) => r.url().endsWith("/ore") && (r.postData() ?? "").includes("--set"));
+    await page.keyboard.type(" First edit.");
+    await saving;
+    await page.waitForTimeout(1380); // inside the editor's 200 ms report delay when the save comes back
+    await page.keyboard.type(" LATE WORDS.");
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    await until("the outside line is merged in", async () => ((await ore("notes", made.id)) as { text: string }).text.includes("Outside line."));
+    await until("the late words are saved too", async () => ((await ore("notes", made.id)) as { text: string }).text.includes("LATE WORDS."), 6000);
+    if (!(await page.locator(".ProseMirror").first().innerText()).includes("LATE WORDS.")) throw new Error("the late words left the page");
+  } finally {
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
+journey("add box: File waits while an add is going in, so nothing picked meanwhile is dropped", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# A slow add\n\nIt takes its time going in.");
+  await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { add: 1200 }));
+  await page.keyboard.press("Enter");
+  const file = page.getByRole("button", { name: "File", exact: true });
+  const usable = await file.isEnabled();
+  await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+  await page.locator(".doc").getByText("It takes its time going in").waitFor();
+  if (usable) throw new Error("File can be picked while an add is going in, and what is picked is dropped");
+});
+
+journey("bulk filing under an archived skill brings it back in the sidebar, and ⌘Z archives it again (D173)", async (page) => {
+  const k = (await ore("skills", "add", "Lathe work")) as { id: string };
+  await ore("skills", "archive", k.id);
+  const archived = async () => !!((await ore("skills")) as { id: string; archived?: boolean }[]).find((s) => s.id === k.id)?.archived;
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const rows = page.locator(".row");
+    await rows.nth(0).click({ modifiers: ["Meta"] });
+    await rows.nth(1).click({ modifiers: ["Meta"] });
+    await page.keyboard.press("Meta+k");
+    await page.locator("[cmdk-input]").fill("under Lathe work");
+    await page.locator("[cmdk-item]", { hasText: "under Lathe work" }).first().click();
+    await until("filing brings the skill back", async () => !(await archived()));
+    await until("the sidebar lists it among the skills", async () => (await page.locator(".sidebar .side-item[data-drop-skill]", { hasText: "Lathe work" }).count()) === 1);
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z archives it again", archived);
+  } finally {
+    const all = (await ore("ls")) as { id: string; skills: string[] }[];
+    for (const i of all.filter((x) => x.skills.includes(k.id))) await ore("edit", i.id, "--skills", i.skills.filter((s) => s !== k.id).join(","));
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
+journey("skill page Find: a question's words are found, though the question is a button", async (page) => {
+  const q = (await ore("snippet", "--text=Does interleaving help with watercolour washes?", "--intent=question", "--skill=learning")) as { annotation: { id: string } };
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+    await page.getByText("Does interleaving help with watercolour washes?").first().waitFor();
+    await page.keyboard.press("Meta+f");
+    await page.locator(".find-bar input").fill("watercolour");
+    await page.waitForTimeout(400);
+    const said = (await page.locator(".find-bar").innerText()).trim();
+    if (/not found/i.test(said)) throw new Error(`Find says “${said}” for a word on the page`);
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("annotate", q.annotation.id, "--status", "deleted").catch(() => {});
+  }
+});
+
+journey("skill recall: a warm-up saved to the skill note is a step, so ⌘Z takes it out and ⇧⌘Z puts it back", async (page) => {
+  const k = (await ore("skills", "add", "Whittling")) as { id: string };
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Whittling" }).first().click();
+    await page.locator(".warm-up").getByRole("button").first().click();
+    const dialog = page.getByRole("dialog").filter({ hasText: "Warm up from memory" });
+    await dialog.getByRole("textbox").fill("Cut away from yourself, with the grain.");
+    await dialog.getByRole("button", { name: /Save as first draft/ }).click();
+    await dialog.waitFor({ state: "detached" });
+    const note = async () => ((await ore("notes", `--skill=${k.id}`)) as { text: string }).text;
+    await until("the recall is in the note", async () => (await note()).includes("with the grain"));
+    await page.locator(".skill-page h1, .skill-head").first().click({ position: { x: 4, y: 4 } }).catch(() => {});
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes the recall out of the note", async () => !(await note()).includes("with the grain"));
+    await page.keyboard.press("Shift+Meta+z");
+    await until("⇧⌘Z puts it back", async () => (await note()).includes("with the grain"));
+  } finally {
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
+journey("finish: nothing can be typed into the recall while it saves, so no words are lost behind a save", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Recall while saving\n\nA page whose recall saves slowly.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("A page whose recall saves slowly").waitFor();
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  const box = page.getByLabel("Free recall");
+  await box.fill("First saved recall.");
+  await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { recall: 1200 }));
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await box.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Added while it saves.");
+  const shown = await box.inputValue().catch(() => "First saved recall.");
+  await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+  await page.getByRole("button", { name: "Keep reading" }).click();
+  if (shown !== "First saved recall.") throw new Error(`the box took ${JSON.stringify(shown)} while saving, and saved only the first sentence`);
 });
 
 journey("finish again: the recall box holds the last recall with the caret at its end, and the note holds it once", async (page) => {
@@ -5041,6 +5301,12 @@ journey("review Ask: a suggested card shows only what it changes, struck and und
   await card.getByRole("button", { name: "Use this card" }).click();
   await card.getByRole("button", { name: "Card updated" }).waitFor();
   if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("using the card dropped the change it shows");
+  // ⌘Z puts the old card back, so the suggestion can be used again.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await card.getByRole("button", { name: "Use this card" }).waitFor({ timeout: 3000 }).catch(() => {
+    throw new Error("after ⌘Z the suggestion still says Card updated");
+  });
   await ore("card", "set", id, `--question=${was.question}`, `--answer=${was.answer}`);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
@@ -5245,6 +5511,47 @@ journey("list: back from a source opened low in To read, its row is selected and
     return a.top >= b.top - 1 && a.bottom <= b.bottom + 1;
   });
   if (!seen) throw new Error(`the selected row “${title}” is scrolled out of the list`);
+});
+
+journey("a popover closes on any click outside it, even after a press inside it or on a control that stops the event", async (page) => {
+  await page.waitForLoadState("networkidle"); // the source the last journey left open has reopened
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  // As in WebKit: a click moves no focus, so the popover's close-on-focus-loss can't hide a missed click.
+  await page.addScriptTag({ content: `document.addEventListener("mousedown", (e) => e.preventDefault(), true)` });
+  // The picker opens on the last row, below the first, so the first row's controls stay uncovered.
+  const skills = page.locator(".row").getByRole("button", { name: /^Skills for / });
+  const picker = page.locator(".skill-picker");
+  const open = async () => {
+    await skills.last().click();
+    await picker.waitFor();
+  };
+  const closed = async (where: string) => {
+    await picker.waitFor({ state: "detached", timeout: 1500 }).catch(() => {
+      throw new Error(`the skill picker stayed open after a click ${where}`);
+    });
+  };
+  // A press inside first: it must not eat the next click outside.
+  await open();
+  await picker.getByPlaceholder("Find or create a skill…").click();
+  await page.mouse.click(1100, 790);
+  await closed("on empty space, after a press inside it");
+  // A control that keeps its press from dragging the row.
+  await open();
+  await skills.first().click();
+  await until("one skill picker open", async () => (await page.locator(".skill-picker[data-state=open]").count()) === 1);
+  await page.keyboard.press("Escape");
+  await closed("on another row's skills (it opens that row's)");
+  await open();
+  const row = page.locator(".row").first();
+  await row.hover();
+  await row.getByRole("button", { name: /^Actions for / }).click();
+  await closed("on another row's ⋯ menu");
+  await page.keyboard.press("Escape");
+  // A control that stops its click.
+  await open();
+  await page.locator(".side-head-tools").getByRole("button", { name: /^Actions for / }).first().click({ force: true });
+  await closed("on a sidebar ⋯ (it stops its click)");
+  await page.keyboard.press("Escape");
 });
 
 journey("skill picker: a skill with a long name still shows its tick", async (page) => {
@@ -5527,6 +5834,59 @@ journey("course: a rename from its menu goes on the history; ⌘Z puts the old n
   }
 });
 
+journey("course: ⌘Z of a skill filed on it gives each lesson back its own skills; ⌘Z of Archive course brings back only what it archived", async (page) => {
+  if (!LIB) throw new Error("this journey edits the library: set ORE_LIBRARY to the running mock's");
+  const { updateItemMeta } = (await import(join(import.meta.dir, "../../../packages/core/src/items.ts"))) as { updateItemMeta: (lib: { root: string }, id: string, patch: (m: object) => object) => Promise<unknown> };
+  const made = (await Promise.all(["A", "B"].map((n) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: `# Part ${n}\n\nA lesson.` }) }).then((r) => r.json())))) as { id: string }[];
+  for (const [i, m] of made.entries()) await updateItemMeta({ root: LIB }, m.id, (x) => ({ ...x, course: { id: "mixed-course", title: "Mixed course", part: i + 1 } }));
+  await ore("edit", made[0]!.id, "--skills", "learning");
+  await ore("edit", made[1]!.id, "--skills", "teaching");
+  const skillsOf = async () => {
+    const all = (await ore("ls")) as { id: string; skills: string[] }[];
+    return made.map((m) => [...(all.find((i) => i.id === m.id)?.skills ?? [])].sort().join("+")).join(" / ");
+  };
+  const archivedOf = async () => {
+    const gone = (await ore("ls", "--archived")) as { id: string }[];
+    return made.map((m) => gone.some((i) => i.id === m.id)).join("/");
+  };
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const row = page.locator(".list .row.course").filter({ hasText: "Mixed course" });
+    await row.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Skills" }).hover();
+    await page.getByRole("menuitemcheckbox", { name: "Habits" }).or(page.getByRole("menuitem", { name: "Habits" })).first().click();
+    await until("both lessons are under Habits, keeping their own", async () => (await skillsOf()) === "habits+learning / habits+teaching");
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z gives each lesson back its own skills", async () => (await skillsOf()) === "learning / teaching");
+    // From a skill's page, where the row lists only that skill's lessons, the course is still the whole course.
+    await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+    await page.locator(".row.course").filter({ hasText: "Mixed course" }).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Skills" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await page.getByRole("menuitemcheckbox", { name: "Habits" }).or(page.getByRole("menuitem", { name: "Habits" })).first().click();
+    await until("filed from a skill page, every lesson is under Habits", async () => (await skillsOf()) === "habits+learning / habits+teaching");
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("and ⌘Z takes it off both", async () => (await skillsOf()) === "learning / teaching");
+    // One lesson archived first, then the course: ⌘Z of the course brings back only the other.
+    await ore("archive", made[1]!.id);
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.locator(".list .row").filter({ hasText: /Mixed course|Part A/ }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: /^Archive/ }).click();
+    await until("the course is archived", async () => (await archivedOf()) === "true/true");
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings back only the lesson it archived", async () => (await archivedOf()) === "false/true");
+    await page.waitForTimeout(400);
+    if ((await archivedOf()) !== "false/true") throw new Error("⌘Z of Archive course also restored a lesson archived before it");
+  } finally {
+    for (const m of made) await ore("archive", m.id).catch(() => {});
+  }
+});
+
 journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the suggestion returns) and Dismiss", async (page) => {
   const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Why sleep consolidates memory\n\nSleep replays the day." }) }).then((r) => r.json())) as { id: string };
   // Undo of a dismiss puts a suggestion on it, as enrich would.
@@ -5580,6 +5940,196 @@ journey("skill importance (D173): Importance ▸ Focus with ⌘Z, Archive folds 
   await until("Habits is back", async () => !(await habits()).archived);
   await page.locator(".skill-importance").waitFor();
   if (await fold.count()) throw new Error("the Archived group stayed with nothing in it");
+});
+
+type Rigged = { __ORE_FAIL?: Record<string, string>; __ORE_SLOW?: Record<string, number> };
+const failNext = (page: Page, command: string, why: string | null) => page.evaluate(([c, why]) => void ((window as unknown as Rigged).__ORE_FAIL = why ? { [c!]: why } : {}), [command, why] as const);
+
+journey("delete skill dialog: ⇧Tab stays in it, Esc closes it, nothing behind it is reachable", async (page) => {
+  const k = (await ore("skills", "add", "Joinery")) as { id: string };
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--skill", k.id], stdin: "# Mortise and tenon\n\nCut the mortise first." }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.reload();
+    await page.locator(".sidebar .side-item", { hasText: "Joinery" }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete skill…" }).click();
+    const dialog = page.getByRole("alertdialog", { name: "Delete Joinery" });
+    await dialog.waitFor();
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("Shift+Tab");
+      if (!(await dialog.evaluate((d) => d.contains(document.activeElement)))) throw new Error("⇧Tab left the dialog for the page behind it");
+    }
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached", timeout: 1500 });
+  } finally {
+    await ore("skills", "rm", k.id);
+    await ore("archive", made.id);
+  }
+});
+
+journey("skill rename: a ⌘Z whose save fails stays on the history, so the next ⌘Z takes it back", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Habits" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Habits" });
+  await dialog.getByLabel("Rename Habits").fill("Habit loops");
+  await page.keyboard.press("Enter");
+  await dialog.waitFor({ state: "detached" });
+  const named = (n: string) => page.locator(".sidebar .side-item", { hasText: n }).count().then((c) => c > 0);
+  await until("renamed", () => named("Habit loops"));
+  await failNext(page, "skills", "The library is read-only.");
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: "Couldn’t undo" }).waitFor();
+  await failNext(page, "skills", null);
+  await page.keyboard.press("Meta+z");
+  await until("the next ⌘Z takes it back", () => named("Habits"));
+});
+
+journey("delete skill: a delete whose save fails can be tried again from the same menu", async (page) => {
+  const k = (await ore("skills", "add", "Empty for now")) as { id: string };
+  try {
+    await page.reload();
+    const item = page.locator(".sidebar .side-item", { hasText: "Empty for now" }).first();
+    await failNext(page, "skills", "The library is read-only.");
+    await item.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete skill…" }).click();
+    await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+    await failNext(page, "skills", null);
+    await item.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete skill…" }).click();
+    await until("the second try deletes it", async () => (await page.locator(".sidebar .side-item", { hasText: "Empty for now" }).count()) === 0);
+  } finally {
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
+journey("feed: a post that opens slowly never takes him away from where he went meanwhile; Forward goes dim once a preview is dropped", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml" ? new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Slow Notes</title><link>http://localhost/</link><item><title>A slow post</title><link>http://localhost:${server.port}/a.html</link><pubDate>${day}</pubDate></item><item><title>Another post</title><link>http://localhost:${server.port}/b.html</link><pubDate>${day}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) : new Response(`<html><head><title>${r.url.endsWith("b.html") ? "Another post" : "A slow post"}</title></head><body><article><h1>${r.url.endsWith("b.html") ? "Another post" : "A slow post"}</h1>${"<p>Spacing beats cramming, as study after study has found over many decades of work.</p>".repeat(8)}</article></body></html>`, { headers: { "content-type": "text/html" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", feed);
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const post = page.locator(".row.post", { hasText: "A slow post" });
+    await post.waitFor();
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { feed: 1500 }));
+    await post.click();
+    await page.getByRole("button", { name: /^Home/ }).click();
+    await page.waitForTimeout(2200);
+    if (await page.locator(".doc-head h1").count()) throw new Error("the post opened over Home after he went there");
+    // Asked for again after leaving and coming back while it still loads, it opens.
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    // (Read posts stay listed for this, as with the view's All.)
+    await page.evaluate(() => localStorage.setItem("ore.feed.show", "all"));
+    const other = page.locator(".row.post", { hasText: "Another post" });
+    await other.click();
+    await page.getByRole("button", { name: /^Home/ }).click();
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    await other.click();
+    await page.locator(".doc-head h1", { hasText: "Another post" }).waitFor({ timeout: 6000 }).catch(() => {
+      throw new Error("a post asked for again while its first open still loads never opens");
+    });
+    // A preview he only looked at is dropped when he goes back, so Forward has nowhere to go and says so.
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    await page.keyboard.press("Meta+BracketLeft");
+    await page.locator(".feed, .row.post, .list").first().waitFor();
+    const forward = page.locator(".nav-arrows button").nth(1);
+    await page.waitForTimeout(600); // the preview is dropped
+    if (await forward.isEnabled()) {
+      await forward.click();
+      await page.waitForTimeout(300);
+      if (!(await page.locator(".doc-head h1").count()) && (await forward.isEnabled())) throw new Error("Forward stays lit and does nothing after a dropped preview");
+    }
+  } finally {
+    await page.evaluate(() => (void ((window as unknown as Rigged).__ORE_SLOW = undefined), localStorage.removeItem("ore.feed.show")));
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
+journey("settings: ⌘Z after closing and reopening Settings shows the goal it put back", async (page) => {
+  const open = async () => {
+    await page.keyboard.press("Meta+Comma");
+    await page.getByRole("tab", { name: "Review" }).click();
+  };
+  const minutes = page.getByRole("group", { name: "Minutes a day" }).or(page.getByRole("radiogroup", { name: "Minutes a day" }));
+  const on = async () => (await minutes.locator("[data-state=on]").innerText()).trim();
+  await open();
+  const was = await on();
+  const other = was === "30" ? "5" : "30";
+  await minutes.getByText(other, { exact: true }).click();
+  await until("the new goal shows", async () => (await on()) === other);
+  await page.waitForTimeout(300); // the save lands and goes on the history
+  await page.keyboard.press("Escape");
+  await open();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z shows the old goal in the Settings now open", async () => (await on()) === was);
+  await page.keyboard.press("Escape");
+});
+
+journey("reader: ⌘Z of a rename made before leaving and coming back shows the old title", async (page) => {
+  await openSource(page, AGENTS);
+  const title = () => page.locator(".doc-head h1").innerText();
+  await page.locator(".doc-head h1").click();
+  await page.getByLabel("Title").fill("Agents, for now");
+  await page.keyboard.press("Enter");
+  await until("renamed", async () => (await title()) === "Agents, for now");
+  await openSource(page, "Agents, for now");
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await until("the reader shows the old title", async () => (await title()) === AGENTS);
+});
+
+journey("source rename: a save that fails keeps the title he typed, in the field, to try again", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row", { hasText: AGENTS }).first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  const field = page.locator(".row-rename");
+  await field.fill("Agents, carefully retitled");
+  await failNext(page, "edit", "The library is read-only.");
+  await field.press("Enter");
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await failNext(page, "edit", null);
+  await until("the field is back with his words", async () => (await field.count()) === 1 && (await field.inputValue()) === "Agents, carefully retitled");
+  await page.keyboard.press("Escape");
+});
+
+journey("resize drags: Esc mid-drag puts the size back and stays on the page; nothing is left stuck after", async (page) => {
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ meta: { id: string } }> };
+  const made = await createItem({ root: LIB }, { type: "youtube", title: "A talk on spacing", url: "https://www.youtube.com/watch?v=spacingTalk1", body: "[00:00] Spacing works.\n\n[00:30] Test yourself after a pause.", source: { ext: "vtt", data: "WEBVTT\n\n00:00:00.000 --> 00:00:30.000\nSpacing works.\n\n00:00:30.000 --> 00:01:00.000\nTest yourself after a pause.\n" } });
+  try {
+    await page.reload();
+    await openSource(page, "A talk on spacing");
+    const edge = page.locator(".video-edge.right");
+    await edge.waitFor();
+    const frame = page.locator(".video-frame");
+    const w0 = (await frame.boundingBox())!.width;
+    const at = (await edge.boundingBox())!;
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(at.x - 90, at.y + at.height / 2, { steps: 4 });
+    await until("the drag resizes the video", async () => Math.abs((await frame.boundingBox())!.width - w0) > 40);
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    if (!(await page.locator(".doc-head h1").count())) throw new Error("Esc during the drag left the source");
+    await until("Esc puts the width back", async () => Math.abs((await frame.boundingBox())!.width - w0) < 2);
+    if (await page.evaluate(() => document.body.classList.contains("resizing"))) throw new Error("the page is still in its resizing state (no text can be selected)");
+    // The note's divider, the same way.
+    await page.getByRole("tab", { name: "Source note" }).click().catch(() => {});
+    const divider = page.getByRole("separator", { name: /Resize/ }).filter({ visible: true }).last();
+    const d = (await divider.boundingBox())!;
+    const col = () => page.evaluate(() => document.querySelector<HTMLElement>(".doc-head")!.getBoundingClientRect().width);
+    const c0 = await col();
+    await page.mouse.move(d.x + d.width / 2, d.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(d.x - 120, d.y + 200, { steps: 4 });
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    if (!(await page.locator(".doc-head h1").count())) throw new Error("Esc during the divider drag left the source");
+    await until("Esc puts the divider back", async () => Math.abs((await col()) - c0) < 2);
+  } finally {
+    await ore("archive", made.meta.id).catch(() => {});
+  }
 });
 
 journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {
@@ -5665,6 +6215,8 @@ for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
   const t0 = Date.now();
   try {
     await run(page);
+    const broke = await page.evaluate(() => [...((window as unknown as { __hygiene?: Set<string> }).__hygiene ?? [])]).catch(() => []);
+    if (broke.length) throw new Error(broke.join("; "));
     console.log(`ok    ${name} (${Date.now() - t0} ms)`);
   } catch (e) {
     failed++;

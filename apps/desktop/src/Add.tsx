@@ -121,11 +121,12 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   const feed = useFeedOf(busy ? null : one);
   /** The link is the feed itself: adding it would be refused, so ↵ follows it. */
   const isFeed = !!feed && feed.url === one;
-  const follow = async () => {
-    if (!one || busy) return;
+  /** `link`: the feed, when it isn't the one in the box (the link he copied, offered and taken with ↵). */
+  const follow = async (link = one) => {
+    if (!link || busy) return;
     setBusy(true);
     setError(null);
-    const why = await onFollow(one, picked);
+    const why = await onFollow(link, picked);
     if (!open.current) return why ? notify(why, "error") : undefined;
     setBusy(false);
     if (!why) return onClose();
@@ -134,6 +135,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
 
   /** Picked files join the box as pasted ones do, so his text and skills stay and ↵ adds them all. */
   const pickFiles = async () => {
+    if (busy) return; // what is going in was read when he pressed ↵: nothing joins it now
     const paths = await onPickFiles();
     if (!open.current) return;
     if (paths.length) {
@@ -149,6 +151,11 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
     setError(null);
     const { failure, failed, cancelled } = await onAdd(what, picked, false);
     if (!open.current) return failure ? notify(failure, "error") : undefined;
+    // ↵ before the preview knew the link is a feed itself, which can't be added as a source: follow it (D107).
+    // Still busy while it looks, so nothing else starts meanwhile.
+    const link = what.length === 1 && what[0]!.kind === "link" ? what[0]!.url : null;
+    if (failure && !cancelled && link && (await ore<FoundFeed>("feed", "find", link).catch(() => null))?.url === link) return open.current ? follow(link) : notify(failure, "error");
+    if (!open.current) return notify(failure ?? "", "error");
     setBusy(false);
     // Cancelled from the toast: the box stays with what didn't go in, to fix or add again.
     if (cancelled && !failure) return failed.length ? (setValue(failed.map(entryText).join("\n")), ref.current?.focus()) : onClose();
@@ -256,7 +263,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
               </button>
             </Hint>
             <Hint text="Choose a file" keys="file">
-              <button className="add-file" onClick={() => void pickFiles()}>
+              <button className="add-file" onClick={() => void pickFiles()} disabled={busy}>
                 <Paperclip size={13} aria-hidden="true" />
                 File
               </button>

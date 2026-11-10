@@ -1,4 +1,5 @@
 import { PixelNote, PixelStack } from "./PixelIcon";
+import { resizeDrag } from "./drag";
 import * as Tabs from "@radix-ui/react-tabs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
@@ -100,6 +101,10 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     return queue(() => ore<Notes & { merged: boolean }>("notes", ...key.split(" "), opt("set", t), opt("base", at()))).then(
       (r) => {
         unsaved.delete(key);
+        // What the editor shows now, as above: a key pressed in its last 200 ms is not in the draft yet, and
+        // showing the merged text over it would drop those words.
+        const shown = owner.current === key ? pull.current?.() : null;
+        if (shown != null && shown !== t) draft.current = shown;
         // An agent or a recall changed the file meanwhile and the CLI merged it in. With no newer
         // typing, show the merged text; otherwise keep his draft and merge again on the next save.
         if (owner.current === key && r.merged && draft.current === t) return apply(r.text), true;
@@ -131,8 +136,16 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       // An append returns the file's text; over a draft that isn't on disk it would replace his words.
       if (!(await flush())) return false;
       try {
+        // The file as it is now (not what this editor last based a save on, which a merge can leave behind).
+        const before = (await queue(() => ore<Notes>("notes", ...key.split(" "))).catch(() => undefined))?.text;
         const r = await queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading)));
         if (owner.current === key) apply(r.text);
+        // On the history, as every change is. The step writes the file itself (--base keeps what he has typed
+        // since) and says so, so whichever copy of the note is open then reads it again.
+        const put = (text: string, base: string) => () =>
+          ore("notes", ...key.split(" "), opt("set", text), opt("base", base)).then(() => void window.dispatchEvent(new CustomEvent("ore:note-written", { detail: key })));
+        // (Only when the text it was added to is known: an undo from a guess would take more than it added.)
+        if (before !== undefined) notify(`Added “${heading}” to the note`, "quiet", put(before, r.text), put(r.text, before));
         return true;
       } catch (e) {
         notify(errorText(e), "error");
@@ -309,22 +322,18 @@ export function useSideWidth(key: string, initial: number, min = 280) {
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    const el = e.currentTarget;
-    el.setPointerCapture(e.pointerId);
-    const right = el.parentElement!.getBoundingClientRect().right;
+    const right = e.currentTarget.parentElement!.getBoundingClientRect().right;
+    const before = width;
     let w = width;
     setDragging(true);
-    const move = (m: PointerEvent) => setWidth((w = clamp(right - m.clientX)));
-    const up = () => {
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", up);
-      el.removeEventListener("pointercancel", up);
-      setDragging(false);
-      save(key, String(w));
-    };
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
+    resizeDrag(e, {
+      move: (m) => setWidth((w = clamp(right - m.clientX))),
+      end: (ev) => {
+        setDragging(false);
+        if (ev) save(key, String(w));
+        else setWidth(before);
+      },
+    });
   };
   const onDoubleClick = () => {
     setWidth(clamp(initial));

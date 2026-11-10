@@ -1,4 +1,5 @@
 import { ArrowClockwise, ArrowCounterClockwise, Pause, Play } from "./icons";
+import { resizeDrag } from "./drag";
 import * as Popover from "@radix-ui/react-popover";
 import * as Slider from "@radix-ui/react-slider";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
@@ -370,21 +371,19 @@ function useVideoWidth(box: RefObject<HTMLDivElement | null>) {
   const drag = (side: -1 | 1) => (e: ReactPointerEvent<HTMLElement>) => {
     if (!fit) return;
     e.preventDefault();
-    const handle = e.currentTarget;
-    handle.setPointerCapture(e.pointerId);
     const x0 = e.clientX;
     const w0 = fit.width;
+    const before = wanted;
+    const at = (ev: PointerEvent) => Math.max(MIN_WIDTH, w0 + side * 2 * (ev.clientX - x0));
     document.body.classList.add("resizing");
-    const move = (ev: PointerEvent) => setWanted(Math.max(MIN_WIDTH, w0 + side * 2 * (ev.clientX - x0)));
-    const up = (ev: PointerEvent) => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", up);
-      document.body.classList.remove("resizing");
-      const w = Math.max(MIN_WIDTH, w0 + side * 2 * (ev.clientX - x0));
-      save(WIDTH_KEY, String(Math.round(w)));
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", up);
+    resizeDrag(e, {
+      move: (ev) => setWanted(at(ev)),
+      end: (ev) => {
+        document.body.classList.remove("resizing");
+        if (ev) save(WIDTH_KEY, String(Math.round(at(ev))));
+        else setWanted(before);
+      },
+    });
   };
   const reset = () => {
     setWanted(null);

@@ -16,14 +16,17 @@ const STARTERS = ["Why is this the answer?", "Give me an example", "Make this ca
 
 /** One card's chat: what he has typed, the thread, and the AI session. Review keeps it by card id,
  *  so closing Ask (or a reply landing while it is closed) loses nothing. */
-export type AskChat = { turns: Turn[]; input: string; busy: boolean; error: string | null; applied: Proposal | null; session?: string; failed?: string };
-export const NO_ASK: AskChat = { turns: [], input: "", busy: false, error: null, applied: null };
+export type AskChat = { turns: Turn[]; input: string; busy: boolean; error: string | null; session?: string; failed?: string };
+export const NO_ASK: AskChat = { turns: [], input: "", busy: false, error: null };
 
 /** Ask about this (D61): a chat about the card he just answered, like ChatGPT's thread under a
  *  message. It runs on his own plan through `ore ask` (claude -p or codex); a proposed card is
  *  applied only when he clicks Use this card. Never shown before the answer, never rates. */
 export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: CardFull; answer: string; chat: AskChat; setChat: (f: (c: AskChat) => AskChat) => void; onApply: (p: Proposal) => Promise<void>; onClose: () => void }) {
-  const { turns, input, busy, error, applied } = chat;
+  const { turns, input, busy, error } = chat;
+  /** Read off the card itself, never remembered: an undo or a later edit makes a suggestion usable again. */
+  const same = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
+  const applied = (p: Proposal) => same(p.question, card.question) && same(p.answer, card.answer);
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -86,8 +89,8 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
                     <div className="quiz-kicker">Suggested card</div>
                     <p className="ask-card-q"><Changes was={t.was?.question} now={t.proposal.question} /></p>
                     <p className="ask-card-a"><Changes was={t.was?.answer} now={t.proposal.answer} /></p>
-                    <button className="ask-use" disabled={applied === t.proposal} onClick={() => void onApply(t.proposal!).then(() => setChat((c) => ({ ...c, applied: t.proposal! })), () => {})}>
-                      {applied === t.proposal ? "Card updated" : "Use this card"}
+                    <button className="ask-use" disabled={applied(t.proposal)} onClick={() => void onApply(t.proposal!).catch(() => {})}>
+                      {applied(t.proposal) ? "Card updated" : "Use this card"}
                     </button>
                   </div>
                 )}

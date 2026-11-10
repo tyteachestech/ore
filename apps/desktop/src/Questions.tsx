@@ -5,7 +5,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
-import { errorText, useFocusWhileMounted, type Notify } from "./util";
+import { errorText, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 
 // D75: answering a question where the answer turns up. One answer model on the skill page and in the
 // reader: pieces of his answer ("contributions"), each naming the source it was written from, so
@@ -283,7 +283,7 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
   const remove = useCallback(
     async (q: Question) => {
       let at = -1;
-      const back = () => setQs((l) => l && [...l.slice(0, at < 0 ? l.length : at), q, ...l.slice(at < 0 ? l.length : at)]);
+      const back = () => setQs((l) => l && (l.some((x) => x.id === q.id) ? l : [...l.slice(0, at < 0 ? l.length : at), q, ...l.slice(at < 0 ? l.length : at)]));
       setQs((l) => {
         at = l ? l.findIndex((x) => x.id === q.id) : -1;
         return l && l.filter((x) => x.id !== q.id);
@@ -293,14 +293,9 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
       const forget = notify(
         "Question deleted",
         "info",
-        () => {
-          back();
-          return write.catch(() => {}).then(() => ore("annotate", q.id, "--status", q.status));
-        },
-        () => {
-          setQs((l) => l && l.filter((x) => x.id !== q.id));
-          return ore("annotate", q.id, "--status", "deleted");
-        },
+        // The list follows the write, so one that fails leaves no row that isn't in the library.
+        () => write.catch(() => {}).then(() => ore("annotate", q.id, "--status", q.status)).then(back),
+        () => ore("annotate", q.id, "--status", "deleted").then(() => setQs((l) => l && l.filter((x) => x.id !== q.id))),
       );
       try {
         await write;
@@ -317,7 +312,9 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
 
 /** Types a question in place, like a new skill in the sidebar: Enter saves it as a question snippet
  *  filed under these skills (as Raycast's Capture Question does), Esc or clicking away drops it. */
-export function AskQuestion({ skills, onDone, notify }: { skills: string[]; onDone: (added: boolean) => void; notify: Notify }) {
+/** `item`: the source he is asking from. A question lives under skills (D75); from a source in none, it is
+ *  marked as one this source may answer, or the source that took it could never show it. */
+export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]; item?: string; onDone: (added: boolean) => void; notify: Notify }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -326,9 +323,15 @@ export function AskQuestion({ skills, onDone, notify }: { skills: string[]; onDo
     setBusy(true);
     try {
       const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
+      // Two writes: if the second fails, the first is taken back, so a retry never leaves a question nobody can see.
+      if (item && !skills.length)
+        await ore("match", item, r.annotation.id).catch(async (e) => {
+          await ore("annotate", r.annotation.id, "--status", "deleted").catch(() => {});
+          throw e;
+        });
       onDone(true);
       // Asking goes on the history: ⌘Z takes the question back, ⇧⌘Z asks it again.
-      const set = (status: string) => void ore("annotate", r.annotation.id, "--status", status).then(() => onDone(true), (e) => notify(errorText(e), "error"));
+      const set = (status: string) => ore("annotate", r.annotation.id, "--status", status).then(() => onDone(true));
       notify("Question added", "quiet", () => set("deleted"), () => set("open"));
     } catch (e) {
       setError(errorText(e));
@@ -372,7 +375,7 @@ const CAP = 6;
 /** The reader's Questions tab (D75): the open questions of this source's skills, the ones it may
  *  answer first. Click one (or ↑ ↓ ↵) to write toward its answer; a selection made before Q comes in
  *  as the quote. */
-export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote, onJumpHighlight, notify, ask }: {
+export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote, onJumpHighlight, notify, ask, marked }: {
   item: string;
   /** The source's skills: their names head the list, and a question typed here is filed under them. */
   skills: { id: string; name: string }[];
@@ -383,6 +386,9 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   notify: Notify;
   /** Inside the Collected tab's Questions group, whose header holds the + and the arrows: bumped to ask one. */
   ask?: number;
+  /** What decides which questions are this source's, as saved (D75): its question highlights and its skills.
+   *  The list reads again when it changes. */
+  marked?: string;
 }) {
   const grouped = ask !== undefined;
   const [qs, setQs] = useState<Question[] | null>(null);
@@ -390,6 +396,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   const [all, setAll] = useState(false);
   const [asking, setAsking] = useState(false);
   const [version, setVersion] = useState(0);
+  const changes = useLibraryChanges();
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   /** Why the list didn't load; Try again reloads it. */
   const [failed, setFailed] = useState<string | null>(null);
@@ -408,13 +415,13 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
     return () => {
       live = false;
     };
-  }, [item, version]);
+  }, [item, version, changes, marked]);
 
   const dismiss = async (q: Question) => {
     setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x)));
     try {
       await ore("match", item, q.id, "--drop");
-      const set = (drop: boolean) => void ore("match", item, q.id, ...(drop ? ["--drop"] : [])).then(reload, (e) => notify(errorText(e), "error"));
+      const set = (drop: boolean) => ore("match", item, q.id, ...(drop ? ["--drop"] : [])).then(reload);
       notify("Not answered here", "info", () => set(false), () => set(true));
     } catch (e) {
       notify(errorText(e), "error");
@@ -537,6 +544,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
         {asking && (
           <AskQuestion
             skills={skills.map((s) => s.id)}
+            item={item}
             notify={notify}
             onDone={(added) => {
               setAsking(false);

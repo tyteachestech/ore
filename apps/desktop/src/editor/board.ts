@@ -2,6 +2,7 @@
 // Notion: drag to pan, pinch or ⌘-scroll to zoom at the pointer, a plain scroll still scrolls the note,
 // a click without a drag opens the editor. The right and bottom edges resize it (Notion's image
 // handles), and the size is kept in the link's alt text, Obsidian's `![Diagram|640x320](…)`.
+import { resizeDrag } from "../drag";
 
 export type Size = { w: number; h: number };
 export type View = { x: number; y: number; z: number };
@@ -58,7 +59,7 @@ export function board(
     inner.style.transform = moved(v) ? `translate(${v.x}px, ${v.y}px) scale(${v.z})` : "";
     dom.classList.toggle("moved", moved(v));
   };
-  fit.addEventListener("pointerdown", (e) => (e.preventDefault(), e.stopPropagation()));
+  fit.addEventListener("pointerdown", (e) => e.preventDefault());
   fit.addEventListener("click", (e) => {
     e.stopPropagation();
     set(HOME);
@@ -71,27 +72,22 @@ export function board(
     g.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      e.stopPropagation();
       const r = dom.getBoundingClientRect();
       const col = (dom.parentElement?.getBoundingClientRect().right ?? r.right) - r.left;
       const start = { x: e.clientX, y: e.clientY, w: r.width, h: r.height };
       let size: Size | null = null;
-      g.setPointerCapture(e.pointerId);
       dom.classList.add("resizing");
-      const move = (m: PointerEvent) => {
-        size = clampSize({ w: axis === "h" ? start.w : start.w + m.clientX - start.x, h: axis === "w" ? start.h : start.h + m.clientY - start.y }, col);
-        opts.resize(size);
-      };
-      const up = () => {
-        g.removeEventListener("pointermove", move);
-        g.removeEventListener("pointerup", up);
-        g.removeEventListener("pointercancel", up);
-        dom.classList.remove("resizing");
-        if (size) opts.commit(size);
-      };
-      g.addEventListener("pointermove", move);
-      g.addEventListener("pointerup", up);
-      g.addEventListener("pointercancel", up);
+      resizeDrag({ pointerId: e.pointerId, currentTarget: g }, {
+        move: (m) => {
+          size = clampSize({ w: axis === "h" ? start.w : start.w + m.clientX - start.x, h: axis === "w" ? start.h : start.h + m.clientY - start.y }, col);
+          opts.resize(size);
+        },
+        end: (ev) => {
+          dom.classList.remove("resizing");
+          if (!ev) opts.resize(opts.size());
+          else if (size) opts.commit(size);
+        },
+      });
     });
     // Double-click an edge: back to the preview's own size (Figma's double-click on a handle).
     g.addEventListener("dblclick", (e) => {
@@ -106,6 +102,7 @@ export function board(
   // Drag pans (left or middle button); a left press that never moves is a click, which opens it.
   let dragged = false;
   dom.addEventListener("pointerdown", (e) => {
+    if ([fit, ...grips].some((c) => c.contains(e.target as Node))) return;
     if (e.pointerType === "touch" || (e.button !== 0 && e.button !== 1)) return;
     // Taken here, the press never reaches the note as a node drag or a text selection.
     e.preventDefault();

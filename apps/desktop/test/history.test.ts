@@ -4,8 +4,8 @@ import { History } from "../src/history";
 const log: string[] = [];
 const step = (name: string, redoable = true) => ({
   message: name,
-  undo: () => log.push(`undo ${name}`),
-  redo: redoable ? () => log.push(`redo ${name}`) : undefined,
+  undo: async () => void log.push(`undo ${name}`),
+  redo: redoable ? async () => void log.push(`redo ${name}`) : undefined,
 });
 
 test("undo walks back a run of steps, redo walks forward, newest first", () => {
@@ -73,7 +73,7 @@ test("an undo whose write fails goes back on the history and says why; redo can'
   const h = new History((s, e, what) => failed.push(`${what} ${s.message}: ${(e as Error).message}`));
   const ok = step("a");
   h.push(ok);
-  const bad = { message: "b", undo: () => Promise.reject(new Error("disk full")), redo: () => {} };
+  const bad = { message: "b", undo: () => Promise.reject(new Error("disk full")), redo: async () => {} };
   h.push(bad);
   expect(h.undo()).toBe(bad);
   await Bun.sleep(0);
@@ -85,7 +85,7 @@ test("an undo whose write fails goes back on the history and says why; redo can'
 test("a redo whose write fails goes back to the redo stack", async () => {
   const failed: string[] = [];
   const h = new History((s, _e, what) => failed.push(`${what} ${s.message}`));
-  const s = { message: "a", undo: () => {}, redo: () => Promise.reject(new Error("offline")) };
+  const s = { message: "a", undo: async () => {}, redo: () => Promise.reject(new Error("offline")) };
   h.push(s);
   h.undo();
   expect(h.redo()).toBe(s);
@@ -108,7 +108,7 @@ test("a toast's own Undo whose write fails puts the step back, and so does its R
   expect(h.canRedo).toBe(false);
   expect(h.take(bad)).toBe(true); // still on the history, so its toast's Undo can try again
   await Bun.sleep(0);
-  const ok = { message: "c", undo: () => {}, redo: () => Promise.reject(new Error("offline")) };
+  const ok = { message: "c", undo: async () => {}, redo: () => Promise.reject(new Error("offline")) };
   h.push(ok);
   h.undo();
   expect(h.again(ok)).toBe(true);
@@ -138,4 +138,17 @@ test("no undo or redo step throws away its write's promise", async () => {
     lines.forEach((l, i) => /(?:^|, )\s*\(\) => void (?:ore|apply)\(/.test(l) && found.push(`${f}:${i + 1}`));
   }
   expect(found).toEqual([]);
+});
+
+test("a step that lands is reported, so screens opened since can read their data again; one that fails isn't", async () => {
+  let landed = 0;
+  const h = new History(undefined, () => landed++);
+  h.push({ message: "a", undo: async () => {}, redo: () => Promise.reject(new Error("offline")) });
+  h.undo();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(landed).toBe(1);
+  h.redo();
+  await new Promise((r) => setTimeout(r, 0));
+  expect(landed).toBe(1);
 });

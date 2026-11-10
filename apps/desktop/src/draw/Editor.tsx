@@ -14,6 +14,7 @@ import { is, label, useKeymap, type KeyId } from "../keys";
 import { WithMenu, type MenuAction } from "../Menu";
 import { ShortcutEditor } from "../Shortcuts";
 import type { Notify } from "../util";
+import { Trap } from "../Trap";
 import {
   absPoints, addChild, addMap, addMatrix, align, connect, tidy, bindTarget, bounds, boundsOf, byId, cellOf, centre, clone, DEFAULT_STYLE, distribute, duplicate, FILLS,
   fitLink, flip, flowDir, FONT_SIZES, frame, GAP, GRID, group, growMatrix, isLabel, isLinear, isNode, isShape, labelOf, labelWidth, layoutMatrix, linear, lineHeightOf,
@@ -1757,11 +1758,13 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
         />
       )}
       {panel === "help" && (
+        <Trap>
         <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && (setPanel(null), root.current?.focus())}>
           <div className="panel keys" role="dialog" aria-modal="true" aria-label="Diagram shortcuts" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") { setPanel(null); root.current?.focus(); } }} tabIndex={-1} ref={(n) => n?.focus()}>
             <ShortcutEditor notify={notify} query="diagram" />
           </div>
         </div>
+        </Trap>
       )}
     </div>
   );
@@ -1919,7 +1922,7 @@ function CustomColour({ label, value, presets, used, onPick, onDone }: { label: 
           // The hex field takes the caret once the popover's focus scope is up, so the diagram sheet's trap
           // has let go (an autoFocus would land first, and the trap would pull it back).
           onOpenAutoFocus={(e) => (e.preventDefault(), (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>(".draw-colour-hex input")?.focus())}
-          onPointerDown={stop} onMouseDown={stop} onClick={stop} onContextMenu={stop} onWheel={stop}
+          onMouseDown={stop} onClick={stop} onContextMenu={stop} onWheel={stop}
           onKeyDown={(e) => {
             e.stopPropagation();
             if (e.key === "Enter") close();
@@ -2024,6 +2027,7 @@ function Commands({ cmds, hint, onClose }: { cmds: { id: string; label: string; 
   const shown = cmds.filter((c) => !c.when || c.when());
   const groups = [...new Set(shown.map((c) => c.group))];
   return (
+    <Trap>
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Diagram commands" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Command className="panel" loop onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); onClose(); } }}>
         <Command.Input autoFocus className="panel-input" placeholder="Diagram commands" />
@@ -2042,6 +2046,7 @@ function Commands({ cmds, hint, onClose }: { cmds: { id: string; label: string; 
         </Command.List>
       </Command>
     </div>
+    </Trap>
   );
 }
 
@@ -2056,6 +2061,7 @@ function TypeMap({ onAdd, onClose }: { onAdd: (src: string) => void; onClose: ()
     onClose();
   };
   return (
+    <Trap>
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Type a map" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="panel draw-map" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); onClose(); } if (e.key === "Enter" && e.metaKey) { e.preventDefault(); go(); } }}>
         <textarea
@@ -2075,6 +2081,7 @@ function TypeMap({ onAdd, onClose }: { onAdd: (src: string) => void; onClose: ()
         </div>
       </div>
     </div>
+    </Trap>
   );
 }
 
@@ -2104,6 +2111,7 @@ function Find({ els, onPick, onClose }: { els: El[]; onPick: (e: El) => void; on
 function LinkPicker({ els, from, onPick, onClose }: { els: El[]; from: El; onPick: (e: El) => void; onClose: () => void }) {
   const named = els.filter((e) => isShape(e) && e.id !== from.id).map((e) => ({ e, name: (labelOf(els, e.id)?.originalText ?? "").trim() })).filter((x) => x.name);
   return (
+    <Trap>
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Link to a node" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Command className="panel" loop onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); onClose(); } }}>
         <Command.Input autoFocus className="panel-input" placeholder="Link to…" />
@@ -2117,6 +2125,7 @@ function LinkPicker({ els, from, onPick, onClose }: { els: El[]; from: El; onPic
         </Command.List>
       </Command>
     </div>
+    </Trap>
   );
 }
 
@@ -2125,6 +2134,7 @@ function UrlPanel({ initial, onSave, onClose }: { initial: string; onSave: (v: s
   const [v, setV] = useState(initial);
   const ok = !v.trim() || /^(https?:\/\/\S+|ore:(item|skill)\/\S+)$/i.test(v.trim());
   return (
+    <Trap>
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Link" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="panel" onKeyDown={(e) => {
         e.stopPropagation();
@@ -2141,5 +2151,6 @@ function UrlPanel({ initial, onSave, onClose }: { initial: string; onSave: (v: s
         </div>
       </div>
     </div>
+    </Trap>
   );
 }
