@@ -1,7 +1,7 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
-import { ArrowDown, ArrowUp, CaretDown, Check, Circle, Copy, Plus, SidebarRight, Square, Stop, Trash, X } from "./icons";
+import { ArrowDown, ArrowUp, CaretDown, Check, Circle, Copy, FileText, Plus, SidebarRight, Square, Stop, Trash, X } from "./icons";
 import { chatGroups } from "./chat-groups";
 import { WithMenu } from "./Menu";
 import { citeRuns, siteName } from "./cite-pills";
@@ -11,10 +11,11 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Evidence } from "./Evidence";
+import { SkillIcon } from "./IconPicker";
 import { Grow } from "./Grow";
 import { escTaken, Hint, onlyTabbed } from "./Hint";
 import { useSideWidth } from "./Notes";
-import { cancelOre, ore, oreJob, oreWith, opt } from "./ore";
+import { cancelOre, ore, oreJob, oreWith, opt, type SkillColor } from "./ore";
 import { is } from "./keys";
 import { errorText, type Notify } from "./util";
 import { Working } from "./Working";
@@ -308,7 +309,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   onFit: () => void;
   /** What @ can point at. */
   sources: { id: string; title: string }[];
-  skills: { id: string; name: string }[];
+  skills: { id: string; name: string; icon?: string; color?: SkillColor | "" }[];
   /** The source on screen, if any. */
   reading: { id: string; title: string; skills: string[] } | null;
   onOpen: (item: string, at: string) => void;
@@ -647,6 +648,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                   onMouseMove={() => setPick(i)}
                   onClick={() => choose(m)}
                 >
+                  {/* Its skill's own icon, as every skill menu shows it; a source gets the page. */}
+                  {m.kind === "skill" ? <SkillIcon icon={skills.find((k) => k.id === m.id)?.icon} color={skills.find((k) => k.id === m.id)?.color} dot className="palette-icon" /> : <FileText className="tutor-mention-icon" size={14} aria-hidden="true" />}
                   <span className="tutor-mention-name">{m.name}</span>
                   <span className="tutor-mention-kind">{m.kind === "skill" ? "Skill" : "Source"}</span>
                 </button>

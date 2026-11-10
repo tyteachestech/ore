@@ -2740,7 +2740,10 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-at { color: var(--accent); }
 /* The @ list (Claude's and ChatGPT's @): above the field, the same rows as every menu. */
 .tutor-mention { position: absolute; left: 12px; right: 12px; bottom: calc(100% - 4px); z-index: 7; max-height: 280px; overflow-y: auto; padding: 4px; border-radius: 10px; background: var(--bg-raised); border: 1px solid var(--border); box-shadow: var(--float); }
-.tutor-mention .menu-item { width: 100%; justify-content: space-between; text-align: left; }
+.tutor-mention .menu-item { width: 100%; gap: 8px; text-align: left; }
+.tutor-mention .palette-icon, .tutor-mention-icon { flex: none; }
+.tutor-mention-icon { width: 16px; height: 16px; color: var(--muted); }
+.tutor-mention-name { flex: 1; }
 .tutor-mention .menu-item.active { background: var(--bg-active); }
 .tutor-mention-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutor-mention-kind { flex: none; font: 600 10px/1 var(--mono); letter-spacing: 0.06em; color: var(--faint); }

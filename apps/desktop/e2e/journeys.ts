@@ -661,6 +661,8 @@ journey("tutor @: typing @ lists skills and sources, Enter writes the name in, a
   await field.pressSequentially("What does @agen");
   const list = page.getByRole("listbox", { name: "Point the tutor at" });
   await list.getByRole("option", { name: new RegExp(AGENTS) }).waitFor();
+  // Every row leads with an icon: a skill's own (or its dot), a page for a source.
+  if ((await list.locator(".skill-icon, .tutor-mention-icon").count()) !== (await list.getByRole("option").count())) throw new Error("an @ row has no icon");
   await page.keyboard.press("Enter");
   await until("the list closes", async () => (await list.count()) === 0);
   await until("the name is in the text", async () => (await field.inputValue()) === `What does @${AGENTS} `);
