@@ -88,7 +88,12 @@ export function useToast() {
   const notify: Notify = useCallback(
     (message, kind = "info", undo, redo, go, stay, slot) => {
       const step = undo && { message, undo, redo };
-      if (step) (stepMade(step), history.current.push(step));
+      if (step) {
+        stepMade(step);
+        history.current.push(step);
+        // What was undone before it can no longer be redone, so a toast still up stops offering Redo.
+        if (list.current.some((x) => x.offer === "redo")) commit(list.current.map((x) => (x.offer === "redo" ? { ...x, offer: undefined, step: undefined } : x)));
+      }
       // A slot's new toast goes in front, in place of its last one.
       if (slot && kind !== "quiet") commit(list.current.filter((x) => x.slot !== slot));
       if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go, stay: stay && !!go, slot });
