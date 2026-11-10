@@ -5923,9 +5923,19 @@ journey("review: while a card edit saves, the editor is read-only and Esc waits,
   await page.getByRole("button", { name: "Edit exercise" }).click();
   const question = page.locator("#edit-q");
   const was = await question.inputValue();
+  // Cancel shows Esc on hover, as Save shows its key; while it saves, Esc waits, so the hint goes too.
+  const cancel = page.locator(".review-edit").getByRole("button", { name: "Cancel", exact: true });
+  const cancelHint = page.locator(".hint", { hasText: /^Cancel\s*Esc$/ });
+  await cancel.hover();
+  await cancelHint.waitFor();
   await question.fill(`${was} (edited)`);
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.locator(".review-edit").getByRole("button", { name: "Save", exact: true }).click();
   await until("the save is held", async () => held);
+  const box = (await cancel.boundingBox())!;
+  await page.mouse.move(box.x - 200, box.y - 200, { steps: 8 });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
+  await page.waitForTimeout(800);
+  if (await cancelHint.isVisible()) throw new Error("Cancel's hint says Esc while the save holds Esc back");
   await question.focus();
   await page.keyboard.press("End");
   await page.keyboard.type(" and more");
