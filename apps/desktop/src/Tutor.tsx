@@ -971,7 +971,10 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
   const cur = chat.current;
   const all = !rows ? [] : cur ? [{ id: cur.id, title: cur.title, updated: rows.find((r) => r.id === cur.id)?.updated ?? new Date().toISOString() }, ...rows.filter((r) => r.id !== cur.id)] : rows;
   const shown = all.filter((r) => r.title.toLowerCase().includes(query.trim().toLowerCase()));
+  // A picked chat puts focus in the field; on Esc Radix gives it back to the title (a click outside, to where it lands).
+  const picked = useRef(false);
   const pick = (id: string) => {
+    picked.current = true;
     setOpen(false);
     void chat.open(id);
   };
@@ -991,7 +994,12 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover menu tutor-chats" side="bottom" align="start" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (e.preventDefault(), onPicked())}>
+        <Popover.Content className="popover menu tutor-chats" side="bottom" align="start" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => {
+          if (!picked.current) return;
+          picked.current = false;
+          e.preventDefault();
+          onPicked();
+        }}>
           <Command
             label="Chats"
             loop

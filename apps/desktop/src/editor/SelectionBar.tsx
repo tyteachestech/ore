@@ -79,6 +79,13 @@ export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0 }
 }
 
 /** A web link on the selection: paste or type the address, Enter applies it, Esc cancels. */
+/** A popover off the bar closes with focus back in the note, on the words he selected (Notion): the bar's buttons
+ *  never took it, so Radix's trigger is no place to go. A click that landed on something else keeps it there. */
+const toNote = (v: EditorView) => (e: Event) => {
+  e.preventDefault();
+  if (!document.activeElement || document.activeElement === document.body) v.focus();
+};
+
 function WebLink({ v, sel, ask }: { v: EditorView; sel: Sel; ask: number }) {
   const t = v.state.schema.marks.link!;
   const now = (() => {
@@ -113,7 +120,7 @@ function WebLink({ v, sel, ask }: { v: EditorView; sel: Sel; ask: number }) {
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover sel-pop" side="bottom" align="start" sideOffset={6} collisionPadding={8} onCloseAutoFocus={(e) => e.preventDefault()}>
+        <Popover.Content className="popover sel-pop" side="bottom" align="start" sideOffset={6} collisionPadding={8} onCloseAutoFocus={toNote(v)}>
           <input
             className="menu-input"
             placeholder="Paste a link"
@@ -157,7 +164,7 @@ function PageLink({ v, sel, targets }: { v: EditorView; sel: Sel; targets: LinkT
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover menu sel-pop" side="bottom" align="start" sideOffset={6} collisionPadding={8} onCloseAutoFocus={(e) => e.preventDefault()}>
+        <Popover.Content className="popover menu sel-pop" side="bottom" align="start" sideOffset={6} collisionPadding={8} onCloseAutoFocus={toNote(v)}>
           <Command label="Link to" loop shouldFilter={false}>
             <Command.Input className="menu-input" placeholder="Find a source or skill…" value={q} onValueChange={setQ} autoFocus />
             <Command.List>
@@ -211,7 +218,7 @@ function Colors({ v, sel }: { v: EditorView; sel: Sel }) {
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover sel-pop sel-colors" side="bottom" align="end" sideOffset={6} collisionPadding={8} onCloseAutoFocus={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()}>
+        <Popover.Content className="popover sel-pop sel-colors" side="bottom" align="end" sideOffset={6} collisionPadding={8} onCloseAutoFocus={toNote(v)} onMouseDown={(e) => e.preventDefault()}>
           <div className="sel-label">Text</div>
           {row(text!, "Text colour")}
           <div className="sel-label">Highlight</div>

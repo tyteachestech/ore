@@ -965,6 +965,34 @@ journey("tutor chats: every chat is saved and listed by day under its name; Find
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor chats menu: Esc gives focus back to the chat's title, a click outside goes where it lands, a picked chat puts it in the field (ChatGPT, Claude)", async (page) => {
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const chats = tutor.getByRole("button", { name: /^Chats/ });
+  const list = page.locator(".tutor-chats");
+  const focused = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.tagName);
+  const title = async () => (await chats.getAttribute("aria-label"))!;
+  // A chat to pick.
+  await page.getByRole("textbox", { name: "Message the tutor" }).fill("What is spacing?");
+  await page.keyboard.press("Enter");
+  await tutor.getByRole("button", { name: "Copy the reply" }).waitFor();
+  await chats.click();
+  await list.getByPlaceholder("Find a chat…").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc closes the list, focus on its title", async () => (await list.count()) === 0 && (await focused()) === (await title()));
+  if ((await tutor.count()) === 0) throw new Error("Esc in the chats list closed the tutor too");
+  await chats.click();
+  await list.getByPlaceholder("Find a chat…").waitFor();
+  // A click outside goes where it lands (Radix): one click into the field closes the list and types there.
+  await page.getByRole("textbox", { name: "Message the tutor" }).click();
+  await until("a click in the field closes the list, focus in the field", async () => (await list.count()) === 0 && (await focused()) === "Message the tutor");
+  await chats.click();
+  await list.locator("[cmdk-item]").first().waitFor();
+  await page.keyboard.press("Enter");
+  await until("a picked chat puts focus in the field", async () => (await list.count()) === 0 && (await focused()) === "Message the tutor");
+  await page.keyboard.press("Meta+j");
+});
+
 journey("tutor chats: deleting a chat while its reply is being written keeps it deleted, with no error, and the new chat goes on (D172)", async (page) => {
   let release: (() => void) | undefined;
   await page.route(/\/ore$/, async (route) => {
@@ -2023,7 +2051,7 @@ journey("note equations: /equation opens a TeX field that draws as he types; ↵
   await until("still drawn after a reload", async () => (await pm.locator(".note-math .katex annotation").last().textContent().catch(() => "")) === "\\pi r^2");
 });
 
-journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words, ⌘↵ closes a toggle", async (page) => {
+journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words (Esc goes back to them), ⌘↵ closes a toggle", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);
   await openSource(page, AGENTS);
@@ -2045,6 +2073,11 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.keyboard.press("Shift+Home");
   await page.waitForTimeout(150); // the editor takes the selection a moment after the page shows it
   await page.keyboard.press("Meta+k"); // the palette's key, in the note with words selected
+  await page.getByPlaceholder("Paste a link").waitFor();
+  // Esc closes it with focus back on the words (Notion), so ⌘K asks again at once.
+  await page.keyboard.press("Escape");
+  await until("Esc puts focus back in the note, on the words", async () => (await page.getByPlaceholder("Paste a link").count()) === 0 && (await page.evaluate(() => !!document.activeElement?.closest(".note-editor") && document.getSelection()?.toString().trim() === "Read the guide")));
+  await page.keyboard.press("Meta+k");
   await page.getByPlaceholder("Paste a link").waitFor();
   await page.keyboard.type("example.com/guide");
   await page.keyboard.press("Enter");
