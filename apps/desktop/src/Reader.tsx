@@ -445,6 +445,8 @@ type Props = {
   onBack: () => void;
   onChanged: () => void;
   onSkillsChanged: () => void;
+  /** Archives again the skills a filing brought back (D173), when that filing is undone. */
+  rearchive?: (skills: string[]) => Promise<unknown>;
   onDone: () => void;
   notify: Notify;
 };
@@ -2409,8 +2411,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       setFiled(skills.join());
       p.onChanged();
       if (revived.length) p.onSkillsChanged();
-      const rearchive = () => Promise.all(revived.map((id) => ore("skills", "archive", id))).finally(p.onSkillsChanged);
-      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true).then(rearchive), () => fileUnder(skills, undefined, true));
+      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true).then(() => p.rearchive?.(revived)), () => fileUnder(skills, undefined, true));
     } catch (e) {
       setDoc((cur) => cur && { ...cur, skills: unfile(cur.skills, skills, before) });
       // From the history (undo or redo): it puts the step back and says why.

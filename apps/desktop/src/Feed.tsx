@@ -332,7 +332,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
               menu={() => feedActions(g.feed)}
               renaming={renaming === g.feed.url}
               onRename={(t) => retitle(g.feed, g.feed.title, t.replace(/\s+/g, " ").trim())}
-              onCancelRename={() => (setRenaming(null), listRef.current?.focus({ preventScroll: true }))}
+              onCancelRename={(byKey = true) => (setRenaming(null), byKey && listRef.current?.focus({ preventScroll: true }))}
               skillsPicker={
                 <SkillPicker skills={skills} value={g.feed.skills} title={g.feed.title} onChange={(next) => refile(g.feed, next)} onCreate={onCreateSkill}>
                   {g.feed.skills.length ? g.feed.skills.map((id) => <SkillChip key={id} skill={skills.find((k) => k.id === id) ?? { id, name: id }} />) : (
@@ -389,7 +389,7 @@ function FeedGroup({ feed, menu, renaming, onRename, onCancelRename, skillsPicke
   menu: () => MenuAction[];
   renaming: boolean;
   onRename: (title: string) => Promise<boolean>;
-  onCancelRename: () => void;
+  onCancelRename: (byKey?: boolean) => void;
   skillsPicker: ReactNode;
   error: ReactNode;
   children: ReactNode;

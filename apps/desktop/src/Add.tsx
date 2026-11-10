@@ -150,13 +150,14 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
     setError(null);
     const { failure, failed, cancelled } = await onAdd(what, picked, false);
     if (!open.current) return failure ? notify(failure, "error") : undefined;
+    // ↵ before the preview knew the link is a feed itself, which can't be added as a source: follow it (D107).
+    // Still busy while it looks, so nothing else starts meanwhile.
+    if (failure && !cancelled && one && what === list && (await ore<FoundFeed>("feed", "find", one).catch(() => null))?.url === one) return open.current ? follow() : undefined;
+    if (!open.current) return notify(failure ?? "", "error");
     setBusy(false);
     // Cancelled from the toast: the box stays with what didn't go in, to fix or add again.
     if (cancelled && !failure) return failed.length ? (setValue(failed.map(entryText).join("\n")), ref.current?.focus()) : onClose();
     if (!failure) return onClose();
-    // ↵ before the preview knew the link is a feed itself, which can't be added as a source: follow it (D107).
-    if (one && what === list && (await ore<FoundFeed>("feed", "find", one).catch(() => null))?.url === one) return follow();
-    if (!open.current) return;
     // Keep only what didn't go in: the rest is already added, and a retry mustn't add it twice.
     if (failed.length < what.length || what !== list) setValue(failed.map(entryText).join("\n"));
     setError(failed.length < what.length ? `Added ${what.length - failed.length} of ${what.length}. ${failure}` : failure);

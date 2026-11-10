@@ -136,14 +136,15 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       // An append returns the file's text; over a draft that isn't on disk it would replace his words.
       if (!(await flush())) return false;
       try {
-        const before = bases.current.get(key) ?? "";
+        const before = bases.current.get(key);
         const r = await queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading)));
         if (owner.current === key) apply(r.text);
         // On the history, as every change is. The step writes the file itself (--base keeps what he has typed
         // since) and says so, so whichever copy of the note is open then reads it again.
         const put = (text: string, base: string) => () =>
           ore("notes", ...key.split(" "), opt("set", text), opt("base", base)).then(() => void window.dispatchEvent(new CustomEvent("ore:note-written", { detail: key })));
-        notify(`Added “${heading}” to the note`, "quiet", put(before, r.text), put(r.text, before));
+        // (Only when the text it was added to is known: an undo from a guess would take more than it added.)
+        if (before !== undefined) notify(`Added “${heading}” to the note`, "quiet", put(before, r.text), put(r.text, before));
         return true;
       } catch (e) {
         notify(errorText(e), "error");

@@ -716,8 +716,9 @@ export function App() {
     try {
       const r = await ore<{ id: string; title: string; preview: boolean }>("feed", "open", post.url);
       // He went elsewhere, or opened another post, while it loaded: it never opens over that, and its preview goes.
-      if (viewRef.current !== from || opening.current !== post.url) return void (r.preview && ore("feed", "close", r.id).catch(() => {}));
-      opening.current = null;
+      const mine = opening.current === post.url;
+      if (mine) opening.current = null;
+      if (viewRef.current !== from || !mine) return void (r.preview && ore("feed", "close", r.id).catch(() => {}));
       if (r.preview) previews.current.set(r.id, r.title);
       openSource(r.id);
     } catch (e) {
@@ -2251,6 +2252,7 @@ export function App() {
             }}
             onChanged={() => void refresh()}
             onSkillsChanged={reloadSkills}
+            rearchive={rearchive}
             onDone={() => {
               // The panel showed the moment (D71); the toast takes a mistaken Done back (D106).
               const item = openItem;

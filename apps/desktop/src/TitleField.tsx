@@ -34,7 +34,7 @@ export function TitleField({ value, label = "Title", className = "row-rename", p
         e.stopPropagation();
         if (busy.current) return;
         if (e.key === "Escape") onClose(true);
-        if (e.key !== "Enter") return;
+        if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
         setSaving((busy.current = true));
         void onSave(e.currentTarget.value).then((ok) => {
           setSaving((busy.current = false));
