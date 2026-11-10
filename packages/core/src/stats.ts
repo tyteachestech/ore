@@ -31,6 +31,27 @@ export function retentionMetric(reviews: Review[]): RetentionResult {
   return { retention: n >= MIN_RETENTION_N ? passed / n : null, n, passed };
 }
 
+/** Two numbers for us to watch, never shown in the app (science pass 2026-11-02, rec 5; `ore stats --json`).
+ *  `ai_agreement`: of typed answers the AI checked, how often his rating is its suggestion. Near 1, the AI
+ *  is in effect setting the rating D21 keeps for him. `explain`: pass rates (Good or Easy) of typed and
+ *  in-head answers on cards old enough for either (D68; passed twice at least), the fluency risk D68 took on. */
+export function raterStats(reviews: Review[]) {
+  const checked = reviews.filter((r) => r.ai_rating !== undefined && !r.in_head);
+  const same = checked.filter((r) => r.rating === r.ai_rating).length;
+  const old = reviews.filter((r) => (r.state_before.reps ?? 0) >= 2);
+  const rate = (rs: Review[]) => ({ reviews: rs.length, pass_rate: rs.length ? rs.filter((r) => r.rating >= 3).length / rs.length : null });
+  return {
+    ai_agreement: {
+      n: checked.length,
+      same,
+      share: checked.length ? same / checked.length : null,
+      his_higher: checked.filter((r) => r.rating > r.ai_rating!).length,
+      his_lower: checked.filter((r) => r.rating < r.ai_rating!).length,
+    },
+    explain: { typed: rate(old.filter((r) => !r.in_head && r.answer)), in_head: rate(old.filter((r) => r.in_head)) },
+  };
+}
+
 export const MIN_CALIBRATION_N = 20;
 const CALIBRATION_DAYS = 84;
 

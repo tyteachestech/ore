@@ -51,7 +51,7 @@ A fix request in the middle of a review runs mode 4, then the review continues w
 
 Start:
 ```bash
-ore session start --json && ore due --json --limit 12 && date +%s
+ore session start --json && ore due --start --json --limit 12 && date +%s
 ```
 Keep the session id (`id`) and pass it as `--session <id>` to every `ore review`.
 
@@ -90,9 +90,9 @@ Proposed: 3 (good)        ok to accept · 1 again · 2 hard · 3 good · 4 easy
 IFS= read -r -d '' ANS <<'ORE_EOF'
 …
 ORE_EOF
-ore review <card> --rating R --confidence C --answer "$ANS" --ai-rating A --elapsed-ms N --session S [--finishing] --json && date +%s
+ore review <card> --rating R --confidence C --answer "$ANS" --ai-rating A --ai-by "VENDOR MODEL PROMPT" --elapsed-ms N --session S [--finishing] --json && date +%s
 ```
-`--finishing` only on a draft's first encounter. Relay the next due date (`due_next`) in passing ("back in 9 days"), at most once per item.
+`--ai-by` is the grade's `ai` (`vendor model prompt_version`). `--finishing` only on a draft's first encounter. Relay the next due date (`due_next`) in passing ("back in 9 days"), at most once per item.
 
 **Misses.** Rating 1 → re-ask that item once, about 3 items later (or at the end if fewer remain). Same flow, logged with `ore review` again. A second miss is not re-asked; mention it at the close as a card worth fixing if the gaps suggest the card, not the memory, is the problem.
 

@@ -69,3 +69,22 @@ function orderGroup(entries: QueueEntry[]): QueueEntry[] {
 export function orderQueue(entries: QueueEntry[]): QueueEntry[] {
   return [...orderGroup(entries.filter((e) => !e.relearn)), ...entries.filter((e) => e.relearn).sort(compare)];
 }
+
+/** How far down the queue the opening card may come from. */
+const WIN_WINDOW = 10;
+
+// D176: a session opens on a card he will likely recall. Most urgent first puts the hardest cards of a
+// backlog back to back at the start, which is what makes people stop (Kang, Daniels & Schweitzer 2022).
+// So the likeliest recall among the first ten comes first; the rest keep their order, and nothing about
+// any card's schedule changes (D22). A card served in a block (confusables, one source's definitions)
+// stays in its block.
+export function winFirst(ordered: QueueEntry[]): QueueEntry[] {
+  const size = new Map<string, number>();
+  for (const e of ordered) size.set(unitKey(e), (size.get(unitKey(e)) ?? 0) + 1);
+  let best = -1;
+  ordered.slice(0, WIN_WINDOW).forEach((e, i) => {
+    if (size.get(unitKey(e)) === 1 && (best < 0 || e.retrievability > ordered[best]!.retrievability)) best = i;
+  });
+  if (best <= 0 || ordered[best]!.retrievability <= ordered[0]!.retrievability) return ordered;
+  return [ordered[best]!, ...ordered.slice(0, best), ...ordered.slice(best + 1)];
+}

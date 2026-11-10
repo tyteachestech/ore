@@ -2,11 +2,11 @@ import { annotationRevs } from "./annotations.ts";
 import { findCard } from "./cards.ts";
 import { withIndex, type CardRow, type LibraryIndex } from "./db.ts";
 import { latestRevs } from "./fsutil.ts";
-import { itemDirs } from "./items.ts";
+import { itemDirs, type AiStamp } from "./items.ts";
 import { localDay, nowIso } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
-import { orderQueue, type QueueEntry } from "./queue.ts";
+import { orderQueue, winFirst, type QueueEntry } from "./queue.ts";
 import { findVariant } from "./remix.ts";
 import { appendReview, appendUndo, readReviews, type FsrsState, type Review } from "./reviews.ts";
 import { emptyState, loadParams, nextState, replay, retrievability } from "./scheduler.ts";
@@ -19,6 +19,8 @@ export interface ReviewInput {
   confidence: number;
   answer?: string;
   ai_rating?: number;
+  /** Who suggested `ai_rating` (the stamp `ore grade` returned): all AI output records it. */
+  ai?: AiStamp;
   elapsed_ms?: number;
   finishing?: boolean;
   session?: string;
@@ -74,6 +76,7 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
       confidence: input.confidence,
       answer: input.answer,
       ai_rating: input.ai_rating,
+      ai: input.ai_rating === undefined ? undefined : input.ai,
       rating: input.rating,
       elapsed_ms: input.elapsed_ms,
       state_before: before,
@@ -120,13 +123,15 @@ export interface QueueOptions {
   skills?: string[];
   /** Apply the new-card limits (D60, D65, D144): at most `new_per_day`, and none drafted today. On by default. */
   newLimit?: boolean;
+  /** A session's first fetch: its first card is a likely recall (D176). A fetch mid-session leaves the order alone. */
+  start?: boolean;
 }
 
 /** One card in this many is new while due cards last (D144). */
 const NEW_EVERY = 5;
 
-// Due queue (SPEC §3): live cards due now in queue order, with unseen drafts (freshest source first,
-// D60) taking every fifth place, and today's pending relearn passes last. A draft waits until the day
+// Due queue (SPEC §3): live cards due now in queue order, opening on a likely recall (D176), with unseen
+// drafts (his own work first, D176, then the freshest source, D60) taking every fifth place, and today's pending relearn passes last. A draft waits until the day
 // after it was written, so its first review is spaced from the reading (D65). Up to `new_per_day` a day.
 export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}, open?: LibraryIndex): QueueEntry[] {
   return withIndex(lib, open, (index) => {
@@ -153,7 +158,7 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const picked = opts.skills && new Set(opts.skills);
 
     const entries: QueueEntry[] = [];
-    const unseen: { entry: QueueEntry; fresh: string }[] = [];
+    const unseen: { entry: QueueEntry; fresh: string; tier: number }[] = [];
     const cards = index.cards();
     for (const c of cards) {
       if (c.state === "retired") continue;
@@ -182,15 +187,18 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
         retrievability: retrievability(c.fsrs, now, c.retention, w),
         relearn,
       };
-      if (!c.fsrs && !relearn) unseen.push({ entry, fresh: finished ?? "" });
+      if (!c.fsrs && !relearn) unseen.push({ entry, fresh: finished ?? "", tier: c.from_notes ? 0 : c.annotation ? 1 : 2 });
       else entries.push(entry);
     }
-    unseen.sort((a, b) => b.fresh.localeCompare(a.fresh) || a.entry.id.localeCompare(b.entry.id));
+    // D176: his own work first (a card from his notes, then one from his highlight, then the AI's
+    // prequestion cards), freshest finished source first within each (D60).
+    unseen.sort((a, b) => a.tier - b.tier || b.fresh.localeCompare(a.fresh) || a.entry.id.localeCompare(b.entry.id));
     // A backlog of due cards is the normal case (D144): new cards get every fifth place of the session,
     // so new learning comes in whatever is due, and the due cards fill the rest, most urgent first.
     const fresh = unseen.slice(0, newLeft).map((u) => u.entry);
     const ordered = orderQueue(entries);
-    const live = ordered.filter((e) => !e.relearn);
+    const due = ordered.filter((e) => !e.relearn);
+    const live = opts.start ? winFirst(due) : due;
     const out: QueueEntry[] = [];
     for (const e of live) {
       out.push(e);

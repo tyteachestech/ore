@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
-  CardState, cardStates, calibration, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
+  CardState, cardStates, calibration, raterStats, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
   readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
@@ -101,12 +101,12 @@ export const studyCommands: Record<string, Command> = {
   },
 
   due: {
-    usage: "[--limit N] [--skill s]... [--all]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills; --all: every unseen draft, past the day's new-card limits",
-    options: { limit: { type: "string" }, skill: { type: "string", multiple: true }, all: { type: "boolean" } },
+    usage: "[--limit N] [--skill s]... [--all] [--start]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills; --all: every unseen draft, past the day's new-card limits; --start: a session's first fetch, opening on the likeliest recall of the first ten (D176)",
+    options: { limit: { type: "string" }, skill: { type: "string", multiple: true }, all: { type: "boolean" }, start: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
       const picked = strs(f.skill);
-      const all = dueQueue(lib, new Date(), { skills: picked.length ? picked : undefined, newLimit: !f.all });
+      const all = dueQueue(lib, new Date(), { skills: picked.length ? picked : undefined, newLimit: !f.all, start: !!f.start });
       const limit = int(f.limit, "limit");
       if (limit !== undefined && limit < 0) throw new Error("--limit must be 0 or more"); // slice(0, -1) would drop the last
       const q = limit === undefined ? all : all.slice(0, limit);
@@ -124,10 +124,10 @@ export const studyCommands: Record<string, Command> = {
   },
 
   review: {
-    usage: "<card> --rating 1-4 --confidence 1-3 [--answer a] [--ai-rating r] [--elapsed-ms n] [--finishing] [--session id] [--variant v] [--in-head] | <card> --undo <ts>   --variant: the remixed version shown (D66); --in-head: answered in his head, self-marked (D68); --undo: takes back the card's latest review (its ts from the review's output)",
+    usage: "<card> --rating 1-4 --confidence 1-3 [--answer a] [--ai-rating r --ai-by 'vendor model prompt@n'] [--elapsed-ms n] [--finishing] [--session id] [--variant v] [--in-head] | <card> --undo <ts>   --variant: the remixed version shown (D66); --in-head: answered in his head, self-marked (D68); --undo: takes back the card's latest review (its ts from the review's output)",
     options: {
       undo: { type: "string" },
-      rating: { type: "string" }, confidence: { type: "string" }, answer: { type: "string" }, "ai-rating": { type: "string" },
+      rating: { type: "string" }, confidence: { type: "string" }, answer: { type: "string" }, "ai-rating": { type: "string" }, "ai-by": { type: "string" },
       "elapsed-ms": { type: "string" }, finishing: { type: "boolean" }, session: { type: "string" }, variant: { type: "string" }, "in-head": { type: "boolean" },
     },
     async run([ref], f) {
@@ -143,8 +143,12 @@ export const studyCommands: Record<string, Command> = {
       if (rating < 1 || rating > 4) throw new Error("--rating must be 1-4");
       if (confidence < 1 || confidence > 3) throw new Error("--confidence must be 1-3");
       if (aiRating !== undefined && (aiRating < 1 || aiRating > 4)) throw new Error("--ai-rating must be 1-4");
+      // The stamp `ore grade` printed with its rating: vendor, model and prompt version, in that order.
+      // The model is whatever sits between the two (a name with a space, or none): a rating is never lost to its stamp.
+      const by = str(f["ai-by"])?.trim().split(/\s+/);
+      if (by && by.length < 2) throw new Error('--ai-by takes "vendor model prompt@n", as `ore grade` prints them');
       const r = await recordReview(lib, need(ref, "<card>"), {
-        rating: rating as 1 | 2 | 3 | 4, confidence, answer: str(f.answer), ai_rating: aiRating,
+        rating: rating as 1 | 2 | 3 | 4, confidence, answer: str(f.answer), ai_rating: aiRating, ai: by && { vendor: by[0]!, model: by.slice(1, -1).join(" "), prompt_version: by.at(-1)! },
         elapsed_ms: int(f["elapsed-ms"], "elapsed-ms"), finishing: Boolean(f.finishing), session: str(f.session), variant: str(f.variant), in_head: Boolean(f["in-head"]),
       });
       // A card that just became remixable, or used up its variants, gets new ones written ahead.
@@ -173,9 +177,10 @@ export const studyCommands: Record<string, Command> = {
             ret(x.retention, x.retention_n), ret(x.retention_own_words, x.retention_own_words_n), ret(x.retention_no_note, x.retention_no_note_n),
           ]),
         ]);
-        // remix: variant vs original pass rates, for us to watch the prompts (D66); the app never shows it.
+        // remix: variant vs original pass rates, for us to watch the prompts (D66); ai_agreement and explain:
+        // his rating against the AI's, typed against in-head answers. The app never shows them.
         const now = new Date();
-        return { data: f.skill ? rows.map((x) => ({ ...x, strength: skillStrength(lib, x.skill, now, index), growth: skillGrowth(lib, x.skill, now, 12, index) })) : { ...s, remix: remixStats(lib), calibration: calibration(readReviews(lib)) }, text };
+        return { data: f.skill ? rows.map((x) => ({ ...x, strength: skillStrength(lib, x.skill, now, index), growth: skillGrowth(lib, x.skill, now, 12, index) })) : { ...s, remix: remixStats(lib), calibration: calibration(readReviews(lib)), ...raterStats(readReviews(lib)) }, text };
       } finally {
         index.close();
       }

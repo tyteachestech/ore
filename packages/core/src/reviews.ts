@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { appendJsonl, deviceLog, readJsonl, visible } from "./fsutil.ts";
+import { AiStamp } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 
 export const FsrsStateSchema = z.object({
@@ -25,6 +26,8 @@ export const ReviewSchema = z.object({
   confidence: z.number().int().min(1).max(3),
   answer: z.string().optional(),
   ai_rating: z.number().int().min(1).max(4).optional(),
+  ai: AiStamp.optional(), // who suggested ai_rating: vendor, model, prompt version
+
   rating: z.number().int().min(1).max(4),
   elapsed_ms: z.number().int().nonnegative().optional(),
   state_before: FsrsStateSchema,
