@@ -9,7 +9,7 @@ import { Mole } from "./Mole";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
-import { ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { lastWin, longGapText, ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -27,6 +27,14 @@ const KEY_POINTS_CHANGED = "The key points changed.";
 const RATINGS = ["Again", "Hard", "Good", "Easy"] as const;
 /** A missed card comes back this many cards later (D59). */
 const AGAIN_GAP = 3;
+/** The queue once its first card is answered. A miss comes back once (D59), a few cards later; a second
+ *  miss waits for its next FSRS date. */
+function afterAnswer(q: DueEntry[], again: boolean): DueEntry[] {
+  if (!q.length) return q;
+  const [head, ...rest] = q;
+  if (!again || head!.relearn) return rest;
+  return [...rest.slice(0, AGAIN_GAP), { ...head!, relearn: true }, ...rest.slice(AGAIN_GAP)];
+}
 /** One card adds at most this much active time (D60, as in core). */
 const ACTIVE_CAP_MS = 3 * 60_000;
 /** Cut gems drawn on the end screen; the rest show as "+N". */
@@ -97,6 +105,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [busy, showBusy] = useState(false);
   /** `busy` as of now, for the guards: two keys in one task would both see the state before either set it. */
   const busyNow = useRef(false);
+  /** The goal closed on a miss and one more card was served first (D177): the next answer ends the session. */
+  const wonLast = useRef(false);
   /** Runs once Review is idle again, after it has closed (when no effect will run it). */
   const whenIdle = useRef<(() => void) | null>(null);
   const setBusy = (on: boolean) => {
@@ -461,15 +471,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     return got === marks.length ? Math.max(3, grade.rating) : got ? 2 : 1;
   })();
 
-  const advance = (again: boolean) => {
-    setQueue((q) => {
-      if (!q?.length) return q;
-      const [head, ...rest] = q;
-      // A miss comes back once (D59); a second miss waits for its next FSRS date.
-      if (!again || head!.relearn) return rest;
-      return [...rest.slice(0, AGAIN_GAP), { ...head!, relearn: true }, ...rest.slice(AGAIN_GAP)];
-    });
-  };
+  const advance = (again: boolean) => setQueue((q) => q && afterAnswer(q, again));
 
   const rate = async (rating: number) => {
     if (!card || phase !== "checked" || busyNow.current) return;
@@ -499,7 +501,13 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     } finally {
       setBusy(false);
     }
-    if (goalClosed) void finish();
+    if (!goalClosed) return;
+    // D177: a goal that closes on a miss gets one more card first, a likely recall, so the session doesn't
+    // end on a failure. Once only: whatever he answers next, it ends.
+    const win = rating === 1 && !wonLast.current ? lastWin(afterAnswer(queue ?? [], true)) : null;
+    if (!win) return void finish();
+    wonLast.current = true;
+    setQueue(win);
   };
 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
@@ -1246,6 +1254,7 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
         // A session of misses is still the work that makes them stick (D62: no guilt copy).
         <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>
       )}
+      {longGapText(s) && <p className="review-rescued">{longGapText(s)}</p>}
       {rescuedWorthSaying(s) && (
         <p className="review-rescued">
           {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}

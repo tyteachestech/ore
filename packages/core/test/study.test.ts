@@ -160,6 +160,23 @@ describe("review loop", () => {
     expect((await endSession(lib)).reviews).toBe(2);
   });
 
+  test("the end receipt keeps the longest gap he recalled across, in days (D177)", async () => {
+    const { lib, a, b } = await setup();
+    const t0 = Date.now() + 864e5;
+    const day = (d: number) => new Date(t0 + d * 864e5);
+    await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: day(0) });
+    await recordReview(lib, b.meta.id, { rating: 3, confidence: 2, now: day(20) });
+    await startSession(lib, day(30));
+    await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: day(30) }); // 30 days since he last saw it
+    await recordReview(lib, b.meta.id, { rating: 1, confidence: 2, now: day(30) }); // a miss is no recall
+    expect((await endSession(lib, day(30))).longest_days).toBe(30);
+    // A session of first answers only has no gap to name.
+    const { lib: lib2, a: c } = await setup();
+    await startSession(lib2, day(0));
+    await recordReview(lib2, c.meta.id, { rating: 3, confidence: 2, now: day(0) });
+    expect((await endSession(lib2, day(0))).longest_days).toBeUndefined();
+  });
+
   test("a miss keeps its relearn pass when the session ends right after it (the goal closed, or Esc then ⌘R)", async () => {
     const { lib, a, b } = await setup();
     const t0 = Date.now() + 864e5;

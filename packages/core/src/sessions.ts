@@ -22,6 +22,9 @@ export interface SessionReceipt {
   /** Cards that became solid memories this session (stability reached 21 days, D90), as each card's
    *  first skill, so the end screen can show one cut gem in that skill's colour. */
   cut?: string[];
+  /** The longest gap, in whole days, between a card he passed this session and when he last saw it (D177):
+   *  the end screen names it, so spacing's delayed gain is something he sees. */
+  longest_days?: number;
   /** Nothing was left to review when the session ended, so the day's goal counts as met (D60). */
   caught_up?: boolean;
 }
@@ -120,7 +123,9 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
         return "";
       }
     });
-  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(caughtUp ? { caught_up: true } : {}) };
+  const gaps = kept.flatMap((x) => (x.state_before.reps > 0 && x.state_before.last_review ? [Math.floor((Date.parse(x.ts) - Date.parse(x.state_before.last_review)) / 864e5)] : []));
+  const longest = Math.max(0, ...gaps);
+  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
   if (openSessionId(lib) === id) unlinkSync(paths.openSession(lib));
   return r;

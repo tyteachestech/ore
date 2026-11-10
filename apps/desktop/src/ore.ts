@@ -280,7 +280,7 @@ export function levelProgress(k: Pick<Strength, "solid" | "level" | "next_level_
 }
 
 /** `ore due`: one card in queue order. `card` is a Fact, `prompt` an Explain (D43). */
-export type DueEntry = { id: string; kind: "card" | "prompt"; state: "draft" | "live"; item: string; skills: string[]; question: string; relearn: boolean };
+export type DueEntry = { id: string; kind: "card" | "prompt"; state: "draft" | "live"; item: string; skills: string[]; question: string; relearn: boolean; /** null: never reviewed. */ due?: string | null; /** His chance of recalling it now, 0 to 1. */ retrievability?: number };
 
 /** `ore card show`. */
 export type CardFull = {
@@ -309,8 +309,29 @@ export type Grade = { rating: 1 | 2 | 3 | 4; gaps: string[]; feedback: string; c
  *  (the normal state, docs/design/daily-session.md) nearly every card is, so the line would say nothing. */
 export const rescuedWorthSaying = (s: { reviews: number; rescued: number }) => s.rescued > 0 && s.rescued * 2 < s.reviews;
 
+/** How far ahead the closing card may come from, and how likely its recall must be. */
+const LAST_WIN_WINDOW = 10;
+const LAST_WIN_AT = 0.6;
+/** D177: when the goal closes on a miss, the session's last moment is a failure, and hard tasks that come
+ *  last raise quitting (Kang 2022). One more card first: the likeliest recall of the next ten, moved to the
+ *  front. Null when none is likely enough, and the session ends as it did. Never the card just missed or a
+ *  new one. Order only: every card keeps its own schedule (D22). */
+export function lastWin(queue: DueEntry[]): DueEntry[] | null {
+  let best = -1;
+  queue.slice(0, LAST_WIN_WINDOW).forEach((e, i) => {
+    if (!e.relearn && e.due && (e.retrievability ?? 0) >= LAST_WIN_AT && (best < 0 || e.retrievability! > queue[best]!.retrievability!)) best = i;
+  });
+  return best < 0 ? null : [queue[best]!, ...queue.slice(0, best), ...queue.slice(best + 1)];
+}
+
+/** The gap worth naming on the end screen (D177): a week or more. */
+const LONG_GAP_DAYS = 7;
+export const longGapText = (s: { longest_days?: number }) => ((s.longest_days ?? 0) >= LONG_GAP_DAYS ? `You recalled one you last saw ${s.longest_days} days ago` : null);
+
 export type SessionEnd = {
   id: string; reviews: number; kept: number; rescued: number; caught_up?: boolean;
+  /** The longest gap, in days, he recalled a card across this session (D177). */
+  longest_days?: number;
   /** Cards that became solid this session, as each one's first skill (D90): one cut gem each. */
   cut?: string[];
   /** On the week's first end screen (D69): of Explain answers marked Sure, the share the key-point check passed. */
