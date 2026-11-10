@@ -50,8 +50,6 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     drafts.set(q.id, t);
   };
   const [busy, setBusy] = useState(false);
-  /** Parts added from the field: each starts it over, so its undo history never holds a saved one (Grow). */
-  const [saved, setSaved] = useState(0);
   const field = useRef<HTMLTextAreaElement>(null);
   useFocusWhileMounted(field);
   const t = text.trim();
@@ -119,7 +117,6 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
       const question = await ore<Saved["question"]>(...args);
       drafts.delete(q.id);
       setTextState("");
-      setSaved((n) => n + 1);
       setBusy(false);
       onSaved({ question, added: t ? question.answers?.at(-1)?.ts : undefined, again: args }, how);
     } catch (e) {
@@ -164,7 +161,6 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
       {quote && <blockquote className="qa-quote">{quote}</blockquote>}
       <Grow
         ref={field}
-        history={saved}
         className="field"
         aria-label={`Your answer to ${questionText(q)}`}
         placeholder={hasAnswer ? "Add to your answer…" : "Your answer, in your own words…"}
