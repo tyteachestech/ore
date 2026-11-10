@@ -300,7 +300,12 @@ export function useTutorChat(notify: Notify) {
   };
   /** Copies files into the library for the message he is writing (D189): paths (picked, or copied in Finder)
    *  or pasted bytes. One the tutor can't read is refused with the reason; at most four a message. */
+  const [attaching, setAttaching] = useState(0);
   const attach = async (from: (string | { name: string; data: string })[]) => {
+    setAttaching((n) => n + 1);
+    try { await attachEach(from); } finally { setAttaching((n) => n - 1); }
+  };
+  const attachEach = async (from: (string | { name: string; data: string })[]) => {
     for (const f of from) {
       if ((draftNow.current.files?.length ?? 0) >= MAX_FILES) return notify(`A message takes up to ${MAX_FILES} files`, "info");
       try {
@@ -315,7 +320,7 @@ export function useTutorChat(notify: Notify) {
   };
   /** A web page a reply cites, in his browser. */
   const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
-  return { turns, draft, setDraft, carry, drop, ask, stop, retry, attach, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
+  return { turns, draft, setDraft, carry, drop, ask, stop, retry, attach, attaching: attaching > 0, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -408,7 +413,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   /** `typed`: the message is what is in the box, so the box empties; a starter or Show me leaves his draft. */
   const send = (text: string, typed = false) => {
     const message = text.trim();
-    if (!message || busy) return;
+    // A file still being copied in goes with this message, so sending waits for it.
+    if (!message || busy || chat.attaching) return;
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
     force.current = true; // what he sends, and its reply, he wants to see
     // What he attached goes with the message he typed, not with a starter or a chip's canned one.
@@ -490,7 +496,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     e.preventDefault();
     const blobs = [...e.clipboardData.files];
     void copiedFiles().then(async (list) => {
-      if (list.length) return chat.attach(list.flatMap((x) => (x.kind === "file" ? [x.path] : [])));
+      const paths = list.flatMap((x) => (x.kind === "file" ? [x.path] : []));
+      if (paths.length) return chat.attach(paths);
       const read = (b: File) => new Promise<{ name: string; data: string }>((ok, no) => {
         const r = new FileReader();
         r.onload = () => ok({ name: b.name && b.name !== "image.png" ? b.name : `Pasted image.${(b.type.split("/")[1] ?? "png").replace("jpeg", "jpg")}`, data: String(r.result).split(",")[1] ?? "" });
@@ -789,7 +796,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
               </button>
             </Hint>
           ) : (
-            <button className="ask-send" aria-label="Send" disabled={!input.trim()} onClick={() => send(input, true)}>
+            <button className="ask-send" aria-label="Send" disabled={!input.trim() || chat.attaching} onClick={() => send(input, true)}>
               <ArrowUp size={14} aria-hidden="true" />
             </button>
           )}

@@ -87,6 +87,10 @@ describe("tutor: what it sees", () => {
     const argv = JSON.parse(readFileSync(join(binDir, "argv.json"), "utf8")) as string[];
     expect(argv[argv.indexOf("--tools") + 1]).toContain("Read");
     await expect(tutor(lib, "and this?", { files: [{ name: "x", path: "../secrets.txt" }] })).rejects.toThrow('no attached file "../secrets.txt"');
+    // An earlier turn's file that is gone is left out, and the follow-up still goes.
+    fakeClaude([out]);
+    await tutor(lib, "go on", { earlier: [{ message: "see this", reply: "Seen.", files: [{ name: "gone.png", path: "chats/files/0000000000000000.png" }] }] });
+    expect((sent().at(-1) as unknown as { earlier: { attached?: unknown }[] }).earlier[0]!.attached).toBeUndefined();
   });
 
   test("a message with no words from the source (\"what's this about?\") still gets its opening", async () => {

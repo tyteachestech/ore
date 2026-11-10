@@ -129,8 +129,11 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
   if (!m) throw new Error("message is empty");
   // Files attached to this message and to the recent ones (D189): the agent reads them from chats/files/, so a
   // follow-up about "the second chart" still has the picture. `attached` names each by its path.
-  const filesOf = (fs: { name: string; path: string }[] = []) => fs.map((f) => ({ name: String(f.name), file: chatFilePath(lib, String(f.path)) }));
-  const attached = filesOf(files);
+  // A file gone from an earlier turn (deleted, or not synced to this Mac yet) is left out; one missing from this message is an error.
+  const filesOf = (fs: { name: string; path: string }[] = [], strict = false) => fs.flatMap((f) => {
+    try { return [{ name: String(f.name), file: chatFilePath(lib, String(f.path)) }]; } catch (e) { if (strict) throw e; return []; }
+  });
+  const attached = filesOf(files, true);
   const recent = earlier.slice(-6).map(({ message, reply, files }) => { const a = filesOf(files); return { message, reply, ...(a.length ? { attached: a } : {}) }; });
   const toRead = [...new Set([...recent.flatMap((t) => t.attached ?? []), ...attached].map((f) => f.file))];
   // The exercise he is answering: the last one set, however long ago, with the card committed then.
