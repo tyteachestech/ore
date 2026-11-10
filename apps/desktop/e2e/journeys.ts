@@ -139,7 +139,7 @@ journey("Home: today's minutes are the big number, and the goal ring stands unfr
     const css = (sel: string) => getComputedStyle(document.querySelector(sel)!);
     return { minutes: css(".home-goal h1 .roll").fontSize, unit: css(".home-goal h1 > span:not(.roll)").fontSize, ring: css(".home-goal .ring").boxShadow };
   });
-  if (look.minutes !== "24px" || look.unit !== "15px") throw new Error(`goal number ${look.minutes}, unit ${look.unit}`);
+  if (look.minutes !== "40px" || look.unit !== "15px") throw new Error(`goal number ${look.minutes}, unit ${look.unit}`);
   if (look.ring !== "none") throw new Error(`goal ring framed: ${look.ring}`);
 });
 
