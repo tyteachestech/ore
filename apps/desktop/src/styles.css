@@ -1216,8 +1216,13 @@ body.resizing iframe { pointer-events: none; }
 .table-add:hover { background: var(--bg-hover); color: var(--muted); }
 .block-drop { position: absolute; z-index: 5; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
 /* Selected blocks (Esc, ⇧↑ ⇧↓, a click on ⋮⋮): Notion's tint in the selection's accent, over an item's bullet too. */
-.note-editor .block-sel { --sel: color-mix(in srgb, var(--accent) 16%, transparent); background: var(--sel); border-radius: 4px; }
-.note-editor li.block-sel { box-shadow: -1.4em 0 0 var(--sel); }
+.note-editor .block-sel { --sel: color-mix(in srgb, var(--accent) 16%, transparent); position: relative; isolation: isolate; }
+/* The tint reaches past the text on every side (Tyler, 2026-11-10: flush with the words it read as too tight), behind it. */
+.note-editor .block-sel::after { content: ""; position: absolute; z-index: -1; inset: -2px -4px -2px -8px; border-radius: 6px; background: var(--sel); pointer-events: none; }
+.note-editor li.block-sel::after { left: calc(-1.4em - 8px); }
+/* A code block and a table scroll sideways, which would clip it: theirs is drawn around them. */
+.note-editor :is(pre, .note-table).block-sel { background: var(--sel); border-radius: 4px; box-shadow: 0 0 0 2px var(--sel); }
+.note-editor :is(pre, .note-table).block-sel::after { content: none; }
 /* A selected diagram shows the tint too, not its own ground in the middle of it. */
 .note-editor .block-sel .note-diagram { background: transparent; }
 /* A drag from beside the note draws Notion's box over the blocks it selects (editor/dragsel.ts). */
