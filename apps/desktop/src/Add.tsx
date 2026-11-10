@@ -121,11 +121,12 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   const feed = useFeedOf(busy ? null : one);
   /** The link is the feed itself: adding it would be refused, so ↵ follows it. */
   const isFeed = !!feed && feed.url === one;
-  const follow = async () => {
-    if (!one || busy) return;
+  /** `link`: the feed, when it isn't the one in the box (the link he copied, offered and taken with ↵). */
+  const follow = async (link = one) => {
+    if (!link || busy) return;
     setBusy(true);
     setError(null);
-    const why = await onFollow(one, picked);
+    const why = await onFollow(link, picked);
     if (!open.current) return why ? notify(why, "error") : undefined;
     setBusy(false);
     if (!why) return onClose();
@@ -152,7 +153,8 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
     if (!open.current) return failure ? notify(failure, "error") : undefined;
     // ↵ before the preview knew the link is a feed itself, which can't be added as a source: follow it (D107).
     // Still busy while it looks, so nothing else starts meanwhile.
-    if (failure && !cancelled && one && what === list && (await ore<FoundFeed>("feed", "find", one).catch(() => null))?.url === one) return open.current ? follow() : undefined;
+    const link = what.length === 1 && what[0]!.kind === "link" ? what[0]!.url : null;
+    if (failure && !cancelled && link && (await ore<FoundFeed>("feed", "find", link).catch(() => null))?.url === link) return open.current ? follow(link) : undefined;
     if (!open.current) return notify(failure ?? "", "error");
     setBusy(false);
     // Cancelled from the toast: the box stays with what didn't go in, to fix or add again.

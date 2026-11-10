@@ -7,7 +7,7 @@ import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
 import { stampBefore } from "./transcript";
-import { errorText, focusPicked, type Notify } from "./util";
+import { errorText, focusPicked, stepLabel, type Notify } from "./util";
 import { Matrix, useLate, Working } from "./Working";
 import { PixelBurst } from "./Burst";
 
@@ -694,7 +694,7 @@ function QuizPanel({ segments, onClose, panelRef, children }: { segments?: strin
     <section className="quiz" aria-label="Quiz" ref={panelRef} tabIndex={-1}>
       <div className="quiz-head">
         {segments ? (
-          <div className="quiz-steps" role="img" aria-label={`Step ${segments.filter((s) => s === "done").length + 1} of ${segments.length}`}>
+          <div className="quiz-steps" role="img" aria-label={stepLabel(segments)}>
             {segments.map((s, i) => (
               <span key={i} className={s} />
             ))}

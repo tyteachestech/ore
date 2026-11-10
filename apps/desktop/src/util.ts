@@ -127,3 +127,6 @@ export function useLibraryChanges(): number {
   }, []);
   return n;
 }
+
+/** A progress bar in words (the finish quiz's): the step he is on, never one past the last once every step is done. */
+export const stepLabel = (segments: string[]) => `Step ${Math.min(segments.filter((s) => s === "done").length + 1, segments.length)} of ${segments.length}`;

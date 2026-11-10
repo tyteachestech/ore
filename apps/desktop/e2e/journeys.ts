@@ -4233,6 +4233,14 @@ journey("add box: a feed's own link followed by ↵ at once follows it, without 
     await page.keyboard.press("Enter");
     await until("the feed is followed", async () => ((await ore("feed")) as { feeds: { url: string }[] }).feeds.some((f) => f.url === feed), 6000);
     if (await page.getByText("not one episode or post").count()) throw new Error("the box refused a feed link it can follow");
+    // The same link, offered as the one he copied: ↵ follows it too.
+    await ore("feed", "unfollow", feed);
+    await page.keyboard.press("Escape");
+    await page.evaluate((u) => (window as unknown as { __copy: (t: string) => Promise<void> }).__copy(u), feed);
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByText("The link you copied").waitFor();
+    await page.keyboard.press("Enter");
+    await until("the copied feed link is followed", async () => ((await ore("feed")) as { feeds: { url: string }[] }).feeds.some((f) => f.url === feed), 6000);
   } finally {
     await ore("feed", "unfollow", feed).catch(() => {});
     server.stop(true);
