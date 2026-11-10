@@ -2672,7 +2672,7 @@ journey("home: arrows move between skill tiles and Continue reading, from the fo
   await until("an arrow with nothing focused picks the first", async () => (await focused()) !== null);
 });
 
-journey("⌘K is the same whatever row is selected: it follows what is open, never the selection (D176)", async (page) => {
+journey("⌘K is the same whatever row is selected: it follows what is open, never the selection (D178)", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const named = () => page.locator("[cmdk-item]").filter({ hasText: /^(Archive|Rename|Pin to top|Copy|File|Remove|Move) (“|\d+ sources)/ }).count();
   const look = async (query: string) => {

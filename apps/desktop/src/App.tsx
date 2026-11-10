@@ -1720,7 +1720,7 @@ export function App() {
     ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, run: () => void archiveSource(r) }]),
   ];
 
-  /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D176): a row's
+  /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178): a row's
    *  actions are on its ⋯ and its right-click. */
   const actions: Action[] = [
     // An open source: the same actions as its ⋯ menu; "Rename…" edits the title in place.
