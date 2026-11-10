@@ -123,6 +123,8 @@
 .panel, .popover, .popover.menu, .popup, .quiz, .settings-sheet { border-radius: 12px; }
 .toast, .mynotes-text, .review-passage, .quiz-answer, .quiz-leave, .quiz-verdict, .skill-badge { border-radius: 10px; }
 .gem-ring-lv { border-radius: 999px; }
+/* On the phone a reading row is a full-width line with a hairline under it (iOS list), so it keeps straight ends. */
+.phone .home-read { border-radius: 0; }
 .chip { background: transparent; box-shadow: inset 0 0 0 1px var(--border); font-size: 11px; }
 
 /* Primary buttons: flat paper white, mono caps (claude.dev's "Try Claude Code"). */
