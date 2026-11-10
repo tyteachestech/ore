@@ -540,7 +540,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
             </label>
           </fieldset>
         ) : null}
-        <p className="quiet">Its cards stay and keep coming up in review.</p>
+        <p className="quiet">Its exercises stay and keep coming up in review.</p>
         <div className="skill-edit-foot">
           <span className="right">
             <button className="quiz-ghost small" onClick={() => onDone(false)}>

@@ -215,6 +215,6 @@ export function reminderNote(lib: Library, now = new Date()): { notify: boolean;
   return {
     notify: !!t.reminder && t.counts && !t.met && t.due > 0,
     title: t.plan ? `After ${t.plan}, I review.` : "Time for today’s review",
-    body: `About ${Math.max(1, Math.round(t.slice_ms / 60_000))} min of your most urgent cards.`,
+    body: `About ${Math.max(1, Math.round(t.slice_ms / 60_000))} min of your most urgent exercises.`,
   };
 }

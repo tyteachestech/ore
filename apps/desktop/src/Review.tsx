@@ -588,14 +588,14 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       const { id, state } = card;
       retired.current.add(id);
       notify(
-        entry?.state === "draft" ? "Card deleted" : "Card retired",
+        entry?.state === "draft" ? "Exercise deleted" : "Exercise retired",
         "info",
         async () => {
           if (state === "retired") return;
           dropAhead();
           return ore("card", "restore", id, opt("state", state)).then(() => {
             retired.current.delete(id);
-            notify("Card restored. It comes back in a later review.");
+            notify("Exercise restored. It comes back in a later review.");
           });
         },
         () => (dropAhead(), ore("card", "retire", id).then(() => void retired.current.add(id))),
@@ -668,7 +668,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     }
     if (undoable) {
       const put = (w: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false);
-      notify("Card edit", "quiet", put(was), put({ question, answer, rubric }));
+      notify("Exercise edit", "quiet", put(was), put({ question, answer, rubric }));
     }
   };
 
@@ -849,7 +849,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
       {/* VoiceOver hears each new card and when the AI's marks arrive, not only the end screen. */}
       <div className="sr-only" aria-live="polite">
-        {card && !end && queue?.length ? `Card ${done + 1} of ${done + left}. ${card.question}${grade ? `. Marked ${grade.covered.filter(Boolean).length} of ${grade.covered.length} key points` : ""}` : ""}
+        {card && !end && queue?.length ? `Exercise ${done + 1} of ${done + left}. ${card.question}${grade ? `. Marked ${grade.covered.filter(Boolean).length} of ${grade.covered.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
         {error && (
@@ -867,7 +867,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
             )}
           </p>
         )}
-        {!error && !end && (!queue || (entry && !card)) && <p className="loading"><Working label="Getting your cards…" /></p>}
+        {!error && !end && (!queue || (entry && !card)) && <p className="loading"><Working label="Getting your exercises…" /></p>}
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick)}</p>}
 
@@ -880,7 +880,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                 <SkillChip key={s} skill={skillOf(s)} />
               ))}
               {entry.state === "draft" && (
-                <Hint text="First time you see this card">
+                <Hint text="First time you see this exercise">
                   <span className="review-new">New</span>
                 </Hint>
               )}
@@ -1071,27 +1071,27 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                       <ChatCircleDots size={14} aria-hidden="true" />
                     </button>
                   </Hint>
-                  <Hint text="Edit card" keys="edit-card" side="top">
-                    <button aria-label="Edit card" onClick={edit}>
+                  <Hint text="Edit exercise" keys="edit-card" side="top">
+                    <button aria-label="Edit exercise" onClick={edit}>
                       <PencilSimple size={14} aria-hidden="true" />
                     </button>
                   </Hint>
                   {card.variant && (
-                    <Hint text="Bad version: show the original card" keys="bad-version" side="top">
+                    <Hint text="Bad version: show the original exercise" keys="bad-version" side="top">
                       <button aria-label="Bad version" disabled={busy} onClick={() => void badVersion()}>
                         <ThumbsDown size={14} aria-hidden="true" />
                       </button>
                     </Hint>
                   )}
                   {entry.state === "draft" ? (
-                    <Hint text="Delete card" keys="retire-card" side="top">
-                      <button aria-label="Delete card" onClick={() => void retire()}>
+                    <Hint text="Delete exercise" keys="retire-card" side="top">
+                      <button aria-label="Delete exercise" onClick={() => void retire()}>
                         <Trash size={14} aria-hidden="true" />
                       </button>
                     </Hint>
                   ) : (
-                    <Hint text="Retire card: it won’t come back" keys="retire-card" side="top">
-                      <button aria-label="Retire card" onClick={() => void retire()}>
+                    <Hint text="Retire exercise: it won’t come back" keys="retire-card" side="top">
+                      <button aria-label="Retire exercise" onClick={() => void retire()}>
                         <Archive size={14} aria-hidden="true" />
                       </button>
                     </Hint>
@@ -1131,7 +1131,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 /** Why a session has no cards, honestly: the pick leaves out skills with cards due, or the daily limits hold
  *  new cards back (D65), and only then "nothing is due". */
 function nothingDue(t: Today | null, pick: string[] | null): string {
-  if (pick && t && t.due > 0) return `Nothing is due in the skills you picked today. ${t.due} ${t.due === 1 ? "card waits" : "cards wait"} in the others.`;
+  if (pick && t && t.due > 0) return `Nothing is due in the skills you picked today. ${t.due} ${t.due === 1 ? "exercise waits" : "exercises wait"} in the others.`;
   return t?.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Nothing is due right now.";
 }
 
@@ -1203,7 +1203,7 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
         <button className="quiz-ghost" aria-disabled={busy || undefined} onClick={() => !busy && onCancel()}>
           Cancel
         </button>
-        <Hint text="Save card" keys="finish" side="top">
+        <Hint text="Save exercise" keys="finish" side="top">
           <button className="pill-btn quiz-go" disabled={busy || !ok} onClick={onSave}>
             Save
           </button>

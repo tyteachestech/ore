@@ -363,7 +363,7 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
 }
 
 function subline(t: Today): string {
-  if (!t.counts) return t.due ? "Today is off. Cards are ready if you feel like it." : "Today is off.";
+  if (!t.counts) return t.due ? "Today is off. Exercises are ready if you feel like it." : "Today is off.";
   // Caught up short of the goal still counts (D60); say why, or a full ring beside "<1 of 10" reads as a bug.
   if (t.met && t.active_ms < t.goal_ms) return t.new_waiting ? `All caught up, so today counts. ${waiting(t)}` : "All caught up, so today counts.";
   if (t.met) return t.caught_up ? (t.new_waiting ? `Goal met. ${waiting(t)}` : "Goal met and all caught up.") : "Goal met. Anything more is a bonus.";
@@ -374,8 +374,8 @@ function subline(t: Today): string {
 /** New cards the daily limits held back (D65), so "caught up" never reads as "there's nothing left". */
 export function waiting(t: Today): string {
   const n = t.new_waiting;
-  const cards = `${n} new card${n === 1 ? "" : "s"}`;
-  if (!t.new_per_day) return `${cards} wait. New cards are off in Settings.`;
+  const cards = `${n} new exercise${n === 1 ? "" : "s"}`;
+  if (!t.new_per_day) return `${cards} wait. New exercises are off in Settings.`;
   // New cards only take the goal time due cards leave (D65), so past a day's worth say that, not "up to 10 a day".
   return n <= t.new_per_day ? `${cards} start${n === 1 ? "s" : ""} tomorrow.` : `${cards} wait. A few start each day, as your goal leaves room.`;
 }

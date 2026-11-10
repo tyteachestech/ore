@@ -42,8 +42,8 @@ const LABEL: Partial<Record<KeyId, string>> = {
   rename: "Rename Source…",
   path: "Copy Path",
   shortcuts: "Keyboard Shortcuts",
-  ask: "Ask About This Card…",
-  "edit-card": "Edit Card…",
+  ask: "Ask About This Exercise…",
+  "edit-card": "Edit Exercise…",
 };
 
 const binding = (id: KeyId) => BINDINGS.find((b) => b.id === id)!;

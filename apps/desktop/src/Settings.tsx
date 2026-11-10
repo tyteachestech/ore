@@ -111,7 +111,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     if (step) notify(step.message, "quiet", step.undo, step.redo);
   };
   /** What each goal setting is called in an Undone toast. */
-  const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New cards a day", plan: "When you review", remix: "Remix cards" };
+  const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New exercises a day", plan: "When you review", remix: "Remix exercises" };
   const setGoal = async <K extends keyof Review>(key: K, flag: string, value: Review[K], record = true): Promise<void> => {
     const d = dataRef.current;
     if (!d) return;
@@ -244,7 +244,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                   <Group title="AI">
                     <Row
                       title="AI provider"
-                      text={data.ai_env ? `Set to ${data.ai_env} by ORE_AI in the app's environment.` : "Drafts cards and checks answers, using the Claude Code or Codex CLI on this Mac."}
+                      text={data.ai_env ? `Set to ${data.ai_env} by ORE_AI in the app's environment.` : "Drafts exercises and checks answers, using the Claude Code or Codex CLI on this Mac."}
                     >
                       <Seg
                         label="AI provider"
@@ -256,7 +256,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                     </Row>
                     <Row
                       title="Model"
-                      text={data.model_env ? `Set to ${data.model_env} by ORE_AI_MODEL in the app's environment.` : "The model that drafts cards, writes questions and checks answers."}
+                      text={data.model_env ? `Set to ${data.model_env} by ORE_AI_MODEL in the app's environment.` : "The model that drafts exercises, writes questions and checks answers."}
                     >
                       <SelectMenu
                         label="Model"
@@ -273,7 +273,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                     </Group>
                   )}
                   <Group title="Library">
-                    <Row title="Library folder" text="Your sources, notes and cards, kept as plain files.">
+                    <Row title="Library folder" text="Your sources, notes and exercises, kept as plain files.">
                       <Hint text={data.library}>
                         <span className="settings-path">{home(data.library)}</span>
                       </Hint>
@@ -307,9 +307,9 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                       <Switch.Thumb className="switch-thumb" />
                     </Switch.Root>
                   </Row>
-                  <Row title="New cards a day" text="Cards seen for the first time each day. Reviews are never capped.">
+                  <Row title="New exercises a day" text="Exercises seen for the first time each day. Reviews are never capped.">
                     <Seg
-                      label="New cards a day"
+                      label="New exercises a day"
                       value={String(data.review.new_per_day)}
                       options={NEW.map((m) => ({ id: String(m), label: String(m) }))}
                       onChange={(v) => void setGoal("new_per_day", "new-per-day", Number(v))}
@@ -328,7 +328,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                 </Group>
               )}
               <Group title="Quick quiz">
-                <Row title="Shortcut" text="Press it in any app for a card or two while you wait. It counts toward today’s goal; Esc puts it away.">
+                <Row title="Shortcut" text="Press it in any app for an exercise or two while you wait. It counts toward today’s goal; Esc puts it away.">
                   <QuizShortcut notify={notify} />
                 </Row>
                 <Row title="Show in menu bar" text="A click on the icon opens the quick quiz." htmlFor="tray">
@@ -355,8 +355,8 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                 </Row>
               </Group>
               {data && (
-                <Group title="Cards">
-                  <Row title="Remix cards" text="Cards you know come back as new questions on the same idea, so you apply it instead of reciting it." htmlFor="remix">
+                <Group title="Exercises">
+                  <Row title="Remix exercises" text="Exercises you know come back as new questions on the same idea, so you apply it instead of reciting it." htmlFor="remix">
                     <Switch.Root id="remix" className="switch" checked={data.review.remix} onCheckedChange={(v) => void setGoal("remix", "remix", v)}>
                       <Switch.Thumb className="switch-thumb" />
                     </Switch.Root>

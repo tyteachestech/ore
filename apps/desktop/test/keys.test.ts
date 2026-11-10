@@ -90,9 +90,9 @@ describe("shortcut editor: Review's keys", () => {
 
   test("Review's rating and confidence digits are taken for every key that works in Review", () => {
     resetKeys();
-    expect(rebind("edit-card", "Digit1")).toBe("1 rates the card in Review");
-    expect(rebind("ask", "Digit4")).toBe("4 rates the card in Review");
-    expect(rebind("undo", "Digit2")).toBe("2 rates the card in Review");
+    expect(rebind("edit-card", "Digit1")).toBe("1 rates the exercise in Review");
+    expect(rebind("ask", "Digit4")).toBe("4 rates the exercise in Review");
+    expect(rebind("undo", "Digit2")).toBe("2 rates the exercise in Review");
     expect(isCustom("edit-card") || isCustom("ask") || isCustom("undo")).toBe(false);
     expect(rebind("edit-card", "Digit5")).toBeNull();
     resetKeys();

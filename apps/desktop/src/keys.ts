@@ -54,10 +54,10 @@ const DEFAULTS = [
   { id: "passage-prev", label: "Previous supporting passage", group: "Quiz", combo: "ArrowUp" },
   { id: "no-idea", label: "No idea", group: "Review", combo: "Meta+Backspace", global: true },
   { id: "in-head", label: "Answered in my head", group: "Review", combo: "Alt+Enter", global: true },
-  { id: "edit-card", label: "Edit card", group: "Review", combo: "KeyE" },
-  { id: "retire-card", label: "Retire card", group: "Review", combo: "Shift+Meta+Backspace", global: true },
-  { id: "ask", label: "Ask about this card", group: "Review", combo: "Slash" },
-  { id: "bad-version", label: "Bad version: show the original card", group: "Review", combo: "KeyB" },
+  { id: "edit-card", label: "Edit exercise", group: "Review", combo: "KeyE" },
+  { id: "retire-card", label: "Retire exercise", group: "Review", combo: "Shift+Meta+Backspace", global: true },
+  { id: "ask", label: "Ask about this exercise", group: "Review", combo: "Slash" },
+  { id: "bad-version", label: "Bad version: show the original exercise", group: "Review", combo: "KeyB" },
   { id: "play", label: "Play / pause", group: "Video and listening", combo: "Space" },
   { id: "back", label: "Back 15 seconds", group: "Video and listening", combo: "ArrowLeft" },
   { id: "forward", label: "Forward 30 seconds", group: "Video and listening", combo: "ArrowRight" },
@@ -279,7 +279,7 @@ export function invalid(id: KeyId, combo: Combo): string | null {
   if (MAC[combo]) return `${label(combo)} is the Mac's ${MAC[combo]}`;
   if (APP[combo] && !("scope" in b)) return `${label(combo)} is ${APP[combo]}`;
   // Review's fixed 1–4 (the rating, and 1–3 for how sure) go before any binding there.
-  if (/^Digit[1-4]$/.test(combo) && (IN_REVIEW.has(id) || IN_REVIEW_TOO.has(id))) return `${label(combo)} rates the card in Review`;
+  if (/^Digit[1-4]$/.test(combo) && (IN_REVIEW.has(id) || IN_REVIEW_TOO.has(id))) return `${label(combo)} rates the exercise in Review`;
   return null;
 }
 

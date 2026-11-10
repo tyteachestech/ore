@@ -12,7 +12,7 @@ type Proposal = { question: string; answer: string };
 type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null; was?: Proposal };
 type Reply = { reply: string; proposal: Proposal | null; session: string };
 
-const STARTERS = ["Why is this the answer?", "Give me an example", "Make this card clearer"];
+const STARTERS = ["Why is this the answer?", "Give me an example", "Make this exercise clearer"];
 
 /** One card's chat: what he has typed, the thread, and the AI session. Review keeps it by card id,
  *  so closing Ask (or a reply landing while it is closed) loses nothing. */
@@ -86,11 +86,11 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.text}</ReactMarkdown>
                 {t.proposal && (
                   <div className="ask-card">
-                    <div className="quiz-kicker">Suggested card</div>
+                    <div className="quiz-kicker">Suggested exercise</div>
                     <p className="ask-card-q"><Changes was={t.was?.question} now={t.proposal.question} /></p>
                     <p className="ask-card-a"><Changes was={t.was?.answer} now={t.proposal.answer} /></p>
                     <button className="ask-use" disabled={applied(t.proposal)} onClick={() => void onApply(t.proposal!).catch(() => {})}>
-                      {applied(t.proposal) ? "Card updated" : "Use this card"}
+                      {applied(t.proposal) ? "Exercise updated" : "Use this exercise"}
                     </button>
                   </div>
                 )}
@@ -128,8 +128,8 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
           ref={field}
           rows={1}
           className="field"
-          aria-label="Ask about this card"
-          placeholder={turns.length ? "Ask a follow-up…" : "Ask about this card…"}
+          aria-label="Ask about this exercise"
+          placeholder={turns.length ? "Ask a follow-up…" : "Ask about this exercise…"}
           value={input}
           onChange={(e) => { const v = e.target.value; setChat((c) => ({ ...c, input: v })); }}
           onKeyDown={(e) => {

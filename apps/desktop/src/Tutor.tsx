@@ -182,14 +182,14 @@ export function useTutorChat(notify: Notify) {
       const c = await ore<{ id: string }>("tutor-card", item, opt("card", JSON.stringify(t.card)), opt("ai", JSON.stringify(t.ai)));
       mark(c.id);
       notify(
-        "Card added",
+        "Exercise added",
         "quiet",
         () => ore("card", "retire", c.id).then(() => mark(undefined)),
         () => ore("card", "restore", c.id, "--state=draft").then(() => mark(c.id)),
       );
     } catch (e) {
       mark(undefined);
-      notify(errorText(e, "add that card"), "error");
+      notify(errorText(e, "add that exercise"), "error");
     }
   };
   /** Puts words he selected in a reply into the note of the source it is about, as a quote under "From the
@@ -410,7 +410,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
       )}
       <ChatList chat={chat} onPicked={() => field.current?.focus()} />
       <div className="tutor-head">
-        <Hint text={quizSkills.length ? `Review your due cards in ${quizSkills.map((s) => skills.find((k) => k.id === s)?.name ?? s).join(", ")}` : "Review your due cards"}>
+        <Hint text={quizSkills.length ? `Review your due exercises in ${quizSkills.map((s) => skills.find((k) => k.id === s)?.name ?? s).join(", ")}` : "Review your due exercises"}>
           <button className="tutor-quiz" onClick={() => onQuiz(quizSkills)}>Quiz me</button>
         </Hint>
         <Hint text="New chat">
@@ -506,8 +506,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
                         )}
                         {t.card && (firstSource(t.citations) ?? t.item) && (
                           <Hint text={t.kept && t.kept !== "adding" ? "In review from tomorrow" : t.card.question}>
-                            <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Card added" : `Add card: ${t.card.question}`} disabled={!!t.kept} onClick={() => void chat.keep(t.id)}>
-                              {t.kept ? <><Check size={12} aria-hidden="true" />Card added</> : <><Plus size={12} aria-hidden="true" />Card</>}
+                            <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Exercise added" : `Add exercise: ${t.card.question}`} disabled={!!t.kept} onClick={() => void chat.keep(t.id)}>
+                              {t.kept ? <><Check size={12} aria-hidden="true" />Exercise added</> : <><Plus size={12} aria-hidden="true" />Exercise</>}
                             </button>
                           </Hint>
                         )}
@@ -526,9 +526,9 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           const done = () => (document.getSelection()?.removeAllRanges(), setPicked(null));
           return (
             <div className={`tutor-sel${picked.below ? " below" : ""}`} role="toolbar" aria-label="Selected words" style={{ left: picked.x, top: picked.y }} onMouseDown={(e) => e.preventDefault()}>
-              <Hint text="The tutor writes it as a card to keep">
+              <Hint text="The tutor writes it as an exercise to keep">
                 <button onClick={() => { send(`Make a card from this: “${picked.text}”`); done(); }}>
-                  <Plus size={12} aria-hidden="true" />Card
+                  <Plus size={12} aria-hidden="true" />Exercise
                 </button>
               </Hint>
               {item && (

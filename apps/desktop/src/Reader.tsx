@@ -219,13 +219,13 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
       setDraft(null);
       setLabel("");
       notify(
-        "Card made",
+        "Exercise made",
         "info",
         () => ore("card", "retire", c.id).then(() => setCards((cs) => cs.filter((x) => x.id !== c.id))),
         () => ore("card", "restore", c.id, "--state=draft").then(() => setCards((cs) => [...cs.filter((x) => x.id !== c.id), made])),
       );
     } catch (e) {
-      notify(`Couldn’t make the card: ${errorText(e)}`, "error");
+      notify(`Couldn’t make the exercise: ${errorText(e)}`, "error");
     } finally {
       setBusy(false);
     }
@@ -320,14 +320,14 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
           if (b && (b[2] * w < 6 || b[3] * h < 6)) setDraft(null); // a slip, not a box
         }}
       />
-      {shown && cards.map((c) => <div key={c.id} className="figure-box saved" style={place(c.box)} aria-label={`Card: ${c.answer}`} role="img" />)}
+      {shown && cards.map((c) => <div key={c.id} className="figure-box saved" style={place(c.box)} aria-label={`Exercise: ${c.answer}`} role="img" />)}
       {shown && draft && <div className="figure-box draft" style={place(draft)} />}
       {shown && draft && !dragging && (
         <div className="popover figure-label" style={{ left: left + (draft[0] + draft[2] / 2) * w, top: below ? top + (draft[1] + draft[3]) * h + 8 : top + draft[1] * h - 8, translate: below ? "-50% 0" : "-50% -100%" }} onClick={stop}>
           <input className="field" autoFocus aria-label="What’s under the box" placeholder="What’s under it?" value={label} disabled={busy} onChange={(e) => setLabel(e.target.value)} />
         </div>
       )}
-      {shown && !draft && <div className="figure-tip">Drag over a part to make a card of it</div>}
+      {shown && !draft && <div className="figure-tip">Drag over a part to make an exercise of it</div>}
     </div>,
     document.body,
   );

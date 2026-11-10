@@ -1,6 +1,6 @@
 # Ore — agent working agreement
 
-Ore is a Mac-first, AI-first, local-files personal learning app: capture anything (its core promise, below) → read → highlight → AI-drafted prompts and cards → FSRS review → skill-level stats. Owner: Tyler. Single user.
+Ore is a Mac-first, AI-first, local-files personal learning app: capture anything (its core promise, below) → read → highlight → AI-drafted exercises → FSRS review → skill-level stats. Owner: Tyler. Single user.
 
 ## Read first
 - `docs/DECISIONS.md` — settled decisions, by D-number: grep the ones your change touches. Do not reopen them; propose changes explicitly.
@@ -26,6 +26,7 @@ Ore's core promise is that whatever someone learns from imports as fully and rob
 - A bug fix starts with a test that fails without it: write the test, watch it fail, then fix. A bug no test caught is a gap in the suite, so the test goes where its kind would be caught next time (a core test, an intake case and grid cell, or an e2e journey). If no test can reach it (a macOS-only API, pixels), say why in the PR.
 - Intake (D96): a new content type, or a fix to how one imports, lands with a saved example in `packages/core/test/fixtures/intake/` (one we may share: openly licensed, written for Ore, or a page's markup with its words rewritten by `rewrite-page.ts`) and a case in `test/intake.test.ts` (title, author, date, phrases from start to end, headings, images, code), and fills its row in `test/intake-grid.test.ts` (every type × every hazard: a test, n/a, or a named gap). Never save a page that isn't the content: refuse it with the next step. `packages/core/test/golden.test.ts` keeps each sample's whole doc.md: a change shows as a diff in the PR, saved on purpose with `bun run golden:update`. `bun run intake:live` checks the real sites.
 - TypeScript strict. Bun runtime, one version everywhere: CI's `bun-version` in `.github/workflows/test.yml` is the Bun on Tyler's Mac (1.4.4, Tyler 2026-11-07, after a download that only broke on his older Bun); bump both together. React for UI. Tauri 2 for the shell. Tiny Swift CLI helpers only where macOS APIs are unavoidable, compiled with `swiftc`.
+- Names (D43, D181): what review brings back is an **exercise** (kinds Fact and Explain) in everything the app shows and in new docs, never a card or flashcard; a ★ highlight is a Key point. Files, the CLI, key ids and code keep `card`. `apps/desktop/test/names.test.ts` checks the app's strings.
 - Commit task-related work with clear messages; keep unrelated edits out.
 - Shipping (`docs/WORKFLOW.md`): merge your own PR once CI is green and `/code-review` is clean, then pull `~/Developer/ore` on the Mac, which reinstalls the app. `~/Developer/ore` stays on `master`; branches live in worktrees. Git housekeeping is yours, never Tyler's.
 

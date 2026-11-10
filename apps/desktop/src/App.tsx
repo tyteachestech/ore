@@ -2228,7 +2228,7 @@ export function App() {
               setOpenId(null);
               setFinishing(false);
               void refresh();
-              if (item) notify(`Finished “${item.title}” · cards start tomorrow`, "info", () => moveSource(item, "reading", false), () => moveSource(item, "done", false));
+              if (item) notify(`Finished “${item.title}” · exercises start tomorrow`, "info", () => moveSource(item, "reading", false), () => moveSource(item, "done", false));
             }}
             notify={notify}
           />

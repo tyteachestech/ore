@@ -368,7 +368,7 @@ export function SidePanel({ tab, onTab, bodyRef, onBodyMouseDown, children }: { 
             <Hint text="Source note" keys="notes">
               <Tabs.Trigger value="note" data-tone="note"><PixelNote className="card-icon" size={12} aria-hidden="true" />Source note</Tabs.Trigger>
             </Hint>
-            <Hint text="Your cards, questions and keeps from this source" keys="collected">
+            <Hint text="Your highlights, key points and questions from this source" keys="collected">
               <Tabs.Trigger value="questions" data-tone="read"><PixelStack className="card-icon" size={12} aria-hidden="true" />Collected</Tabs.Trigger>
             </Hint>
           </Tabs.List>

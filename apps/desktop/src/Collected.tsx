@@ -14,7 +14,7 @@ export const LABEL: Record<Intent, string> = { keep: "Highlight", card: "Key poi
 export const ICON: Record<Intent, typeof PixelKeep> = { keep: PixelKeep, card: PixelStar, question: PixelQuestion, apply: PixelTry };
 /** What each mark means, said on hover where he picks it. */
 export const MEANS: Record<Intent, string> = {
-  keep: "Cards are planned from your highlights the next day",
+  keep: "Exercises are planned from your highlights the next day",
   card: "Make sure this comes back in review",
   question: "Something to find out",
   apply: "A technique to try on your own work, then check off",

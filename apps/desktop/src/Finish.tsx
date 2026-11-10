@@ -48,7 +48,7 @@ const undrafted = new Map<string, { title: string; run: () => Promise<void> }>()
 function sayUndrafted(notify: Notify, why: string) {
   const left = [...undrafted.values()];
   if (!left.length) return;
-  const what = left.length === 1 ? `Cards for “${left[0]!.title}”` : `Cards for ${left.length} sources`;
+  const what = left.length === 1 ? `Exercises for “${left[0]!.title}”` : `Exercises for ${left.length} sources`;
   const again = () => {
     const runs = [...undrafted.values()];
     undrafted.clear();
@@ -582,7 +582,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             <PixelBurst />
           </span>
           <h2>Source finished</h2>
-          <p>New cards start in tomorrow’s review.</p>
+          <p>New exercises start in tomorrow’s review.</p>
         </div>
       )}
 
@@ -600,7 +600,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           {marked && (
             <div className="quiz-verdict yes quiz-made">
               <div>
-                <b>New cards tomorrow</b>
+                <b>New exercises tomorrow</b>
                 <span>Drafted from what you marked and answered. They start in tomorrow’s review.</span>
               </div>
             </div>
@@ -633,20 +633,20 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <div className="quiz-grow" />
           <div className="quiz-foot">
             {!marked && (
-              <Hint text="Keep it in To read · its questions become cards when you finish" side="top">
+              <Hint text="Keep it in To read · its questions become exercises when you finish" side="top">
                 <button className="quiz-ghost" onClick={() => void keepReading()} disabled={busy}>
                   Keep reading
                 </button>
               </Hint>
             )}
             {nextLesson && (
-              <Hint text={`Draft this lesson’s cards and open “${nextLesson.title}”`} side="top">
+              <Hint text={`Draft this lesson’s exercises and open “${nextLesson.title}”`} side="top">
                 <button className="quiz-ghost" onClick={() => void finish(nextLesson.open)} disabled={busy}>
                   Next lesson
                 </button>
               </Hint>
             )}
-            <Hint text={marked ? "Draft its cards and go back" : "Mark it done · its cards start tomorrow"} keys="finish" side="top">
+            <Hint text={marked ? "Draft its exercises and go back" : "Mark it done · its exercises start tomorrow"} keys="finish" side="top">
               <button className="pill-btn quiz-go wide" onClick={primary} disabled={busy}>
                 Done
               </button>
