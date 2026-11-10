@@ -39,7 +39,9 @@ function startBackground(lib: Library, args: string[], logName: string, started?
   mkdirSync(paths.logs(lib), { recursive: true });
   const log = openSync(join(paths.logs(lib), `${logName}.log`), "a");
   // Compiled into the app (one file), `ore` is process.execPath itself; from a checkout, Bun runs ore.ts.
-  const self = import.meta.dir.startsWith("/$bunfs") ? [process.execPath] : [process.execPath, join(import.meta.dir, "ore.ts")];
+  // Bun.main says which: compiled, it is a path inside the file ("/$bunfs/…"). import.meta.dir does not:
+  // a --bytecode build keeps the checkout's path there (apps/desktop/test/compiled-cli.test.ts).
+  const self = Bun.main.startsWith("/$bunfs") ? [process.execPath] : [process.execPath, join(import.meta.dir, "ore.ts")];
   const proc = Bun.spawn([...self, ...args], {
     cwd: lib.root,
     env: { ...process.env, ORE_LIBRARY: lib.root },
