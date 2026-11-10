@@ -4152,6 +4152,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   };
   await finish();
   // The cart plays only with something to tip (a ring dot this session lit, or a gem it cut).
+  // Whether this library has that depends on the journeys before it, so that the cart mounts at all is
+  // checked in test/end-screen.test.tsx; here it is checked in a real browser when it does play.
   const first = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip .cart"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
   if (first.cart) {
     if (first.mole) throw new Error("the mole is up while the cart is still on the rail");
@@ -4165,9 +4167,11 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   await back();
   // Reduce Motion: the same screen, at once, with no cart.
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await finish();
-  const still = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
-  await page.emulateMedia({ reducedMotion: null });
+  // Set back whatever happens, or every journey after a failure here would run with Reduce Motion on.
+  const still = await (async () => {
+    await finish();
+    return page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
+  })().finally(() => page.emulateMedia({ reducedMotion: null }));
   // A second session only adds minutes, so the ring is at least as full.
   if (still.cart || !still.mole || still.on < after.on) throw new Error(`Reduce Motion: ${JSON.stringify({ still, after })}`);
   await back();
