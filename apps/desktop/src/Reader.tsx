@@ -3155,8 +3155,11 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
 }) {
   const qs = doc.prequestions ?? [];
   const section = useRef<HTMLElement>(null);
+  // Only an ask made while this block is up: a remount (the questions arrive, another source) is not one.
+  const asked = useRef(ask);
   useEffect(() => {
-    if (!ask) return;
+    if (ask === asked.current) return;
+    asked.current = ask;
     setOpen(true);
     section.current?.scrollIntoView({ block: "center" });
     section.current?.querySelector<HTMLElement>(".preq-head")?.focus({ preventScroll: true });

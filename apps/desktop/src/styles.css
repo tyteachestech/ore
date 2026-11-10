@@ -2129,14 +2129,14 @@ button.home-plan:hover { color: var(--text); }
   position: relative; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px;
   color: var(--text-read); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums;
 }
-.collected-chip:hover, .collected-chip[data-state="delayed-open"] { background: var(--bg-hover); color: var(--text); }
+.collected-chip:hover, .collected-chip[data-state="delayed-open"], .collected-chip.reading-for[data-state="open"] { background: var(--bg-hover); color: var(--text); }
 .collected-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 /* D179: the prequestions, in reach from anywhere in the source. One raised card, as the skill fan. */
 .collected-chip.reading-for { white-space: nowrap; }
 .reading-for-card { z-index: 30; width: 340px; max-height: min(60vh, 420px); overflow-y: auto; padding: 8px 14px; border-radius: 10px; background: var(--bg-raised); border: 1px solid var(--border); box-shadow: var(--float); }
 .reading-for-card ol { list-style: none; margin: 0; padding: 0; }
 .reading-for-card li { padding: 6px 0; font-size: 14px; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; }
-.reading-for-card li span { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.reading-for-card li span { margin-top: 2px; font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .collected-chip svg, .collected-tab svg, .collected-list [cmdk-item] svg { color: var(--hue); flex: none; }
 .collected-chip.pop { animation: collected-pop 300ms cubic-bezier(.2, .9, .3, 1) 380ms both; }
 .collected-chip .plus {
