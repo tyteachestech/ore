@@ -1,10 +1,9 @@
-import { expect, test } from "bun:test";
+import { expect, jest, test } from "bun:test";
 import { Window } from "happy-dom";
 import { act } from "react";
 
 // D190 on the end screen itself: the cart is there whenever the session lit a ring dot or cut a gem, the mole
-// waits for it, everything settles, and Reduce Motion shows the settled screen at once. Real timers: the tip
-// takes about three seconds.
+// waits for it, everything settles, and Reduce Motion shows the settled screen at once.
 const w = new Window();
 for (const k of ["window", "document", "HTMLElement", "Node", "MutationObserver", "getComputedStyle", "navigator"] as const) {
   const v = (w as unknown as Record<string, unknown>)[k];
@@ -19,6 +18,7 @@ g.cancelAnimationFrame = (id: number) => clearTimeout(id);
 (w.Element.prototype as unknown as Record<string, unknown>).animate = () => ({ cancel() {} });
 const { createRoot } = await import("react-dom/client");
 const { EndScreen } = await import("../src/Review");
+const { CartTip } = await import("../src/CartTip");
 const { TooltipProvider } = await import("@radix-ui/react-tooltip");
 
 const today = (met: boolean, active_ms: number) => ({ goal_minutes: 10, goal_ms: 600_000, active_ms, met, counts: true, caught_up: false, new_waiting: 0, skills: [] });
@@ -38,28 +38,31 @@ async function mount(e: never) {
 const cheering = (body: HTMLElement) => (body.querySelector(".mole-nose")?.getAttribute("d")?.match(/M/g)?.length ?? 0) === 4;
 
 test("a session that filled the ring and cut a gem: the cart is there, the mole and the gem wait, then all of it settles", async () => {
+  jest.useFakeTimers();
   const s = await mount(end(["ai"]));
   expect(s.q(".review-end.carted .cart-tip .cart")).toBe(1);
   expect(s.q(".review-mole .mole")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(0);
   expect(s.q(".review-cut > span[data-wait]")).toBe(1);
-  let up = 0, cheer = 0;
-  for (const t0 = Date.now(); Date.now() - t0 < 6000 && !(cheer && !s.q(".cart-tip")); ) {
-    await wait(40);
-    if (!up && s.q(".review-mole .mole")) up = Date.now();
-    if (up && !cheer && cheering(s.body)) cheer = Date.now();
+  // A clock the test turns by hand, so the gap between the mole coming up and its cheer is exact on any runner.
+  let up = -1, cheer = -1;
+  for (let t = 0; t < 6000 && !(cheer >= 0 && !s.q(".cart-tip")); t += 20) {
+    await act(async () => void jest.advanceTimersByTime(20));
+    if (up < 0 && s.q(".review-mole .mole")) up = t;
+    if (up >= 0 && cheer < 0 && cheering(s.body)) cheer = t;
   }
+  jest.useRealTimers();
   expect(s.q(".cart-tip")).toBe(0);
   expect(s.q(".cart-ore")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(30);
   expect(s.q(".review-cut > span[data-wait]")).toBe(0);
   // The mole cheers once it is up (560ms), not when the cart has finished leaving.
-  expect(cheer - up).toBeGreaterThan(400);
-  expect(cheer - up).toBeLessThan(800);
+  expect(cheer - up).toBeGreaterThanOrEqual(540);
+  expect(cheer - up).toBeLessThanOrEqual(580);
   await s.done();
 }, 10_000);
 
-test("a gem cut with the ring already full: the ring is full from the start, and only the stone falls", async () => {
+test("a gem cut with the ring already full: the cart still comes, carrying only the stone", async () => {
   const s = await mount(end(["ai"], today(true, 600_000)));
   expect(s.q(".cart-tip .cart")).toBe(1);
   expect(s.q(".dot-ring .on")).toBe(30);
@@ -80,3 +83,19 @@ test("nothing to tip, or Reduce Motion: no cart, and the mole, the ring and the 
   expect(still.q(".review-cut > span[data-wait]")).toBe(0);
   await still.done();
 });
+
+test("an ore whose ring dot is missing still counts, so the ring is told it is full", async () => {
+  const body = document.createElement("div");
+  body.className = "review-body";
+  body.innerHTML = `<div class="host"><div class="ring"><svg class="dot-ring"><circle></circle></svg></div></div>`;
+  document.body.appendChild(body);
+  const host = body.querySelector<HTMLElement>(".host")!, slot = document.createElement("div");
+  host.appendChild(slot);
+  const root = createRoot(slot);
+  let poured = 0;
+  await act(async () => root.render(<CartTip host={host} lit={[0, 7]} stones={[]} onStone={() => {}} onPoured={() => poured++} onLeave={() => {}} onDone={() => {}} />));
+  for (const t0 = Date.now(); Date.now() - t0 < 4000 && !poured; ) await wait(40);
+  expect(poured).toBe(1);
+  expect(body.querySelectorAll(".dot-ring .on").length).toBe(1);
+  await act(async () => (root.unmount(), body.remove()));
+}, 10_000);

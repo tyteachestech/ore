@@ -1237,8 +1237,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     return !quick && !PHONE && !document.hidden && !still() && (dots.length > 0 || shown.length > 0) ? dots : null;
   });
   // cart: rolling and pouring · poured: the ring is full · leaving: the mole comes up · done: the cart has gone.
-  // With no ore to pour (only a gem was cut) the ring is already what it will be.
-  const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(!pour ? "done" : pour.length ? "cart" : "poured");
+  const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
   const [mood, setMood] = useState<"peek" | "cheer">(pour ? "peek" : "cheer");
   // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that.

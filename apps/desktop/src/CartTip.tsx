@@ -59,9 +59,9 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
     const hb = host.getBoundingClientRect(), rb = ring.getBoundingClientRect(), bb = { left: body.getBoundingClientRect().left + body.clientLeft, width: body.clientWidth };
     el.style.left = `${bb.left - hb.left}px`;
     el.style.width = `${bb.width}px`;
-    // Where a thing is in the layer, measured against the layer as it is now: the end screen is still sliding in
-    // when the cart mounts, and the window can scroll or resize while it plays.
-    const at = (r: DOMRect) => { const o = el.getBoundingClientRect(); return { x: r.left - o.left + r.width / 2, y: r.top - o.top + r.height / 2 }; };
+    // Where a thing is in the layer, measured against the layer as it is at that throw: the end screen is still
+    // sliding in when the cart mounts, and the page can scroll while it plays.
+    const at = (r: DOMRect, o: DOMRect) => ({ x: r.left - o.left + r.width / 2, y: r.top - o.top + r.height / 2 });
     const cart = el.querySelector<SVGSVGElement>(".cart")!, rail = el.querySelector<HTMLElement>(".cart-rail")!, bucket = el.querySelector<SVGGElement>(".cart-bucket")!;
     const wheels = [...el.querySelectorAll<SVGGElement>(".cart-wheel")], heap = [...el.querySelectorAll<SVGCircleElement>(".cart-ore-in")], roughIn = [...el.querySelectorAll<SVGGElement>(".cart-rough-in")];
     const roughs = [...el.querySelectorAll<HTMLElement>(".cart-rough")], lip = el.querySelector<SVGCircleElement>(".cart-lip")!;
@@ -85,8 +85,8 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
       }
       frame = flying.length ? requestAnimationFrame(tick) : 0;
     };
-    const fly = (node: HTMLElement, ours: boolean, to: { x: number; y: number }, spin: number, land: () => void) => {
-      const from = at(lip.getBoundingClientRect());
+    const fly = (node: HTMLElement, ours: boolean, target: Element, spin: number, land: () => void) => {
+      const o = el.getBoundingClientRect(), from = at(lip.getBoundingClientRect(), o), to = at(target.getBoundingClientRect(), o);
       const dy = to.y - from.y, T = flight(dy);
       node.style.transform = `translate3d(${from.x}px, ${from.y}px, 0)`;
       node.hidden = false;
@@ -102,10 +102,10 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
     play(rail, [{ opacity: 0 }, { opacity: 1 }], { duration: T2, easing: OUT });
     roll(-(stop + W + 20), 0, MOMENT, OUT);
     // Its own momentum throws the bucket forward as it stops.
-    later(500, () => play(bucket, [{ transform: "rotate(0deg)" }, { transform: "rotate(58deg)" }], { duration: T4, easing: SPRING }));
+    later(MOMENT - 100, () => play(bucket, [{ transform: "rotate(0deg)" }, { transform: "rotate(58deg)" }], { duration: T4, easing: SPRING }));
 
     const circles = [...ring.querySelectorAll("circle")], gap = lit.length ? Math.max(18, Math.min(60, 600 / lit.length)) : 0;
-    const POUR = 780, poured = POUR + lit.length * gap, stoned = poured + stones.length * 130;
+    const POUR = MOMENT + 180, poured = POUR + lit.length * gap, stoned = poured + stones.length * 130;
     let left = lit.length;
     lit.forEach((n, k) => later(POUR + k * gap, () => {
       // The heap drains as the ore leaves.
@@ -117,7 +117,7 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
       ore.className = "cart-ore";
       ore.hidden = true;
       el.appendChild(ore);
-      fly(ore, true, at(c.getBoundingClientRect()), 0, () => {
+      fly(ore, true, c, 0, () => {
         // The ore is the ring's dot from here: it lights where it landed, with the squash of a landing.
         c.classList.add("on");
         anims.push(c.animate([{ transform: "scale(1.55)" }, { transform: "scale(1)" }], { duration: T4, easing: OUT }));
@@ -130,14 +130,15 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
       const slot = host.querySelectorAll(".review-cut > span")[i]?.querySelector(".gem");
       const rough = roughs[i];
       if (!slot || !rough) return calls.current.onStone(i);
-      fly(rough, false, at(slot.getBoundingClientRect()), 220, () => calls.current.onStone(i));
+      fly(rough, false, slot, 220, () => calls.current.onStone(i));
     }));
 
     // Emptied, the bucket drops back and the cart rolls off the other way out.
     later(stoned + 160, () => play(bucket, [{ transform: "rotate(58deg)" }, { transform: "rotate(0deg)" }], { duration: T4, easing: OUT }));
     later(stoned + 340, () => {
-      // It gathers speed across the screen; nothing waits on it (the mole is already coming up).
-      roll(0, bb.width - stop + 20, MOMENT, IN_OUT);
+      // It gathers speed across the screen: the roll runs twice as far as the window's edge, so the cart crosses
+      // the edge at the curve's fastest and is clipped there. Nothing waits on it (the mole is already coming up).
+      roll(0, 2 * (bb.width - stop + 20), MOMENT, IN_OUT);
       play(rail, [{ opacity: 1 }, { opacity: 0 }], { duration: T4, delay: 260, easing: OUT });
     });
     later(stoned + 520, () => calls.current.onLeave());
