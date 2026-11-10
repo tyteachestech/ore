@@ -1,5 +1,5 @@
 import { ArrowUp, Sparkle } from "./icons";
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
@@ -42,10 +42,13 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
   /** `again`: Try again on a message that failed; it is in the thread already, and what he has typed since stays. */
   /** One request at a time: a double click on Try again sends once (busy is a render behind). */
   const sending = useRef(false);
+  /** Questions sent from the field: each starts it over, so its undo history never holds a sent one (Grow). */
+  const [sent, setSent] = useState(0);
   const send = async (text: string, again = false) => {
     const message = text.trim();
     if (!message || busy || sending.current) return;
     sending.current = true;
+    if (!again) setSent((n) => n + 1);
     setChat((c) => (again ? { ...c, error: null, busy: true } : { ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true }));
     try {
       const r = await ore<Reply>(
@@ -127,6 +130,7 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
       <div className="ask-input">
         <Grow
           ref={field}
+          history={sent}
           rows={1}
           className="field"
           aria-label="Ask about this exercise"

@@ -409,6 +409,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   /** The point of an exercise's feedback under the pointer or focus: its words are underlined in his answer (D162). */
   const [lit, setLit] = useState<{ turn: string; quote: string } | null>(null);
   const { width, dragging, divider } = useSideWidth("ore.tutorwidth", 380, 300);
+  /** Messages sent from the field: each starts it over, so its undo history never holds a sent one (Grow). */
+  const [sent, setSent] = useState(0);
 
   /** `typed`: the message is what is in the box, so the box empties; a starter or Show me leaves his draft. */
   const send = (text: string, typed = false) => {
@@ -419,7 +421,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     force.current = true; // what he sends, and its reply, he wants to see
     // What he attached goes with the message he typed, not with a starter or a chip's canned one.
     chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}), ...(typed && files.length ? { files } : {}) });
-    if (typed) setDraft(() => ({ input: "", mentions: [] }));
+    if (typed) setDraft(() => ({ input: "", mentions: [] })), setSent((n) => n + 1);
     setAt(null);
     field.current?.focus();
   };
@@ -747,6 +749,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
         <div className="ask-input">
           <Grow
             ref={field}
+            history={sent}
             rows={1}
             className="field"
             aria-label="Message the tutor"

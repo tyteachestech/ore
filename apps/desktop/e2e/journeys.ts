@@ -6,7 +6,7 @@
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 //   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
-import { chromium, type Page } from "playwright";
+import { chromium, webkit, type Browser, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,8 +41,8 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   return { url, stop: () => (bridge.kill(), vite.kill()) };
 }
 
-async function open(url: string): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+async function open(url: string, engine: Engine): Promise<Page> {
+  const page = await (engine === "webkit" ? (safari ??= await webkit.launch()) : browser).newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
@@ -77,8 +77,12 @@ const HYGIENE = `(() => {
 const errors: string[] = [];
 const { url, stop } = await start();
 const browser = await chromium.launch();
-const journeys: [string, (page: Page) => Promise<void>][] = [];
-const journey = (name: string, run: (page: Page) => Promise<void>) => journeys.push([name, run]);
+/** The Mac app runs in WebKit (WKWebView), not Chromium: a journey about what only WebKit does (its native
+ *  undo in a text field) runs there, in a browser launched the first time one needs it. */
+type Engine = "chromium" | "webkit";
+let safari: Browser | undefined;
+const journeys: [string, (page: Page) => Promise<void>, Engine][] = [];
+const journey = (name: string, run: (page: Page) => Promise<void>, engine: Engine = "chromium") => journeys.push([name, run, engine]);
 
 const TESTING = "The Testing Effect: Why Retrieval Beats Rereading";
 const AGENTS = "Building Effective Agents";
@@ -992,6 +996,56 @@ journey("tutor chats menu: Esc gives focus back to the chat's title, a click out
   await until("a picked chat puts focus in the field", async () => (await list.count()) === 0 && (await focused()) === "Message the tutor");
   await page.keyboard.press("Meta+j");
 });
+
+journey("tutor field in WebKit: a sent message is not in the next draft's undo history, so ⌘Z and ⇧⌘Z never bring it back (ChatGPT, Claude)", async (page) => {
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click();
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  await field.pressSequentially("First message");
+  await page.keyboard.press("Enter");
+  await tutor.locator(".ask-me").getByText("First message").waitFor();
+  await until("the sent message leaves the field, which keeps focus", async () => (await field.inputValue()) === "" && (await field.evaluate((el) => el === document.activeElement)));
+  await page.keyboard.type("Second draft");
+  await page.keyboard.press("Meta+z");
+  const undone = await field.inputValue();
+  await page.keyboard.press("Shift+Meta+z");
+  const redone = await field.inputValue();
+  for (const [what, v] of [["⌘Z", undone], ["⇧⌘Z", redone]] as const) if (v.includes("First")) throw new Error(`${what} brought the sent message back: “${v}”`);
+  if (redone !== "Second draft") throw new Error(`⇧⌘Z didn't redo the draft: “${redone}”`);
+  await page.keyboard.press("Meta+j");
+}, "webkit");
+
+journey("Ask about this exercise in WebKit: a sent question is not in the next draft's undo history (ChatGPT, Claude)", async (page) => {
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Because recalling it is the practice.", proposal: null, session: "s1" }) });
+  });
+  try {
+    await startReview(page, null);
+    await reveal(page);
+    await page.getByRole("button", { name: "Ask about this" }).click();
+    const field = page.getByRole("textbox", { name: "Ask about this exercise" });
+    await field.pressSequentially("First question");
+    await page.keyboard.press("Enter");
+    await page.locator(".ask").getByText("Because recalling it is the practice.").waitFor();
+    await until("the field is empty and has focus", async () => (await field.inputValue()) === "" && (await field.evaluate((el) => el === document.activeElement)));
+    await page.keyboard.type("Second draft");
+    await page.keyboard.press("Meta+z");
+    const undone = await field.inputValue();
+    await page.keyboard.press("Shift+Meta+z");
+    const redone = await field.inputValue();
+    for (const [what, v] of [["⌘Z", undone], ["⇧⌘Z", redone]] as const) if (v.includes("First")) throw new Error(`${what} brought the sent question back: “${v}”`);
+    if (redone !== "Second draft") throw new Error(`⇧⌘Z didn't redo the draft: “${redone}”`);
+  } finally {
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+}, "webkit");
 
 journey("tutor chats: deleting a chat while its reply is being written keeps it deleted, with no error, and the new chat goes on (D172)", async (page) => {
   let release: (() => void) | undefined;
@@ -6516,8 +6570,8 @@ journey("a11y: a row is one control with its actions beside it (axe nested-inter
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only));
 const per = Math.ceil(picked.length / shards);
-for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
-  const page = await open(url);
+for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
+  const page = await open(url, engine);
   const t0 = Date.now();
   try {
     await run(page);
@@ -6534,6 +6588,7 @@ for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
   await page.close();
 }
 await browser.close();
+await safari?.close();
 // The style rules a regex can't see (nested frames, off-ramp font sizes), on the same mock.
 if (!only && shard === shards) {
   const style = Bun.spawnSync(["bun", join(MOCK, "style-check.ts"), url], { env: { ...process.env, ORE_BRIDGE: String(BRIDGE) }, stdout: "inherit", stderr: "inherit" });
