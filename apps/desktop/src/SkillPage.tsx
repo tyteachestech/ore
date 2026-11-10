@@ -848,8 +848,9 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   const [adding, setAdding] = useState<string[]>([]);
   const [answering, setAnswering] = useState(false);
   const done = q.status === "done";
-  const exact = passageText(q.exact);
   const own = typedQuestion(q);
+  // A typed question is his own text, kept as typed; a highlight's passage reads as the page shows it.
+  const exact = own ? q.exact.replace(/\s+/g, " ").trim() : passageText(q.exact);
   // Sources that may answer it and that he hasn't written from yet (D75).
   const credited = new Set(q.answers.map((c) => c.item));
   const maybe = q.matches.filter((m) => !credited.has(m.item));

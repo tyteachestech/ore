@@ -4290,6 +4290,28 @@ journey("questions: one asked on a source in no skill is listed there; a highlig
   });
 });
 
+journey("questions: a highlight marked as a question joins the list even when its save lands after the list was read", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# A slow save\n\nSpacing reviews apart strengthens memory more than cramming them together does.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("Spacing reviews apart").waitFor();
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const head = page.locator(".cp-head", { hasText: "Questions" });
+  if ((await head.locator(".cp-toggle").getAttribute("aria-expanded")) === "false") await head.locator(".cp-toggle").click();
+  // The mark's write reaches the library late: the list, read the moment the highlight shows as a question, comes back without it.
+  await page.route(/\/ore$/, async (route) => {
+    if ((route.request().postData() ?? "").includes('"args":["annotate",')) await new Promise((r) => setTimeout(r, 700));
+    await route.fallback();
+  });
+  await select(page, "strengthens memory more than cramming");
+  await page.locator(".popup").waitFor();
+  await page.keyboard.press("3"); // a question highlight
+  await page.locator(".qp-line", { hasText: "strengthens memory more than cramming" }).waitFor({ timeout: 4000 }).catch(() => {
+    throw new Error("a passage marked as a question never joins Questions when its save lands after the list was read");
+  });
+  await page.unroute(/\/ore$/);
+});
+
 journey("author: a save that fails keeps the name he typed, in the field", async (page) => {
   await openSource(page, AGENTS);
   await page.locator(".doc-head button.by").click();

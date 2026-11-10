@@ -13,8 +13,9 @@ import { passageText } from "./text";
 // writing from a source is what links it to the question. Answered closes it; Answered + card also
 // has the next enrich draft a card from his answer (offer, never require).
 
-/** His question in one line: a typed question is its own text; a highlight's question is his note. */
-const questionText = (q: Question) => q.note?.trim() || passageText(q.exact);
+/** His question in one line: a highlight's question is his note, or its passage as the page shows it;
+ *  a question he typed is his own text, kept as typed ("__init__", "*args"). */
+export const questionText = (q: Pick<Question, "exact" | "item_title" | "note">) => q.note?.trim() || (typedQuestion(q) ? q.exact.replace(/\s+/g, " ").trim() : passageText(q.exact));
 
 /** A question he typed (not one highlighted in a source): its hidden source is titled from its first
  *  line, cut to 77 characters and "…" past 80, as `addSnippet` titles it. */

@@ -1515,7 +1515,15 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   /** `ore annotate`, one write at a time per highlight: quick changes and their ⌘Z land in the order
    *  he made them, never an older one last. */
-  const annotate = <T = unknown,>(id: string, ...args: string[]) => inOrder(`annotate ${id}`, () => ore<T>("annotate", id, ...args));
+  /** Highlight writes that have settled. A highlight shows its mark at once, but `ore questions` only
+   *  knows it once the write lands, so the Questions list reads again after each one (its `marked`). */
+  const [annWrites, setAnnWrites] = useState(0);
+  const annotate = <T = unknown,>(id: string, ...args: string[]) => {
+    const write = inOrder(`annotate ${id}`, () => ore<T>("annotate", id, ...args));
+    const landed = () => setAnnWrites((n) => n + 1);
+    write.then(landed, landed);
+    return write;
+  };
 
   /** The popup's marks are switches on one highlight (D118): Key point or Question, again for neither. */
   async function setIntent(want: Intent) {
@@ -3071,7 +3079,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                   onJumpHighlight={(id) => onSource(() => jumpToHighlight(id))}
                   notify={p.notify}
                   ask={ask}
-                  marked={`${filed}|${anns.filter((a) => a.intent === "question").map((a) => a.id).join()}`}
+                  marked={`${filed}|${annWrites}|${anns.filter((a) => a.intent === "question").map((a) => a.id).join()}`}
                 />
               }
             />
