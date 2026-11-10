@@ -236,7 +236,6 @@ export function App() {
   const [renameSource, setRenameSource] = useState(0);
   const readerActions = useRef<MenuAction[]>([]);
   const [readerPractice] = useState<PracticeRef>(() => ({ current: null, pending: null }));
-  const feedPick = useRef<{ title: string; actions: MenuAction[] } | null>(null);
   const [palette, setPalette] = useState(false);
   /** Leaves Review as Esc does, without its end screen: a palette action run over Review goes there instead. */
   const leaveReview = useRef<(() => Promise<void>) | null>(null);
@@ -1335,7 +1334,6 @@ export function App() {
   };
 
   const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
-  const listPick = !openId && !onHome && keyed && !currentCourse ? current : null;
 
   /** Archives a source (hidden from lists and search, files and cards kept), with Undo. The row
    *  goes at once (optimistic); a failure brings it back with the error. */
@@ -1722,22 +1720,9 @@ export function App() {
     ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, run: () => void archiveSource(r) }]),
   ];
 
-  /** A row's ⋯ actions as ⌘K entries, named for the row; a submenu (Skills) becomes one entry per choice. */
-  const rowPalette = (acts: MenuAction[], title: string, prefix: string): Action[] =>
-    acts.filter((a) => a.id !== "show").flatMap((a): Action[] =>
-      a.sub
-        ? a.sub.map((b) => ({ id: `${prefix}-${a.id}:${b.id}`, label: `${b.checked ? "Remove" : "File"} “${title}” ${b.checked ? "from" : "under"} ${b.label}`, keywords: ["skill", "move"], run: b.run }))
-        : [{ id: `${prefix}-${a.id}`, label: `${a.label.replace(/…$/, "")} “${title}”${a.label.endsWith("…") ? "…" : ""}`, hint: a.hint, run: a.run }],
-    );
+  /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D176): a row's
+   *  actions are on its ⋯ and its right-click. */
   const actions: Action[] = [
-    // Picked sources: their actions, named for the count.
-    ...(!openId && many.length > 1
-      ? manyActions().filter((a) => a.id !== "show").flatMap((a): Action[] =>
-          a.sub
-            ? a.sub.map((b) => ({ id: `many:${a.id}:${b.id}`, label: `${b.checked ? "Remove" : "File"} ${sourcesN(many.length)} ${b.checked ? "from" : "under"} ${b.label}`, keywords: ["skill", "move"], run: b.run }))
-            : [{ id: `many:${a.id}`, label: a.label, hint: a.hint, run: a.run }],
-        )
-      : []),
     // An open source: the same actions as its ⋯ menu; "Rename…" edits the title in place.
     ...(openId
       ? readerActions.current.flatMap((a): Action[] =>
@@ -1750,13 +1735,6 @@ export function App() {
     { id: "review", label: "Start review", hint: label(keys.review), run: askReview },
     ...(openId ? [{ id: "back", label: skill ? `Back to ${skillOf(skill).name}` : "Back to sources", hint: "Esc", run: () => setOpenId(null) }] : []),
     ...(skill || onHome ? [{ id: "all", label: "All sources", run: () => openSkill(null) }] : []),
-    // A list row only once the keyboard has selected it, so ⌘K never acts on a row he can't see:
-    // the same actions as its ⋯ menu, named for the row.
-    ...(listPick && many.length <= 1 ? rowPalette(rowActions(listPick), listPick.title, "row") : []),
-    // A Feed post picked by the keyboard: the same actions as its ⋯ menu.
-    ...(onFeed && !openId && feedPick.current ? rowPalette(feedPick.current.actions, feedPick.current.title, "post") : []),
-    // A course row picked by the keyboard: the same actions as its ⋯ menu.
-    ...(!openId && !onHome && keyed && currentCourse ? rowPalette(courseActions(currentCourse), currentCourse.title, "course") : []),
     ...(!openId && !onSkillPage ? [{ id: "filter", label: "Filter sources", hint: label(keys.filter), keywords: ["search", "find"], run: () => {
       setPlace("sources");
       requestAnimationFrame(() => filterRef.current?.focus());
@@ -2297,7 +2275,7 @@ export function App() {
             notify={notify}
           />
         ) : onFeed ? (
-          <Feed skills={skills} tick={feedTick} blocked={overlay} onOpen={openPost} onFollow={() => setAdding(true)} onCreateSkill={createSkill} notify={notify} pickRef={feedPick} />
+          <Feed skills={skills} tick={feedTick} blocked={overlay} onOpen={openPost} onFollow={() => setAdding(true)} onCreateSkill={createSkill} notify={notify} />
         ) : (
           sources
         )}
