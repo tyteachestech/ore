@@ -225,9 +225,11 @@ export function useToast() {
             </button>
           )}
           {t.stay && (
-            <button className="icon-btn toast-x" aria-label="Dismiss" onClick={() => drop(t.id)}>
-              <X size={12} aria-hidden="true" />
-            </button>
+            <Hint text="Dismiss">
+              <button className="icon-btn toast-x" aria-label="Dismiss" onClick={() => drop(t.id)}>
+                <X size={12} aria-hidden="true" />
+              </button>
+            </Hint>
           )}
           {t.offer === "undo" && (
             <Hint text="Undo" keys="undo">

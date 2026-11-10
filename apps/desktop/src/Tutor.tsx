@@ -796,9 +796,11 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
               </button>
             </Hint>
           ) : (
-            <button className="ask-send" aria-label="Send" disabled={!input.trim() || chat.attaching} onClick={() => send(input, true)}>
-              <ArrowUp size={14} aria-hidden="true" />
-            </button>
+            <Hint text={<>Send <kbd>↵</kbd></>} side="top">
+              <button className="ask-send" aria-label="Send" disabled={!input.trim() || chat.attaching} onClick={() => send(input, true)}>
+                <ArrowUp size={14} aria-hidden="true" />
+              </button>
+            </Hint>
           )}
         </div>
       </div>
@@ -937,7 +939,9 @@ function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; o
       <div className="step-track" role="group" aria-label={`Step ${n} of ${steps.length}`}>
         {steps.map((_, i) =>
           i < n ? (
-            <button key={i} className={i === n - 1 ? "now" : undefined} aria-label={`Step ${i + 1}`} aria-current={i === n - 1 ? "step" : undefined} onClick={() => { const li = list.current?.children[i]; if (li) reveal(li); }} />
+            <Hint key={i} text={`Step ${i + 1}`}>
+              <button className={i === n - 1 ? "now" : undefined} aria-label={`Step ${i + 1}`} aria-current={i === n - 1 ? "step" : undefined} onClick={() => { const li = list.current?.children[i]; if (li) reveal(li); }} />
+            </Hint>
           ) : (
             <i key={i} />
           ),
@@ -971,7 +975,10 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
   const cur = chat.current;
   const all = !rows ? [] : cur ? [{ id: cur.id, title: cur.title, updated: rows.find((r) => r.id === cur.id)?.updated ?? new Date().toISOString() }, ...rows.filter((r) => r.id !== cur.id)] : rows;
   const shown = all.filter((r) => r.title.toLowerCase().includes(query.trim().toLowerCase()));
+  // A picked chat puts focus in the field; on Esc Radix gives it back to the title (a click outside, to where it lands).
+  const picked = useRef(false);
   const pick = (id: string) => {
+    picked.current = true;
     setOpen(false);
     void chat.open(id);
   };
@@ -991,7 +998,12 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover menu tutor-chats" side="bottom" align="start" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (e.preventDefault(), onPicked())}>
+        <Popover.Content className="popover menu tutor-chats" side="bottom" align="start" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => {
+          if (!picked.current) return;
+          picked.current = false;
+          e.preventDefault();
+          onPicked();
+        }}>
           <Command
             label="Chats"
             loop

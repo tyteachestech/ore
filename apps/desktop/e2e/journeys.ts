@@ -6,7 +6,7 @@
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 //   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
-import { chromium, type Page } from "playwright";
+import { chromium, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,8 +41,17 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   return { url, stop: () => (bridge.kill(), vite.kill()) };
 }
 
-async function open(url: string): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+/** WebKit, launched the first time a journey needs it; not installed, that journey fails saying how to get it. */
+async function safariBrowser(): Promise<Browser> {
+  try {
+    return (safari ??= await webkit.launch());
+  } catch (e) {
+    throw new Error(`WebKit won't start (${(e as Error).message.split("\n")[0]}): install it with \`bunx playwright install webkit\``);
+  }
+}
+
+async function open(url: string, engine: Engine): Promise<Page> {
+  const page = await (engine === "webkit" ? await safariBrowser() : browser).newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
@@ -151,8 +160,12 @@ const HYGIENE = `(() => {
 const errors: string[] = [];
 const { url, stop } = await start();
 const browser = await chromium.launch();
-const journeys: [string, (page: Page) => Promise<void>][] = [];
-const journey = (name: string, run: (page: Page) => Promise<void>) => journeys.push([name, run]);
+/** The Mac app runs in WebKit (WKWebView), not Chromium: a journey about what only WebKit does (its native
+ *  undo in a text field) runs there, in a browser launched the first time one needs it. */
+type Engine = "chromium" | "webkit";
+let safari: Browser | undefined;
+const journeys: [string, (page: Page) => Promise<void>, Engine][] = [];
+const journey = (name: string, run: (page: Page) => Promise<void>, engine: Engine = "chromium") => journeys.push([name, run, engine]);
 
 const TESTING = "The Testing Effect: Why Retrieval Beats Rereading";
 const AGENTS = "Building Effective Agents";
@@ -1038,6 +1051,87 @@ journey("tutor chats: every chat is saved and listed by day under its name; Find
   }
   await page.keyboard.press("Meta+j");
 });
+
+journey("tutor chats menu: Esc gives focus back to the chat's title, a click outside goes where it lands, a picked chat puts it in the field (ChatGPT, Claude)", async (page) => {
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const chats = tutor.getByRole("button", { name: /^Chats/ });
+  const list = page.locator(".tutor-chats");
+  const focused = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.tagName);
+  const title = async () => (await chats.getAttribute("aria-label"))!;
+  // A chat to pick.
+  await page.getByRole("textbox", { name: "Message the tutor" }).fill("What is spacing?");
+  await page.keyboard.press("Enter");
+  await tutor.getByRole("button", { name: "Copy the reply" }).waitFor();
+  await chats.click();
+  await list.getByPlaceholder("Find a chat…").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc closes the list, focus on its title", async () => (await list.count()) === 0 && (await focused()) === (await title()));
+  if ((await tutor.count()) === 0) throw new Error("Esc in the chats list closed the tutor too");
+  await chats.click();
+  await list.getByPlaceholder("Find a chat…").waitFor();
+  // A click outside goes where it lands (Radix): one click into the field closes the list and types there.
+  await page.getByRole("textbox", { name: "Message the tutor" }).click();
+  await until("a click in the field closes the list, focus in the field", async () => (await list.count()) === 0 && (await focused()) === "Message the tutor");
+  await chats.click();
+  await list.locator("[cmdk-item]").first().waitFor();
+  await page.keyboard.press("Enter");
+  await until("a picked chat puts focus in the field", async () => (await list.count()) === 0 && (await focused()) === "Message the tutor");
+  await page.keyboard.press("Meta+j");
+});
+
+/** Types a second draft in a field just emptied by a send, then undoes and redoes it: the undo must take the
+ *  draft back (so the check can't pass by doing nothing) and neither may bring back the sent "First …".
+ *  ControlOrMeta: ⌘ on the Mac, Ctrl on CI's Linux, where WebKit's undo is Ctrl+Z. The bug this guards
+ *  (WebKit redoing a cleared field's typing into the new draft) was seen on the Mac's WebKit. */
+async function undoRedo(page: Page, field: Locator) {
+  await page.keyboard.type("Second draft");
+  await page.keyboard.press("ControlOrMeta+z");
+  const undone = await field.inputValue();
+  if (undone === "Second draft") throw new Error("⌘Z did nothing to the draft, so this check can't tell");
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  const redone = await field.inputValue();
+  for (const [what, v] of [["⌘Z", undone], ["⇧⌘Z", redone]] as const) if (v.includes("First")) throw new Error(`${what} brought the sent text back: “${v}”`);
+  if (redone !== "Second draft") throw new Error(`⇧⌘Z didn't redo the draft: “${redone}”`);
+}
+
+journey("tutor field in WebKit: a sent message is not in the next draft's undo history, so ⌘Z and ⇧⌘Z never bring it back (ChatGPT, Claude)", async (page) => {
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const fresh = tutor.getByRole("button", { name: "New chat" });
+  if (await fresh.isEnabled()) await fresh.click();
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  await field.pressSequentially("First message");
+  await page.keyboard.press("Enter");
+  await tutor.locator(".ask-me").getByText("First message").waitFor();
+  await until("the sent message leaves the field, which keeps focus", async () => (await field.inputValue()) === "" && (await field.evaluate((el) => el === document.activeElement)));
+  await undoRedo(page, field);
+  await page.keyboard.press("Meta+j");
+}, "webkit");
+
+journey("Ask about this exercise in WebKit: a sent question is not in the next draft's undo history (ChatGPT, Claude)", async (page) => {
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Because recalling it is the practice.", proposal: null, session: "s1" }) });
+  });
+  try {
+    await startReview(page, null);
+    await reveal(page);
+    await page.getByRole("button", { name: "Ask about this" }).click();
+    const field = page.getByRole("textbox", { name: "Ask about this exercise" });
+    await field.pressSequentially("First question");
+    await page.keyboard.press("Enter");
+    await page.locator(".ask").getByText("Because recalling it is the practice.").waitFor();
+    await until("the field is empty and has focus", async () => (await field.inputValue()) === "" && (await field.evaluate((el) => el === document.activeElement)));
+    await undoRedo(page, field);
+  } finally {
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+}, "webkit");
 
 journey("tutor chats: deleting a chat while its reply is being written keeps it deleted, with no error, and the new chat goes on (D172)", async (page) => {
   let release: (() => void) | undefined;
@@ -2097,7 +2191,7 @@ journey("note equations: /equation opens a TeX field that draws as he types; ↵
   await until("still drawn after a reload", async () => (await pm.locator(".note-math .katex annotation").last().textContent().catch(() => "")) === "\\pi r^2");
 });
 
-journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words, ⌘↵ closes a toggle", async (page) => {
+journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words (Esc goes back to them, a press outside doesn't), ⌘↵ closes a toggle", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);
   await openSource(page, AGENTS);
@@ -2119,6 +2213,23 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.keyboard.press("Shift+Home");
   await page.waitForTimeout(150); // the editor takes the selection a moment after the page shows it
   await page.keyboard.press("Meta+k"); // the palette's key, in the note with words selected
+  await page.getByPlaceholder("Paste a link").waitFor();
+  // Esc closes it with focus back on the words (Notion), so ⌘K asks again at once.
+  await page.keyboard.press("Escape");
+  await until("Esc puts focus back in the note, on the words", async () => (await page.getByPlaceholder("Paste a link").count()) === 0 && (await page.evaluate(() => !!document.activeElement?.closest(".note-editor") && document.getSelection()?.toString().trim() === "Read the guide")));
+  // A press outside closes it and leaves focus where it landed: the note doesn't pull it back. The title bar takes
+  // no focus, as a button doesn't in WebKit, so focus falls to the page and must stay there.
+  await page.keyboard.press("Meta+k");
+  await page.getByPlaceholder("Paste a link").waitFor();
+  await page.locator(".titlebar").click({ position: { x: 400, y: 5 } });
+  await until("a press outside closes the link field", async () => (await page.getByPlaceholder("Paste a link").count()) === 0);
+  await page.waitForTimeout(200);
+  if (await page.evaluate(() => !!document.activeElement?.closest(".note-editor"))) throw new Error("a press outside the link field put focus back in the note");
+  await pm.getByText("Read the guide").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+Home");
+  await page.waitForTimeout(150);
+  await page.keyboard.press("Meta+k");
   await page.getByPlaceholder("Paste a link").waitFor();
   await page.keyboard.type("example.com/guide");
   await page.keyboard.press("Enter");
@@ -6653,10 +6764,11 @@ journey("a11y: a row is one control with its actions beside it (axe nested-inter
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only));
 const per = Math.ceil(picked.length / shards);
-for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
-  const page = await open(url);
+for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
+  let page: Page | undefined;
   const t0 = Date.now();
   try {
+    page = await open(url, engine);
     await run(page);
     const broke = await page.evaluate(async () => {
       const w = window as unknown as { __hygiene?: Set<string>; __hygieneCheck?: () => Promise<void> };
@@ -6668,13 +6780,14 @@ for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
   } catch (e) {
     failed++;
     const shot = join(tmpdir(), `ore-e2e-${name.replace(/\W+/g, "-")}.png`);
-    await page.screenshot({ path: shot }).catch(() => {});
+    await page?.screenshot({ path: shot }).catch(() => {});
     const why = (e as Error).message.split("\n").filter((l) => l.trim() && !/^\s*Call log/.test(l)).slice(0, 2).join("\n      ");
-    console.log(`FAIL  ${name}\n      ${why}\n      screenshot: ${shot}`);
+    console.log(`FAIL  ${name}\n      ${why}${page ? `\n      screenshot: ${shot}` : ""}`);
   }
-  await page.close();
+  await page?.close();
 }
 await browser.close();
+await safari?.close();
 // The style rules a regex can't see (nested frames, off-ramp font sizes), on the same mock.
 if (!only && shard === shards) {
   const style = Bun.spawnSync(["bun", join(MOCK, "style-check.ts"), url], { env: { ...process.env, ORE_BRIDGE: String(BRIDGE) }, stdout: "inherit", stderr: "inherit" });
