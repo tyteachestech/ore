@@ -91,7 +91,7 @@ keeps its headings and lists.
 
 Left out: ⌘/ (Ore's shortcut list) and `/color` names (the format bar's colour menu does it).
 
-## Drag to select, and blocks that stand alone (2026-11-10, D187)
+## Drag to select, and blocks that stand alone (2026-11-10, D188)
 
 From Tyler's clip: a drag down the gutter did nothing, and "Gh" typed beside a diagram became one block with it.
 

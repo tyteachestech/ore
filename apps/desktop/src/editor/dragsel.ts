@@ -3,7 +3,7 @@ import type { EditorView } from "@milkdown/kit/prose/view";
 import { $prose } from "@milkdown/kit/utils";
 import { blocksOf, BlockSelection, selectBlocks, type Block } from "./blockops";
 
-// Notion's drag to select blocks (D187). A drag that starts beside the note (its gutter, the space
+// Notion's drag to select blocks (D188). A drag that starts beside the note (its gutter, the space
 // around its blocks) draws a box and selects every block it passes; a drag that starts in a block's
 // text selects text until it reaches another block, then selects whole blocks instead.
 

@@ -44,7 +44,7 @@ const found = new Map<string, string>(); // call → the file's code, for its la
 for (const path of files(src)) {
   const code = readFileSync(path, "utf8");
   const name = relative(src, path);
-  for (const m of code.matchAll(/\bore(?:Detached)?(?:<[\s\S]{0,200}?>)?\(\s*"([a-z-]+)"(?:,\s*"([a-z-]+)")?([^\n]*)/g)) {
+  for (const m of code.matchAll(/\bore(?:Detached|Job)?(?:<[\s\S]{0,200}?>)?\(\s*(?:[\w.]+,\s*[\w.]+,\s*)?"([a-z-]+)"(?:,\s*"([a-z-]+)")?([^\n]*)/g)) {
     const [, cmd, sub, rest] = m as unknown as [string, string, string | undefined, string];
     let key: string | null = null;
     if (cmd === "feed") key = sub && SLOW_FEED.has(sub) ? `feed ${sub}` : !sub && rest.includes('"--refresh"') ? "feed --refresh" : null;

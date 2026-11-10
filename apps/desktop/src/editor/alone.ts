@@ -3,7 +3,7 @@ import { type EditorState, Plugin, TextSelection, type Transaction } from "@milk
 import { canSplit } from "@milkdown/kit/prose/transform";
 import { $prose } from "@milkdown/kit/utils";
 
-// A diagram or image is a block of its own, as in Notion (D187). Markdown lets one share a line with
+// A diagram or image is a block of its own, as in Notion (D188). Markdown lets one share a line with
 // words, and the caret can sit beside one, so text typed there (or a diagram made on a line with words)
 // used to join it in one block: one handle for both, and no way to move or delete either alone.
 

@@ -418,7 +418,7 @@ describe("equations (Notion's /equation and /math), stored as the reader reads t
   });
 });
 
-// Tyler, 2026-11-10: "Gh" typed with the caret beside a diagram became one block with it (D187).
+// Tyler, 2026-11-10: "Gh" typed with the caret beside a diagram became one block with it (D188).
 describe("a diagram or image is a block of its own", () => {
   const D = "![Diagram](diagrams/d.excalidraw)";
   /** The caret right before (-1) or after (1) the note's first image. */
