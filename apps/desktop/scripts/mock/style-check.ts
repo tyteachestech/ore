@@ -8,7 +8,7 @@
 // `bun run e2e` runs it too, on its own mock (ORE_BRIDGE names that mock's bridge port).
 import { chromium, type Page } from "playwright";
 
-const RAMP = [11, 12, 13, 14, 15, 16, 17, 20, 24, 28, 30];
+const RAMP = [11, 12, 13, 14, 15, 16, 17, 20, 24, 28, 30, 40];
 const url = process.argv[2] ?? "http://localhost:1420/";
 
 async function audit(page: Page, screen: string) {

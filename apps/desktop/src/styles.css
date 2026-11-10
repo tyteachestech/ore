@@ -1443,13 +1443,16 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 @keyframes gem-glow { 50% { filter: drop-shadow(0 0 0.5px var(--skill, var(--accent))) drop-shadow(0 0 1px var(--skill, var(--accent))); } }
 .gem[data-kind="rough"] { opacity: 0.8; }
 .gem-ring { position: relative; flex: none; display: inline-grid; place-items: center; }
-.gem-ring > svg:first-child { position: absolute; inset: 0; }
-.gem-ring-track, .gem-ring-fill { fill: none; stroke-width: 7; }
-.gem-ring-track { stroke: var(--bg-active); }
-.gem-ring-ghost { fill: none; stroke-width: 7; stroke: var(--skill, var(--accent)); opacity: 0.7; }
-.gem-ring[data-finishes] > svg:first-child { filter: drop-shadow(0 0 3px var(--skill, var(--accent))); }
-[data-color="gray"] .gem-ring-fill { stroke: var(--text); }
-.gem-ring-fill { stroke: var(--skill, var(--accent)); stroke-linecap: round; }
+.gem-ring > .dot-ring { position: absolute; inset: 0; }
+/* A ring of dots (D183): the track sits a step above the ground, a lit dot is full size in the ring's colour. */
+.dot-ring { display: block; --ring: var(--skill, var(--accent)); }
+.dot-ring circle { fill: color-mix(in oklab, var(--bg-active), var(--text) 10%); transform-box: fill-box; transform-origin: center; transform: scale(0.7); transition: fill 150ms ease-out, transform 150ms ease-out; }
+.dot-ring .on { fill: var(--ring); transform: none; }
+.dot-ring .soon { fill: var(--ring); opacity: 0.55; transform: scale(0.85); }
+@media (prefers-reduced-motion: reduce) { .dot-ring circle { transition: none; } }
+.ring .dot-ring { --ring: var(--c-green); }
+[data-color="gray"] .gem-ring .dot-ring { --ring: var(--text); }
+.gem-ring[data-finishes] > .dot-ring { filter: drop-shadow(0 0 3px var(--skill, var(--accent))); }
 .gem-ring-lv { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; height: 16px; line-height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: var(--round); font-size: 10px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .strength-side { display: flex; flex-direction: column; gap: 4px; }
 .near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--round); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -1919,8 +1922,6 @@ button.home-plan:hover { color: var(--text); }
 
 /* The goal ring (D60, D62). */
 .ring { position: relative; flex: none; }
-.ring svg { display: block; }
-.ring-fill { transition: stroke-dashoffset 600ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .ring-burst { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); animation: ring-burst 700ms ease-out 550ms 1 both; }
 @keyframes ring-burst { from { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); } to { transform: scale(1.25); opacity: 0; box-shadow: 0 0 0 14px transparent; } }
 

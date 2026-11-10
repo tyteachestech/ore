@@ -1,5 +1,25 @@
 import { useEffect, useState } from "react";
 
+/** How many of `n` dots a share lights: any progress lights one, and only a whole share lights them all. */
+export const lit = (share: number, n: number) => (share >= 1 ? n : share <= 0 ? 0 : Math.max(1, Math.min(n - 1, Math.round(share * n))));
+
+/** A ring of dots, one per step, from 12 o'clock (D183): the lit ones in `--ring` (the skill's colour, or green
+ *  for the goal), then `ghost` dimmer ones, the rest as the track. Each dot lights a beat after the one before. */
+export function DotRing({ size, share, ghost = 0 }: { size: number; share: number; ghost?: number }) {
+  const n = size > 60 ? 30 : size > 36 ? 20 : 14;
+  const on = lit(share, n);
+  const soon = Math.min(n, on + (ghost > 0 ? Math.max(1, Math.round(ghost * n)) : 0));
+  const r = Math.min(6.5, ((2 * Math.PI * 43) / n) * 0.36);
+  return (
+    <svg className="dot-ring" width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => {
+        const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+        return <circle key={i} className={i < on ? "on" : i < soon ? "soon" : undefined} cx={+(50 + 43 * Math.cos(a)).toFixed(2)} cy={+(50 + 43 * Math.sin(a)).toFixed(2)} r={+r.toFixed(2)} style={{ transitionDelay: `${i * 16}ms` }} />;
+      })}
+    </svg>
+  );
+}
+
 /** The daily goal as a ring (D60), like Apple Fitness's move ring: it fills from `from` to `value`
  *  when shown and plays one short burst when `burst` is set (D62; none under Reduce Motion). */
 export function Ring({ value, from = 0, size = 64, met, burst = false, label }: { value: number; from?: number; size?: number; met: boolean; burst?: boolean; label: string }) {
@@ -9,27 +29,9 @@ export function Ring({ value, from = 0, size = 64, met, burst = false, label }: 
     const f = requestAnimationFrame(() => setShown(target));
     return () => cancelAnimationFrame(f);
   }, [target]);
-  const stroke = Math.max(5, Math.round(size / 9));
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
   return (
     <div className={`ring${met ? " met" : ""}`} style={{ width: size, height: size }} role="img" aria-label={label}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--bg-active)" strokeWidth={stroke} />
-        <circle
-          className="ring-fill"
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke="var(--c-green)"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - Math.max(0, Math.min(1, shown)))}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </svg>
+      <DotRing size={size} share={shown} />
       {burst && <span className="ring-burst" aria-hidden="true" />}
     </div>
   );

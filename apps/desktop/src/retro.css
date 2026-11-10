@@ -12,6 +12,8 @@
 /* OpenTUI Mono (Iosevka build, OFL, no reserved name): its Latin subset; anything outside it falls back to Geist Mono. */
 @font-face { font-family: "OpenTUI Mono"; src: url("./fonts/OpenTUIMono-Regular.woff2") format("woff2"); font-weight: 400 600; font-display: block; }
 @font-face { font-family: "OpenTUI Mono"; src: url("./fonts/OpenTUIMono-Bold.woff2") format("woff2"); font-weight: 700 900; font-display: block; }
+/* Geist Pixel Circle (OFL, Vercel): the dot face, for a screen's one hero number only (D183). */
+@font-face { font-family: "Geist Pixel Circle"; src: url("./fonts/GeistPixel-Circle.woff2") format("woff2"); font-weight: 400 900; font-display: block; }
 
 :root {
   /* opencode's neutral ramp, lifted a step (Tyler: softer, not as black). */
@@ -55,6 +57,7 @@
   --font: "Geist", var(--font-read);
   --mono: "OpenTUI Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --round: var(--font);
+  --dot: "Geist Pixel Circle", var(--mono); /* hero numbers: today's minutes on Home, a skill's cut gems (D183) */
   --pixel: var(--mono); /* big numbers in the mono (round 3 kit); 8-bit stays for gems, icons, rings and bars */
   --radius: 0px;
 }
@@ -109,6 +112,8 @@
 /* Big numbers in pixel type. */
 .home-solid, .hero-strength .home-solid, .home-goal h1, .review-kept b, .review-cut b { font-family: var(--pixel); font-weight: 400; }
 .home-goal .goal-of { font-family: var(--font); }
+/* The hero number is the one place a dot face is big enough to read (D183): 40px, never below 24. */
+.home-goal h1 .roll, .strength-big { font-family: var(--dot); font-weight: 400; font-size: 40px; line-height: 1; }
 
 /* Square corners everywhere a row, chip or control sits. */
 .row, .home-read, .side-item, .chip, .icon-button, .icon-btn, .skill-badge, .pick-row, .gem-ring-lv, [cmdk-item],
@@ -126,8 +131,6 @@
 .home-meter { height: 8px; }
 .home-meter > span, .thumb-bar > span { border-radius: 0; }
 .home-meter.small > span, .thumb-bar > span { background: var(--paper); }
-.gem-ring > svg:first-child, .ring svg { -webkit-mask: repeating-conic-gradient(#000 0 9deg, transparent 9deg 12deg); mask: repeating-conic-gradient(#000 0 9deg, transparent 9deg 12deg); }
-.gem-ring-fill, .ring-fill { stroke-linecap: butt; }
 .gem-ring-lv { font-weight: 400; }
 
 /* Selection in lists: neutral grey with a white bar on the left edge. */
@@ -226,7 +229,7 @@
 
 /* Railway touches (D129, Tyler's pick B, 2026-11-07): progress is a stretch of pixel track. Review's steps are rail
    with a tie at each card, green where he has been, and an ore cart (a 16-grid sprite) on the card he is on; it
-   moves as he rates, without animating (keyboard-driven). Home's week is the same track with a square station per day. */
+   moves as he rates, without animating (keyboard-driven). Home's week is the same track with a round dot per day (D183). */
 .review-steps { gap: 0; align-items: end; height: 22px; }
 .review-steps span, .review-steps span.now, .review-steps span.done {
   position: relative; height: 8px; border-radius: 0; --rail: var(--bg-active); --tie: var(--border);
@@ -239,7 +242,7 @@
 }
 .home-week { position: relative; gap: 14px; width: fit-content; }
 .home-week::before { content: ""; position: absolute; left: 4px; right: 4px; top: 5px; height: 2px; background: var(--bg-active); }
-.home-day i { position: relative; width: 12px; height: 12px; border-radius: 0; background: var(--bg); box-shadow: inset 0 0 0 2px var(--bg-active); }
+.home-day i { position: relative; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 2px var(--bg-active); }
 .home-day.met i { background: var(--c-green); box-shadow: none; }
 .home-day.today i { outline: none; box-shadow: inset 0 0 0 2px var(--muted); }
 .home-day.off i { background: var(--bg); box-shadow: inset 0 0 0 2px var(--border); }
