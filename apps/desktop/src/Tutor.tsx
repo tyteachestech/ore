@@ -1,7 +1,7 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
-import { ArrowDown, ArrowUp, CaretDown, Check, Circle, Plus, SidebarRight, Sparkle, Square, Trash, X } from "./icons";
+import { ArrowDown, ArrowUp, CaretDown, Check, Circle, Plus, SidebarRight, Square, Trash, X } from "./icons";
 import { chatGroups } from "./chat-groups";
 import { WithMenu } from "./Menu";
 import { citeRuns, siteName } from "./cite-pills";
@@ -390,6 +390,41 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     else if (el.scrollHeight > end.current + 1) setBelow(true); // grew below him, not a change higher up (+ Card)
   }, [turns]);
 
+  // The reply he was waiting for lands in the chat he is looking at: the mole hops for it (a jolt for an error).
+  // Followed by its turn, so opening another chat mid-reply, or a turn that is taken away, is not a landing.
+  const [landed, setLanded] = useState<{ id: string; failed: boolean } | null>(null);
+  const pending = turns.find((t) => t.reply === undefined && !t.error)?.id;
+  const waited = useRef(pending);
+  useEffect(() => {
+    const t = turns.find((x) => x.id === waited.current);
+    if (t && t.id !== pending) setLanded({ id: t.id, failed: !!t.error });
+    waited.current = pending;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending]);
+  const chips = (context || !!carry.length) && (
+    <div className="tutor-chips">
+      {context && (
+        <span className="tutor-chip">
+          <span className="tutor-chip-title">{context.title}</span>
+          <Hint text="Leave this source out">
+            <button aria-label={`Leave “${context.title}” out`} onClick={() => { setDropped(context.id); field.current?.focus(); }}>
+              <X size={10} aria-hidden="true" />
+            </button>
+          </Hint>
+        </span>
+      )}
+      {carry.map((m) => (
+        <span key={m.kind + m.id} className="tutor-chip">
+          <span className="tutor-chip-title">@{m.name}</span>
+          <Hint text={m.kind === "skill" ? "Leave this skill out" : "Leave this source out"}>
+            <button aria-label={`Leave “${m.name}” out`} onClick={() => { chat.drop(m); field.current?.focus(); }}>
+              <X size={10} aria-hidden="true" />
+            </button>
+          </Hint>
+        </span>
+      ))}
+    </div>
+  );
   return (
     <aside
       className={`tutor${docked ? "" : " float"}${dragging ? " dragging" : ""}`}
@@ -450,9 +485,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           return (
           <div key={t.id} className="library-turn">
             <p className="ask-me">{lit?.turn === t.id ? <Evidence answer={t.message} quote={lit.quote} /> : marked(t.message, t.mentions ?? [])}</p>
-            <div className="ask-ai">
-              <Sparkle className="ask-mark" size={14} aria-hidden="true" />
-              <div className="ask-text">
+            <div className={`ask-ai${i === turns.length - 1 ? " newest" : ""}`}>
+              <div className={`ask-text${t.reply === undefined && !t.error ? " typing" : ""}`}>
                 {t.error ? (
                   <p className="err">
                     {t.error}{" "}
@@ -571,30 +605,12 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
             )}
           </div>
         )}
-        {(context || !!carry.length) && (
-          <div className="tutor-chips">
-            {context && (
-              <span className="tutor-chip">
-                <span className="tutor-chip-title">{context.title}</span>
-                <Hint text="Leave this source out">
-                  <button aria-label={`Leave “${context.title}” out`} onClick={() => { setDropped(context.id); field.current?.focus(); }}>
-                    <X size={10} aria-hidden="true" />
-                  </button>
-                </Hint>
-              </span>
-            )}
-            {carry.map((m) => (
-              <span key={m.kind + m.id} className="tutor-chip">
-                <span className="tutor-chip-title">@{m.name}</span>
-                <Hint text={m.kind === "skill" ? "Leave this skill out" : "Leave this source out"}>
-                  <button aria-label={`Leave “${m.name}” out`} onClick={() => { chat.drop(m); field.current?.focus(); }}>
-                    <X size={10} aria-hidden="true" />
-                  </button>
-                </Hint>
-              </span>
-            ))}
-          </div>
-        )}
+        {/* The one mole (D186): it peeks over the field's edge, wonders while a reply is written and hops when one lands;
+            the newest bubble's tail points down at it. What he pointed the chat at sits beside it. */}
+        <div className="tutor-perch">
+          <span className="tutor-mole"><Mole bare size={36} mood={busy ? "thinking" : landed ? (landed.failed ? "surprised" : "happy") : "idle"} cue={landed?.id} /></span>
+          {chips}
+        </div>
         <div className="ask-input">
           <Grow
             ref={field}

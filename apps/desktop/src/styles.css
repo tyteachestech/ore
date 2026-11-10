@@ -2701,6 +2701,28 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor .ask-input .field { display: block; }
 .tutor-foot { position: relative; }
 .tutor-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+/* The mole's chat (D186): it says each reply in a bubble, his messages are outlined. One mole, peeking over the
+   field's edge with what the chat is pointed at beside it; the newest bubble's stair tail points down at it.
+   A block blinks where words are about to appear: after the mole's as it wonders and types, and in the empty field. */
+.tutor .library-turn { gap: 12px; }
+.tutor .ask-me { border-radius: 12px; background: none; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); }
+.tutor .ask-text { position: relative; flex: 0 1 auto; max-width: 92%; padding: 9px 12px; border-radius: 12px; background: var(--bg-active); }
+/* Chips inside a bubble sit one step above its fill. */
+.tutor .ask-text :is(.cite, .tutor-sources, code) { background: color-mix(in srgb, var(--text) 9%, var(--bg-active)); }
+.tutor .ask-text .tutor-acts button:hover:not(:disabled), .tutor .ask-text .tutor-acts button:focus-visible, .tutor .ask-text .library-sources button:hover, .tutor .ask-text .library-sources button:focus-visible { background: color-mix(in srgb, var(--text) 9%, var(--bg-active)); }
+.tutor .ask-ai.newest .ask-text::after { content: ""; position: absolute; left: 18px; top: 100%; width: 9px; height: 9px; background: var(--bg-active); clip-path: polygon(0 0, 9px 0, 9px 3px, 6px 3px, 6px 6px, 3px 6px, 3px 9px, 0 9px); }
+.tutor-perch { display: flex; align-items: flex-end; gap: 8px; margin-bottom: -6px; padding-left: 12px; }
+.tutor-mole { flex: none; }
+.tutor-mole .mole { display: block; }
+.tutor-perch .tutor-chips { min-width: 0; padding-bottom: 6px; }
+.tutor .working { gap: 0; }
+.tutor .working .matrix { display: none; }
+.tutor .ask-text.typing > p:last-child::after, .tutor .ask-text.typing > :is(ul, ol):last-child > li:last-child::after, .tutor .ask-text.typing .working::after, .tutor .ask-input:has(.field:placeholder-shown)::before { content: ""; display: inline-block; flex: none; width: 0.55em; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: var(--text); animation: block-blink 1s steps(1) infinite; }
+.tutor .ask-input:has(.field:placeholder-shown)::before { position: absolute; left: 12px; top: 11px; margin: 0; width: 8px; height: 16px; pointer-events: none; }
+.tutor .ask-input:has(.field:placeholder-shown:not(:focus))::before { background: var(--faint); animation: none; }
+.tutor .ask-input .field:placeholder-shown { padding-left: 28px; caret-color: transparent; }
+@keyframes block-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tutor .ask-text.typing ::after, .tutor .ask-input::before { animation: none !important; } }
 .tutor-at { color: var(--accent); }
 /* The @ list (Claude's and ChatGPT's @): above the field, the same rows as every menu. */
 .tutor-mention { position: absolute; left: 12px; right: 12px; bottom: calc(100% - 4px); z-index: 7; max-height: 280px; overflow-y: auto; padding: 4px; border-radius: 10px; background: var(--bg-raised); border: 1px solid var(--border); box-shadow: var(--float); }

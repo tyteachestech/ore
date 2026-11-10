@@ -757,6 +757,9 @@ journey("tutor pending: closing mid-reply asks once; a new chat keeps its own re
   await field.fill("First question");
   await page.keyboard.press("Enter");
   await tutor.getByText("Reading your sources…").waitFor();
+  // D186: one mole by the field, and the newest bubble is the one with the tail.
+  await tutor.locator(".tutor-mole .mole").waitFor();
+  if ((await tutor.locator(".ask-ai.newest").count()) !== 1) throw new Error("the chat should mark exactly one newest reply");
   await page.keyboard.press("Escape");
   await until("Esc closes it", async () => (await tutor.count()) === 0);
   await page.keyboard.press("Meta+j");

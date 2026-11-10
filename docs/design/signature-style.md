@@ -30,6 +30,9 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 ## Picked (2026-11-10, D185)
 - Motion is "Glide" (Tyler's pick B of three, felt on a clickable page): everyday moves 100/150/200/300ms on one ease-out with no bounce, the spring and 600ms kept for moments, dots lighting 16ms apart. Not picked: Crisp (no spring anywhere, celebrations barely there), Bounce (a spring on everything). Page: `/mnt/project-files/house-style/motion-round-1/index.html`.
 
+## Picked (2026-11-10, D186)
+- The mole's chat (Tyler's pick C of three, then place 2 of three): replies in speech bubbles, one mole peeking over the field that wonders while it writes, the newest bubble's stair tail pointing at it, a blinking block where words are about to appear. Not picked: a mono terminal, a game dialogue box, a mole on every reply, beside the newest reply or in the header.
+
 ## Open
 - The first signature moment; a page showing every component.
 - Redraw Hand, ThumbsDown, Paperclip, Compass.
