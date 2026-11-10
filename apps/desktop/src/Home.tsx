@@ -8,7 +8,7 @@ import { SkillIcon } from "./IconPicker";
 import { lessonsOf, levelProgress, nextLesson, opt, ore, PHONE, touched, type DueEntry, type Item, type Skill, type Today } from "./ore";
 import * as HoverCard from "@radix-ui/react-hover-card";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { minutes, minutesText, Ring } from "./Ring";
+import { DotBar, minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
 import { archivedOnly, SkillChip, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
@@ -269,9 +269,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                     </SkillPicker>
                   )}
                   <Hint text={`${Math.round(at * 100)}% read`}>
-                    <span className="home-meter small">
-                      <span style={{ width: `${Math.max(4, at * 100)}%` }} />
-                    </span>
+                    {/* The hint needs an element to hold its ref, so the bar sits in a span. */}
+                    <span className="home-meter small"><DotBar className="" share={at} n={10} /></span>
                   </Hint>
                   {/* On hover the ⋯ takes the meter's place, as on every other row (Linear). */}
                   {sourceMenu && <MoreButton label="Source actions" actions={() => withRename(sourceMenu(i), i)} hoverOnly />}
@@ -338,7 +337,7 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
           ) : (
             <>
               <span className="home-lv">Lv {lv}</span>
-              <span className="home-meter" />
+              <DotBar className="home-meter" share={0} n={10} />
             </>
           )}
         </span>

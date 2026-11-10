@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { burstOffsets } from "../src/Burst";
 
 describe("pixel burst (D153)", () => {
-  test("fourteen squares, every direction, two radii, the far ones a beat later", () => {
+  test("fourteen dots, every direction, two radii, the far ones a beat later", () => {
     const o = burstOffsets();
     expect(o).toHaveLength(14);
     const r = o.map((p) => Math.round(Math.hypot(p.dx, p.dy)));

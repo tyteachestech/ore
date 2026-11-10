@@ -59,7 +59,7 @@
   --round: var(--font);
   --dot: "Geist Pixel Circle", var(--mono); /* hero numbers: today's minutes on Home, a skill's cut gems (D183) */
   --pixel: var(--mono); /* big numbers in the mono (round 3 kit); 8-bit stays for gems, icons, rings and bars */
-  --radius: 0px;
+  --radius: 8px; /* soft corners (D184): rows 8, controls 6, chips 4, floating things 12 */
 }
 ::selection { background: rgba(228, 228, 226, 0.18); }
 .doc, .note-editor, .review-passage { font-family: var(--font-read); }
@@ -115,22 +115,29 @@
 /* The hero number is the one place a dot face is big enough to read (D183): 40px, never below 24. */
 .home-goal h1 .roll, .strength-big { font-family: var(--dot); font-weight: 400; font-size: 40px; line-height: 1; }
 
-/* Square corners everywhere a row, chip or control sits. */
-.row, .home-read, .side-item, .chip, .icon-button, .icon-btn, .skill-badge, .pick-row, .gem-ring-lv, [cmdk-item],
-.panel, .popover, .popover.menu, .toast, .popup, .quiz, .mynotes-text, .review-passage, .quiz-answer, .quiz-leave, .quiz-verdict, .quiz-stepper, .field { border-radius: 0; }
+/* Soft corners (D184, Tyler's pick B, 2026-11-10): round dots sit in round-cornered things. Rows 8, controls 6,
+   chips 4, what floats 12, what he reads or writes in Review 10. */
+.row, .home-read, .side-item, .pick-row, [cmdk-item], .quiz-sure button, .review-rate button { border-radius: 8px; }
+.icon-button, .icon-btn, .field, .quiz-stepper, .pick-box, .thumb, .settings-tab, .settings-btn { border-radius: 6px; }
+.chip, .chips-button { border-radius: 4px; }
+.panel, .popover, .popover.menu, .popup, .quiz, .settings-sheet { border-radius: 12px; }
+.toast, .mynotes-text, .review-passage, .quiz-answer, .quiz-leave, .quiz-verdict, .skill-badge { border-radius: 10px; }
+.gem-ring-lv { border-radius: 999px; }
 .chip { background: transparent; box-shadow: inset 0 0 0 1px var(--border); font-size: 11px; }
-/* Square like the chips, so the group's round clip doesn't join two pills into one shape. */
-.chips-button { border-radius: 0; }
 
 /* Primary buttons: flat paper white, mono caps (claude.dev's "Try Claude Code"). */
-.pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 0; font-family: var(--mono); font-weight: 500; letter-spacing: 0.06em; }
+.pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 6px; font-family: var(--mono); font-weight: 500; letter-spacing: 0.06em; }
 .pill-btn:active:not(:disabled) { box-shadow: none; }
 
-/* Bars are dithered tracks with a solid fill; rings are cut into segments. */
-.home-meter, .thumb-bar { border-radius: 0; background: repeating-conic-gradient(#3a3a37 0 25%, transparent 0 50%) 0 0 / 2px 2px; }
-.home-meter { height: 8px; }
-.home-meter > span, .thumb-bar > span { border-radius: 0; }
-.home-meter.small > span, .thumb-bar > span { background: var(--paper); }
+/* Bars are a row of dots (D184, `DotBar` in Ring.tsx): small and grey on the track, full size where it is filled. */
+.dot-bar { display: flex; align-items: center; gap: 2px; height: 6px; border-radius: 0; background: none; overflow: visible; --fill: var(--c-green); }
+.dot-bar i { flex: none; width: 4px; height: 4px; border-radius: 50%; background: color-mix(in oklab, var(--bg-active), var(--text) 10%); transform: scale(0.65); }
+.dot-bar i.on { background: var(--fill); transform: none; }
+.home-meter.small, .thumb-bar { --fill: var(--paper); }
+.home-meter.small { display: flex; width: auto; height: 6px; background: none; overflow: visible; }
+.thumb-bar, .review-dots { justify-content: space-between; gap: 0; }
+.review-dots i { width: 6px; height: 6px; }
+.thumb-bar { bottom: -8px; height: 4px; }
 .gem-ring-lv { font-weight: 400; }
 
 /* Selection in lists: neutral grey with a white bar on the left edge. */
@@ -138,30 +145,22 @@
 .list:focus-visible .row.on { box-shadow: inset 2px 0 0 var(--paper), inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
 
 /* Review: what he picked is inverted, paper white with ink text (Playdate), on a hard 3px lip. */
-.review-rate button, .quiz-sure button { border-radius: 0; font-family: var(--mono); font-weight: 500; letter-spacing: 0.04em; }
+.review-rate button, .quiz-sure button { font-family: var(--mono); font-weight: 500; letter-spacing: 0.04em; }
 .review-rate button.suggested, .review-rate button.suggested:hover:not(:disabled),
 .quiz-sure button[aria-checked="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); box-shadow: 0 3px 0 #6b6a66; filter: none; }
-.pick-box { border-radius: 0; }
 .pick-row[aria-checked="true"] .pick-box { background: var(--paper); color: var(--ink); box-shadow: 0 2px 0 #6b6a66; }
 
-/* The skill badge: a matte tile in the skill's colour with 8-bit stepped corners, no outline (Tyler, 2026-10-29). */
-.skill-badge, .skill-badge.tinted {
-  box-shadow: none; background: color-mix(in srgb, var(--skill, var(--muted)) 26%, var(--bg));
-  clip-path: polygon(0 6px, 3px 6px, 3px 3px, 6px 3px, 6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px,
-    100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%,
-    6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px));
-}
-/* The clip hides an outline, so keyboard focus brightens the tile instead. */
-.skill-badge:focus-visible { outline: none; background: color-mix(in srgb, var(--skill, var(--muted)) 55%, var(--bg)); }
+/* The skill badge: a matte tile in the skill's colour, no outline (Tyler, 2026-10-29), soft corners (D184). */
+.skill-badge, .skill-badge.tinted { box-shadow: none; background: color-mix(in srgb, var(--skill, var(--muted)) 26%, var(--bg)); }
+.skill-badge:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* Settings follows the skill page (Tyler, 2026-10-31): each group is a mono label over a hairline rule and its rows
-   sit on the page between hairlines, no rounded card around them; controls are square like every other control. */
+   sit on the page between hairlines, no rounded card around them. */
 .settings-group { margin-bottom: 36px; }
 .settings-group h2 { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .settings-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .settings-row { padding: 14px 0; }
-.settings-tab, .settings-btn { border-radius: 0; }
-.settings-sheet { border-radius: 0; border: 1px solid var(--border); }
+.settings-sheet { border: 1px solid var(--border); }
 /* The shortcut list in Settings: groups are mono labels over a rule, the list sits on the page; the search stays a field. */
 .keys-editor.in-page .keys-head { border-radius: 0; }
 .keys-editor.in-page .keys-body { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
@@ -227,18 +226,20 @@
 .settle-glow i { position: absolute; background: var(--glow); border-radius: 2px; }
 @keyframes settle-glow { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
 
-/* Railway touches (D129, Tyler's pick B, 2026-11-07): progress is a stretch of pixel track. Review's steps are rail
-   with a tie at each card, green where he has been, and an ore cart (a 16-grid sprite) on the card he is on; it
-   moves as he rates, without animating (keyboard-driven). Home's week is the same track with a round dot per day (D183). */
-.review-steps { gap: 0; align-items: end; height: 22px; }
+/* Review's steps are Home's week track (D129 pick B, redrawn in dots by D184): a hairline with a round dot per
+   exercise, green where he has been, white on the one he is on, and an ore cart (a 16-grid sprite, each cell a dot)
+   riding above it; it moves as he rates, without animating (keyboard-driven). */
+.review-steps { gap: 0; align-items: end; height: 30px; }
 .review-steps span, .review-steps span.now, .review-steps span.done {
-  position: relative; height: 8px; border-radius: 0; --rail: var(--bg-active); --tie: var(--border);
-  background: linear-gradient(var(--rail), var(--rail)) 0 4px / 100% 2px no-repeat, linear-gradient(var(--tie), var(--tie)) 0 0 / 2px 8px no-repeat;
+  position: relative; height: 8px; border-radius: 0; --rail: var(--bg-active); --tie: color-mix(in oklab, var(--bg-active), var(--text) 18%);
+  background: radial-gradient(circle at 4px 4px, var(--tie) 3.6px, transparent 4px) 0 0 / 8px 8px no-repeat, linear-gradient(var(--rail), var(--rail)) 0 3px / 100% 2px no-repeat;
 }
-.review-steps > span.done { --rail: var(--c-green); --tie: color-mix(in srgb, var(--c-green) 55%, var(--bg)); }
+.review-steps > span.done { --rail: var(--c-green); --tie: var(--c-green); }
+.review-steps > span.now { --tie: var(--text); }
 .review-steps span.now::after {
-  content: ""; position: absolute; left: -6px; bottom: 4px; width: 16px; height: 16px; background: var(--muted);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2016%2016%27%20shape-rendering%3D%27crispEdges%27%3E%3Cpath%20%20d%3D%27M5%203h1v1h-1zM6%203h1v1h-1zM9%203h1v1h-1zM4%204h1v1h-1zM5%204h1v1h-1zM6%204h1v1h-1zM7%204h1v1h-1zM9%204h1v1h-1zM10%204h1v1h-1zM2%205h1v1h-1zM3%205h1v1h-1zM4%205h1v1h-1zM5%205h1v1h-1zM6%205h1v1h-1zM7%205h1v1h-1zM8%205h1v1h-1zM9%205h1v1h-1zM10%205h1v1h-1zM11%205h1v1h-1zM12%205h1v1h-1zM13%205h1v1h-1zM2%206h1v1h-1zM3%206h1v1h-1zM4%206h1v1h-1zM5%206h1v1h-1zM6%206h1v1h-1zM7%206h1v1h-1zM8%206h1v1h-1zM9%206h1v1h-1zM10%206h1v1h-1zM11%206h1v1h-1zM12%206h1v1h-1zM13%206h1v1h-1zM2%207h1v1h-1zM3%207h1v1h-1zM4%207h1v1h-1zM5%207h1v1h-1zM6%207h1v1h-1zM7%207h1v1h-1zM8%207h1v1h-1zM9%207h1v1h-1zM10%207h1v1h-1zM11%207h1v1h-1zM12%207h1v1h-1zM13%207h1v1h-1zM3%208h1v1h-1zM4%208h1v1h-1zM5%208h1v1h-1zM6%208h1v1h-1zM7%208h1v1h-1zM8%208h1v1h-1zM9%208h1v1h-1zM10%208h1v1h-1zM11%208h1v1h-1zM12%208h1v1h-1zM3%209h1v1h-1zM4%209h1v1h-1zM5%209h1v1h-1zM6%209h1v1h-1zM7%209h1v1h-1zM8%209h1v1h-1zM9%209h1v1h-1zM10%209h1v1h-1zM11%209h1v1h-1zM12%209h1v1h-1zM4%2010h1v1h-1zM5%2010h1v1h-1zM6%2010h1v1h-1zM7%2010h1v1h-1zM8%2010h1v1h-1zM9%2010h1v1h-1zM10%2010h1v1h-1zM11%2010h1v1h-1zM4%2011h1v1h-1zM5%2011h1v1h-1zM6%2011h1v1h-1zM7%2011h1v1h-1zM8%2011h1v1h-1zM9%2011h1v1h-1zM10%2011h1v1h-1zM11%2011h1v1h-1zM3%2012h1v1h-1zM4%2012h1v1h-1zM11%2012h1v1h-1zM12%2012h1v1h-1zM2%2013h1v1h-1zM3%2013h1v1h-1zM4%2013h1v1h-1zM5%2013h1v1h-1zM10%2013h1v1h-1zM11%2013h1v1h-1zM12%2013h1v1h-1zM13%2013h1v1h-1zM3%2014h1v1h-1zM4%2014h1v1h-1zM11%2014h1v1h-1zM12%2014h1v1h-1z%27/%3E%3C/svg%3E") center / 16px 16px no-repeat; mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2016%2016%27%20shape-rendering%3D%27crispEdges%27%3E%3Cpath%20%20d%3D%27M5%203h1v1h-1zM6%203h1v1h-1zM9%203h1v1h-1zM4%204h1v1h-1zM5%204h1v1h-1zM6%204h1v1h-1zM7%204h1v1h-1zM9%204h1v1h-1zM10%204h1v1h-1zM2%205h1v1h-1zM3%205h1v1h-1zM4%205h1v1h-1zM5%205h1v1h-1zM6%205h1v1h-1zM7%205h1v1h-1zM8%205h1v1h-1zM9%205h1v1h-1zM10%205h1v1h-1zM11%205h1v1h-1zM12%205h1v1h-1zM13%205h1v1h-1zM2%206h1v1h-1zM3%206h1v1h-1zM4%206h1v1h-1zM5%206h1v1h-1zM6%206h1v1h-1zM7%206h1v1h-1zM8%206h1v1h-1zM9%206h1v1h-1zM10%206h1v1h-1zM11%206h1v1h-1zM12%206h1v1h-1zM13%206h1v1h-1zM2%207h1v1h-1zM3%207h1v1h-1zM4%207h1v1h-1zM5%207h1v1h-1zM6%207h1v1h-1zM7%207h1v1h-1zM8%207h1v1h-1zM9%207h1v1h-1zM10%207h1v1h-1zM11%207h1v1h-1zM12%207h1v1h-1zM13%207h1v1h-1zM3%208h1v1h-1zM4%208h1v1h-1zM5%208h1v1h-1zM6%208h1v1h-1zM7%208h1v1h-1zM8%208h1v1h-1zM9%208h1v1h-1zM10%208h1v1h-1zM11%208h1v1h-1zM12%208h1v1h-1zM3%209h1v1h-1zM4%209h1v1h-1zM5%209h1v1h-1zM6%209h1v1h-1zM7%209h1v1h-1zM8%209h1v1h-1zM9%209h1v1h-1zM10%209h1v1h-1zM11%209h1v1h-1zM12%209h1v1h-1zM4%2010h1v1h-1zM5%2010h1v1h-1zM6%2010h1v1h-1zM7%2010h1v1h-1zM8%2010h1v1h-1zM9%2010h1v1h-1zM10%2010h1v1h-1zM11%2010h1v1h-1zM4%2011h1v1h-1zM5%2011h1v1h-1zM6%2011h1v1h-1zM7%2011h1v1h-1zM8%2011h1v1h-1zM9%2011h1v1h-1zM10%2011h1v1h-1zM11%2011h1v1h-1zM3%2012h1v1h-1zM4%2012h1v1h-1zM11%2012h1v1h-1zM12%2012h1v1h-1zM2%2013h1v1h-1zM3%2013h1v1h-1zM4%2013h1v1h-1zM5%2013h1v1h-1zM10%2013h1v1h-1zM11%2013h1v1h-1zM12%2013h1v1h-1zM13%2013h1v1h-1zM3%2014h1v1h-1zM4%2014h1v1h-1zM11%2014h1v1h-1zM12%2014h1v1h-1z%27/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+  content: ""; position: absolute; left: -6px; bottom: 9px; width: 20px; height: 20px; background: var(--text);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2016%2016%27%20shape-rendering%3D%27crispEdges%27%3E%3Cpath%20%20d%3D%27M5%203h1v1h-1zM6%203h1v1h-1zM9%203h1v1h-1zM4%204h1v1h-1zM5%204h1v1h-1zM6%204h1v1h-1zM7%204h1v1h-1zM9%204h1v1h-1zM10%204h1v1h-1zM2%205h1v1h-1zM3%205h1v1h-1zM4%205h1v1h-1zM5%205h1v1h-1zM6%205h1v1h-1zM7%205h1v1h-1zM8%205h1v1h-1zM9%205h1v1h-1zM10%205h1v1h-1zM11%205h1v1h-1zM12%205h1v1h-1zM13%205h1v1h-1zM2%206h1v1h-1zM3%206h1v1h-1zM4%206h1v1h-1zM5%206h1v1h-1zM6%206h1v1h-1zM7%206h1v1h-1zM8%206h1v1h-1zM9%206h1v1h-1zM10%206h1v1h-1zM11%206h1v1h-1zM12%206h1v1h-1zM13%206h1v1h-1zM2%207h1v1h-1zM3%207h1v1h-1zM4%207h1v1h-1zM5%207h1v1h-1zM6%207h1v1h-1zM7%207h1v1h-1zM8%207h1v1h-1zM9%207h1v1h-1zM10%207h1v1h-1zM11%207h1v1h-1zM12%207h1v1h-1zM13%207h1v1h-1zM3%208h1v1h-1zM4%208h1v1h-1zM5%208h1v1h-1zM6%208h1v1h-1zM7%208h1v1h-1zM8%208h1v1h-1zM9%208h1v1h-1zM10%208h1v1h-1zM11%208h1v1h-1zM12%208h1v1h-1zM3%209h1v1h-1zM4%209h1v1h-1zM5%209h1v1h-1zM6%209h1v1h-1zM7%209h1v1h-1zM8%209h1v1h-1zM9%209h1v1h-1zM10%209h1v1h-1zM11%209h1v1h-1zM12%209h1v1h-1zM4%2010h1v1h-1zM5%2010h1v1h-1zM6%2010h1v1h-1zM7%2010h1v1h-1zM8%2010h1v1h-1zM9%2010h1v1h-1zM10%2010h1v1h-1zM11%2010h1v1h-1zM4%2011h1v1h-1zM5%2011h1v1h-1zM6%2011h1v1h-1zM7%2011h1v1h-1zM8%2011h1v1h-1zM9%2011h1v1h-1zM10%2011h1v1h-1zM11%2011h1v1h-1zM3%2012h1v1h-1zM4%2012h1v1h-1zM11%2012h1v1h-1zM12%2012h1v1h-1zM2%2013h1v1h-1zM3%2013h1v1h-1zM4%2013h1v1h-1zM5%2013h1v1h-1zM10%2013h1v1h-1zM11%2013h1v1h-1zM12%2013h1v1h-1zM13%2013h1v1h-1zM3%2014h1v1h-1zM4%2014h1v1h-1zM11%2014h1v1h-1zM12%2014h1v1h-1z%27/%3E%3C/svg%3E") center / 20px 20px no-repeat, radial-gradient(circle, #000 0.47px, transparent 0.52px) 0 0 / 1.25px 1.25px; mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2016%2016%27%20shape-rendering%3D%27crispEdges%27%3E%3Cpath%20%20d%3D%27M5%203h1v1h-1zM6%203h1v1h-1zM9%203h1v1h-1zM4%204h1v1h-1zM5%204h1v1h-1zM6%204h1v1h-1zM7%204h1v1h-1zM9%204h1v1h-1zM10%204h1v1h-1zM2%205h1v1h-1zM3%205h1v1h-1zM4%205h1v1h-1zM5%205h1v1h-1zM6%205h1v1h-1zM7%205h1v1h-1zM8%205h1v1h-1zM9%205h1v1h-1zM10%205h1v1h-1zM11%205h1v1h-1zM12%205h1v1h-1zM13%205h1v1h-1zM2%206h1v1h-1zM3%206h1v1h-1zM4%206h1v1h-1zM5%206h1v1h-1zM6%206h1v1h-1zM7%206h1v1h-1zM8%206h1v1h-1zM9%206h1v1h-1zM10%206h1v1h-1zM11%206h1v1h-1zM12%206h1v1h-1zM13%206h1v1h-1zM2%207h1v1h-1zM3%207h1v1h-1zM4%207h1v1h-1zM5%207h1v1h-1zM6%207h1v1h-1zM7%207h1v1h-1zM8%207h1v1h-1zM9%207h1v1h-1zM10%207h1v1h-1zM11%207h1v1h-1zM12%207h1v1h-1zM13%207h1v1h-1zM3%208h1v1h-1zM4%208h1v1h-1zM5%208h1v1h-1zM6%208h1v1h-1zM7%208h1v1h-1zM8%208h1v1h-1zM9%208h1v1h-1zM10%208h1v1h-1zM11%208h1v1h-1zM12%208h1v1h-1zM3%209h1v1h-1zM4%209h1v1h-1zM5%209h1v1h-1zM6%209h1v1h-1zM7%209h1v1h-1zM8%209h1v1h-1zM9%209h1v1h-1zM10%209h1v1h-1zM11%209h1v1h-1zM12%209h1v1h-1zM4%2010h1v1h-1zM5%2010h1v1h-1zM6%2010h1v1h-1zM7%2010h1v1h-1zM8%2010h1v1h-1zM9%2010h1v1h-1zM10%2010h1v1h-1zM11%2010h1v1h-1zM4%2011h1v1h-1zM5%2011h1v1h-1zM6%2011h1v1h-1zM7%2011h1v1h-1zM8%2011h1v1h-1zM9%2011h1v1h-1zM10%2011h1v1h-1zM11%2011h1v1h-1zM3%2012h1v1h-1zM4%2012h1v1h-1zM11%2012h1v1h-1zM12%2012h1v1h-1zM2%2013h1v1h-1zM3%2013h1v1h-1zM4%2013h1v1h-1zM5%2013h1v1h-1zM10%2013h1v1h-1zM11%2013h1v1h-1zM12%2013h1v1h-1zM13%2013h1v1h-1zM3%2014h1v1h-1zM4%2014h1v1h-1zM11%2014h1v1h-1zM12%2014h1v1h-1z%27/%3E%3C/svg%3E") center / 20px 20px no-repeat, radial-gradient(circle, #000 0.47px, transparent 0.52px) 0 0 / 1.25px 1.25px;
+  -webkit-mask-composite: source-in; mask-composite: intersect;
 }
 .home-week { position: relative; gap: 14px; width: fit-content; }
 .home-week::before { content: ""; position: absolute; left: 4px; right: 4px; top: 5px; height: 2px; background: var(--bg-active); }

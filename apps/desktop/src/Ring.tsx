@@ -20,6 +20,16 @@ export function DotRing({ size, share, ghost = 0 }: { size: number; share: numbe
   );
 }
 
+/** A bar of `n` dots (D184), lit by the same rule as the ring. `className` places it (home-meter, thumb-bar, review-bar). */
+export function DotBar({ share, n, className }: { share: number; n: number; className: string }) {
+  const on = lit(share, n);
+  return (
+    <span className={`dot-bar ${className}`} aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => <i key={i} className={i < on ? "on" : undefined} />)}
+    </span>
+  );
+}
+
 /** The daily goal as a ring (D60), like Apple Fitness's move ring: it fills from `from` to `value`
  *  when shown and plays one short burst when `burst` is set (D62; none under Reduce Motion). */
 export function Ring({ value, from = 0, size = 64, met, burst = false, label }: { value: number; from?: number; size?: number; met: boolean; burst?: boolean; label: string }) {
