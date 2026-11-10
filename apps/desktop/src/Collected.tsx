@@ -9,12 +9,12 @@ import { passageText } from "./text";
 import { load, save } from "./util";
 
 // D118: one highlight; a key point (`card` in the files) is a highlight he marked to come back, and the AI
-// plans the cards from all of them at the finish.
+// plans the cards from all of them: the day after a sitting while he is still reading (D180), and at the finish.
 export const LABEL: Record<Intent, string> = { keep: "Highlight", card: "Key point", question: "Question", apply: "Try it" };
 export const ICON: Record<Intent, typeof PixelKeep> = { keep: PixelKeep, card: PixelStar, question: PixelQuestion, apply: PixelTry };
 /** What each mark means, said on hover where he picks it. */
 export const MEANS: Record<Intent, string> = {
-  keep: "Cards are planned from your highlights when you finish",
+  keep: "Cards are planned from your highlights the next day",
   card: "Make sure this comes back in review",
   question: "Something to find out",
   apply: "A technique to try on your own work, then check off",

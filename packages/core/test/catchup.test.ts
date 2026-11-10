@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
-import { addText, catchUpDue, catchUpItems, markCatchUp, optimizeDue, paths } from "../src/index.ts";
+import { addHighlight, addText, catchUpDue, catchUpItems, findItem, markCatchUp, optimizeDue, paths, setItemStatus, updateItemMeta } from "../src/index.ts";
 import { tempLibrary } from "./helpers.ts";
 
 describe("daily catch-up (D8, D10)", () => {
@@ -19,6 +19,16 @@ describe("daily catch-up (D8, D10)", () => {
     const added = Date.parse(item.meta.captured_at);
     expect(catchUpItems(lib, new Date(added + 10 * 60_000)).map((i) => i.meta.id)).toEqual([]);
     expect(catchUpItems(lib, new Date(added + 61 * 60_000)).map((i) => i.meta.id)).toEqual([item.meta.id]);
+  });
+
+  test("D180: picks up a source he is still reading once its plain highlights have rested six hours", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Spacing\n\nReviews spread over days beat one long session.");
+    await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, enriched_at: m.captured_at }));
+    await setItemStatus(lib, item.meta.id, "reading");
+    const made = Date.parse(addHighlight(findItem(lib, item.meta.id), { exact: "Reviews spread over days", intent: "keep" }).ts);
+    expect(catchUpItems(lib, new Date(made + 5 * 3_600_000)).map((i) => i.meta.id)).toEqual([]);
+    expect(catchUpItems(lib, new Date(made + 6 * 3_600_000)).map((i) => i.meta.id)).toEqual([item.meta.id]);
   });
 
   test("no refit below 1,000 reviews; a month-old fit is due again", async () => {

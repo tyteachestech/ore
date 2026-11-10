@@ -45,7 +45,7 @@ export const aiCommands: Record<string, Command> = {
   },
 
   "catch-up": {
-    usage: "                             the daily catch-up (D8, D10): enrich what is pending (not sources added in the last hour), then refit FSRS when a month old; started in the background once a day",
+    usage: "                             the daily catch-up (D8, D10): enrich what is pending (not sources added in the last hour), which plans cards from the highlights of sources still being read once they are six hours old (D180), then refit FSRS when a month old; started in the background once a day",
     async run() {
       const lib = openLibrary();
       markCatchUp(lib);

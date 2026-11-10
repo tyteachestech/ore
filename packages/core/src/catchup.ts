@@ -7,7 +7,8 @@ import { MIN_REVIEWS_TO_OPTIMIZE } from "./optimize.ts";
 import { readReviews } from "./reviews.ts";
 
 // D8, D10: "runs when awake, catches up once". Once a day the first command that checks starts a background
-// run that enriches what is still pending; once a month that run also refits FSRS's parameters.
+// run that enriches what is still pending, which includes planning cards from the plain highlights of a
+// source he is still reading once it has rested (D180); once a month that run also refits FSRS's parameters.
 export const CATCH_UP_EVERY_MS = 20 * 3_600_000;
 export const OPTIMIZE_EVERY_MS = 30 * 86_400_000;
 // A source added in the last hour has its own background enrich running; the catch-up leaves it alone.
@@ -31,7 +32,7 @@ export function markCatchUp(lib: Library, now = new Date()) {
 }
 
 export function catchUpItems(lib: Library, now = new Date()): Item[] {
-  return pendingItems(lib).filter((i) => now.getTime() - Date.parse(i.meta.captured_at) >= FRESH_MS);
+  return pendingItems(lib, now).filter((i) => now.getTime() - Date.parse(i.meta.captured_at) >= FRESH_MS);
 }
 
 /** Enough reviews, and the parameters are missing or a month old. */

@@ -4,7 +4,7 @@ Read `docs/DECISIONS.md` first. Evidence and option research live in `docs/resea
 
 ## 1. Loop
 
-capture → (AI: prequestions, skills, topics) → read + highlight (one highlight, marked ★ Key point or Question if he wants, optional note; D118) + a source note in his own words (section lines, chapter and finish recall) → (AI: draft cards and prompts from key points at once and, after the finish, a planned few from his highlights, plus the source note and the prequestions; D118) → review (confidence → answer → AI grade proposal → your rating → FSRS) → skill-level stats.
+capture → (AI: prequestions, skills, topics) → read + highlight (one highlight, marked ★ Key point or Question if he wants, optional note; D118) + a source note in his own words (section lines, chapter and finish recall) → (AI: draft cards and prompts from key points at once; a planned few from his highlights the day after a sitting while he is still reading, D180, and after the finish; plus the source note and, after the finish, the prequestions; D118) → review (confidence → answer → AI grade proposal → your rating → FSRS) → skill-level stats.
 
 ## 2. Library layout (`~/Ore`, override with `ORE_LIBRARY`)
 

@@ -197,7 +197,7 @@ describe("AI adapter", () => {
     expect(readTopic(lib, "agent-workflows")!.meta.status).toBe("active");
     const after = findItem(lib, item.meta.id).meta;
     expect(after.enriched_at).toBeDefined();
-    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@13" });
+    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@14" });
     const cards = listCards(lib);
     expect(cards).toHaveLength(1);
     expect(cards[0]!.meta).toMatchObject({ state: "draft", kind: "prompt", annotation: card.id, topics: ["agent-workflows"], ai: after.ai });
@@ -267,6 +267,50 @@ describe("AI adapter", () => {
     // a highlight made after the plan is weighed next time
     const late = hl("Nobody saw it coming.");
     expect(pendingHighlights(findItem(lib, id), listCards(lib)).map((x) => x.id)).toEqual([late.id]);
+  });
+
+  test("D180: on a source he is still reading, plain highlights are planned once it has rested; prequestions wait for the finish", async () => {
+    const lib = await tempLibrary();
+    const text = "Three reasons we doubt forecasts. We think in straight lines. Recent history misleads. Experience makes us stubborn. Nobody saw it coming.";
+    const id = (await createItem(lib, { type: "article", title: "Forecasts", body: text })).meta.id;
+    await updateItemMeta(lib, id, (m) => ({ ...m, skills: ["ai"], enriched_at: "2026-10-25T00:00:00Z", prequestions: [{ q: "Why do forecasts miss?" }, { q: "What misleads us?" }] }));
+    await setItemStatus(lib, id, "reading");
+    const hl = (exact: string) => addHighlight(findItem(lib, id), { exact, intent: "keep" });
+    const [lead, a, b] = ["Three reasons we doubt forecasts.", "We think in straight lines.", "Recent history misleads."].map(hl);
+    const at = (h: number) => new Date(Date.now() + h * 3_600_000);
+    const pending = (now: Date) => pendingHighlights(findItem(lib, id), listCards(lib), now).map((x) => x.id);
+    // He may still be in that sitting: nothing to plan, and the day's catch-up leaves the source alone.
+    expect(pending(at(5))).toEqual([]);
+    expect(needsEnrich(findItem(lib, id), listCards(lib), at(5))).toBe(false);
+    expect(pendingItems(lib, at(5))).toEqual([]);
+    // Six hours with no new highlight: the plan weighs them, as it would at the finish.
+    expect(pending(at(7)).sort()).toEqual([lead, a, b].map((x) => x!.id).sort());
+    expect(pendingItems(lib, at(7)).map((i) => i.meta.id)).toEqual([id]);
+    // An inbox source he never opened is not being read.
+    await setItemStatus(lib, id, "inbox");
+    expect(pending(at(7))).toEqual([]);
+    await setItemStatus(lib, id, "reading");
+
+    const group = { ...draft(lead!.id), kind: "prompt", content_type: "concept", question: "Why do people doubt bold forecasts?", answer: "Linear thinking and misleading recent history.", rubric: ["Linear thinking", "Recent history"], also: [a!.id, b!.id] };
+    fakeClaude([enrichOut(["Q1?", "Q2?"], [group])]);
+    const r = await enrichItem(lib, id, at(7));
+    const sent = JSON.parse(inputOf(0).slice(inputOf(0).indexOf("{"), inputOf(0).lastIndexOf("}") + 1));
+    expect(sent.highlights.map((h: { intent: string }) => h.intent)).toEqual(["highlight", "highlight", "highlight"]);
+    // Still being answered: no review prompt from a prequestion before the finish.
+    expect(sent.prequestions_to_draft).toEqual([]);
+    expect(sent.plain_cap).toBe(5);
+    expect(r.cards.map((c) => c.annotation)).toEqual([lead!.id]);
+    expect(findItem(lib, id).meta.status).toBe("reading");
+    expect(findItem(lib, id).meta.planned?.sort()).toEqual([lead, a, b].map((x) => x!.id).sort());
+    expect(pending(at(7))).toEqual([]);
+    // The next sitting's highlight waits its own rest, and holds nothing else back.
+    const late = hl("Nobody saw it coming.");
+    expect(pending(at(5))).toEqual([]);
+    expect(pending(at(7))).toEqual([late.id]);
+    // The finish still plans what is left and writes the prequestions' prompts.
+    await setItemStatus(lib, id, "done");
+    expect(pending(new Date())).toEqual([late.id]);
+    expect(pendingPrequestions(findItem(lib, id), listCards(lib)).map((p) => p.n)).toEqual([1, 2]);
   });
 
   test("D118: more plain-only drafts than the cap are refused", async () => {
