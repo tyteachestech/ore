@@ -830,7 +830,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
           </div>
         ) : (
           <div className="review-bar" role="progressbar" aria-label="Session" aria-valuemin={0} aria-valuemax={done + left} aria-valuenow={done}>
-            <DotBar className="review-dots" share={end ? 1 : progress} n={60} />
+            {/* 6px dots: 60 need 360px, which the phone's head does not have. */}
+            <DotBar className="review-dots" share={end ? 1 : progress} n={PHONE ? 30 : 60} />
           </div>
         )}
         {last && (
