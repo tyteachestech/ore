@@ -189,7 +189,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
           before.current = t;
           setStart(t);
         }, () => {});
-        const q = await ore<DueEntry[]>("due", ...(pick ?? []).map((s) => opt("skill", s)));
+        // --start: a session opens on a likely recall (D176); the quick quiz asks the card that is next.
+        const q = await ore<DueEntry[]>("due", ...(quick ? [] : ["--start"]), ...(pick ?? []).map((s) => opt("skill", s)));
         // An empty queue ends the session at once, and why ("nothing due in the skills you picked",
         // new cards waiting) reads today: let it land first.
         if (!q.length) await t;

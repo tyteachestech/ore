@@ -205,9 +205,15 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     // Five reviewed long ago, one a week later: on the day all are overdue, that one is the likeliest recall.
     for (const card of cards.slice(0, 5)) await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, now: day1 });
     await recordReview(lib, cards[5]!.meta.id, { rating: 3, confidence: 2, now: new Date(day1.getTime() + 7 * 864e5) });
-    const q = dueQueue(lib, new Date(day1.getTime() + 60 * 864e5));
+    const later = new Date(day1.getTime() + 60 * 864e5);
+    const q = dueQueue(lib, later, { start: true });
     expect(q[0]!.id).toBe(cards[5]!.meta.id);
     expect(q[0]!.retrievability).toBeGreaterThan(q[1]!.retrievability);
+    // A fetch mid-session (the quick quiz, the queue re-read when it closes) keeps most urgent first:
+    // a second "likely recall" pulled forward would no longer be the card on screen.
+    const mid = dueQueue(lib, later);
+    expect(mid.at(-1)!.id).toBe(cards[5]!.meta.id);
+    expect(q.slice(1).map((e) => e.id)).toEqual(mid.slice(0, -1).map((e) => e.id));
   });
 
   // Review's Delete on a New card is `ore card retire`; its Undo is `ore card restore --state draft` (D144: answer approves, delete drops).

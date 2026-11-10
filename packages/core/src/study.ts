@@ -123,6 +123,8 @@ export interface QueueOptions {
   skills?: string[];
   /** Apply the new-card limits (D60, D65, D144): at most `new_per_day`, and none drafted today. On by default. */
   newLimit?: boolean;
+  /** A session's first fetch: its first card is a likely recall (D176). A fetch mid-session leaves the order alone. */
+  start?: boolean;
 }
 
 /** One card in this many is new while due cards last (D144). */
@@ -195,7 +197,8 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     // so new learning comes in whatever is due, and the due cards fill the rest, most urgent first.
     const fresh = unseen.slice(0, newLeft).map((u) => u.entry);
     const ordered = orderQueue(entries);
-    const live = winFirst(ordered.filter((e) => !e.relearn));
+    const due = ordered.filter((e) => !e.relearn);
+    const live = opts.start ? winFirst(due) : due;
     const out: QueueEntry[] = [];
     for (const e of live) {
       out.push(e);

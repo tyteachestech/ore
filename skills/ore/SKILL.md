@@ -51,7 +51,7 @@ A fix request in the middle of a review runs mode 4, then the review continues w
 
 Start:
 ```bash
-ore session start --json && ore due --json --limit 12 && date +%s
+ore session start --json && ore due --start --json --limit 12 && date +%s
 ```
 Keep the session id (`id`) and pass it as `--session <id>` to every `ore review`.
 
