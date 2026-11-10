@@ -15,6 +15,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
+import { compileCli } from "./compile-cli.ts";
 
 const APP = join(import.meta.dir, "..");
 const MOCK = join(APP, "scripts/mock");
@@ -34,7 +35,7 @@ if (!process.argv.includes("--no-build")) await $`bunx vite build`.cwd(APP).quie
 
 // --compiled: the CLI as the release app carries it (scripts/bundle-cli.ts), instead of from source as `bun link` runs it.
 const compiled = process.argv.includes("--compiled") ? join(tmpdir(), "ore-bench-cli") : undefined;
-if (compiled) await $`bun build --compile --minify --bytecode ${join(APP, "../../packages/cli/src/ore.ts")} --outfile ${compiled}`.quiet();
+if (compiled) await compileCli(compiled);
 const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, PORT: String(BRIDGE), ...(compiled && { ORE_BRIDGE_BIN: compiled }) }, stdout: "ignore", stderr: "inherit" });
 const vite = Bun.spawn(["bunx", "vite", "preview", "--port", String(PORT), "--strictPort"], { cwd: APP, stdout: "ignore", stderr: "ignore" });
 const url = `http://localhost:${PORT}/`;
