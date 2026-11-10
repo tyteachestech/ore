@@ -6,14 +6,16 @@ import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
 import { errorText, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { passageText } from "./text";
 
 // D75: answering a question where the answer turns up. One answer model on the skill page and in the
 // reader: pieces of his answer ("contributions"), each naming the source it was written from, so
 // writing from a source is what links it to the question. Answered closes it; Answered + card also
 // has the next enrich draft a card from his answer (offer, never require).
 
-/** His question in one line: a typed question is its own text; a highlight's question is his note. */
-const questionText = (q: Question) => q.note?.trim() || q.exact.replace(/\s+/g, " ").trim();
+/** His question in one line: a highlight's question is his note, or its passage as the page shows it;
+ *  a question he typed is his own text, kept as typed ("__init__", "*args"). */
+export const questionText = (q: Pick<Question, "exact" | "item_title" | "note">) => q.note?.trim() || (typedQuestion(q) ? q.exact.replace(/\s+/g, " ").trim() : passageText(q.exact));
 
 /** A question he typed (not one highlighted in a source): its hidden source is titled from its first
  *  line, cut to 77 characters and "…" past 80, as `addSnippet` titles it. */

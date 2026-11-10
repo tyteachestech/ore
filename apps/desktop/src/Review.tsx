@@ -19,6 +19,7 @@ import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
+import { passageText } from "./text";
 import { Evidence } from "./Evidence";
 import { Occluded } from "./Occluded";
 
@@ -362,9 +363,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       (s) => {
         if (at !== showing.current) return;
         if (c.evidence?.length)
-          return setPassage({ item: c.item, title: s.title, quotes: c.evidence.map((e) => ({ text: e.exact.replace(/\[[\d:.]+\]\s*/g, ""), at: `q:${e.start}:${e.end}`, time: stampBefore(s.body, e.start) })) });
+          return setPassage({ item: c.item, title: s.title, quotes: c.evidence.map((e) => ({ text: passageText(e.exact.replace(/\[[\d:.]+\]\s*/g, "")), at: `q:${e.start}:${e.end}`, time: stampBefore(s.body, e.start) })) });
         const a = c.annotation ? s.annotations.find((x) => x.id === c.annotation && x.status !== "deleted") : undefined;
-        setPassage({ item: c.item, title: s.title, quotes: a ? [{ text: a.exact, at: a.id }] : [] });
+        setPassage({ item: c.item, title: s.title, quotes: a ? [{ text: passageText(a.exact), at: a.id }] : [] });
       },
       (e) => {
         if (at !== showing.current) return;
@@ -1293,7 +1294,7 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
           <button className="review-try" onClick={() => onTry(end.next!)}>
             <PixelTry size={16} aria-hidden="true" />
             <span>
-              <span className="review-try-plan">{end.next.note || `“${end.next.exact.replace(/\s+/g, " ").trim()}”`}</span>
+              <span className="review-try-plan">{end.next.note || `“${passageText(end.next.exact)}”`}</span>
               <span className="review-try-from">{end.next.item_title}</span>
             </span>
           </button>

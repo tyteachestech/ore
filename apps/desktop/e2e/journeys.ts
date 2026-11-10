@@ -4022,6 +4022,56 @@ journey("review picker: fresh numbers that drop the only ticked skill leave noth
   await page.keyboard.press("Escape");
 });
 
+journey("review: a rating undone and given again leaves no Redo to press", async (page) => {
+  // Undo offers Redo; a new rating ends what can be redone, so the toast that is still up stops offering it.
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  const first = await q.innerText();
+  const good = page.getByRole("button", { name: "Good", exact: true });
+  const undo = page.getByRole("button", { name: "Undo last rating" });
+  const redo = page.locator(".toast").getByRole("button", { name: "Redo" });
+  await reveal(page);
+  await good.click();
+  await undo.click();
+  await until("Undo puts the card back", async () => (await q.isVisible()) && (await q.innerText()) === first);
+  await redo.waitFor();
+  await reveal(page);
+  await good.click();
+  await until("the rating given again moves on", async () => !(await q.isVisible()) || (await q.innerText()) !== first);
+  if (await redo.count()) throw new Error("the toast still offers Redo, which no longer does anything");
+  // Leaves the card due for the journeys after this one.
+  await undo.click();
+  await until("Undo puts the card back", async () => (await q.isVisible()) && (await q.innerText()) === first);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: a card's passage reads as the page shows it, without its Markdown", async (page) => {
+  // A highlight keeps the source's Markdown (bold, a link, emphasis); the passage under the answer shows the words.
+  // The first card is given such a highlight in what `ore` answers, so the journey leans on no other's state.
+  const exact = "Retrieval prompts should produce **consistent** answers, as [Matuschak](https://example.test/prompts) puts it,\nlighting the *same bulbs* each time.";
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    const card = body.includes('"args":["card","show",');
+    if (!card && !body.includes('"args":["show",')) return route.fallback();
+    const res = await route.fetch();
+    const json = await res.json();
+    if (card) Object.assign(json, { annotation: "md-passage", evidence: [] });
+    else json.annotations = [...(json.annotations ?? []), { id: "md-passage", exact, intent: "card", status: "open" }];
+    await route.fulfill({ response: res, json });
+  });
+  await startReview(page, null);
+  await reveal(page);
+  const quote = page.locator(".review-passage blockquote");
+  await quote.waitFor();
+  const shown = (await quote.innerText()).replace(/\s+/g, " ").trim();
+  const want = "Retrieval prompts should produce consistent answers, as Matuschak puts it, lighting the same bulbs each time.";
+  if (shown !== want) throw new Error(`the passage shows “${shown}”, not “${want}”`);
+  await page.unroute(/\/ore$/);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: a Tutor card with no passage still offers Open in source after the answer, and it opens that source", async (page) => {
   // The seed's Storytelling card: the tutor kept it, so it has its source but no passage in it.
   await startReview(page, /Storytelling/);
@@ -4238,6 +4288,28 @@ journey("questions: one asked on a source in no skill is listed there; a highlig
   await page.locator(".qp-line", { hasText: "useful deliberate practice" }).waitFor({ timeout: 3000 }).catch(() => {
     throw new Error("a passage marked as a question is missing from Questions until the tab is reopened");
   });
+});
+
+journey("questions: a highlight marked as a question joins the list even when its save lands after the list was read", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# A slow save\n\nSpacing reviews apart strengthens memory more than cramming them together does.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("Spacing reviews apart").waitFor();
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const head = page.locator(".cp-head", { hasText: "Questions" });
+  if ((await head.locator(".cp-toggle").getAttribute("aria-expanded")) === "false") await head.locator(".cp-toggle").click();
+  // The mark's write reaches the library late: the list, read the moment the highlight shows as a question, comes back without it.
+  await page.route(/\/ore$/, async (route) => {
+    if ((route.request().postData() ?? "").includes('"args":["annotate",')) await new Promise((r) => setTimeout(r, 700));
+    await route.fallback();
+  });
+  await select(page, "strengthens memory more than cramming");
+  await page.locator(".popup").waitFor();
+  await page.keyboard.press("3"); // a question highlight
+  await page.locator(".qp-line", { hasText: "strengthens memory more than cramming" }).waitFor({ timeout: 4000 }).catch(() => {
+    throw new Error("a passage marked as a question never joins Questions when its save lands after the list was read");
+  });
+  await page.unroute(/\/ore$/);
 });
 
 journey("author: a save that fails keeps the name he typed, in the field", async (page) => {
