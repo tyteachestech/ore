@@ -707,22 +707,24 @@ export function App() {
   /** Feed posts open as previews; leaving one keeps it if he highlighted or wrote in it, else drops it. */
   const previews = useRef(new Map<string, string>());
   const [feedTick, setFeedTick] = useState(0);
-  const opening = useRef<string | null>(null);
+  const opening = useRef<{ url: string; from: unknown } | null>(null);
   const openPost = useCallback(async (post: FeedPost) => {
-    // A second click or Enter on the post already loading waits for the first.
-    if (opening.current === post.url) return;
     const from = viewRef.current;
-    opening.current = post.url;
+    // A second click or Enter on the post already loading waits for the first. (Asked again after going
+    // away and coming back, it is a new ask: the first one is let go.)
+    if (opening.current?.url === post.url && opening.current.from === from) return;
+    const ask = (opening.current = { url: post.url, from });
     try {
       const r = await ore<{ id: string; title: string; preview: boolean }>("feed", "open", post.url);
       // He went elsewhere, or opened another post, while it loaded: it never opens over that, and its preview goes.
-      const mine = opening.current === post.url;
+      const mine = opening.current === ask;
       if (mine) opening.current = null;
-      if (viewRef.current !== from || !mine) return void (r.preview && ore("feed", "close", r.id).catch(() => {}));
+      // (Unless he has asked for this same post again: that ask opens this preview.)
+      if (viewRef.current !== from || !mine) return void (r.preview && opening.current?.url !== post.url && ore("feed", "close", r.id).catch(() => {}));
       if (r.preview) previews.current.set(r.id, r.title);
       openSource(r.id);
     } catch (e) {
-      if (opening.current === post.url) opening.current = null;
+      if (opening.current === ask) opening.current = null;
       notify(errorText(e), "error");
     }
   }, [openSource, notify]);

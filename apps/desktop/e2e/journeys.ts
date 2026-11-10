@@ -3574,6 +3574,11 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   await until("the session counts the rating", async () => (await done()) === before + 1);
   await page.getByRole("button", { name: "Undo last rating" }).click();
   await until("Undo puts the first card back", async () => (await done()) === before && (await q.innerText()) === first);
+  // The button is the same step as ⌘Z: ⇧⌘Z gives the rating again, and ⌘Z takes it back once more.
+  await page.keyboard.press("Shift+Meta+z");
+  await until("⇧⌘Z after the button's Undo rates it again", async () => (await done()) === before + 1);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => (await done()) === before);
   // Leave Review as he would, so its session ends: one left open carries into the journeys after this one.
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
@@ -5957,12 +5962,20 @@ journey("feed: a post that opens slowly never takes him away from where he went 
     await page.getByRole("button", { name: /^Home/ }).click();
     await page.waitForTimeout(2200);
     if (await page.locator(".doc-head h1").count()) throw new Error("the post opened over Home after he went there");
-    // A preview he only looked at is dropped when he goes back, so Forward has nowhere to go and says so.
-    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    // Asked for again after leaving and coming back while it still loads, it opens.
     await page.getByRole("button", { name: /^Feed/ }).click();
+    // (Read posts stay listed for this, as with the view's All.)
+    await page.evaluate(() => localStorage.setItem("ore.feed.show", "all"));
     const other = page.locator(".row.post", { hasText: "Another post" });
     await other.click();
-    await page.locator(".doc-head h1", { hasText: "Another post" }).waitFor();
+    await page.getByRole("button", { name: /^Home/ }).click();
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    await other.click();
+    await page.locator(".doc-head h1", { hasText: "Another post" }).waitFor({ timeout: 6000 }).catch(() => {
+      throw new Error("a post asked for again while its first open still loads never opens");
+    });
+    // A preview he only looked at is dropped when he goes back, so Forward has nowhere to go and says so.
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
     await page.keyboard.press("Meta+BracketLeft");
     await page.locator(".feed, .row.post, .list").first().waitFor();
     const forward = page.locator(".nav-arrows button").nth(1);
@@ -5973,7 +5986,7 @@ journey("feed: a post that opens slowly never takes him away from where he went 
       if (!(await page.locator(".doc-head h1").count()) && (await forward.isEnabled())) throw new Error("Forward stays lit and does nothing after a dropped preview");
     }
   } finally {
-    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = undefined));
+    await page.evaluate(() => (void ((window as unknown as Rigged).__ORE_SLOW = undefined), localStorage.removeItem("ore.feed.show")));
     await ore("feed", "unfollow", feed).catch(() => {});
     server.stop(true);
   }

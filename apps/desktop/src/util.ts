@@ -11,7 +11,10 @@ import { useEffect, useRef, useState, type FocusEvent, type RefObject } from "re
 /** `show`: the toast's one action: Show on a result, Try again on an error. */
 /** `stay`: an error toast that stays until its Try again is pressed or its × dismisses it, for a failure only that toast can recover. */
 /** `slot`: one toast at a time for it; a new one takes the place of the one showing (a retry that failed again). */
-export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => Promise<unknown>, redo?: () => Promise<unknown>, show?: () => void, stay?: boolean, slot?: string) => () => void;
+export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => Promise<unknown>, redo?: () => Promise<unknown>, show?: () => void, stay?: boolean, slot?: string) => Forget;
+/** What `notify` returns: call it to take the step off the history; `undo()` takes the step back as ⌘Z would
+ *  (a screen's own Undo button), so it can be redone and a failure is reported the same way. */
+export type Forget = (() => void) & { undo: () => void };
 
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never
  *  reaches the UI as "Cannot read properties of null". */
