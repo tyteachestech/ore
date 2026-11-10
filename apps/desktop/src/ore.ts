@@ -302,7 +302,7 @@ export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; ne
 
 /** `ore grade`: a proposed rating (never logged by itself, D21) and one mark per rubric point, with the words
  *  of his answer that earned each covered one ("" for none; absent from a grade made before D141). */
-export type Grade = { rating: 1 | 2 | 3 | 4; gaps: string[]; feedback: string; covered: boolean[]; evidence?: string[] };
+export type Grade = { rating: 1 | 2 | 3 | 4; gaps: string[]; feedback: string; covered: boolean[]; evidence?: string[]; ai?: { vendor: string; model: string; prompt_version: string } };
 
 /** `ore session end` (D62). */
 /** The end screen says how many were rescued only when they are a minority of the session: over a backlog

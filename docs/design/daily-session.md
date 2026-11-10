@@ -71,7 +71,7 @@ Tyler wants the daily session to be something people get hooked on in a good way
 Each needs Tyler's call before it is built. None touches FSRS math (D22). `learning-system.md` marks which are safe to build now.
 
 1. **Drop the full due count from Home's hover hint** (D65.4). Under a standing backlog it only grows, and nothing in the session changes because of it (purpose rule). The slice in minutes already says what today asks.
-2. **Start on a likely win.** The first card of a session is one they will probably recall, so the first ten seconds feel good. Order within today's slice only.
+2. **Start on a likely win.** The first card of a session is one they will probably recall, so the first ten seconds feel good. Order within today's slice only. **Built as D176** (Tyler, 2026-11-10).
 3. **End on a win.** When the goal closes right after a miss, one more likely-recalled card first, so the session's last moment is a success (the peak-end rule, Kahneman et al. 1993; in the field, hard tasks that came last or back to back raised quitting, Kang, Daniels & Schweitzer 2022, `research/brief-learning-science.md` §10).
 4. **The glowing gem as a one-click review** of the cards it stands for (D90's "later").
 

@@ -6,8 +6,8 @@ import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
 import { paths } from "../src/library.ts";
 import { endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
-import type { Review } from "../src/reviews.ts";
-import { calibration } from "../src/stats.ts";
+import { readReviews, type Review } from "../src/reviews.ts";
+import { calibration, raterStats } from "../src/stats.ts";
 import { loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
 import { dueQueue, recordReview } from "../src/study.ts";
 import { level, nextLevelAt, reminderNote, skillGrowth, skillStrength, today } from "../src/today.ts";
@@ -183,6 +183,31 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(picked.flatMap((e, i) => (e.due === null ? [i] : []))).toEqual([4, 9]);
     expect(picked.filter((e) => e.due === null).map((e) => e.id)).toEqual([fromB.meta.id, fromC.meta.id]);
     expect(dueQueue(lib, later, { skills: ["habits"] }).map((e) => e.id)).toEqual([habit.meta.id]);
+  });
+
+  test("new cards from his own work come before the AI's: his notes, then his highlights, then the rest (D176)", async () => {
+    const { lib, item: a } = await library(0);
+    const { item: b } = await addSnippet(lib, { text: "Interleaving beats blocking." });
+    await setItemStatus(lib, a.meta.id, "done", "2026-01-01T00:00:00Z");
+    await setItemStatus(lib, b.meta.id, "done", "2026-03-01T00:00:00Z"); // the fresher source
+    const draft = (item: string, q: string, over: object = {}) => writeNewCard(lib, { kind: "card", item, skills: ["learning"], topics: ["spacing"], content_type: "fact", question: q, answer: "A", rubric: [], ...over });
+    const asked = draft(b.meta.id, "A prequestion's card?", { from: "prequestion", prequestion: 1 });
+    const marked = draft(a.meta.id, "From his key point?", { annotation: "01M0000000000000000000000A" });
+    const wrote = draft(a.meta.id, "From his note?", { from: "notes" });
+    const markedFresh = draft(b.meta.id, "From a key point in the fresher source?", { annotation: "01M0000000000000000000000B" });
+    const tomorrow = new Date(Date.now() + 864e5);
+    expect(dueQueue(lib, tomorrow).map((e) => e.question)).toEqual([wrote, markedFresh, marked, asked].map((c) => c.question));
+  });
+
+  test("over a backlog the session opens on the likeliest recall of its first ten (D176)", async () => {
+    const { lib, cards } = await library(6);
+    const day1 = T();
+    // Five reviewed long ago, one a week later: on the day all are overdue, that one is the likeliest recall.
+    for (const card of cards.slice(0, 5)) await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, now: day1 });
+    await recordReview(lib, cards[5]!.meta.id, { rating: 3, confidence: 2, now: new Date(day1.getTime() + 7 * 864e5) });
+    const q = dueQueue(lib, new Date(day1.getTime() + 60 * 864e5));
+    expect(q[0]!.id).toBe(cards[5]!.meta.id);
+    expect(q[0]!.retrievability).toBeGreaterThan(q[1]!.retrievability);
   });
 
   // Review's Delete on a New card is `ore card retire`; its Undo is `ore card restore --state draft` (D144: answer approves, delete drops).
@@ -367,4 +392,32 @@ describe("editing a card in review (D59)", () => {
     expect(e).toMatchObject({ question: "Why space?", answer: "Some forgetting makes retrieval effortful.", rubric: ["names forgetting", "names retrieval"] });
     expect(e.meta).toEqual(c.meta);
   });
+});
+
+describe("what the review log can say about the grader and in-head answers (science pass rec 5)", () => {
+  const r = (over: Partial<Review>) => ({ ts: new Date().toISOString(), card: "C", confidence: 2, rating: 3, state_before: { reps: 3 }, ...over }) as unknown as Review;
+  test("how often his rating is the AI's suggestion, and how far apart they fall", () => {
+    const rs = [r({ ai_rating: 3 }), r({ ai_rating: 3 }), r({ ai_rating: 2 }), r({ ai_rating: 4, rating: 2 }), r({}), r({ ai_rating: 1, in_head: true })];
+    expect(raterStats(rs).ai_agreement).toEqual({ n: 4, same: 2, share: 0.5, his_higher: 1, his_lower: 1 });
+    expect(raterStats([]).ai_agreement.share).toBeNull();
+  });
+  test("pass rates of typed and in-head answers, on cards old enough for either", () => {
+    const rs = [
+      r({ answer: "typed", rating: 3 }), r({ answer: "typed", rating: 1 }),
+      r({ in_head: true, rating: 4 }), r({ in_head: true, rating: 3 }), r({ in_head: true, rating: 2 }),
+      r({ answer: "a new card", state_before: { reps: 1 } as Review["state_before"] }), // not yet allowed in his head (D68)
+      r({ rating: 3 }), // a Fact card: nothing typed
+    ];
+    expect(raterStats(rs).explain).toEqual({ typed: { reviews: 2, pass_rate: 0.5 }, in_head: { reviews: 3, pass_rate: 2 / 3 } });
+  });
+});
+
+test("a review keeps who suggested its AI rating: vendor, model and prompt version", async () => {
+  const lib = await tempLibrary();
+  const { item } = await addSnippet(lib, { text: "Spacing reviews over days beats one long session." });
+  const card = await writeNewCard(lib, { kind: "prompt", item: item.meta.id, skills: [], topics: [], content_type: "concept", question: "Why space reviews?", answer: "Forgetting between them makes each recall count.", rubric: ["forgetting", "recall"] });
+  const ai = { vendor: "claude", model: "sonnet", prompt_version: "grade@3" };
+  await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, answer: "so I forget a bit", ai_rating: 3, ai });
+  await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, ai }); // no AI rating: nothing to stamp
+  expect(readReviews(lib).map((r) => r.ai)).toEqual([ai, undefined]);
 });
