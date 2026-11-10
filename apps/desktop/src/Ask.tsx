@@ -3,6 +3,7 @@ import { Fragment, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
+import { Hint } from "./Hint";
 import { ore, opt, type CardFull } from "./ore";
 import { errorText } from "./util";
 import { wordDiff } from "./worddiff";
@@ -142,9 +143,11 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
             }
           }}
         />
-        <button className="ask-send" aria-label="Send" disabled={!input.trim() || busy} onClick={() => void send(input)}>
-          <ArrowUp size={14} weight="bold" aria-hidden="true" />
-        </button>
+        <Hint text={<>Send <kbd>↵</kbd></>} side="top">
+          <button className="ask-send" aria-label="Send" disabled={!input.trim() || busy} onClick={() => void send(input)}>
+            <ArrowUp size={14} weight="bold" aria-hidden="true" />
+          </button>
+        </Hint>
       </div>
     </section>
   );

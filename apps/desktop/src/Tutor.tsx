@@ -796,9 +796,11 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
               </button>
             </Hint>
           ) : (
-            <button className="ask-send" aria-label="Send" disabled={!input.trim() || chat.attaching} onClick={() => send(input, true)}>
-              <ArrowUp size={14} aria-hidden="true" />
-            </button>
+            <Hint text={<>Send <kbd>↵</kbd></>} side="top">
+              <button className="ask-send" aria-label="Send" disabled={!input.trim() || chat.attaching} onClick={() => send(input, true)}>
+                <ArrowUp size={14} aria-hidden="true" />
+              </button>
+            </Hint>
           )}
         </div>
       </div>
@@ -937,7 +939,9 @@ function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; o
       <div className="step-track" role="group" aria-label={`Step ${n} of ${steps.length}`}>
         {steps.map((_, i) =>
           i < n ? (
-            <button key={i} className={i === n - 1 ? "now" : undefined} aria-label={`Step ${i + 1}`} aria-current={i === n - 1 ? "step" : undefined} onClick={() => { const li = list.current?.children[i]; if (li) reveal(li); }} />
+            <Hint key={i} text={`Step ${i + 1}`}>
+              <button className={i === n - 1 ? "now" : undefined} aria-label={`Step ${i + 1}`} aria-current={i === n - 1 ? "step" : undefined} onClick={() => { const li = list.current?.children[i]; if (li) reveal(li); }} />
+            </Hint>
           ) : (
             <i key={i} />
           ),
