@@ -1220,7 +1220,7 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
 
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
-function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void }) {
+export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void }) {
   const { session: s, today: t, before: b } = end;
   const part = (x: Today | null) => (!x ? 0 : x.met ? 1 : x.goal_ms ? x.active_ms / x.goal_ms : 0);
   const closed = t.met && !!b && !b.met;
@@ -1240,11 +1240,13 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
   const [mood, setMood] = useState<"peek" | "cheer">(pour ? "peek" : "cheer");
+  // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that.
+  const up = stage === "leaving" || stage === "done";
   useEffect(() => {
-    if (!pour || (stage !== "leaving" && stage !== "done") || mood === "cheer") return;
+    if (!pour || !up) return;
     const id = setTimeout(() => setMood("cheer"), 560);
     return () => clearTimeout(id);
-  }, [pour, stage, mood]);
+  }, [pour, up]);
   const full = stage !== "cart";
   return (
     <div className={`review-end${pour ? " carted" : ""}`} role="status" ref={setHost}>
@@ -1252,7 +1254,7 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
         <CartTip host={host} lit={pour} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
       )}
       {/* D169: the tutor's mole cheers from the top of the ring, once, at the end of a session (not in the quick quiz). After the cart (D190) it comes up first. */}
-      {!quick && <span className="review-mole">{(stage === "leaving" || stage === "done") && <Mole bare size={64} mood={mood} />}</span>}
+      {!quick && <span className="review-mole">{up && <Mole bare size={64} mood={mood} />}</span>}
       <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
       <h2>{title}</h2>
       {/* "Caught up" never hides the new cards the daily limits hold back (D65). */}
