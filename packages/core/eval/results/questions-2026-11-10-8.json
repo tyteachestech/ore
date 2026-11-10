@@ -1,0 +1,203 @@
+{
+  "eval": "questions",
+  "date": "2026-11-10T15:11:02.424Z",
+  "set": "9c79c321",
+  "prompt": "enrich@14",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "enrich@14",
+      "judge": "opus",
+      "all": {
+        "passed": "5/10",
+        "rate": 0.5,
+        "ci95": [
+          0.23658959361548731,
+          0.7634104063845126
+        ]
+      },
+      "prequestions": {
+        "passed": "3/3",
+        "rate": 1,
+        "ci95": [
+          0.43849391955098227,
+          1
+        ]
+      },
+      "cards": {
+        "passed": "2/7",
+        "rate": 0.2857142857142857,
+        "ci95": [
+          0.0822171657090155,
+          0.6410709098517873
+        ]
+      },
+      "by_check": {
+        "code:lifted": 2,
+        "faithful": 1,
+        "worth_it": 1,
+        "code:long_card_answer": 1,
+        "one_target": 1
+      },
+      "plan_failed": [],
+      "errors": 0,
+      "wall_s": 47.1,
+      "cost_usd": 0.0742716,
+      "judge_cost_usd": 0.08410000000000001,
+      "input_tokens": 70363,
+      "output_tokens": 3267,
+      "cases": [
+        {
+          "id": "git-undo",
+          "questions": [
+            {
+              "n": 1,
+              "kind": "prequestion",
+              "question": "Why might a version-control tool let you undo most mistakes, even though a wrong command feels like it could destroy work?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prequestion",
+              "question": "How should you choose between rewriting history and adding a new commit to undo a mistake, depending on whether others have your commits?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prequestion",
+              "question": "What would you expect a tool to need to keep so that a commit nobody points to anymore can still be recovered, and what limits that?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 1,
+              "kind": "prompt",
+              "question": "In Git, why can you undo most mistakes even though a wrong command feels like it could destroy your work?",
+              "answer": "Git keeps almost everything you commit for weeks, and each kind of mistake has its own undo. A change always sits in the working tree, the index or the history, and undo commands just move a change between these places or move a branch along the history. Only edits that were never committed are truly lost.",
+              "rubric": [
+                "Git keeps committed work for a long time (via the history and reflog)",
+                "Each kind of mistake has its own undo command",
+                "Undo commands only move changes between working tree, index and history, or move a branch",
+                "Uncommitted, unstaged edits are the main thing that can really be lost"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [
+                "faithful"
+              ],
+              "why": "faithful: 'Only edits that were never committed are truly lost' overstates the source, which says restore is 'one of the few' losing commands and that unreachable commits can be garbage-collected after the reflog expires."
+            },
+            {
+              "n": 2,
+              "kind": "prompt",
+              "question": "In Git, how do you choose between `git reset` and `git revert` to undo a commit, depending on whether others already have it?",
+              "answer": "If the commit is not shared yet, use reset to step the branch back, since nobody else holds the old history. Once others have pulled it, use revert: reset moves the branch and leaves their copies disagreeing with yours, while revert adds a new commit that is the exact opposite of the bad one, so history only grows and nobody's copy is contradicted. The cost is a visible record of the mistake.",
+              "rubric": [
+                "Unshared commits: reset is fine",
+                "Shared commits: use revert",
+                "Reset moves the branch, so others' histories disagree with yours",
+                "Revert adds an opposite commit, so history only grows, at the cost of a visible record"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prompt",
+              "question": "In Git, how can you recover a commit that no branch points to any more, such as one left by an amend or a hard reset?",
+              "answer": "Every time HEAD moves (commit, reset, checkout, amend), Git writes a line in the reflog, a private log of where HEAD has been. Run `git reflog`, find the entry for the lost commit, and move back to it, for example with `git reset --hard HEAD@{1}`.",
+              "rubric": [
+                "The reflog records every HEAD movement",
+                "Use `git reflog` to find the entry for the lost commit",
+                "Return to it, e.g. `git reset --hard HEAD@{1}`"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [
+                "code:lifted"
+              ],
+              "why": ""
+            },
+            {
+              "n": 4,
+              "kind": "card",
+              "question": "In Git, which command takes a file out of the index but keeps your edits on disk?",
+              "answer": "`git restore --staged <file>`",
+              "rubric": [],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 5,
+              "kind": "prompt",
+              "question": "In Git, how do the three modes of `git reset` differ in what happens to the changes from the commits you step over?",
+              "answer": "`--soft` leaves the changes in the index, ready to commit again. `--mixed` (the default) leaves them in the working tree, unstaged. `--hard` removes them from both, so files look as they did at the commit you reset to.",
+              "rubric": [
+                "--soft keeps changes staged in the index",
+                "--mixed (default) keeps them in the working tree, unstaged",
+                "--hard removes them from index and working tree"
+              ],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [
+                "code:lifted"
+              ],
+              "why": ""
+            },
+            {
+              "n": 6,
+              "kind": "card",
+              "question": "In Git, by default the reflog keeps its entries for ____ (30 days for entries of commits no branch can reach).",
+              "answer": "90 days",
+              "rubric": [],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [
+                "worth_it"
+              ],
+              "why": "worth_it: the exact default expiry is trivia; what matters is that the reflog expires and is local, which this card doesn't test."
+            },
+            {
+              "n": 7,
+              "kind": "card",
+              "question": "In Git, what is a detached HEAD?",
+              "answer": "A state where HEAD points straight at a commit instead of at a branch, e.g. after checking out a commit by hash or a tag. Commits made there belong to no branch; make one with `git switch -c <name>` to keep them.",
+              "rubric": [],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [
+                "code:long_card_answer",
+                "one_target"
+              ],
+              "why": "one_target: a short 'what is' card whose answer also has to cover causes, the consequence and the `git switch -c` fix."
+            }
+          ],
+          "plan_failed": [],
+          "ms": 47095,
+          "usage": {
+            "input_tokens": 70363,
+            "output_tokens": 3267,
+            "cost_usd": 0.0742716
+          },
+          "judge_usage": {
+            "input_tokens": 26544,
+            "output_tokens": 2020,
+            "cost_usd": 0.08410000000000001
+          },
+          "prompt_version": "enrich@14",
+          "model": "claude-sonnet-5-5"
+        }
+      ]
+    }
+  ]
+}

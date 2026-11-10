@@ -50,6 +50,14 @@ describe("question-quality eval", () => {
     expect(codeFailures(q({ kind: "card", answer: "x".repeat(201) }))).toEqual(["code:long_card_answer"]);
   });
 
+  test("a question that is the source's own sentence, turned around or with a word hidden, is lifted", () => {
+    const source = "Dough rises because yeast gives off gas.\n\nA cooler, longer fermentation tends to favour acetic acid, which tastes sharper.";
+    expect(codeFailures(q({ question: "In sourdough, which acid does a slow, cool rise bring out?" }), undefined, source)).toEqual([]);
+    expect(codeFailures(q({ question: "Why is it that a cooler, longer fermentation tends to favour acetic acid?" }), undefined, source)).toEqual(["code:lifted"]);
+    expect(codeFailures(q({ kind: "card", question: "A cooler, longer fermentation tends to favour ____ acid, which is sharp.", answer: "acetic" }), undefined, source)).toEqual(["code:lifted"]);
+    expect(codeFailures(q({ kind: "card", question: "In sourdough, a slow, cool rise brings out ____ acid.", answer: "acetic" }), undefined, source)).toEqual([]);
+  });
+
   test("the judge's false checks are the failures, counted most first", () => {
     const failed = judgeFailures({ n: 1, faithful: true, distinct: false, rubric_fits: false, why: "distinct: repeats card 1" });
     expect(failed).toEqual(["distinct", "rubric_fits"]);

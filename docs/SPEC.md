@@ -110,7 +110,7 @@ content_type: definition | concept | procedure | fact   # drives interleaving (D
 state: draft | live | retired
 created: ...
 ```
-Body for `card`: question, a line `---`, answer. Cloze allowed with `{{c1::text}}`.
+Body for `card`: question, a line `---`, answer. A fill in the blank (D182) is a statement with its one hidden word written `____`, the answer being what it hides; Anki's `{{c1::text}}` is read and kept as `____`.
 Body for `prompt`: question, `---`, model answer, then `## Rubric` with 2–4 bullets (prefixes `Optionally…` and `Avoids…` allowed).
 
 ### reviews/<yyyy>-<mm>.jsonl

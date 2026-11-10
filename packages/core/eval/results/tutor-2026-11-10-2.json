@@ -1,0 +1,465 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-10T15:08:57.953Z",
+  "set": "431adf6c",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@13",
+      "runs": 2,
+      "passed": "32/32",
+      "accuracy": 1,
+      "ci95": [
+        0.8928172849426366,
+        1
+      ],
+      "flaky": [],
+      "errors": 0,
+      "wall_s": 91.3,
+      "cost_usd": 0.9666563,
+      "input_tokens": 735659,
+      "output_tokens": 27329,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's get you to it yourself. Picture the boxes: a card you get right moves to a box you see less often. What would the system want to do with a card you *missed*, and which box would suit it? Have a go, and I'll tell you how close you are.",
+          "ms": 8826,
+          "usage": {
+            "input_tokens": 25232,
+            "output_tokens": 699,
+            "cost_usd": 0.07240440000000001
+          },
+          "evidence": [
+            "What would the system want to do with a card you *missed*, and which box would suit it?"
+          ]
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "It goes back to the first box. In the Leitner system, a card you miss is sent back to the first group [1], which is reviewed most often, while cards you get right move on to less frequent boxes [2]. So the cards you know least well come back the most.",
+          "ms": 5608,
+          "usage": {
+            "input_tokens": 16831,
+            "output_tokens": 463,
+            "cost_usd": 0.0634675
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Close, but no: FSRS came in Anki **23.10**, a year and a half after 22.04. Your Spaced repetition source says FSRS is \"available in Anki starting with release 23.10\" [1]. The release notes it links to are dated October 31, 2023, which fits the year.month numbering.",
+          "ms": 9074,
+          "usage": {
+            "input_tokens": 17097,
+            "output_tokens": 711,
+            "cost_usd": 0.0670115
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Good one to work out. Start with where FSRS shows up: your \"Spaced repetition\" source has a section on the families of algorithms, and FSRS is in the last bullet. Read what it says about Anki there. The release number is written right beside the name. Tell me what you find, or what you think it is.",
+          "ms": 5813,
+          "usage": {
+            "input_tokens": 35493,
+            "output_tokens": 558,
+            "cost_usd": 0.10397509999999999
+          },
+          "evidence": [
+            "The release number is written right beside the name. Tell me what you find, or what you think it is."
+          ]
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start with a similar case. The function reads like this: if you remembered, multiply the gap by 2.5, and if you didn't, go back to 1 [1]. So a gap of 10 days that you remembered gives 10 × 2.5 = 25 days. The same 10-day gap forgotten gives 1 day.\n\nNow try yours: you remembered after a gap of 4 days. Which branch applies, and what number comes out?",
+          "ms": 8166,
+          "usage": {
+            "input_tokens": 24527,
+            "output_tokens": 930,
+            "cost_usd": 0.0328632
+          },
+          "evidence": [
+            "Now try yours: you remembered after a gap of 4 days. Which branch applies, and what number comes out?",
+            "Now try yours: you remembered after a gap of 4 days. Which branch applies, and what number comes out?"
+          ]
+        },
+        {
+          "id": "worked-example-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's the worked answer: the next gap is 10 days. The book's function multiplies the gap by 2.5 when you remembered, and resets it to 1 when you didn't [1].\n1. Check the answer: you remembered it, so `remembered` is true and the first branch runs, `gap * 2.5` [1].\n2. Put in the gap of 4 days: 4 * 2.5.\n3. That gives 10, so you'd review again in 10 days. Had you forgotten, the gap would drop back to 1 day.",
+          "ms": 5608,
+          "usage": {
+            "input_tokens": 16255,
+            "output_tokens": 516,
+            "cost_usd": 0.0226623
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start with the first one, from the book you have open. According to \"A Small Book of Remembering\", what fades fastest on the forgetting curve, and which review does it say matters most?",
+          "ms": 4292,
+          "usage": {
+            "input_tokens": 14613,
+            "output_tokens": 314,
+            "cost_usd": 0.014074300000000001
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table gives 25% at 7 days, so about a quarter, not half [1]. Half is closer to day 1, which is 58%. That's why the book says recall drops fast at first and then levels off [2].\n\nNext question: given that shape, why does the book say the first review matters most?",
+          "ms": 6887,
+          "usage": {
+            "input_tokens": 23611,
+            "output_tokens": 796,
+            "cost_usd": 0.0278592
+          },
+          "evidence": [
+            "Not quite. The table gives 25% at 7 days, so about a quarter, not half [1]."
+          ]
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days. [1] Notice how steep that is: 58% after one day, then only 21% by day 30, so the drop is fast early and then flattens. [2]\n\nNext question: why does the book say the first review matters most?",
+          "ms": 4605,
+          "usage": {
+            "input_tokens": 16293,
+            "output_tokens": 387,
+            "cost_usd": 0.0215243
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one to try from memory. Maya has three weeks to learn 40 Spanish verb forms before a trip. Plan A is one three-hour session on Sunday, rereading her list. Plan B is 20 minutes a day, covering the answers and trying to produce each form before checking. Which plan will hold up better on the trip, and what's behind the difference?",
+          "ms": 10122,
+          "usage": {
+            "input_tokens": 16754,
+            "output_tokens": 1153,
+            "cost_usd": 0.0310283
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "You've got the diagnostic half: testing shows you what you don't know yet, and the book says the same: \"either the answer comes, or it does not\" [1]. That isn't the whole reason, though. Two things are missing:\n\n- **Retrieval itself helps learning.** Each recall makes the path to the idea easier to find next time, so a test teaches as well as measures [2].\n- **Rereading misleads you.** It feels fluent, and that fluency fools you into thinking you know the page [3].\n\nHere's a question to push you further. Why might someone who rereads feel more confident than someone who quizzes themselves, even though they've learned less?",
+          "ms": 9371,
+          "usage": {
+            "input_tokens": 25187,
+            "output_tokens": 1253,
+            "cost_usd": 0.0387332
+          },
+          "evidence": [
+            "You've got the diagnostic half: testing shows you what you don't know yet",
+            "Each recall makes the path to the idea easier to find next time, so a test teaches as well as measures [2]."
+          ]
+        },
+        {
+          "id": "practice-tell-apart",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's a tell apart on the two ideas in 1.1.2. Say which idea each case shows and what decides it. Write from memory, and give the name of each idea.\nCase A: Maya wants to get better at geometry. She practises only area problems for 20 minutes a day on five days in a row, and does nothing else on those days.\nCase B: Leo wants to get better at geometry. On Saturday he does one 100-minute session in which area, volume and angle problems are shuffled together in random order.",
+          "ms": 12473,
+          "usage": {
+            "input_tokens": 25075,
+            "output_tokens": 1363,
+            "cost_usd": 0.039385199999999995
+          },
+          "evidence": [
+            "Case A: Maya ... practises only area problems for 20 minutes a day on five days in a row; Case B: Leo ... one 100-minute session in which area, volume and angle problems are shuffled together",
+            "Say which idea each case shows and what decides it. Write from memory, and give the name of each idea."
+          ]
+        },
+        {
+          "id": "practice-new-case-unnamed",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's a new case. Two friends are preparing for the same written driving test in four weeks.\n\n- **Dara** sets aside one Saturday. She reads the handbook through three times, highlighting as she goes.\n- **Eli** spends 20 minutes on each of 12 evenings. He closes the handbook and tries to answer sample questions from memory.\n\nWhich plan will leave more in memory on test day? Say what in each plan decides it.",
+          "ms": 19139,
+          "usage": {
+            "input_tokens": 44682,
+            "output_tokens": 2138,
+            "cost_usd": 0.060766600000000004
+          },
+          "evidence": [
+            "Which plan will leave more in memory on test day? Say what in each plan decides it."
+          ]
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is easy, and easy feels like knowing. Your chapter says it \"feels fluent, and that fluency fools us into thinking we know the page.\" [1] A quiz breaks that illusion fast: the answer either comes or it doesn't. [1] Another of your notes makes the same point: a group that rereads can feel better about its learning while the group that quizzes each other actually learns more. [2]",
+          "ms": 5879,
+          "usage": {
+            "input_tokens": 16043,
+            "output_tokens": 649,
+            "cost_usd": 0.0231443
+          }
+        },
+        {
+          "id": "keep-from-quote",
+          "ok": true,
+          "failed": [],
+          "reply": "Done. I kept your sentence as the idea and asked for the why behind it, so review can test whether you can explain it, not just repeat it.",
+          "ms": 5592,
+          "usage": {
+            "input_tokens": 24152,
+            "output_tokens": 594,
+            "cost_usd": 0.0280032
+          },
+          "evidence": [
+            "Done. I kept your sentence as the idea and asked for the why behind it, so review can test whether you can explain it, not just repeat it."
+          ]
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "That's a fair place to stop. Tired is a good reason to quit for today, and your sources say spreading practice over days beats cramming it into one session [1]. So resting now isn't lost time. If you want one tiny thing before you go, I can ask you a single question about what you read today. Or you can just close the book and come back tomorrow.",
+          "ms": 4883,
+          "usage": {
+            "input_tokens": 16441,
+            "output_tokens": 395,
+            "cost_usd": 0.022196300000000002
+          }
+        },
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Try this one yourself first. Think about the boxes in the Leitner system: each box is reviewed less often than the one before. If you get a card right, it moves toward the less frequent boxes. So where would a card you get wrong have to go? Have a go, and look at the \"Paper flash cards\" section of your Spaced repetition source if you're unsure.",
+          "ms": 9863,
+          "usage": {
+            "input_tokens": 25276,
+            "output_tokens": 776,
+            "cost_usd": 0.019534299999999997
+          },
+          "evidence": [
+            "So where would a card you get wrong have to go? Have a go, and look at the \"Paper flash cards\" section of your Spaced repetition source if you're unsure."
+          ]
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "A card you answer incorrectly goes back to the first box. [1] That box is reviewed most often, since each later box waits longer before you see its cards again. [2] So a miss means that card starts its climb over and gets \"more aggressive review and repetition.\"",
+          "ms": 5079,
+          "usage": {
+            "input_tokens": 16834,
+            "output_tokens": 399,
+            "cost_usd": 0.0088167
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Close on the format, but it's 23.10, not 22.04. Your source says FSRS is \"available in Anki starting with release 23.10\" [1]. That means the October 2023 release, which fits the year.month pattern. 22.04 would be April 2022, more than a year too early.",
+          "ms": 9195,
+          "usage": {
+            "input_tokens": 17096,
+            "output_tokens": 843,
+            "cost_usd": 0.0132712
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Check your Spaced repetition source, in the \"Algorithms\" section. FSRS (Free Spaced Repetition Scheduler) is listed there, and the same line says which tools support it and from which release. Look for the Anki part of that line.\n\nWhat number do you find there? If it's still unclear, tell me what you see and we'll narrow it down.",
+          "ms": 8472,
+          "usage": {
+            "input_tokens": 34020,
+            "output_tokens": 763,
+            "cost_usd": 0.0207778
+          },
+          "evidence": [
+            "What number do you find there?"
+          ]
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "Start by reading the function's one line. It says that if you remembered, the next gap is the old gap times 2.5, and if you forgot, it resets to 1 [1].\n\nHere's a similar case. Say the gap was 6 days and you remembered. Since `remembered` is true, you take `gap * 2.5`, which is 6 × 2.5 = 15 days. If you had forgotten, you'd skip the multiplication and get 1.\n\nNow try yours: the gap is 4 days and you remembered. Which branch applies, and what do you get?",
+          "ms": 7674,
+          "usage": {
+            "input_tokens": 24561,
+            "output_tokens": 1014,
+            "cost_usd": 0.022201600000000002
+          },
+          "evidence": [
+            "Now try yours: the gap is 4 days and you remembered. Which branch applies, and what do you get?",
+            "Now try yours: the gap is 4 days and you remembered. Which branch applies, and what do you get?"
+          ]
+        },
+        {
+          "id": "worked-example-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "The answer is **10 days**. The book's function is `gap * 2.5 if remembered else 1` [1], so a remembered gap gets multiplied by 2.5. A missed one would reset to 1 day instead.\n1. Read the function: `next_gap(gap, remembered)` returns `gap * 2.5` when `remembered` is true, and `1` otherwise [1].\n2. You remembered it, so the first branch runs. Here `gap` is 4.\n3. Compute 4 * 2.5 = 10, so the next review is in 10 days.",
+          "ms": 6414,
+          "usage": {
+            "input_tokens": 16254,
+            "output_tokens": 646,
+            "cost_usd": 0.011220899999999999
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start with the book you have open. Question 1: according to \"A Small Book of Remembering\", what happens to most of what we read within a week, and why? Answer in your own words.",
+          "ms": 4685,
+          "usage": {
+            "input_tokens": 14610,
+            "output_tokens": 313,
+            "cost_usd": 0.007714800000000001
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table puts recall at 7 days at 25%, about a quarter. [1] Half is closer to day 1, which is 58%, so most of the drop happens in the first day. The book also notes its numbers are illustrative, not from one study.\n\nNext question: why does the book say the first review matters most?",
+          "ms": 7826,
+          "usage": {
+            "input_tokens": 23616,
+            "output_tokens": 825,
+            "cost_usd": 0.0198739
+          },
+          "evidence": [
+            "Not quite. The table puts recall at 7 days at 25%, about a quarter."
+          ]
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days. [1] Note how steep the drop is: 58% after one day, then only 21% by day 30, so the loss comes early and then flattens. [2]\n\nNext question: why does the book say the first review matters most?",
+          "ms": 5045,
+          "usage": {
+            "input_tokens": 16296,
+            "output_tokens": 387,
+            "cost_usd": 0.0086468
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one to write from memory. Dana has a driving theory test in three weeks. Her plan is to read the handbook four times over the weekend before the test. Her friend says to close the book for 20 minutes on three evenings a week and write down what she remembers. Which plan would you back, and what decides it?",
+          "ms": 9483,
+          "usage": {
+            "input_tokens": 16751,
+            "output_tokens": 1112,
+            "cost_usd": 0.0159306
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "That holds: a test shows you what you don't know yet. The book says a quiz \"breaks the illusion at once\" [1]. But you've only covered the measuring side of it. Two things are missing:\n\n- **Recall is itself learning.** Each time you recall an idea, the path to it gets easier to find next time [2]. So a test teaches you, as well as measuring you.\n- **Why rereading misleads.** It feels fluent, and that fluency fools you into thinking you know the page [3].\n\nHere's a question to push further. Why would rereading make you feel like you know something when you don't?",
+          "ms": 8115,
+          "usage": {
+            "input_tokens": 25169,
+            "output_tokens": 1192,
+            "cost_usd": 0.0241789
+          },
+          "evidence": [
+            "That holds: a test shows you what you don't know yet.",
+            "Each time you recall an idea, the path to it gets easier to find next time [2]."
+          ]
+        },
+        {
+          "id": "practice-tell-apart",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one to tell apart. Two learners each changed how they practice, and both improved. Name the idea behind each change, and say what decides which is which.\nCase A: Maya is learning Spanish vocabulary. She used to study all 90 minutes of a unit on the night before the quiz. Now she studies 30 minutes on Monday, Wednesday and Friday, and the quiz is on Friday. Her quiz scores and her recall weeks later both went up.\nCase B: Dev is training for a nursing exam. He used to do all his dosage calculations in one block, then all his ECG readings, then all his triage questions. Now each session shuffles the three kinds together. His scores on the mixed exam went up.",
+          "ms": 14249,
+          "usage": {
+            "input_tokens": 25144,
+            "output_tokens": 1450,
+            "cost_usd": 0.026822700000000005
+          },
+          "evidence": [
+            "Two learners each changed how they practice, and both improved. Name the idea behind each change, and say what decides which is which.",
+            "Name the idea behind each change, and say what decides which is which."
+          ]
+        },
+        {
+          "id": "practice-new-case-unnamed",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's a new case. Read it, then say which plan you'd bet on and why.\n\nDev has three weeks to learn 60 irregular Spanish verbs for a trip. His plan is to spend five hours on one Sunday rereading his highlighted list. His sister suggests 20 minutes a day instead. Each day he would cover the list, try to write the verbs from memory, then check what he missed.",
+          "ms": 23927,
+          "usage": {
+            "input_tokens": 65112,
+            "output_tokens": 2988,
+            "cost_usd": 0.06068980000000001
+          },
+          "evidence": [
+            "Here's a new case. Read it, then say which plan you'd bet on and why."
+          ]
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is easy, and easy feels like knowing. Your chapter says it \"feels fluent, and that fluency fools us into thinking we know the page\" [1]. You recognise the words, so you mistake recognising for being able to recall. A quiz breaks that illusion, since either the answer comes or it doesn't [1]. The café study group in your notes shows it: rereading can feel better and still teach less [2].",
+          "ms": 6743,
+          "usage": {
+            "input_tokens": 16042,
+            "output_tokens": 676,
+            "cost_usd": 0.0114958
+          }
+        },
+        {
+          "id": "keep-from-quote",
+          "ok": true,
+          "failed": [],
+          "reply": "Kept. It asks you to explain why the feeling of knowing is misleading, which is the part worth remembering. [1]",
+          "ms": 5331,
+          "usage": {
+            "input_tokens": 24155,
+            "output_tokens": 632,
+            "cost_usd": 0.0176546
+          },
+          "evidence": [
+            "Kept. It asks you to explain why the feeling of knowing is misleading, which is the part worth remembering. [1]"
+          ]
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, that's a good place to stop. Your sources even back you up: practice spread over days beats the same practice crammed into one night [1]. So stopping now is part of the plan, not a failure. If you want one tiny thing before you go, say \"quiz me\" and I'll ask a single question. Otherwise, rest up.",
+          "ms": 4838,
+          "usage": {
+            "input_tokens": 16437,
+            "output_tokens": 394,
+            "cost_usd": 0.008727
+          }
+        }
+      ]
+    }
+  ]
+}

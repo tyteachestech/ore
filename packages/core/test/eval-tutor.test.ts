@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { failures, loadTutorCases, summary, tally, unblind, type TutorResult } from "../eval/tutor.ts";
+import { asSeen, failures, loadTutorCases, summary, tally, unblind, type TutorResult } from "../eval/tutor.ts";
 import { loadPrompt, usePromptText } from "../src/ai/prompts.ts";
 import { withSteps } from "../src/ai/tutor.ts";
 
@@ -31,6 +31,12 @@ describe("tutor pedagogy eval", () => {
     const worked = loadTutorCases().find((c) => c.id === "worked-example-show-me")!.expect;
     expect(failures(worked, reply({ reply: withSteps({ reply: "Here's the working.", steps: ["You remembered it, so the gap is multiplied: 4 × 2.5.", "That makes the next gap 10 days."] }), hint: false, steps: 2 }))).toEqual([]);
     expect(failures(worked, reply({ reply: "The next gap is 10 days.", hint: false }))).toEqual(["no steps"]);
+  });
+
+  // The app shows a tell apart's cases under the reply (D163), so the reply alone no longer holds them.
+  test("what the judge reads holds a tell apart's two cases, as he sees them", () => {
+    expect(asSeen({ reply: "Which idea fits each?", steps: [], exercise: { cases: ["Ana rereads her notes.", "Ben quizzes himself."] } })).toBe("Which idea fits each?\nCase A: Ana rereads her notes.\nCase B: Ben quizzes himself.");
+    expect(asSeen({ reply: "Explain why.", steps: [], exercise: { cases: null } })).toBe("Explain why.");
   });
 
   test("exercise feedback that found a miss offers the committed card; the exercise turn carries it (D158)", () => {

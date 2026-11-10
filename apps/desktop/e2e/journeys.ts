@@ -1166,7 +1166,7 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   await page.keyboard.press("Meta+j");
 });
 
-journey("tutor: words selected in a reply go into the source note as a quote, Undo takes them out; Card asks the tutor for a card from them (D164)", async (page) => {
+journey("tutor: words selected in a reply go into the source note as a quote, Undo takes them out; Exercise asks the tutor for one from them (D164)", async (page) => {
   await openSource(page, AGENTS);
   const said = "An agent decides its own next step, and a workflow follows steps written in advance.";
   const asked: string[] = [];
@@ -1208,7 +1208,7 @@ journey("tutor: words selected in a reply go into the source note as a quote, Un
   await until("Undo takes it out", async () => !(await note()).includes(said));
   await pick();
   await bar.getByRole("button", { name: "Exercise" }).click();
-  await until("Exercise asks the tutor for one from the words", async () => asked.at(-1) === `Make a card from this: “${said}”`);
+  await until("Exercise asks the tutor for one from the words", async () => asked.at(-1) === `Make an exercise from this: “${said}”`);
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Meta+j");
 });

@@ -1,0 +1,181 @@
+{
+  "eval": "questions",
+  "date": "2026-11-10T15:10:48.017Z",
+  "set": "9c79c321",
+  "prompt": "enrich@15",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "enrich@15",
+      "judge": "opus",
+      "all": {
+        "passed": "8/9",
+        "rate": 0.8888888888888888,
+        "ci95": [
+          0.5649937852319399,
+          0.9801096286728695
+        ]
+      },
+      "prequestions": {
+        "passed": "3/3",
+        "rate": 1,
+        "ci95": [
+          0.43849391955098227,
+          1
+        ]
+      },
+      "cards": {
+        "passed": "5/6",
+        "rate": 0.8333333333333334,
+        "ci95": [
+          0.43649056343635395,
+          0.9699474141282697
+        ]
+      },
+      "by_check": {
+        "clear_target": 1
+      },
+      "plan_failed": [],
+      "errors": 0,
+      "wall_s": 43.7,
+      "cost_usd": 0.0735623,
+      "judge_cost_usd": 0.072946,
+      "input_tokens": 74005,
+      "output_tokens": 3185,
+      "cases": [
+        {
+          "id": "git-undo",
+          "questions": [
+            {
+              "n": 1,
+              "kind": "prequestion",
+              "question": "Why can a mistaken Git command rarely destroy committed work, and what would limit that safety?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prequestion",
+              "question": "Why might undoing a bad commit on a branch your teammates already pulled need a different approach than on a local-only branch?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prequestion",
+              "question": "What determines which undo command fits a given Git mistake?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 1,
+              "kind": "prompt",
+              "question": "In Git, why is it hard to destroy work you have already committed with a wrong command, and what limits that safety net?",
+              "answer": "Git records every movement of HEAD in the reflog, so a commit that no branch points to any more (after an amend or hard reset) can still be reached by its reflog entry. The limits: entries expire (90 days by default, 30 for commits no branch can reach), after which garbage collection may delete the commits; the reflog is local and never pushed, so it can't help if you lose the machine; and work never committed was never saved by Git.",
+              "rubric": [
+                "Names the reflog (a log of where HEAD has been) as how abandoned commits can be recovered",
+                "States that entries expire after a limited time, after which garbage collection may delete commits",
+                "States that the reflog is local, never pushed, so it can't rescue work from a lost machine"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prompt",
+              "question": "A bad commit is already on a branch your teammates have pulled. Why is reverting it safer than resetting the branch back?",
+              "answer": "A reset moves the branch itself, so teammates who already have the old commits hold a history that disagrees with yours, and their next push or pull must reconcile the two. A revert adds a new commit that applies the exact opposite changes, so history only grows and nobody's copy is contradicted. The cost is a visible record of the mistake, which on a shared branch is usually wanted anyway.",
+              "rubric": [
+                "Explains that reset rewrites where the branch points, leaving others' copies with a conflicting history",
+                "Explains that revert adds a new opposite commit, so history only grows and no one's copy is contradicted",
+                "Mentions the trade-off: the mistake stays visible in history"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prompt",
+              "question": "You've made a Git mistake and need to pick an undo command. What do you decide first to choose the right one?",
+              "answer": "Match the command to what you want back, which depends on where the change is (working tree, index, or history) and whether the commits have been shared. Unstaged edits use restore, staged ones use restore --staged, an unshared commit can be amended or reset, a shared one should be reverted, and a lost commit can come back via the reflog.",
+              "rubric": [
+                "Says the choice depends on what you want back / where the change currently is (working tree, index, history)",
+                "Says whether the commits have been shared with others matters (reset/amend vs revert)",
+                "Gives at least one matching of mistake to command"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 4,
+              "kind": "card",
+              "question": "In Git, which command removes a file from what the next commit will contain while leaving your edits on disk?",
+              "answer": "`git restore --staged <file>`",
+              "rubric": [],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [
+                "clear_target"
+              ],
+              "why": "clear_target: `git reset <file>` is an equally correct answer, so the single expected answer isn't the only right one."
+            },
+            {
+              "n": 5,
+              "kind": "prompt",
+              "question": "You committed a half-finished change locally (not pushed) and want to take that commit back but keep the edits in your files, staged ready to recommit with a better split. Which `git reset` mode would you use, and how do the other two modes differ?",
+              "answer": "Use `git reset --soft HEAD~1`: it steps the branch back and leaves the undone changes in the index, ready to commit again. `--mixed` (the default) leaves them in the working tree, unstaged. `--hard` removes them from both index and working tree.",
+              "rubric": [
+                "Chooses --soft for this case, leaving changes staged in the index",
+                "States --mixed leaves changes in the working tree, unstaged",
+                "States --hard removes changes from both index and working tree, losing them from the files"
+              ],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 6,
+              "kind": "prompt",
+              "question": "You check out an old commit by its hash, make two commits while exploring, then want to switch to another branch. What is the risk, and what do you do first to keep that work?",
+              "answer": "In a detached HEAD, HEAD points at a commit rather than a branch, so your new commits belong to no branch. Switching away leaves them reachable only through the reflog, which expires. Before leaving, create a branch there with `git switch -c <name>`.",
+              "rubric": [
+                "Explains that commits made in detached HEAD belong to no branch",
+                "Notes that after switching away they're reachable only via the reflog (so can eventually be lost)",
+                "Says to create a branch first with `git switch -c <name>`"
+              ],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            }
+          ],
+          "plan_failed": [],
+          "ms": 43689,
+          "usage": {
+            "input_tokens": 74005,
+            "output_tokens": 3185,
+            "cost_usd": 0.0735623
+          },
+          "judge_usage": {
+            "input_tokens": 26821,
+            "output_tokens": 1410,
+            "cost_usd": 0.072946
+          },
+          "prompt_version": "enrich@15",
+          "model": "claude-sonnet-5-5"
+        }
+      ]
+    }
+  ]
+}

@@ -99,8 +99,13 @@ export function summary(runs: TutorResult[][]) {
 async function replyTo(lib: Library, c: TutorCase, id: (golden: string) => string | undefined) {
   if (c.reading && !id(c.reading)) throw new Error(`${c.id}: no golden doc ${c.reading}`);
   const r = await tutor(lib, c.message, { earlier: c.earlier ?? [], item: c.reading ? id(c.reading) : undefined });
-  return { r, said: withSteps(r) };
+  return { r, said: asSeen(r) };
 }
+
+/** The reply as he sees it: its steps written out, and a tell apart's two cases, which the app shows under
+ *  the reply instead of in it (D163), so a check of the cases can read them. */
+export const asSeen = (r: { reply: string; steps: string[]; exercise?: { cases?: string[] | null } | null }) =>
+  [withSteps(r), ...(r.exercise?.cases ?? []).map((c, i) => `Case ${"AB"[i]}: ${c}`)].join("\n");
 
 const Better = z.strictObject({ better: z.enum(["A", "B", "same"]), why: z.string() });
 export type Pick = "new" | "old" | "same";

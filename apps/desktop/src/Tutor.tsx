@@ -527,7 +527,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           return (
             <div className={`tutor-sel${picked.below ? " below" : ""}`} role="toolbar" aria-label="Selected words" style={{ left: picked.x, top: picked.y }} onMouseDown={(e) => e.preventDefault()}>
               <Hint text="The tutor writes it as an exercise to keep">
-                <button onClick={() => { send(`Make a card from this: “${picked.text}”`); done(); }}>
+                <button onClick={() => { send(`Make an exercise from this: “${picked.text}”`); done(); }}>
                   <Plus size={12} aria-hidden="true" />Exercise
                 </button>
               </Hint>

@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gradeAnswer } from "../src/ai/grade.ts";
-import { findCard, writeCardContent, writeNewCard } from "../src/cards.ts";
+import { blankProblem, findCard, writeCardContent, writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -62,5 +62,33 @@ describe("editing an Explain card's key points", () => {
     const { item } = await addSnippet(lib, { text: "Two." });
     const f = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "One plus one?", answer: "Two.", rubric: [] });
     expect(() => writeCardContent(findCard(lib, f.meta.id), { rubric: ["says two"] })).toThrow(/Fact exercise/);
+  });
+});
+
+// A blank written the Anki way carried its answer into the question review shows (`{{c1::acetic}}` on screen).
+describe("fill in the blank (D182)", () => {
+  const fact = { kind: "card" as const, skills: [], topics: [], content_type: "fact" as const, rubric: [] };
+
+  test("a blank never shows what it hides: written, read and edited, it is ____", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Cool dough favours acetic acid." });
+    const c = writeNewCard(lib, { ...fact, item: item.meta.id, question: "In sourdough, a cool, slow rise favours {{c1::acetic}} acid.", answer: "acetic" });
+    expect(c.question).toBe("In sourdough, a cool, slow rise favours ____ acid.");
+    expect(readFileSync(c.path, "utf8")).not.toContain("acetic}}");
+    expect(findCard(lib, c.meta.id).question).toBe("In sourdough, a cool, slow rise favours ____ acid.");
+    expect(writeCardContent(c, { question: "A cool rise favours {{c1::acetic::an acid}} acid." }).question).toBe("A cool rise favours ____ acid.");
+    // A file from before this, or one he wrote by hand, reads the same way.
+    writeFileSync(c.path, readFileSync(c.path, "utf8").replace("____", "{{c2::acetic}}"));
+    expect(findCard(lib, c.meta.id).question).toBe("A cool rise favours ____ acid.");
+  });
+
+  test("a drafted blank hides one exact thing in a statement of a Fact exercise", () => {
+    const ok = { kind: "card" as const, question: "In Python, ____ starts a function definition.", answer: "def" };
+    expect(blankProblem(ok)).toBeNull();
+    expect(blankProblem({ kind: "prompt", question: "Why space reviews?", answer: "Forgetting makes recall effortful." })).toBeNull();
+    expect(blankProblem({ ...ok, question: "In Python, {{c1::def}} starts a ____." })).toMatch(/one blank/);
+    expect(blankProblem({ ...ok, question: "In Python, what does ____ start?" })).toMatch(/statement/);
+    expect(blankProblem({ ...ok, kind: "prompt" })).toMatch(/Fact exercise/);
+    expect(blankProblem({ ...ok, answer: "it tells the interpreter that a new function begins here" })).toMatch(/term, a number, a name/);
   });
 });

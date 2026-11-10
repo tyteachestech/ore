@@ -5,7 +5,7 @@ import { readAnnotations, type Annotation } from "../annotations.ts";
 import { reflections } from "../tries.ts";
 import { locate } from "../anchoring.ts";
 import { listQuestions } from "../questions.ts";
-import { cardTextProblem, ContentType, CardKind, listCards, writeNewCard, type Card } from "../cards.ts";
+import { blankProblem, cardTextProblem, ContentType, CardKind, listCards, writeNewCard, type Card } from "../cards.ts";
 import { stringifyFrontmatter } from "../frontmatter.ts";
 import { sha256, writeAtomic } from "../fsutil.ts";
 import { nowIso, slugify } from "../ids.ts";
@@ -248,7 +248,7 @@ async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichR
       const points = new Set(pending.filter((a) => a.point).map((a) => a.id));
       const ungrounded = d.drafts.filter((x) => x.annotation && points.has(x.annotation) && !anchorEvidence(item.body, x.evidence).length).map((x) => x.annotation);
       if (ungrounded.length) return `drafts for point highlights need evidence: sentences copied exactly from the document (none found for ${ungrounded.join(", ")})`;
-      const unreadable = d.drafts.map((x) => cardTextProblem(x)).find(Boolean);
+      const unreadable = d.drafts.map((x) => cardTextProblem(x) ?? blankProblem(x)).find(Boolean);
       if (unreadable) return unreadable;
       const prompts = d.drafts.filter((x) => x.kind === "prompt" && (x.rubric.length < 2 || x.rubric.length > 4));
       if (prompts.length) return "every prompt draft needs 2–4 rubric points";

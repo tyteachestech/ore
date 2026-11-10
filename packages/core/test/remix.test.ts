@@ -82,13 +82,14 @@ const goodWriter = (setting: string, type: Variant["type"] = "new-case") => ({
 const pass = { in_scope: true, answerable: true, same_claim: true, gives_away: false, reason: "" };
 
 describe("card remixing (D66)", () => {
-  test("facts and cloze cards stay as written; concepts, procedures and definitions remix", async () => {
+  test("facts and fill in the blanks stay as written; concepts, procedures and definitions remix", async () => {
     const lib = await tempLibrary();
     expect(remixTypes(await concept(lib))).toEqual(["new-case", "predict", "diagnose", "choose"]);
     expect(remixTypes(await concept(lib, { content_type: "procedure" }))).toEqual(["new-case"]);
     expect(remixTypes(await concept(lib, { kind: "card", content_type: "definition", rubric: [] }))).toEqual(["name-it"]);
     expect(remixTypes(await concept(lib, { kind: "card", content_type: "fact", rubric: [] }))).toEqual([]);
     expect(remixTypes(await concept(lib, { kind: "card", content_type: "definition", question: "{{c1::Prequestions}} direct attention.", rubric: [] }))).toEqual([]);
+    expect(remixTypes(await concept(lib, { kind: "card", content_type: "definition", question: "____ direct attention.", rubric: [] }))).toEqual([]);
   });
 
   test("starts after two passes on the original, rotates variant, variant, original, and uses each variant twice at most", async () => {
@@ -191,7 +192,7 @@ describe("card remixing (D66)", () => {
     const vs = readVariants(lib, c.meta.id);
     expect(vs.map((v) => v.status)).toEqual(["ready", "rejected", "ready"]);
     expect(vs[1]!.reason).toContain("idea the card doesn't have");
-    expect(vs[0]).toMatchObject({ maps: [0, 1], ai: { prompt_version: "variant@1" }, check_ai: { prompt_version: "variant-check@1" } });
+    expect(vs[0]).toMatchObject({ maps: [0, 1], ai: { prompt_version: "variant@2" }, check_ai: { prompt_version: "variant-check@2" } });
     // The writer saw the rejected one and why; the checker saw each point beside the original point it tests.
     const calls = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
     expect(calls[5]![1]).toContain("idea the card doesn't have");

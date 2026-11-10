@@ -91,7 +91,7 @@ describe("grading eval", () => {
     const cases = [mk("easy-capital", "Canberra", "right"), mk("easy-capital-wrong", "Sydney", "wrong"), mk("easy-blank", "no idea", "wrong"), mk("easy-spacing", "Canberra, I think", "right"), mk("fails", "boom", "right")];
     const r = await runVendor("claude", cases);
     expect(r.model).toBe("claude-fake-1");
-    expect(r.prompt_version).toBe("grade@3");
+    expect(r.prompt_version).toBe("grade@4");
     expect(r.cases.map((c) => [c.id, c.got, c.correct])).toEqual([
       ["easy-capital", "right", true], ["easy-capital-wrong", "right", false], ["easy-blank", "wrong", true], ["easy-spacing", "right", true], ["fails", undefined, false],
     ]);

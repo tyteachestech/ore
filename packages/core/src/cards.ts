@@ -61,7 +61,7 @@ export function parseCardBody(body: string): CardContent {
   const rubric = rub === -1 ? [] : rest.slice(rub + 1).filter((l) => /^\s*[-*]\s+/.test(l)).map((l) => l.replace(/^\s*[-*]\s+/, "").trim());
   if (!question) throw new Error("card question is empty");
   if (!answer) throw new Error("card answer is empty");
-  return { question, answer, rubric };
+  return { question: hideBlanks(question), answer, rubric };
 }
 
 /** Why this text would not read back as the same card, or null: a `---` line in the question ends it,
@@ -72,11 +72,31 @@ export function cardTextProblem(c: { question: string; answer: string }): string
   return null;
 }
 
+/** What a fill in the blank's question shows where its word is hidden (D182). */
+export const BLANK = "____";
+const CLOZE = /\{\{c\d+::[^}]*\}\}/g;
+/** A blank written the Anki way, `{{c1::word}}`, would show its own answer in review: it is kept and read as `____`. */
+export const hideBlanks = (question: string) => question.replace(CLOZE, BLANK);
+const blanks = (question: string) => hideBlanks(question).match(/_{4,}/g)?.length ?? 0;
+export const hasBlank = (question: string) => blanks(question) > 0;
+
+/** Why a drafted fill in the blank breaks its rules (D182), or null: a blank is for one exact thing, in a
+ *  statement, and helps only what it hides, so a reason or a mechanism is asked as a question. */
+export function blankProblem(c: { kind: CardKind; question: string; answer: string }): string | null {
+  const n = blanks(c.question);
+  if (!n) return null;
+  if (n > 1) return "A fill in the blank has one blank: hide the single word that carries the meaning, or ask it as a question.";
+  if (c.kind !== "card") return "Only a Fact exercise (kind \"card\") may have a blank: ask a why or a how as a question.";
+  if (c.question.includes("?")) return "A fill in the blank is a complete statement with one ____, never a blank plus a question: ask the question without a blank instead.";
+  if (c.answer.trim().split(/\s+/).length > 5) return "A blank hides a term, a number, a name or a piece of syntax, and the answer is exactly what it hides: ask a reason, a mechanism or steps as a question.";
+  return null;
+}
+
 export function renderCardBody(c: CardContent): string {
   const problem = cardTextProblem(c);
   if (problem) throw new Error(problem);
   const rubric = c.rubric.length ? `\n## Rubric\n${c.rubric.map((b) => `- ${b}`).join("\n")}\n` : "";
-  return `${c.question.trim()}\n---\n${c.answer.trim()}\n${rubric}`;
+  return `${hideBlanks(c.question.trim())}\n---\n${c.answer.trim()}\n${rubric}`;
 }
 
 export function readCardFile(path: string): Card {
@@ -153,7 +173,7 @@ export function writeNewCard(lib: Library, c: NewCard): Card {
     figure: c.figure,
   };
   const path = paths.card(lib, meta.id);
-  const content = { question: c.question, answer: c.answer, rubric: c.rubric };
+  const content = { question: hideBlanks(c.question), answer: c.answer, rubric: c.rubric };
   writeAtomic(path, stringifyFrontmatter(meta, renderCardBody(content)));
   return { meta, path, ...content };
 }

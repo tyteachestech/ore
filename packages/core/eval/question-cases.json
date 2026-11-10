@@ -69,6 +69,19 @@
         { "exact": "Name mangling is helpful for letting subclasses override methods without breaking intraclass method calls.", "intent": "keep" },
         { "exact": "canine", "intent": "keep", "skip": true }
       ]
+    },
+    {
+      "id": "git-undo",
+      "source": "eval:git-undo",
+      "highlights": [
+        { "exact": "To take a file out of the index but keep your edits on disk, run `git restore --staged <file>`.", "intent": "card" },
+        { "exact": "`--mixed`, the default, leaves them in the working tree, unstaged.", "intent": "keep" },
+        { "exact": "A reset moves the branch itself, so everyone who already has the old commits now holds a history that disagrees with yours", "intent": "card" },
+        { "exact": "It adds a new commit whose changes are the exact opposite of the commit you name, so the history only grows and nobody's copy is contradicted.", "intent": "keep" },
+        { "exact": "Its entries are kept for 90 days by default", "intent": "card" },
+        { "exact": "A detached HEAD means HEAD points straight at a commit instead of at a branch.", "intent": "card" },
+        { "exact": "Most fear of Git", "intent": "keep", "skip": true }
+      ]
     }
   ]
 }
