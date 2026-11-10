@@ -2672,33 +2672,33 @@ journey("home: arrows move between skill tiles and Continue reading, from the fo
   await until("an arrow with nothing focused picks the first", async () => (await focused()) !== null);
 });
 
-journey("feed: ⌘K offers the selected post's actions, named for it, once the keyboard picks it", async (page) => {
-  // A feed of its own, served here, with posts from the last two days.
-  const day = (n: number) => new Date(Date.now() - n * 864e5).toUTCString();
-  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Spacing Notes</title><link>http://localhost/</link><item><title>Why spacing works</title><link>http://localhost/a.html</link><pubDate>${day(1)}</pubDate></item><item><title>Interleaving in practice</title><link>http://localhost/b.html</link><pubDate>${day(2)}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
-  const feed = `http://localhost:${server.port}/feed.xml`;
-  const ore = (...args: string[]) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: [...args, "--json"] }) }).then((r) => r.json());
-  try {
-    await ore("feed", "follow", feed);
-    await page.getByRole("button", { name: /^Feed/ }).click();
-    await page.locator(".row.post", { hasText: "Why spacing works" }).waitFor();
-    const offered = () => page.locator("[cmdk-item]", { hasText: "Mark read “Why spacing works”" }).count();
+journey("⌘K is the same whatever row is selected: it follows what is open, never the selection (D178)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const named = () => page.locator("[cmdk-item]").filter({ hasText: /^(Archive|Rename|Pin to top|Copy|File|Remove|Move) (“|\d+ sources)/ }).count();
+  const look = async (query: string) => {
     await page.keyboard.press("Meta+k");
-    await page.locator("[cmdk-input]").fill("mark read");
-    await until("nothing offered before a post is picked", async () => (await offered()) === 0);
+    await page.locator("[cmdk-input]").fill(query);
+    await page.waitForTimeout(250);
+    const n = await named();
     await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Meta+k");
-    await page.locator("[cmdk-input]").fill("mark read");
-    await until("the picked post's Mark read is offered", async () => (await offered()) === 1);
-    await page.keyboard.press("Enter");
-    await until("it is marked read", async () => (await page.locator(".row.post.read", { hasText: "Why spacing works" }).count()) === 1 || (await page.locator(".row.post", { hasText: "Why spacing works" }).count()) === 0);
-  } finally {
-    await ore("feed", "unfollow", feed).catch(() => {});
-    server.stop(true);
-    await page.getByRole("button", { name: /^Home/ }).click();
-  }
+    return n;
+  };
+  await page.locator(".list").focus();
+  await page.keyboard.press("ArrowDown");
+  if (await look("archive")) throw new Error("⌘K offers actions named for the row the arrow keys selected");
+  const rows = page.locator(".row");
+  await rows.nth(0).click({ modifiers: ["Meta"] });
+  await rows.nth(1).click({ modifiers: ["Meta"] });
+  if (await look("archive")) throw new Error("⌘K offers actions for the selected sources");
+  await page.keyboard.press("Escape");
+  // An open source still brings its own actions.
+  await openSource(page, AGENTS);
+  await page.keyboard.press("Meta+k");
+  await page.locator("[cmdk-input]").fill("archive source");
+  await page.locator("[cmdk-item]", { hasText: "Archive source" }).first().waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
 });
 
 journey("⌘K: Esc clears what was typed first, then closes", async (page) => {
@@ -4338,9 +4338,10 @@ journey("bulk filing under an archived skill brings it back in the sidebar, and 
     const rows = page.locator(".row");
     await rows.nth(0).click({ modifiers: ["Meta"] });
     await rows.nth(1).click({ modifiers: ["Meta"] });
-    await page.keyboard.press("Meta+k");
-    await page.locator("[cmdk-input]").fill("under Lathe work");
-    await page.locator("[cmdk-item]", { hasText: "under Lathe work" }).first().click();
+    await rows.nth(1).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Skills" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await page.getByRole("menuitemcheckbox", { name: "Lathe work" }).or(page.getByRole("menuitem", { name: "Lathe work" })).first().click();
     await until("filing brings the skill back", async () => !(await archived()));
     await until("the sidebar lists it among the skills", async () => (await page.locator(".sidebar .side-item[data-drop-skill]", { hasText: "Lathe work" }).count()) === 1);
     await page.waitForTimeout(300);
