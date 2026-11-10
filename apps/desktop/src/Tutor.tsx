@@ -1,12 +1,15 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
-import { ArrowDown, ArrowUp, CaretDown, Check, Circle, Copy, FileText, Plus, SidebarRight, Square, Stop, Trash, X } from "./icons";
+import { ArrowDown, ArrowUp, BookOpen, CaretDown, Check, Circle, Copy, FilePdf, FileText, Image, Paperclip, PencilSimple, Plus, Quotes, SidebarRight, Square, Stack, Stop, TextAlignLeft, Trash, X, type Icon } from "./icons";
 import { chatGroups } from "./chat-groups";
 import { WithMenu } from "./Menu";
 import { citeRuns, siteName } from "./cite-pills";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { copiedFiles, pastesFiles } from "./copied";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -52,6 +55,8 @@ export type TutorTurn = {
   steps?: string[];
   /** Feedback on his answer to an exercise: its card's points, marked (D162); empty for any other reply. */
   marks?: Mark[];
+  /** Files he attached to this message (D189), as `ore chat --attach` returned them. */
+  files?: ChatFile[];
   /** He stopped this reply (D187): what was written by then is its reply; with nothing written it says so. */
   stopped?: boolean;
   /** The card he kept from this reply: its id, or "adding" while it is written. */
@@ -60,9 +65,16 @@ export type TutorTurn = {
 type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; steps?: string[]; marks?: Mark[]; ai: Ai };
 /** What he has typed and not sent yet, with the @-mentions in it. */
 /** `cases`: what he has written under a tell-apart exercise's two cases, not yet sent, and the turn that asked. */
-export type TutorDraft = { input: string; mentions: Mention[]; cases?: { turn: TutorTurn["id"]; said: string[] } };
+/** `files`: what he has attached to the message he is writing (D189). */
+export type TutorDraft = { input: string; mentions: Mention[]; files?: ChatFile[]; cases?: { turn: TutorTurn["id"]; said: string[] } };
 export type TutorChat = ReturnType<typeof useTutorChat>;
 
+/** A file attached to a message (D189): its name, its path from the library's root, and what it is. */
+export type ChatFile = { name: string; path: string; kind: "image" | "pdf" | "text" };
+/** The library's folder, learned from the first attach or saved chat read, so an attached image can be shown. */
+let libraryRoot = "";
+const ATTACH_EXTS = ["png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "md", "csv", "json", "py", "js", "ts", "tsx", "html", "css", "sql", "sh", "yaml", "yml", "tex", "ipynb"];
+const MAX_FILES = 4;
 /** A citation marker cut off mid-stream, or one whose source list never came. */
 const CUT_MARKS = /\s?\[\d*$|\s?\[\d+\](?!\()/g;
 let turnSeq = 0;
@@ -82,7 +94,9 @@ const settled = ({ partial: _p, searching: _s, kept, ...t }: TutorTurn): TutorTu
  *  reply still being written for it lands in its file. */
 export function useTutorChat(notify: Notify) {
   const [turns, setTurns] = useState<TutorTurn[]>([]);
-  const [draft, setDraft] = useState<TutorDraft>({ input: "", mentions: [] });
+  const [draft, setDraftState] = useState<TutorDraft>({ input: "", mentions: [] });
+  const draftNow = useRef(draft);
+  const setDraft = (f: (d: TutorDraft) => TutorDraft) => setDraftState((draftNow.current = f(draftNow.current)));
   const now = useRef(turns);
   const update = (f: (t: TutorTurn[]) => TutorTurn[]) => setTurns((now.current = f(now.current)));
   // The chat on screen: its id (its first turn's) and name; null until he sends its first message.
@@ -117,8 +131,9 @@ export function useTutorChat(notify: Notify) {
     if (p.partial !== undefined || p.searching || p.searched) return;
     void write(async () => {
       // Deleted while the reply was on its way: nothing to put it in.
-      const c = await ore<SavedChat>("chat", chat).catch(() => null);
-      if (!c) return;
+      const read = await ore<SavedChat & { root?: string }>("chat", chat).catch(() => null);
+      if (!read) return;
+      const { root: _root, ...c } = read; // where the library is, not part of the chat
       await oreWith(JSON.stringify({ ...c, ...(title ? { title } : {}), turns: c.turns.map((t) => (t.id === id ? settled({ ...t, ...p }) : t)) }), "chat", "--set");
     });
   };
@@ -144,7 +159,7 @@ export function useTutorChat(notify: Notify) {
     // 2?") can lean on them; the ones still hidden aren't, so his own try at the next step is his (D142).
     const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).slice(0, stepsShown.get(x.id) ?? 1).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
     // A turn that set an exercise carries it, so the feedback judges against the card committed then (D158).
-    const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: said(x), ...(x.exercise ? { exercise: x.exercise } : {}) }] : []));
+    const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: said(x), ...(x.exercise ? { exercise: x.exercise } : {}), ...(x.files?.length ? { files: x.files } : {}) }] : []));
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
@@ -153,7 +168,7 @@ export function useTutorChat(notify: Notify) {
     try {
       if (!mine()) return; // stopped before the run began
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
-      const r = await oreJob<Reply & { title?: string }>(job, null, "tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
+      const r = await oreJob<Reply & { title?: string }>(job, null, "tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), ...(t.files?.length ? [opt("files", JSON.stringify(t.files))] : []), opt("stream", t.id));
       if (!mine()) return;
       jobs.current.delete(t.id);
       flying.current.delete(t.id);
@@ -194,9 +209,9 @@ export function useTutorChat(notify: Notify) {
   const retry = (id: string) => {
     const i = now.current.findIndex((t) => t.id === id);
     if (i < 0) return;
-    const { message, item, title, mentions, pointed } = now.current[i]!;
+    const { message, item, title, mentions, pointed, files } = now.current[i]!;
     stepsShown.delete(id); // a new reply starts its steps from the first
-    const t = { id, message, item, title, mentions, pointed };
+    const t = { id, message, item, title, mentions, pointed, ...(files?.length ? { files } : {}) };
     update((ts) => ts.map((x) => (x.id === id ? t : x)));
     void run(t, now.current.slice(0, i));
   };
@@ -256,7 +271,8 @@ export function useTutorChat(notify: Notify) {
   const open = async (id: string) => {
     if (metaNow.current?.id === id) return;
     try {
-      const c = await serial(() => ore<SavedChat>("chat", id));
+      const c = await serial(() => ore<SavedChat & { root?: string }>("chat", id));
+      if (c.root) libraryRoot = c.root;
       update(() => c.turns.map((t) => (t.reply === undefined && !t.error && !flying.current.has(t.id) ? { ...t, error: "No reply came: Ore closed before it did." } : t)));
       setCarry(c.carry ?? []);
       setMeta({ id: c.id, title: c.title });
@@ -282,14 +298,29 @@ export function useTutorChat(notify: Notify) {
       notify(errorText(e, "delete that chat"), "error");
     }
   };
+  /** Copies files into the library for the message he is writing (D189): paths (picked, or copied in Finder)
+   *  or pasted bytes. One the tutor can't read is refused with the reason; at most four a message. */
+  const attach = async (from: (string | { name: string; data: string })[]) => {
+    for (const f of from) {
+      if ((draftNow.current.files?.length ?? 0) >= MAX_FILES) return notify(`A message takes up to ${MAX_FILES} files`, "info");
+      try {
+        const r = typeof f === "string" ? await ore<ChatFile & { root: string }>("chat", opt("attach", f)) : await oreWith<ChatFile & { root: string }>(f.data, "chat", "--attach", "-", opt("name", f.name));
+        libraryRoot = r.root;
+        const file = { name: r.name, path: r.path, kind: r.kind };
+        setDraft((d) => (d.files?.some((x) => x.path === file.path) ? d : { ...d, files: [...(d.files ?? []), file] }));
+      } catch (e) {
+        notify(errorText(e, "attach that"), "error");
+      }
+    }
+  };
   /** A web page a reply cites, in his browser. */
   const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
-  return { turns, draft, setDraft, carry, drop, ask, stop, retry, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
+  return { turns, draft, setDraft, carry, drop, ask, stop, retry, attach, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
-const STARTERS_READING = ["Explain this simply", "Give me an example", "Practice"];
-const STARTERS = ["What have I been learning?", "Explain something I saved", "Practice"];
+const STARTERS_READING: [string, Icon][] = [["Explain this simply", TextAlignLeft], ["Give me an example", Quotes], ["Practice", PencilSimple]];
+const STARTERS: [string, Icon][] = [["What have I been learning?", Stack], ["Explain something I saved", BookOpen], ["Practice", PencilSimple]];
 
 /** The tutor (D128): a chat docked at the window's right, like Notion AI's and Linear's Ask panels,
  *  opened from the bubble at the bottom right or ⌘J. It sees the source he is reading (the chip over
@@ -315,7 +346,7 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   onOpen: (item: string, at: string) => void;
   onClose: () => void;
 }) {
-  const { turns, draft: { input, mentions }, setDraft, carry } = chat;
+  const { turns, draft: { input, mentions, files = [] }, setDraft, carry } = chat;
   const setInput = (text: string) => setDraft((d) => ({ ...d, input: text }));
   // He can take the open source out of the context (the chip's ×); a new source puts it back.
   const [dropped, setDropped] = useState<string | null>(null);
@@ -380,7 +411,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     if (!message || busy) return;
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
     force.current = true; // what he sends, and its reply, he wants to see
-    chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}) });
+    // What he attached goes with the message he typed, not with a starter or a chip's canned one.
+    chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}), ...(typed && files.length ? { files } : {}) });
     if (typed) setDraft(() => ({ input: "", mentions: [] }));
     setAt(null);
     field.current?.focus();
@@ -446,7 +478,29 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     const text = [t.reply, ...(t.steps ?? []).map((x, i) => `${i + 1}. ${x}`)].join("\n\n").replace(/\s?\[(\d+)\](?!\()/g, (m, n: string) => (cited.has(n) ? "" : m));
     void navigator.clipboard.writeText(text).then(() => { setCopied(t.id); setTimeout(() => setCopied((c) => (c === t.id ? null : c)), 1500); }, (e) => chat.say(errorText(e, "copy that"), "error"));
   };
-  const chips = (context || !!carry.length) && (
+  const pickFiles = async () => {
+    const picked = await openDialog({ multiple: true, directory: false, filters: [{ name: "Images, PDFs and text", extensions: ATTACH_EXTS }] });
+    if (picked) await chat.attach(Array.isArray(picked) ? picked : [picked]);
+    field.current?.focus();
+  };
+  /** A paste that carries files: ones copied in Finder come by path from the pasteboard; a copied picture
+   *  (a screenshot) has only its bytes. Text pastes as text. */
+  const pasteFiles = (e: React.ClipboardEvent) => {
+    if (!pastesFiles(e.clipboardData)) return;
+    e.preventDefault();
+    const blobs = [...e.clipboardData.files];
+    void copiedFiles().then(async (list) => {
+      if (list.length) return chat.attach(list.flatMap((x) => (x.kind === "file" ? [x.path] : [])));
+      const read = (b: File) => new Promise<{ name: string; data: string }>((ok, no) => {
+        const r = new FileReader();
+        r.onload = () => ok({ name: b.name && b.name !== "image.png" ? b.name : `Pasted image.${(b.type.split("/")[1] ?? "png").replace("jpeg", "jpg")}`, data: String(r.result).split(",")[1] ?? "" });
+        r.onerror = () => no(r.error);
+        r.readAsDataURL(b);
+      });
+      await chat.attach(await Promise.all(blobs.map(read)));
+    }).catch((err) => chat.say(errorText(err, "attach that"), "error"));
+  };
+  const chips = (context || !!carry.length || !!files.length) && (
     <div className="tutor-chips">
       {context && (
         <span className="tutor-chip">
@@ -458,6 +512,17 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           </Hint>
         </span>
       )}
+      {files.map((x) => (
+        <span key={x.path} className="tutor-chip">
+          <FileIcon kind={x.kind} />
+          <span className="tutor-chip-title">{x.name}</span>
+          <Hint text="Remove this file">
+            <button aria-label={`Remove “${x.name}”`} onClick={() => { setDraft((d) => ({ ...d, files: d.files?.filter((y) => y.path !== x.path) })); field.current?.focus(); }}>
+              <X size={10} aria-hidden="true" />
+            </button>
+          </Hint>
+        </span>
+      ))}
       {carry.map((m) => (
         <span key={m.kind + m.id} className="tutor-chip">
           <span className="tutor-chip-title">@{m.name}</span>
@@ -519,9 +584,9 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
         }}
       >
         {turns.length === 0 && (
-          <div className="ask-starters tutor-starters">
-            {(context ? STARTERS_READING : STARTERS).map((s) => (
-              <button key={s} onClick={() => send(s)}>{s}</button>
+          <div className="tutor-starters">
+            {(context ? STARTERS_READING : STARTERS).map(([s, Glyph]) => (
+              <button key={s} className="menu-item" onClick={() => send(s)}><Glyph size={14} aria-hidden="true" />{s}</button>
             ))}
           </div>
         )}
@@ -529,6 +594,13 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
           const last = i === turns.length - 1 && !busy;
           return (
           <div key={t.id} className="library-turn">
+            {!!t.files?.length && (
+              <div className="ask-files">
+                {t.files.map((x) => (x.kind === "image" && libraryRoot
+                  ? <img key={x.path} src={convertFileSrc(`${libraryRoot}/${x.path}`)} alt={x.name} draggable={false} />
+                  : <span key={x.path} className="tutor-chip"><FileIcon kind={x.kind} /><span className="tutor-chip-title">{x.name}</span></span>))}
+              </div>
+            )}
             <p className="ask-me">{lit?.turn === t.id ? <Evidence answer={t.message} quote={lit.quote} /> : marked(t.message, t.mentions ?? [])}</p>
             <div className={`ask-ai${i === turns.length - 1 ? " newest" : ""}`}>
               <div className={`ask-text${t.reply === undefined && !t.error ? " typing" : ""}`}>
@@ -671,7 +743,8 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
             rows={1}
             className="field"
             aria-label="Message the tutor"
-            placeholder={turns.length ? "Reply…" : context ? "Ask about this, or @ a source or skill…" : "Ask anything, or @ a source or skill…"}
+            onPaste={pasteFiles}
+            placeholder={files.length ? "Ask about it…" : turns.length ? "Reply…" : context ? "Ask about this, or @ a source or skill…" : "Ask anything, or @ a source or skill…"}
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
@@ -703,6 +776,11 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
               }
             }}
           />
+          <Hint text="Attach an image, PDF or text file" side="top">
+            <button className="icon-btn ask-attach" aria-label="Attach a file" onClick={() => void pickFiles()}>
+              <Paperclip size={14} aria-hidden="true" />
+            </button>
+          </Hint>
           {busy ? (
             // While a reply is written the send button is Stop (ChatGPT, Claude, Notion AI).
             <Hint text="Stop" keys="tutor-stop" side="top">
@@ -1013,6 +1091,8 @@ function Cases({ cases, open, said, onSaid, onSend }: { cases: string[]; open: b
     </div>
   );
 }
+
+const FileIcon = ({ kind }: { kind: ChatFile["kind"] }) => (kind === "image" ? <Image size={12} aria-hidden="true" /> : kind === "pdf" ? <FilePdf size={12} aria-hidden="true" /> : <FileText size={12} aria-hidden="true" />);
 
 /** The tutor's button (D160, after Notion AI's bubble at the bottom right): the mole, where the floating tutor
  *  opens. A reply that landed while it was closed comes out of it as a speech bubble (D159, after Cult UI's

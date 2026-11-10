@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { deleteChat, listChats, readChat, saveChat } from "../src/chats.ts";
+import { attachToChat, chatFilePath, deleteChat, listChats, readChat, saveChat } from "../src/chats.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // D172: the tutor's chats are saved in the library, one file each.
@@ -71,5 +71,34 @@ describe("tutor chats", () => {
     writeFileSync(join(lib.root, "chats", "broken.json"), "{");
     writeFileSync(join(lib.root, "chats", ".DS_Store"), "junk");
     expect(listChats(lib).map((r) => r.id)).toEqual(["a-1"]);
+  });
+});
+
+// D189: a file attached to a message is copied into chats/files/, named by its content.
+describe("chat attachments", () => {
+  test("a file by path and a pasted one are copied in; the same bytes are kept once; the list of chats ignores them", async () => {
+    const lib = await tempLibrary();
+    const src = join(lib.root, "..", `chart-${Date.now()}.PNG`);
+    writeFileSync(src, new Uint8Array([137, 80, 78, 71, 1]));
+    const a = await attachToChat(lib, src);
+    expect(a).toMatchObject({ name: src.split("/").pop(), kind: "image" });
+    expect(a.path).toMatch(/^chats\/files\/[0-9a-f]{16}\.png$/);
+    expect([...readFileSync(chatFilePath(lib, a.path))]).toEqual([137, 80, 78, 71, 1]);
+    const b = await attachToChat(lib, { name: "Pasted image.png", data: new Uint8Array([137, 80, 78, 71, 1]) });
+    expect(b.path).toBe(a.path);
+    expect(readdirSync(join(lib.root, "chats", "files"))).toHaveLength(1);
+    expect((await attachToChat(lib, { name: "paper.pdf", data: new Uint8Array([37, 80, 68, 70]) })).kind).toBe("pdf");
+    expect((await attachToChat(lib, { name: "notes.md", data: new TextEncoder().encode("# hi") })).kind).toBe("text");
+    expect(listChats(lib)).toEqual([]);
+  });
+
+  test("what the tutor can't read is refused with the next step, and nothing is saved", async () => {
+    const lib = await tempLibrary();
+    await expect(attachToChat(lib, { name: "book.epub", data: new Uint8Array([1]) })).rejects.toThrow("the tutor can't read a .epub file: attach an image, a PDF or a text file, or add it as a source (⌘N)");
+    await expect(attachToChat(lib, { name: "empty.png", data: new Uint8Array() })).rejects.toThrow("empty.png is empty");
+    await expect(attachToChat(lib, { name: "big.pdf", data: new Uint8Array(20 * 1024 * 1024 + 1) })).rejects.toThrow("big.pdf is over 20 MB");
+    await expect(attachToChat(lib, join(lib.root, "nope.png"))).rejects.toThrow("no file at");
+    expect(existsSync(join(lib.root, "chats", "files"))).toBe(false);
+    expect(() => chatFilePath(lib, "skills.yaml")).toThrow('no attached file "skills.yaml"');
   });
 });

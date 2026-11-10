@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Citation } from "../src/ai/ask.ts";
 import { addTutorCard, partialReply, tutor, tutorPassages, type TutorCard } from "../src/ai/tutor.ts";
+import { attachToChat } from "../src/chats.ts";
 import { sceneOutline, setDiagram } from "../src/diagrams.ts";
 import { findCard } from "../src/cards.ts";
 import { createItem, findItem } from "../src/items.ts";
@@ -70,6 +71,24 @@ describe("tutor: what it sees", () => {
     expect(new Set(ps.map((p) => `${p.item}:${p.start}`)).size).toBe(ps.length); // no passage twice
   });
 
+  test("files he attached reach the agent: this message's and the recent turns', by path, with the Read tool; a path outside chats/files is refused (D189)", async () => {
+    const { lib } = await library();
+    const png = await attachToChat(lib, { name: "chart.png", data: new Uint8Array([137, 80, 78, 71]) });
+    const txt = await attachToChat(lib, { name: "notes.txt", data: new TextEncoder().encode("spacing") });
+    const out = { reply: "It shows a forgetting curve.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "A chart" };
+    fakeClaude([out]);
+    await tutor(lib, "what does this show?", { files: [png], earlier: [{ message: "see my notes", reply: "Read them.", files: [txt] }] });
+    const m = JSON.parse(readFileSync(join(binDir, "msgs.jsonl"), "utf8").trim()) as string;
+    const abs = (f: { path: string }) => join(lib.root, f.path);
+    expect(m).toContain(`Files to read:\n- ${abs(txt)}\n- ${abs(png)}`);
+    const input = sent()[0] as unknown as { attached: unknown; earlier: { attached?: unknown }[] };
+    expect(input.attached).toEqual([{ name: "chart.png", file: abs(png) }]);
+    expect(input.earlier[0]!.attached).toEqual([{ name: "notes.txt", file: abs(txt) }]);
+    const argv = JSON.parse(readFileSync(join(binDir, "argv.json"), "utf8")) as string[];
+    expect(argv[argv.indexOf("--tools") + 1]).toContain("Read");
+    await expect(tutor(lib, "and this?", { files: [{ name: "x", path: "../secrets.txt" }] })).rejects.toThrow('no attached file "../secrets.txt"');
+  });
+
   test("a message with no words from the source (\"what's this about?\") still gets its opening", async () => {
     const { lib, a } = await library();
     const ps = tutorPassages(lib, "summarize", { item: a.meta.id });
@@ -82,7 +101,7 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@13" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@14" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });

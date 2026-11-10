@@ -95,6 +95,7 @@ has to ask for something obvious, add a row here in the same PR.**
 | Right-click by surface | Row, card, title or header: the same actions as its ⋯. Sidebar space and Home/All sources rows: New skill, New collection. A list's space and its card (Sources, Questions): that list's create action (Add source, Add a question). Home, Review, Settings, the reader's side panel outside rows: nothing. A new surface picks one of these and adds its row here | Finder, Notion |
 | Canvas tools (diagram) | The tool he picked stays after drawing, so the next shape needs no key; V or Esc goes back to Select, and the lock (Q, remembered) turns this off. Each tool shows its key against its icon (Tyler, 2026-11-10) | tldraw, Excalidraw with the lock on |
 | AI chat (tutor) | While a reply is written the send button is Stop (⌘. too): the words so far stay as the reply, none leaves "Stopped" with Try again, and a late answer is ignored. Every reply has Copy. The field stays typable while it writes | ChatGPT, Claude, Notion AI |
+| AI chat (tutor) | A file gets into a message three ways: the paperclip, pasting a copied picture, pasting files copied in Finder. Each shows as a chip with × before sending and over the message after; one it can't read is refused with what to do instead | ChatGPT, Claude |
 
 ## Detail behind each rule
 
