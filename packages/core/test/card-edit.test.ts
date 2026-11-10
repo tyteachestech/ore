@@ -61,6 +61,6 @@ describe("editing an Explain card's key points", () => {
     const { lib } = await explain();
     const { item } = await addSnippet(lib, { text: "Two." });
     const f = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "One plus one?", answer: "Two.", rubric: [] });
-    expect(() => writeCardContent(findCard(lib, f.meta.id), { rubric: ["says two"] })).toThrow(/Fact card/);
+    expect(() => writeCardContent(findCard(lib, f.meta.id), { rubric: ["says two"] })).toThrow(/Fact exercise/);
   });
 });

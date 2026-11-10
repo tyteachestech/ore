@@ -946,7 +946,7 @@ journey("mole says: a reply that lands while the tutor is closed comes out of th
   }
 });
 
-journey("tutor hints and cards: a hint offers Show me, which asks for the answer; + Card keeps the reply's card, ⌘Z takes it back", async (page) => {
+journey("tutor hints and cards: a hint offers Show me, which asks for the answer; + Exercise keeps the reply's exercise, ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   const replies = [
     { reply: "Think about what the tested group did that the rereaders didn't.", citations: [], general: false, hint: true, card: null },
@@ -964,12 +964,12 @@ journey("tutor hints and cards: a hint offers Show me, which asks for the answer
   await tutor.getByRole("button", { name: "Show me" }).click();
   await tutor.getByText("Show me", { exact: true }).waitFor(); // sent as his message
   const kept = page.waitForResponse((r) => (r.request().postData() ?? "").includes('"tutor-card"'));
-  await tutor.getByRole("button", { name: /^Add card:/ }).click();
-  await tutor.getByRole("button", { name: "Card added" }).waitFor();
+  await tutor.getByRole("button", { name: /^Add exercise:/ }).click();
+  await tutor.getByRole("button", { name: "Exercise added" }).waitFor();
   await kept;
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // out of the field, so ⌘Z is the app's
   await page.keyboard.press("Meta+z");
-  await tutor.getByRole("button", { name: /^Add card:/ }).waitFor();
+  await tutor.getByRole("button", { name: /^Add exercise:/ }).waitFor();
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Meta+j");
 });
@@ -1161,7 +1161,7 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   await tutor.locator(".ask-me .quiz-evidence", { hasText: "same steps each time" }).waitFor();
   await tutor.getByRole("listitem", { name: "Missed: Choosing its own tools makes an agent" }).focus();
   await until("a missed point marks nothing", async () => (await tutor.locator(".ask-me .quiz-evidence").count()) === 0);
-  await tutor.getByRole("button", { name: /^Add card/ }).waitFor(); // the committed card, offered after the miss (D158)
+  await tutor.getByRole("button", { name: /^Add exercise/ }).waitFor(); // the committed card, offered after the miss (D158)
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Meta+j");
 });
@@ -1207,8 +1207,8 @@ journey("tutor: words selected in a reply go into the source note as a quote, Un
   await page.locator(".toast", { hasText: "Added to your note" }).getByRole("button", { name: "Undo" }).click();
   await until("Undo takes it out", async () => !(await note()).includes(said));
   await pick();
-  await bar.getByRole("button", { name: "Card" }).click();
-  await until("Card asks the tutor for a card from the words", async () => asked.at(-1) === `Make a card from this: “${said}”`);
+  await bar.getByRole("button", { name: "Exercise" }).click();
+  await until("Exercise asks the tutor for one from the words", async () => asked.at(-1) === `Make a card from this: “${said}”`);
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Meta+j");
 });
@@ -1413,7 +1413,7 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   await field.press("Backspace");
   await field.press("Backspace");
   await field.press("Enter");
-  await page.getByText("Card made").waitFor();
+  await page.getByText("Exercise made").waitFor();
   const saved = page.locator(".figure-box.saved");
   await saved.first().waitFor();
   const id = ((await ore("cards", "--state", "draft")) as { id: string; answer: string; figure?: object }[]).find((c) => c.figure && c.answer === "Router")?.id;
@@ -3480,7 +3480,7 @@ journey("review: Open in source pauses on the card; Back to Review picks it up w
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("review: Enter activates the focused button (Again, Edit card, Open in source); on the card it gives the suggested Good", async (page) => {
+journey("review: Enter activates the focused button (Again, Edit exercise, Open in source); on the card it gives the suggested Good", async (page) => {
   const ratings: string[] = [];
   page.on("request", (r) => {
     const m = /"--rating=(\d)"/.exec(r.postData() ?? "");
@@ -3516,8 +3516,8 @@ journey("review: Enter activates the focused button (Again, Edit card, Open in s
     }
     await page.keyboard.press("Enter");
   };
-  await enterOn("Edit card");
-  await until("Enter on Edit card opens the editor", async () => !(await q.isVisible()));
+  await enterOn("Edit exercise");
+  await until("Enter on Edit exercise opens the editor", async () => !(await q.isVisible()));
   await page.keyboard.press("Escape");
   await q.waitFor();
   await enterOn("Open in source");
@@ -3562,7 +3562,7 @@ journey("review Ask: closing and reopening it keeps the reply so far and a half-
   await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
   const toggle = page.getByRole("button", { name: "Ask about this" });
   await toggle.click();
-  const field = page.getByRole("textbox", { name: "Ask about this card" });
+  const field = page.getByRole("textbox", { name: "Ask about this exercise" });
   await field.fill("Why is this the answer?");
   await page.keyboard.press("Enter");
   const ask = page.getByRole("region", { name: "Ask about this" });
@@ -4104,14 +4104,14 @@ journey("review: editing an Explain card corrects a key point too; it's there wh
   await reveal(page);
   const points = page.locator(".quiz-points");
   await points.getByText(was).waitFor();
-  await page.getByRole("button", { name: "Edit card" }).click();
+  await page.getByRole("button", { name: "Edit exercise" }).click();
   const field = page.getByRole("textbox", { name: "Key points" });
   await until("the editor lists the key points, one a line", async () => (await field.inputValue()).split("\n")[0] === was);
   await field.fill((await field.inputValue()).replace(was, now));
   await page.getByRole("button", { name: "Save" }).click();
   await points.getByText(now).waitFor();
   if ((await rubric())[0] !== now) throw new Error(`saved ${await rubric()}`);
-  await page.getByRole("button", { name: "Edit card" }).click();
+  await page.getByRole("button", { name: "Edit exercise" }).click();
   await until("opened again, the editor has the new point", async () => (await field.inputValue()).split("\n")[0] === now);
   await page.keyboard.press("Escape");
   await page.locator(".review").focus();
@@ -4135,7 +4135,7 @@ journey("review: retiring a card keeps ⌘Z for the ratings before it, and so do
   }
   const third = await q.innerText();
   await reveal(page);
-  const retire = page.getByRole("button", { name: /^(Retire|Delete) card$/ });
+  const retire = page.getByRole("button", { name: /^(Retire|Delete) exercise$/ });
   // The write fails: the card stays, and so does Undo for the two ratings.
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"retire"')) return route.fallback();
@@ -4745,7 +4745,7 @@ journey("finish: drafting that fails after Done stays in front of “Finished”
   await page.getByRole("button", { name: "Finish", exact: true }).click();
   await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.getByRole("button", { name: "Done", exact: true }).click();
-  const both = page.locator(".toast").filter({ hasText: "Cards for 2 sources weren’t drafted: Codex isn’t installed." });
+  const both = page.locator(".toast").filter({ hasText: "Exercises for 2 sources weren’t drafted: Codex isn’t installed." });
   await both.waitFor();
   await page.waitForTimeout(300);
   const failures = await page.locator(".toast").filter({ hasText: "weren’t drafted" }).count();
@@ -4978,7 +4978,7 @@ async function explain(page: Page, phrase: string) {
 }
 
 // After the question journeys: Learn this makes its term a question. On words no other journey highlights.
-journey("explain: ↵ on a focused Retry, Make card or Later does what clicking it does", async (page) => {
+journey("explain: ↵ on a focused Retry, Key point or Later does what clicking it does", async (page) => {
   await openSource(page, AGENTS);
   const learning = page.getByRole("dialog", { name: /^Learn / });
   await explain(page, "subtasks");
@@ -4989,11 +4989,11 @@ journey("explain: ↵ on a focused Retry, Make card or Later does what clicking 
   await page.waitForTimeout(300);
   if (await learning.count()) throw new Error("↵ on Retry started Learn this");
   await ex.getByRole("button", { name: "Retry" }).waitFor();
-  await ex.getByRole("button", { name: "Make card" }).focus();
+  await ex.getByRole("button", { name: "Key point" }).focus();
   await page.keyboard.press("Enter");
   await ex.waitFor({ state: "detached" });
-  if (await learning.count()) throw new Error("↵ on Make card started Learn this");
-  await page.getByRole("dialog", { name: "Highlight" }).waitFor(); // the card's note, as clicking Make card opens it
+  if (await learning.count()) throw new Error("↵ on Key point started Learn this");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor(); // the card's note, as clicking Key point opens it
   await page.keyboard.press("Escape");
   await explain(page, "Parallelisation");
   await page.getByRole("dialog", { name: "Explain Parallelisation" }).getByRole("button", { name: "Learn this" }).click();
@@ -5232,12 +5232,12 @@ journey("review: changing an Explain card's key points after it was checked keep
   const suggested = page.locator(".review-rate .suggested");
   await until("the AI marked both points", async () => (await points.locator("li.got").count()) === 2);
   await suggested.waitFor();
-  await page.getByRole("button", { name: "Edit card" }).click();
+  await page.getByRole("button", { name: "Edit exercise" }).click();
   const field = page.getByRole("textbox", { name: "Key points" });
   const was = await field.inputValue();
   const [kept, changed] = was.split("\n") as [string, string];
   const save = async (text: string, shows: string) => {
-    if (!(await field.isVisible())) await page.getByRole("button", { name: "Edit card" }).click();
+    if (!(await field.isVisible())) await page.getByRole("button", { name: "Edit exercise" }).click();
     await field.fill(text);
     await page.getByRole("button", { name: "Save" }).click();
     await points.locator("li").first().filter({ hasText: shows }).waitFor();
@@ -5258,7 +5258,7 @@ journey("review: changing an Explain card's key points after it was checked keep
   await points.locator("li", { hasText: "Says when rereading does help" }).locator(".quiz-mark").click();
   await suggested.waitFor();
   // ⌘Z lands while the editor is open and untouched: it shows the points as they are now.
-  await page.getByRole("button", { name: "Edit card" }).click();
+  await page.getByRole("button", { name: "Edit exercise" }).click();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Meta+z");
   await until("the open editor has the points back", async () => (await field.inputValue()) === `${changed}\n${kept}`);
@@ -5318,7 +5318,7 @@ journey("review: while a card edit saves, the editor is read-only and Esc waits,
     await new Promise<void>((ok) => (release = ok));
     await route.fallback();
   });
-  await page.getByRole("button", { name: "Edit card" }).click();
+  await page.getByRole("button", { name: "Edit exercise" }).click();
   const question = page.locator("#edit-q");
   const was = await question.inputValue();
   await question.fill(`${was} (edited)`);
@@ -5355,7 +5355,7 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   await startReview(page, null);
   await reveal(page);
   await page.getByRole("button", { name: "Ask about this" }).click();
-  const box = page.getByRole("textbox", { name: "Ask about this card" });
+  const box = page.getByRole("textbox", { name: "Ask about this exercise" });
   await box.fill("Why does this work?");
   await page.keyboard.press("Enter");
   await page.locator(".ask").getByText("The AI is offline.", { exact: false }).waitFor();
@@ -5388,7 +5388,7 @@ journey("review Ask: a suggested card shows only what it changes, struck and und
   await reveal(page);
   was.answer = (await page.locator(".review-answer").first().innerText()).trim();
   await page.getByRole("button", { name: "Ask about this" }).click();
-  await page.locator(".ask-starters").getByRole("button", { name: "Make this card clearer" }).click();
+  await page.locator(".ask-starters").getByRole("button", { name: "Make this exercise clearer" }).click();
   const card = page.locator(".ask-card");
   await card.waitFor();
   const q = card.locator(".ask-card-q");
@@ -5396,14 +5396,14 @@ journey("review Ask: a suggested card shows only what it changes, struck and und
   if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("the added words aren't marked");
   if (!(await card.locator(".ask-card-a .diff-add").allInnerTexts()).join("").includes("Short")) throw new Error("the new answer isn't marked as added");
   await page.unroute(/\/ore$/);
-  await card.getByRole("button", { name: "Use this card" }).click();
-  await card.getByRole("button", { name: "Card updated" }).waitFor();
+  await card.getByRole("button", { name: "Use this exercise" }).click();
+  await card.getByRole("button", { name: "Exercise updated" }).waitFor();
   if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("using the card dropped the change it shows");
   // ⌘Z puts the old card back, so the suggestion can be used again.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Meta+z");
-  await card.getByRole("button", { name: "Use this card" }).waitFor({ timeout: 3000 }).catch(() => {
-    throw new Error("after ⌘Z the suggestion still says Card updated");
+  await card.getByRole("button", { name: "Use this exercise" }).waitFor({ timeout: 3000 }).catch(() => {
+    throw new Error("after ⌘Z the suggestion still says Exercise updated");
   });
   await ore("card", "set", id, `--question=${was.question}`, `--answer=${was.answer}`);
   await page.keyboard.press("Escape");

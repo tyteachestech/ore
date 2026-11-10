@@ -246,10 +246,10 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
           )}
           {again && <p className="ex-again">{again}</p>}
           <div className="ex-actions">
-            <Hint text="Card this word, with its sentence" keys="card" side="bottom">
+            <Hint text="Make this word a key point, with its sentence" keys="card" side="bottom">
               <button className="ex-btn" onClick={p.onMakeCard}>
                 <CardIcon size={14} className="card" aria-hidden="true" />
-                Make card
+                Key point
               </button>
             </Hint>
             <Hint text={<>Make it a question, with sources to learn it <kbd>↵</kbd></>} side="bottom">

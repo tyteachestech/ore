@@ -658,7 +658,7 @@ function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pic
           undo: [["--undo"], ...setReflection(text || undefined, t.reflection)],
         }
       : { from: { reflection: t.reflection }, to: { reflection: text }, do: setReflection(t.reflection, text), undo: setReflection(text, t.reflection) };
-    const msg = next ? `Next try planned${text ? " · a card comes from how it went" : ""}` : "Saved how it went · a card comes from it";
+    const msg = next ? `Next try planned${text ? " · an exercise comes from how it went" : ""}` : "Saved how it went · an exercise comes from it";
     if (await change(t, step, msg)) drafts.delete(t.id);
     else setReflecting(t.id);
   };

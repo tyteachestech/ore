@@ -29,7 +29,7 @@ export function figureFile(item: Item, src: string): string {
  *  and the box inside it. */
 export async function addFigureCard(lib: Library, ref: string, f: { src: string; box: number[]; label: string }): Promise<Card> {
   const label = f.label.trim();
-  if (!label) throw new Error("say what’s under the box: it is the card’s answer");
+  if (!label) throw new Error("say what’s under the box: it is the exercise’s answer");
   if (/[\r\n]/.test(label)) throw new Error("what’s under the box is one line");
   const [x, y, w, h] = f.box;
   const ok = (n: number | undefined): n is number => typeof n === "number" && Number.isFinite(n);

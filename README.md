@@ -1,6 +1,6 @@
 # Ore
 
-A Mac learning app that turns what you read into things you remember. Capture anything (articles, PDFs, EPUBs, YouTube, notes), read it in a calm reader, highlight what matters, answer a few AI-written questions, and review AI-drafted cards on a spaced schedule (FSRS). Every design choice is checked against learning science; the evidence lives in [`docs/research/`](docs/research/).
+A Mac learning app that turns what you read into things you remember. Capture anything (articles, PDFs, EPUBs, YouTube, notes), read it in a calm reader, highlight what matters, answer a few AI-written questions, and do AI-drafted exercises on a spaced schedule (FSRS). Every design choice is checked against learning science; the evidence lives in [`docs/research/`](docs/research/).
 
 ![The reader: prequestions at the top, highlights in the text, the source note on the right](docs/images/reader.png)
 
@@ -20,17 +20,17 @@ You need a Mac with Apple Silicon (M1 or later, macOS 13 or newer) and a paid Cl
    ```
    Then type `claude`, press Return, and sign in with your Claude account in the browser window it opens. Close Terminal when it says you're signed in. (Using ChatGPT instead: install [Codex](https://github.com/openai/codex), sign in, and pick Codex in Ore's Settings › AI.)
 4. **Add 5 sources.** In Ore press ⌘N, paste a link to an article or a YouTube video, and press Return. Do it 5 times, or drop PDFs, EPUBs, Word files or slides onto the window. Each one lands in **To read**, and after a few seconds the AI adds a few questions to think about before you read it.
-5. **Read one and make a card.** Open a source, select a sentence worth remembering, and pick **Card**. When you reach the end, press ⇧⌘Return to finish it: write what you remember and answer its questions. The AI then turns your Card highlights into flashcards, in about a minute.
-6. **Do a review.** Press ⌘R. Answer the card, say how sure you were (1 to 3), and rate how it went (1 Again to 4 Easy). Ore brings it back just before you'd forget it.
+5. **Read one and mark a key point.** Open a source, select a sentence worth remembering, and pick **Key point**. When you reach the end, press ⇧⌘Return to finish it: write what you remember and answer its questions. The AI then writes exercises from your highlights, in about a minute.
+6. **Do a review.** Press ⌘R. Answer the exercise, say how sure you were (1 to 3), and rate how it went (1 Again to 4 Easy). Ore brings it back just before you'd forget it.
 
 Your library is the folder `Ore` in your home folder: plain files you own. Nothing leaves your Mac except what the AI reads to help you.
 
 ## The loop
 
 1. **Capture.** Paste a URL or drop a file. AI drafts 2 to 4 broad *prequestions* and tags the source with your skills.
-2. **Read.** Try the prequestions first, then read. Select text to highlight it as Keep, Card or Question, with an optional note.
+2. **Read.** Try the prequestions first, then read. Select text to highlight it, and mark it a Key point or a Question if you want, with an optional note.
 3. **Finish.** The source blurs; you write what you remember, then answer each prequestion and check it against the passages it came from.
-4. **Review.** Cards from your highlights and notes come back on an FSRS schedule. Fact cards are flipped; Explain cards are typed and checked against a rubric by AI. You always set the rating.
+4. **Review.** Exercises from your highlights and notes come back on an FSRS schedule. Fact exercises are flipped; Explain exercises are typed and checked against their key points by AI. You always set the rating.
 5. **Grow.** Each skill shows its *strength* as gems: one cut gem per memory you'd still recall three weeks out. No streaks, XP or leaderboards.
 
 Glossary: [`CONTEXT.md`](CONTEXT.md).

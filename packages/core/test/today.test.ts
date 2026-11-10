@@ -40,7 +40,7 @@ describe("daily plan and reminder (D67)", () => {
     const later = T();
     expect(reminderNote(lib, later).notify).toBe(false); // no time set
     await setReviewSettings(lib, { reminder: "08:30", plan: "my morning coffee" });
-    expect(reminderNote(lib, later)).toEqual({ notify: true, title: "After my morning coffee, I review.", body: "About 1 min of your most urgent cards." });
+    expect(reminderNote(lib, later)).toEqual({ notify: true, title: "After my morning coffee, I review.", body: "About 1 min of your most urgent exercises." });
     await expect(setReviewSettings(lib, { reminder: "8:30" })).rejects.toThrow("HH:MM");
     await setReviewSettings(lib, { plan: "" });
     expect(reminderNote(lib, later).title).toBe("Time for today’s review");

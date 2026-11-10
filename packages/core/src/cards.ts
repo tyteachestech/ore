@@ -67,8 +67,8 @@ export function parseCardBody(body: string): CardContent {
 /** Why this text would not read back as the same card, or null: a `---` line in the question ends it,
  *  and a `## Rubric` line in the answer starts the rubric. */
 export function cardTextProblem(c: { question: string; answer: string }): string | null {
-  if (c.question.split("\n").some((l) => l.trim() === "---")) return "A card’s question can’t have a line of just “---”: that line is where the answer starts. Use *** for a rule instead.";
-  if (c.answer.split("\n").some((l) => /^##\s+Rubric\s*$/i.test(l.trim()))) return "A card’s answer can’t have a “## Rubric” line: that heading is where the rubric starts. Name the heading something else.";
+  if (c.question.split("\n").some((l) => l.trim() === "---")) return "An exercise’s question can’t have a line of just “---”: that line is where the answer starts. Use *** for a rule instead.";
+  if (c.answer.split("\n").some((l) => /^##\s+Rubric\s*$/i.test(l.trim()))) return "An exercise’s answer can’t have a “## Rubric” line: that heading is where the rubric starts. Name the heading something else.";
   return null;
 }
 
@@ -167,8 +167,8 @@ export function writeCardMeta(card: Card, meta: CardMeta): void {
 /** Why these key points can't be an Explain card's rubric (D59: the grader marks one per point), or null.
  *  Each is one line of the card's "## Rubric" list; a Fact card has none. */
 export function rubricProblem(kind: Card["meta"]["kind"], rubric: string[]): string | null {
-  if (kind === "card") return rubric.length ? "A Fact card has no key points." : null;
-  if (!rubric.length) return "An Explain card needs at least one key point: they are what its answer is marked against.";
+  if (kind === "card") return rubric.length ? "A Fact exercise has no key points." : null;
+  if (!rubric.length) return "An Explain exercise needs at least one key point: they are what its answer is marked against.";
   if (rubric.some((p) => !p.trim())) return "A key point can’t be empty.";
   if (rubric.some((p) => /[\r\n]/.test(p.trim()))) return "Each key point is one line.";
   return null;

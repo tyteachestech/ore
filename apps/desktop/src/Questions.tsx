@@ -177,9 +177,9 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
         <button onClick={() => void send("done")} disabled={busy}>
           Answered
         </button>
-        <Hint text="Answered, and draft a card from your answer for review">
+        <Hint text="Answered, and draft an exercise from your answer for review">
           <button className="primary" onClick={() => void send("card")} disabled={busy || (!t && !hasAnswer)}>
-            Answered + card <kbd>{label(keys.finish)}</kbd>
+            Answered + exercise <kbd>{label(keys.finish)}</kbd>
           </button>
         </Hint>
       </div>
@@ -256,7 +256,7 @@ export function announce(q: Question, s: Saved, how: "contribution" | "done" | "
     if (added) added = r.answers?.at(-1)?.ts;
     onUndone();
   };
-  notify(how === "contribution" ? "Added to your answer" : how === "card" ? "Answered. A card is on its way" : "Answered", "info", undo, s.again ? redo : undefined);
+  notify(how === "contribution" ? "Added to your answer" : how === "card" ? "Answered. An exercise is on its way" : "Answered", "info", undo, s.again ? redo : undefined);
 }
 
 /** Mark answered / Reopen and Delete on a list of questions, the same on the skill page and in the
