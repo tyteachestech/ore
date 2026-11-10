@@ -741,15 +741,16 @@ journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ repla
 journey("tutor stop and copy: the send button stops a reply (⌘. too), words written by then stay, none says Stopped with Try again, a late answer is ignored; Copy copies a reply (D187)", async (page) => {
   let id = "";
   const held: (() => void)[] = [];
-  let cancelled = 0;
+  let cancelled = 0, calls = 0;
   await page.route(/\/cancel$/, (route) => (cancelled++, route.fallback()));
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
     if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
     const args = JSON.parse(body).args as string[];
     id = (args.find((x) => x.startsWith("--stream=")) ?? "").slice(9);
+    const n = ++calls;
     if (args[1] !== "Answer me") await new Promise<void>((ok) => held.push(ok));
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: args[1] === "Answer me" ? "A whole reply." : "Too late", citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: args[1] === "Answer me" ? "A whole reply." : `Reply ${n}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) });
   });
   try {
     await page.keyboard.press("Meta+j");
@@ -768,7 +769,12 @@ journey("tutor stop and copy: the send button stops a reply (⌘. too), words wr
     await until("the run was cancelled", async () => cancelled === 1);
     held.shift()!();
     await page.waitForTimeout(300);
-    if (await tutor.getByText("Too late").count()) throw new Error("a stopped reply landed anyway");
+    if (await tutor.getByText("Reply 1").count()) throw new Error("a stopped reply landed anyway");
+    // Try again on the stopped turn runs it anew, and that answer lands.
+    await tutor.getByRole("button", { name: "Try again" }).click();
+    await until("it asks again", async () => held.length === 1);
+    held.shift()!();
+    await tutor.getByText("Reply 2").waitFor();
     // Words already written stay as the reply; ⌘. stops from the keyboard.
     id = "";
     await field.fill("Stop me late");
@@ -781,7 +787,7 @@ journey("tutor stop and copy: the send button stops a reply (⌘. too), words wr
     await tutor.getByText("Half a thought", { exact: true }).waitFor();
     held.shift()!();
     await page.waitForTimeout(300);
-    if (await tutor.getByText("Too late").count()) throw new Error("a stopped reply was replaced by the late one");
+    if (await tutor.getByText("Reply 3").count()) throw new Error("a stopped reply was replaced by the late one");
     // Copy puts a reply on the clipboard.
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
     await field.fill("Answer me");

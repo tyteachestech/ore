@@ -134,6 +134,11 @@ export function useTutorChat(notify: Notify) {
     const chat = metaNow.current!.id;
     const first = !before.length;
     flying.current.add(t.id);
+    // This run of the turn: Stop, or a Try again that starts another, makes it no longer the turn's own,
+    // and whatever it still sends or returns is dropped.
+    const job = `${t.id}.${++turnSeq}`;
+    jobs.current.set(t.id, job);
+    const mine = () => jobs.current.get(t.id) === job;
     // The steps of a worked answer he has shown are part of what the tutor said, so a follow-up ("why step
     // 2?") can lean on them; the ones still hidden aren't, so his own try at the next step is his (D142).
     const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).slice(0, stepsShown.get(x.id) ?? 1).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
@@ -142,17 +147,20 @@ export function useTutorChat(notify: Notify) {
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
-      if (p.stream === t.id && !halted.current.has(t.id)) patch(chat, t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
+      if (p.stream === t.id && mine()) patch(chat, t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
     }).catch(() => () => {});
     try {
+      if (!mine()) return; // stopped before the run began
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
-      const r = await oreJob<Reply & { title?: string }>(t.id, null, "tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
+      const r = await oreJob<Reply & { title?: string }>(job, null, "tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
+      if (!mine()) return;
+      jobs.current.delete(t.id);
       flying.current.delete(t.id);
-      if (halted.current.delete(t.id)) return;
       patch(chat, t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], marks: r.marks ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined }, first ? r.title?.trim() || undefined : undefined);
     } catch (e) {
+      if (!mine()) return;
+      jobs.current.delete(t.id);
       flying.current.delete(t.id);
-      if (halted.current.delete(t.id)) return;
       patch(chat, t.id, { error: errorText(e, "answer that"), partial: undefined, searching: undefined });
     } finally {
       stop();
@@ -170,13 +178,15 @@ export function useTutorChat(notify: Notify) {
   };
   /** Stops the reply being written (ChatGPT's and Claude's Stop): the words so far stay as the reply, with
    *  none it says Stopped and offers Try again. The turn settles now; the cancelled run's end is ignored. */
-  const halted = useRef(new Set<string>());
+  const jobs = useRef(new Map<string, string>());
   const stop = () => {
     const chat = metaNow.current?.id;
     const t = now.current.find((x) => x.reply === undefined && !x.error);
-    if (!chat || !t || !flying.current.has(t.id)) return;
-    halted.current.add(t.id);
-    void cancelOre(t.id);
+    const job = t && jobs.current.get(t.id);
+    if (!chat || !t || !job) return;
+    jobs.current.delete(t.id);
+    flying.current.delete(t.id);
+    void cancelOre(job);
     const said = t.partial?.replace(CUT_MARKS, "").trim();
     patch(chat, t.id, { ...(said ? { reply: said, citations: [], steps: [], marks: [] } : { error: "Stopped." }), stopped: true, partial: undefined, searching: undefined });
   };
@@ -430,7 +440,9 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   }, [busy]);
   const [copied, setCopied] = useState<string | null>(null);
   const copy = (t: TutorTurn) => {
-    const text = [t.reply, ...(t.steps ?? []).map((x, i) => `${i + 1}. ${x}`)].join("\n\n").replace(CUT_MARKS, "");
+    // Without the [n] markers of its sources (the pills), and only those: `arr[0]` in a reply stays.
+    const cited = new Set((t.citations ?? []).map((c) => String(c.n)));
+    const text = [t.reply, ...(t.steps ?? []).map((x, i) => `${i + 1}. ${x}`)].join("\n\n").replace(/\s?\[(\d+)\](?!\()/g, (m, n: string) => (cited.has(n) ? "" : m));
     void navigator.clipboard.writeText(text).then(() => { setCopied(t.id); setTimeout(() => setCopied((c) => (c === t.id ? null : c)), 1500); }, (e) => chat.say(errorText(e, "copy that"), "error"));
   };
   const chips = (context || !!carry.length) && (
