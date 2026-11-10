@@ -91,6 +91,16 @@ keeps its headings and lists.
 
 Left out: ⌘/ (Ore's shortcut list) and `/color` names (the format bar's colour menu does it).
 
+## Drag to select, and blocks that stand alone (2026-11-10, D187)
+
+From Tyler's clip: a drag down the gutter did nothing, and "Gh" typed beside a diagram became one block with it.
+
+| Notion | Ore before | Now |
+| --- | --- | --- |
+| A drag that starts beside the page's blocks draws a box and selects the blocks it passes | missing (left out in the first pass) | added (`dragsel.ts`, e2e "note drag to select") |
+| A drag from inside text into another block selects whole blocks | fail (a text selection across blocks) | fixed |
+| An image or embed is a block of its own; words never share its block | fail (words typed with the caret beside a diagram joined its line, as did `/diagram` on a line with words) | fixed (`alone.ts`, `notion-parity.test.ts`) |
+
 ## Already covered elsewhere
 
 Esc block selection, ⌘A twice, ⌘D, ⌘⇧↑↓, ⋮⋮ drag and Turn into (`blockops.test.ts`); `[[` links, `/`,

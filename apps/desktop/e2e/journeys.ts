@@ -2832,6 +2832,54 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
   await until("⌘Z takes it back", async () => (await items()).some((t) => t.startsWith("Effortful")));
 });
 
+journey("note drag to select: a drag down the gutter boxes the blocks it passes, a drag through text into the next block selects both, a drag along one line stays text", async (page) => {
+  const picked = () => page.locator(".note-editor .block-sel").allInnerTexts();
+  await openSource(page, AGENTS);
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  await until("the note takes the caret", async () => (await note.click({ position: { x: 8, y: 8 } }), await note.evaluate((e) => e.contains(document.activeElement))));
+  await page.keyboard.press("ControlOrMeta+End");
+  for (const line of ["Drag one here", "Drag two here", "Drag three here"]) {
+    await page.keyboard.press("Enter");
+    await page.keyboard.type(line);
+  }
+  const box = async (text: string) => (await page.locator(".note-editor p", { hasText: text }).boundingBox())!;
+  const [one, two, three] = [await box("Drag one"), await box("Drag two"), await box("Drag three")];
+  // From the gutter left of the note, straight down (Tyler's clip, 2026-11-10: nothing happened).
+  await page.mouse.move(one.x - 12, one.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(one.x - 10, two.y + two.height / 2, { steps: 6 });
+  await page.locator(".block-marquee").waitFor();
+  await until("the box selects the two blocks it passes", async () => (await picked()).join() === "Drag one here,Drag two here");
+  await page.mouse.move(one.x - 10, three.y + three.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await until("and the third, once it reaches it; the box goes on release", async () => (await picked()).length === 3 && (await page.locator(".block-marquee").count()) === 0);
+  await page.locator(".note-editor p", { hasText: "Drag three" }).click();
+  await until("a click lets go", async () => (await picked()).length === 0);
+  // Through text: words first, whole blocks from the next block on.
+  await page.mouse.move(one.x + 30, one.y + one.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(one.x + 70, one.y + one.height / 2 + 2, { steps: 4 });
+  if ((await picked()).length) throw new Error("a drag along one line selected its block");
+  await page.mouse.move(one.x + 70, two.y + two.height / 2, { steps: 6 });
+  await until("into the next block, both are selected", async () => (await picked()).join() === "Drag one here,Drag two here");
+  await page.mouse.up();
+  await page.waitForTimeout(300); // the browser's own text selection must not take over after the release
+  if ((await picked()).length !== 2 || (await page.locator(".sel-bar").count())) throw new Error("the blocks did not stay selected after the drag");
+  await page.keyboard.press("Backspace");
+  await until("Backspace takes both out", async () => (await page.locator(".note-editor p", { hasText: /Drag (one|two)/ }).count()) === 0);
+  await page.keyboard.press("ControlOrMeta+z");
+  await until("⌘Z brings them back", async () => (await page.locator(".note-editor p", { hasText: /Drag (one|two)/ }).count()) === 2);
+  // Leave the note as it was.
+  await page.locator(".note-editor p", { hasText: "Drag three" }).click();
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Shift+ArrowUp");
+  await page.keyboard.press("Shift+ArrowUp");
+  await until("the three lines are selected", async () => (await picked()).length === 3);
+  await page.keyboard.press("Backspace");
+  await until("and gone", async () => (await page.locator(".note-editor p", { hasText: "Drag" }).count()) === 0);
+});
+
 journey("note block selection: Esc selects a block, ⇧↓ takes in the list, the ⋮⋮ drags both, Backspace and ⌘Z", async (page) => {
   const tops = () => page.locator(".note-editor .ProseMirror > *").evaluateAll((els) => els.map((e) => e.tagName));
   const picked = () => page.locator(".note-editor .block-sel").count();

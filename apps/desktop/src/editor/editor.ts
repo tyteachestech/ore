@@ -10,7 +10,9 @@ import { findWrapping } from "@milkdown/kit/prose/transform";
 import { $inputRule } from "@milkdown/kit/utils";
 import { calloutSchema, remarkBlocks, toggleSchema, toggleSummarySchema } from "./blocks";
 import { highlightSchema, remarkColors, stringifyColor, textColorSchema, underlineSchema } from "./colors";
+import { alonePlugin } from "./alone";
 import { blockSelPlugin } from "./blocksel";
+import { dragSelPlugin } from "./dragsel";
 import { tablePlugin, tableView } from "./tables";
 import { mathBlockSchema, mathInlineSchema, mathRule, remarkNoteMath } from "./math";
 import { emptyHints, foldPlugin, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
@@ -31,6 +33,7 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(remarkNoteMath)
     // Before the keymaps, so selected blocks get their keys first.
     .use(blockSelPlugin)
+    .use(dragSelPlugin)
     .use(tablePlugin)
     .use(foldPlugin)
     .use(notionKeys)
@@ -45,6 +48,7 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(mathRule)
     .use(history)
     .use(listener)
+    .use(alonePlugin)
     .use(emptyHints)
     .use(pasteLink)
     .use(clipboard)
