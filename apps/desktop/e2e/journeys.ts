@@ -102,32 +102,47 @@ const HYGIENE = `(() => {
       }
     return { b, v };
   };
+  // Found out twice running, a frame apart, and not while a press is held: a popup a ResizeObserver puts back
+  // a frame behind a drag is out only between the drag's step and the next paint, which no one sees.
+  let out = new Set();
+  let pressed = false;
+  addEventListener("pointerdown", () => (pressed = true), true);
+  for (const t of ["pointerup", "pointercancel"]) addEventListener(t, () => ((pressed = false), queue()), true);
   const check = (final) => {
     let again = false;
+    const now = new Set();
     for (const { el, css, busy } of floating()) {
-      if (busy && !final) { again = true; continue; }
+      if ((busy || pressed) && !final) { again = true; continue; }
       const { b, v } = seen(el, css);
       if (!b.width || !b.height || v.bottom - v.top < 1 || v.right - v.left < 1) continue;
       const W = innerWidth, H = innerHeight;
       const cut = (b.top < -1 && v.top <= 1) || (b.left < -1 && v.left <= 1) || (b.bottom > H + 1 && v.bottom >= H - 1) || (b.right > W + 1 && v.right >= W - 1);
-      if (cut) found.add("a " + (el.getAttribute("role") ?? "popup") + " runs out of the " + W + "×" + H + " window: " + el.className + " at " + [b.left, b.top, b.width, b.height].map(Math.round).join(","));
+      if (!cut) continue;
+      now.add(el);
+      if (out.has(el)) found.add("a " + (el.getAttribute("role") ?? "popup") + " runs out of the " + W + "×" + H + " window: " + el.className + " at " + [b.left, b.top, b.width, b.height].map(Math.round).join(","));
+      else again = true;
     }
+    out = now;
     return again;
   };
-  // Each change gets its own budget of frames to wait out a popup being placed or animating.
+  // Each change gets its own budget of frames to wait out a popup being placed or animating. Each look is
+  // after a frame is painted (a task after its rAF), so what a ResizeObserver places before paint counts.
   let queued = false, budget = 0;
+  const painted = (f) => requestAnimationFrame(() => setTimeout(f, 0));
   const run = () => {
     queued = false;
-    if (check(false) && budget-- > 0) { queued = true; requestAnimationFrame(run); }
+    if (check(false) && budget-- > 0) { queued = true; painted(run); }
   };
   const queue = () => {
     budget = 30;
-    if (!queued) { queued = true; requestAnimationFrame(() => requestAnimationFrame(run)); }
+    if (!queued) { queued = true; painted(run); }
   };
   addEventListener("resize", queue);
   // Once more as the journey ends: waits out (a second at most) any popup still animating, then checks every one.
   window.__hygieneCheck = async () => {
     for (let i = 0; i < 60 && floating().some((f) => f.busy); i++) await new Promise((r) => requestAnimationFrame(r));
+    check(true);
+    await new Promise((r) => painted(r));
     check(true);
   };
   addEventListener("DOMContentLoaded", () => new MutationObserver(() => (modals(), queue())).observe(document.body, { childList: true, subtree: true }));
