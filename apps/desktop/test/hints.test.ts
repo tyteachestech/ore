@@ -142,3 +142,59 @@ describe("icon-only buttons", () => {
     expect(scan("x.tsx", src)).toEqual({ found: ["x.tsx Close"], balanced: true });
   });
 });
+
+// A button labelled only Cancel, Close, Done or Back is one Esc usually runs too (a Mac sheet's Cancel, Linear's
+// dialogs), so it shows Esc: a <kbd>Esc</kbd> in its label, or a <Hint> around it whose text shows it. The scan
+// can't see what Esc runs, so one whose action Esc doesn't run, or whose own key is shown instead, is listed
+// here, by file and label, with the reason.
+const DISMISS_OK: Record<string, string> = {
+  "Review.tsx Done": "the end screen's default button: its hint shows ↵, its key, as a Mac sheet's default button shows Return",
+  "Finish.tsx Done": "its hint shows its key, finish (⌘↵); Esc leaves the panel, which runs Keep reading unless the source is already done",
+  "Tables.tsx Cancel": "stops the 2 GB reader download (in a PDF and in Settings); Esc doesn't, so a stray Esc never throws the download away",
+  "Toast.tsx Cancel": "stops a long job from its progress toast; Esc doesn't reach a toast, so a stray Esc never stops one",
+};
+
+/** The <Hint …> tag open around offset `at`, or "" when none is. */
+function hintAround(s: string, at: number): string {
+  const open: number[] = [];
+  for (const m of s.slice(0, at).matchAll(/<Hint\b|<\/Hint>/g)) m[0] === "</Hint>" ? open.pop() : open.push(m.index);
+  const i = open.at(-1);
+  return i === undefined ? "" : s.slice(i, tagEnd(s, i) + 1);
+}
+
+/** One file's dismiss buttons that don't show Esc. */
+function dismissScan(name: string, raw: string): string[] {
+  const s = uncommented(raw);
+  const found: string[] = [];
+  for (const m of s.matchAll(/<button\b/g)) {
+    const end = tagEnd(s, m.index);
+    if (s[end - 1] === "/") continue;
+    const inner = s.slice(end + 1, s.indexOf("</button>", end));
+    const word = inner.replace(/<kbd>[^<]*<\/kbd>|<[^<>]*>|\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "").trim();
+    if (!/^(Cancel|Close|Done|Back)$/.test(word)) continue;
+    if (/<kbd>Esc<\/kbd>/.test(inner) || /\bEsc\b/.test(hintAround(s, m.index))) continue;
+    found.push(`${name} ${word}`);
+  }
+  return found;
+}
+
+describe("dismiss buttons", () => {
+  const root = join(import.meta.dir, "../src");
+  const files = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : e.name.endsWith(".tsx") ? [join(dir, e.name)] : []));
+  const found = files(root).flatMap((f) => dismissScan(relative(root, f), readFileSync(f, "utf8")));
+  test("a Cancel, Close, Done or Back that Esc runs shows Esc, or is listed with the reason it doesn't", () => {
+    expect(found.filter((b) => !(b in DISMISS_OK))).toEqual([]);
+  });
+  test("the list holds only dismiss buttons that don't show Esc", () => {
+    expect(Object.keys(DISMISS_OK).filter((b) => !found.includes(b))).toEqual([]);
+  });
+  test("Esc in the label or in the hint around it counts; Esc anywhere else doesn't", () => {
+    const src = `<Hint text="Save" keys="finish"><button>Save</button></Hint>
+<button>Cancel <kbd>Esc</kbd></button>
+<Hint text={<>Close <kbd>Esc</kbd></>}><button>Close</button></Hint>
+<Hint text="Esc closes it"></Hint><button>Done</button>
+<button aria-label="Close"><X /></button>`;
+    expect(dismissScan("x.tsx", src)).toEqual(["x.tsx Done"]);
+  });
+});

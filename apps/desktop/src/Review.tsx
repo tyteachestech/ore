@@ -1205,9 +1205,11 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
         </>
       )}
       <div className="review-foot">
-        <button className="quiz-ghost" aria-disabled={busy || undefined} onClick={() => !busy && onCancel()}>
-          Cancel
-        </button>
+        <Hint text={<>Cancel <kbd>Esc</kbd></>} side="top">
+          <button className="quiz-ghost" aria-disabled={busy || undefined} onClick={() => !busy && onCancel()}>
+            Cancel
+          </button>
+        </Hint>
         <Hint text="Save exercise" keys="finish" side="top">
           <button className="pill-btn quiz-go" disabled={busy || !ok} onClick={onSave}>
             Save
