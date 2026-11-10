@@ -1324,7 +1324,7 @@ body.resizing iframe { pointer-events: none; }
 .note-editor .toggle:not([data-level="0"]) > .toggle-caret { font-size: var(--th); top: -0.1em; height: 1.3em; width: 1em; }
 .note-editor .toggle:not([data-level="0"]) > .toggle-body > .toggle-summary:has(> br:only-child)::before { content: "Heading"; font-weight: 650; }
 .note-menu {
-  position: fixed; z-index: 30; min-width: 220px; max-width: 320px; padding: 4px;
+  position: fixed; z-index: 30; min-width: 220px; max-width: 320px; padding: 4px; overflow-y: auto; overscroll-behavior: contain;
   background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); font-size: 13px; user-select: none; -webkit-user-select: none;
 }
