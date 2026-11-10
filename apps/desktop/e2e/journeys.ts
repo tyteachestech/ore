@@ -53,11 +53,14 @@ async function open(url: string): Promise<Page> {
   return page;
 }
 
-// Two rules every journey checks as it runs, whatever it is about:
+// Three rules every journey checks as it runs, whatever it is about:
 // - A press stopped on its way to the document leaves an open popover deaf to it (Radix listens there), and one
 //   stopped inside a popover makes the next press outside count as inside.
 // - A modal dialog keeps Tab inside it (<Trap>, which marks its panel data-trap): without one, ⇧Tab reaches the
 //   page behind, where Esc no longer closes the dialog and Enter runs what is under it.
+// - A menu, popover or popup that floats (fixed, or a Radix popper) lies inside the window: one placed at the caret
+//   or pointer with no room for it ran off the bottom (the note's / menu, 2026-11-10). Checked a frame after the
+//   page changes or resizes; one still being placed (Radix's first frame) or animating in or out is looked at again.
 const HYGIENE = `(() => {
   const found = (window.__hygiene = new Set());
   for (const m of ["stopPropagation", "stopImmediatePropagation"]) {
@@ -71,7 +74,28 @@ const HYGIENE = `(() => {
     for (const el of document.querySelectorAll('[aria-modal="true"]'))
       if (!el.closest("[data-trap]") && !el.querySelector("[data-trap]")) found.add("a modal dialog with no focus trap: " + (el.getAttribute("aria-label") ?? el.className));
   };
-  addEventListener("DOMContentLoaded", () => new MutationObserver(modals).observe(document.body, { childList: true, subtree: true }));
+  const POPUPS = '[role="menu"], [role="listbox"], [role="dialog"], [role="toolbar"], .popover, .note-menu, .sel-bar, .tutor-sel, .tutor-mention';
+  let queued = false, tries = 0;
+  const outside = () => {
+    queued = false;
+    let again = false;
+    for (const el of document.querySelectorAll(POPUPS)) {
+      const css = getComputedStyle(el);
+      const wrap = el.parentElement?.hasAttribute("data-radix-popper-content-wrapper") ? el.parentElement : null;
+      if (!(css.position === "fixed" || wrap || (css.position === "absolute" && el.matches(".popover, .sel-bar, .tutor-sel, .tutor-mention")))) continue;
+      if (css.visibility === "hidden" || css.display === "none" || el.closest('[aria-hidden="true"], [inert], [data-state="closed"]')) continue;
+      if ((wrap && /-200%/.test(wrap.style.transform)) || el.getAnimations().some((a) => a.playState === "running")) { again = true; continue; }
+      const b = el.getBoundingClientRect();
+      if (!b.width || !b.height) continue;
+      if (b.top < -1 || b.left < -1 || b.bottom > innerHeight + 1 || b.right > innerWidth + 1)
+        found.add("a " + (el.getAttribute("role") ?? "popup") + " runs out of the " + innerWidth + "×" + innerHeight + " window: " + el.className + " at " + [b.left, b.top, b.width, b.height].map(Math.round).join(","));
+    }
+    if (again && tries++ < 30) queue(); else if (!again) tries = 0;
+  };
+  const queue = () => { if (!queued) { queued = true; requestAnimationFrame(() => requestAnimationFrame(outside)); } };
+  addEventListener("resize", queue);
+  window.__hygieneCheck = outside; // once more as the journey ends, for a popup opened in its last frames
+  addEventListener("DOMContentLoaded", () => new MutationObserver(() => (modals(), queue())).observe(document.body, { childList: true, subtree: true }));
 })()`;
 
 const errors: string[] = [];
@@ -6482,7 +6506,11 @@ for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
   const t0 = Date.now();
   try {
     await run(page);
-    const broke = await page.evaluate(() => [...((window as unknown as { __hygiene?: Set<string> }).__hygiene ?? [])]).catch(() => []);
+    const broke = await page.evaluate(() => {
+      const w = window as unknown as { __hygiene?: Set<string>; __hygieneCheck?: () => void };
+      w.__hygieneCheck?.();
+      return [...(w.__hygiene ?? [])];
+    }).catch(() => []);
     if (broke.length) throw new Error(broke.join("; "));
     console.log(`ok    ${name} (${Date.now() - t0} ms)`);
   } catch (e) {
