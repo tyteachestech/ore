@@ -1476,31 +1476,14 @@ export function App() {
     }
   };
   const courseSkills = (c: CourseLine) => [...new Set(c.lessons.flatMap((l) => l.skills))];
-  const courseFiling = (c: CourseLine) => ({ title: c.title, ids: new Set(c.lessons.map((l) => l.id)), write: (ids: string[]) => ore("course", "set", c.id, opt("skills", ids.join(","))) });
-  /** Files every lesson of a course under a skill, or takes them all off it, from its ⋯ menu. */
-  const fileCourse = (c: CourseLine, k: Skill) => {
-    const had = courseSkills(c);
-    const on = c.lessons.every((l) => l.skills.includes(k.id));
-    void refile(courseFiling(c), on ? had.filter((s) => s !== k.id) : [...had, k.id], had, k);
-  };
-  /** Archives every lesson of a course (files and cards kept), with Undo. */
-  const archiveCourse = async (c: CourseLine) => {
-    const ids = new Set(c.lessons.map((l) => l.id));
-    setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
-    if (openId && ids.has(openId)) setOpenId(null);
-    const queue = inOrder();
-    const apply = (on: boolean) => {
-      if (on) setItems((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
-      else setCursor(`course:${c.id}`);
-      // Run only from the history, which puts a failed step back and says why.
-      return queue(() => ore("course", "archive", c.id, ...(on ? [] : ["--undo"])));
-    };
-    notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
-    try {
-      await queue(() => ore("course", "archive", c.id));
-    } catch (e) {
-      notify(errorText(e), "error");
-    }
+  /** Files every lesson of a course under a skill, or takes them all off it. Lesson by lesson, as for a
+   *  selection: each keeps its other skills, and Undo gives each back exactly what it had. */
+  const fileCourse = (c: CourseLine, k: Skill, on = !c.lessons.every((l) => l.skills.includes(k.id))) => fileItems(c.lessons, `“${c.title}”`, k, on);
+  /** Archives the lessons of a course that are listed (files and cards kept); Undo brings back those, not
+   *  one he archived before. */
+  const archiveCourse = (c: CourseLine) => {
+    if (openId && c.lessons.some((l) => l.id === openId)) setOpenId(null);
+    batch(`Archived “${c.title}”`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, c.lessons);
   };
   const courseActions = (c: CourseLine): MenuAction[] => [
     { id: "open", label: c.next && c.next.status !== "inbox" ? "Continue" : "Open", hint: "↵", run: () => openSource(lessonFirst(c).id) },
@@ -1525,8 +1508,7 @@ export function App() {
    *  it again. Either way the sidebar reads the skills again. */
   const rearchive = (ids: string[]) => Promise.all(ids.map((id) => ore("skills", "archive", id))).finally(reloadSkills);
   /** `after`: what follows the writes each way (a skill a filing brought back). */
-  const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null, after?: (forward: boolean) => unknown) => {
-    const sel = many;
+  const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null, after?: (forward: boolean) => unknown, sel = many) => {
     const ids = new Set(sel.map((i) => i.id));
     const was = cursor;
     const queue = inOrder();
@@ -1557,13 +1539,16 @@ export function App() {
   const restoreMany = () => batch(`Restored ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])));
   const moveMany = (to: Item["status"]) =>
     batch(`Moved ${sourcesN(many.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }));
-  const fileMany = (k: Skill, on: boolean) => {
+  const fileMany = (k: Skill, on: boolean) => fileItems(many, sourcesN(many.length), k, on);
+  /** Puts `k` on each of these sources, or takes it off, each keeping its other skills. */
+  const fileItems = (sel: Item[], what: string, k: Skill, on: boolean) => {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
     batch(
-      on ? `Filed ${sourcesN(many.length)} under ${k.name}` : `Removed ${sourcesN(many.length)} from ${k.name}`,
+      on ? `Filed ${what} under ${k.name}` : `Removed ${what} from ${k.name}`,
       (i, f) => ore("edit", i.id, "--skills", (f ? next(i) : i.skills).join(",")),
       (i) => ({ ...i, skills: next(i) }),
       on && k.archived ? (forward) => (forward ? reloadSkills() : rearchive([k.id])) : undefined,
+      sel,
     );
   };
   /** The picked sources' actions: the same as one row's that make sense for many, named for the count. */
@@ -1992,7 +1977,7 @@ export function App() {
             </span>
             <span className="row-line">
               {authorOf({ author: c.lessons.find((l) => l.author)?.author, url: c.url ?? c.lessons[0]?.url })}
-              <SkillPicker skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, before, k) => void refile(courseFiling(c), next, before, k)} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
+              <SkillPicker skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, _, k) => fileCourse(c, k, next.includes(k.id))} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
                 {others.length > 0 && skillsOf(others)}
               </SkillPicker>
               {/* Closed, it says which lesson a click opens; open, the lessons below say it. */}

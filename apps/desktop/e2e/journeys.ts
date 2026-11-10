@@ -5834,6 +5834,49 @@ journey("course: a rename from its menu goes on the history; ⌘Z puts the old n
   }
 });
 
+journey("course: ⌘Z of a skill filed on it gives each lesson back its own skills; ⌘Z of Archive course brings back only what it archived", async (page) => {
+  if (!LIB) throw new Error("this journey edits the library: set ORE_LIBRARY to the running mock's");
+  const { updateItemMeta } = (await import(join(import.meta.dir, "../../../packages/core/src/items.ts"))) as { updateItemMeta: (lib: { root: string }, id: string, patch: (m: object) => object) => Promise<unknown> };
+  const made = (await Promise.all(["A", "B"].map((n) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: `# Part ${n}\n\nA lesson.` }) }).then((r) => r.json())))) as { id: string }[];
+  for (const [i, m] of made.entries()) await updateItemMeta({ root: LIB }, m.id, (x) => ({ ...x, course: { id: "mixed-course", title: "Mixed course", part: i + 1 } }));
+  await ore("edit", made[0]!.id, "--skills", "learning");
+  await ore("edit", made[1]!.id, "--skills", "teaching");
+  const skillsOf = async () => {
+    const all = (await ore("ls")) as { id: string; skills: string[] }[];
+    return made.map((m) => [...(all.find((i) => i.id === m.id)?.skills ?? [])].sort().join("+")).join(" / ");
+  };
+  const archivedOf = async () => {
+    const gone = (await ore("ls", "--archived")) as { id: string }[];
+    return made.map((m) => gone.some((i) => i.id === m.id)).join("/");
+  };
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const row = page.locator(".list .row.course").filter({ hasText: "Mixed course" });
+    await row.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Skills" }).hover();
+    await page.getByRole("menuitemcheckbox", { name: "Habits" }).or(page.getByRole("menuitem", { name: "Habits" })).first().click();
+    await until("both lessons are under Habits, keeping their own", async () => (await skillsOf()) === "habits+learning / habits+teaching");
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z gives each lesson back its own skills", async () => (await skillsOf()) === "learning / teaching");
+    // One lesson archived first, then the course: ⌘Z of the course brings back only the other.
+    await ore("archive", made[1]!.id);
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.locator(".list .row").filter({ hasText: /Mixed course|Part A/ }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: /^Archive/ }).click();
+    await until("the course is archived", async () => (await archivedOf()) === "true/true");
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings back only the lesson it archived", async () => (await archivedOf()) === "false/true");
+    await page.waitForTimeout(400);
+    if ((await archivedOf()) !== "false/true") throw new Error("⌘Z of Archive course also restored a lesson archived before it");
+  } finally {
+    for (const m of made) await ore("archive", m.id).catch(() => {});
+  }
+});
+
 journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the suggestion returns) and Dismiss", async (page) => {
   const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Why sleep consolidates memory\n\nSleep replays the day." }) }).then((r) => r.json())) as { id: string };
   // Undo of a dismiss puts a suggestion on it, as enrich would.
