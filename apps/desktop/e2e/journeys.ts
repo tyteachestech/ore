@@ -4019,6 +4019,56 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
   await page.keyboard.press("Escape");
 });
 
+journey("review: at a session's end the cart tips its ore into the ring and leaves, the mole comes up after, and Reduce Motion skips it (D190)", async (page) => {
+  const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
+  const q = page.locator(".review-q");
+  const finish = async () => {
+    await page.getByRole("button", { name: "Start review" }).click();
+    const pick = page.getByRole("dialog", { name: "What to review" });
+    await pick.or(q).first().waitFor();
+    if (await pick.isVisible()) await page.keyboard.press("Enter");
+    for (let n = 0; n < 12 && !(await doneButton.isVisible()); n++) {
+      await q.or(doneButton).first().waitFor();
+      if (await doneButton.isVisible()) break;
+      const noIdea = page.getByRole("button", { name: "No idea" });
+      await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click().catch(() => {});
+      await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(300);
+    }
+    await doneButton.waitFor();
+  };
+  const back = async () => {
+    const undo = page.getByRole("button", { name: "Undo last rating" });
+    for (let n = 0; n < 12 && (await undo.isVisible()); n++) {
+      await undo.click({ timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(250);
+    }
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  };
+  await finish();
+  // The cart plays only with something to tip (a ring dot this session lit, or a gem it cut).
+  const first = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip .cart"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
+  if (first.cart) {
+    if (first.mole) throw new Error("the mole is up while the cart is still on the rail");
+    // Its layer never widens the page or takes a click: Done is still his.
+    const layer = await page.evaluate(() => ({ events: getComputedStyle(document.querySelector(".cart-tip")!).pointerEvents, scroll: document.querySelector(".review-body")!.scrollWidth - document.querySelector(".review-body")!.clientWidth }));
+    if (layer.events !== "none" || layer.scroll > 0) throw new Error(`the cart's layer is in the way: ${JSON.stringify(layer)}`);
+    await until("the cart has gone", async () => (await page.locator(".cart-tip").count()) === 0, 8000);
+  }
+  const after = await page.evaluate(() => ({ mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length, waiting: document.querySelectorAll(".review-cut > span[data-wait]").length, ore: document.querySelectorAll(".cart-ore").length }));
+  if (!after.mole || after.waiting || after.ore || after.on < first.on) throw new Error(`the end screen didn't settle: ${JSON.stringify({ first, after })}`);
+  await back();
+  // Reduce Motion: the same screen, at once, with no cart.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await finish();
+  const still = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
+  await page.emulateMedia({ reducedMotion: null });
+  // A second session only adds minutes, so the ring is at least as full.
+  if (still.cart || !still.mole || still.on < after.on) throw new Error(`Reduce Motion: ${JSON.stringify({ still, after })}`);
+  await back();
+});
+
 /** The `ore` CLI through the bridge, as the app calls it. */
 const ore = (...args: string[]) =>
   fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: [...args, "--json"] }) }).then(async (r) => {
