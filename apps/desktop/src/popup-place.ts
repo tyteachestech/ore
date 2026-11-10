@@ -19,3 +19,39 @@ export function popupPlace(first: Box, last: Box, view: { top: number; bottom: n
   const near = below ? last : first;
   return { y, x: aim.x ?? near.left + near.width / 2, below: pinned || below };
 }
+
+export type Side = "below" | "above";
+
+/** Where a menu opened at the caret goes (the note's / and [[ menus), in window coordinates, as Notion's
+ *  does: under the line when it fits, above it when it doesn't, and with no room for the whole list on
+ *  either side, on the roomier one with its height capped to that room (the list scrolls). It stays on
+ *  the side it opened on (`was`) while it still fits there, so typing to narrow the list doesn't make
+ *  it jump; it never runs past the window's edges. */
+const MARGIN = 8;
+const MENU_GAP = 4;
+
+export function menuPlace(at: { left: number; top: number; bottom: number }, size: { width: number; height: number }, view: { width: number; height: number }, was?: Side) {
+  // A caret scrolled out of the window (it shrank under him) counts as at its edge.
+  const caret = { left: at.left, top: Math.min(Math.max(at.top, 0), view.height), bottom: Math.min(Math.max(at.bottom, 0), view.height) };
+  const room = { below: view.height - MARGIN - (caret.bottom + MENU_GAP), above: caret.top - MENU_GAP - MARGIN };
+  const fits = (s: Side) => size.height <= room[s];
+  const side: Side = was && fits(was) ? was : fits("below") ? "below" : fits("above") ? "above" : room.above > room.below ? "above" : "below";
+  // Never 0 while the menu shows: it shows only while its line is in view (lineShown), and the app's
+  // window is at least 480 tall (tauri.conf.json), so the roomier side has 200px and more.
+  const maxHeight = Math.max(0, room[side]);
+  const top = side === "below" ? caret.bottom + MENU_GAP : caret.top - MENU_GAP - Math.min(size.height, maxHeight);
+  return { left: clampX(caret.left, size.width, view.width), top, maxHeight, side };
+}
+
+/** A left edge that keeps something this wide inside the window, `MARGIN` from either side. */
+export function clampX(left: number, width: number, viewWidth: number) {
+  return Math.max(MARGIN, Math.min(left, viewWidth - MARGIN - width));
+}
+
+/** Whether the caret's line is in view in the panel it scrolls in (`clip`, already cut to the window):
+ *  by its middle, so a line half under the panel's edge counts with the half that holds more of it. The
+ *  menu hides while it isn't, rather than hang at the window's edge away from its line. */
+export function lineShown(line: { top: number; bottom: number }, clip: { top: number; bottom: number }) {
+  const mid = (line.top + line.bottom) / 2;
+  return mid >= clip.top && mid <= clip.bottom;
+}
