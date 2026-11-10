@@ -14,7 +14,7 @@ export function DotRing({ size, share, ghost = 0 }: { size: number; share: numbe
     <svg className="dot-ring" width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
       {Array.from({ length: n }, (_, i) => {
         const a = (i / n) * 2 * Math.PI - Math.PI / 2;
-        return <circle key={i} className={i < on ? "on" : i < soon ? "soon" : undefined} cx={+(50 + 43 * Math.cos(a)).toFixed(2)} cy={+(50 + 43 * Math.sin(a)).toFixed(2)} r={+r.toFixed(2)} style={{ transitionDelay: `${i * 16}ms` }} />;
+        return <circle key={i} className={i < on ? "on" : i < soon ? "soon" : undefined} cx={+(50 + 43 * Math.cos(a)).toFixed(2)} cy={+(50 + 43 * Math.sin(a)).toFixed(2)} r={+r.toFixed(2)} style={{ transitionDelay: `calc(${i} * var(--stagger))` }} />;
       })}
     </svg>
   );
