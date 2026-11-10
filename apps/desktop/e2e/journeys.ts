@@ -6,7 +6,7 @@
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 //   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
-import { chromium, webkit, type Browser, type Page } from "playwright";
+import { chromium, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,8 +41,17 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   return { url, stop: () => (bridge.kill(), vite.kill()) };
 }
 
+/** WebKit, launched the first time a journey needs it; not installed, that journey fails saying how to get it. */
+async function safariBrowser(): Promise<Browser> {
+  try {
+    return (safari ??= await webkit.launch());
+  } catch (e) {
+    throw new Error(`WebKit won't start (${(e as Error).message.split("\n")[0]}): install it with \`bunx playwright install webkit\``);
+  }
+}
+
 async function open(url: string, engine: Engine): Promise<Page> {
-  const page = await (engine === "webkit" ? (safari ??= await webkit.launch()) : browser).newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await (engine === "webkit" ? await safariBrowser() : browser).newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
@@ -997,6 +1006,21 @@ journey("tutor chats menu: Esc gives focus back to the chat's title, a click out
   await page.keyboard.press("Meta+j");
 });
 
+/** Types a second draft in a field just emptied by a send, then undoes and redoes it: the undo must take the
+ *  draft back (so the check can't pass by doing nothing) and neither may bring back the sent "First …".
+ *  ControlOrMeta: ⌘ on the Mac, Ctrl on CI's Linux, where WebKit's undo is Ctrl+Z. The bug this guards
+ *  (WebKit redoing a cleared field's typing into the new draft) was seen on the Mac's WebKit. */
+async function undoRedo(page: Page, field: Locator) {
+  await page.keyboard.type("Second draft");
+  await page.keyboard.press("ControlOrMeta+z");
+  const undone = await field.inputValue();
+  if (undone === "Second draft") throw new Error("⌘Z did nothing to the draft, so this check can't tell");
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  const redone = await field.inputValue();
+  for (const [what, v] of [["⌘Z", undone], ["⇧⌘Z", redone]] as const) if (v.includes("First")) throw new Error(`${what} brought the sent text back: “${v}”`);
+  if (redone !== "Second draft") throw new Error(`⇧⌘Z didn't redo the draft: “${redone}”`);
+}
+
 journey("tutor field in WebKit: a sent message is not in the next draft's undo history, so ⌘Z and ⇧⌘Z never bring it back (ChatGPT, Claude)", async (page) => {
   await page.keyboard.press("Meta+j");
   const tutor = page.getByRole("complementary", { name: "Tutor" });
@@ -1007,13 +1031,7 @@ journey("tutor field in WebKit: a sent message is not in the next draft's undo h
   await page.keyboard.press("Enter");
   await tutor.locator(".ask-me").getByText("First message").waitFor();
   await until("the sent message leaves the field, which keeps focus", async () => (await field.inputValue()) === "" && (await field.evaluate((el) => el === document.activeElement)));
-  await page.keyboard.type("Second draft");
-  await page.keyboard.press("Meta+z");
-  const undone = await field.inputValue();
-  await page.keyboard.press("Shift+Meta+z");
-  const redone = await field.inputValue();
-  for (const [what, v] of [["⌘Z", undone], ["⇧⌘Z", redone]] as const) if (v.includes("First")) throw new Error(`${what} brought the sent message back: “${v}”`);
-  if (redone !== "Second draft") throw new Error(`⇧⌘Z didn't redo the draft: “${redone}”`);
+  await undoRedo(page, field);
   await page.keyboard.press("Meta+j");
 }, "webkit");
 
@@ -1032,13 +1050,7 @@ journey("Ask about this exercise in WebKit: a sent question is not in the next d
     await page.keyboard.press("Enter");
     await page.locator(".ask").getByText("Because recalling it is the practice.").waitFor();
     await until("the field is empty and has focus", async () => (await field.inputValue()) === "" && (await field.evaluate((el) => el === document.activeElement)));
-    await page.keyboard.type("Second draft");
-    await page.keyboard.press("Meta+z");
-    const undone = await field.inputValue();
-    await page.keyboard.press("Shift+Meta+z");
-    const redone = await field.inputValue();
-    for (const [what, v] of [["⌘Z", undone], ["⇧⌘Z", redone]] as const) if (v.includes("First")) throw new Error(`${what} brought the sent question back: “${v}”`);
-    if (redone !== "Second draft") throw new Error(`⇧⌘Z didn't redo the draft: “${redone}”`);
+    await undoRedo(page, field);
   } finally {
     await page.unroute(/\/ore$/);
   }
@@ -6571,9 +6583,10 @@ let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only));
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
-  const page = await open(url, engine);
+  let page: Page | undefined;
   const t0 = Date.now();
   try {
+    page = await open(url, engine);
     await run(page);
     const broke = await page.evaluate(() => [...((window as unknown as { __hygiene?: Set<string> }).__hygiene ?? [])]).catch(() => []);
     if (broke.length) throw new Error(broke.join("; "));
@@ -6581,11 +6594,11 @@ for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) 
   } catch (e) {
     failed++;
     const shot = join(tmpdir(), `ore-e2e-${name.replace(/\W+/g, "-")}.png`);
-    await page.screenshot({ path: shot }).catch(() => {});
+    await page?.screenshot({ path: shot }).catch(() => {});
     const why = (e as Error).message.split("\n").filter((l) => l.trim() && !/^\s*Call log/.test(l)).slice(0, 2).join("\n      ");
-    console.log(`FAIL  ${name}\n      ${why}\n      screenshot: ${shot}`);
+    console.log(`FAIL  ${name}\n      ${why}${page ? `\n      screenshot: ${shot}` : ""}`);
   }
-  await page.close();
+  await page?.close();
 }
 await browser.close();
 await safari?.close();

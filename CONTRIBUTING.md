@@ -14,7 +14,7 @@ You need [Bun](https://bun.sh) 1.4.4, the version CI uses. Tests and the browser
 bun install
 bun run typecheck                        # tsc strict, whole workspace
 bun test                                 # unit and intake tests
-bunx playwright install chromium         # once, for e2e
+bunx playwright install chromium webkit  # once, for e2e (WebKit: the Mac app's engine)
 bun run e2e                              # journeys in a browser on a seeded mock library
 
 ORE_LIBRARY=/tmp/lib bun packages/cli/src/ore.ts init   # a scratch library; never test against ~/Ore
