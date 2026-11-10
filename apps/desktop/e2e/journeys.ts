@@ -2160,6 +2160,26 @@ journey("note / menu at the bottom of a long note: it opens above the line, insi
   const mb = (await menu.boundingBox())!;
   if (Math.abs(mb.y - back.bottom) > 8 && Math.abs(mb.y + mb.height - back.top) > 8) throw new Error(`the menu came back away from its line (${mb.y}..${mb.y + mb.height}, line ${back.top}..${back.bottom})`);
   await page.keyboard.press("Escape");
+  // The format bar on words at the right edge of the window stays inside it, and again when the window narrows.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Read the guide to building agents", { delay: 5 });
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+Shift+ArrowLeft" : "Shift+Home"); // to the line's start (⇧Home is to the note's start on the Mac)
+  const bar = page.locator(".sel-bar");
+  await bar.waitFor();
+  await inside("the format bar", bar);
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await frames();
+  await inside("the format bar after the window narrows", bar);
+  // And when the side panel is dragged narrower under it.
+  const edge = (await page.getByRole("separator", { name: "Resize the side panel" }).boundingBox())!;
+  await page.mouse.move(edge.x + edge.width / 2, edge.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + 120, edge.y + 200, { steps: 6 });
+  await page.mouse.up();
+  await frames();
+  if (!(await bar.isVisible())) throw new Error("the format bar closed when the panel was resized");
+  await inside("the format bar after the panel narrows", bar);
 });
 
 journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {

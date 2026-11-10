@@ -2,7 +2,7 @@ import type { MarkType } from "@milkdown/kit/prose/model";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Hint } from "../Hint";
 import { CaretDown, LinkSimple } from "../icons";
 import type { LinkTarget } from "./NoteEditor";
@@ -14,15 +14,29 @@ import { clampX } from "../popup-place";
 /** Where the selection is, relative to the note: the bar sits above its first line. */
 export type Sel = { from: number; to: number; x: number; y: number };
 
-/** The bar is placed from the selection inside the note, which may sit at the window's right edge (the
- *  source note's panel), and is wider than a guess when Turn into names a long kind: moved back so it
- *  ends inside the window. Layout boxes, not the opening scale's. */
-function fitInside(el: HTMLElement | null) {
-  const parent = el?.offsetParent;
-  if (!el || !parent) return;
-  const left = parent.getBoundingClientRect().left + el.offsetLeft;
-  const dx = clampX(left, el.offsetWidth, document.documentElement.clientWidth) - left;
-  el.style.translate = dx ? `${dx}px 0` : "";
+/** Where the bar's left edge goes, in the note's coordinates: by the selection's first line, but kept
+ *  inside the note (8px over its left edge at most) and inside the window, by the bar's real width (it
+ *  is wider when Turn into names a long kind). Placed again when the window or the note's panel resizes. */
+function useBarLeft(bar: { current: HTMLDivElement | null }, x: number, docked?: boolean) {
+  useLayoutEffect(() => {
+    const el = bar.current;
+    const host = el?.offsetParent;
+    if (!el || !host || docked) return;
+    const place = () => {
+      const h = host.getBoundingClientRect();
+      const w = el.offsetWidth;
+      const left = clampX(Math.max(h.left - 8, Math.min(h.left + x, h.right - w)), w, document.documentElement.clientWidth);
+      el.style.left = `${left - h.left}px`;
+    };
+    place();
+    const watch = new ResizeObserver(place);
+    watch.observe(host);
+    addEventListener("resize", place);
+    return () => {
+      watch.disconnect();
+      removeEventListener("resize", place);
+    };
+  });
 }
 
 const NAMES: Record<Color, string> = { gray: "Gray", red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", teal: "Teal", blue: "Blue", purple: "Purple", pink: "Pink" };
@@ -30,6 +44,8 @@ const NAMES: Record<Color, string> = { gray: "Gray", red: "Red", orange: "Orange
 /** Notion's bar over selected text: Turn into, bold, italic, underline, strikethrough, code, a web link, a
  *  link to a source or skill note ([[ ]], D39), and colour. Each is one editor step (⌘Z). */
 export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0 }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void; /** In the iPhone's keyboard bar, not over the text: iOS puts its Copy bar there. */ docked?: boolean; /** Goes up each time ⌘K asks for a web link on the selection (Notion). */ askLink?: number }) {
+  const bar = useRef<HTMLDivElement>(null);
+  useBarLeft(bar, sel.x, docked);
   const v = view();
   if (!v) return null;
   const { schema, doc } = v.state;
@@ -53,7 +69,7 @@ export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0 }
   );
 
   return (
-    <div ref={docked ? undefined : (el) => fitInside(el)} className={`sel-bar${docked ? " docked" : ""}`} style={docked ? undefined : { left: sel.x, top: sel.y }} onMouseDown={keep} role="toolbar" aria-label="Format">
+    <div ref={bar} className={`sel-bar${docked ? " docked" : ""}`} style={docked ? undefined : { top: sel.y }} onMouseDown={keep} role="toolbar" aria-label="Format">
       <MoreButton
         label="Turn into"
         hint="Turn into"

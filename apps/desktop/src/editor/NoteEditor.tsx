@@ -985,8 +985,7 @@ function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | n
     const h = host.current.getBoundingClientRect();
     const a = view.coordsAtPos(s.from);
     const z = view.coordsAtPos(s.to);
-    const width = 340;
-    const x = Math.max(-8, Math.min(a.left - h.left - 16, h.width - width));
+    const x = a.left - h.left - 16; // where its left edge would go; SelectionBar keeps it inside the note and window
     // Above the first line; below the last when there is no room above: the top of the window, or of
     // the panel the note scrolls in (the source note's first line sits right under its tabs).
     let top = 0;
