@@ -2143,6 +2143,18 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   // Esc closes it with focus back on the words (Notion), so ⌘K asks again at once.
   await page.keyboard.press("Escape");
   await until("Esc puts focus back in the note, on the words", async () => (await page.getByPlaceholder("Paste a link").count()) === 0 && (await page.evaluate(() => !!document.activeElement?.closest(".note-editor") && document.getSelection()?.toString().trim() === "Read the guide")));
+  // A press outside closes it and leaves focus where it landed: the note doesn't pull it back. The title bar takes
+  // no focus, as a button doesn't in WebKit, so focus falls to the page and must stay there.
+  await page.keyboard.press("Meta+k");
+  await page.getByPlaceholder("Paste a link").waitFor();
+  await page.locator(".titlebar").click({ position: { x: 400, y: 5 } });
+  await until("a press outside closes the link field", async () => (await page.getByPlaceholder("Paste a link").count()) === 0);
+  await page.waitForTimeout(200);
+  if (await page.evaluate(() => !!document.activeElement?.closest(".note-editor"))) throw new Error("a press outside the link field put focus back in the note");
+  await pm.getByText("Read the guide").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+Home");
+  await page.waitForTimeout(150);
   await page.keyboard.press("Meta+k");
   await page.getByPlaceholder("Paste a link").waitFor();
   await page.keyboard.type("example.com/guide");
@@ -2159,16 +2171,6 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await until("the toggle closes", async () => (await page.locator(".note-editor .toggle.closed").count()) === 1);
   await page.keyboard.press("ControlOrMeta+Enter");
   await until("and opens", async () => (await page.locator(".note-editor .toggle.closed").count()) === 0);
-  // A press outside closes the link field and leaves focus where it landed: the note doesn't pull it back.
-  await page.keyboard.press("Shift+Home");
-  await page.waitForTimeout(150);
-  await page.keyboard.press("Meta+k");
-  await page.getByPlaceholder("Paste a link").waitFor();
-  // The title bar takes no focus, as a button doesn't in WebKit: focus falls to the page, and must stay there.
-  await page.locator(".titlebar").click({ position: { x: 400, y: 5 } });
-  await until("the link field closes", async () => (await page.getByPlaceholder("Paste a link").count()) === 0);
-  await page.waitForTimeout(200);
-  if (await page.evaluate(() => !!document.activeElement?.closest(".note-editor"))) throw new Error("a press outside the link field put focus back in the note");
 });
 
 journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
