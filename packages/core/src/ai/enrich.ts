@@ -51,20 +51,28 @@ export const PLAN_CAP = 5;
  *  a lower retention target alone saves little. */
 export const LIGHT_PLAN_CAP = 2;
 
+/** D180: a source he is still reading has its plain highlights planned once it has rested this long with
+ *  no highlight made or changed on it, so a sitting is planned whole and comes back the next day. */
+export const READING_REST_MS = 6 * 3_600_000;
+
 // Highlights that should become review items and have none yet (D19, D118): a key point (`card` intent
-// in the files) at once, a question he answered with "Answered + card" (D75), and once the source is
-// finished every plain highlight the plan has not weighed yet. They are signals: the plan groups them
-// into ideas, so one card can come from several and most plain ones get none.
-export function pendingHighlights(item: Item, cards: Card[]): Annotation[] {
+// in the files) at once, a question he answered with "Answered + card" (D75), and every plain highlight
+// the plan has not weighed yet, once the source is finished or, while he is still reading it, rested
+// (D180). They are signals: the plan groups them into ideas, so one card can come from several and most
+// plain ones get none.
+export function pendingHighlights(item: Item, cards: Card[], now = new Date()): Annotation[] {
   const drafted = new Set(cards.flatMap((c) => [c.meta.annotation, ...(c.meta.also ?? [])]).filter(Boolean));
   const planned = new Set(item.meta.planned ?? []);
+  const anns = readAnnotations(item);
+  const rested = item.meta.status === "reading" && anns.every((a) => now.getTime() - Date.parse(a.ts) >= READING_REST_MS);
+  const plan = item.meta.status === "done" || rested;
   const wanted = (a: Annotation) =>
     a.intent === "card" ||
     (a.intent === "question" && a.card && a.status === "done" && a.answers?.length) ||
     // D148: a try re-planned with "Next time I'll…" is open again, but the round he wrote up still gets its card.
     (a.intent === "apply" && reflections(a).length > 0) ||
-    (a.intent === "keep" && item.meta.status === "done" && !planned.has(a.id));
-  return readAnnotations(item).filter((a) => wanted(a) && !drafted.has(a.id));
+    (a.intent === "keep" && plan && !planned.has(a.id));
+  return anns.filter((a) => wanted(a) && !drafted.has(a.id));
 }
 
 // D118: what the skills already ask, so the plan never writes a card twice. Newest first, a cap for the prompt.
@@ -98,8 +106,8 @@ export function pendingPrequestions(item: Item, cards: Card[]): { n: number; q: 
 
 // Also true when the source note changed since the last enrich drafted from it,
 // or a finished item has prequestions without a review item.
-export function needsEnrich(item: Item, cards: Card[]): boolean {
-  return !item.meta.enriched_at || pendingHighlights(item, cards).length > 0 || pendingNotes(item) !== null || pendingPrequestions(item, cards).length > 0;
+export function needsEnrich(item: Item, cards: Card[], now = new Date()): boolean {
+  return !item.meta.enriched_at || pendingHighlights(item, cards, now).length > 0 || pendingNotes(item) !== null || pendingPrequestions(item, cards).length > 0;
 }
 
 export interface EnrichResult {
@@ -151,11 +159,11 @@ export function enrichLogs(lib: Library): (id: string) => { enrich_error?: strin
   };
 }
 
-export async function enrichItem(lib: Library, ref: string): Promise<EnrichResult> {
+export async function enrichItem(lib: Library, ref: string, now = new Date()): Promise<EnrichResult> {
   const id = findItem(lib, ref).meta.id;
   rmSync(skipFile(lib, id), { force: true });
   try {
-    const r = await enrichOnce(lib, id);
+    const r = await enrichOnce(lib, id, now);
     rmSync(errorFile(lib, id), { force: true });
     return r;
   } catch (e) {
@@ -165,10 +173,10 @@ export async function enrichItem(lib: Library, ref: string): Promise<EnrichResul
   }
 }
 
-async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
+async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichResult> {
   const item = findItem(lib, ref);
   const allCards = listCards(lib);
-  const pending = pendingHighlights(item, allCards);
+  const pending = pendingHighlights(item, allCards, now);
   const notes = pendingNotes(item);
   const preqs = pendingPrequestions(item, allCards);
   const base = { item: item.meta.id, title: item.meta.title, prequestions: (item.meta.prequestions ?? []).map((p) => p.q), skills: item.meta.skills, topics: item.meta.topics, topics_created: [], cards: [] };
@@ -324,7 +332,7 @@ async function enrichOnce(lib: Library, ref: string): Promise<EnrichResult> {
   });
 }
 
-export function pendingItems(lib: Library): Item[] {
+export function pendingItems(lib: Library, now = new Date()): Item[] {
   const cards = listCards(lib);
-  return listItems(lib).filter((i) => needsEnrich(i, cards));
+  return listItems(lib).filter((i) => needsEnrich(i, cards, now));
 }

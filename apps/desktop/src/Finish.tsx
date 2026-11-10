@@ -313,7 +313,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   }
 
   // The closing card counts what he made from this source, read fresh (highlights made while
-  // reading live in the reader, not in `doc`). Cards are drafted after Done, so they aren't counted.
+  // reading live in the reader, not in `doc`). The cards Done drafts aren't there yet, so cards aren't counted.
   const [made, setMade] = useState<{ highlights: number; questions: number } | null>(null);
   useEffect(() => {
     if (step <= n) return;
@@ -633,7 +633,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <div className="quiz-grow" />
           <div className="quiz-foot">
             {!marked && (
-              <Hint text="Keep it in To read · cards are drafted when you finish" side="top">
+              <Hint text="Keep it in To read · its questions become cards when you finish" side="top">
                 <button className="quiz-ghost" onClick={() => void keepReading()} disabled={busy}>
                   Keep reading
                 </button>
