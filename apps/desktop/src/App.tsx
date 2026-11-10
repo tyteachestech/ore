@@ -1528,7 +1528,7 @@ export function App() {
         notify(errorText(e), "error");
       }
     };
-    unpick();
+    if (sel === many) unpick();
     void go(true);
     notify(message, "info", () => go(false, true), () => go(true, true));
   };

@@ -136,7 +136,8 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       // An append returns the file's text; over a draft that isn't on disk it would replace his words.
       if (!(await flush())) return false;
       try {
-        const before = bases.current.get(key);
+        // The file as it is now (not what this editor last based a save on, which a merge can leave behind).
+        const before = (await queue(() => ore<Notes>("notes", ...key.split(" "))).catch(() => undefined))?.text;
         const r = await queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading)));
         if (owner.current === key) apply(r.text);
         // On the history, as every change is. The step writes the file itself (--base keeps what he has typed

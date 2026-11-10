@@ -36,7 +36,10 @@ export function TitleField({ value, label = "Title", className = "row-rename", p
         if (e.key === "Escape") onClose(true);
         if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
         setSaving((busy.current = true));
-        void onSave(e.currentTarget.value).then((ok) => {
+        const field = e.currentTarget;
+        void onSave(field.value).then((ok) => {
+          // Gone meanwhile (another row is being renamed now): its close is not this one's to call.
+          if (!field.isConnected) return;
           setSaving((busy.current = false));
           if (ok || left.current) onClose(!left.current);
         });

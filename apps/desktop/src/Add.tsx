@@ -154,7 +154,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
     // ↵ before the preview knew the link is a feed itself, which can't be added as a source: follow it (D107).
     // Still busy while it looks, so nothing else starts meanwhile.
     const link = what.length === 1 && what[0]!.kind === "link" ? what[0]!.url : null;
-    if (failure && !cancelled && link && (await ore<FoundFeed>("feed", "find", link).catch(() => null))?.url === link) return open.current ? follow(link) : undefined;
+    if (failure && !cancelled && link && (await ore<FoundFeed>("feed", "find", link).catch(() => null))?.url === link) return open.current ? follow(link) : notify(failure, "error");
     if (!open.current) return notify(failure ?? "", "error");
     setBusy(false);
     // Cancelled from the toast: the box stays with what didn't go in, to fix or add again.

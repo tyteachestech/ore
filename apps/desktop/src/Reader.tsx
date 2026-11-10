@@ -838,7 +838,8 @@ function ReaderView(p: Props & { reload: () => void }) {
         if (!d.preview && opened.current !== p.id) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
         opened.current = p.id;
       },
-      (e) => live && setError(errorText(e)),
+      // A read again after ⌘Z that fails leaves the page as it is: nothing about the open source failed.
+      (e) => live && opened.current !== p.id && setError(errorText(e)),
     );
     return () => {
       live = false;
