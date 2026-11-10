@@ -1478,12 +1478,15 @@ export function App() {
   const courseSkills = (c: CourseLine) => [...new Set(c.lessons.flatMap((l) => l.skills))];
   /** Files every lesson of a course under a skill, or takes them all off it. Lesson by lesson, as for a
    *  selection: each keeps its other skills, and Undo gives each back exactly what it had. */
-  const fileCourse = (c: CourseLine, k: Skill, on = !c.lessons.every((l) => l.skills.includes(k.id))) => fileItems(c.lessons, `“${c.title}”`, k, on);
+  const fileCourse = (c: CourseLine, k: Skill, on = !c.lessons.every((l) => l.skills.includes(k.id))) => fileItems(wholeCourse(c), `“${c.title}”`, k, on);
+  /** Every listed lesson of the course, whatever the page shows: a skill's page rows hold only that skill's. */
+  const wholeCourse = (c: CourseLine) => (items ?? []).filter((i) => i.course?.id === c.id);
   /** Archives the lessons of a course that are listed (files and cards kept); Undo brings back those, not
    *  one he archived before. */
   const archiveCourse = (c: CourseLine) => {
-    if (openId && c.lessons.some((l) => l.id === openId)) setOpenId(null);
-    batch(`Archived “${c.title}”`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, c.lessons);
+    const lessons = wholeCourse(c);
+    if (openId && lessons.some((l) => l.id === openId)) setOpenId(null);
+    batch(`Archived “${c.title}”`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, lessons);
   };
   const courseActions = (c: CourseLine): MenuAction[] => [
     { id: "open", label: c.next && c.next.status !== "inbox" ? "Continue" : "Open", hint: "↵", run: () => openSource(lessonFirst(c).id) },

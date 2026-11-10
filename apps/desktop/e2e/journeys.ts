@@ -5860,6 +5860,16 @@ journey("course: ⌘Z of a skill filed on it gives each lesson back its own skil
     await page.waitForTimeout(300);
     await page.keyboard.press("Meta+z");
     await until("⌘Z gives each lesson back its own skills", async () => (await skillsOf()) === "learning / teaching");
+    // From a skill's page, where the row lists only that skill's lessons, the course is still the whole course.
+    await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+    await page.locator(".row.course").filter({ hasText: "Mixed course" }).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Skills" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await page.getByRole("menuitemcheckbox", { name: "Habits" }).or(page.getByRole("menuitem", { name: "Habits" })).first().click();
+    await until("filed from a skill page, every lesson is under Habits", async () => (await skillsOf()) === "habits+learning / habits+teaching");
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Meta+z");
+    await until("and ⌘Z takes it off both", async () => (await skillsOf()) === "learning / teaching");
     // One lesson archived first, then the course: ⌘Z of the course brings back only the other.
     await ore("archive", made[1]!.id);
     await page.reload();
