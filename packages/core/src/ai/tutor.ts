@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
 import { findItem, listItems, type AiStamp } from "../items.ts";
-import { cardTextProblem, ContentType, writeNewCard, type Card } from "../cards.ts";
+import { blankProblem, cardTextProblem, ContentType, hideBlanks, writeNewCard, type Card } from "../cards.ts";
 import { getDiagram, sceneOutline } from "../diagrams.ts";
 import { withLock } from "../lock.ts";
 import { paths } from "../library.ts";
@@ -184,7 +184,9 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
         if (d.covered.length !== open.card.rubric.length) return `covered: one boolean per rubric point (${open.card.rubric.length})`;
         if (d.evidence.length !== d.covered.length) return `evidence: one per rubric point (${d.covered.length}), "" where not covered`;
       }
-      return d.card ? cardTextProblem(d.card) : null;
+      if (!d.card) return null;
+      d.card.question = hideBlanks(d.card.question); // what the + Exercise chip shows, before it is kept
+      return cardTextProblem(d.card) ?? blankProblem(d.card);
     },
   });
   const citations: (Citation | WebCitation)[] = data.citations.map((c, i) => {

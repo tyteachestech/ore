@@ -34,9 +34,9 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
     }
     const v = a.variant ? findVariant(lib, card.meta.id, a.variant) : null;
     const shown = v ? { question: v.question, model_answer: v.answer, rubric: v.rubric } : { question: card.question, model_answer: card.answer, rubric: card.rubric };
-    const original = v ? { original_card: { question: card.question, model_answer: card.answer, rubric: card.rubric, note: "He answered a new version of this card that tests the same idea in a new case." } } : {};
+    const original = v ? { original: { question: card.question, model_answer: card.answer, rubric: card.rubric, note: "He answered a new version of this exercise that tests the same idea in a new case." } } : {};
     const context = { ...shown, his_answer: a.answer?.trim() || "(no idea)", passage, ...original };
-    message = `Card (JSON):\n${JSON.stringify(context, null, 2)}\n\nHis message:\n${message}`;
+    message = `Exercise (JSON):\n${JSON.stringify(context, null, 2)}\n\nHis message:\n${message}`;
   }
   const r = await runChatTurn(lib, { system: prompt.text, message, schema: vendorSchema(ChatOutput), session: a.session, cwd: lib.root });
   const out = ChatOutput.parse(parseOutput(r.output));

@@ -12,9 +12,9 @@ About $1.40 and under two minutes a run on Sonnet (writer ~$0.65, judge ~$0.80).
 
 ## How it works
 
-- **Set** (`packages/core/eval/question-cases.json`): five sources used the way he uses them. Two are real pages from the golden docs (Wikipedia's *Spaced repetition*, Python's *Classes* tutorial); three were written for this eval (`eval/question-sources/`): an opinion essay, a mechanism explainer outside his skills (sourdough), and a talk transcript. Each is added (enrich writes the prequestions), read with highlights (plain ones, a key point, a Card here line, a try with its reflection, a stray word, an aside), and finished (enrich plans the cards and turns each prequestion into a review prompt). Each case runs in its own library, so no case sees another's cards.
-- **Code checks** (`codeFailures` in `eval/questions.ts`, tested in `test/eval-questions.test.ts`): a prequestion names no author and asks nothing about "the article"; a card never points at "the article", never asks to "name the three…", and keeps a short answer. A plan that makes a card of its own from a stray word or an aside is a plan miss.
-- **Judge** (`eval/question-judge.md`): one call per source, on a different model from the writer (Opus by default), with the source to read. Prequestions: attemptable before reading, central, deep (why, how, what if), answered by the source. Cards: faithful (hedges kept), a clear target, no giveaway, one idea, rubric fits the question, worth months of review, standalone, distinct from the other cards, attributed when it's opinion.
+- **Set** (`packages/core/eval/question-cases.json`): six sources used the way he uses them. Two are real pages from the golden docs (Wikipedia's *Spaced repetition*, Python's *Classes* tutorial); four were written for this eval (`eval/question-sources/`): an opinion essay, a mechanism explainer outside his skills (sourdough), a talk transcript, and a reference page full of exact things (Git commands, a default number, a term), where a fact or a blank is tempting. Each is added (enrich writes the prequestions), read with highlights (plain ones, a key point, a Card here line, a try with its reflection, a stray word, an aside), and finished (enrich plans the cards and turns each prequestion into a review prompt). Each case runs in its own library, so no case sees another's cards.
+- **Code checks** (`codeFailures` in `eval/questions.ts`, tested in `test/eval-questions.test.ts`): a prequestion names no author and asks nothing about "the article"; a card never points at "the article", never asks to "name the three…", keeps a short answer, and is not lifted: no eight words in a row from its source, a blank read with its word back in (D182). A plan that makes a card of its own from a stray word or an aside is a plan miss.
+- **Judge** (`eval/question-judge.md`): one call per source, on a different model from the writer (Opus by default), with the source to read. Prequestions: attemptable before reading, central, deep (why, how, what if), answered by the source. Cards: faithful (hedges kept), a clear target, no giveaway, a blank that hides one exact thing only one answer fits (D182), one idea, rubric fits the question, worth months of review, standalone, distinct from the other cards, attributed when it's opinion.
 - **Report**: share of questions passing every check, with a 95% interval, split into prequestions and cards; failures by check; each miss with the judge's reason. Results in `packages/core/eval/results/questions-<date>.json`, with the prompt version and a fingerprint of the set and judge.
 
 ## What the first runs found (2026-11-08, Sonnet 5.5 writing, Opus judging, enrich@11)
@@ -37,9 +37,25 @@ The plan writes each prequestion's review prompt first and folds a highlight on 
 
 The firm gain is the repeats: from 5 to 7 a run to 0 or 1, and a third fewer cards for the same five sources, so less review time for the same ideas. The pass rate rose too, but the intervals overlap: single runs on enrich@12 ranged 48% to 71% while the prompt was tuned. Two-part questions are the biggest miss left; the prompt now says so three times and a quarter of them still slip through, so the next step is probably a code check that sends them back, not more words.
 
+## What enrich@15 changed (D182)
+
+The writing rules from `docs/research/brief-exercise-types.md`: outcome first, answer before question, words the source did not use, and rules for each type, with fill in the blank kept for one exact thing. Two new checks (`code:lifted`, `blank_fits`) and the Git case came with it. Old and new prompt, two runs each, same checks and judge (2026-11-10, Sonnet 5.5 writing, Opus judging):
+
+| | enrich@14 | enrich@15 |
+|---|---|---|
+| the five earlier sources, exercises passing | 67% (33/49) | 64% (35/55) |
+| the Git reference page, exercises passing | 36% (5/14) | 75% (9/12) |
+| lifted from the source (Git page) | 3 | 1 |
+| blanks written | 1 | 0 |
+| prequestions passing | 39/39 | 40/41 |
+
+- On the five earlier sources nothing moved: the difference is inside the noise, neither prompt lifted a sentence, and neither wrote a blank. Those sources draw almost no Fact exercises (4 of 104), so they can't show what a rule about facts does.
+- On the Git page the old prompt asked the page's own sentences back ("how do the three modes of `git reset` differ in what happens to the changes from the commits you step over?") and wrote one blank with a second fact in brackets beside it. The new prompt asked for use on a case ("You ran `git add .` and a file with local secrets is staged…"). 12 and 14 exercises are few: read it as a direction, not a size.
+- Still the biggest misses, unchanged: two questions joined with "and", and key points the question never asked for.
+
 ## Limits
 
-- 51 questions from five sources: one question moves the score two points, so a change smaller than the interval is noise. Run twice before trusting a move.
+- About 60 questions from six sources: one question moves the score two points, so a change smaller than the interval is noise. Run twice before trusting a move.
 - The judge is a model, and models judge questions worse than experts do (Scaria et al. 2024). Its `why` lines are there to be read: a fail you disagree with is a judge prompt fix, not a writer fix.
 - No case yet for notes (`from_notes`), answered questions, a partway finish, or key points drafted before the finish (the daily catch-up), and variants (`variant.md`) aren't covered.
 - Ore asks open questions, not multiple choice, so there are no distractors to judge; the nearest are a variant's "choose" and "diagnose" types, which this eval doesn't run.

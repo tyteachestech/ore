@@ -80,7 +80,7 @@ git config core.hooksPath .githooks   # once per clone: a commit or pull on mast
 AI vendor for enrichment and grading: `ai:` in the library's `skills.yaml` (`claude` or `codex`), `ORE_AI` overrides; its model: `models:` there (Settings › AI › Model, D116), `ORE_AI_MODEL` overrides. Background enrich logs: `<library>/.ore/logs/`.
 
 ## Where things are
-- `packages/core/src/ai/prompts/*.md` — versioned prompts; bump the `version` header when you change one.
+- `packages/core/src/ai/prompts/*.md` — versioned prompts; bump the `version` header when you change one. How an exercise is written (D182: the process, each type, what to avoid) lives in `enrich.md`, `variant.md` and `tutor.md`, its evidence in `docs/research/brief-exercise-types.md`; a change to it is checked with `bun run eval:questions`, run twice.
 - `packages/core/src/queue.ts` — due-queue order (D22, D24). `scheduler.ts` — ts-fsrs wrapper and retention mapping.
 - `packages/core/src/links.ts` — note links and backlinks (D39). `apps/desktop/src/editor/` — the note editor (D38): Milkdown setup, toggle and callout blocks, and `preserve.ts`, which keeps lines he did not edit.
 - `apps/desktop/src/QuickQuiz.tsx` — the quick quiz window (D76): Review in quick mode, shown by the system-wide shortcut or menu bar item set up in `src-tauri/src/main.rs` and `src/quick.ts`.

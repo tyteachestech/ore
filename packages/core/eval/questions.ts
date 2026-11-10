@@ -1,7 +1,7 @@
 // Question-quality eval: are the questions Ore's AI writes good learning material? Each case in
 // question-cases.json is one source used the way he uses it: added (enrich writes the prequestions he
 // guesses before reading and answers in the in-reader quiz), then highlighted and finished (enrich plans
-// his review cards and turns each prequestion into a review prompt). Every question is checked by code
+// his review exercises and turns each prequestion into one). Every question is checked by code
 // (`codeFailures`) and by a judge model that reads the source (question-judge.md), and each plan by
 // whether it drafted a card from a highlight a good plan skips. Spends AI usage, so by hand only:
 // `bun run eval:questions` (--vendor claude|codex, --model <id> for the writer; --judge <model>, default opus).
@@ -17,6 +17,7 @@ import { parseFrontmatter } from "../src/frontmatter.ts";
 import { initLibrary } from "../src/init.ts";
 import { createItem, findItem, ItemType, setItemStatus, updateItemMeta, type Item } from "../src/items.ts";
 import type { Library } from "../src/library.ts";
+import { sharedRun } from "../src/remix.ts";
 import { loadSkills } from "../src/skills.ts";
 import { GOLDEN } from "./ask.ts";
 import { columns, costText, pct, pool, range, resultPath, setId, wilson, withVendor } from "./grade.ts";
@@ -84,9 +85,12 @@ const ATTRIBUTED = /\baccording to\b|\bwhat does .{1,40} (?:say|argue|claim|reco
 const LIST_ALL = /\b(?:name|list|what are|give) (?:all |the |each of the )?(?:two|three|four|five|six|seven|\d+)\b|\blist (?:all|every)\b/i;
 /** A card is a short answer to recall; a paragraph is a prompt in a card's clothes. */
 export const CARD_ANSWER_MAX = 200;
+/** This many words in a row from the source and the question is its sentence, turned around or with a word
+ *  taken out: answerable from the sentence's shape, and it helps that sentence only (D182, step 4). */
+export const LIFTED_RUN = 8;
 
 /** The checks a question fails by code, by name; none means it passed them. */
-export function codeFailures(q: Question, author?: string): string[] {
+export function codeFailures(q: Question, author?: string, source?: string): string[] {
   const out: string[] = [];
   // Letters only, so a name like "Smith)" or "C++" makes no broken pattern.
   const surname = author?.split(/[^\p{L}]+/u).filter((w) => w.length > 2).pop();
@@ -97,12 +101,14 @@ export function codeFailures(q: Question, author?: string): string[] {
   if (POINTS_AT.test(q.question)) out.push("code:points_at_source");
   if (q.kind === "card" && LIST_ALL.test(q.question)) out.push("code:list_all");
   if (q.kind === "card" && (q.answer?.length ?? 0) > CARD_ANSWER_MAX) out.push("code:long_card_answer");
+  // A blank is read with its word back in, so the source's sentence with one word hidden counts.
+  if (source && sharedRun(q.question.replace(/_{4,}/g, () => q.answer ?? ""), { question: source, answer: "" }, LIFTED_RUN)) out.push("code:lifted");
   return out;
 }
 
 const PreJudged = z.strictObject({ n: z.number().int(), attemptable: z.boolean(), central: z.boolean(), deep: z.boolean(), answered: z.boolean(), why: z.string() });
 const CardJudged = z.strictObject({
-  n: z.number().int(), faithful: z.boolean(), clear_target: z.boolean(), no_giveaway: z.boolean(), one_target: z.boolean(),
+  n: z.number().int(), faithful: z.boolean(), clear_target: z.boolean(), no_giveaway: z.boolean(), blank_fits: z.boolean(), one_target: z.boolean(),
   rubric_fits: z.boolean(), worth_it: z.boolean(), standalone: z.boolean(), distinct: z.boolean(), attribution: z.boolean(), why: z.string(),
 });
 const Judged = z.strictObject({ prequestions: z.array(PreJudged), cards: z.array(CardJudged) });
@@ -170,7 +176,7 @@ export async function runCase(root: string, c: QuestionCase, judgeModel: string)
     const plan_failed = cards.filter((k) => k.meta.annotation && skip.has(k.meta.annotation)).map((k) => `drafted a card from "${anns.find((a) => a.id === k.meta.annotation)?.exact}"`);
     const pre: Question[] = added.prequestions.map((q, i) => ({ n: i + 1, kind: "prequestion", question: q }));
     const qs: Question[] = cards.map((k, i) => ({ n: i + 1, kind: k.meta.kind as Kind, question: k.question, answer: k.answer, rubric: k.rubric, from: cardFrom(k, tries, lines) }));
-    const meta = findItem(lib, item.meta.id).meta;
+    const { meta, body } = findItem(lib, item.meta.id);
     const j = await judge(lib.root, item.docPath, {
       source: { title: meta.title, author: meta.author ?? null, type: meta.type },
       skills: loadSkills(lib).skills.filter((s) => meta.skills.includes(s.id)).map((s) => ({ name: s.name, hook: s.hook })),
@@ -179,7 +185,7 @@ export async function runCase(root: string, c: QuestionCase, judgeModel: string)
     }, judgeModel);
     const scored = (list: Question[], judged: Record<string, unknown>[]): Scored[] => list.map((q) => {
       const v = judged.find((x) => x.n === q.n);
-      const failed = [...codeFailures(q, meta.author), ...(v ? judgeFailures(v) : ["judge:missing"])];
+      const failed = [...codeFailures(q, meta.author, q.kind === "prequestion" ? undefined : body), ...(v ? judgeFailures(v) : ["judge:missing"])];
       return { ...q, case: c.id, failed, why: typeof v?.why === "string" ? v.why : "" };
     });
     return {

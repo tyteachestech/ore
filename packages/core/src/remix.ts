@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { findAnnotation } from "./annotations.ts";
-import { findCard, rubricProblem, type Card } from "./cards.ts";
+import { findCard, hasBlank, rubricProblem, type Card } from "./cards.ts";
 import { appendJsonl, latestRevs, readJsonl } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
 import { AiStamp } from "./items.ts";
@@ -40,11 +40,9 @@ export const VARIANT_USES = 2;
 /** Ready variants kept ahead of review. */
 const AHEAD = 2;
 
-const isCloze = (c: Card) => /\{\{c\d+::/.test(c.question);
-
-/** The variant types a card can take: none for facts and cloze cards, which stay as written. */
+/** The variant types a card can take: none for facts and fill in the blanks, which stay as written. */
 export function remixTypes(c: Card): VariantType[] {
-  if (isCloze(c)) return [];
+  if (hasBlank(c.question)) return [];
   switch (c.meta.content_type) {
     case "definition": return ["name-it"];
     case "concept": return ["new-case", "predict", "diagnose", "choose"];

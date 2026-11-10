@@ -63,7 +63,7 @@ describe("Ask about this (D61)", () => {
     const card = writeNewCard(lib, { kind: "prompt", item: item.meta.id, annotation: annotation.id, skills: [], topics: ["t"], content_type: "concept", question: "Why test yourself?", answer: "Recall changes memory.", rubric: ["Recall is learning"] });
     fakeClaude([{ reply: "Because recall rewrites.", card: null }, { reply: "Try this.", card: { question: "What does recall do?", answer: "Strengthens it." } }]);
     const first = await askAboutCard(lib, card.meta.id, { message: "Why?", answer: "effort" });
-    expect(first).toMatchObject({ reply: "Because recall rewrites.", proposal: null, ai: { vendor: "claude", prompt_version: "chat@1" } });
+    expect(first).toMatchObject({ reply: "Because recall rewrites.", proposal: null, ai: { vendor: "claude", prompt_version: "chat@2" } });
     const next = await askAboutCard(lib, card.meta.id, { message: "Clearer card?", session: first.session });
     expect(next.proposal).toEqual({ question: "What does recall do?", answer: "Strengthens it." });
     const [a, b] = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
@@ -81,7 +81,7 @@ describe("AI adapter", () => {
     fakeClaude([{ rating: 9 }, { rating: 3 }]);
     const r = await runAgent(lib, { prompt: "grade", cwd: lib.root, schema: Schema, input: {} });
     expect(r.data.rating).toBe(3);
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "grade@3" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "grade@4" });
     expect(calls()).toBe(2);
     const second = JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n")[1]!) as string[];
     expect(second[1]).toContain("previous output was invalid");
@@ -197,7 +197,7 @@ describe("AI adapter", () => {
     expect(readTopic(lib, "agent-workflows")!.meta.status).toBe("active");
     const after = findItem(lib, item.meta.id).meta;
     expect(after.enriched_at).toBeDefined();
-    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@14" });
+    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@15" });
     const cards = listCards(lib);
     expect(cards).toHaveLength(1);
     expect(cards[0]!.meta).toMatchObject({ state: "draft", kind: "prompt", annotation: card.id, topics: ["agent-workflows"], ai: after.ai });
@@ -911,7 +911,7 @@ describe("a partway finish (D100)", () => {
     const r = await scopeFinish(lib, id, { reached: body.indexOf(code) - 10, leaveOut: " the coding part " });
     expect(calls()).toBe(2);
     expect(r.prequestions.map((p) => p.skipped ?? null)).toEqual([null, "past", "left_out"]);
-    expect(r.leave_out).toEqual({ text: "the coding part", ai: { vendor: "claude", model: "claude-fake-1", prompt_version: "leave-out@1" } });
+    expect(r.leave_out).toEqual({ text: "the coding part", ai: { vendor: "claude", model: "claude-fake-1", prompt_version: "leave-out@2" } });
     const [args] = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
     expect(args!.join(" ")).not.toContain("How do you start a Flask app?"); // already out: not sent
   });

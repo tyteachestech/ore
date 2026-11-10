@@ -5,10 +5,6 @@ import { join } from "node:path";
 // D181: what review brings back is an exercise in everything the app shows. `card` stays in files,
 // the CLI, key ids, class names and code, so only words he can read are checked: quoted strings,
 // template text and JSX text that say Card, or card among other words.
-const ALLOWED = [
-  "Make a card from this: “", // the line the tutor's prompt answers (tutor.md); it changes with that prompt
-];
-
 function files(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : []));
 }
@@ -28,7 +24,7 @@ export function shown(src: string): string[] {
     ...[...code.matchAll(/`((?:[^`\\\n]|\\.)*)`/g)].flatMap((m) => m[1]!.split(/\$\{[^{}]*\}/)),
     ...[...code.matchAll(/>([^<>{}=;()]+)</g)].map((m) => m[1]!),
   ];
-  return texts.map((t) => t.replace(/\s+/g, " ").trim()).filter((t) => says(t) && !/^[.#]/.test(t) && !ALLOWED.includes(t));
+  return texts.map((t) => t.replace(/\s+/g, " ").trim()).filter((t) => says(t) && !/^[.#]/.test(t));
 }
 
 test("the check sees a label, a message with a name in it and JSX text, and leaves code alone", () => {
