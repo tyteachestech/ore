@@ -753,6 +753,72 @@ journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ repla
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor skill page: opened on a skill's page it is scoped to that skill, a chip with its icon; × leaves it out, another skill page brings its own, an @ of the same skill isn't doubled, Quiz me takes it; a source open shows the source's chip", async (page) => {
+  const asked: string[][] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    asked.push(JSON.parse(body).args);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `Reply ${asked.length}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }) });
+  });
+  try {
+    await page.getByRole("button", { name: /^Learning/ }).first().click();
+    await page.locator(".skill-page").waitFor();
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click(); // an earlier journey's thread
+    const chips = tutor.locator(".tutor-chips .tutor-chip");
+    const skillChip = (name: string) => chips.filter({ has: page.locator(".skill-icon") }).filter({ hasText: new RegExp(`^${name}$`) });
+    const send = async (text: string, at?: string) => {
+      const n = asked.length;
+      await field.pressSequentially(text);
+      if (at) {
+        await field.pressSequentially(at);
+        await page.getByRole("listbox", { name: "Point the tutor at" }).getByRole("option").first().waitFor();
+        await page.keyboard.press("Enter");
+      }
+      await page.keyboard.press("Enter");
+      await tutor.getByText(`Reply ${n + 1}`).waitFor();
+      return asked[n]!;
+    };
+    await skillChip("Learning").waitFor();
+    if ((await chips.count()) !== 1) throw new Error(`want one chip, the skill's: ${await chips.allTextContents()}`);
+    const first = await send("What is spacing?");
+    if (!first.includes("--skill=learning") || first.some((a) => a.startsWith("--item="))) throw new Error(`the skill page's skill was not sent: ${first.join(" ")}`);
+    await tutor.getByRole("button", { name: "Leave “Learning” out" }).click();
+    await until("× takes the chip away", async () => (await skillChip("Learning").count()) === 0);
+    if ((await send("And this?")).some((a) => a.startsWith("--skill="))) throw new Error("a skill left out was still sent");
+    // Another skill's page brings its own chip.
+    await page.keyboard.press("Meta+j");
+    await page.getByRole("button", { name: /^Teaching/ }).first().click();
+    await page.keyboard.press("Meta+j");
+    await skillChip("Teaching").waitFor();
+    // He @s the same skill: one chip, sent once.
+    const twice = await send("Explain ", "@Teach");
+    if (twice.filter((a) => a === "--skill=teaching").length !== 1) throw new Error(`the skill went twice, or not at all: ${twice.join(" ")}`);
+    await skillChip("Teaching").waitFor();
+    if ((await chips.count()) !== 1) throw new Error(`the page's skill and its @ show as two chips: ${await chips.allTextContents()}`);
+    const quiz = page.waitForRequest((r) => /"due","--start","--skill=teaching"/.test(r.postData() ?? ""));
+    await tutor.getByRole("button", { name: "Quiz me" }).click();
+    await quiz;
+    await page.locator(".review").waitFor();
+    await page.keyboard.press("Escape");
+    await until("Esc leaves Review", async () => (await page.locator(".review").count()) === 0);
+    // With a source open, the source is the context, as before.
+    await openSource(page, TESTING);
+    if (!(await tutor.count())) await page.keyboard.press("Meta+j"); // Review's Esc may have brought it back
+    await fresh.click();
+    await chips.filter({ hasText: TESTING }).waitFor();
+    if (await chips.locator(".skill-icon").count()) throw new Error("a skill chip shows beside the open source");
+    if (!(await send("Why?")).some((a) => a.startsWith("--item="))) throw new Error("the open source was not sent");
+  } finally {
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("tutor stop and copy: the send button stops a reply (⌘. too), words written by then stay, none says Stopped with Try again, a late answer is ignored; Copy copies a reply (D187)", async (page) => {
   let id = "";
   const held: (() => void)[] = [];

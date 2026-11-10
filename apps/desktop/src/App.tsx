@@ -2284,7 +2284,7 @@ export function App() {
         </Boundary>
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
       </main>
-      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name, icon: k.icon, color: k.color }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
+      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name, icon: k.icon, color: k.color }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} skillPage={onSkillPage ? skill : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
         // The note takes the room while he writes; the tutor comes back with what he sent (D128.6).
         // The exercise belongs to the source it was asked about: that one opens first if he has moved on.
         const done = (text: string | null) => {
