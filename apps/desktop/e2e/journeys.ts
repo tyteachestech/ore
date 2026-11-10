@@ -2117,7 +2117,7 @@ journey("note equations: /equation opens a TeX field that draws as he types; ↵
   await until("still drawn after a reload", async () => (await pm.locator(".note-math .katex annotation").last().textContent().catch(() => "")) === "\\pi r^2");
 });
 
-journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words (Esc goes back to them), ⌘↵ closes a toggle", async (page) => {
+journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words (Esc goes back to them, a press outside doesn't), ⌘↵ closes a toggle", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);
   await openSource(page, AGENTS);
@@ -2159,6 +2159,16 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await until("the toggle closes", async () => (await page.locator(".note-editor .toggle.closed").count()) === 1);
   await page.keyboard.press("ControlOrMeta+Enter");
   await until("and opens", async () => (await page.locator(".note-editor .toggle.closed").count()) === 0);
+  // A press outside closes the link field and leaves focus where it landed: the note doesn't pull it back.
+  await page.keyboard.press("Shift+Home");
+  await page.waitForTimeout(150);
+  await page.keyboard.press("Meta+k");
+  await page.getByPlaceholder("Paste a link").waitFor();
+  // The title bar takes no focus, as a button doesn't in WebKit: focus falls to the page, and must stay there.
+  await page.locator(".titlebar").click({ position: { x: 400, y: 5 } });
+  await until("the link field closes", async () => (await page.getByPlaceholder("Paste a link").count()) === 0);
+  await page.waitForTimeout(200);
+  if (await page.evaluate(() => !!document.activeElement?.closest(".note-editor"))) throw new Error("a press outside the link field put focus back in the note");
 });
 
 journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
