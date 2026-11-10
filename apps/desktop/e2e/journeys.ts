@@ -59,8 +59,10 @@ async function open(url: string): Promise<Page> {
 // - A modal dialog keeps Tab inside it (<Trap>, which marks its panel data-trap): without one, ⇧Tab reaches the
 //   page behind, where Esc no longer closes the dialog and Enter runs what is under it.
 // - A menu, popover or popup that floats (fixed, or a Radix popper) lies inside the window: one placed at the caret
-//   or pointer with no room for it ran off the bottom (the note's / menu, 2026-11-10). Checked a frame after the
-//   page changes or resizes; one still being placed (Radix's first frame) or animating in or out is looked at again.
+//   or pointer with no room for it ran off the bottom (the note's / menu, 2026-11-10). Checked two frames after the
+//   page changes or resizes, and as the journey ends; one still being placed (Radix's first frame) or animating is
+//   looked at again. An absolute one counts only where he can see it cut by the window, not when it has scrolled
+//   out of its panel with its text.
 const HYGIENE = `(() => {
   const found = (window.__hygiene = new Set());
   for (const m of ["stopPropagation", "stopImmediatePropagation"]) {
@@ -75,26 +77,59 @@ const HYGIENE = `(() => {
       if (!el.closest("[data-trap]") && !el.querySelector("[data-trap]")) found.add("a modal dialog with no focus trap: " + (el.getAttribute("aria-label") ?? el.className));
   };
   const POPUPS = '[role="menu"], [role="listbox"], [role="dialog"], [role="toolbar"], .popover, .note-menu, .sel-bar, .tutor-sel, .tutor-mention';
-  let queued = false, tries = 0;
-  const outside = () => {
-    queued = false;
-    let again = false;
-    for (const el of document.querySelectorAll(POPUPS)) {
-      const css = getComputedStyle(el);
-      const wrap = el.parentElement?.hasAttribute("data-radix-popper-content-wrapper") ? el.parentElement : null;
-      if (!(css.position === "fixed" || wrap || (css.position === "absolute" && el.matches(".popover, .sel-bar, .tutor-sel, .tutor-mention")))) continue;
-      if (css.visibility === "hidden" || css.display === "none" || el.closest('[aria-hidden="true"], [inert], [data-state="closed"]')) continue;
-      if ((wrap && /-200%/.test(wrap.style.transform)) || el.getAnimations().some((a) => a.playState === "running")) { again = true; continue; }
-      const b = el.getBoundingClientRect();
-      if (!b.width || !b.height) continue;
-      if (b.top < -1 || b.left < -1 || b.bottom > innerHeight + 1 || b.right > innerWidth + 1)
-        found.add("a " + (el.getAttribute("role") ?? "popup") + " runs out of the " + innerWidth + "×" + innerHeight + " window: " + el.className + " at " + [b.left, b.top, b.width, b.height].map(Math.round).join(","));
-    }
-    if (again && tries++ < 30) queue(); else if (!again) tries = 0;
+  // The floating ones on screen, each with whether it is still being placed (Radix's first frame) or animating.
+  const floating = () => [...document.querySelectorAll(POPUPS)].flatMap((el) => {
+    const css = getComputedStyle(el);
+    const wrap = el.parentElement?.hasAttribute("data-radix-popper-content-wrapper") ? el.parentElement : null;
+    if (!(css.position === "fixed" || wrap || (css.position === "absolute" && el.matches(".popover, .sel-bar, .tutor-sel, .tutor-mention")))) return [];
+    if (css.visibility === "hidden" || css.display === "none" || el.closest('[aria-hidden="true"], [inert], [data-state="closed"]')) return [];
+    return [{ el, css, busy: !!(wrap && /-200%/.test(wrap.style.transform)) || el.getAnimations().some((a) => a.playState === "running") }];
+  });
+  // The part of its box he sees: cut by each ancestor that clips, up to the fixed layer it is in. A popup
+  // scrolled out of its panel with the text it belongs to is not cut by the window; one cut at the window's
+  // edge (or at a panel's edge lying on the window's) is.
+  const seen = (el, css) => {
+    const b = el.getBoundingClientRect();
+    const v = { top: b.top, left: b.left, bottom: b.bottom, right: b.right };
+    if (css.position !== "fixed")
+      for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+        const c = getComputedStyle(a);
+        if (c.overflowX !== "visible" || c.overflowY !== "visible") {
+          const q = a.getBoundingClientRect();
+          v.top = Math.max(v.top, q.top); v.left = Math.max(v.left, q.left); v.bottom = Math.min(v.bottom, q.bottom); v.right = Math.min(v.right, q.right);
+        }
+        if (c.position === "fixed") break;
+      }
+    return { b, v };
   };
-  const queue = () => { if (!queued) { queued = true; requestAnimationFrame(() => requestAnimationFrame(outside)); } };
+  const check = (final) => {
+    let again = false;
+    for (const { el, css, busy } of floating()) {
+      if (busy && !final) { again = true; continue; }
+      const { b, v } = seen(el, css);
+      if (!b.width || !b.height || v.bottom - v.top < 1 || v.right - v.left < 1) continue;
+      const W = innerWidth, H = innerHeight;
+      const cut = (b.top < -1 && v.top <= 1) || (b.left < -1 && v.left <= 1) || (b.bottom > H + 1 && v.bottom >= H - 1) || (b.right > W + 1 && v.right >= W - 1);
+      if (cut) found.add("a " + (el.getAttribute("role") ?? "popup") + " runs out of the " + W + "×" + H + " window: " + el.className + " at " + [b.left, b.top, b.width, b.height].map(Math.round).join(","));
+    }
+    return again;
+  };
+  // Each change gets its own budget of frames to wait out a popup being placed or animating.
+  let queued = false, budget = 0;
+  const run = () => {
+    queued = false;
+    if (check(false) && budget-- > 0) { queued = true; requestAnimationFrame(run); }
+  };
+  const queue = () => {
+    budget = 30;
+    if (!queued) { queued = true; requestAnimationFrame(() => requestAnimationFrame(run)); }
+  };
   addEventListener("resize", queue);
-  window.__hygieneCheck = outside; // once more as the journey ends, for a popup opened in its last frames
+  // Once more as the journey ends: waits out (a second at most) any popup still animating, then checks every one.
+  window.__hygieneCheck = async () => {
+    for (let i = 0; i < 60 && floating().some((f) => f.busy); i++) await new Promise((r) => requestAnimationFrame(r));
+    check(true);
+  };
   addEventListener("DOMContentLoaded", () => new MutationObserver(() => (modals(), queue())).observe(document.body, { childList: true, subtree: true }));
 })()`;
 
@@ -6608,9 +6643,9 @@ for (const [name, run] of picked.slice((shard - 1) * per, shard * per)) {
   const t0 = Date.now();
   try {
     await run(page);
-    const broke = await page.evaluate(() => {
-      const w = window as unknown as { __hygiene?: Set<string>; __hygieneCheck?: () => void };
-      w.__hygieneCheck?.();
+    const broke = await page.evaluate(async () => {
+      const w = window as unknown as { __hygiene?: Set<string>; __hygieneCheck?: () => Promise<void> };
+      await w.__hygieneCheck?.();
       return [...(w.__hygiene ?? [])];
     }).catch(() => []);
     if (broke.length) throw new Error(broke.join("; "));
