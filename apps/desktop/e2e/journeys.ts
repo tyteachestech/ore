@@ -1074,7 +1074,7 @@ journey("tutor Quiz me: opens Review on the due cards of the source's skills, an
   await openSource(page, TESTING);
   await page.keyboard.press("Meta+j");
   const tutor = page.getByRole("complementary", { name: "Tutor" });
-  const sent = page.waitForRequest((r) => /"due","--skill=learning","--skill=teaching"/.test(r.postData() ?? ""));
+  const sent = page.waitForRequest((r) => /"due","--start","--skill=learning","--skill=teaching"/.test(r.postData() ?? ""));
   await tutor.getByRole("button", { name: "Quiz me" }).click();
   await sent;
   await page.locator(".review").waitFor();
