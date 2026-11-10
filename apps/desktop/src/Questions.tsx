@@ -323,7 +323,12 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
     setBusy(true);
     try {
       const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
-      if (item && !skills.length) await ore("match", item, r.annotation.id);
+      // Two writes: if the second fails, the first is taken back, so a retry never leaves a question nobody can see.
+      if (item && !skills.length)
+        await ore("match", item, r.annotation.id).catch(async (e) => {
+          await ore("annotate", r.annotation.id, "--status", "deleted").catch(() => {});
+          throw e;
+        });
       onDone(true);
       // Asking goes on the history: ⌘Z takes the question back, ⇧⌘Z asks it again.
       const set = (status: string) => ore("annotate", r.annotation.id, "--status", status).then(() => onDone(true));
@@ -381,7 +386,8 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   notify: Notify;
   /** Inside the Collected tab's Questions group, whose header holds the + and the arrows: bumped to ask one. */
   ask?: number;
-  /** The source's own question highlights, as saved: the list reads again when one is made, retyped or removed. */
+  /** What decides which questions are this source's, as saved (D75): its question highlights and its skills.
+   *  The list reads again when it changes. */
   marked?: string;
 }) {
   const grouped = ask !== undefined;

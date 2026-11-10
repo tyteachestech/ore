@@ -4210,6 +4210,70 @@ journey("questions: one asked on a source in no skill is listed there; a highlig
   });
 });
 
+journey("author: a save that fails keeps the name he typed, in the field", async (page) => {
+  await openSource(page, AGENTS);
+  await page.locator(".doc-head button.by").click();
+  const field = page.getByLabel("Author");
+  await field.fill("A corrected author");
+  await failNext(page, "edit", "The library is read-only.");
+  await field.press("Enter");
+  await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
+  await failNext(page, "edit", null);
+  if (!(await field.count()) || (await field.inputValue()) !== "A corrected author") throw new Error("the failed save lost the author he typed");
+  await page.keyboard.press("Escape");
+});
+
+journey("add box: a feed's own link followed by ↵ at once follows it, without waiting for the preview", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Quick Notes</title><link>http://localhost/</link><item><title>One post</title><link>http://localhost/a.html</link><pubDate>${day}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByLabel("Link, file path or text").fill(feed);
+    await page.keyboard.press("Enter");
+    await until("the feed is followed", async () => ((await ore("feed")) as { feeds: { url: string }[] }).feeds.some((f) => f.url === feed), 6000);
+    if (await page.getByText("not one episode or post").count()) throw new Error("the box refused a feed link it can follow");
+  } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
+journey("questions on a source: filing it under a skill lists that skill's questions at once; one whose link to the source fails to save is taken back", async (page) => {
+  const k = (await ore("skills", "add", "Glassblowing")) as { id: string };
+  const q = (await ore("snippet", "--text=How hot is the glory hole?", "--intent=question", `--skill=${k.id}`)) as { annotation: { id: string } };
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# A page in no skill\n\nGather, blow, shape, anneal." }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "A page in no skill");
+    await page.getByRole("tab", { name: "Collected" }).click();
+    const head = page.locator(".cp-head", { hasText: "Questions" });
+    if ((await head.locator(".cp-toggle").getAttribute("aria-expanded")) === "false") await head.locator(".cp-toggle").click();
+    // A question whose link to this source fails to save leaves nothing behind.
+    const count = async () => ((await ore("questions")) as unknown[]).length;
+    const before = await count();
+    await head.getByRole("button", { name: "Ask a question" }).click();
+    await page.getByLabel("New question").fill("Which gather comes first?");
+    await failNext(page, "match", "The library is read-only.");
+    await page.keyboard.press("Enter");
+    await page.getByText("The library is read-only.").first().waitFor();
+    await failNext(page, "match", null);
+    await until("the half-saved question is taken back", async () => (await count()) === before);
+    await page.keyboard.press("Escape");
+    // Filing the source under a skill brings that skill's questions.
+    await page.getByRole("button", { name: "Skills for A page in no skill" }).click();
+    await page.locator(".skill-picker [cmdk-item]", { hasText: "Glassblowing" }).click();
+    await page.keyboard.press("Escape");
+    await page.locator(".qp-line", { hasText: "How hot is the glory hole?" }).waitFor({ timeout: 3000 }).catch(() => {
+      throw new Error("the skill's question is missing until the tab is reopened");
+    });
+  } finally {
+    await ore("annotate", q.annotation.id, "--status", "deleted").catch(() => {});
+    await ore("archive", made.id).catch(() => {});
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
 journey("note: words typed just before a save that merges an outside edit comes back are kept", async (page) => {
   const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# A note two hands write\n\nA page for its note." }) }).then((r) => r.json())) as { id: string };
   await ore("notes", made.id, "--set=Original.");

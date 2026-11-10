@@ -2356,20 +2356,21 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** Sets the author by hand, in place where the byline sits (Readwise Reader's "Edit metadata"): one
    *  that ingest and its PDF metadata missed. Empty clears it. Optimistic, on the history. */
   async function reauthor(id: string, before: string | undefined, a: string | undefined, undoable = true) {
-    setAuthoring(false);
-    if ((a ?? "") === (before ?? "")) return;
+    if ((a ?? "") === (before ?? "")) return true;
     setDoc((cur) => cur && cur.id === id ? { ...cur, author: a } : cur);
     // On the history at once, so a quick ⌘Z takes it back; taken off again if the write fails.
     const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => reauthor(id, a, before, false), () => reauthor(id, before, a, false)) : () => {};
     try {
       await inOrder(id, () => ore("edit", id, "--author", a ?? ""));
       p.onChanged();
+      return true;
     } catch (e) {
       forget();
       setDoc((cur) => cur && cur.id === id ? { ...cur, author: before } : cur);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       p.notify(errorText(e), "error");
+      return false;
     }
   }
 
@@ -2395,6 +2396,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
 
   /** Files the source under exactly `skills` (its cards follow), with Undo naming the one that changed. */
+  /** The skills as last saved from here: the Questions list reads again once a filing has landed. */
+  const [filed, setFiled] = useState("");
   const fileUnder = async (skills: string[], changed?: Skill, fromHistory = false) => {
     if (!doc) return;
     const before = doc.skills;
@@ -2403,6 +2406,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     setDoc((cur) => cur && { ...cur, skills });
     try {
       await ore("edit", doc.id, "--skills", skills.join(","));
+      setFiled(skills.join());
       p.onChanged();
       if (revived.length) p.onSkillsChanged();
       const rearchive = () => Promise.all(revived.map((id) => ore("skills", "archive", id))).finally(p.onSkillsChanged);
@@ -2742,22 +2746,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             {(doc.author || authoring || published || doc.skills.length > 0 || suggested || !PHONE) && (
               <div className="chips">
                 {authoring ? (
-                  <input
-                    className="author-edit"
-                    aria-label="Author"
-                    placeholder="Author"
-                    autoFocus
-                    defaultValue={doc.author ?? ""}
-                    size={Math.max(12, (doc.author ?? "").length + 2)}
-                    onFocus={(e) => e.currentTarget.select()}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === "Enter") void reauthor(doc.id, doc.author, e.currentTarget.value.replace(/\s+/g, " ").trim() || undefined);
-                      else if (e.key === "Escape") setAuthoring(false);
-                    }}
-                    // Half-typed text is never saved on blur (AGENTS.md); Enter saves.
-                    onBlur={() => setAuthoring(false)}
-                  />
+                  <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
                 ) : (
                   doc.author &&
                   (PHONE ? (
@@ -3074,7 +3063,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                   onJumpHighlight={(id) => onSource(() => jumpToHighlight(id))}
                   notify={p.notify}
                   ask={ask}
-                  marked={anns.filter((a) => a.intent === "question").map((a) => a.id).join()}
+                  marked={`${filed}|${anns.filter((a) => a.intent === "question").map((a) => a.id).join()}`}
                 />
               }
             />

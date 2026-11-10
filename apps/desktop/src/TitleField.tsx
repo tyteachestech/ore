@@ -1,14 +1,16 @@
 import { useRef, useState } from "react";
 
 /** A title edited in place (Finder's Rename, Notion's page title), one field for every list and the reader.
- *  Enter saves and Esc or clicking away keeps the old one (half-typed text is never saved on blur). The field
+ *  (The author's byline too.) Enter saves and Esc or clicking away keeps the old one (half-typed text is never saved on blur). The field
  *  stays until the save lands: one that fails leaves what he typed in it, to try again. `onSave` resolves
  *  false when the write failed (and has said why). `onClose(byKey)`: true when Enter or Esc closed it, so
  *  focus goes back to the row; false when he clicked away, and focus stays where he put it. */
-export function TitleField({ value, label = "Title", className = "row-rename", onSave, onClose }: {
+export function TitleField({ value, label = "Title", className = "row-rename", placeholder, size, onSave, onClose }: {
   value: string;
   label?: string;
   className?: string;
+  placeholder?: string;
+  size?: number;
   onSave: (title: string) => Promise<boolean>;
   onClose: (byKey: boolean) => void;
 }) {
@@ -20,6 +22,8 @@ export function TitleField({ value, label = "Title", className = "row-rename", o
     <input
       className={className}
       aria-label={label}
+      placeholder={placeholder}
+      size={size}
       autoFocus
       defaultValue={value}
       readOnly={saving}
