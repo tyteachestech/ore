@@ -83,43 +83,62 @@ function tagEnd(s: string, i: number): number {
 }
 
 const inHint = (s: string, at: number) => (s.slice(0, at).match(/<Hint\b/g)?.length ?? 0) > (s.slice(0, at).match(/<\/Hint>/g)?.length ?? 0);
+/** The source with comments blanked, offsets kept: a `<Hint` in a comment must not count as one. */
+const uncommented = (s: string) => s.replace(/\/\*[\s\S]*?\*\/|(?<![:"'`])\/\/.*$/gm, (m) => m.replace(/[^\n]/g, " "));
 
-function iconOnly(): string[] {
+/** One file's icon-only buttons with no hint, and whether its <Hint>s balance (one in a string would not). */
+function scan(name: string, raw: string): { found: string[]; balanced: boolean } {
+  const s = uncommented(raw);
+  const found: string[] = [];
+  for (const m of s.matchAll(/<button\b/g)) {
+    const end = tagEnd(s, m.index);
+    const open = s.slice(m.index, end + 1);
+    const label = /aria-label=(?:\{`([^`]*)`\}|"([^"]*)"|\{([^}]*)\})/.exec(open);
+    if (!label) continue;
+    const inner = open.endsWith("/>") ? "" : s.slice(end + 1, s.indexOf("</button>", end));
+    const words = inner
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}|\{\s+\}/g, "") // comments
+      .replace(/<[A-Z][\w.]*\b[^<>]*\/>/g, "") // icons
+      .replace(/\{[^{}<"'`]*(\?|&&|\|\|)[^{}<"'`]*\}/g, "") // what is left of {on ? <A/> : <B/>}
+      .trim()
+      .replace(/^[^\p{L}\p{N}{}<>]{1,2}$/u, ""); // a glyph drawn as text, as × or ↗
+    if (words) continue;
+    // Built once (`const button = (…)`) and wrapped in a Hint where it is used.
+    const built = /const (\w+) = \(\s*$/.exec(s.slice(0, m.index))?.[1];
+    const used = built ? [...s.matchAll(new RegExp(`\\{${built}\\}`, "g"))].some((u) => inHint(s, u.index)) : false;
+    if (inHint(s, m.index) || used) continue;
+    found.push(`${name} ${label[1] ?? label[2] ?? label[3]}`);
+  }
+  return { found, balanced: (s.match(/<Hint\b/g)?.length ?? 0) === (s.match(/<\/Hint>/g)?.length ?? 0) };
+}
+
+function iconOnly(): { found: string[]; unbalanced: string[] } {
   const root = join(import.meta.dir, "../src");
   const files = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : e.name.endsWith(".tsx") ? [join(dir, e.name)] : []));
-  const found: string[] = [];
+  const found: string[] = [], unbalanced: string[] = [];
   for (const f of files(root)) {
-    const s = readFileSync(f, "utf8");
-    for (const m of s.matchAll(/<button\b/g)) {
-      const end = tagEnd(s, m.index);
-      const open = s.slice(m.index, end + 1);
-      const label = /aria-label=(?:\{`([^`]*)`\}|"([^"]*)"|\{([^}]*)\})/.exec(open);
-      if (!label) continue;
-      const inner = open.endsWith("/>") ? "" : s.slice(end + 1, s.indexOf("</button>", end));
-      const words = inner
-        .replace(/\{\/\*[\s\S]*?\*\/\}/g, "") // comments
-        .replace(/<[A-Z][\w.]*\b[^<>]*\/>/g, "") // icons
-        .replace(/\{[^{}<"'`]*(\?|&&|\|\|)[^{}<"'`]*\}/g, "") // what is left of {on ? <A/> : <B/>}
-        .trim()
-        .replace(/^[^\p{L}\p{N}{}<>]{1,2}$/u, ""); // a glyph drawn as text, as × or ↗
-      if (words) continue;
-      // Built once (`const button = (…)`) and wrapped in a Hint where it is used.
-      const built = /const (\w+) = \(\s*$/.exec(s.slice(0, m.index))?.[1];
-      const used = built ? [...s.matchAll(new RegExp(`\\{${built}\\}`, "g"))].some((u) => inHint(s, u.index)) : false;
-      if (inHint(s, m.index) || used) continue;
-      found.push(`${relative(root, f)} ${label[1] ?? label[2] ?? label[3]}`);
-    }
+    const r = scan(relative(root, f), readFileSync(f, "utf8"));
+    found.push(...r.found);
+    if (!r.balanced) unbalanced.push(relative(root, f));
   }
-  return found;
+  return { found, unbalanced };
 }
 
 describe("icon-only buttons", () => {
-  const found = iconOnly();
+  const { found, unbalanced } = iconOnly();
   test("every one shows a hint on hover, or is listed with the reason it can't", () => {
     expect(found.filter((b) => !(b in ICON_ONLY_OK))).toEqual([]);
   });
   test("the list holds only icon-only buttons with no hint", () => {
     expect(Object.keys(ICON_ONLY_OK).filter((b) => !found.includes(b))).toEqual([]);
+  });
+  // The scan counts <Hint> and </Hint> before a button, so a stray one (in a string) would exempt the rest.
+  test("every file's hints balance, so the count can be trusted", () => {
+    expect(unbalanced).toEqual([]);
+  });
+  test("a <Hint in a comment doesn't hint the buttons after it", () => {
+    const src = `// wrap it in <Hint text="…"> later\n/* or <Hint> */\nconst a = <button aria-label="Close"><X /></button>;`;
+    expect(scan("x.tsx", src)).toEqual({ found: ["x.tsx Close"], balanced: true });
   });
 });
