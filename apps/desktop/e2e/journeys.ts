@@ -3131,6 +3131,11 @@ journey("diagram: S styles at the pointer, keys stay on the canvas, Space never 
   await page.keyboard.press("Enter");
   const boxes = () => page.locator(".diagram .draw-canvas > g rect").count();
   await until("the box is drawn", async () => (await boxes()) === 1);
+  // The tool he picked stays for the next box (Tyler 2026-11-10), its key shown against its icon; V goes back to Select.
+  const boxTool = page.locator(".draw-tools").getByRole("button", { name: "Box" });
+  if ((await boxTool.getAttribute("aria-pressed")) !== "true") throw new Error("drawing a box put the tool back on Select");
+  if ((await boxTool.locator(".draw-key").textContent()) !== "R") throw new Error("the Box tool doesn't show its key");
+  await page.keyboard.press("v");
   // S opens the style picker by the pointer; its keys restyle the selection and Esc closes only it.
   const rect = page.locator(".diagram .draw-canvas > g rect").first();
   await page.mouse.move(c.x + 640, c.y + 420);
@@ -3236,14 +3241,17 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
   await until("Backspace deletes it", async () => (await rect.count()) === 0);
   await page.keyboard.press("Meta+z");
   await until("⌘Z brings it back selected", async () => (await rect.count()) === 1 && (await selected()) === "Selected: Sleep");
-  // An arrow started with a click and dropped with Esc leaves no arrow and the Select tool, as a finished one does.
+  // An arrow started with a click and dropped with Esc leaves no arrow and keeps the Arrow tool, as a finished one
+  // does (Tyler 2026-11-10); the next Esc goes back to Select.
   await page.keyboard.press("Escape");
   await page.keyboard.press("a");
   await page.mouse.click(c.x + 900, c.y + 600);
   await page.keyboard.press("Escape");
   const tool = () => page.locator(".draw-tool[aria-pressed=true]").first().getAttribute("aria-label");
+  await until("the dropped arrow is gone", async () => (await page.locator(".diagram .draw-canvas > g path").count()) === 0);
+  if ((await tool()) !== "Arrow") throw new Error(`dropping an arrow left the ${await tool()} tool, not Arrow`);
+  await page.keyboard.press("Escape");
   await until("the tool is Select again", async () => (await tool()) === "Select");
-  if (await page.locator(".diagram .draw-canvas > g path").count()) throw new Error("the dropped arrow stayed");
   // In the picker, A D F set which way a selected arrow points: one-way, both ways, no heads.
   await page.keyboard.press("a");
   await page.mouse.move(c.x + 900, c.y + 600);
@@ -3295,6 +3303,7 @@ journey("diagram: align and space from keys and the picker, drags snap to edges 
     await page.locator(".draw-text").waitFor();
     await page.keyboard.type(label);
     await page.keyboard.press("Enter");
+    await page.keyboard.press("v"); // the Box tool stays until another is picked
   };
   const drag = async (x1: number, y1: number, x2: number, y2: number, mod?: string) => {
     if (mod) await page.keyboard.down(mod);
@@ -3384,6 +3393,7 @@ journey("diagram: align and space from keys and the picker, drags snap to edges 
   await drag(a.x + 40, a.y + 40, (await rects.nth(1).boundingBox())!.x + 40, bb.y + 40);
   await drop();
   await until("an arrow joins A to B", async () => (await summary())?.includes("→") ?? false);
+  await page.keyboard.press("v"); // the Arrow tool stays until another is picked
   await page.mouse.click(a.x + 40, a.y + 40);
   await page.keyboard.press("Backspace");
   await until("deleting A takes the arrow with it", async () => !(await summary())?.includes("→") && (await rects.count()) === 2);
