@@ -804,6 +804,54 @@ journey("tutor stop and copy: the send button stops a reply (⌘. too), words wr
   }
 });
 
+journey("tutor attach: the paperclip attaches an image and a text file as chips, × removes one, the message carries them and shows the picture, a follow-up still sends them, and a file it can't read is refused with why (D189)", async (page) => {
+  const notes = join(mkdtempSync(join(tmpdir(), "ore-attach-")), "notes.txt");
+  writeFileSync(notes, "spacing notes\n");
+  const sent: string[][] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    sent.push(JSON.parse(body).args as string[]);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `Reply ${sent.length}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@14" } }) });
+  });
+  const pick = (paths: string[]) => page.evaluate((paths) => ((window as unknown as { __ORE_PICK: string[] }).__ORE_PICK = paths), paths);
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    // The starters are rows, each with its icon.
+    if ((await tutor.locator(".tutor-starters .menu-item svg").count()) !== 3) throw new Error("each starter row should lead with an icon");
+    const attach = tutor.getByRole("button", { name: "Attach a file" });
+    await pick([join(FIXTURES, "book.epub")]);
+    await attach.click();
+    await page.locator(".toast").getByText("the tutor can't read a .epub file").waitFor();
+    await pick([join(FIXTURES, "screenshot.png"), notes]);
+    await attach.click();
+    await tutor.locator(".tutor-chip", { hasText: "screenshot.png" }).waitFor();
+    await tutor.locator(".tutor-chip", { hasText: "notes.txt" }).waitFor();
+    await tutor.getByRole("button", { name: "Remove “notes.txt”" }).click();
+    await until("the removed file's chip goes", async () => (await tutor.locator(".tutor-chip", { hasText: "notes.txt" }).count()) === 0);
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    await field.fill("What is in this picture?");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("Reply 1").waitFor();
+    const files = (args: string[]) => JSON.parse((args.find((x) => x.startsWith("--files=")) ?? "--files=[]").slice(8)) as { name: string; path: string }[];
+    if (files(sent[0]!).map((f) => f.name).join() !== "screenshot.png" || !/^chats\/files\/[0-9a-f]{16}\.png$/.test(files(sent[0]!)[0]!.path)) throw new Error(`the message went without its file: ${sent[0]!.join(" ")}`);
+    await until("his message shows the picture", async () => await tutor.locator(".ask-files img").evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0).catch(() => false));
+    if (await tutor.locator(".tutor-perch .tutor-chip", { hasText: "screenshot.png" }).count()) throw new Error("a sent file stayed attached to the next message");
+    // A follow-up has no file of its own, and the earlier turn's goes along.
+    await field.fill("And the colours?");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("Reply 2").waitFor();
+    if (sent[1]!.some((x) => x.startsWith("--files="))) throw new Error("the follow-up carried a file it wasn't given");
+    const earlier = JSON.parse(sent[1]!.find((x) => x.startsWith("--earlier="))!.slice(10)) as { files?: { name: string }[] }[];
+    if (earlier[0]?.files?.[0]?.name !== "screenshot.png") throw new Error("the earlier turn's file was not sent with the follow-up");
+  } finally {
+    await page.unroute(/\/ore$/);
+  }
+});
+
 journey("tutor pending: closing mid-reply asks once; a new chat keeps its own reply, the old one lands in the old chat, which the list of chats opens with it", async (page) => {
   const asked: string[] = [];
   let release: (() => void) | undefined;
