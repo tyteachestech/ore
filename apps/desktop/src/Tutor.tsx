@@ -44,7 +44,8 @@ export type TutorTurn = {
   /** Unique across chats: a reply lands only on the turn that asked for it. */
   id: string;
   message: string; item?: string; title?: string; mentions?: Mention[];
-  /** The @ context the request carried: his own @s, else the ones still in effect from before (D128.3). */
+  /** The @ context the request carried: his own @s, else the ones still in effect from before (D128.3), then
+   *  the skill whose page he asked from (D191). Try again sends it as it was. */
   pointed?: Mention[];
   /** While the reply is written: its text so far, and whether it is searching the web (claude streams both). */
   partial?: string; searching?: boolean;
@@ -182,12 +183,12 @@ export function useTutorChat(notify: Notify) {
       stop();
     }
   };
-  /** Adds his message to the thread and asks. `turn.pointed` is the page's own context beyond the @s (the
-   *  skill page he is on): it goes with this message only, never carried, and once even if he @s it too. */
-  const ask = (turn: Omit<TutorTurn, "id">) => {
+  /** Adds his message to the thread and asks. `page` is the page's own context beyond the @s (the skill page
+   *  he is on, D191): it goes with this message only, never carried, and once even if he @s it too. */
+  const ask = (turn: Omit<TutorTurn, "id" | "pointed">, page: Mention[] = []) => {
     if (turn.mentions?.length) setCarry(turn.mentions);
-    const pointed = pointedAt(carryNow.current, turn.pointed ?? []);
-    const t = { ...turn, pointed: pointed.length ? pointed : undefined, id: turnId() };
+    const pointed = pointedAt(carryNow.current, page);
+    const t: TutorTurn = { ...turn, ...(pointed.length ? { pointed } : {}), id: turnId() };
     const before = now.current;
     if (!metaNow.current) setMeta({ id: t.id, title: firstLine(t.message) });
     update((ts) => [...ts, t]);
@@ -358,12 +359,13 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
   const { turns, draft: { input, mentions, files = [] }, setDraft, carry } = chat;
   const setInput = (text: string) => setDraft((d) => ({ ...d, input: text }));
   // The page on screen is the context (Notion AI): the open source, else the skill whose page it is. He can
-  // take it out (the chip's ×); another source or skill page puts the context back.
+  // take it out (the chip's ×): it stays out for that page while the tutor is open, and another page has its own.
   const onPage = reading ? `item:${reading.id}` : skillPage ? `skill:${skillPage}` : null;
-  const [dropped, setDropped] = useState<string | null>(null);
-  useEffect(() => setDropped(null), [onPage]);
-  const context = reading && dropped !== onPage ? reading : null;
-  const pageSkill = !reading && skillPage && dropped !== onPage ? skills.find((k) => k.id === skillPage) : undefined;
+  const [dropped, setDropped] = useState<ReadonlySet<string>>(new Set());
+  const drop = () => onPage && setDropped((d) => new Set(d).add(onPage));
+  const kept = !!onPage && !dropped.has(onPage);
+  const context = reading && kept ? reading : null;
+  const pageSkill = !reading && skillPage && kept ? skills.find((k) => k.id === skillPage) : undefined;
   const scope: Mention | null = pageSkill ? { kind: "skill", id: pageSkill.id, name: pageSkill.name } : null;
   // @-mentions (Claude's and ChatGPT's @): the name goes into the text, and each one still written
   // there when he sends points the tutor at it.
@@ -427,7 +429,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
     force.current = true; // what he sends, and its reply, he wants to see
     // What he attached goes with the message he typed, not with a starter or a chip's canned one.
-    chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}), ...(scope ? { pointed: [scope] } : {}), ...(typed && files.length ? { files } : {}) });
+    chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}), ...(typed && files.length ? { files } : {}) }, scope ? [scope] : []);
     if (typed) setDraft(() => ({ input: "", mentions: [] }));
     setAt(null);
     field.current?.focus();
@@ -524,7 +526,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
         <span className="tutor-chip">
           <span className="tutor-chip-title">{context.title}</span>
           <Hint text="Leave this source out">
-            <button aria-label={`Leave “${context.title}” out`} onClick={() => { setDropped(onPage); field.current?.focus(); }}>
+            <button aria-label={`Leave “${context.title}” out`} onClick={() => { drop(); field.current?.focus(); }}>
               <X size={10} aria-hidden="true" />
             </button>
           </Hint>
@@ -535,7 +537,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
           <SkillIcon icon={pageSkill.icon} color={pageSkill.color} dot className="palette-icon" />
           <span className="tutor-chip-title">{scope.name}</span>
           <Hint text="Leave this skill out">
-            <button aria-label={`Leave “${scope.name}” out`} onClick={() => { setDropped(onPage); if (carried.length !== carry.length) chat.drop(scope); field.current?.focus(); }}>
+            <button aria-label={`Leave “${scope.name}” out`} onClick={() => { drop(); if (carried.length !== carry.length) chat.drop(scope); field.current?.focus(); }}>
               <X size={10} aria-hidden="true" />
             </button>
           </Hint>
