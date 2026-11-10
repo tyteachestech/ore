@@ -2045,7 +2045,25 @@ button.home-plan:hover { color: var(--text); }
 .review-keys kbd { margin-right: 4px; }
 .review-end { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4vh auto 0; max-width: 420px; animation: card-in var(--t-4) ease-out both; }
 /* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
-.review-mole { display: block; line-height: 0; margin-bottom: 2px; }
+.review-mole { display: block; line-height: 0; margin-bottom: 2px; width: 64px; height: calc(64px * 18 / 22); }
+/* The cart's tip (D190): a layer as wide as the window over the end screen, so the cart crosses it on a rail just
+   over the ring. Its ore is the ring's own dot, in size and colour; a rough stone is the gem it becomes. */
+.review-end.carted { position: relative; }
+.cart-tip { position: absolute; top: 0; bottom: 0; z-index: 1; pointer-events: none; overflow-x: clip; }
+.cart-rail { position: absolute; left: 0; right: 0; height: 2px; background: var(--bg-active); }
+.cart { position: absolute; display: block; overflow: visible; will-change: transform; }
+.cart-bucket, .cart-wheel { transform-box: fill-box; }
+.cart-wheel { transform-origin: center; }
+.cart-W { fill: var(--text); }
+.cart-H, .cart-M, .cart-D { fill: color-mix(in oklab, var(--text) 62%, var(--bg)); }
+.cart-ore-in { fill: var(--c-green); }
+.cart-lip { fill: none; }
+.cart-ore, .cart-rough { position: absolute; left: 0; top: 0; will-change: transform; }
+.cart-ore { width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--c-green); }
+.cart-rough { margin: -9px 0 0 -9px; line-height: 0; }
+.review-end.carted .dot-ring circle { transition: none !important; }
+.review-end.carted .ring-burst { animation-delay: 0ms; }
+.review-cut > span[data-wait] { visibility: hidden; animation: none; }
 .review-end h2 { font-family: var(--round); margin: 22px 0 0; font-size: 24px; }
 .review-kept { margin: 10px 0 0; font-size: 16px; color: var(--muted); }
 .review-kept b { font-family: var(--round); color: var(--text); font-size: 24px; font-variant-numeric: tabular-nums; }

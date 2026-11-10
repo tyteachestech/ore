@@ -6,12 +6,13 @@ import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Gem } from "./Gem";
 import { Mole } from "./Mole";
+import { CartTip } from "./CartTip";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { lastWin, longGapText, ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { DotBar, minutes, minutesText, Ring } from "./Ring";
+import { DotBar, lit, minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -40,6 +41,8 @@ function afterAnswer(q: DueEntry[], again: boolean): DueEntry[] {
 const ACTIVE_CAP_MS = 3 * 60_000;
 /** Cut gems drawn on the end screen; the rest show as "+N". */
 const CUT_SHOWN = 8;
+/** The dots in the end screen's ring (a `DotRing` of 120px). */
+const RING_DOTS = 30;
 
 type Phase = "answer" | "checked" | "edit";
 type Rating = 1 | 2 | 3 | 4;
@@ -1224,11 +1227,33 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
   const short = t.counts && t.caught_up && t.active_ms < t.goal_ms;
   const title = short ? "All caught up · today counts" : closed ? "Goal met!" : "Nice work";
   const ups = t.skills.filter((k) => k.level > (b?.skills.find((x) => x.skill === k.skill)?.level ?? k.level));
+  // D190: the cart tips this session's ore into the ring, once, when there is something to tip: ring dots this
+  // session lit, or gems it cut. Not in the quick quiz, on the phone, or under Reduce Motion.
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  const shown = (s.cut ?? []).slice(0, CUT_SHOWN);
+  const [pour] = useState(() => {
+    const from = lit(part(b), RING_DOTS), to = lit(part(t), RING_DOTS);
+    const dots = Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i);
+    return !quick && !PHONE && !document.hidden && !matchMedia("(prefers-reduced-motion: reduce)").matches && (dots.length > 0 || shown.length > 0) ? dots : null;
+  });
+  // cart: rolling and pouring · poured: the ring is full · leaving: the mole comes up · done: the cart has gone.
+  const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
+  const [landed, setLanded] = useState(pour ? 0 : shown.length);
+  const [mood, setMood] = useState<"peek" | "cheer">(pour ? "peek" : "cheer");
+  useEffect(() => {
+    if (!pour || (stage !== "leaving" && stage !== "done") || mood === "cheer") return;
+    const id = setTimeout(() => setMood("cheer"), 560);
+    return () => clearTimeout(id);
+  }, [pour, stage, mood]);
+  const full = stage !== "cart";
   return (
-    <div className="review-end" role="status">
-      {/* D169: the tutor's mole cheers from the top of the ring, once, at the end of a session (not in the quick quiz). */}
-      {!quick && <span className="review-mole"><Mole bare size={64} mood="cheer" /></span>}
-      <Ring value={part(t)} from={part(b)} met={t.met} burst={closed} size={quick ? 72 : 120} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
+    <div className={`review-end${pour ? " carted" : ""}`} role="status" ref={setHost}>
+      {pour && stage !== "done" && host && (
+        <CartTip host={host} lit={pour} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => setStage("done")} />
+      )}
+      {/* D169: the tutor's mole cheers from the top of the ring, once, at the end of a session (not in the quick quiz). After the cart (D190) it comes up first. */}
+      {!quick && <span className="review-mole">{(stage === "leaving" || stage === "done") && <Mole bare size={64} mood={mood} />}</span>}
+      <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : 120} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
       <h2>{title}</h2>
       {/* "Caught up" never hides the new cards the daily limits hold back (D65). */}
       {t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>}
@@ -1236,8 +1261,9 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
       {(s.cut?.length ?? 0) > 0 && (
         <Hint text={`${s.cut!.length} new cut ${s.cut!.length === 1 ? "gem" : "gems"}: you'd still recall ${s.cut!.length === 1 ? "it" : "them"} three weeks from now`}>
           <p className="review-cut" aria-label={`${s.cut!.length} became solid`}>
-            {s.cut!.slice(0, CUT_SHOWN).map((id, i) => (
-              <span key={i} data-color={skills.find((x) => x.id === id)?.color} style={{ animationDelay: `${500 + i * 90}ms` }}>
+            {shown.map((id, i) => (
+              // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then.
+              <span key={i} data-color={skills.find((x) => x.id === id)?.color} data-wait={i >= landed || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
                 <Gem kind="cut" size={36} />
                 {(() => {
                   const sk = skills.find((x) => x.id === id);
@@ -1245,7 +1271,7 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
                 })()}
               </span>
             ))}
-            {s.cut!.length > CUT_SHOWN && <b>+{s.cut!.length - CUT_SHOWN}</b>}
+            {s.cut!.length > CUT_SHOWN && landed >= shown.length && <b>+{s.cut!.length - CUT_SHOWN}</b>}
           </p>
         </Hint>
       )}
