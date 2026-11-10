@@ -5657,6 +5657,9 @@ journey("review: while a card edit saves, the editor is read-only and Esc waits,
   await page.getByRole("button", { name: "Edit exercise" }).click();
   const question = page.locator("#edit-q");
   const was = await question.inputValue();
+  // Cancel shows Esc on hover, as Save shows its key.
+  await page.getByRole("button", { name: "Cancel" }).hover();
+  await page.locator(".hint", { hasText: /^Cancel\s*Esc$/ }).waitFor();
   await question.fill(`${was} (edited)`);
   await page.getByRole("button", { name: "Save" }).click();
   await until("the save is held", async () => held);
