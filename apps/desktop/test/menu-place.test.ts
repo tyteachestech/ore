@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { menuPlace } from "../src/popup-place";
+import { lineShown, menuPlace } from "../src/popup-place";
 
 // The caret's line box, where the menu opens: 20px tall at the given top.
 const caret = (top: number, left = 200) => ({ left, top, bottom: top + 20 });
@@ -42,5 +42,22 @@ describe("menu at the caret stays inside the window (Notion's / menu)", () => {
     expect(menuPlace(caret(700), small, view).side).toBe("below");
     // The side it was on no longer fits (the window got short): it moves.
     expect(menuPlace(caret(60), small, view, "above").side).toBe("below");
+  });
+});
+
+describe("the menu shows only while its line does", () => {
+  const pane = { top: 60, bottom: 700 }; // the note's scrolling panel, inside the window
+  test("a line inside the panel shows it", () => {
+    expect(lineShown(caret(300), pane)).toBe(true);
+  });
+  test("a line scrolled above or below the panel hides it, even while it is still inside the window", () => {
+    expect(lineShown(caret(20), pane)).toBe(false);
+    expect(lineShown(caret(720), pane)).toBe(false);
+  });
+  test("a line cut in half by the panel's edge counts by its middle", () => {
+    expect(lineShown(caret(45), pane)).toBe(false); // 45..65, middle 55: above the edge
+    expect(lineShown(caret(55), pane)).toBe(true); // 55..75, middle 65
+    expect(lineShown(caret(685), pane)).toBe(true); // middle 695
+    expect(lineShown(caret(695), pane)).toBe(false);
   });
 });

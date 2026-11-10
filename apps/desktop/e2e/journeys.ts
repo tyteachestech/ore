@@ -2088,16 +2088,25 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
 
 journey("note / menu at the bottom of a long note: it opens above the line, inside the window; in a short window its list scrolls (Notion)", async (page) => {
   const menu = page.locator(".note-menu");
-  const inside = async (what: string) => {
-    const b = (await menu.boundingBox())!;
+  const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); // resize and scroll land on the next frame
+  const inside = async (what: string, box = menu) => {
+    const b = (await box.boundingBox())!;
     const v = page.viewportSize()!;
-    if (b.y < 0 || b.x < 0 || b.y + b.height > v.height + 0.5 || b.x + b.width > v.width + 0.5) throw new Error(`${what}: the menu runs out of the ${v.width}×${v.height} window at ${JSON.stringify(b)}`);
+    if (b.y < 0 || b.x < 0 || b.y + b.height > v.height + 0.5 || b.x + b.width > v.width + 0.5) throw new Error(`${what}: it runs out of the ${v.width}×${v.height} window at ${JSON.stringify(b)}`);
+  };
+  const onInMenu = async (what: string) => {
+    const on = page.locator(".note-menu-row.on");
+    const [m, r] = [(await menu.boundingBox())!, (await on.boundingBox())!];
+    if (r.y < m.y - 0.5 || r.y + r.height > m.y + m.height + 0.5) throw new Error(`${what}: the highlighted row (${await on.innerText()}) is scrolled out of the menu`);
   };
   await page.setViewportSize({ width: 1280, height: 900 });
   await openSource(page, AGENTS);
   await page.locator(".note-editor [contenteditable=true]").first().click();
-  await page.keyboard.press("ControlOrMeta+End");
+  // To the end of the note: ⌘↓ on the Mac (⌘End is not a Mac key), Ctrl+End elsewhere.
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End");
   for (let i = 0; i < 40; i++) await page.keyboard.press("Enter");
+  const atEnd = await page.evaluate(() => document.querySelector(".note-editor .ProseMirror")!.lastElementChild!.contains(getSelection()!.anchorNode));
+  if (!atEnd) throw new Error("the caret is not on the note's last line");
   await page.keyboard.type("/");
   await menu.waitFor();
   await inside("at the bottom of the note");
@@ -2108,23 +2117,48 @@ journey("note / menu at the bottom of a long note: it opens above the line, insi
   await inside("narrowed to Quote");
   await menu.locator(".note-menu-row", { hasText: "Quote" }).click();
   await page.locator(".note-editor blockquote").last().waitFor();
-  // A short window: the full list is taller than either side, so it is capped and scrolls; ↑ from the
-  // first row goes to the last, which scrolls into view.
+  // A short window, the line high in the note's panel: the full list is taller than the room under it,
+  // so it is capped and scrolls; ↑ from the first row goes to the last, which scrolls into view.
   await page.keyboard.press("Enter");
   await page.keyboard.press("Enter");
   await page.setViewportSize({ width: 1280, height: 500 });
+  await frames();
+  for (let i = 0; i < 16; i++) await page.keyboard.press("ArrowUp"); // up the empty lines, with the note's end below
+  await page.evaluate(() => {
+    const r = getSelection()!.getRangeAt(0).getBoundingClientRect();
+    let pane = document.querySelector(".note-editor")!.parentElement;
+    while (pane && !/auto|scroll/.test(getComputedStyle(pane).overflowY)) pane = pane.parentElement;
+    pane!.scrollTop += r.top - 140;
+  });
   await page.keyboard.type("/");
   await menu.waitFor();
   await inside("in a 500px window");
   if (!(await menu.evaluate((el) => el.scrollHeight > el.clientHeight))) throw new Error("in a short window the list should scroll inside the menu");
   await page.keyboard.press("ArrowUp");
-  const on = page.locator(".note-menu-row.on");
-  const [m, r] = [(await menu.boundingBox())!, (await on.boundingBox())!];
-  if (r.y < m.y || r.y + r.height > m.y + m.height + 0.5) throw new Error(`the highlighted row (${await on.innerText()}) is scrolled out of the menu`);
-  // The window shrinks while it is open: still inside.
+  await onInMenu("↑ to the last row");
+  // The window shrinks while it is open: still inside, and the late row its smaller cap hides is scrolled back to.
   await page.setViewportSize({ width: 1280, height: 420 });
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); // resize fires on the next frame
+  await frames();
   await inside("after the window shrinks");
+  await onInMenu("after the window shrinks");
+  // Its line scrolled out of the note's panel: the menu goes with it rather than hang at the window's
+  // edge; typing still filters it, and it is back by the line when the line is.
+  const line = await page.evaluate(() => { const r = getSelection()!.getRangeAt(0).getBoundingClientRect(); return { x: r.left, y: r.top }; });
+  await page.mouse.move(line.x + 40, line.y + 120);
+  await page.mouse.wheel(0, 300);
+  await frames();
+  await frames();
+  if (await menu.isVisible()) throw new Error("the menu still shows with its line scrolled out of view");
+  await page.keyboard.type("div");
+  await page.mouse.wheel(0, -300);
+  await frames();
+  await frames();
+  await menu.waitFor();
+  await inside("its line scrolled back");
+  if ((await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]).join() !== "Divider") throw new Error("typing while it was hidden did not filter it");
+  const back = await page.evaluate(() => getSelection()!.getRangeAt(0).getBoundingClientRect());
+  const mb = (await menu.boundingBox())!;
+  if (Math.abs(mb.y - back.bottom) > 8 && Math.abs(mb.y + mb.height - back.top) > 8) throw new Error(`the menu came back away from its line (${mb.y}..${mb.y + mb.height}, line ${back.top}..${back.bottom})`);
   await page.keyboard.press("Escape");
 });
 

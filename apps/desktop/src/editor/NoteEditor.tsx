@@ -35,7 +35,7 @@ import { SelectionBar, type Sel } from "./SelectionBar";
 import { WithMenu, type MenuAction } from "../Menu";
 import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock, topGaps, turnAtCaret, type Kind } from "./blockops";
 import { is } from "../keys";
-import { menuPlace, type Side } from "../popup-place";
+import { lineShown, menuPlace, type Side } from "../popup-place";
 
 /** What a link can point at (D39): a source, or a skill (its note, D41). */
 export type LinkTarget = { kind: "item" | "skill"; id: string; title: string };
@@ -1186,48 +1186,87 @@ const toggleView = $view(toggleSchema.node, () => (node) => {
   return { dom, contentDOM: content, ignoreMutation };
 });
 
-/** Notion's equation field, under the equation it edits: the TeX, drawn live as he types (each change is
- *  an editor step, grouped by the editor's history). ↵ or a click away closes it (⇧↵ breaks the line
- *  in a block equation); one left empty is taken out. */
 /** Keeps the / and [[ menu inside the window (menuPlace, Notion): placed by the caret when it opens and
- *  as typing narrows the list, again when the page scrolls or the window resizes, with the highlighted
- *  row scrolled into view in a list capped to the room there is. On the phone CSS docks it instead. */
+ *  as typing narrows the list, again when the window resizes and (once a frame) when the page scrolls, with
+ *  the highlighted row scrolled into view in a list capped to the room there is. Hidden while its line
+ *  is scrolled out of view (lineShown); the keys still drive it. On the phone CSS docks it instead. */
 function useMenuPlace(box: { current: HTMLDivElement | null }, view: () => EditorView | undefined, menu: Menu | null, count: number, index: number) {
   const side = useRef<Side | undefined>(undefined);
+  const size = useRef({ width: 0, height: 0 });
+  const place = useRef(() => {});
+  const latest = useRef(menu);
+  latest.current = menu;
   const opened = menu && `${menu.kind} ${menu.from}`;
+  // Measured once per opening and each time the rows change, unsqueezed by the window's edges.
   useLayoutEffect(() => {
     side.current = undefined;
   }, [opened]);
   useLayoutEffect(() => {
     const el = box.current;
     const v = view();
-    if (!menu || !el || !v || PHONE) return;
-    const place = (e?: Event) => {
-      if (e?.target === el) return; // its own list scrolling
-      const c = v.coordsAtPos(Math.min(menu.from, v.state.doc.content.size));
-      el.style.left = "0px"; // measured unsqueezed by the window's right edge
-      const at = menuPlace(c, { width: el.offsetWidth, height: el.scrollHeight + el.offsetHeight - el.clientHeight }, { width: innerWidth, height: innerHeight }, side.current);
+    if (!opened || !el || !v || PHONE) return;
+    Object.assign(el.style, { left: "0px", top: "0px", maxHeight: "none" });
+    size.current = { width: el.offsetWidth, height: el.offsetHeight };
+    place.current = () => {
+      const m = latest.current;
+      if (!m) return;
+      const c = v.coordsAtPos(Math.min(m.from, v.state.doc.content.size));
+      const shown = lineShown(c, clipOf(v.dom));
+      el.style.visibility = shown ? "" : "hidden";
+      if (!shown) return;
+      const at = menuPlace(c, size.current, { width: innerWidth, height: innerHeight }, side.current);
       side.current = at.side;
       Object.assign(el.style, { left: `${at.left}px`, top: `${at.top}px`, maxHeight: `${at.maxHeight}px` });
+      rowInView(el);
     };
-    place();
-    addEventListener("resize", place);
-    document.addEventListener("scroll", place, { capture: true, passive: true });
+    place.current();
+    let frame = 0;
+    const later = (e: Event) => {
+      if (e.target === el || frame) return; // its own list scrolling, or a frame already asked for
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        place.current();
+      });
+    };
+    const resized = () => place.current(); // at once: anything that looks in the frame after a resize sees it placed
+    addEventListener("resize", resized);
+    document.addEventListener("scroll", later, { capture: true, passive: true });
     return () => {
-      removeEventListener("resize", place);
-      document.removeEventListener("scroll", place, { capture: true });
+      cancelAnimationFrame(frame);
+      removeEventListener("resize", resized);
+      document.removeEventListener("scroll", later, { capture: true });
     };
-  }, [menu, count]);
-  useLayoutEffect(() => {
-    const el = box.current;
-    const row = el?.querySelector<HTMLElement>(".note-menu-row.on");
-    if (!el || !row) return;
-    const pad = 4; // the menu's padding, kept round the first and last rows
-    if (row.offsetTop - pad < el.scrollTop) el.scrollTop = row.offsetTop - pad;
-    else if (row.offsetTop + row.offsetHeight + pad > el.scrollTop + el.clientHeight) el.scrollTop = row.offsetTop + row.offsetHeight + pad - el.clientHeight;
-  }, [index, count, menu]);
+  }, [opened, menu?.query, count]);
+  // Each editor update (the line can move as he types) places it again; an arrow keeps its row in view.
+  useLayoutEffect(() => place.current(), [menu]);
+  useLayoutEffect(() => rowInView(box.current), [index]);
 }
 
+/** Scrolls a capped menu's highlighted row into view, keeping the menu's padding round it. */
+function rowInView(el: HTMLElement | null) {
+  const row = el?.querySelector<HTMLElement>(".note-menu-row.on");
+  if (!el || !row) return;
+  const pad = 4;
+  if (row.offsetTop - pad < el.scrollTop) el.scrollTop = row.offsetTop - pad;
+  else if (row.offsetTop + row.offsetHeight + pad > el.scrollTop + el.clientHeight) el.scrollTop = row.offsetTop + row.offsetHeight + pad - el.clientHeight;
+}
+
+/** The part of the window an element's scrolling panels leave in view, top to bottom. */
+function clipOf(el: Element) {
+  let top = 0;
+  let bottom = innerHeight;
+  for (let a = el.parentElement; a; a = a.parentElement) {
+    if (!/auto|scroll|hidden|clip/.test(getComputedStyle(a).overflowY)) continue;
+    const r = a.getBoundingClientRect();
+    top = Math.max(top, r.top);
+    bottom = Math.min(bottom, r.bottom);
+  }
+  return { top, bottom };
+}
+
+/** Notion's equation field, under the equation it edits: the TeX, drawn live as he types (each change is
+ *  an editor step, grouped by the editor's history). ↵ or a click away closes it (⇧↵ breaks the line
+ *  in a block equation); one left empty is taken out. */
 function MathField({ at, view, onClose }: { at: { pos: number; x: number; y: number; w: number; h: number }; view: () => EditorView | undefined; onClose: () => void }) {
   const node = () => {
     const v = view();
