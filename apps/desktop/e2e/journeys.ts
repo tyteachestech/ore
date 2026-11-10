@@ -1766,6 +1766,31 @@ journey("prequestion: a guess typed but not stored is still there when he comes 
   if (await page.locator(".preq-row.done").filter({ hasText: q }).count()) throw new Error("the draft was marked answered");
 });
 
+journey("prequestions stay in reach: once he has started a source, Reading for lists them from anywhere in it and Enter goes back to the block (D179)", async (page) => {
+  const q = "When is an agent the wrong choice?";
+  await openSource(page, AGENTS);
+  const item = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === AGENTS)!;
+  const was = ((await ore("show", item.id)) as { status: string }).status;
+  await ore("status", item.id, "reading");
+  try {
+    await openSource(page, TESTING);
+    await openSource(page, AGENTS);
+    const chip = page.getByRole("button", { name: /^Reading for \d+$/ });
+    await chip.waitFor();
+    if (await page.locator(".preq-head").getAttribute("aria-expanded") === "true") await page.locator(".preq-head").click();
+    await page.locator(".reader-scroll, .reader").first().evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    await chip.focus();
+    await page.getByLabel("What you’re reading for").getByText(q).waitFor();
+    await page.keyboard.press("Enter");
+    await until("the block is open, in view, with focus on its head", async () =>
+      (await page.locator(".preq-head").getAttribute("aria-expanded")) === "true" &&
+      (await page.locator(".preq-q").filter({ hasText: q }).isVisible()) &&
+      (await page.evaluate(() => document.activeElement?.classList.contains("preq-head") ?? false)));
+  } finally {
+    await ore("status", item.id, was);
+  }
+});
+
 journey("note: / makes a toggle heading and @ writes a date; both are still there after a reload", async (page) => {
   const d = new Date(Date.now() + 864e5);
   const tomorrow = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

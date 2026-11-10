@@ -1,6 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as HoverCard from "@radix-ui/react-hover-card";
 import { Children, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -528,6 +529,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   // chip per type, then one chip for all, then none (the side panel's Collected tab lists them all).
   const [tools, setTools] = useState<HTMLDivElement | null>(null);
   const [fit, setFit] = useState<Fit>("all");
+  const [preqAsk, setPreqAsk] = useState(0);
   // Which types have chips, and how wide each count is: a change measures the chips again from the top.
   const chipSet = INTENTS.map((i) => {
     const n = anns.filter((a) => a.intent === i && visible(a)).length;
@@ -2441,6 +2443,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   const inHeading = !!popupEl?.closest("h1, h2, h3, h4, h5, h6");
   /** The open source's actions, Readwise Reader's document menu: ⋯ at the top right, right-click on
    *  the title, and ⌘K, each with its shortcut. */
+  // D179: once he is reading, the prequestions fold away at the top; the toolbar keeps them in reach.
+  const readingFor = !PHONE && !!doc && !doc.preview && doc.status !== "done" && !!doc.prequestions?.length && (doc.status === "reading" || anns.length > 0);
   const actions: MenuAction[] = !doc
     ? []
     : [
@@ -2491,6 +2495,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
         { id: "collected", label: questionsShown ? "Close collected" : "Collected", hint: label(keys.collected), run: () => p.onShowSide("questions") },
+        ...(readingFor ? [{ id: "reading-for", label: "Show prequestions", paletteOnly: true, run: () => setPreqAsk((n) => n + 1) }] : []),
         ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", run: () => {
           setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
           p.onPin(doc);
@@ -2658,6 +2663,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             </Hint>
           )}
           {/* What he has collected sits in the toolbar (Reeder's article tools), never over the text he reads. */}
+          {readingFor && <ReadingFor qs={doc.prequestions!} onOpen={() => setPreqAsk((n) => n + 1)} />}
           {!PHONE && collected}
           {/* Not on the phone: its note is a page of its own, the source already out of sight. */}
           {!PHONE && (
@@ -2801,7 +2807,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           {/* The phone can't write prequestions (AI runs on the Mac): it shows the ones the Mac wrote. */}
           {/* No text, nothing to ask before reading it. */}
           {!doc.preview && <TablesLine key={doc.id} doc={doc} onRead={tablesRead} />}
-          {!doc.preview && (!PHONE || !!doc.prequestions?.length) && (!!doc.body.trim() || !!doc.prequestions?.length) && <Prequestions key={doc.prequestions?.length ?? 0} doc={doc} waiting={waiting || retrying} onRetry={gaveUp && !retrying ? () => void retryEnrich() : undefined} notify={p.notify} />}
+          {!doc.preview && (!PHONE || !!doc.prequestions?.length) && (!!doc.body.trim() || !!doc.prequestions?.length) && <Prequestions key={doc.prequestions?.length ?? 0} doc={doc} waiting={waiting || retrying} onRetry={gaveUp && !retrying ? () => void retryEnrich() : undefined} notify={p.notify} ask={preqAsk} onKept={(i, text) => setDoc((cur) => cur && { ...cur, prequestions: cur.prequestions?.map((q, j) => (j === i ? { ...q, before: text || undefined } : q)) })} />}
           {away === "up" && !video && (
             <div className="follow-up">
               <BackToCurrent dir="up" onClick={follow} />
@@ -3106,14 +3112,55 @@ function BackToCurrent({ dir, onClick }: { dir: "up" | "down"; onClick: () => vo
   );
 }
 
+/** D179: the prequestions stay in reach while he reads. A pretest pays off for the answers he finds while
+ *  reading (St Hilaire & Carpenter 2020), and the block at the top of the source is out of sight a screen
+ *  down. Hover or focus lists them with his guesses; a click goes to the block. Copied from Linear's hover
+ *  previews: a glance without leaving where he is. */
+function ReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>; onOpen: () => void }) {
+  return (
+    <HoverCard.Root openDelay={150} closeDelay={150}>
+      <HoverCard.Trigger asChild>
+        <button className="collected-chip reading-for" onClick={onOpen}>
+          Reading for {qs.length}
+        </button>
+      </HoverCard.Trigger>
+      <HoverCard.Portal>
+        <HoverCard.Content className="reading-for-card" side="bottom" align="end" sideOffset={6} collisionPadding={8} aria-label="What you’re reading for">
+          <ol>
+            {qs.map((q, i) => (
+              <li key={i}>
+                {q.q}
+                {q.before && <span>{q.before}</span>}
+              </li>
+            ))}
+          </ol>
+        </HoverCard.Content>
+      </HoverCard.Portal>
+    </HoverCard.Root>
+  );
+}
+
 /** Prequestion guesses typed but not yet stored, by source and question: leaving the source keeps them for when
  *  he comes back (Enter still stores one). */
 const preqDrafts = new Map<string, string>();
 
 /** "What do you already know?" — short attempts before reading, stored and never scored (D18). Question rows; the one
  *  you are on opens an answer line, Enter stores it and opens the next unanswered one. */
-function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: boolean; onRetry?: () => void; notify: Notify }) {
+function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
+  doc: Doc; waiting: boolean; onRetry?: () => void; notify: Notify;
+  /** Bumps when he asks for the block from the toolbar's Reading for chip or ⌘K (D179): it opens and comes into view. */
+  ask: number;
+  /** A guess he stored, so the Reading for chip shows it too. */
+  onKept: (i: number, text: string) => void;
+}) {
   const qs = doc.prequestions ?? [];
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!ask) return;
+    setOpen(true);
+    section.current?.scrollIntoView({ block: "center" });
+    section.current?.querySelector<HTMLElement>(".preq-head")?.focus({ preventScroll: true });
+  }, [ask]);
   const draftKey = (i: number) => `${doc.id}\n${qs[i]?.q}`;
   const [vals, setVals] = useState(() => qs.map((q, i) => preqDrafts.get(draftKey(i)) ?? q.before ?? ""));
   const [saved, setSaved] = useState(() => qs.map((q) => q.before ?? ""));
@@ -3164,7 +3211,9 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
     setVals((v) => v.map((x, j) => (j === i ? t : x)));
     setSaved((v) => v.map((x, j) => (j === i ? t : x)));
     setJust(i);
+    onKept(i, t);
     ore("prequestion", doc.id, String(i + 1), "--before", t).catch((e) => {
+      onKept(i, was);
       setSaved((v) => v.map((x, j) => (j === i ? was : x)));
       preqDrafts.set(draftKey(i), t);
       notify(errorText(e), "error");
@@ -3185,7 +3234,7 @@ function Prequestions({ doc, waiting, onRetry, notify }: { doc: Doc; waiting: bo
   };
 
   return (
-    <section className="preq">
+    <section className="preq" ref={section}>
       <button className="preq-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <CaretRight className={`caret${open ? " open" : ""}`} size={12} aria-hidden="true" />
         What do you already know?
