@@ -2,6 +2,7 @@ import { z } from "zod";
 import { locate } from "../anchoring.ts";
 import { findItem, listItems, type AiStamp } from "../items.ts";
 import { blankProblem, cardTextProblem, ContentType, hideBlanks, writeNewCard, type Card } from "../cards.ts";
+import { chatFilePath } from "../chats.ts";
 import { getDiagram, sceneOutline } from "../diagrams.ts";
 import { withLock } from "../lock.ts";
 import { paths } from "../library.ts";
@@ -18,7 +19,8 @@ import { quoteIn } from "./grade.ts";
 // @-mentions, as context.
 
 /** One earlier turn. A turn that set an exercise carries it, with the card committed then (D158). */
-export interface TutorTurn { message: string; reply: string; exercise?: z.input<typeof Exercise> }
+/** `files`: what he attached to that message (D189), as `attachToChat` returned them. */
+export interface TutorTurn { message: string; reply: string; exercise?: z.input<typeof Exercise>; files?: { name: string; path: string }[] }
 
 /** A reply with its worked answer's steps numbered under it (D142): what it said, as text. */
 export const withSteps = (r: { reply: string; steps: string[] }) => [r.reply, ...r.steps.map((s, i) => `${i + 1}. ${s}`)].join("\n");
@@ -122,10 +124,18 @@ export type TutorProgress = { reply: string } | { searching: boolean };
  *  which lists titles JSON-escaped (a title with "quotes" in it reads \"quotes\" there). */
 const pageWords = (page: { title: string; text: string }) => `${page.title}\n${page.text}`;
 
-export async function tutor(lib: Library, message: string, { earlier = [], onProgress, ...focus }: { earlier?: TutorTurn[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
+export async function tutor(lib: Library, message: string, { earlier = [], files = [], onProgress, ...focus }: { earlier?: TutorTurn[]; files?: { name: string; path: string }[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
   const m = withDiagrams(lib, focus.item, message.trim());
   if (!m) throw new Error("message is empty");
-  const recent = earlier.slice(-6).map(({ message, reply }) => ({ message, reply }));
+  // Files attached to this message and to the recent ones (D189): the agent reads them from chats/files/, so a
+  // follow-up about "the second chart" still has the picture. `attached` names each by its path.
+  // A file gone from an earlier turn (deleted, or not synced to this Mac yet) is left out; one missing from this message is an error.
+  const filesOf = (fs: { name: string; path: string }[] = [], strict = false) => fs.flatMap((f) => {
+    try { return [{ name: String(f.name), file: chatFilePath(lib, String(f.path)) }]; } catch (e) { if (strict) throw e; return []; }
+  });
+  const attached = filesOf(files, true);
+  const recent = earlier.slice(-6).map(({ message, reply, files }) => { const a = filesOf(files); return { message, reply, ...(a.length ? { attached: a } : {}) }; });
+  const toRead = [...new Set([...recent.flatMap((t) => t.attached ?? []), ...attached].map((f) => f.file))];
   // The exercise he is answering: the last one set, however long ago, with the card committed then.
   const open = earlier.flatMap((t) => { const e = Exercise.safeParse(t.exercise); return e.success ? [e.data] : []; }).at(-1);
   const reading = focus.item ? findItem(lib, focus.item).meta.title : undefined;
@@ -139,6 +149,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
     prompt: "tutor",
     cwd: lib.root,
     web: true,
+    ...(toRead.length ? { files: toRead } : {}),
     onProgress: onProgress && ((p) => {
       if ("searching" in p) return onProgress(p);
       if (!p.partial) return (last = 0), onProgress({ reply: "" });
@@ -148,7 +159,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], onPro
       if (reply) (last = Date.now()), onProgress({ reply });
     }),
     schema: TutorOutput,
-    input: { message: m, earlier: recent, ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
+    input: { message: m, ...(attached.length ? { attached } : {}), earlier: recent, ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
     check: (d, seen) => {
       for (const c of d.citations) {
         if (isWebUrl(c.passage)) {

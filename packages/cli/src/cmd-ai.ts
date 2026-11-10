@@ -1,5 +1,5 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, listChats, readChat, saveChat, deleteChat, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, listChats, readChat, saveChat, deleteChat, attachToChat, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { int, need, readStdin, str, strs } from "./util.ts";
@@ -107,8 +107,8 @@ export const aiCommands: Record<string, Command> = {
   },
 
   tutor: {
-    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply, exercise?}] (a turn that set an exercise carries it, so feedback judges against its card), --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching} when a web search starts or ends)',
-    options: { item: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" }, stream: { type: "string" } },
+    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--files <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply, exercise?, files?}] (a turn that set an exercise carries it, so feedback judges against its card), --files is what he attached to this message, [{name, path}] as `ore chat --attach` returned them (D189), --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching} when a web search starts or ends)',
+    options: { item: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" }, files: { type: "string" }, stream: { type: "string" } },
     async run(words, f) {
       const lib = openLibrary();
       let earlier: TutorTurn[] = [];
@@ -119,17 +119,26 @@ export const aiCommands: Record<string, Command> = {
       // lines on stderr, which the app shows on the turn with that id (claude only).
       const stream = str(f.stream);
       const onProgress = stream ? (p: TutorProgress) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
-      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, item: str(f.item), sources: strs(f.source), skills: strs(f.skill), onProgress });
+      let files: { name: string; path: string }[] = [];
+      if (str(f.files)) {
+        try { files = JSON.parse(str(f.files)!); } catch { throw new Error("--files must be JSON: [{name, path}]"); }
+      }
+      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, files, item: str(f.item), sources: strs(f.source), skills: strs(f.skill), onProgress });
       const text = [withSteps(r), ...(r.exercise?.cases ?? []).map((c, i) => `  ${"AB"[i]}: ${c}`), ...r.marks.map((m) => `  ${m.covered ? "got" : "missed"}: ${m.point}${m.quote ? ` (“${m.quote}”)` : ""}`), ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
       return { data: r, text };
     },
   },
 
   chat: {
-    usage: "[<id> [--set [--keep-time] | --delete]]   The tutor's saved chats (D172), chats/<id>.json: list them (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back)",
-    options: { set: { type: "boolean" }, "keep-time": { type: "boolean" }, delete: { type: "boolean" } },
+    usage: "[<id> [--set [--keep-time] | --delete]] | --attach <file> | --attach - --name <name>   The tutor's saved chats (D172), chats/<id>.json: list them (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back). --attach copies a file for a message into chats/files/ (an image, a PDF or a text file, 20 MB at most; --attach -: its bytes in base64 on stdin, as pasted) and prints {name, path, kind} (D189)",
+    options: { set: { type: "boolean" }, "keep-time": { type: "boolean" }, delete: { type: "boolean" }, attach: { type: "string" }, name: { type: "string" } },
     async run([id], f) {
       const lib = openLibrary();
+      if (str(f.attach)) {
+        const from = str(f.attach)!;
+        const c = await attachToChat(lib, from === "-" ? { name: need(str(f.name), "--name"), data: Buffer.from(await readStdin(), "base64") } : from);
+        return { data: { ...c, root: lib.root }, text: `Attached ${c.name} as ${c.path}` };
+      }
       if (f.set) {
         const json = await readStdin();
         const given = (() => { try { return (JSON.parse(json) as { id?: unknown }).id; } catch { return undefined; } })();
@@ -143,7 +152,7 @@ export const aiCommands: Record<string, Command> = {
       }
       if (id) {
         const c = readChat(lib, id);
-        return { data: c, text: [c.title, ...c.turns.map((t) => `\n> ${t.message}\n${typeof t.reply === "string" ? t.reply : ""}`)].join("\n") };
+        return { data: { ...c, root: lib.root }, text: [c.title, ...c.turns.map((t) => `\n> ${t.message}\n${typeof t.reply === "string" ? t.reply : ""}`)].join("\n") };
       }
       const rows = listChats(lib);
       return { data: rows, text: rows.map((r) => `${r.id}  ${r.updated.slice(0, 16).replace("T", " ")}  ${r.title}`).join("\n") || "No chats yet." };

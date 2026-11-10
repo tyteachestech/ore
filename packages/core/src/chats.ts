@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { visible, writeAtomic } from "./fsutil.ts";
 import { nowIso } from "./ids.ts";
@@ -87,4 +87,44 @@ export async function deleteChat(lib: Library, id: string): Promise<Chat> {
     rmSync(file(lib, id));
     return c;
   });
+}
+
+// D189: a file he attaches to a message (an image, a PDF, a text file) is copied into chats/files/, named by
+// its content, so the same file attached twice is kept once and a saved chat can show it again. It is for
+// the chat only: it is not a source, is never indexed, and learning from it for good means adding it (⌘N).
+const FILE_KINDS: Record<string, "image" | "pdf" | "text"> = {
+  ".png": "image", ".jpg": "image", ".jpeg": "image", ".gif": "image", ".webp": "image",
+  ".pdf": "pdf",
+  ".txt": "text", ".md": "text", ".csv": "text", ".json": "text", ".py": "text", ".js": "text", ".ts": "text", ".tsx": "text", ".html": "text", ".css": "text", ".sql": "text", ".sh": "text", ".yaml": "text", ".yml": "text", ".tex": "text", ".ipynb": "text",
+};
+const FILE_MAX = 20 * 1024 * 1024;
+export type ChatFile = { name: string; path: string; kind: "image" | "pdf" | "text" };
+
+/** Copies a file into chats/files/ and returns its name, its path from the library's root and its kind.
+ *  `file` is a path, or a pasted one's name and bytes. Refused with the next step when the tutor can't read it. */
+export async function attachToChat(lib: Library, file: string | { name: string; data: Uint8Array }): Promise<ChatFile> {
+  const name = (typeof file === "string" ? basename(file) : basename(file.name)).trim() || "file";
+  if (typeof file === "string" && !(existsSync(file) && statSync(file).isFile())) throw new Error(`no file at ${file}`);
+  const ext = extname(name).toLowerCase();
+  const kind = FILE_KINDS[ext];
+  if (!kind) throw new Error(`the tutor can't read ${ext ? `a ${ext} file` : "that file"}: attach an image, a PDF or a text file, or add it as a source (⌘N)`);
+  const size = typeof file === "string" ? statSync(file).size : file.data.length;
+  if (!size) throw new Error(`${name} is empty`);
+  if (size > FILE_MAX) throw new Error(`${name} is over 20 MB: add it as a source (⌘N) and @ it instead`);
+  const data = typeof file === "string" ? readFileSync(file) : file.data;
+  return withLock(paths.lock(lib), () => {
+    const dir = join(paths.chats(lib), "files");
+    mkdirSync(dir, { recursive: true });
+    const to = join(dir, `${new Bun.CryptoHasher("sha256").update(data).digest("hex").slice(0, 16)}${ext}`);
+    if (!existsSync(to)) typeof file === "string" ? copyFileSync(file, to) : writeFileSync(to, data);
+    return { name, path: relative(lib.root, to).split(sep).join("/"), kind };
+  });
+}
+
+/** The absolute path of an attached file, given as `attachToChat` returned it; only a file in chats/files/. */
+export function chatFilePath(lib: Library, path: string): string {
+  const dir = join(paths.chats(lib), "files");
+  const abs = resolve(lib.root, path);
+  if (!abs.startsWith(dir + sep) || !existsSync(abs)) throw new Error(`no attached file "${path}"`);
+  return abs;
 }
