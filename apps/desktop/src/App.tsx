@@ -42,6 +42,7 @@ import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChip, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
 import { errorText, load, save } from "./util";
+import { passageText } from "./text";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
 
@@ -1075,7 +1076,7 @@ export function App() {
     ore<QuestionView[]>("questions", opt("skill", skill!)).then((qs) => {
       if (!live) return;
       const m = new Map<string, string[]>();
-      for (const q of qs) if (q.status === "open") for (const x of q.matches) m.set(x.item, [...(m.get(x.item) ?? []), q.note?.trim() || q.exact.replace(/\s+/g, " ").trim()]);
+      for (const q of qs) if (q.status === "open") for (const x of q.matches) m.set(x.item, [...(m.get(x.item) ?? []), q.note?.trim() || passageText(q.exact)]);
       setMayAnswer(m);
     }, () => live && setMayAnswer(new Map()));
     return () => {

@@ -20,6 +20,7 @@ import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
 import { errorText, load, save, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { Trap } from "./Trap";
+import { passageText } from "./text";
 
 type Props = {
   skill: Skill;
@@ -744,7 +745,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
         <Hint text="Open this passage">
           <button className="question-quote try-quote" data-find="" onClick={onPassage}>
             {!history && t.note && <span className="note">{t.note}</span>}
-            <span className="exact">“{t.exact.replace(/\s+/g, " ").trim()}”</span>
+            <span className="exact">“{passageText(t.exact)}”</span>
             <span className="from">{t.item_title}</span>
           </button>
         </Hint>
@@ -847,7 +848,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   const [adding, setAdding] = useState<string[]>([]);
   const [answering, setAnswering] = useState(false);
   const done = q.status === "done";
-  const exact = q.exact.replace(/\s+/g, " ").trim();
+  const exact = passageText(q.exact);
   const own = typedQuestion(q);
   // Sources that may answer it and that he hasn't written from yet (D75).
   const credited = new Set(q.answers.map((c) => c.item));
