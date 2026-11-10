@@ -93,6 +93,7 @@ has to ask for something obvious, add a row here in the same PR.**
 | Hover-only controls | A ⋯ or + that shows only on hover gives focus to its row when its menu or field closes, since it can't hold focus itself (`hoverOnly` on `MoreButton`). Hiding the sidebar with focus in it (⇧⌘S) puts focus on the view's list, else the text or the page's first control (Tyler, 2026-11-08) | Finder, Linear |
 | Right-click by surface | Row, card, title or header: the same actions as its ⋯. Sidebar space and Home/All sources rows: New skill, New collection. A list's space and its card (Sources, Questions): that list's create action (Add source, Add a question). Home, Review, Settings, the reader's side panel outside rows: nothing. A new surface picks one of these and adds its row here | Finder, Notion |
 | Canvas tools (diagram) | The tool he picked stays after drawing, so the next shape needs no key; V or Esc goes back to Select, and the lock (Q, remembered) turns this off. Each tool shows its key against its icon (Tyler, 2026-11-10) | tldraw, Excalidraw with the lock on |
+| AI chat (tutor) | While a reply is written the send button is Stop (⌘. too): the words so far stay as the reply, none leaves "Stopped" with Try again, and a late answer is ignored. Every reply has Copy. The field stays typable while it writes | ChatGPT, Claude, Notion AI |
 
 ## Detail behind each rule
 

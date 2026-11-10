@@ -25,6 +25,7 @@ const DEFAULTS = [
   { id: "go-feed", label: "Go to Feed", group: "General", combo: "Meta+Digit3", global: true },
   { id: "mark-read", label: "Mark post read or unread", group: "Feed", combo: "KeyU" },
   { id: "tutor", label: "Tutor chat", group: "General", combo: "Meta+KeyJ", global: true },
+  { id: "tutor-stop", label: "Stop the tutor's reply", group: "General", combo: "Meta+Period", global: true },
   { id: "review", label: "Start review", group: "General", combo: "Meta+KeyR", global: true },
   { id: "quick-quiz", label: "Quick quiz, from any app", group: "General", combo: "Ctrl+Alt+KeyQ", global: true, system: true },
   { id: "undo", label: "Undo", group: "General", combo: "Meta+KeyZ" },
