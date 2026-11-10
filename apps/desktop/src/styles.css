@@ -1767,8 +1767,13 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 30px; height: 30px; padding: 0 6px; color: var(--muted);
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
 }
+/* A tool's key sits against its icon, on the icon's foot. */
+.draw-key { margin: 8px 0 0 -7px; font: inherit; font-size: 10px; line-height: 1; letter-spacing: 0; opacity: 0.6; }
 .draw-tool:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .draw-tool[aria-pressed="true"] { background: var(--paper); color: var(--ink, #141413); }
+/* The lock is on by default: the closed lock says so, and the bar keeps one filled button, the tool. */
+.draw-tool.quiet[aria-pressed="true"] { background: none; color: var(--text); }
+.draw-tool.quiet[aria-pressed="true"]:hover { background: var(--bg-hover); }
 .draw-tool:disabled { opacity: 0.35; }
 .draw-tool:focus-visible, .draw-seg:focus-visible, .draw-swatch:focus-visible { outline: 1px solid var(--paper); outline-offset: -1px; }
 .draw-tool.wide { padding: 0 8px; }

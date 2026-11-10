@@ -13,7 +13,7 @@ import { Hint } from "../Hint";
 import { is, label, useKeymap, type KeyId } from "../keys";
 import { WithMenu, type MenuAction } from "../Menu";
 import { ShortcutEditor } from "../Shortcuts";
-import type { Notify } from "../util";
+import { load, save, type Notify } from "../util";
 import { Trap } from "../Trap";
 import {
   absPoints, addChild, addMap, addMatrix, align, connect, tidy, bindTarget, bounds, boundsOf, byId, cellOf, centre, clone, DEFAULT_STYLE, distribute, duplicate, FILLS,
@@ -43,6 +43,7 @@ type Gesture =
   | { kind: "erase"; ids: Set<string> }
   | { kind: "pan"; start: [number, number]; view: View };
 
+const LOCK = "ore.diagram.lock";
 const TOOLS: { tool: Tool; key: KeyId; label: string; icon: ReactNode }[] = [
   { tool: "select", key: "d-select", label: "Select", icon: <CursorClick size={16} /> },
   { tool: "hand", key: "d-hand", label: "Hand", icon: <Hand size={16} /> },
@@ -111,7 +112,13 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const [files, setFiles] = useState<Files>(initialFiles);
   const [sel, setSelState] = useState<string[]>([]);
   const [tool, setTool] = useState<Tool>("select");
-  const [toolLock, setToolLock] = useState(false);
+  // On unless he turned it off: a tool he picked stays until he picks another (V or Esc for Select).
+  const [toolLock, setToolLockState] = useState(() => load(LOCK) !== "0");
+  const setToolLock = (f: (x: boolean) => boolean) => setToolLockState((x) => {
+    const to = f(x);
+    save(LOCK, to ? "1" : "0");
+    return to;
+  });
   const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
   const [view, setView] = useState<View>({ x: 0, y: 0, zoom: 1 });
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -1195,6 +1202,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     if (!closed) pts.pop();
     if (pts.length < 2) {
       setEls(els.filter((x) => x.id !== id));
+      setSel([]);
       hist.current.past.pop();
       return toolDone();
     }
@@ -1633,11 +1641,12 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
           <Hint key={t.tool} text={t.label} keys={t.key}>
             <button className="draw-tool" aria-pressed={tool === t.tool} aria-label={t.label} onClick={() => { setTool(t.tool); if (t.tool !== "select") setSel([]); root.current?.focus(); }}>
               {t.icon}
+              <span className="draw-key" aria-hidden>{label(keys[t.key])}</span>
             </button>
           </Hint>
         ))}
         <Hint text={toolLock ? "Tool stays after drawing" : "Keep the tool after drawing"} keys="d-lock">
-          <button className="draw-tool" aria-pressed={toolLock} aria-label="Keep the tool" onClick={() => setToolLock((x) => !x)}>
+          <button className="draw-tool quiet" aria-pressed={toolLock} aria-label="Keep the tool" onClick={() => setToolLock((x) => !x)}>
             {toolLock ? <LockSimple size={16} /> : <LockSimpleOpen size={16} />}
           </button>
         </Hint>
