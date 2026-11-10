@@ -2014,6 +2014,48 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await until("and opens", async () => (await page.locator(".note-editor .toggle.closed").count()) === 0);
 });
 
+journey("note / menu at the bottom of a long note: it opens above the line, inside the window; in a short window its list scrolls (Notion)", async (page) => {
+  const menu = page.locator(".note-menu");
+  const inside = async (what: string) => {
+    const b = (await menu.boundingBox())!;
+    const v = page.viewportSize()!;
+    if (b.y < 0 || b.x < 0 || b.y + b.height > v.height + 0.5 || b.x + b.width > v.width + 0.5) throw new Error(`${what}: the menu runs out of the ${v.width}×${v.height} window at ${JSON.stringify(b)}`);
+  };
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openSource(page, AGENTS);
+  await page.locator(".note-editor [contenteditable=true]").first().click();
+  await page.keyboard.press("ControlOrMeta+End");
+  for (let i = 0; i < 40; i++) await page.keyboard.press("Enter");
+  await page.keyboard.type("/");
+  await menu.waitFor();
+  await inside("at the bottom of the note");
+  const caret = await page.evaluate(() => getSelection()!.getRangeAt(0).getBoundingClientRect().top);
+  if ((await menu.boundingBox())!.y > caret) throw new Error("with no room under the line the menu should open above it");
+  // Narrowing the list keeps it inside and by the line; a row is still a click away.
+  await page.keyboard.type("quo");
+  await inside("narrowed to Quote");
+  await menu.locator(".note-menu-row", { hasText: "Quote" }).click();
+  await page.locator(".note-editor blockquote").last().waitFor();
+  // A short window: the full list is taller than either side, so it is capped and scrolls; ↑ from the
+  // first row goes to the last, which scrolls into view.
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await page.keyboard.type("/");
+  await menu.waitFor();
+  await inside("in a 500px window");
+  if (!(await menu.evaluate((el) => el.scrollHeight > el.clientHeight))) throw new Error("in a short window the list should scroll inside the menu");
+  await page.keyboard.press("ArrowUp");
+  const on = page.locator(".note-menu-row.on");
+  const [m, r] = [(await menu.boundingBox())!, (await on.boundingBox())!];
+  if (r.y < m.y || r.y + r.height > m.y + m.height + 0.5) throw new Error(`the highlighted row (${await on.innerText()}) is scrolled out of the menu`);
+  // The window shrinks while it is open: still inside.
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); // resize fires on the next frame
+  await inside("after the window shrinks");
+  await page.keyboard.press("Escape");
+});
+
 journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
   const cells = () => page.locator(".note-editor .note-table tr").evaluateAll((rs) => rs.map((r) => [...r.children].map((c) => c.textContent ?? "")));
   await openSource(page, AGENTS);

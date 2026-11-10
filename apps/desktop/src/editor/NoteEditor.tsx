@@ -35,6 +35,7 @@ import { SelectionBar, type Sel } from "./SelectionBar";
 import { WithMenu, type MenuAction } from "../Menu";
 import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock, topGaps, turnAtCaret, type Kind } from "./blockops";
 import { is } from "../keys";
+import { menuPlace, type Side } from "../popup-place";
 
 /** What a link can point at (D39): a source, or a skill (its note, D41). */
 export type LinkTarget = { kind: "item" | "skill"; id: string; title: string };
@@ -132,7 +133,7 @@ const DiagramEditor = lazy(() => import("../Diagram"));
 /** Fired after a diagram is saved, so its preview redraws; detail is `<note dir>/<name>`. */
 const SAVED = "ore:diagram-saved";
 
-type Menu = { kind: "slash" | "link" | "date"; query: string; from: number; to: number; x: number; y: number };
+type Menu = { kind: "slash" | "link" | "date"; query: string; from: number; to: number };
 /** `names`: what Notion also takes after `/` for it (`/h1`, `/#`, `/hr`). */
 type Row = { label: string; sub?: string; names?: string[]; run: () => void };
 
@@ -509,6 +510,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     return all.filter((r) => slashMatch(r.label, r.names ?? [], q));
   };
   const rows = rowsFor(menu);
+  const menuBox = useRef<HTMLDivElement>(null);
+  useMenuPlace(menuBox, view, menu, rows.length, index);
   /** Selects the row under a pointer that moved. A menu that opens under a resting pointer keeps
    *  its first row, as in Notion and Raycast; mouseenter would fire there and select another. */
   const hover = (i: number) => {
@@ -696,7 +699,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {PHONE && <KeyboardBar view={view} targets={p.targets} />}
       {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => showSel(null)} askLink={askLink} />}
       {menu && (menu.kind !== "date" || rows.length > 0) && (
-        <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
+        <div ref={menuBox} className="note-menu" role="listbox" onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
             rows.map((r, i) => (
               <div key={r.label + i} role="option" aria-selected={i === index} className={`note-menu-row${i === index ? " on" : ""}`} onMouseMove={() => hover(i)} onClick={r.run}>
@@ -822,8 +825,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
     const { kind, query, typed } = t;
     const from = $from.pos - typed;
     if (from === live.current.dismissed.at) return show(null);
-    const c = view.coordsAtPos(from);
-    show({ kind, query, from, to: $from.pos, x: c.left, y: c.bottom + 4 });
+    show({ kind, query, from, to: $from.pos });
   };
   return $prose(
     () =>
@@ -1187,6 +1189,45 @@ const toggleView = $view(toggleSchema.node, () => (node) => {
 /** Notion's equation field, under the equation it edits: the TeX, drawn live as he types (each change is
  *  an editor step, grouped by the editor's history). ↵ or a click away closes it (⇧↵ breaks the line
  *  in a block equation); one left empty is taken out. */
+/** Keeps the / and [[ menu inside the window (menuPlace, Notion): placed by the caret when it opens and
+ *  as typing narrows the list, again when the page scrolls or the window resizes, with the highlighted
+ *  row scrolled into view in a list capped to the room there is. On the phone CSS docks it instead. */
+function useMenuPlace(box: { current: HTMLDivElement | null }, view: () => EditorView | undefined, menu: Menu | null, count: number, index: number) {
+  const side = useRef<Side | undefined>(undefined);
+  const opened = menu && `${menu.kind} ${menu.from}`;
+  useLayoutEffect(() => {
+    side.current = undefined;
+  }, [opened]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    const v = view();
+    if (!menu || !el || !v || PHONE) return;
+    const place = (e?: Event) => {
+      if (e?.target === el) return; // its own list scrolling
+      const c = v.coordsAtPos(Math.min(menu.from, v.state.doc.content.size));
+      el.style.left = "0px"; // measured unsqueezed by the window's right edge
+      const at = menuPlace(c, { width: el.offsetWidth, height: el.scrollHeight + el.offsetHeight - el.clientHeight }, { width: innerWidth, height: innerHeight }, side.current);
+      side.current = at.side;
+      Object.assign(el.style, { left: `${at.left}px`, top: `${at.top}px`, maxHeight: `${at.maxHeight}px` });
+    };
+    place();
+    addEventListener("resize", place);
+    document.addEventListener("scroll", place, { capture: true, passive: true });
+    return () => {
+      removeEventListener("resize", place);
+      document.removeEventListener("scroll", place, { capture: true });
+    };
+  }, [menu, count]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    const row = el?.querySelector<HTMLElement>(".note-menu-row.on");
+    if (!el || !row) return;
+    const pad = 4; // the menu's padding, kept round the first and last rows
+    if (row.offsetTop - pad < el.scrollTop) el.scrollTop = row.offsetTop - pad;
+    else if (row.offsetTop + row.offsetHeight + pad > el.scrollTop + el.clientHeight) el.scrollTop = row.offsetTop + row.offsetHeight + pad - el.clientHeight;
+  }, [index, count, menu]);
+}
+
 function MathField({ at, view, onClose }: { at: { pos: number; x: number; y: number; w: number; h: number }; view: () => EditorView | undefined; onClose: () => void }) {
   const node = () => {
     const v = view();
