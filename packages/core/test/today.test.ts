@@ -216,6 +216,20 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(q.slice(1).map((e) => e.id)).toEqual(mid.slice(0, -1).map((e) => e.id));
   });
 
+  test("a review keeps the AI's stamp whatever the model is called: one with a space, or none (D176)", async () => {
+    const { lib, cards } = await library(2);
+    const review = async (card: string, by: string) => {
+      const p = Bun.spawn(["bun", join(import.meta.dir, "../../cli/src/ore.ts"), "review", card, "--rating=3", "--confidence=2", "--ai-rating=3", `--ai-by=${by}`, "--json"], { env: { ...process.env, ORE_LIBRARY: lib.root }, stdout: "pipe", stderr: "pipe" });
+      if ((await p.exited) !== 0) throw new Error(await new Response(p.stderr).text());
+    };
+    await review(cards[0]!.meta.id, "claude Sonnet 5 grade@4");
+    await review(cards[1]!.meta.id, "codex  grade@4");
+    expect(readReviews(lib).map((r) => r.ai)).toEqual([
+      { vendor: "claude", model: "Sonnet 5", prompt_version: "grade@4" },
+      { vendor: "codex", model: "", prompt_version: "grade@4" },
+    ]);
+  });
+
   // Review's Delete on a New card is `ore card retire`; its Undo is `ore card restore --state draft` (D144: answer approves, delete drops).
   test("a retired draft leaves the queue and can't be rated; restored as a draft it is new again, as live it is due", async () => {
     const { lib, cards } = await library(2);

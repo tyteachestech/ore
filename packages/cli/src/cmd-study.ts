@@ -144,10 +144,11 @@ export const studyCommands: Record<string, Command> = {
       if (confidence < 1 || confidence > 3) throw new Error("--confidence must be 1-3");
       if (aiRating !== undefined && (aiRating < 1 || aiRating > 4)) throw new Error("--ai-rating must be 1-4");
       // The stamp `ore grade` printed with its rating: vendor, model and prompt version, in that order.
+      // The model is whatever sits between the two (a name with a space, or none): a rating is never lost to its stamp.
       const by = str(f["ai-by"])?.trim().split(/\s+/);
-      if (by && by.length !== 3) throw new Error('--ai-by takes "vendor model prompt@n", as `ore grade` prints them');
+      if (by && by.length < 2) throw new Error('--ai-by takes "vendor model prompt@n", as `ore grade` prints them');
       const r = await recordReview(lib, need(ref, "<card>"), {
-        rating: rating as 1 | 2 | 3 | 4, confidence, answer: str(f.answer), ai_rating: aiRating, ai: by && { vendor: by[0]!, model: by[1]!, prompt_version: by[2]! },
+        rating: rating as 1 | 2 | 3 | 4, confidence, answer: str(f.answer), ai_rating: aiRating, ai: by && { vendor: by[0]!, model: by.slice(1, -1).join(" "), prompt_version: by.at(-1)! },
         elapsed_ms: int(f["elapsed-ms"], "elapsed-ms"), finishing: Boolean(f.finishing), session: str(f.session), variant: str(f.variant), in_head: Boolean(f["in-head"]),
       });
       // A card that just became remixable, or used up its variants, gets new ones written ahead.
