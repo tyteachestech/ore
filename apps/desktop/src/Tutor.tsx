@@ -1,7 +1,7 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
-import { ArrowDown, ArrowUp, CaretDown, Check, Circle, Plus, SidebarRight, Square, Trash, X } from "./icons";
+import { ArrowDown, ArrowUp, CaretDown, Check, Circle, Copy, Plus, SidebarRight, Square, Stop, Trash, X } from "./icons";
 import { chatGroups } from "./chat-groups";
 import { WithMenu } from "./Menu";
 import { citeRuns, siteName } from "./cite-pills";
@@ -14,7 +14,8 @@ import { Evidence } from "./Evidence";
 import { Grow } from "./Grow";
 import { escTaken, Hint, onlyTabbed } from "./Hint";
 import { useSideWidth } from "./Notes";
-import { ore, oreWith, opt } from "./ore";
+import { cancelOre, ore, oreJob, oreWith, opt } from "./ore";
+import { is } from "./keys";
 import { errorText, type Notify } from "./util";
 import { Working } from "./Working";
 import { mentionMatches, type Mention } from "./mentions";
@@ -50,6 +51,8 @@ export type TutorTurn = {
   steps?: string[];
   /** Feedback on his answer to an exercise: its card's points, marked (D162); empty for any other reply. */
   marks?: Mark[];
+  /** He stopped this reply (D187): what was written by then is its reply; with nothing written it says so. */
+  stopped?: boolean;
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
 };
@@ -59,6 +62,8 @@ type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: 
 export type TutorDraft = { input: string; mentions: Mention[]; cases?: { turn: TutorTurn["id"]; said: string[] } };
 export type TutorChat = ReturnType<typeof useTutorChat>;
 
+/** A citation marker cut off mid-stream, or one whose source list never came. */
+const CUT_MARKS = /\s?\[\d*$|\s?\[\d+\](?!\()/g;
 let turnSeq = 0;
 const turnId = () => `${Date.now().toString(36)}-${++turnSeq}`;
 
@@ -137,15 +142,17 @@ export function useTutorChat(notify: Notify) {
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
-      if (p.stream === t.id) patch(chat, t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
+      if (p.stream === t.id && !halted.current.has(t.id)) patch(chat, t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
     }).catch(() => () => {});
     try {
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
-      const r = await ore<Reply & { title?: string }>("tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
+      const r = await oreJob<Reply & { title?: string }>(t.id, null, "tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("stream", t.id));
       flying.current.delete(t.id);
+      if (halted.current.delete(t.id)) return;
       patch(chat, t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], marks: r.marks ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined }, first ? r.title?.trim() || undefined : undefined);
     } catch (e) {
       flying.current.delete(t.id);
+      if (halted.current.delete(t.id)) return;
       patch(chat, t.id, { error: errorText(e, "answer that"), partial: undefined, searching: undefined });
     } finally {
       stop();
@@ -160,6 +167,18 @@ export function useTutorChat(notify: Notify) {
     update((ts) => [...ts, t]);
     save();
     void run(t, before);
+  };
+  /** Stops the reply being written (ChatGPT's and Claude's Stop): the words so far stay as the reply, with
+   *  none it says Stopped and offers Try again. The turn settles now; the cancelled run's end is ignored. */
+  const halted = useRef(new Set<string>());
+  const stop = () => {
+    const chat = metaNow.current?.id;
+    const t = now.current.find((x) => x.reply === undefined && !x.error);
+    if (!chat || !t || !flying.current.has(t.id)) return;
+    halted.current.add(t.id);
+    void cancelOre(t.id);
+    const said = t.partial?.replace(CUT_MARKS, "").trim();
+    patch(chat, t.id, { ...(said ? { reply: said, citations: [], steps: [], marks: [] } : { error: "Stopped." }), stopped: true, partial: undefined, searching: undefined });
   };
   const retry = (id: string) => {
     const i = now.current.findIndex((t) => t.id === id);
@@ -254,7 +273,7 @@ export function useTutorChat(notify: Notify) {
   };
   /** A web page a reply cites, in his browser. */
   const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
-  return { turns, draft, setDraft, carry, drop, ask, retry, keep, quote, fresh, open, remove, current: meta, openLink };
+  return { turns, draft, setDraft, carry, drop, ask, stop, retry, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -397,10 +416,23 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
   const waited = useRef(pending);
   useEffect(() => {
     const t = turns.find((x) => x.id === waited.current);
-    if (t && t.id !== pending) setLanded({ id: t.id, failed: !!t.error });
+    if (t && t.id !== pending && !t.stopped) setLanded({ id: t.id, failed: !!t.error });
     waited.current = pending;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending]);
+  // ⌘. stops the reply, from anywhere in the app while the chat is open (the Mac's own cancel key).
+  useEffect(() => {
+    if (!busy) return;
+    const key = (e: KeyboardEvent) => { if (is(e, "tutor-stop")) { e.preventDefault(); chat.stop(); } };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy]);
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (t: TutorTurn) => {
+    const text = [t.reply, ...(t.steps ?? []).map((x, i) => `${i + 1}. ${x}`)].join("\n\n").replace(CUT_MARKS, "");
+    void navigator.clipboard.writeText(text).then(() => { setCopied(t.id); setTimeout(() => setCopied((c) => (c === t.id ? null : c)), 1500); }, (e) => chat.say(errorText(e, "copy that"), "error"));
+  };
   const chips = (context || !!carry.length) && (
     <div className="tutor-chips">
       {context && (
@@ -488,22 +520,29 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
             <div className={`ask-ai${i === turns.length - 1 ? " newest" : ""}`}>
               <div className={`ask-text${t.reply === undefined && !t.error ? " typing" : ""}`}>
                 {t.error ? (
-                  <p className="err">
+                  <p className={t.stopped ? "tutor-stopped" : "err"}>
                     {t.error}{" "}
                     <button className="link" onClick={() => chat.retry(t.id)}>Try again</button>
                   </p>
                 ) : t.reply === undefined && t.partial ? (
                   // Its [n] markers wait for the citations, which come with the whole reply.
-                  <Answer text={t.partial.replace(/\s?\[\d*$|\s?\[\d+\](?!\()/g, "")} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
+                  <Answer text={t.partial.replace(CUT_MARKS, "")} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
                 ) : t.reply === undefined ? (
                   // What it is doing, as far as the stream says (D146): his sources come first (D137), a web search
                   // is reported as it starts and ends, and after one the reply is written from what it found.
                   <Working stage={t.searching ? "search" : t.searched ? "write" : "read"} label={t.searching ? "Searching the web…" : t.searched ? "Writing…" : "Reading your sources…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />
                 ) : (
                   <>
+                    {/* Copy (ChatGPT, Claude, Notion AI): beside the bubble, shown for the newest reply and on hover. */}
+                    <Hint text={copied === t.id ? "Copied" : "Copy"} side="top">
+                      <button className="icon-btn tutor-copy" aria-label="Copy the reply" onClick={() => copy(t)}>
+                        {copied === t.id ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                      </button>
+                    </Hint>
                     <div data-reply={t.id}>
                       <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />
                     </div>
+                    {t.stopped && <p className="tutor-general">Stopped</p>}
                     {t.exercise?.cases?.length === 2 && (
                       <Cases cases={t.exercise.cases} open={last} said={chat.draft.cases?.turn === t.id ? chat.draft.cases.said : NO_CASES} onSaid={(said) => setDraft((d) => ({ ...d, cases: { turn: t.id, said } }))} onSend={(text) => send(text)} />
                     )}
@@ -649,9 +688,18 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
               }
             }}
           />
-          <button className="ask-send" aria-label="Send" disabled={!input.trim() || busy} onClick={() => send(input, true)}>
-            <ArrowUp size={14} aria-hidden="true" />
-          </button>
+          {busy ? (
+            // While a reply is written the send button is Stop (ChatGPT, Claude, Notion AI).
+            <Hint text="Stop" keys="tutor-stop" side="top">
+              <button className="ask-send stop" aria-label="Stop the reply" onClick={() => { chat.stop(); field.current?.focus(); }}>
+                <Stop size={14} aria-hidden="true" />
+              </button>
+            </Hint>
+          ) : (
+            <button className="ask-send" aria-label="Send" disabled={!input.trim()} onClick={() => send(input, true)}>
+              <ArrowUp size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
     </aside>

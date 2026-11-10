@@ -738,6 +738,64 @@ journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ repla
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor stop and copy: the send button stops a reply (⌘. too), words written by then stay, none says Stopped with Try again, a late answer is ignored; Copy copies a reply (D187)", async (page) => {
+  let id = "";
+  const held: (() => void)[] = [];
+  let cancelled = 0;
+  await page.route(/\/cancel$/, (route) => (cancelled++, route.fallback()));
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    const args = JSON.parse(body).args as string[];
+    id = (args.find((x) => x.startsWith("--stream=")) ?? "").slice(9);
+    if (args[1] !== "Answer me") await new Promise<void>((ok) => held.push(ok));
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: args[1] === "Answer me" ? "A whole reply." : "Too late", citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) });
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    const stop = tutor.getByRole("button", { name: "Stop the reply" });
+    // Nothing written yet: Stopped, with Try again.
+    await field.fill("Stop me early");
+    await page.keyboard.press("Enter");
+    await stop.click();
+    await tutor.getByText("Stopped.").waitFor();
+    await tutor.getByRole("button", { name: "Try again" }).waitFor();
+    await tutor.getByRole("button", { name: "Send" }).waitFor();
+    await until("the run was cancelled", async () => cancelled === 1);
+    held.shift()!();
+    await page.waitForTimeout(300);
+    if (await tutor.getByText("Too late").count()) throw new Error("a stopped reply landed anyway");
+    // Words already written stay as the reply; ⌘. stops from the keyboard.
+    id = "";
+    await field.fill("Stop me late");
+    await page.keyboard.press("Enter");
+    await until("the call carries its stream id", async () => !!id);
+    await page.evaluate(([p]) => (window as any).__emit("ore-progress", p), [{ stream: id, reply: "Half a thought [1" }] as const);
+    await tutor.getByText("Half a thought", { exact: true }).waitFor();
+    await page.keyboard.press("Meta+.");
+    await tutor.getByText("Stopped", { exact: true }).waitFor();
+    await tutor.getByText("Half a thought", { exact: true }).waitFor();
+    held.shift()!();
+    await page.waitForTimeout(300);
+    if (await tutor.getByText("Too late").count()) throw new Error("a stopped reply was replaced by the late one");
+    // Copy puts a reply on the clipboard.
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await field.fill("Answer me");
+    await page.keyboard.press("Enter");
+    await tutor.getByText("A whole reply.").waitFor();
+    await tutor.getByRole("button", { name: "Copy the reply" }).last().click();
+    await until("the reply is on the clipboard", async () => (await page.evaluate(() => navigator.clipboard.readText())) === "A whole reply.");
+  } finally {
+    held.forEach((ok) => ok());
+    await page.unroute(/\/ore$/);
+    await page.unroute(/\/cancel$/);
+  }
+});
+
 journey("tutor pending: closing mid-reply asks once; a new chat keeps its own reply, the old one lands in the old chat, which the list of chats opens with it", async (page) => {
   const asked: string[] = [];
   let release: (() => void) | undefined;
