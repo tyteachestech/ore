@@ -1045,9 +1045,11 @@ function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill:
         <header className="skill-recall-head">
           <SkillChip skill={skill} />
           <span className="quiet">{goal ? "Your goal, from memory" : "Warm up from memory"}</span>
-          <button className="skill-recall-close" aria-label="Close" onClick={onClose}>
-            <X size={14} weight="bold" aria-hidden="true" />
-          </button>
+          <Hint text={<>Close <kbd>Esc</kbd></>}>
+            <button className="skill-recall-close" aria-label="Close" onClick={onClose}>
+              <X size={14} weight="bold" aria-hidden="true" />
+            </button>
+          </Hint>
         </header>
         <h2 id="skill-recall-title">{goal ?? `What do you know about ${skill.name}, across what you’ve read?`}</h2>
         <Grow ref={field} className="field" value={text} onChange={(e) => setText(e.target.value)} readOnly={saving} spellCheck />

@@ -41,8 +41,9 @@ jobs:
         with:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
-      # Headless runs use the headless shell only, so the full Chrome download is skipped.
-      - run: bunx playwright install --with-deps --only-shell chromium
+      # Headless runs use the headless shell only, so the full Chrome download is skipped. WebKit is for the
+      # journeys about what only the Mac app's engine does (its native undo in a text field).
+      - run: bunx playwright install --with-deps --only-shell chromium webkit
       - run: bun run e2e
         env:
           ORE_E2E_SHARD: ${{ matrix.shard }}/4

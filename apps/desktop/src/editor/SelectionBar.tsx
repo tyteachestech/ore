@@ -78,8 +78,24 @@ export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0 }
   );
 }
 
+/** Closing a popover off the bar: Esc puts focus back in the note, on the words he selected (Notion), since the bar's
+ *  buttons never took it and Radix's trigger is no place to go; a pick puts it there itself. A press outside leaves
+ *  it where it landed, so a click or drag he began elsewhere is his. */
+function useToNote(v: EditorView) {
+  const esc = useRef(false);
+  return {
+    onEscapeKeyDown: () => void (esc.current = true),
+    onCloseAutoFocus: (e: Event) => {
+      e.preventDefault();
+      if (esc.current) v.focus();
+      esc.current = false;
+    },
+  };
+}
+
 /** A web link on the selection: paste or type the address, Enter applies it, Esc cancels. */
 function WebLink({ v, sel, ask }: { v: EditorView; sel: Sel; ask: number }) {
+  const toNote = useToNote(v);
   const t = v.state.schema.marks.link!;
   const now = (() => {
     let href = "";
@@ -113,7 +129,7 @@ function WebLink({ v, sel, ask }: { v: EditorView; sel: Sel; ask: number }) {
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover sel-pop" side="bottom" align="start" sideOffset={6} collisionPadding={8} onCloseAutoFocus={(e) => e.preventDefault()}>
+        <Popover.Content className="popover sel-pop" side="bottom" align="start" sideOffset={6} collisionPadding={8} {...toNote}>
           <input
             className="menu-input"
             placeholder="Paste a link"
@@ -138,6 +154,7 @@ function WebLink({ v, sel, ask }: { v: EditorView; sel: Sel; ask: number }) {
 
 /** Links the selected words to a source or skill note (D39): the link keeps his words as its text. */
 function PageLink({ v, sel, targets }: { v: EditorView; sel: Sel; targets: LinkTarget[] }) {
+  const toNote = useToNote(v);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const hits = targets.filter((t) => t.title.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8);
@@ -157,7 +174,7 @@ function PageLink({ v, sel, targets }: { v: EditorView; sel: Sel; targets: LinkT
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover menu sel-pop" side="bottom" align="start" sideOffset={6} collisionPadding={8} onCloseAutoFocus={(e) => e.preventDefault()}>
+        <Popover.Content className="popover menu sel-pop" side="bottom" align="start" sideOffset={6} collisionPadding={8} {...toNote}>
           <Command label="Link to" loop shouldFilter={false}>
             <Command.Input className="menu-input" placeholder="Find a source or skill…" value={q} onValueChange={setQ} autoFocus />
             <Command.List>
@@ -178,6 +195,7 @@ function PageLink({ v, sel, targets }: { v: EditorView; sel: Sel; targets: LinkT
 
 /** Notion's colour menu: a text colour and a highlight, each with Default to take it off. */
 function Colors({ v, sel }: { v: EditorView; sel: Sel }) {
+  const toNote = useToNote(v);
   const { ore_text_color: text, ore_highlight: back } = v.state.schema.marks;
   const [open, setOpen] = useState(false);
   const set = (t: MarkType, color: Color | null) => {
@@ -211,7 +229,7 @@ function Colors({ v, sel }: { v: EditorView; sel: Sel }) {
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover sel-pop sel-colors" side="bottom" align="end" sideOffset={6} collisionPadding={8} onCloseAutoFocus={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()}>
+        <Popover.Content className="popover sel-pop sel-colors" side="bottom" align="end" sideOffset={6} collisionPadding={8} {...toNote} onMouseDown={(e) => e.preventDefault()}>
           <div className="sel-label">Text</div>
           {row(text!, "Text colour")}
           <div className="sel-label">Highlight</div>

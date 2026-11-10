@@ -3019,9 +3019,11 @@ function ReaderView(p: Props & { reload: () => void }) {
                   <div className="chapter-fb" role="status">
                     <div className="quiz-kicker">
                       {chapterFb.title}
-                      <button aria-label="Dismiss the feedback" onClick={() => setChapterFb(null)}>
-                        <X size={12} />
-                      </button>
+                      <Hint text="Dismiss">
+                        <button aria-label="Dismiss the feedback" onClick={() => setChapterFb(null)}>
+                          <X size={12} aria-hidden="true" />
+                        </button>
+                      </Hint>
                     </div>
                     {!chapterFb.feedback && !chapterFb.error && (
                       <p className="loading">

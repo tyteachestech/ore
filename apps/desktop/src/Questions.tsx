@@ -521,9 +521,11 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
           <span>
             Your selection goes with your answer: <q>{quote}</q>
           </span>
-          <button className="qp-x" aria-label="Don't use the selection" onClick={onClearQuote}>
-            <X size={12} aria-hidden="true" />
-          </button>
+          <Hint text="Don't use the selection">
+            <button className="qp-x" aria-label="Don't use the selection" onClick={onClearQuote}>
+              <X size={12} aria-hidden="true" />
+            </button>
+          </Hint>
         </div>
       )}
       {here.length > 0 && (
