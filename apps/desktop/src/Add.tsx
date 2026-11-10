@@ -307,7 +307,7 @@ export function DropOverlay({ drop }: { drop: Dropping | null }) {
   useEffect(() => {
     if (drop) return setShown({ drop, leaving: false });
     setShown((s) => s && { ...s, leaving: true });
-    const t = setTimeout(() => setShown(null), 140);
+    const t = setTimeout(() => setShown(null), 150); // --t-2, the veil's fade
     return () => clearTimeout(t);
   }, [drop]);
   if (!shown) return null;

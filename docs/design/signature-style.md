@@ -27,8 +27,11 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 ## Picked (2026-11-10, D184)
 - The squares that were left (Tyler's pick B of three on the real app): bars are rows of dots, Review's track has a round dot per exercise and a cart drawn in dots, and corners are soft (rows 8, controls 6, chips 4, floating things 12, a rounded skill badge). Not picked: dots with square corners (still two styles), full pills for the main button and chips (a generic app look). Mocks: `/mnt/project-files/house-style/squares-round-1/`.
 
+## Picked (2026-11-10, D185)
+- Motion is "Glide" (Tyler's pick B of three, felt on a clickable page): everyday moves 100/150/200/300ms on one ease-out with no bounce, the spring and 600ms kept for moments, dots lighting 16ms apart. Not picked: Crisp (no spring anywhere, celebrations barely there), Bounce (a spring on everything). Page: `/mnt/project-files/house-style/motion-round-1/index.html`.
+
 ## Open
-- Motion tokens (4 durations, 3 curves) and the first signature moment; a page showing every component.
+- The first signature moment; a page showing every component.
 - Redraw Hand, ThumbsDown, Paperclip, Compass.
 - A Rive trial; sound.
 - A mascot later; sound after the look.
