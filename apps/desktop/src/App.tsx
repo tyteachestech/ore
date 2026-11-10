@@ -247,9 +247,11 @@ export function App() {
   const [tutorDock, setTutorDock] = useState(() => load("ore.tutor.fit") === "dock");
   const tutorDocked = tutorOpen && tutorDock;
   const openItemRef = useRef<{ id: string; title: string } | undefined>(undefined);
+  const pageSkillRef = useRef<{ id: string; name: string } | undefined>(undefined);
   const tutorFrom = useRef<HTMLElement | null>(null);
   const openTutor = (message?: string) => {
-    if (message) tutor.ask({ message, ...(openItemRef.current ? { item: openItemRef.current.id, title: openItemRef.current.title } : {}) });
+    const scope = pageSkillRef.current;
+    if (message) tutor.ask({ message, ...(openItemRef.current ? { item: openItemRef.current.id, title: openItemRef.current.title } : {}) }, scope ? [{ kind: "skill", id: scope.id, name: scope.name }] : []);
     if (!tutorOpen) tutorFrom.current = document.activeElement as HTMLElement | null;
     setTutorOpen(true);
   };
@@ -936,6 +938,9 @@ export function App() {
    *  source, else the source's first skill, else All sources. */
   const openItem = openId ? (items ?? []).find((i) => i.id === openId) : undefined;
   openItemRef.current = openItem;
+  /** The skill whose page is the tutor's context (D191): none when it has no sources, which would leave it nothing to search. */
+  const pageSkill = onSkillPage && (items ?? []).some((i) => i.skills.includes(skill!)) ? skill : null;
+  pageSkillRef.current = pageSkill ? skills.find((s) => s.id === pageSkill) : undefined;
   const sideSkill = !openItem ? skill : skill && openItem.skills.includes(skill) ? skill : (openItem.skills.find((k) => skills.some((s) => s.id === k)) ?? null);
   /** The course the open source is a lesson of (D79). */
   const openCourse = openId ? (items ?? []).find((i) => i.id === openId)?.course?.id : undefined;
@@ -2284,7 +2289,7 @@ export function App() {
         </Boundary>
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
       </main>
-      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name, icon: k.icon, color: k.color }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
+      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name, icon: k.icon, color: k.color }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} skillPage={pageSkill} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
         // The note takes the room while he writes; the tutor comes back with what he sent (D128.6).
         // The exercise belongs to the source it was asked about: that one opens first if he has moved on.
         const done = (text: string | null) => {
