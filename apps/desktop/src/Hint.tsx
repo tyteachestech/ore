@@ -21,13 +21,13 @@ export const escTaken = (e: Event) => e.defaultPrevented && !hintEscapes.has(e);
 /** Hover hint for a control, Linear-style: what it does and its shortcut, read from the keymap so a
  *  rebinding shows at once. Every control whose action has a binding uses this (AGENTS.md, UI quality
  *  bar); test/hints.test.ts fails when a binding is neither hinted nor listed as having no control. */
-export function Hint({ text, keys, side = "bottom", children }: { text: ReactNode; keys?: KeyId | KeyId[]; side?: "top" | "bottom" | "left" | "right"; children: ReactElement }) {
+export function Hint({ text, keys, side = "bottom", off, children }: { text: ReactNode; keys?: KeyId | KeyId[]; side?: "top" | "bottom" | "left" | "right"; /** Shows nothing for now (what it says doesn't hold), keeping the trigger mounted. */ off?: boolean; children: ReactElement }) {
   const map = useKeymap();
   const combos = (Array.isArray(keys) ? keys : keys ? [keys] : []).map((k) => label(map[k])).filter(Boolean);
   // A row not on screen yet can't be hovered.
   if (useLite()) return children;
   return (
-    <Tooltip.Root>
+    <Tooltip.Root open={off ? false : undefined}>
       {/* Opens on hover, and on focus only when Tab moved it there: focus set by code (a field
           autofocused, a panel opening) must not drop a hint over the label beside it. */}
       <Tooltip.Trigger asChild onFocus={onlyTabbed}>

@@ -1205,7 +1205,8 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
         </>
       )}
       <div className="review-foot">
-        <Hint text={<>Cancel <kbd>Esc</kbd></>} side="top">
+        {/* While it saves, Esc waits (and so does Cancel), so the hint doesn't promise it. */}
+        <Hint text={<>Cancel <kbd>Esc</kbd></>} side="top" off={busy}>
           <button className="quiz-ghost" aria-disabled={busy || undefined} onClick={() => !busy && onCancel()}>
             Cancel
           </button>
