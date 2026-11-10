@@ -390,15 +390,17 @@ export function Tutor({ docked, onFit, chat, reading, sources, skills, onOpen, o
     else if (el.scrollHeight > end.current + 1) setBelow(true); // grew below him, not a change higher up (+ Card)
   }, [turns]);
 
-  // A reply that landed while the chat is open: the mole hops for it (a jolt for an error).
+  // The reply he was waiting for lands in the chat he is looking at: the mole hops for it (a jolt for an error).
+  // Followed by its turn, so opening another chat mid-reply, or a turn that is taken away, is not a landing.
   const [landed, setLanded] = useState<{ id: string; failed: boolean } | null>(null);
-  const wasBusy = useRef(busy);
+  const pending = turns.find((t) => t.reply === undefined && !t.error)?.id;
+  const waited = useRef(pending);
   useEffect(() => {
-    const t = turns[turns.length - 1];
-    if (wasBusy.current && !busy && t) setLanded({ id: t.id, failed: !!t.error });
-    wasBusy.current = busy;
+    const t = turns.find((x) => x.id === waited.current);
+    if (t && t.id !== pending) setLanded({ id: t.id, failed: !!t.error });
+    waited.current = pending;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busy]);
+  }, [pending]);
   const chips = (context || !!carry.length) && (
     <div className="tutor-chips">
       {context && (
