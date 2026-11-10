@@ -33,8 +33,11 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 ## Picked (2026-11-10, D186)
 - The mole's chat (Tyler's pick C of three, then place 2 of three): replies in speech bubbles, one mole peeking over the field that wonders while it writes, the newest bubble's stair tail pointing at it, a blinking block where words are about to appear. Not picked: a mono terminal, a game dialogue box, a mole on every reply, beside the newest reply or in the header.
 
+## Picked (2026-11-10, D190)
+- The first signature moment (Tyler's pick B of three, played on a copy of the real end screen): a finished session lands with the cart rolling in and tipping its ore into the ring, rough stones dropping to be cut, the mole coming up after. Not picked: Light up (today, tuned), Mole strike. The sketch moved in straight lines and he called it amateur; the build draws the cart in dots with turning wheels and throws the ore on real arcs. Lesson: sketch the idea, but say it is a sketch before he sees it.
+
 ## Open
-- The first signature moment; a page showing every component.
+- A page showing every component.
 - Redraw Hand, ThumbsDown, Paperclip, Compass.
 - A Rive trial; sound.
 - A mascot later; sound after the look.
