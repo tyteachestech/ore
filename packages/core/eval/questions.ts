@@ -102,7 +102,7 @@ export function codeFailures(q: Question, author?: string, source?: string): str
   if (q.kind === "card" && LIST_ALL.test(q.question)) out.push("code:list_all");
   if (q.kind === "card" && (q.answer?.length ?? 0) > CARD_ANSWER_MAX) out.push("code:long_card_answer");
   // A blank is read with its word back in, so the source's sentence with one word hidden counts.
-  if (source && sharedRun(q.question.replace(/_{4,}/g, q.answer ?? ""), { question: source, answer: "" }, LIFTED_RUN)) out.push("code:lifted");
+  if (source && sharedRun(q.question.replace(/_{4,}/g, () => q.answer ?? ""), { question: source, answer: "" }, LIFTED_RUN)) out.push("code:lifted");
   return out;
 }
 

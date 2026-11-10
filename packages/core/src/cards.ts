@@ -87,7 +87,7 @@ export function blankProblem(c: { kind: CardKind; question: string; answer: stri
   if (!n) return null;
   if (n > 1) return "A fill in the blank has one blank: hide the single word that carries the meaning, or ask it as a question.";
   if (c.kind !== "card") return "Only a Fact exercise (kind \"card\") may have a blank: ask a why or a how as a question.";
-  if (c.question.includes("?")) return "A fill in the blank is a complete statement with one ____, never a blank plus a question: ask the question without a blank instead.";
+  if (c.question.trim().endsWith("?")) return "A fill in the blank is a complete statement with one ____, never a blank plus a question: ask the question without a blank instead.";
   if (c.answer.trim().split(/\s+/).length > 5) return "A blank hides a term, a number, a name or a piece of syntax, and the answer is exactly what it hides: ask a reason, a mechanism or steps as a question.";
   return null;
 }

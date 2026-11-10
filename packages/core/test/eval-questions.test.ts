@@ -56,6 +56,9 @@ describe("question-quality eval", () => {
     expect(codeFailures(q({ question: "Why is it that a cooler, longer fermentation tends to favour acetic acid?" }), undefined, source)).toEqual(["code:lifted"]);
     expect(codeFailures(q({ kind: "card", question: "A cooler, longer fermentation tends to favour ____ acid, which is sharp.", answer: "acetic" }), undefined, source)).toEqual(["code:lifted"]);
     expect(codeFailures(q({ kind: "card", question: "In sourdough, a slow, cool rise brings out ____ acid.", answer: "acetic" }), undefined, source)).toEqual([]);
+    // The hidden word goes back as written: "$`" in an answer is not a pattern that copies the words before it.
+    expect(codeFailures(q({ kind: "card", question: "In the shell, the last command's exit status ____ is zero on success, by convention.", answer: "$?" }), undefined, "In the shell, the last command's exit status $? is zero on success, by convention.")).toEqual(["code:lifted"]);
+    expect(codeFailures(q({ kind: "card", question: "Slow and cool brings out ____.", answer: "$`" }), undefined, "Slow and cool brings out slow and cool brings out acid.")).toEqual([]);
   });
 
   test("the judge's false checks are the failures, counted most first", () => {

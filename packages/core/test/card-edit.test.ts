@@ -88,6 +88,7 @@ describe("fill in the blank (D182)", () => {
     expect(blankProblem({ kind: "prompt", question: "Why space reviews?", answer: "Forgetting makes recall effortful." })).toBeNull();
     expect(blankProblem({ ...ok, question: "In Python, {{c1::def}} starts a ____." })).toMatch(/one blank/);
     expect(blankProblem({ ...ok, question: "In Python, what does ____ start?" })).toMatch(/statement/);
+    expect(blankProblem({ ...ok, question: "In JavaScript, `a ?? b` uses the ____ operator.", answer: "nullish coalescing" })).toBeNull();
     expect(blankProblem({ ...ok, kind: "prompt" })).toMatch(/Fact exercise/);
     expect(blankProblem({ ...ok, answer: "it tells the interpreter that a new function begins here" })).toMatch(/term, a number, a name/);
   });
