@@ -9,9 +9,21 @@ import type { LinkTarget } from "./NoteEditor";
 import { MoreButton } from "../Menu";
 import { blockAt, kindOf, KINDS, turnInto } from "./blockops";
 import { COLORS, paint, type Color } from "./colors";
+import { clampX } from "../popup-place";
 
 /** Where the selection is, relative to the note: the bar sits above its first line. */
 export type Sel = { from: number; to: number; x: number; y: number };
+
+/** The bar is placed from the selection inside the note, which may sit at the window's right edge (the
+ *  source note's panel), and is wider than a guess when Turn into names a long kind: moved back so it
+ *  ends inside the window. Layout boxes, not the opening scale's. */
+function fitInside(el: HTMLElement | null) {
+  const parent = el?.offsetParent;
+  if (!el || !parent) return;
+  const left = parent.getBoundingClientRect().left + el.offsetLeft;
+  const dx = clampX(left, el.offsetWidth, document.documentElement.clientWidth) - left;
+  el.style.translate = dx ? `${dx}px 0` : "";
+}
 
 const NAMES: Record<Color, string> = { gray: "Gray", red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", teal: "Teal", blue: "Blue", purple: "Purple", pink: "Pink" };
 
@@ -41,7 +53,7 @@ export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0 }
   );
 
   return (
-    <div className={`sel-bar${docked ? " docked" : ""}`} style={docked ? undefined : { left: sel.x, top: sel.y }} onMouseDown={keep} role="toolbar" aria-label="Format">
+    <div ref={docked ? undefined : (el) => fitInside(el)} className={`sel-bar${docked ? " docked" : ""}`} style={docked ? undefined : { left: sel.x, top: sel.y }} onMouseDown={keep} role="toolbar" aria-label="Format">
       <MoreButton
         label="Turn into"
         hint="Turn into"

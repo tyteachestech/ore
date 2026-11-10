@@ -38,6 +38,10 @@ export function menuPlace(at: { left: number; top: number; bottom: number }, siz
   const side: Side = was && fits(was) ? was : fits("below") ? "below" : fits("above") ? "above" : room.above > room.below ? "above" : "below";
   const maxHeight = Math.max(0, room[side]);
   const top = side === "below" ? caret.bottom + MENU_GAP : caret.top - MENU_GAP - Math.min(size.height, maxHeight);
-  const left = Math.max(MARGIN, Math.min(caret.left, view.width - MARGIN - size.width));
-  return { left, top, maxHeight, side };
+  return { left: clampX(caret.left, size.width, view.width), top, maxHeight, side };
+}
+
+/** A left edge that keeps something this wide inside the window, `MARGIN` from either side. */
+export function clampX(left: number, width: number, viewWidth: number) {
+  return Math.max(MARGIN, Math.min(left, viewWidth - MARGIN - width));
 }
