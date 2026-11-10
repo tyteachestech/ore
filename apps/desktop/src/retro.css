@@ -110,7 +110,7 @@
 .skill-page .row .kind, .row .kind-line, .row .count, .side-item .count, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
 
 /* Big numbers in pixel type. */
-.home-solid, .hero-strength .home-solid, .near-goal, .home-goal h1, .review-kept b, .review-cut b { font-family: var(--pixel); font-weight: 400; }
+.home-solid, .hero-strength .home-solid, .home-goal h1, .review-kept b, .review-cut b { font-family: var(--pixel); font-weight: 400; }
 .home-goal .goal-of { font-family: var(--font); }
 /* The hero number is the one place a dot face is big enough to read (D183): 40px, never below 24. */
 .home-goal h1 .roll, .strength-big { font-family: var(--dot); font-weight: 400; font-size: 40px; line-height: 1; }
@@ -119,7 +119,6 @@
    chips 4, what floats 12, what he reads or writes in Review 10. */
 .row, .home-read, .side-item, .pick-row, [cmdk-item], .quiz-sure button, .review-rate button { border-radius: 8px; }
 .icon-button, .icon-btn, .field, .quiz-stepper, .pick-box, .thumb, .settings-tab, .settings-btn { border-radius: 6px; }
-.chip, .chips-button { border-radius: 4px; }
 .panel, .popover, .popover.menu, .popup, .quiz, .settings-sheet { border-radius: 12px; }
 .toast, .mynotes-text, .review-passage, .quiz-answer, .quiz-leave, .quiz-verdict, .skill-badge { border-radius: 10px; }
 .gem-ring-lv { border-radius: 999px; }
@@ -206,7 +205,6 @@
    segmented control (shadcn Tabs, as the reader's side panel) over the note: a ground track with a border edge, the
    picked type a raised pill with its icon in colour. The note field and the tools column keep no frames. */
 .popup { border: 1px solid var(--border); border-radius: 10px; padding: 8px; width: 360px; }
-.intents { margin: 0 0 8px; }
 .intents .intent { flex: 1; gap: 5px; }
 .popup .field { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 4px 8px; }
 .popup .field:focus { box-shadow: none; }
