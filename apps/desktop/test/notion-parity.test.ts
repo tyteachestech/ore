@@ -417,3 +417,46 @@ describe("equations (Notion's /equation and /math), stored as the reader reads t
     expect(await md("Run `echo ‸ now`", "$$PID$$")).toBe("Run `echo $$PID$$ now`");
   });
 });
+
+// Tyler, 2026-11-10: "Gh" typed with the caret beside a diagram became one block with it (D188).
+describe("a diagram or image is a block of its own", () => {
+  const D = "![Diagram](diagrams/d.excalidraw)";
+  /** The caret right before (-1) or after (1) the note's first image. */
+  const beside = (side: -1 | 1) => (st: import("@milkdown/kit/prose/state").EditorState, v: View) => {
+    let at = -1;
+    st.doc.descendants((n, p) => void (at < 0 && n.type.name === "image" && (at = p)));
+    v.dispatch(st.tr.setSelection(pm.TextSelection.create(st.doc, side < 0 ? at : at + 1)));
+    return null;
+  };
+  const typed = async (start: string, side: -1 | 1, text: string) => {
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    const editor = await ed.createEditor(root as unknown as HTMLElement, start, () => {});
+    editor.action((ctx) => {
+      const v: View = ctx.get(core.editorViewCtx);
+      beside(side)(v.state, v);
+      type(v, text);
+    });
+    const out = ed.markdownOf(editor).trim();
+    editor.destroy();
+    root.remove();
+    return out;
+  };
+
+  test("words typed right before one go on a line above it, and stay together", async () => {
+    expect(await typed(D, -1, "Gh")).toBe(`Gh\n\n${D}`);
+    expect(await typed(`Above\n\n${D}\n\nBelow`, -1, "Gh")).toBe(`Above\n\nGh\n\n${D}\n\nBelow`);
+  });
+
+  test("words typed right after one go on a line below it", async () => {
+    expect(await typed(D, 1, "Gh")).toBe(`${D}\n\nGh`);
+    expect(await typed("![](images/a.png)", 1, "x y")).toBe("![](images/a.png)\n\nx y");
+  });
+
+  test("a note saved with one on a line with words splits them on the next edit", async () => {
+    expect(await md(`First‸\n\nGh\n${D}`, "!")).toBe(`First!\n\nGh\n\n${D}`);
+    expect(await md(`First‸\n\nGh ${D} and more`, "!")).toBe(`First!\n\nGh\n\n${D}\n\nand more`);
+    expect(await md(`First‸\n\n${D}${D}`, "!")).toBe(`First!\n\n${D}\n\n${D}`);
+    expect(await md(`First‸\n\n- item ${D}`, "!")).toBe(`First!\n\n- item\n\n  ${D}`);
+  });
+});

@@ -1218,6 +1218,11 @@ body.resizing iframe { pointer-events: none; }
 /* Selected blocks (Esc, ⇧↑ ⇧↓, a click on ⋮⋮): Notion's tint in the selection's accent, over an item's bullet too. */
 .note-editor .block-sel { --sel: color-mix(in srgb, var(--accent) 16%, transparent); background: var(--sel); border-radius: 4px; }
 .note-editor li.block-sel { box-shadow: -1.4em 0 0 var(--sel); }
+/* A selected diagram shows the tint too, not its own ground in the middle of it. */
+.note-editor .block-sel .note-diagram { background: transparent; }
+/* A drag from beside the note draws Notion's box over the blocks it selects (editor/dragsel.ts). */
+.block-marquee { position: absolute; z-index: 4; pointer-events: none; border-radius: 2px; background: color-mix(in srgb, var(--accent) 12%, transparent); outline: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.note-editor.block-dragging { cursor: default; }
 .note-editor .ProseMirror-hideselection *::selection { background: transparent; }
 .note-editor .ProseMirror-hideselection { caret-color: transparent; }
 .skill-page .note-editor { --note-size: 16px; }
