@@ -35,6 +35,7 @@ import { SelectionBar, type Sel } from "./SelectionBar";
 import { WithMenu, type MenuAction } from "../Menu";
 import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock, topGaps, turnAtCaret, type Kind } from "./blockops";
 import { is } from "../keys";
+import { lineShown, menuPlace, type Side } from "../popup-place";
 
 /** What a link can point at (D39): a source, or a skill (its note, D41). */
 export type LinkTarget = { kind: "item" | "skill"; id: string; title: string };
@@ -132,7 +133,7 @@ const DiagramEditor = lazy(() => import("../Diagram"));
 /** Fired after a diagram is saved, so its preview redraws; detail is `<note dir>/<name>`. */
 const SAVED = "ore:diagram-saved";
 
-type Menu = { kind: "slash" | "link" | "date"; query: string; from: number; to: number; x: number; y: number };
+type Menu = { kind: "slash" | "link" | "date"; query: string; from: number; to: number };
 /** `names`: what Notion also takes after `/` for it (`/h1`, `/#`, `/hr`). */
 type Row = { label: string; sub?: string; names?: string[]; run: () => void };
 
@@ -509,6 +510,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     return all.filter((r) => slashMatch(r.label, r.names ?? [], q));
   };
   const rows = rowsFor(menu);
+  const menuBox = useRef<HTMLDivElement>(null);
+  useMenuPlace(menuBox, view, menu, rows.length, index);
   /** Selects the row under a pointer that moved. A menu that opens under a resting pointer keeps
    *  its first row, as in Notion and Raycast; mouseenter would fire there and select another. */
   const hover = (i: number) => {
@@ -696,7 +699,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {PHONE && <KeyboardBar view={view} targets={p.targets} />}
       {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => showSel(null)} askLink={askLink} />}
       {menu && (menu.kind !== "date" || rows.length > 0) && (
-        <div className="note-menu" role="listbox" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.preventDefault()}>
+        <div ref={menuBox} className="note-menu" role="listbox" onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
             rows.map((r, i) => (
               <div key={r.label + i} role="option" aria-selected={i === index} className={`note-menu-row${i === index ? " on" : ""}`} onMouseMove={() => hover(i)} onClick={r.run}>
@@ -822,8 +825,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
     const { kind, query, typed } = t;
     const from = $from.pos - typed;
     if (from === live.current.dismissed.at) return show(null);
-    const c = view.coordsAtPos(from);
-    show({ kind, query, from, to: $from.pos, x: c.left, y: c.bottom + 4 });
+    show({ kind, query, from, to: $from.pos });
   };
   return $prose(
     () =>
@@ -983,8 +985,7 @@ function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | n
     const h = host.current.getBoundingClientRect();
     const a = view.coordsAtPos(s.from);
     const z = view.coordsAtPos(s.to);
-    const width = 340;
-    const x = Math.max(-8, Math.min(a.left - h.left - 16, h.width - width));
+    const x = a.left - h.left - 16; // where its left edge would go; SelectionBar keeps it inside the note and window
     // Above the first line; below the last when there is no room above: the top of the window, or of
     // the panel the note scrolls in (the source note's first line sits right under its tabs).
     let top = 0;
@@ -1183,6 +1184,84 @@ const toggleView = $view(toggleSchema.node, () => (node) => {
   const ignoreMutation = (m: ViewMutationRecord) => (m.type === "attributes" && m.target === dom) || m.target === caret || caret.contains(m.target as Node);
   return { dom, contentDOM: content, ignoreMutation };
 });
+
+/** Keeps the / and [[ menu inside the window (menuPlace, Notion): placed by the caret when it opens and
+ *  as typing narrows the list, again when the window resizes and (once a frame) when the page scrolls, with
+ *  the highlighted row scrolled into view in a list capped to the room there is. Hidden while its line
+ *  is scrolled out of view (lineShown); the keys still drive it. On the phone CSS docks it instead. */
+function useMenuPlace(box: { current: HTMLDivElement | null }, view: () => EditorView | undefined, menu: Menu | null, count: number, index: number) {
+  const side = useRef<Side | undefined>(undefined);
+  const size = useRef({ width: 0, height: 0 });
+  const place = useRef(() => {});
+  const latest = useRef(menu);
+  latest.current = menu;
+  const opened = menu && `${menu.kind} ${menu.from}`;
+  // Measured once per opening and each time the rows change, unsqueezed by the window's edges.
+  useLayoutEffect(() => {
+    side.current = undefined;
+  }, [opened]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    const v = view();
+    if (!opened || !el || !v || PHONE) return;
+    Object.assign(el.style, { left: "0px", top: "0px", maxHeight: "none" });
+    size.current = { width: el.offsetWidth, height: el.offsetHeight };
+    place.current = () => {
+      const m = latest.current;
+      if (!m) return;
+      const c = v.coordsAtPos(Math.min(m.from, v.state.doc.content.size));
+      const shown = lineShown(c, clipOf(v.dom));
+      el.style.visibility = shown ? "" : "hidden";
+      if (!shown) return;
+      const at = menuPlace(c, size.current, { width: innerWidth, height: innerHeight }, side.current);
+      side.current = at.side;
+      Object.assign(el.style, { left: `${at.left}px`, top: `${at.top}px`, maxHeight: `${at.maxHeight}px` });
+      rowInView(el);
+    };
+    place.current();
+    let frame = 0;
+    const later = (e: Event) => {
+      if (e.target === el || frame) return; // its own list scrolling, or a frame already asked for
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        place.current();
+      });
+    };
+    const resized = () => place.current(); // at once: anything that looks in the frame after a resize sees it placed
+    addEventListener("resize", resized);
+    document.addEventListener("scroll", later, { capture: true, passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      removeEventListener("resize", resized);
+      document.removeEventListener("scroll", later, { capture: true });
+    };
+  }, [opened, menu?.query, count]);
+  // Each editor update (the line can move as he types) places it again; an arrow keeps its row in view.
+  useLayoutEffect(() => place.current(), [menu]);
+  useLayoutEffect(() => rowInView(box.current), [index]);
+}
+
+/** Scrolls a capped menu's highlighted row into view, keeping the menu's padding round it. */
+function rowInView(el: HTMLElement | null) {
+  const row = el?.querySelector<HTMLElement>(".note-menu-row.on");
+  if (!el || !row) return;
+  const pad = 4;
+  if (row.offsetTop - pad < el.scrollTop) el.scrollTop = row.offsetTop - pad;
+  else if (row.offsetTop + row.offsetHeight + pad > el.scrollTop + el.clientHeight) el.scrollTop = row.offsetTop + row.offsetHeight + pad - el.clientHeight;
+}
+
+/** The part of the window an element's scrolling panels leave in view, top to bottom. */
+function clipOf(el: Element) {
+  let top = 0;
+  let bottom = innerHeight;
+  for (let a = el.parentElement; a; a = a.parentElement) {
+    if (!/auto|scroll|hidden|clip/.test(getComputedStyle(a).overflowY)) continue;
+    const r = a.getBoundingClientRect();
+    top = Math.max(top, r.top);
+    bottom = Math.min(bottom, r.bottom);
+  }
+  return { top, bottom };
+}
 
 /** Notion's equation field, under the equation it edits: the TeX, drawn live as he types (each change is
  *  an editor step, grouped by the editor's history). ↵ or a click away closes it (⇧↵ breaks the line
