@@ -3887,7 +3887,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   await finish();
   const still = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
   await page.emulateMedia({ reducedMotion: null });
-  if (still.cart || !still.mole || still.on !== after.on) throw new Error(`Reduce Motion: ${JSON.stringify({ still, after })}`);
+  // A second session only adds minutes, so the ring is at least as full.
+  if (still.cart || !still.mole || still.on < after.on) throw new Error(`Reduce Motion: ${JSON.stringify({ still, after })}`);
   await back();
 });
 

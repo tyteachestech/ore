@@ -3,10 +3,13 @@ import { useEffect, useState } from "react";
 /** How many of `n` dots a share lights: any progress lights one, and only a whole share lights them all. */
 export const lit = (share: number, n: number) => (share >= 1 ? n : share <= 0 ? 0 : Math.max(1, Math.min(n - 1, Math.round(share * n))));
 
+/** How many dots a ring of `size` px has. */
+export const ringDots = (size: number) => (size > 60 ? 30 : size > 36 ? 20 : 14);
+
 /** A ring of dots, one per step, from 12 o'clock (D183): the lit ones in `--ring` (the skill's colour, or green
  *  for the goal), then `ghost` dimmer ones, the rest as the track. Each dot lights a beat after the one before. */
 export function DotRing({ size, share, ghost = 0 }: { size: number; share: number; ghost?: number }) {
-  const n = size > 60 ? 30 : size > 36 ? 20 : 14;
+  const n = ringDots(size);
   const on = lit(share, n);
   const soon = Math.min(n, on + (ghost > 0 ? Math.max(1, Math.round(ghost * n)) : 0));
   const r = Math.min(6.5, ((2 * Math.PI * 43) / n) * 0.36);

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Gem } from "./Gem";
+import { lit } from "./Ring";
 
 /* The end of a session (D190, Tyler's pick B of three): the ore cart that rode Review's rail rolls in over the
    ring, brakes, and its bucket tips. One dot of ore per ring dot this session lit falls out on a real arc
@@ -30,7 +31,10 @@ export const flight = (dy: number) => (-HOP + Math.sqrt(HOP * HOP + 2 * GRAVITY 
 /** Where it is `t` seconds into a flight of `T` seconds that ends `dx`, `dy` away. */
 export const along = (dx: number, dy: number, T: number, t: number): [number, number] => [(dx * t) / T, HOP * t + ((dy - HOP * T) / (T * T)) * t * t];
 
-type Flying = { el: HTMLElement; x0: number; y0: number; dx: number; dy: number; T: number; t0: number; spin: number; land: () => void };
+/** The ring dots a session lit, in the order they light: from the share it began at to the one it ended at. */
+export const oreFor = (from: number, to: number, n: number) => Array.from({ length: Math.max(0, lit(to, n) - lit(from, n)) }, (_, i) => lit(from, n) + i);
+
+type Flying = { el: HTMLElement; ours: boolean; x0: number; y0: number; dx: number; dy: number; T: number; t0: number; spin: number; land: () => void };
 
 /** `host` is the end screen. `lit` are the ring dots to light, in order; `stones` the colours of the gems cut
  *  (already capped to those shown). `onStone(i)` when stone i lands, `onPoured` when the ring is full, `onLeave`
@@ -46,9 +50,12 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
   useEffect(() => {
     const el = layer.current, ring = host?.querySelector<SVGSVGElement>(".ring .dot-ring"), body = host?.closest<HTMLElement>(".review-body");
     if (!el || !host || !ring || !body) { calls.current.onPoured(); calls.current.onLeave(); calls.current.onDone(); return; }
-    const css = getComputedStyle(el), OUT = css.getPropertyValue("--ease-out").trim() || "ease-out", SPRING = css.getPropertyValue("--ease-spring").trim() || "ease-out";
+    // Speeds and curves are the motion tokens (D185); the roll in, the roll off and the falls keep their own time.
+    const css = getComputedStyle(el), token = (name: string, or: string) => css.getPropertyValue(name).trim() || or, ms = (name: string, or: number) => parseFloat(token(name, "")) || or;
+    const OUT = token("--ease-out", "ease-out"), SPRING = token("--ease-spring", "ease-out"), T2 = ms("--t-2", 150), T4 = ms("--t-4", 300);
     // The layer spans the window's width, so the cart comes from one edge and leaves by the other.
-    const hb = host.getBoundingClientRect(), bb = body.getBoundingClientRect(), rb = ring.getBoundingClientRect();
+    // Inside its scrollbar, or the layer would make the screen scroll sideways while it plays.
+    const hb = host.getBoundingClientRect(), rb = ring.getBoundingClientRect(), bb = { left: body.getBoundingClientRect().left + body.clientLeft, width: body.clientWidth };
     el.style.left = `${bb.left - hb.left}px`;
     el.style.width = `${bb.width}px`;
     const at = (r: DOMRect) => ({ x: r.left - bb.left + r.width / 2, y: r.top - hb.top + r.height / 2 });
@@ -68,18 +75,19 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
     const tick = (now: number) => {
       for (let i = flying.length - 1; i >= 0; i--) {
         const f = flying[i]!, t = (now - f.t0) / 1000;
-        if (t >= f.T) { flying.splice(i, 1); f.el.remove(); f.land(); continue; }
+        // A stone is React's to remove; the ore is ours.
+        if (t >= f.T) { flying.splice(i, 1); if (f.ours) f.el.remove(); else f.el.hidden = true; f.land(); continue; }
         const [x, y] = along(f.dx, f.dy, f.T, Math.max(0, t));
         f.el.style.transform = `translate3d(${f.x0 + x}px, ${f.y0 + y}px, 0) rotate(${f.spin * t}deg)`;
       }
       frame = flying.length ? requestAnimationFrame(tick) : 0;
     };
-    const fly = (node: HTMLElement, to: { x: number; y: number }, spin: number, land: () => void) => {
+    const fly = (node: HTMLElement, ours: boolean, to: { x: number; y: number }, spin: number, land: () => void) => {
       const from = at(lip.getBoundingClientRect());
       const dy = to.y - from.y, T = flight(dy);
       node.style.transform = `translate3d(${from.x}px, ${from.y}px, 0)`;
       node.hidden = false;
-      flying.push({ el: node, x0: from.x, y0: from.y, dx: to.x - from.x, dy, T, t0: performance.now(), spin, land });
+      flying.push({ el: node, ours, x0: from.x, y0: from.y, dx: to.x - from.x, dy, T, t0: performance.now(), spin, land });
       if (!frame) frame = requestAnimationFrame(tick);
     };
 
@@ -88,10 +96,10 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
       play(cart, [{ transform: `translateX(${from}px)` }, { transform: `translateX(${to}px)` }], { duration: ms, easing });
       for (const w of wheels) play(w, [{ transform: `rotate(${from / (2.5 * CELL)}rad)` }, { transform: `rotate(${to / (2.5 * CELL)}rad)` }], { duration: ms, easing });
     };
-    play(rail, [{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
+    play(rail, [{ opacity: 0 }, { opacity: 1 }], { duration: T2, easing: OUT });
     roll(-(stop + W + 20), 0, 650, OUT);
     // Its own momentum throws the bucket forward as it stops.
-    later(500, () => play(bucket, [{ transform: "rotate(0deg)" }, { transform: "rotate(58deg)" }], { duration: 360, easing: SPRING }));
+    later(500, () => play(bucket, [{ transform: "rotate(0deg)" }, { transform: "rotate(58deg)" }], { duration: T4, easing: SPRING }));
 
     const circles = [...ring.querySelectorAll("circle")], gap = lit.length ? Math.max(18, Math.min(60, 600 / lit.length)) : 0;
     const POUR = 780, poured = POUR + lit.length * gap, stoned = poured + stones.length * 130;
@@ -105,10 +113,10 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
       ore.className = "cart-ore";
       ore.hidden = true;
       el.appendChild(ore);
-      fly(ore, at(c.getBoundingClientRect()), 0, () => {
+      fly(ore, true, at(c.getBoundingClientRect()), 0, () => {
         // The ore is the ring's dot from here: it lights where it landed, with the squash of a landing.
         c.classList.add("on");
-        anims.push(c.animate([{ transform: "scale(1.55)" }, { transform: "scale(1)" }], { duration: 280, easing: OUT }));
+        anims.push(c.animate([{ transform: "scale(1.55)" }, { transform: "scale(1)" }], { duration: T4, easing: OUT }));
         if (--left === 0) calls.current.onPoured();
       });
     }));
@@ -118,15 +126,15 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
       const slot = host.querySelectorAll(".review-cut > span")[i]?.querySelector(".gem");
       const rough = roughs[i];
       if (!slot || !rough) return calls.current.onStone(i);
-      fly(rough, at(slot.getBoundingClientRect()), 220, () => calls.current.onStone(i));
+      fly(rough, false, at(slot.getBoundingClientRect()), 220, () => calls.current.onStone(i));
     }));
 
     // Emptied, the bucket drops back and the cart rolls off the other way out.
-    later(stoned + 160, () => play(bucket, [{ transform: "rotate(58deg)" }, { transform: "rotate(0deg)" }], { duration: 260, easing: OUT }));
+    later(stoned + 160, () => play(bucket, [{ transform: "rotate(58deg)" }, { transform: "rotate(0deg)" }], { duration: T4, easing: OUT }));
     later(stoned + 340, () => {
       // An object leaving speeds up as it goes; nothing waits on it (the mole is already coming up).
       roll(0, bb.width - stop + 20, 560, "cubic-bezier(0.5, 0, 0.9, 0.5)");
-      play(rail, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 260, easing: "ease-out" });
+      play(rail, [{ opacity: 1 }, { opacity: 0 }], { duration: T4, delay: 260, easing: OUT });
     });
     later(stoned + 520, () => calls.current.onLeave());
     later(stoned + 920, () => calls.current.onDone());

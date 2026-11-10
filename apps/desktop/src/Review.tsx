@@ -6,13 +6,14 @@ import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Gem } from "./Gem";
 import { Mole } from "./Mole";
-import { CartTip } from "./CartTip";
+import { CartTip, oreFor } from "./CartTip";
+import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { lastWin, longGapText, ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { DotBar, lit, minutes, minutesText, Ring } from "./Ring";
+import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -41,8 +42,8 @@ function afterAnswer(q: DueEntry[], again: boolean): DueEntry[] {
 const ACTIVE_CAP_MS = 3 * 60_000;
 /** Cut gems drawn on the end screen; the rest show as "+N". */
 const CUT_SHOWN = 8;
-/** The dots in the end screen's ring (a `DotRing` of 120px). */
-const RING_DOTS = 30;
+/** The end screen's ring, in px (the quick quiz's is smaller and has no cart). */
+const END_RING = 120;
 
 type Phase = "answer" | "checked" | "edit";
 type Rating = 1 | 2 | 3 | 4;
@@ -1232,9 +1233,8 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const shown = (s.cut ?? []).slice(0, CUT_SHOWN);
   const [pour] = useState(() => {
-    const from = lit(part(b), RING_DOTS), to = lit(part(t), RING_DOTS);
-    const dots = Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i);
-    return !quick && !PHONE && !document.hidden && !matchMedia("(prefers-reduced-motion: reduce)").matches && (dots.length > 0 || shown.length > 0) ? dots : null;
+    const dots = oreFor(part(b), part(t), ringDots(END_RING));
+    return !quick && !PHONE && !document.hidden && !still() && (dots.length > 0 || shown.length > 0) ? dots : null;
   });
   // cart: rolling and pouring · poured: the ring is full · leaving: the mole comes up · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
@@ -1249,11 +1249,11 @@ function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; s
   return (
     <div className={`review-end${pour ? " carted" : ""}`} role="status" ref={setHost}>
       {pour && stage !== "done" && host && (
-        <CartTip host={host} lit={pour} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => setStage("done")} />
+        <CartTip host={host} lit={pour} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
       )}
       {/* D169: the tutor's mole cheers from the top of the ring, once, at the end of a session (not in the quick quiz). After the cart (D190) it comes up first. */}
       {!quick && <span className="review-mole">{(stage === "leaving" || stage === "done") && <Mole bare size={64} mood={mood} />}</span>}
-      <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : 120} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
+      <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
       <h2>{title}</h2>
       {/* "Caught up" never hides the new cards the daily limits hold back (D65). */}
       {t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>}

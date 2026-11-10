@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { along, CartTip, flight } from "../src/CartTip";
+import { along, CartTip, flight, oreFor } from "../src/CartTip";
+import { ringDots } from "../src/Ring";
 
 // D190: the cart's ore falls as a thrown thing does, and the cart is drawn in round dots like the rest.
 
@@ -31,4 +32,13 @@ test("the cart is round dots only, carries at most nine dots of ore and three st
   expect(full).not.toMatch(/<path|<polygon|<line/);
   expect(html(2, 0).match(/class="cart-ore-in"/g)?.length).toBe(2);
   expect(html(0, 1)).not.toContain("cart-ore-in");
+});
+
+test("the cart carries one dot of ore for each ring dot the session lit, and none when the ring did not move", () => {
+  const n = ringDots(120);
+  expect(oreFor(0, 1, n)).toEqual(Array.from({ length: n }, (_, i) => i));
+  expect(oreFor(0.5, 0.6, n)).toEqual([15, 16, 17]);
+  expect(oreFor(0, 0.01, n)).toEqual([0]);
+  expect(oreFor(1, 1, n)).toEqual([]);
+  expect(oreFor(0.5, 0.5, n)).toEqual([]);
 });
