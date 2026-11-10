@@ -244,7 +244,6 @@ img.thumb { filter: brightness(0.86); }
 .row:hover .thumb, .row.on .thumb, .row.sel .thumb, .home-read:hover .thumb, [cmdk-item][data-selected="true"] .thumb { opacity: 1; filter: none; }
 .thumb-at { position: relative; flex: none; display: flex; }
 .thumb-bar { position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; border-radius: 1px; background: var(--bg-active); overflow: hidden; }
-.thumb-bar > span { display: block; height: 100%; background: var(--accent); }
 .row .col { flex: none; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .col.added { width: 11ch; text-align: right; }
 .row .col.site { width: 16ch; }
@@ -1876,9 +1875,7 @@ button.home-plan:hover { color: var(--text); }
 .home-level { display: flex; align-items: center; gap: 8px; }
 .home-lv { flex: none; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .home-meter { flex: 1; height: 6px; border-radius: 4px; background: var(--bg-active); overflow: hidden; }
-.home-meter > span { display: block; height: 100%; border-radius: 4px; background: var(--skill, var(--c-green)); }
 .home-meter.small { flex: none; width: 64px; height: 4px; }
-.home-meter.small > span { background: var(--accent); }
 .home-skill-foot { color: var(--faint); font-size: 12px; }
 .home-cont { margin-top: 12px; padding: 6px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--lift); }
 .home-cont .home-h { margin: 8px 12px 4px; color: var(--text); font-size: 14px; font-weight: 600; }
@@ -1931,8 +1928,8 @@ button.home-plan:hover { color: var(--text); }
 .review:focus-visible { outline: none; }
 .review-head { display: flex; align-items: center; gap: 14px; height: 52px; flex: none; padding: 8px 16px 0 90px; }
 .review-steps { gap: 3px; }
-.review-bar { flex: 1; height: 6px; border-radius: 4px; background: var(--bg-active); overflow: hidden; }
-.review-bar span { display: block; height: 100%; background: var(--c-green); transform-origin: left; transition: transform 300ms ease-out; }
+.review-bar { flex: 1; height: 6px; }
+.review-dots { width: 100%; }
 .review-steps span { transition: background-color 200ms; }
 .review-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding: 6vh 24px 32px; }
 .review-body > .loading, .review-body > .err { max-width: 640px; margin: 0 auto; }
@@ -2834,7 +2831,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
    six hard frames over 600ms once the badge has popped, once. None under reduced motion. */
 .quiz-done-badge { position: relative; }
 .pixel-burst { position: absolute; inset: 0; pointer-events: none; }
-.pixel-burst i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: var(--skill, var(--c-green)); animation: pixel-burst 600ms steps(6, end) var(--d, 0ms) both; }
+.pixel-burst i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; border-radius: 50%; margin: -2px 0 0 -2px; background: var(--skill, var(--c-green)); animation: pixel-burst 600ms steps(6, end) var(--d, 0ms) both; }
 @keyframes pixel-burst { from { transform: translate(var(--x0), var(--y0)); opacity: 1; } to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .pixel-burst { display: none; } }
 

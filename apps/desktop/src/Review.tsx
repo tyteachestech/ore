@@ -11,7 +11,7 @@ import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { lastWin, longGapText, ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { minutes, minutesText, Ring } from "./Ring";
+import { DotBar, minutes, minutesText, Ring } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -830,7 +830,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
           </div>
         ) : (
           <div className="review-bar" role="progressbar" aria-label="Session" aria-valuemin={0} aria-valuemax={done + left} aria-valuenow={done}>
-            <span style={{ transform: `scaleX(${end ? 1 : progress})` }} />
+            {/* 6px dots: 60 need 360px, which the phone's head does not have. */}
+            <DotBar className="review-dots" share={end ? 1 : progress} n={PHONE ? 30 : 60} />
           </div>
         )}
         {last && (

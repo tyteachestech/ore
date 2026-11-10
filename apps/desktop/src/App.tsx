@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
+import { DotBar } from "./Ring";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
@@ -1869,7 +1870,7 @@ export function App() {
           return (
             <span className="thumb-at">
               <Thumb item={r} iconSize={16} />
-              {at >= 0.02 && <span className="thumb-bar" aria-hidden="true"><span style={{ width: `${Math.min(100, at * 100)}%` }} /></span>}
+              {at >= 0.02 && <DotBar className="thumb-bar" share={at} n={12} />}
             </span>
           );
         })()}
