@@ -52,3 +52,7 @@ jobs:
         with:
           name: e2e-screenshots-${{ matrix.shard }}
           path: /tmp/ore-e2e-*.png
+      # The release build under the release CSP, in WebKit (apps/desktop/e2e/release-check.ts): what only the installed
+      # app breaks, which the journeys on the dev server never see. On one shard, where WebKit is already installed.
+      - if: matrix.shard == 1
+        run: bun run --cwd apps/desktop build && bun run release:check

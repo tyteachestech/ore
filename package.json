@@ -18,6 +18,7 @@
     "eval:questions": "bun packages/core/eval/questions.ts",
     "golden:update": "ORE_UPDATE_GOLDEN=1 bun test packages/core/test/golden.test.ts",
     "e2e": "bun apps/desktop/e2e/journeys.ts",
+    "release:check": "bun apps/desktop/e2e/release-check.ts",
     "bench": "bun apps/desktop/scripts/bench.ts"
   },
   "devDependencies": {

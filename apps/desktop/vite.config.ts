@@ -108,7 +108,9 @@ export default defineConfig({
   // first time a diagram opens in dev (it lost the reader in the e2e diagram journey on a fresh checkout).
   optimizeDeps: { include: ["react-dom/server", "react-colorful"] },
   server: { port: 1420, strictPort: true, host: PHONE ? true : undefined, watch: { ignored: ["**/src-tauri/**"] } },
-  build: { target: "safari17", outDir: PHONE ? "dist-phone" : "dist" },
+  // Fonts stay files: one inlined as data: is refused by the release CSP's font-src 'self' (KaTeX_Size3 was), and
+  // the dev server, which has no CSP, never shows it (e2e/release-check.ts does).
+  build: { target: "safari17", outDir: PHONE ? "dist-phone" : "dist", assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf|eot)$/.test(file) ? false : undefined) },
   ...(PHONE && {
     resolve: { alias: phoneAliases },
     define: {
