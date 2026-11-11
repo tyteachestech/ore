@@ -1230,8 +1230,10 @@ body.resizing iframe { pointer-events: none; }
 .note-editor :is(pre, .note-table).block-sel::after { content: none; }
 /* A selected diagram shows the tint too, not its own ground in the middle of it. */
 .note-editor .block-sel .note-diagram { background: transparent; }
-/* A drag from beside the note draws Notion's box over the blocks it selects (editor/dragsel.ts). */
-.block-marquee { position: absolute; z-index: 4; pointer-events: none; border-radius: 2px; background: color-mix(in srgb, var(--accent) 12%, transparent); outline: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+/* A drag from beside the note draws Notion's box over the blocks it selects (editor/dragsel.ts, D188), and one
+   from beside a list's rows Finder's over the rows (D194, marquee.ts): the same box, one way of drawing. */
+.marquee.fixed { position: fixed; z-index: 30; }
+.marquee { position: absolute; z-index: 4; pointer-events: none; border-radius: 2px; background: color-mix(in srgb, var(--accent) 12%, transparent); outline: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
 .note-editor.block-dragging { cursor: default; }
 .note-editor .ProseMirror-hideselection *::selection { background: transparent; }
 .note-editor .ProseMirror-hideselection { caret-color: transparent; }
