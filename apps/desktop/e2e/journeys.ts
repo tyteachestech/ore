@@ -6651,6 +6651,33 @@ journey("settle: closing a typed highlight lifts the popup away, pops its mark a
 });
 
 // Last: they add headings and a diagram to AGENTS' note, which earlier journeys lay out.
+/** Clicks just inside the end of an element's last line of text, where a click puts the caret after its last letter. */
+async function clickAtEnd(page: Page, el: Locator) {
+  const at = await el.evaluate((e) => {
+    const walk = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
+    let last: Text | null = null;
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) if (n.data.length) last = n;
+    if (!last) return null;
+    const r = document.createRange();
+    r.setStart(last, last.data.length - 1);
+    r.setEnd(last, last.data.length);
+    const b = r.getBoundingClientRect();
+    return { x: b.right - 1, y: b.top + b.height / 2 };
+  });
+  if (!at) throw new Error("no text to click the end of");
+  await page.mouse.click(at.x, at.y);
+}
+/** Whether the caret sits after the last letter of `el`. */
+const caretAtEndOf = (el: Locator) =>
+  el.evaluate((e) => {
+    const s = getSelection();
+    if (!s?.isCollapsed || !s.anchorNode || !e.contains(s.anchorNode)) return false;
+    const r = document.createRange();
+    r.selectNodeContents(e);
+    r.setStart(s.anchorNode, s.anchorOffset);
+    return r.toString() === "";
+  });
+
 journey("tutor Practice: an answer under a renamed heading, and a diagram-only answer, both reach the tutor; an empty one is refused in place", async (page) => {
   await openSource(page, AGENTS);
   const exercise = (heading: string) => ({ heading, prompts: ["Your answer"] });
@@ -6675,11 +6702,16 @@ journey("tutor Practice: an answer under a renamed heading, and a diagram-only a
   await tutor.getByRole("button", { name: "Practice", exact: true }).click();
   // A written answer under a heading he renamed.
   await tutor.getByRole("button", { name: "Write it in your note" }).click();
-  await page.locator(".note-editor h2", { hasText: "What loop does an agent run?" }).waitFor();
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowRight" : "End");
+  const head = page.locator(".note-editor h2", { hasText: "What loop does an agent run?" });
+  await head.waitFor();
+  // The caret goes where he would click, checked each time: line-end keys differ by platform, and on CI's
+  // Linux an End once left it at the heading's start, so the rename and the answer both went into the heading.
+  await clickAtEnd(page, head);
+  await until("the caret is at the heading's end", () => caretAtEndOf(head));
   await page.keyboard.type(" (my words)");
-  await page.keyboard.press("ArrowDown");
+  const answer = page.locator(".note-editor .ghost").first();
+  await answer.click();
+  await until("the caret is in the answer line", () => answer.evaluate((el) => !!getSelection()?.anchorNode && el.contains(getSelection()!.anchorNode)));
   await page.keyboard.type("It acts, observes the result and decides again.");
   await page.keyboard.press("Meta+Enter");
   await tutor.getByText("Good. Now draw it.").waitFor();
