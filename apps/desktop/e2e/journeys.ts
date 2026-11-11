@@ -6935,6 +6935,31 @@ journey("review: a card that fails to load offers Try again, focused, which load
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: once an Explain exercise is checked, the key bar names the suggested rating (↵ Hard), as its button does", async (page) => {
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ rating: 2, gaps: [], feedback: "", covered: [true, false] }) });
+  });
+  try {
+    await startReview(page, /Teaching/);
+    const keys = page.locator(".review-keys");
+    await page.getByRole("textbox", { name: "Your answer" }).fill("Fluency feels like knowing");
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    const suggested = page.locator(".review-rate .suggested");
+    await suggested.waitFor();
+    const name = (await suggested.innerText()).trim();
+    if (name !== "Hard") throw new Error(`the suggested button reads ${name}, not Hard`);
+    await until("the key bar says ↵ Hard", async () => /↵\s*Hard/.test(await keys.innerText())).catch(async () => {
+      throw new Error(`the key bar reads: ${await keys.innerText()}`);
+    });
+  } finally {
+    await page.unroute(/\/ore$/);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
+  }
+});
+
 journey("review: changing an Explain card's key points after it was checked keeps the marks of points left as they were, but suggests nothing until he marks; an undo refreshes an untouched open editor only", async (page) => {
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();

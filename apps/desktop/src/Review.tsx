@@ -1280,7 +1280,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested !== undefined} variant={!!card.variant} inHead={!!card.in_head_ok} />}
+      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} />}
     </div>
     </Trap>
   );
@@ -1294,7 +1294,8 @@ function nothingDue(t: Today | null, pick: string[] | null): string {
 }
 
 /** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). */
-function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; kind: CardFull["kind"]; suggested: boolean; variant: boolean; inHead: boolean }) {
+/** `suggested`: the rating ↵ gives, named in the bar as its button is (Again, Hard, Good or Easy); none, no ↵. */
+function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);
   const rows: [string, string][] =
@@ -1305,7 +1306,7 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
             [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
           : [["1 2 3", "How sure, then show"], [k("later"), "Later"], ["Esc", "Leave"]]
-        : [["1–4", "Rate"], ...(suggested ? [["↵", kind === "card" ? "Good" : "Suggested"] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], ["Esc", "Leave"]];
+        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">
       {rows.map(([key, what]) => (
