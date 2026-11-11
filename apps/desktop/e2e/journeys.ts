@@ -1977,6 +1977,8 @@ journey("notebook: a cell's output is folded until he opens it, a click or Enter
   await out.waitFor();
   if (!(await out.innerText()).includes("array([0, 2, 4])")) throw new Error(`the output reads “${await out.innerText()}”`);
   if (await fold.count()) throw new Error("the row stays after the output is shown");
+  // The row he pressed Enter on is gone: focus goes to the output it showed, never to nothing.
+  await until("focus is on the output it showed", () => page.evaluate(() => document.activeElement?.matches("pre.output") ?? false));
   // An article's plain text block is not an output.
   await openSource(page, AGENTS);
   if (await page.locator(".doc .output-fold").count()) throw new Error("an article got a folded output");
