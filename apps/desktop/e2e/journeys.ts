@@ -163,14 +163,14 @@ const HYGIENE = `(() => {
   // exactly and scoped by its screen, why]. Empty since the follow-up to the lists fix (2026-11-11).
   const ALLOW = [];
   const screen = () => document.querySelector(".main")?.lastElementChild ?? null;
-  let held = null, heldScreen = null, away = false, leaving = false, losing = false, clicked = false, pressedOn = null, fromNothing = false, allowed = false, rightAt = -Infinity;
+  let held = null, heldScreen = null, away = false, leaving = false, losing = false, clicked = false, pressedOn = null, fromNothing = false, allowed = false, rightAt = -Infinity, heldLayer = null;
   const entered = new WeakMap();
   addEventListener("focusin", (e) => {
     const layer = e.target.closest?.(LAYERS);
     // A menu a right-click opened came from the row under the pointer, though Chromium's press on a row that takes
     // no focus had already put focus on <body>: a pick that loses focus there counts.
     if (layer && !entered.has(layer)) entered.set(layer, (!e.relatedTarget || e.relatedTarget === document.body) && performance.now() - rightAt > 1000);
-    held = e.target; heldScreen = screen(); away = false; clicked = !!pressedOn && e.target.contains(pressedOn); fromNothing = !!layer && entered.get(layer);
+    held = e.target; heldScreen = screen(); away = false; clicked = !!pressedOn && e.target.contains(pressedOn); fromNothing = !!layer && entered.get(layer); heldLayer = layer;
     allowed = ALLOW.some(([sel]) => e.target.matches?.(sel));
   }, true);
   for (const t of ["pointerup", "pointercancel"]) addEventListener(t, () => setTimeout(() => (pressedOn = null), 0), true);
@@ -183,7 +183,9 @@ const HYGIENE = `(() => {
   }, true);
   addEventListener("pagehide", () => (leaving = true));
   addEventListener("beforeunload", () => (leaving = true));
-  const lost = () => !leaving && !away && !clicked && !fromNothing && !allowed && !!held && document.activeElement === document.body && !(held.isConnected && held.getClientRects().length) && screen() === heldScreen;
+  // A layer that declares where focus goes when nothing opened it (data-gives-back: useFocusWhileMounted's fallback) is held to it.
+  const exempt = () => fromNothing && !heldLayer?.hasAttribute("data-gives-back");
+  const lost = () => !leaving && !away && !clicked && !exempt() && !allowed && !!held && document.activeElement === document.body && !(held.isConnected && held.getClientRects().length) && screen() === heldScreen;
   const name = (el) => (el.tagName.toLowerCase() + (typeof el.className === "string" && el.className.trim() ? "." + el.className.trim().split(/\\s+/).join(".") : "") + " “" + (el.getAttribute("aria-label") ?? el.value ?? el.textContent ?? "").trim().slice(0, 40) + "”");
   const watchLoss = () => {
     if (losing || !lost()) return;
@@ -2643,6 +2645,7 @@ journey("source title: one click renames it in place, Enter saves, Esc keeps the
   await page.getByLabel("Title").fill("Agents, renamed");
   await page.keyboard.press("Enter");
   await until("Enter saves it", async () => (await page.locator(".doc-head h1").innerText()) === "Agents, renamed");
+  await until("focus goes to the text (the title is no control)", () => page.evaluate(() => !!document.activeElement?.matches(".reader-scroll")));
   await page.waitForTimeout(300); // the rename's write lands, then its step is on the history
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Meta+z");
@@ -2944,6 +2947,83 @@ journey("sidebar: ⌘Z while a collection's rename still saves puts the old name
   if (shown.some((n) => /craft slowly/i.test(n))) throw new Error(`the old name came back and went: ${shown.join(" → ")}`);
   const kept = ((await ore("skills")) as { collection?: string }[]).map((s) => s.collection);
   if (!kept.includes("Craft") || kept.includes("Craft slowly")) throw new Error(`the library kept the rename: ${[...new Set(kept)].join(", ")}`);
+});
+
+journey("Review: Esc gives focus back to Start review when it started there, and from ⌘R with nothing focused to Home's own place", async (page) => {
+  const go = page.getByRole("button", { name: "Start review" });
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const leave = async () => {
+    await pick.waitFor({ timeout: 2000 }).then(() => page.keyboard.press("Enter"), () => {});
+    await page.locator(".review-q").waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  };
+  await go.focus();
+  await page.keyboard.press("Enter");
+  await leave();
+  await until("focus is back on Start review", () => go.evaluate((el) => el === document.activeElement));
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+r");
+  await leave();
+  await page.waitForTimeout(400);
+  await until("focus is on one of Home's controls", () => page.evaluate(() => !!document.activeElement?.closest(".home, .main-tools")));
+});
+
+journey("Review: Done after the last due exercise leaves focus on a control Home still has, and ↓ moves on from it", async (page) => {
+  const app = oreCalls(page);
+  try {
+    await startReview(page, null);
+    for (let n = 0; n < 40 && (await page.locator(".review-q").count()); n++) {
+      await reveal(page);
+      await page.getByRole("button", { name: "Good", exact: true }).click();
+      await until("the next exercise or the end", async () => app.rated.length === n + 1);
+      await page.waitForTimeout(150);
+    }
+    const done = page.locator(".review-foot").getByRole("button", { name: "Done" });
+    await done.waitFor();
+    await done.focus();
+    await page.keyboard.press("Enter");
+    await page.locator(".review").waitFor({ state: "detached" });
+    await page.waitForTimeout(1200); // Home reads today again: nothing is due, so Start review goes
+    const on = () => page.evaluate(() => { const a = document.activeElement as HTMLElement | null; return a && a !== document.body ? (a.textContent ?? "").trim() : null; });
+    const first = await on();
+    if (!first) throw new Error("focus fell to <body> after the session cleared what was due");
+    await page.keyboard.press("ArrowDown");
+    await until("↓ moves on from it", async () => !!(await on()) && (await on()) !== first);
+  } finally {
+    await app.undoAll();
+  }
+});
+
+journey("tutor: put away with ⌘J while he types in the note, the words stay in the note; Esc gives focus back to the mole that opened it, or opened from nothing", async (page) => {
+  await openSource(page, TESTING);
+  await page.keyboard.press("Meta+j");
+  await page.getByLabel("Message the tutor").waitFor();
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.type("Typed before ");
+  await page.keyboard.press("Meta+j");
+  await page.locator("aside.tutor").waitFor({ state: "detached" });
+  await page.keyboard.type("and after.");
+  await until("every word lands in the note", async () => (await note.innerText()).includes("Typed before and after."));
+  const mole = page.locator(".tutor-bubble");
+  await mole.focus();
+  await page.keyboard.press("Enter");
+  await page.getByLabel("Message the tutor").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc gives focus back to the mole", () => mole.evaluate((el) => el === document.activeElement));
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+j");
+  await page.getByLabel("Message the tutor").waitFor();
+  await page.keyboard.press("Escape");
+  await until("opened from nothing, Esc gives focus to the mole", () => mole.evaluate((el) => el === document.activeElement));
+  // Leave the note as it was.
+  await note.click();
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press("Backspace", { delay: 0 });
+  for (let n = 1; n < "Typed before and after.".length; n++) await page.keyboard.press("Backspace");
+  await until("the note is as it was", async () => !(await note.innerText()).includes("Typed before"));
 });
 
 journey("sidebar: renaming a collection to a name another one has is refused in place; Esc keeps the old name", async (page) => {
@@ -3404,6 +3484,7 @@ journey("answer pieces: one click rewrites a piece in place, ⌘Z puts the old w
   await edit.fill("Yes, from about age 8.");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Edit: Yes, from about age 8." }).waitFor();
+  await until("focus is back on the piece", () => page.getByRole("button", { name: "Edit: Yes, from about age 8." }).evaluate((el) => el === document.activeElement));
   await page.locator(".skill-page, main").first().click({ position: { x: 2, y: 2 } }).catch(() => {});
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Meta+z");
@@ -3412,6 +3493,7 @@ journey("answer pieces: one click rewrites a piece in place, ⌘Z puts the old w
   await edit.fill("");
   await page.keyboard.press("Enter");
   await until("emptied, it goes", async () => (await piece.count()) === 0);
+  await until("focus goes on to the answer field", () => page.evaluate(() => !!document.activeElement?.matches(".qa-box .field:not(.qa-piece-edit)")));
   await page.locator(".toast").filter({ hasText: "Removed from your answer" }).getByRole("button", { name: "Undo" }).click();
   await piece.waitFor();
   // Leave the question as the seed had it.
@@ -3483,6 +3565,7 @@ journey("reader questions: ask one, ⌘Z takes it back; its ⋯ menu marks it an
   await page.getByLabel("New question").fill(ask);
   await page.keyboard.press("Enter");
   await until("the question is listed", async () => (await rows()) === 1);
+  await until("focus is back on Ask a question", () => head.getByRole("button", { name: "Ask a question" }).evaluate((el) => el === document.activeElement));
   await page.waitForTimeout(300);
   await page.keyboard.press("Meta+z");
   await until("⌘Z takes it back", async () => (await rows()) === 0);
@@ -3657,7 +3740,9 @@ journey("⌘K: a match in a skill note opens the skill's note scrolled to the wo
   await page.locator(".skill-page").waitFor();
   await foundOnScreen(page, "first coffee", ".skill-note");
   if (!(await page.locator(".skill-col").first().evaluate((el) => el.scrollTop > 0))) throw new Error("the note didn't scroll to its end");
+  await page.locator(".find-bar input").waitFor();
   await page.keyboard.press("Escape");
+  await until("Esc gives focus back to the note it searched", () => page.evaluate(() => !!document.activeElement?.closest(".skill-note")));
 });
 
 journey("search: when searching the text fails, ⌘K and the sources filter say so instead of “no matches”", async (page) => {
@@ -5708,6 +5793,7 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   await page.keyboard.press("Enter");
   const again = page.locator(".try:not(.history)").filter({ hasText: "Quiz myself before writing, too" });
   await again.waitFor();
+  await until("focus is back on a try's row", () => page.evaluate(() => !!document.activeElement?.closest(".try")));
   if ((await again.getByRole("checkbox", { name: "Mark tried" }).count()) !== 1) throw new Error("the re-planned try isn't open again");
   const record = page.locator(".try.history").filter({ hasText: "Quiz myself before each edit session" });
   await record.waitFor();
@@ -5973,6 +6059,7 @@ journey("skill page Find: a question's words are found, though the question is a
     const said = (await page.locator(".find-bar").innerText()).trim();
     if (/not found/i.test(said)) throw new Error(`Find says “${said}” for a word on the page`);
     await page.keyboard.press("Escape");
+    await until("Esc gives focus to the sources list", () => page.evaluate(() => !!document.activeElement?.matches(".skill-page .list")));
   } finally {
     await ore("annotate", q.annotation.id, "--status", "deleted").catch(() => {});
   }
@@ -6505,6 +6592,7 @@ journey("explain: ↵ on a focused Retry, Key point or Later does what clicking 
   await ex.getByRole("button", { name: "Retry" }).focus();
   await page.keyboard.press("Enter");
   await page.waitForTimeout(300);
+  await until("focus stays in Explain", () => ex.evaluate((el) => el.contains(document.activeElement)));
   if (await learning.count()) throw new Error("↵ on Retry started Learn this");
   await ex.getByRole("button", { name: "Retry" }).waitFor();
   await ex.getByRole("button", { name: "Key point" }).focus();
