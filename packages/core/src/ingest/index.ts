@@ -199,6 +199,8 @@ async function asEpisode(html: string, base: string, page: NewItem, opts: AddOpt
   if (!audio && opts.episode) throw new Error("Couldn’t find the episode’s audio on its page any more, so it was left as it was. Open the page to check.");
   if (!audio) return null;
   try {
+    // An episode this machine can't hear (another computer, an older macOS) isn't downloaded for nothing.
+    if (!(await import("./audio.ts")).canTranscribe()) throw new Error("Transcribing audio needs macOS 26 or later on a Mac. If it has a transcript, copy it and paste it here instead.");
     const res = await get(audio, new URL(audio).host);
     const kind = kindOf(new URL(res.url || audio).pathname, res.headers.get("content-type") ?? "");
     if (!kind || !AUDIO_TYPES.includes(kind)) {

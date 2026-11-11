@@ -1257,6 +1257,20 @@ describe("import coverage: audio and podcasts", () => {
     expect(item.body.startsWith("**Rachel Feltman:**")).toBe(true);
     expect(existsSync(join(item.dir, "source.html"))).toBe(true);
     expect(audioOf(item)).toBeNull();
+    // A machine that can't hear speech at all doesn't download the audio for nothing.
+    const fetched: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const u = String(input instanceof Request ? input.url : input);
+      fetched.push(u);
+      return u === EPISODE ? new Response(episodePage, { headers: { "content-type": HTML } }) : new Response(new Uint8Array(4096), { headers: { "content-type": "audio/mpeg" } });
+    }) as unknown as typeof fetch;
+    process.env.ORE_TRANSCRIBE = "";
+    try {
+      expect(audioOf(await addSource(await tempLibrary(), EPISODE))).toBeNull();
+      expect(fetched.filter((u) => u.includes("megaphone"))).toEqual([]);
+    } finally {
+      process.env.ORE_TRANSCRIBE = stand(`cat '${vttFile}'`);
+    }
     // Nor when the Mac can't hear it (an older macOS).
     process.env.ORE_TRANSCRIBE = stand("exit 3");
     serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });

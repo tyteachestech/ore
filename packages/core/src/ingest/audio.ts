@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { release, tmpdir } from "node:os";
 import { join } from "node:path";
 import { madeThisRun } from "../cancel.ts";
 import { run, swiftHelper } from "./swift.ts";
@@ -26,6 +26,15 @@ export async function transcribe(data: Uint8Array, ext: string, onProgress?: Pro
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** Whether this machine can hear speech at all, before anything downloads: the stand-in transcriber
+ *  (ORE_TRANSCRIBE; set empty, none), else macOS 26 or later (Darwin 25), where Apple's SpeechAnalyzer
+ *  is. Whether it has a model for the speech's language is only known by trying. */
+export function canTranscribe(): boolean {
+  const stand = process.env.ORE_TRANSCRIBE;
+  if (stand !== undefined) return stand !== "";
+  return process.platform === "darwin" && Number(release().split(".")[0]) >= 25;
 }
 
 /** A sound or video file on disk as WebVTT, without reading it into memory (a lecture video can be
