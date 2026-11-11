@@ -3428,16 +3428,17 @@ journey("list drag to select: a drag from beside the rows boxes the ones it cros
     await until("a drag from below the last row selects it", async () => (await pickedRows(page)).join() === (await rowTitles(page, lastAt)).join());
     await page.mouse.click(x, (await at(1)).y + 10);
   }
+  // One click on a row still opens it, and back, the list is as it was.
+  await rows.nth(1).click();
+  await page.locator(".doc-head").waitFor();
+  await page.keyboard.press("Escape");
+  await rows.nth(3).waitFor();
   // A drag that starts on a row carries the row (to file it on a skill), and boxes nothing.
   await boxDrag(page, (await at(0)).x + 60, await mid(0), (await at(0)).x + 60, await mid(3), false); // on its picture
   await page.locator(".row-ghost").waitFor();
   if ((await page.locator(".marquee").count()) || (await pickedRows(page)).length) throw new Error("a drag from a row drew the box");
-  await page.keyboard.press("Escape");
   await page.mouse.up();
-  // One click on a row still opens it.
-  const title = (await rowTitles(page, 1))[0]!;
-  await rows.nth(1).click();
-  await page.locator(".doc-head").filter({ hasText: title }).waitFor();
+  await until("dropped on no skill, nothing is picked", async () => !(await page.locator(".row-ghost").count()) && !(await pickedRows(page)).length);
 });
 
 journey("list drag to select on a skill page: a drag from the column beside its sources selects the ones it crosses; a click there clears (D194)", async (page) => {
@@ -3450,7 +3451,8 @@ journey("list drag to select on a skill page: a drag from the column beside its 
   const x = list.x + list.width + 6; // right of the rows, in the column
   await boxDrag(page, x, r0.y + 8, x - 200, r1.y + r1.height / 2);
   await until("both rows are selected", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1)).join());
-  await page.mouse.click(x, r0.y + 8);
+  // Read again: the page above the list settles as it loads.
+  await page.mouse.click(x, (await rows.nth(0).boundingBox())!.y + 8);
   await until("a click beside them clears", async () => !(await pickedRows(page)).length);
 });
 
