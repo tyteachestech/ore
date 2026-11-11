@@ -1008,9 +1008,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         </Hint>
       </div>
 
-      {/* VoiceOver hears each new card and when the AI's marks arrive, not only the end screen. */}
+      {/* VoiceOver hears each new card and the key points as marked (by the AI, or by him), not only the end screen. */}
       <div className="sr-only" aria-live="polite">
-        {card && !end && queue?.length ? `Exercise ${done + 1} of ${done + left}. ${card.question.replace(/_{4,}/g, "blank")}${grade && marks ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
+        {card && !end && queue?.length ? `Exercise ${done + 1} of ${done + left}. ${card.question.replace(/_{4,}/g, "blank")}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
         {error && (

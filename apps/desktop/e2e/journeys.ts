@@ -4926,6 +4926,19 @@ journey("review: the screen reader's summary counts the key points as he has mar
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: with no AI marks (the check failed), the screen reader counts the ones he sets", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { grade: "AI is signed out." }));
+  await startReview(page, /Teaching/);
+  await page.getByRole("textbox", { name: "Your answer" }).fill("fluency feels like knowing");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const live = page.locator(".review .sr-only[aria-live]");
+  await page.getByRole("button", { name: /Mark as got$/ }).first().click();
+  await until("his mark is read out", async () => (await live.innerText()).includes("Marked 1 of 2 key points"));
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: Start review clicked before the skills have loaded still asks what to review", async (page) => {
   // Home's numbers can land before the skill list (CI, 2026-11-07): the click must not start every skill unasked.
   await page.addInitScript("window.__ORE_SLOW = { skills: 1500 }");
