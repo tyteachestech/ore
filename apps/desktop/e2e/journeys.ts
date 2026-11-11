@@ -8164,6 +8164,24 @@ journey("phone: the last rating of a review shows the end screen, not Wrapping u
   await until("the end screen comes up by itself", async () => !(await page.getByText("Wrapping up").count()) && (await page.locator(".phone-full .review-end").count()) > 0);
 }, "phone");
 
+/** What a tap at the middle of the element would land on, as its nearest button's accessible name. */
+const tappedAt = (page: Page, sel: string) =>
+  page.evaluate((sel) => {
+    const r = document.querySelector(sel)!.getBoundingClientRect();
+    const b = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest("button");
+    return b?.getAttribute("aria-label") ?? b?.textContent?.trim() ?? "";
+  }, sel);
+
+journey("phone: the reading pill and the reader's bottom bar each keep their own taps", async (page) => {
+  // Both sat at the bottom centre: the bar covered the pill, and a tap on it opened the note.
+  await phoneSource(page, TESTING);
+  const pill = page.locator(".read-pill");
+  await page.locator(".phone-tools").waitFor();
+  await until("the pill's middle is the pill, not the bar", async () => /Sections$/.test(await tappedAt(page, ".read-pill")));
+  await tap(page, pill);
+  await until("a tap on the pill opens the sections", async () => (await pill.getAttribute("aria-expanded")) === "true");
+}, "phone");
+
 // —— run ——
 
 let failed = 0;

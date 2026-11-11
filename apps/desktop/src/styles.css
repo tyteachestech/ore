@@ -2912,12 +2912,15 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 
 /* Reading pill (D152, phone): where he is in the source, at the foot of the page. 28px pill: a 16px ring that
    fills as he reads and the section's name; a tap opens the sections as a bottom sheet. */
-.read-pill { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%; transform: translateX(-50%); z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: 70%; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
+.read-pill { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%; transform: translateX(-50%); transition: transform var(--t-3) ease-out; z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: 70%; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
 .read-pill:disabled { padding-right: 6px; }
 .read-pill:active:not(:disabled) { background: var(--bg-hover); }
 .read-pill svg { flex: none; color: var(--text); }
-/* The text never ends under the pill. */
-.phone-reader .reader-pane:has(.read-pill) .doc { padding-bottom: 56px; }
+/* While the bottom bar shows (D156) the pill rides above it and settles back to the foot as the bar slides away,
+   so neither covers the other's taps (Books keeps its place at the foot, clear of its controls). */
+.phone .reader:not(:is(.bars-hidden, .dragging, .noting)) .reader-pane:has(.phone-tools) .read-pill { transform: translate(-50%, -52px); }
+/* The text never ends under the pill, nor under the bar it sits on at either end of the source. */
+.phone-reader .reader-pane:has(.read-pill) .doc { padding-bottom: 108px; }
 .read-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: pill-name var(--t-2) ease-out both; }
 @keyframes pill-name { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .read-pill-name { animation: none; } }
