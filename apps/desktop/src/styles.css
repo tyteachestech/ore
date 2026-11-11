@@ -2278,7 +2278,9 @@ button.home-plan:hover { color: var(--text); }
 .menu-item kbd { margin-left: auto; color: var(--faint); }
 .menu-item.check { gap: 8px; padding-left: 6px; }
 .menu-item.check > .skill-icon { flex: none; }
-.menu-tick { flex: none; width: 14px; display: grid; place-items: center; color: var(--accent); }
+/* The tick's column: 16px holds the Tick's ink (12.5px) whole; the indicator is a flex box so the sprite centres on the row, not on the text baseline. */
+.menu-tick { flex: none; width: 16px; height: 20px; display: grid; place-items: center; color: var(--accent); }
+.menu-tick > span { display: flex; }
 .menu-sep { height: 1px; margin: 4px 6px; background: var(--border); }
 .doc-head .title-edit { display: block; width: 100%; font-size: 30px; line-height: 1.25; font-weight: 700; margin: 8px 0 6px; letter-spacing: -0.01em; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -1px 0 var(--accent); }
 .row { position: relative; }

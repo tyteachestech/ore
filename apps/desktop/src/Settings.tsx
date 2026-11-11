@@ -1,4 +1,4 @@
-import { CaretUpDown, Check, GearSix, Keyboard, Minus, Plus, Target, X } from "./icons";
+import { CaretUpDown, GearSix, Tick, Keyboard, Minus, Plus, Target, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { invoke } from "@tauri-apps/api/core";
 import * as Switch from "@radix-ui/react-switch";
@@ -536,7 +536,7 @@ function SelectMenu({ label, value, options, disabled, onChange }: { label: stri
                 <DropdownMenu.RadioItem key={o.id || "default"} value={o.id} className="menu-item check">
                   <span className="menu-tick">
                     <DropdownMenu.ItemIndicator>
-                      <Check size={12} weight="bold" />
+                      <Tick />
                     </DropdownMenu.ItemIndicator>
                   </span>
                   <span className="menu-label">{o.label}</span>

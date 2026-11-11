@@ -1,5 +1,5 @@
 import { ranked } from "./match";
-import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
+import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
 import { DotBar } from "./Ring";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
@@ -90,7 +90,6 @@ const added = (iso: string) => {
 };
 
 function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; archived: boolean; go: (s: Tab) => void; details: Detail[]; toggle: (d: Detail) => void }) {
-  const keys = useKeymap();
   const views = [...TABS, ...(archived || status === "archived" ? [{ id: "archived" as Tab, label: "Archived", key: undefined }] : [])];
   return (
     <DropdownMenu.Root modal={false}>
@@ -109,11 +108,10 @@ function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; arch
               <DropdownMenu.RadioItem key={v.id} value={v.id} className="menu-item check">
                 <span className="menu-tick">
                   <DropdownMenu.ItemIndicator>
-                    <Check size={12} weight="bold" />
+                    <Tick />
                   </DropdownMenu.ItemIndicator>
                 </span>
                 <span className="menu-label">{v.label}</span>
-                {v.key && <kbd>{label(keys[v.key])}</kbd>}
               </DropdownMenu.RadioItem>
             ))}
           </DropdownMenu.RadioGroup>
@@ -129,7 +127,7 @@ function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; arch
             >
               <span className="menu-tick">
                 <DropdownMenu.ItemIndicator>
-                  <Check size={12} weight="bold" />
+                  <Tick />
                 </DropdownMenu.ItemIndicator>
               </span>
               <span className="menu-label">{c.label}</span>
