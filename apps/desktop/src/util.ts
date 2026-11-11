@@ -42,24 +42,35 @@ export function save(key: string, value: string): void {
   }
 }
 
-/** A Map kept in localStorage under `key` as well (null: memory only). The phone's drafts use it: iOS ends a web
- *  view left in the background, and what he typed must be there on the relaunch, as in Notes. */
-export function keptMap<V>(key: string | null): Map<string, V> {
+/** Drafts by id, kept in localStorage under `key` as well (null: memory only). The phone's use it: iOS ends a web view
+ *  left in the background, and what he typed must be there on the relaunch, as in Notes. Written a moment after the
+ *  last change, and at once as the page is hidden or goes (iOS may end it any time after), never on each keystroke. */
+export type Kept<V> = { get(id: string): V | undefined; set(id: string, v: V): void; delete(id: string): void };
+export function kept<V>(key: string | null): Kept<V> {
   const m = new Map<string, V>();
-  if (!key) return m;
+  if (!key) return { get: (id) => m.get(id), set: (id, v) => void m.set(id, v), delete: (id) => void m.delete(id) };
   try {
     for (const [k, v] of JSON.parse(load(key) ?? "[]") as [string, V][]) m.set(k, v);
   } catch {}
-  const write = () => save(key, JSON.stringify([...m]));
-  const set = m.set.bind(m);
-  const remove = m.delete.bind(m);
-  m.set = (k, v) => (set(k, v), write(), m);
-  m.delete = (k) => {
-    const had = remove(k);
-    if (had) write();
-    return had;
+  let dirty = false;
+  let later = 0;
+  const flush = () => {
+    clearTimeout(later);
+    if (dirty) save(key, JSON.stringify([...m]));
+    dirty = false;
   };
-  return m;
+  const changed = () => {
+    dirty = true;
+    clearTimeout(later);
+    later = window.setTimeout(flush, 300);
+  };
+  addEventListener("pagehide", flush);
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flush());
+  return {
+    get: (id) => m.get(id),
+    set: (id, v) => (m.set(id, v), changed()),
+    delete: (id) => void (m.delete(id) && changed()),
+  };
 }
 
 /** How far each list was scrolled, by tab, skill page or "home": one map in localStorage for the app, as every

@@ -16,7 +16,7 @@ import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthS
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, keptMap, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
@@ -66,7 +66,17 @@ const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : [
 
 /** Answers typed but not checked, and how sure he said he was, by card: putting the quick quiz away
  *  (D76), Esc or Open in source keep them for when the card comes up again; on the phone, a relaunch too. */
-const drafts = keptMap<{ text: string; conf?: number }>(PHONE ? "ore.review-drafts" : null);
+const drafts = kept<{ text: string; conf?: number; asked: string; at: number }>(PHONE ? "ore.review-drafts" : null);
+/** What a draft was typed for: the question, or the remixed version shown (D66). One for another is dropped. */
+const askedOf = (c: CardFull) => `${c.variant ?? ""}\n${c.question}`;
+/** A draft lasts a day: today's session is the slice it was typed in (D65), and tomorrow the exercise is asked anew. */
+const DRAFT_MS = 24 * 3600_000;
+const draftFor = (c: CardFull) => {
+  const d = drafts.get(c.id);
+  if (d && (d.asked !== askedOf(c) || Date.now() - d.at > DRAFT_MS)) return void drafts.delete(c.id);
+  return d;
+};
+const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c), at: Date.now() });
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
@@ -332,9 +342,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       (c) => {
         if (!live) return;
         setCard(c);
-        const kept = c.kind === "prompt" ? drafts.get(c.id) : undefined;
-        setAnswer(kept?.text ?? "");
-        setConf(kept?.conf);
+        const draft = c.kind === "prompt" ? draftFor(c) : undefined;
+        setAnswer(draft?.text ?? "");
+        setConf(draft?.conf);
         shownAt.current = Date.now();
       },
       (e) => live && setError(errorText(e)),
@@ -732,6 +742,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       await ore("card", "retire", card.id);
       const { id, state } = card;
       retired.current.add(id);
+      drafts.delete(id); // what he typed goes with it
       notify(
         entry?.state === "draft" ? "Exercise deleted" : "Exercise retired",
         "info",
@@ -835,7 +846,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   const pickSure = (n: number) => {
     setConf(n);
-    if (card?.kind === "prompt") drafts.set(card.id, { text: answer, conf: n });
+    if (card?.kind === "prompt") keepDraft(card, answer, n);
     if (card?.kind === "card") {
       setPhase("checked");
       shownAnswerAt.current = Date.now();
@@ -1062,13 +1073,13 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                   value={answer}
                   onChange={(e) => {
                     setAnswer(e.target.value);
-                    drafts.set(card.id, { text: e.target.value, conf });
+                    keepDraft(card, e.target.value, conf);
                   }}
                 />
                 <div className={`quiz-label${askSure ? " ask" : ""}`} id="review-sure">
                   How sure are you?
                 </div>
-                <Sure refEl={sureRef} conf={conf} onPick={(n) => (conf === n ? (setConf(undefined), drafts.set(card.id, { text: answer })) : pickSure(n))} />
+                <Sure refEl={sureRef} conf={conf} onPick={(n) => (conf === n ? (setConf(undefined), keepDraft(card, answer)) : pickSure(n))} />
                 <div className="review-foot">
                   {card.in_head_ok && (
                     <Hint text="Answered in my head" keys="in-head" side="top">

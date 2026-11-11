@@ -7,7 +7,7 @@ import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
 import { stampBefore } from "./transcript";
-import { errorText, focusPicked, keptMap, stepLabel, type Notify } from "./util";
+import { errorText, focusPicked, kept, stepLabel, type Notify } from "./util";
 import { Matrix, useLate, Working } from "./Working";
 import { PixelBurst } from "./Burst";
 
@@ -38,9 +38,24 @@ type Props = NotesSync & {
 
 const SURE = ["Guess", "Think so", "Sure"] as const;
 
-// Typed text survives closing the panel (Esc) and reopening it while the reader stays open (D52), and on the phone a relaunch.
+// Typed text survives closing the panel (Esc) and reopening it while the reader stays open (D52).
 type Draft = { step: number; recall: string; answers: string[]; conf: (number | undefined)[]; use: string; leave: string; qs: Prequestion[] };
-const drafts = keptMap<Draft>(PHONE ? "ore.finish-drafts" : null);
+const drafts = new Map<string, Draft>();
+/** On the phone it survives a relaunch too, once he has typed something: kept without the questions (they are read
+ *  from the source again) but with what they were and when it was written, so a draft for questions the Mac has
+ *  since rewritten, or older than a recall recorded since, goes instead of answering something else. */
+type KeptDraft = Omit<Draft, "qs"> & { asked: string; at: number };
+const keptDrafts = kept<KeptDraft>(PHONE ? "ore.finish-drafts" : null);
+const askedIn = (qs: Prequestion[]) => JSON.stringify(qs.map((q) => q.q));
+function keptDraft(doc: Doc): Draft | undefined {
+  const k = keptDrafts.get(doc.id);
+  if (!k) return undefined;
+  const qs = doc.prequestions ?? [];
+  if (k.asked !== askedIn(qs) || (doc.recall && Date.parse(doc.recall.at) > k.at)) return void keptDrafts.delete(doc.id);
+  const { asked: _asked, at: _at, ...d } = k;
+  return { ...d, qs };
+}
+const dropDraft = (id: string) => (drafts.delete(id), keptDrafts.delete(id));
 
 /** Sources whose cards failed to draft, each with its retry: one toast says them all (the latest reason),
  *  and its Try again drafts them all, so a second failure never hides the first one's way back. */
@@ -63,7 +78,7 @@ function sayUndrafted(notify: Notify, why: string) {
 export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, nextLesson, notify, flushNotes, onNotes, skills }: Props) {
   // The finished badge bursts in the colour of the source's first coloured skill (D153).
   const burstColor = doc.skills.map((id) => skills?.find((s) => s.id === id)?.color).find(Boolean);
-  const draft = drafts.get(doc.id);
+  const draft = drafts.get(doc.id) ?? keptDraft(doc);
   const [qs, setQs] = useState<Prequestion[]>(draft?.qs ?? doc.prequestions ?? []);
   /** "Leave anything out?" (D100): his words, sent to the AI with the recall. */
   const [leave, setLeave] = useState(draft?.leave ?? doc.leave_out?.text ?? "");
@@ -95,6 +110,9 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
 
   useEffect(() => {
     drafts.set(doc.id, { step, recall, answers, conf, use, leave, qs });
+    const typed = recall !== (doc.recall?.text ?? "") || answers.some((a, i) => a !== (qs[i]?.after ?? "")) || !!use.trim() || leave !== (doc.leave_out?.text ?? "");
+    if (typed) keptDrafts.set(doc.id, { step, recall, answers, conf, use, leave, asked: askedIn(qs), at: Date.now() });
+    else keptDrafts.delete(doc.id);
   }, [doc.id, step, recall, answers, conf, use, leave, qs]);
 
   // D56: key points for every prequestion, written while he does the free recall.
@@ -269,7 +287,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       setBusy(false);
       return;
     }
-    drafts.delete(doc.id);
+    dropDraft(doc.id);
     // Drafting starts at once, so a window closed during the moment still drafts the cards.
     let gone = () => {};
     enrich(new Promise<void>((ok) => (gone = ok)));
@@ -293,7 +311,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       setBusy(false);
       return;
     }
-    drafts.delete(doc.id);
+    dropDraft(doc.id);
     onCancel();
   }
 

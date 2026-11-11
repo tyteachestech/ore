@@ -8461,6 +8461,74 @@ journey("phone: a bottom sheet covers the reader's bar, the pill and a toast", a
   await check("What to review");
 }, "phone");
 
+/** Changes a file in the phone's library as a sync from the Mac would (the next load brings it in), and puts it back
+ *  when `run` is done. */
+async function macChanges(path: (lib: string) => string, from: string, to: string, run: () => Promise<void>) {
+  const file = path(PHONE_LIB);
+  const was = readFileSync(file, "utf8");
+  if (!was.includes(from)) throw new Error(`“${from}” is not in ${file}`);
+  writeFileSync(file, was.replace(from, to));
+  try {
+    await run();
+  } finally {
+    writeFileSync(file, was);
+  }
+}
+const itemFile = (lib: string, slug: string, name: string) => {
+  const year = readdirSync(join(lib, "items")).find((d) => /^\d{4}$/.test(d))!; // the seed carries Finder junk too
+  return join(lib, "items", year, readdirSync(join(lib, "items", year)).find((d) => d.startsWith(slug))!, name);
+};
+const cardFile = (lib: string, text: string) => join(lib, "cards", readdirSync(join(lib, "cards")).find((f) => f.endsWith(".md") && readFileSync(join(lib, "cards", f), "utf8").includes(text))!);
+
+journey("phone: a kept draft goes when the Mac changes what it answered, and nothing is kept before he types", async (page) => {
+  // Kept drafts outlived their questions: Finish kept one (with a copy of the questions) the moment it opened, and
+  // after the Mac changed the questions the phone showed and sent answers against the old ones.
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  const recall = page.getByPlaceholder("In your own words…");
+  await recall.waitFor();
+  await Bun.sleep(800);
+  const kept = () => page.evaluate(() => localStorage.getItem("ore.finish-drafts") ?? "");
+  if ((await kept()).length > 4) throw new Error(`Finish kept a draft before he typed: ${(await kept()).slice(0, 80)}`);
+  await tap(page, recall);
+  await page.keyboard.type("Testing beats rereading");
+  await Bun.sleep(800);
+  await macChanges((lib) => itemFile(lib, "the-testing-effect", "doc.md"), "Why does rereading feel effective even when it isn't?", "Why does rereading feel so convincing?", async () => {
+    await page.reload();
+    await recall.waitFor();
+    await until("the old recall is gone with the old questions", async () => (await recall.inputValue()) === "");
+  });
+  await until("the kept draft for the old questions is gone", async () => !(await kept()).includes("rereading feel effective"));
+
+  // Review: an Explain answer typed for a question the Mac has since changed.
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(page.url().split("#")[0]!);
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const field = page.locator(".phone-full textarea:visible");
+  const toExplain = async () => {
+    for (let i = 0; ; i++) {
+      await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
+      if (await field.count()) return;
+      if (i > 10) throw new Error("no Explain exercise came up");
+      await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+      await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+      await Bun.sleep(300);
+    }
+  };
+  await toExplain();
+  await tap(page, field);
+  await page.keyboard.type("Rereading feels fluent");
+  await Bun.sleep(800);
+  await macChanges((lib) => cardFile(lib, "illusion of competence"), "Explain why rereading creates an illusion of competence.", "Explain why rereading misleads learners.", async () => {
+    await page.reload();
+    await toExplain();
+    await page.getByText("Explain why rereading misleads learners.").first().waitFor();
+    if ((await field.inputValue()) !== "") throw new Error("the answer typed for the old question came back under the new one");
+  });
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
