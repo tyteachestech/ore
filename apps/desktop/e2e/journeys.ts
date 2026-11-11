@@ -8236,6 +8236,17 @@ journey("phone: a half-typed Explain answer and a Finish recall survive a relaun
   await until("the recall comes back after a relaunch", async () => (await recall.inputValue().catch(() => "")) === "Testing beats rereading after a delay");
 }, "phone");
 
+journey("phone: a relaunch with a source's Collected page open comes back to it", async (page) => {
+  // The page beside the source wasn't kept: a relaunch showed the note page in its place.
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  const collected = page.locator('aside.mynotes[aria-label="Collected"]');
+  await collected.waitFor();
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await until("Collected is the page beside the source again", async () => (await collected.count()) === 1 && (await page.locator(".reader.noting").count()) === 1);
+}, "phone");
+
 // —— run ——
 
 let failed = 0;

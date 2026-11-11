@@ -146,7 +146,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
 type TabId = "today" | "sources" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
-type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; finishing?: boolean; review: { pick: string[] | null } | null };
+type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null } | null };
 const PLACE = "ore-phone-place";
 function loadPlace(): Place {
   try {
@@ -277,7 +277,7 @@ export function PhoneApp() {
   const [openId, setOpenId] = useState<string | null>(start.openId);
   const [noting, setNoting] = useState(!!start.noting);
   /** What the page beside the source shows: the note, or what he collected (a tap on the collected count). */
-  const [side, setSide] = useState<SideTab>("note");
+  const [side, setSide] = useState<SideTab>(start.side ?? "note");
   // Once that page has slid away it is the note again, so the edge swipe always brings the note.
   useEffect(() => {
     if (noting) return;
@@ -303,9 +303,9 @@ export function PhoneApp() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, finishing, review: reviewing && { pick: reviewing.pick } } satisfies Place));
+      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, side, finishing, review: reviewing && { pick: reviewing.pick } } satisfies Place));
     } catch {}
-  }, [tab, skill, skillNote, openId, noting, finishing, reviewing]);
+  }, [tab, skill, skillNote, openId, noting, side, finishing, reviewing]);
   const tabNow = useRef(tab);
   tabNow.current = tab;
   const refresh = useCallback(async () => {
