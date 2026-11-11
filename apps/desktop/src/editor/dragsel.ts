@@ -2,15 +2,13 @@ import { Plugin, PluginKey, type EditorState } from "@milkdown/kit/prose/state";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { $prose } from "@milkdown/kit/utils";
 import { blocksOf, BlockSelection, selectBlocks, type Block } from "./blockops";
-import { crossing, drawBox } from "../marquee";
+import { besideAt, crossing, drawBox } from "../marquee";
 
 // Notion's drag to select blocks (D188). A drag that starts beside the note (its gutter, the space
 // around its blocks) draws a box and selects every block it passes; a drag that starts in a block's
 // text selects text until it reaches another block, then selects whole blocks instead.
 
 const mine = new PluginKey("drag-sel");
-/** Beside the note: how far left or right of it a drag may start. */
-const REACH = 40;
 /** What a press on is never the start of a drag over blocks: controls, and a diagram (a drag pans it). */
 const OWN = 'button, input, textarea, select, img, [contenteditable="false"], [role="button"], [role="menu"], [role="dialog"], .block-handle, .sel-bar';
 
@@ -66,7 +64,7 @@ export const dragSelPlugin = $prose(() => {
         const r = h.getBoundingClientRect();
         const text = view.dom.contains(t) && t !== view.dom;
         // Beside the note: the note's own empty space, or the bare column around it (never another part of the page).
-        const beside = !text && (h.contains(t) || t.contains(h)) && e.clientX >= r.left - REACH && e.clientX <= r.right + REACH;
+        const beside = !text && (h.contains(t) || besideAt(e, t, h));
         if (!text && !beside) return;
         drag = { x: e.clientX, y: e.clientY, from: e.clientY - r.top, text, on: false, box: null };
       };

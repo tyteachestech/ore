@@ -28,8 +28,16 @@ export function combine(ids: string[], held: string[], crossed: string[], mode: 
   return ids.filter((id) => (mode === "set" ? hit.has(id) : mode === "add" ? hit.has(id) || had.has(id) : hit.has(id) !== had.has(id)));
 }
 
-/** Beside a list: how far left or right of it a drag may start (the note's gutter, D188). */
+/** Beside a note or a list: how far left or right of it a drag may start (the note's gutter, D188). */
 const REACH = 40;
+
+/** A press on the bare page around `el` (on something that holds it), level with it and at most 40px to
+ *  its side. Level with it only, so where the note sits above the sources (a narrow skill page) a press
+ *  beside one is never also beside the other, and only one box starts. */
+export function besideAt(e: MouseEvent, t: Element, el: Element): boolean {
+  const r = el.getBoundingClientRect();
+  return t.contains(el) && e.clientX >= r.left - REACH && e.clientX <= r.right + REACH && e.clientY >= r.top && e.clientY <= r.bottom;
+}
 /** Where a Mac's overlay scrollbar sits, at a scrolling list's right edge. */
 const BAR = 12;
 /** What a press on is never the start of a box: a row (it drags to file, and opens on a click), a control, a header. */
@@ -45,9 +53,7 @@ const scroller = (el: HTMLElement): HTMLElement => {
 export function blankStart(e: MouseEvent, list: HTMLElement): boolean {
   const t = e.target;
   if (e.button !== 0 || e.ctrlKey || e.altKey || !(t instanceof Element) || t.closest(OWN)) return false;
-  if (!(list.contains(t) || t.contains(list)) || !t.closest(".main") || !list.querySelector('[role="row"]')) return false;
-  const r = list.getBoundingClientRect();
-  if (e.clientX < r.left - REACH || e.clientX > r.right + REACH || e.clientY < r.top) return false;
+  if (!(list.contains(t) || besideAt(e, t, list)) || !t.closest(".main") || !list.querySelector('[role="row"]')) return false;
   const s = scroller(list);
   const sr = s.getBoundingClientRect();
   const edge = sr.left + s.clientLeft + s.clientWidth - (s.scrollHeight > s.clientHeight ? BAR : 0);
@@ -69,9 +75,12 @@ export type RowPick = {
 
 /** Follows a press `blankStart` took: past a few pixels it draws the box and picks the rows (`[role=row]`,
  *  id `row-<id>`) it crosses as it goes; Esc puts the selection back, release keeps it. No autoscroll near
- *  the edges (D188 left it out; the wheel scrolls and the box follows). */
-export function dragRows(e: MouseEvent, list: HTMLElement, on: RowPick) {
+ *  the edges (D188 left it out; the wheel scrolls and the box follows). Returns what ends it where it is,
+ *  with no more picks, for when the list goes (another view); the window losing focus ends it too. */
+export function dragRows(e: MouseEvent, list: HTMLElement, on: RowPick): () => void {
   e.preventDefault(); // no text selected under the box; focus goes to the list instead, so its keys work after
+  // A click lets go of words selected anywhere; the press it stopped would have, so it does it here.
+  window.getSelection()?.removeAllRanges();
   list.focus({ preventScroll: true });
   const mode: Mode = e.metaKey ? "toggle" : e.shiftKey ? "add" : "set";
   const ok = new Set(on.ids);
@@ -83,6 +92,7 @@ export function dragRows(e: MouseEvent, list: HTMLElement, on: RowPick) {
   let last: string | null = null;
 
   const update = () => {
+    if (!list.isConnected) return end();
     const r = list.getBoundingClientRect();
     const v = scroller(list).getBoundingClientRect();
     const clamp = (y: number) => Math.max(Math.max(v.top, 0), Math.min(Math.min(v.bottom, innerHeight), y));
@@ -118,17 +128,23 @@ export function dragRows(e: MouseEvent, list: HTMLElement, on: RowPick) {
     stop(true);
   };
   const up = () => stop(false);
-  function stop(cancel: boolean) {
+  const end = () => {
     window.removeEventListener("mousemove", move, true);
     window.removeEventListener("mouseup", up, true);
     window.removeEventListener("keydown", key, true);
     window.removeEventListener("scroll", scrolled, true);
+    window.removeEventListener("blur", end);
+    box?.remove();
+  };
+  function stop(cancel: boolean) {
+    end();
     if (cancel) on.cancel();
     else if (!box && mode === "set") on.click();
-    box?.remove();
   }
   window.addEventListener("mousemove", move, true);
   window.addEventListener("mouseup", up, true);
   window.addEventListener("keydown", key, true);
   window.addEventListener("scroll", scrolled, true);
+  window.addEventListener("blur", end);
+  return end;
 }

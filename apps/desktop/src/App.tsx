@@ -1169,8 +1169,13 @@ export function App() {
     setPicked([]);
     anchor.current = null;
   };
-  // A pick belongs to the list it was made in.
-  useEffect(unpick, [status, skill, q, openId, place]);
+  /** Ends a drag box (D194) where it is, with no more picks: a view that changes takes the list it was over. */
+  const boxDrag = useRef<(() => void) | null>(null);
+  // A pick belongs to the list it was made in, and so does a box still being dragged.
+  useEffect(() => {
+    boxDrag.current?.();
+    unpick();
+  }, [status, skill, q, openId, place]);
   /** A drag from blank space beside the rows boxes the ones it crosses (D194, Finder; the note's D188):
    *  a pick like ⇧-click's, from the row it began by to the one it reached; ⇧ adds, ⌘ toggles. */
   const boxPick = (): RowPick => {
@@ -1840,10 +1845,13 @@ export function App() {
     if (!listShown) return;
     const down = (e: MouseEvent) => {
       const list = listRef.current;
-      if (list && !overlayRef.current && blankStart(e, list)) dragRows(e, list, live.current.boxPick());
+      if (list && !overlayRef.current && blankStart(e, list)) boxDrag.current = dragRows(e, list, live.current.boxPick());
     };
     window.addEventListener("mousedown", down);
-    return () => window.removeEventListener("mousedown", down);
+    return () => {
+      window.removeEventListener("mousedown", down);
+      boxDrag.current?.();
+    };
   }, [listShown]);
   /** A row's optional details last, at fixed widths, so they line up down the list whatever the chips.
    *  A course takes its lessons' author and its first added date. */
