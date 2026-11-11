@@ -26,6 +26,8 @@ describe("menu bar", () => {
     expect(row("rename", { reader: true, review: false }).enabled).toBe(true);
     expect(row("retire-card").enabled).toBe(false);
     expect(row("retire-card", { reader: false, review: true }).enabled).toBe(true);
+    // Review ▸ Later, with its ⌘L (D192).
+    expect([row("later").enabled, row("later", { reader: false, review: true }).enabled, row("later").accel]).toEqual([false, true, "Super+KeyL"]);
     expect(row("review").enabled).toBe(true);
   });
 

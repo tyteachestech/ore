@@ -59,6 +59,8 @@ const DEFAULTS = [
   { id: "retire-card", label: "Retire exercise", group: "Review", combo: "Shift+Meta+Backspace", global: true },
   { id: "ask", label: "Ask about this exercise", group: "Review", combo: "Slash" },
   { id: "bad-version", label: "Bad version: show the original exercise", group: "Review", combo: "KeyB" },
+  // ⌘L, L for Later: it works with the answer half typed (a plain key would type into it), as ⌘⌫ No idea does.
+  { id: "later", label: "Later: at the end of this session", group: "Review", combo: "Meta+KeyL", global: true },
   { id: "play", label: "Play / pause", group: "Video and listening", combo: "Space" },
   { id: "back", label: "Back 15 seconds", group: "Video and listening", combo: "ArrowLeft" },
   { id: "forward", label: "Forward 30 seconds", group: "Video and listening", combo: "ArrowRight" },
@@ -285,7 +287,7 @@ export function invalid(id: KeyId, combo: Combo): string | null {
 }
 
 /** Review's own commands: they work only in Review, where the app's other keys are off (App.tsx). */
-export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["no-idea", "in-head", "edit-card", "retire-card", "ask", "bad-version"]);
+export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["no-idea", "in-head", "later", "edit-card", "retire-card", "ask", "bad-version"]);
 /** App keys that work in Review too (⌘↵, the passage arrows, Undo and Redo, by its button and the toast), and the quick quiz, which works from any app. */
 const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-next", "passage-prev", "undo", "redo", "quick-quiz"]);
 

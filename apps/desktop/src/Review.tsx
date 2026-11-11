@@ -1,4 +1,4 @@
-import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, PencilSimple, ThumbsDown, Trash, X } from "./icons";
+import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, Clock, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
@@ -11,7 +11,8 @@ import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
-import { lastWin, longGapText, ore, opt, PHONE, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { keydownFor } from "./menubar";
+import { lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -46,6 +47,15 @@ const CUT_SHOWN = 8;
 const END_RING = 120;
 
 type Phase = "answer" | "checked" | "edit";
+/** The passage a card came from, shown after the answer (see `passage` in Review). */
+type Passage = { item: string; title: string; quotes: { text: string; at: string; time?: string }[] };
+/** An exercise as he had it on screen when he put it off: ⌘Z brings it back so (D192). `elapsed`: its clock so far. */
+type Shown = {
+  card: CardFull; phase: "answer" | "checked"; answer: string; conf?: number; inHead: boolean; grade: Grade | null; marks: (boolean | undefined)[] | null;
+  remark: boolean; gradeError: string | null; passage: Passage | null; quoteAt: number; passageGone: string | null; asking: boolean; elapsed: number;
+};
+/** One Later on the history: the session before and after it (null: it ended the session), and what it changed. */
+type Put = { id: string; before: DueEntry[]; after: DueEntry[] | null; off: Set<string>; won: boolean; shown: Shown; forget?: Forget };
 type Rating = 1 | 2 | 3 | 4;
 /** The session receipt, and today before and after it (for the ring and level-ups). */
 /** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
@@ -101,7 +111,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   /** What answers the card in its source, shown after the answer: the passage it came from, or for a line
    *  he typed (D99) the quotes the AI found, one at a time. `at` opens the source there. A card with no
    *  passage (one the tutor kept, or whose highlight is gone) has no quotes and opens the source at the top. */
-  const [passage, setPassage] = useState<{ item: string; title: string; quotes: { text: string; at: string; time?: string }[] } | null>(null);
+  const [passage, setPassage] = useState<Passage | null>(null);
   const [quoteAt, setQuoteAt] = useState(0);
   /** Why the passage can't show (its source deleted since the card was made), in its place. */
   const [passageGone, setPassageGone] = useState<string | null>(null);
@@ -156,10 +166,18 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [start, setStart] = useState<Today | null>(null);
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
-  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; forget: Forget }[]>([]);
+  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; forget: Forget }[]>([]);
   const last = undos.at(-1);
   /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
   const retired = useRef(new Set<string>());
+  /** Exercises put off this session (D192), by id: once every one left is, the session ends. A rating takes its own off. */
+  const putOffIds = useRef(new Set<string>());
+  /** An exercise ⌘Z brought back from Later: it shows again as he had it, not loaded afresh. */
+  const restoreTo = useRef<{ id: string; was: Shown } | null>(null);
+  /** The Laters on the app history: nothing is recorded, so once Review closes there is nothing to take back. */
+  const laterSteps = useRef(new Set<Forget>());
+  const undoLaterNow = useRef<(p: Put) => Promise<void> | null>(() => null);
+  const redoLaterNow = useRef<(p: Put) => Promise<void> | null>(() => null);
   /** Ratings go on the app history (⌘Z) with every other step; while Review is open, taking back its
    *  newest rating also shows that card again. */
   /** The history's undo and redo of a rating while Review shows it: the write's promise, or null when it isn't Review's to do. */
@@ -175,6 +193,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   /** The card's words as the editor last loaded them: an undo refreshes the editor only if he hasn't typed since. */
   const loaded = useRef(draft);
   const entry = queue?.[0];
+  /** For a press a Later passes on (`passOn`): the history's own keys, as he has them set. */
+  const keymap = useKeymap();
 
   useEffect(() => {
     let live = true;
@@ -218,6 +238,12 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     session.current = null;
   }, [pick]);
 
+  // Closed: a Later recorded nothing, so ⌘Z after it has nothing of Review's to take back.
+  useEffect(() => () => {
+    for (const f of laterSteps.current) f();
+    laterSteps.current.clear();
+  }, []);
+
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
   // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
   // goes only if he hasn't started on it.
@@ -258,6 +284,27 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
    *  a rating arms it (`submit`); anything else that moves the queue or changes a card (an undo, an edit,
    *  a retire, a version dropped, Try again) drops it, and that card loads afresh. */
   const ahead = useRef<{ id: string; card: Promise<CardFull>; armed: boolean } | null>(null);
+  /** Shows an exercise as Later found it (`Shown`), its clock where it was. */
+  const showAgain = (s: Shown) => {
+    dropAhead();
+    setCard(s.card);
+    setPhase(s.phase);
+    setAnswer(s.answer);
+    setConf(s.conf);
+    setInHead(s.inHead);
+    setGrade(s.grade);
+    setMarks(s.marks);
+    setRemark(s.remark);
+    setGradeError(s.gradeError);
+    setPassage(s.passage);
+    setQuoteAt(s.quoteAt);
+    setPassageGone(s.passageGone);
+    setAsking(s.asking);
+    shownAt.current = Date.now() - s.elapsed;
+    shownAnswerAt.current = 0;
+    // Put off before its passage landed: that reply was dropped as it moved on, so it loads now.
+    if (s.phase === "checked" && !s.passage && !s.passageGone) loadPassage(s.card);
+  };
   const dropAhead = () => void (ahead.current = null);
   const loadCard = (id: string) => ore<CardFull>("card", "show", id, "--review");
   // Each card: load the version to review (a remix in its turn, D66), reset the answer, start its clock.
@@ -267,7 +314,10 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setCard(null);
     setError(null);
     reset();
-    // The card loaded ahead, if a rating just moved on to it; one whose early load failed loads again.
+    const back = restoreTo.current?.id === entry.id ? restoreTo.current.was : null;
+    restoreTo.current = null;
+    if (back) return void showAgain(back);
+    // The card loaded ahead, if a rating or Later just moved on to it; one whose early load failed loads again.
     const early = ahead.current?.armed && ahead.current.id === entry.id ? ahead.current.card : undefined;
     dropAhead();
     (early ? early.catch(() => loadCard(entry.id)) : loadCard(entry.id)).then(
@@ -519,10 +569,12 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
    *  ⌘Z takes it back and ⇧⌘Z gives it again: the same rating, answer and time. Throws if the write fails. */
   const submit = async (args: string[], rating: number, elapsed: number, again?: { forget: Forget; setTs: (ts: string) => void }) => {
-    const was = { queue: queue ?? [], done, activeMs: activeMs.current };
+    const was = { queue: queue ?? [], done, activeMs: activeMs.current, off: new Set(putOffIds.current), won: wonLast.current };
     const r = await ore<{ ts: string }>("review", ...args);
     reviewed.current++;
     const id = args[0]!;
+    // Answered: a miss's relearn pass is a new turn, not one he put off.
+    putOffIds.current.delete(id);
     let ts = r.ts;
     again?.setTs(ts);
     const setTs = (t: string) => void (ts = t);
@@ -566,6 +618,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       }
       reviewed.current--;
       activeMs.current = last.activeMs;
+      putOffIds.current = new Set(last.off);
+      // D177's one more goes with the rating that earned it.
+      wonLast.current = last.won;
       setDone(last.done);
       setQueue(last.queue.filter((e) => !retired.current.has(e.id)));
       setUndos((u) => u.slice(0, -1));
@@ -582,6 +637,80 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setBusy(true);
     return submit(args, rating, elapsed, again).finally(() => setBusy(false));
   };
+
+  /** What he has on screen, for ⌘Z after a Later. An Explain answer still being checked comes back to check
+   *  again (that grade is dropped as it moves on), with what he typed and how sure he was. */
+  const shownNow = (c: CardFull): Shown => {
+    const base = { card: c, answer, conf, elapsed: Date.now() - shownAt.current };
+    if (phase !== "checked" || (c.kind === "prompt" && !inHead && !marks && !gradeError))
+      return { ...base, phase: "answer", inHead: false, grade: null, marks: null, remark: false, gradeError: null, passage: null, quoteAt: 0, passageGone: null, asking: false };
+    // Ask open (D192): it comes back open, its chat kept as closing and opening it keeps it.
+    return { ...base, phase: "checked", inHead, grade, marks, remark, gradeError, passage, quoteAt, passageGone, asking };
+  };
+
+  /** Later (D192, Anki's Bury for this session): the exercise goes to the end of the session, before or after
+   *  its answer, and nothing is recorded: no rating, no review line, no FSRS change (D21, D22), no minutes.
+   *  When every exercise left has been put off the session ends, and they stay due. What he typed and how sure
+   *  he was wait for it in `drafts`, as on Esc. On the app history: ⌘Z brings it back as it was, ⇧⌘Z puts it
+   *  off again (`redo`). */
+  const later = (redo?: Put): boolean => {
+    if (!card || card.id !== entry?.id || !queue || phase === "edit" || end || busyNow.current) return false;
+    const p: Put = Object.assign(redo ?? ({} as Put), { id: card.id, before: queue, after: putOff(queue, putOffIds.current), off: new Set(putOffIds.current), won: wonLast.current, shown: shownNow(card) });
+    putOffIds.current.add(card.id);
+    // D177's one more after a miss was this one: put off, it is no answer, so the next one he answers takes that turn.
+    wonLast.current = false;
+    if (!redo) {
+      p.forget = notify("Later", "quiet", () => (mounted.current && undoLaterNow.current(p)) || passOn(p, "undo"), () => (mounted.current && redoLaterNow.current(p)) || passOn(p, "redo"));
+      laterSteps.current.add(p.forget);
+    }
+    if (!p.after) {
+      void finish();
+      return true;
+    }
+    if (ahead.current) ahead.current.armed = true;
+    setQueue(p.after);
+    return true;
+  };
+  /** A Later the session has moved past (its exercise has left the session: answered in the quick quiz, retired
+   *  on its next turn): nothing is left to take back, so it leaves the history and the press goes on to the step
+   *  before it, never spent on nothing. */
+  const passOn = (p: Put, what: "undo" | "redo") => {
+    setTimeout(() => {
+      if (p.forget) {
+        p.forget();
+        laterSteps.current.delete(p.forget);
+      }
+      document.body.dispatchEvent(keydownFor(keymap[what]));
+    });
+    return Promise.resolve();
+  };
+  // ⌘Z after a Later: the exercise is the current one again, as he had it, wherever the session has put it since
+  // (a step since, like a Retire, may have moved the rest). One that ended the session opens it again on it.
+  undoLaterNow.current = (p) => {
+    if (!queue) return null;
+    if (busyNow.current) return Promise.reject(new Error("Still saving. Try again in a moment."));
+    const at = queue.findIndex((e) => e.id === p.id);
+    if (at < 0 || (end && at !== 0)) return null;
+    putOffIds.current = new Set(p.off);
+    wonLast.current = p.won;
+    if (end) {
+      const id = end.session.id;
+      setBusy(true);
+      return ore("session", "reopen", id)
+        .then(() => {
+          if (session.current) session.current.open = true;
+          // Its clock goes on from the Later, so the time on the end screen never counts (D60).
+          shownAt.current = Date.now() - p.shown.elapsed;
+          setEnd(null);
+        })
+        .finally(() => setBusy(false));
+    }
+    dropAhead();
+    restoreTo.current = { id: p.id, was: p.shown };
+    setQueue([queue[at]!, ...queue.slice(0, at), ...queue.slice(at + 1)]);
+    return Promise.resolve();
+  };
+  redoLaterNow.current = (p) => (queue?.[0]?.id === p.id && later(p) ? Promise.resolve() : null);
 
   const retire = async () => {
     if (!card || busyNow.current) return;
@@ -760,6 +889,12 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     if (is(e, "retire-card")) {
       e.preventDefault();
       void retire();
+      return;
+    }
+    if (is(e, "later") && !PHONE) {
+      e.preventDefault();
+      // A held ⌘L puts off the one on screen, never the ones after it.
+      if (!e.repeat) later();
       return;
     }
     if (phase === "answer") {
@@ -1088,6 +1223,14 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                       </button>
                     </Hint>
                   )}
+                  {/* The Mac only for now (D192): the phone's toolbar stays as it was. */}
+                  {!PHONE && (
+                    <Hint text="Later: at the end of this session" keys="later" side="top">
+                      <button aria-label="Later" disabled={busy} onClick={() => later()}>
+                        <Clock size={14} aria-hidden="true" />
+                      </button>
+                    </Hint>
+                  )}
                   {entry.state === "draft" ? (
                     <Hint text="Delete exercise" keys="retire-card" side="top">
                       <button aria-label="Delete exercise" onClick={() => void retire()}>
@@ -1150,9 +1293,9 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
       : phase === "answer"
         ? kind === "prompt"
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
-            [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), [k("no-idea"), "No idea"], ["Esc", "Leave"]]
-          : [["1 2 3", "How sure, then show"], ["Esc", "Leave"]]
-        : [["1–4", "Rate"], ...(suggested ? [["↵", kind === "card" ? "Good" : "Suggested"] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), ["Esc", "Leave"]];
+            [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
+          : [["1 2 3", "How sure, then show"], [k("later"), "Later"], ["Esc", "Leave"]]
+        : [["1–4", "Rate"], ...(suggested ? [["↵", kind === "card" ? "Good" : "Suggested"] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">
       {rows.map(([key, what]) => (
