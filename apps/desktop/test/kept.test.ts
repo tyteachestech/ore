@@ -11,7 +11,8 @@ g.window = w;
 g.document = w.document;
 g.localStorage = w.localStorage;
 g.addEventListener = w.addEventListener.bind(w);
-const { kept, flushKept, DRAFT_MS } = await import("../src/util");
+// Its own copy of util.ts, whose page listeners go on this window (another test file may have loaded it already).
+const { kept, flushKept, DRAFT_MS } = await import("../src/util?kept-test");
 
 test("a draft kept before the store stamped its rows ({...draft, at}) still comes back", () => {
   const at = Date.now() - 1000;
