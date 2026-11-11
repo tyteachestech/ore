@@ -4504,6 +4504,8 @@ journey("diagram: opens in a sheet centred over the window, ⇧⌘↵ gives it t
   await page.locator(".note-editor .note-diagram").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Open diagram" }).click();
   await sheet.waitFor();
+  // The drawing loads, then takes the keys (a slow runner's Esc can land before it has them).
+  await until("the opened drawing takes the keys", () => page.evaluate(() => !!document.activeElement?.closest(".diagram .draw")));
   await page.keyboard.press("Escape");
   await until("Esc closes it again", async () => (await page.locator(".diagram").count()) === 0);
   await page.locator(".note-editor .note-diagram").click({ button: "right" });
