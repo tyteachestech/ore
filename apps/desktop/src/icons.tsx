@@ -390,6 +390,27 @@ export const Check = sprite([
   "................",
 ]);
 
+/** A menu's tick: the check at a 13px label's size, ten dots wide where Check is fourteen, so it stands
+    about as tall as the label's capitals (Linear's and macOS's menus) instead of over them. */
+export const Tick = sprite([
+  "................",
+  "................",
+  "................",
+  "................",
+  "............#...",
+  "...........##...",
+  "..........##....",
+  "...#.....##.....",
+  "...##...##......",
+  "....##.##.......",
+  ".....###........",
+  "......#.........",
+  "................",
+  "................",
+  "................",
+  "................",
+]);
+
 export const Circle = sprite([
   "................",
   "......####......",

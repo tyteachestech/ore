@@ -6,7 +6,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Article, CaretDown, Check, Plus, YoutubeLogo } from "./icons";
+import { Article, CaretDown, Plus, Tick, YoutubeLogo } from "./icons";
 import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
@@ -441,7 +441,7 @@ function FeedViewMenu({ view, show, setView, setShow }: { view: View; show: Show
     <DropdownMenu.RadioItem value={value} className="menu-item check">
       <span className="menu-tick">
         <DropdownMenu.ItemIndicator>
-          <Check size={12} weight="bold" />
+          <Tick />
         </DropdownMenu.ItemIndicator>
       </span>
       <span className="menu-label">{text}</span>
@@ -471,7 +471,7 @@ function FeedViewMenu({ view, show, setView, setShow }: { view: View; show: Show
               <DropdownMenu.RadioItem key={v} value={v} className="menu-item check" onSelect={(e) => e.preventDefault()}>
                 <span className="menu-tick">
                   <DropdownMenu.ItemIndicator>
-                    <Check size={12} weight="bold" />
+                    <Tick />
                   </DropdownMenu.ItemIndicator>
                 </span>
                 <span className="menu-label">{v === "unread" ? "Unread" : "All"}</span>
