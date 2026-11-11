@@ -34,6 +34,25 @@ export function SkillChip({ skill }: { skill: Skill }) {
   return chipLook() === "icon" || skill.name.length > 24 ? <Hint text={skill.name}>{chip}</Hint> : chip;
 }
 
+/** A source's skills on a row (D198, Linear's labels): the first two by name, whole, then +N with the
+ *  rest named on hover, so a source under six skills never squeezes them to "L." and "Story…". Icon
+ *  only shows them all, since an icon is narrower than the count. */
+export function SkillChips({ ids, skills }: { ids: string[]; skills: Skill[] }) {
+  const all = ids.map((id) => skills.find((s) => s.id === id) ?? { id, name: id });
+  const first = chipLook() === "icon" ? all : all.slice(0, 2);
+  const rest = all.slice(first.length).map((s) => s.name).join(", ");
+  return (
+    <span className="chips">
+      {first.map((s) => <SkillChip key={s.id} skill={s} />)}
+      {rest && (
+        <Hint text={rest}>
+          <span className="chip chip-more" aria-label={rest}>+{all.length - first.length}</span>
+        </Hint>
+      )}
+    </span>
+  );
+}
+
 /** A source's skill pills, and the picker they open on click: Linear's label picker (Notion's
  *  multi-select). Type to filter, click or Enter ticks or unticks a skill and the list stays open, a
  *  name no skill has creates one. With no skills, a quiet + on hover stands where the pills would be.

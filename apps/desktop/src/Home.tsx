@@ -10,7 +10,7 @@ import * as HoverCard from "@radix-ui/react-hover-card";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { DotBar, minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
-import { archivedOnly, SkillChip, skillGroups, SkillPicker } from "./Skills";
+import { archivedOnly, SkillChips, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
 import { Roll } from "./Roll";
@@ -300,13 +300,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                   {i.course && <span className="course-of">{i.course.title}</span>}
                   {onRefile && onCreateSkill && (
                     <SkillPicker skills={skills} value={i.skills} title={i.title} onChange={(next, before, k) => onRefile(i, next, before, k)} onCreate={onCreateSkill}>
-                      {i.skills.length > 0 && (
-                        <span className="chips">
-                          {i.skills.map((id) => (
-                            <SkillChip key={id} skill={skills.find((s) => s.id === id) ?? { id, name: id }} />
-                          ))}
-                        </span>
-                      )}
+                      {i.skills.length > 0 && <SkillChips ids={i.skills} skills={skills} />}
                     </SkillPicker>
                   )}
                   <Hint text={`${Math.round(at * 100)}% read`}>
