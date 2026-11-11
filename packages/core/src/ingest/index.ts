@@ -222,14 +222,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   }
   const refused = refuseLink(url);
   if (refused) throw new Error(refused);
-  if (PODCAST.test(url)) {
-    // An episode link: its audio, transcribed, under the episode's title (D96).
-    const ep = await (await import("./audio.ts")).episode(url);
-    const res = await get(ep.audio, new URL(ep.audio).host);
-    const ext = kindOf(new URL(res.url || ep.audio).pathname, res.headers.get("content-type") ?? "") ?? "mp3";
-    const draft = await fromBytes(await readCapped(res), ext, ep.title ?? "Episode", url, url, { ...opts, language: ep.language ?? opts.language });
-    return { ...draft, title: ep.title ?? draft.title, author: ep.show, published: ep.published };
-  }
+  if (PODCAST.test(url)) return fromEpisode(await (await import("./audio.ts")).episode(url), url, opts);
   if (VIDEO_SITE.test(url)) {
     // Played on its own site (the reader's player is YouTube's); the transcript reads like an article.
     const y = await fetchYoutube(url, { listen: true, onProgress: opts.onProgress });
@@ -263,12 +256,30 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   }
   const bytes = await readCapped(res);
   const kind = opts.type ? ({ article: "html", youtube: "html", snippet: "markdown" } as Record<string, string>)[opts.type] ?? opts.type : (kindOf(urlName, ctype) ?? "html");
+  if (kind === "html" && !opts.type) {
+    // A page that is really an episode (a show's or publisher's own page) comes in as its audio,
+    // as an episode link does, under the page's own title, author and date (D122, D167).
+    const html = decodeText(bytes);
+    const audio = (await import("./audio.ts")).pageAudio(html, res.url || url);
+    if (audio) {
+      const w = await (await import("./web.ts")).htmlToDoc(html, res.url || url).catch(() => null);
+      return fromEpisode({ audio, title: w?.title, show: w?.author, published: w?.published }, url, opts);
+    }
+  }
   // Audio is titled by the link he added: a redirect lands on a CDN's opaque file name.
   const name = AUDIO_TYPES.includes(kind) ? decodeURIComponent(new URL(url).pathname.split("/").pop() || urlName) : urlName;
   const draft = await fromBytes(bytes, kind, name, url, res.url || rw?.url || url, opts);
   if (rw?.kind !== "fetch") return draft;
   const body = rw.base && draft.type === "markdown" ? (await import("./links.ts")).absolutize(draft.body, rw.base) : draft.body;
   return { ...draft, body, author: draft.author ?? rw.author, source: draft.source && rw.base && draft.type === "markdown" ? { ...draft.source, data: body } : draft.source };
+}
+
+/** An episode: its audio, kept and transcribed, under the episode's title (D96, D167). */
+async function fromEpisode(ep: import("./audio.ts").Episode, url: string, opts: AddOptions): Promise<NewItem> {
+  const res = await get(ep.audio, new URL(ep.audio).host);
+  const ext = kindOf(new URL(res.url || ep.audio).pathname, res.headers.get("content-type") ?? "") ?? "mp3";
+  const draft = await fromBytes(await readCapped(res), ext, ep.title ?? "Episode", url, url, { ...opts, language: ep.language ?? opts.language });
+  return { ...draft, title: ep.title ?? draft.title, author: ep.show, published: ep.published };
 }
 
 /** The response's body, refused once it passes MAX_BYTES (a server need not say how big it is). */
