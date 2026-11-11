@@ -638,17 +638,23 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [adding, setAdding] = useState<string | null>(null);
   /** Where Card here was opened: the source offset his line is anchored at. */
   const hereAt = useRef<number | null>(null);
-  // The line he was typing comes back after a relaunch (for a day, `kept`), anchored where it was; not when the
-  // source's text there has changed since (a reimport, the Mac's edit through sync).
+  // The line he was typing comes back after a relaunch (for a day, `kept`), anchored where it was, into the place he
+  // left it: the Collected field, when it opens (Card here) or is open as the source opens; never over a line in
+  // progress, and not when the source's text there has changed since (a reimport, the Mac's edit through sync).
+  const keptLine = (): string | null => {
+    const d = keyDrafts.get(p.id);
+    if (!d || !doc) return null;
+    if (doc.body.slice(d.at, d.at + NEAR) !== d.near) return void keyDrafts.delete(p.id), null;
+    hereAt.current = d.at;
+    return d.text;
+  };
   const addTried = useRef(false);
   useEffect(() => {
     if (!doc || addTried.current) return;
     addTried.current = true;
-    const d = keyDrafts.get(p.id);
-    if (!d) return;
-    if (doc.body.slice(d.at, d.at + NEAR) !== d.near) return keyDrafts.delete(p.id);
-    hereAt.current = d.at;
-    setAdding((cur) => cur ?? d.text);
+    if (adding !== null || !(p.notesOpen && p.sideTab === "questions")) return;
+    const line = keptLine();
+    if (line !== null) setAdding(line);
   }, [doc, p.id]);
   useEffect(() => {
     const at = hereAt.current;
@@ -1577,10 +1583,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** A key point of his own ("Card here", Tyler, 2026-10-29; D118): a line he types, anchored where he is now, drafted from the whole source. */
   function cardHere() {
     if (popup) closePopup();
-    // A draft he kept stays anchored where he started it.
-    if (adding === null) hereAt.current = here();
+    // A draft he kept stays anchored where he started it, one kept across a relaunch too.
+    const restored = adding === null ? keptLine() : null;
+    if (adding === null && restored === null) hereAt.current = here();
     focusAdd.current = true;
-    setAdding((cur) => cur ?? "");
+    setAdding((cur) => cur ?? restored ?? "");
     setAddAsk((n) => n + 1);
     p.onShowSide("questions", true);
   }

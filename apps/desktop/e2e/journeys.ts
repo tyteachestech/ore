@@ -8829,11 +8829,29 @@ journey("phone: a key point being typed survives a relaunch, and goes when the t
   await Bun.sleep(500);
   await page.reload();
   await until("the line comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
+  // Left on the source, it waits for the field: Collected alone shows none, Add a key point here brings it back.
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+  await page.locator(".reader:not(.noting)").waitFor();
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  await page.locator('aside.mynotes[aria-label="Collected"]').waitFor();
+  await Bun.sleep(300);
+  if (await field.count()) throw new Error("the kept line came back with Collected, not where he left it");
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Add a key point here" }));
+  await until("Add a key point here brings it back", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
   await macChanges((lib) => itemFile(lib, "the-testing-effect", "doc.md"), "# The Testing Effect: Why Retrieval Beats Rereading\n", "# The Testing Effect: Why Retrieval Beats Rereading\n\nA new opening paragraph the Mac added.\n", async () => {
     await page.reload();
     await page.locator(".phone-reader .doc").first().waitFor();
     await Bun.sleep(800);
-    if ((await field.count()) && (await field.inputValue())) throw new Error("the line came back over text that changed under its anchor");
+    if (await field.count()) throw new Error("the line came back over text that changed under its anchor");
+    await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: "Add a key point here" }));
+    await field.waitFor();
+    if (await field.inputValue()) throw new Error("the line came back over text that changed under its anchor");
   });
 }, "phone");
 
