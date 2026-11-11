@@ -464,17 +464,17 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ti
           <span className="total"> / {total ? clock(total) : "–:––"}</span>
         </span>
         <div className="transport">
-          <Hint text="Back 15 seconds" keys="back" side="top">
+          <Hint text="Back 15 seconds" keys={["back", "back-alt"]} side="top">
             <button className="ctl skip" aria-label="Back 15 seconds" onClick={() => player.skip(-15)} disabled={off}>
               <SkipIcon by={15} back />
             </button>
           </Hint>
-          <Hint text={player.playing ? "Pause" : "Play"} keys="play" side="top">
+          <Hint text={player.playing ? "Pause" : "Play"} keys={["play", "play-alt"]} side="top">
             <button className="ctl play" aria-label={player.playing ? "Pause" : "Play"} onClick={player.toggle} disabled={off}>
               {player.playing ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}
             </button>
           </Hint>
-          <Hint text="Forward 30 seconds" keys="forward" side="top">
+          <Hint text="Forward 30 seconds" keys={["forward", "forward-alt"]} side="top">
             <button className="ctl skip" aria-label="Forward 30 seconds" onClick={() => player.skip(30)} disabled={off}>
               <SkipIcon by={30} />
             </button>
