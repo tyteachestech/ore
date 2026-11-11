@@ -50,19 +50,29 @@ async function safariBrowser(): Promise<Browser> {
   }
 }
 
-/** The iPhone build (ORE_PHONE=1, src/phone) on the seeded library, started the first time a phone journey needs it
- *  (on ORE_E2E_PHONE_PORT, vite's port + 2; E2E_PHONE_URL uses one already running). It runs the core inside the
- *  page, so it takes no bridge; its library is a snapshot of the files when the page loads. */
+/** The iPhone build (ORE_PHONE=1, src/phone), started the first time a phone journey needs it (on ORE_E2E_PHONE_PORT,
+ *  vite's port + 2; E2E_PHONE_URL uses one already running). It runs the core inside the page, so it takes no bridge.
+ *  Its library is a seed of its own (PHONE_LIB), never the one the desktop journeys change: the phone only reads the
+ *  files (its writes stay in each page's IndexedDB, and every journey's page is a fresh one), so each phone journey
+ *  starts from the same fresh seed. A journey that changes a file there (a sync from the Mac) puts it back. */
 let phoneVite: { url: string; stop: () => void } | undefined;
+let PHONE_LIB = process.env.ORE_PHONE_LIBRARY ?? "";
 async function phoneApp(): Promise<string> {
   if (process.env.E2E_PHONE_URL) return process.env.E2E_PHONE_URL;
   if (phoneVite) return phoneVite.url;
+  PHONE_LIB = mkdtempSync(join(tmpdir(), "ore-e2e-phone-"));
+  await $`bun ${join(MOCK, "seed.ts")} ${PHONE_LIB}`.quiet();
   const port = Number(process.env.ORE_E2E_PHONE_PORT ?? PORT + 2);
-  const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: LIB }, stdout: "ignore", stderr: "ignore" });
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: PHONE_LIB }, stdout: "ignore", stderr: "inherit" });
   const url = `http://localhost:${port}/`;
-  for (let i = 0; i < 100; i++) {
-    if (await fetch(url).then((r) => r.ok, () => false)) break;
-    await Bun.sleep(200);
+  let up = false;
+  for (let i = 0; i < 150 && !up; i++) {
+    up = await fetch(url).then((r) => r.ok, () => false);
+    if (!up) await Bun.sleep(200);
+  }
+  if (!up) {
+    vite.kill();
+    throw new Error(`the phone build's vite never answered on ${url} (30 s): is the port taken? ORE_E2E_PHONE_PORT picks another`);
   }
   phoneVite = { url, stop: () => vite.kill() };
   // Loaded once first: what vite bundles on a first load (and the reload that follows) lands before any journey.
@@ -8473,6 +8483,7 @@ for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) 
 await browser.close();
 await safari?.close();
 phoneVite?.stop();
+if (PHONE_LIB && !process.env.ORE_PHONE_LIBRARY) rmSync(PHONE_LIB, { recursive: true, force: true });
 // The style rules a regex can't see (nested frames, off-ramp font sizes), on the same mock.
 if (!only && shard === shards) {
   const style = Bun.spawnSync(["bun", join(MOCK, "style-check.ts"), url], { env: { ...process.env, ORE_BRIDGE: String(BRIDGE) }, stdout: "inherit", stderr: "inherit" });
