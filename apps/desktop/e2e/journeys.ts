@@ -8311,7 +8311,10 @@ for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) 
     failed++;
     const shot = join(tmpdir(), `ore-e2e-${name.replace(/\W+/g, "-")}.png`);
     await page?.screenshot({ path: shot }).catch(() => {});
-    const why = (e as Error).message.split("\n").filter((l) => l.trim() && !/^\s*Call log/.test(l)).slice(0, 2).join("\n      ");
+    // The error's first two lines, then the end of Playwright's call log: what was in the way of a click that timed out.
+    const lines = (e as Error).message.split("\n").filter((l) => l.trim());
+    const log = lines.findIndex((l) => /^\s*Call log/.test(l));
+    const why = [...(log < 0 ? lines : lines.slice(0, log)).slice(0, 2), ...(log < 0 ? [] : lines.slice(log + 1).slice(-4))].join("\n      ");
     console.log(`FAIL  ${name}\n      ${why}${page ? `\n      screenshot: ${shot}` : ""}`);
   }
   await page?.close();
