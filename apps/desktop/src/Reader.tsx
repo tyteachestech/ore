@@ -2678,7 +2678,8 @@ function ReaderView(p: Props & { reload: () => void }) {
         { id: "rename", label: "Rename…", hint: label(keys.rename), divider: true, run: () => setRenaming(true) },
         { id: "author", label: doc.author ? "Edit author…" : "Add author…", run: () => setAuthoring(true) },
         // A PDF or EPUB file is read again from the copy kept with it, so a better reader reaches it.
-        ...((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub" ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
+        // Not on the phone: it can't fetch a page (its CSP) or reread an original (not in its library), D78; like Listen.
+        ...(!PHONE && ((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub") ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
         ...(PHONE ? [] : [{ id: "find", label: "Find in source…", hint: label(keys.filter), paletteOnly: true, run: openFind }]),
         ...(p.skills.length
           ? [{

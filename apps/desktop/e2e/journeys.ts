@@ -8832,6 +8832,15 @@ journey("phone: a key point being typed survives a relaunch, and goes when the t
   });
 }, "phone");
 
+journey("phone: Source actions offers no Reimport, which needs the Mac", async (page) => {
+  // The phone can't fetch a page or reread an original (its CSP and its library leave both to the Mac, D78):
+  // offered, Reimport failed blaming the connection. Like Listen, it isn't offered.
+  await phoneSource(page, AGENTS);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await page.locator(".action-sheet").waitFor();
+  if (await page.locator(".action-sheet button").filter({ hasText: "Reimport" }).count()) throw new Error("Reimport is offered on the phone");
+}, "phone");
+
 journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt touch", async (page) => {
   await phoneSource(page, TESTING);
   const action = async (name: RegExp) => {
