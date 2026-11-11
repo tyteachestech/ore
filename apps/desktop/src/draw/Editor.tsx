@@ -1297,6 +1297,11 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
 
   // ---------- style ----------
   const kinds = new Set(selected.map((e) => e.type));
+  /** A box's label in the middle or under its top edge, where a section's title goes (Excalidraw's vertical align). */
+  const alignLabels = (v: "middle" | "top") => {
+    const boxes = new Set(selected.filter((e) => e.type === "rectangle").map((e) => e.id));
+    apply(syncAll(live.current.els.map((e) => (e.type === "text" && e.containerId && boxes.has(e.containerId) ? { ...e, verticalAlign: v } : e))));
+  };
   const showStyle = selected.length > 0 || (tool !== "select" && tool !== "hand" && tool !== "eraser");
   const current = selected[0];
   const value = <K extends keyof Style>(k: K): Style[K] => (current && k in current ? (current[k as keyof El] as Style[K]) : style[k]);
@@ -1480,6 +1485,12 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
                 </Seg>
               ))}
             </Row>
+            {selected.some((e) => e.type === "rectangle" && labelOf(els, e.id)) && (
+              <Row label="Label">
+                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle")?.id ?? "")?.verticalAlign !== "top"} onPick={() => alignLabels("middle")} label="Middle">Mid</Seg>
+                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle")?.id ?? "")?.verticalAlign === "top"} onPick={() => alignLabels("top")} label="Top">Top</Seg>
+              </Row>
+            )}
             <Row label="Font">
               <Seg on={(lbl("font") ?? value("fontFamily")) !== MONO} onPick={() => setProp({ fontFamily: SANS })} label="Sans">Aa</Seg>
               <Seg on={(lbl("font") ?? value("fontFamily")) === MONO} onPick={() => setProp({ fontFamily: MONO })} label="Mono"><span className="mono">Aa</span></Seg>
@@ -1535,6 +1546,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       const wrapped = wrap(draft || " ", w, fs, fam);
       const lines = wrapped.split("\n").length;
       const c = isLinear(e) ? midOfPts(absPoints(e)) : centre(e);
+      if (e.type === "rectangle" && lbl?.verticalAlign === "top") c[1] = lbl.y + (lines * lh) / 2;
       const width = isLinear(e) ? Math.max(60, measureText(wrapped, fs, fam).width + 12) : w;
       return { left: (c[0] - width / 2 - view.x) * z, top: (c[1] - (lines * lh) / 2 - view.y) * z, width: width * z, height: lines * lh * z, font: fs * z, fam, align: "center" as const, angle: isLinear(e) ? 0 : e.angle, colour: dark(e.strokeColor), wrap: true };
     }

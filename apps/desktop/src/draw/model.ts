@@ -374,7 +374,7 @@ function compact(e: El): El {
 
 export const labelOf = (els: Els, id: string) => els.find((e) => e.type === "text" && e.containerId === id);
 
-/** Places a container's label at its centre (an arrow's at its midpoint) and grows the container to fit. */
+/** Places a container's label at its centre (an arrow's at its midpoint, a box's at its top when set so) and grows the container to fit. */
 export function syncAll(els: Els): El[] {
   const map = byId(els);
   const out = els.map((e) => e);
@@ -403,7 +403,9 @@ export function syncAll(els: Els): El[] {
       }
     }
     const [cx, cy] = isLinear(container) ? midpoint(absPoints(container)) : centre(container);
-    out[i] = { ...t, text, x: cx - m.width / 2, y: cy - m.height / 2, width: m.width, height: m.height, angle: isLinear(container) ? 0 : container.angle };
+    // A box's label set to the top (a section's title, Excalidraw's vertical align) sits under its top edge.
+    const top = container.type === "rectangle" && t.verticalAlign === "top" ? container.y + PAD * 2 : null;
+    out[i] = { ...t, text, x: cx - m.width / 2, y: top ?? cy - m.height / 2, width: m.width, height: m.height, angle: isLinear(container) ? 0 : container.angle };
   }
   return out;
 }
@@ -1136,67 +1138,122 @@ export function addMap(els: Els, src: string, style: Style, at: Pt): { els: El[]
     ids.push(arrow.id);
     if (e.label) out = setLabel(out, arrow.id, e.label, style);
   }
-  return { els: syncAll(out), ids };
+  // Laid out as Tidy lays a map out, so no link runs through a node it doesn't join.
+  const fresh = new Set(ids.filter((id) => out.some((x) => x.id === id && isShape(x))));
+  return { els: fresh.size > 1 ? tidy(syncAll(out), fresh) : syncAll(out), ids };
 }
 
-/** Tidies a map: nodes joined by arrows go into columns by depth from the roots, each column ordered
- *  by where its parents sit (fewer crossings), with room between columns for the widest link label.
- *  Only the picked nodes move (all joined nodes when `ids` is empty); free shapes stay where they are. */
+/** Whether the segment p–q passes within `pad` of box b. */
+function segHits(p: Pt, q: Pt, b: Box, pad: number): boolean {
+  const x0 = b.x - pad, y0 = b.y - pad, x1 = b.x + b.w + pad, y1 = b.y + b.h + pad;
+  let t0 = 0, t1 = 1;
+  const dx = q[0] - p[0], dy = q[1] - p[1];
+  for (const [pp, qq] of [[-dx, p[0] - x0], [dx, x1 - p[0]], [-dy, p[1] - y0], [dy, y1 - p[1]]] as const) {
+    if (pp === 0) { if (qq < 0) return false; continue; }
+    const r = qq / pp;
+    if (pp < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+    else { if (r < t0) return false; if (r < t1) t1 = r; }
+  }
+  return t0 <= t1;
+}
+
+/** Tidies a map: nodes joined by arrows go into columns by depth from the roots (a root one column
+ *  before its nearest child), each column ordered by where its parents sit (fewer crossings), with room
+ *  between columns for the widest link label; maps not joined to each other stack, one under another.
+ *  A link that skips a column never runs through a node it doesn't join: that node and the ones under
+ *  it move down past the line. Only the picked nodes move (all joined nodes when `ids` is empty);
+ *  free shapes stay where they are. */
 export function tidy(els: Els, ids: Set<string> = new Set()): El[] {
   const arrows = els.filter((e) => e.type === "arrow" && e.startBinding && e.endBinding && e.startBinding.elementId !== e.endBinding.elementId);
   const pick = (id: string) => !ids.size || ids.has(id);
-  const edges = arrows.map((a) => ({ a, from: a.startBinding!.elementId, to: a.endBinding!.elementId })).filter((e) => pick(e.from) && pick(e.to));
-  const nodeIds = [...new Set(edges.flatMap((e) => [e.from, e.to]))].filter((id) => {
+  const nodeIds = [...new Set(arrows.flatMap((a) => [a.startBinding!.elementId, a.endBinding!.elementId]))].filter((id) => {
     const n = els.find((x) => x.id === id);
-    return n && isShape(n) && !cellOf(n) && !n.locked;
+    return pick(id) && n && isShape(n) && !cellOf(n) && !n.locked;
   });
-  if (nodeIds.length < 2) return [...els];
+  const inMap = new Set(nodeIds);
+  const edges = arrows.map((a) => ({ a, from: a.startBinding!.elementId, to: a.endBinding!.elementId })).filter((e) => inMap.has(e.from) && inMap.has(e.to));
+  if (nodeIds.length < 2 || !edges.length) return [...els];
   const map = byId(els);
-  const depth = new Map(nodeIds.map((n) => [n, 0]));
-  for (let pass = 0; pass < nodeIds.length; pass++) {
-    let changed = false;
-    for (const e of edges) {
-      if (!depth.has(e.from) || !depth.has(e.to)) continue;
-      const d = depth.get(e.from)! + 1;
-      if (d > depth.get(e.to)! && d < nodeIds.length) {
-        depth.set(e.to, d);
-        changed = true;
-      }
-    }
-    if (!changed) break;
-  }
-  const cols: string[][] = [];
-  for (const n of nodeIds) (cols[depth.get(n)!] ??= []).push(n);
-  const rowOf = new Map<string, number>();
-  cols.forEach((col, ci) => {
-    if (ci > 0)
-      col.sort((x, y) => {
-        const avg = (n: string) => {
-          const ps = edges.filter((e) => e.to === n && rowOf.has(e.from)).map((e) => rowOf.get(e.from)!);
-          return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : Infinity;
-        };
-        return avg(x) - avg(y);
-      });
-    col.forEach((n, i) => rowOf.set(n, i));
-  });
-  const start = boundsOf(nodeIds.map((n) => map.get(n)!))!;
-  const heights = cols.map((col) => col.reduce((h, n) => h + map.get(n)!.height, 0) + (col.length - 1) * 32);
-  const tallest = Math.max(...heights);
-  let x = start.x;
+  // Maps not joined to each other, in the order their first node was drawn.
+  const root = new Map(nodeIds.map((n) => [n, n]));
+  const find = (n: string): string => (root.get(n) === n ? n : find(root.get(n)!));
+  for (const e of edges) root.set(find(e.from), find(e.to));
+  const comps = [...new Set(nodeIds.map(find))].map((r) => nodeIds.filter((n) => find(n) === r)).filter((c) => c.length > 1);
+  const start = boundsOf(comps.flat().map((n) => map.get(n)!))!;
   let out = [...els];
-  cols.forEach((col, ci) => {
-    const w = Math.max(...col.map((n) => map.get(n)!.width));
-    let y = start.y + (tallest - heights[ci]!) / 2;
-    for (const n of col) {
-      const e = out.find((v) => v.id === n)!;
-      const f = frame(e);
-      out = out.map((v) => (v.id === n ? { ...v, x: x + (w - f.w) / 2, y, angle: 0 } : v.containerId === n ? v : v));
-      y += f.h + 32;
+  let top = start.y;
+  for (const comp of comps) {
+    const es = edges.filter((e) => comp.includes(e.from));
+    const depth = new Map(comp.map((n) => [n, 0]));
+    for (let pass = 0; pass < comp.length; pass++) {
+      let changed = false;
+      for (const e of es) {
+        const d = depth.get(e.from)! + 1;
+        if (d > depth.get(e.to)! && d < comp.length) {
+          depth.set(e.to, d);
+          changed = true;
+        }
+      }
+      if (!changed) break;
     }
-    const next = cols[ci + 1];
-    const labels = next ? edges.filter((e) => col.includes(e.from) && next.includes(e.to)).map((e) => labelOf(els, e.a.id)?.width ?? 0) : [];
-    x += w + Math.max(SPACE, Math.max(0, ...labels) + 56);
-  });
+    // A root sits one column before its nearest child, so its link doesn't reach across other nodes.
+    for (const n of comp) {
+      if (es.some((e) => e.to === n)) continue;
+      const kids = es.filter((e) => e.from === n).map((e) => depth.get(e.to)!);
+      if (kids.length) depth.set(n, Math.max(0, Math.min(...kids) - 1));
+    }
+    const cols: string[][] = Array.from({ length: Math.max(...depth.values()) + 1 }, () => []);
+    for (const n of comp) cols[depth.get(n)!]!.push(n);
+    const rowOf = new Map<string, number>();
+    cols.forEach((col, ci) => {
+      if (ci > 0)
+        col.sort((x, y) => {
+          const avg = (n: string) => {
+            const ps = es.filter((e) => e.to === n && rowOf.has(e.from)).map((e) => rowOf.get(e.from)!);
+            return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : Infinity;
+          };
+          return avg(x) - avg(y);
+        });
+      col.forEach((n, i) => rowOf.set(n, i));
+    });
+    const heights = cols.map((col) => col.reduce((h, n) => h + map.get(n)!.height, 0) + Math.max(0, col.length - 1) * 32);
+    const tallest = Math.max(...heights);
+    let x = start.x;
+    cols.forEach((col, ci) => {
+      if (!col.length) return;
+      const w = Math.max(...col.map((n) => map.get(n)!.width));
+      let y = top + (tallest - heights[ci]!) / 2;
+      for (const n of col) {
+        const f = frame(out.find((v) => v.id === n)!);
+        out = out.map((v) => (v.id === n ? { ...v, x: x + (w - f.w) / 2, y, angle: 0 } : v));
+        y += f.h + 32;
+      }
+      const next = cols[ci + 1];
+      const labels = next ? es.filter((e) => col.includes(e.from) && next.includes(e.to)).map((e) => labelOf(els, e.a.id)?.width ?? 0) : [];
+      x += w + Math.max(SPACE, Math.max(0, ...labels) + 56);
+    });
+    for (let pass = 0; pass < comp.length * 2; pass++) {
+      const at = byId(out);
+      let hit: { col: string[]; i: number; dy: number } | null = null;
+      for (const e of es) {
+        const [p, q] = [centre(at.get(e.from)!), centre(at.get(e.to)!)];
+        const [c0, c1] = [depth.get(e.from)!, depth.get(e.to)!].sort((a, b) => a - b);
+        for (const col of cols.slice(c0! + 1, c1)) {
+          const i = col.findIndex((n) => segHits(p, q, frame(at.get(n)!), 20));
+          if (i < 0) continue;
+          const f = frame(at.get(col[i]!)!);
+          const yAt = (x: number) => p[1] + ((q[1] - p[1]) * (Math.min(Math.max(x, Math.min(p[0], q[0])), Math.max(p[0], q[0])) - p[0])) / (q[0] - p[0] || 1);
+          hit = { col, i, dy: Math.max(yAt(f.x), yAt(f.x + f.w)) + 36 - f.y };
+          break;
+        }
+        if (hit) break;
+      }
+      if (!hit || hit.dy <= 0) break;
+      const below = new Set(hit.col.slice(hit.i));
+      out = out.map((v) => (below.has(v.id) ? { ...v, y: v.y + hit!.dy } : v));
+    }
+    top = boundsOf(comp.map((n) => out.find((v) => v.id === n)!))!.y + boundsOf(comp.map((n) => out.find((v) => v.id === n)!))!.h + 64;
+  }
   return reroute(syncAll(out), new Set(nodeIds));
 }
 
