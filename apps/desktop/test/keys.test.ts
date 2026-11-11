@@ -99,6 +99,38 @@ describe("shortcut editor: Review's keys", () => {
   });
 });
 
+describe("shortcut editor: the player's second keys (YouTube's K J L)", () => {
+  test("K, J and L are second keys for play, back and forward, and L stays Listen", () => {
+    resetKeys();
+    expect(is(press("KeyK"), "play-alt")).toBe(true);
+    expect(is(press("KeyJ"), "back-alt")).toBe(true);
+    expect(is(press("KeyL"), "forward-alt")).toBe(true);
+    expect(is(press("KeyL"), "listen")).toBe(true);
+  });
+
+  test("Listen works only on a source with no sound of its own, so it never meets the keys that need one", () => {
+    resetKeys();
+    expect(clash("forward-alt", "KeyL")).toBeNull();
+    expect(clash("listen", "KeyL")).toBeNull();
+    expect(clash("listen", "KeyJ")).toBeNull();
+    expect(rebind("listen", "KeyK")).toBeNull();
+    resetKeys();
+  });
+
+  test("they still meet every key that works on a playing source, and read-aloud's own keys meet Listen", () => {
+    resetKeys();
+    expect(clash("forward-alt", "KeyA")?.id).toBe("archive");
+    expect(clash("back-alt", "KeyH")?.id).toBe("highlight");
+    expect(clash("play-alt", "KeyL")?.id).toBe("forward-alt");
+    expect(clash("forward", "KeyJ")?.id).toBe("back-alt");
+    // Space and [ ] drive read-aloud on an article too, where L is Listen.
+    expect(clash("listen", "Space")?.id).toBe("play");
+    expect(clash("play", "KeyL")?.id).toBe("listen");
+    expect(rebind("forward-alt", "ArrowLeft")).toBe("← is reserved");
+    resetKeys();
+  });
+});
+
 test("a saved shortcut the rules now refuse is dropped when the keymap loads", async () => {
   (globalThis as Record<string, unknown>).localStorage = w.localStorage;
   w.localStorage.setItem("ore.keys", JSON.stringify({ palette: "Meta+KeyA", "edit-card": "Digit1", add: "Meta+KeyY", gone: "Meta+KeyU" }));

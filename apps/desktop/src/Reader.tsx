@@ -1909,11 +1909,12 @@ function ReaderView(p: Props & { reload: () => void }) {
       }
       const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
       if (video && player.ready && !inField && !inNote && !ownsMediaKey(t, e.key)) {
-        const act = is(e, "play")
+        // Space ← →, and YouTube's K J L beside them (D195).
+        const act = is(e, "play") || is(e, "play-alt")
           ? player.toggle
-          : is(e, "back")
+          : is(e, "back") || is(e, "back-alt")
             ? () => seekTo(player.time() - 15)
-            : is(e, "forward")
+            : is(e, "forward") || is(e, "forward-alt")
               ? () => seekTo(player.time() + 30)
               : is(e, "slower")
                 ? () => player.setRate(player.rate - 0.25)

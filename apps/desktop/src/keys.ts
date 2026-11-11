@@ -4,7 +4,10 @@ import { load, save } from "./util";
 /** A key combo as `Ctrl+Alt+Shift+Meta+<KeyboardEvent.code>`, e.g. "Meta+KeyK", "Digit1". Physical keys, so ⌥ and ⇧ do not change it. */
 export type Combo = string;
 
-type Binding = { id: string; label: string; group: string; combo: Combo; global?: boolean; system?: boolean; scope?: "diagram" };
+/** `scope`: where a binding works, when not everywhere in the app. "diagram" is the diagram editor (it owns the
+ *  keyboard). "sound" is a source with sound of its own (a video or a recording), "silent" one without: one
+ *  source is never both, so their keys never meet (L is Listen on an article, Forward on a video). */
+type Binding = { id: string; label: string; group: string; combo: Combo; global?: boolean; system?: boolean; scope?: "diagram" | "sound" | "silent" };
 
 // Editable bindings. `global` ones also fire in text fields, so they need ⌘, ⌃ or ⌥. `system` ones are
 // registered with macOS and work in any app; they can be turned off ("").
@@ -42,7 +45,7 @@ const DEFAULTS = [
   { id: "copy", label: "Copy with the source (a highlight, a source, picked sources)", group: "General", combo: "Meta+KeyC" },
   { id: "link", label: "Copy link to original", group: "Reader", combo: "Shift+Meta+KeyC", global: true },
   { id: "path", label: "Copy path (the original file, else doc.md)", group: "General", combo: "Alt+Meta+KeyC", global: true },
-  { id: "listen", label: "Listen / stop listening", group: "Reader", combo: "KeyL" },
+  { id: "listen", label: "Listen / stop listening", group: "Reader", combo: "KeyL", scope: "silent" },
   { id: "look-up", label: "Explain a word (Learn this from there)", group: "Reader", combo: "Ctrl+Meta+KeyD" },
   { id: "lesson-prev", label: "Previous lesson in the course", group: "Reader", combo: "Alt+Meta+ArrowLeft" },
   { id: "lesson-next", label: "Next lesson in the course", group: "Reader", combo: "Alt+Meta+ArrowRight" },
@@ -59,9 +62,13 @@ const DEFAULTS = [
   { id: "retire-card", label: "Retire exercise", group: "Review", combo: "Shift+Meta+Backspace", global: true },
   { id: "ask", label: "Ask about this exercise", group: "Review", combo: "Slash" },
   { id: "bad-version", label: "Bad version: show the original exercise", group: "Review", combo: "KeyB" },
+  // YouTube's K J L sit beside Space ← →, on a video or a recording only (D195).
   { id: "play", label: "Play / pause", group: "Video and listening", combo: "Space" },
+  { id: "play-alt", label: "Play / pause", group: "Video and listening", combo: "KeyK", scope: "sound" },
   { id: "back", label: "Back 15 seconds", group: "Video and listening", combo: "ArrowLeft" },
+  { id: "back-alt", label: "Back 15 seconds", group: "Video and listening", combo: "KeyJ", scope: "sound" },
   { id: "forward", label: "Forward 30 seconds", group: "Video and listening", combo: "ArrowRight" },
+  { id: "forward-alt", label: "Forward 30 seconds", group: "Video and listening", combo: "KeyL", scope: "sound" },
   { id: "slower", label: "Slower", group: "Video and listening", combo: "BracketLeft" },
   { id: "faster", label: "Faster", group: "Video and listening", combo: "BracketRight" },
   { id: "keep", label: "Highlight (no key point or question)", group: "Highlight", combo: "Digit1" },
@@ -278,7 +285,7 @@ export function invalid(id: KeyId, combo: Combo): string | null {
   if (combo === b.combo) return null;
   if (combo === "Escape" || combo === "Enter" || combo.startsWith("Arrow")) return `${label(combo)} is reserved`;
   if (MAC[combo]) return `${label(combo)} is the Mac's ${MAC[combo]}`;
-  if (APP[combo] && !("scope" in b)) return `${label(combo)} is ${APP[combo]}`;
+  if (APP[combo] && !("scope" in b && b.scope === "diagram")) return `${label(combo)} is ${APP[combo]}`;
   // Review's fixed 1–4 (the rating, and 1–3 for how sure) go before any binding there.
   if (/^Digit[1-4]$/.test(combo) && (IN_REVIEW.has(id) || IN_REVIEW_TOO.has(id))) return `${label(combo)} rates the exercise in Review`;
   return null;
@@ -292,9 +299,10 @@ const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-ne
 /** The binding that already has `combo` where `id` works (the app, Review, or the diagram editor), if any. */
 export function clash(id: KeyId, combo: Combo): (Binding & { id: KeyId }) | null {
   if (!combo) return null;
-  const scope = (x: Binding) => x.scope ?? (IN_REVIEW.has(x.id) ? "review" : "app");
+  const scope = (x: Binding) => (x.scope === "diagram" ? "diagram" : IN_REVIEW.has(x.id) ? "review" : "app");
+  const apart = (x: Binding, y: Binding) => (x.scope === "sound" && y.scope === "silent") || (x.scope === "silent" && y.scope === "sound");
   const meet = (x: Binding, y: Binding) =>
-    scope(x) === scope(y) || (scope(x) !== "diagram" && scope(y) !== "diagram" && (IN_REVIEW_TOO.has(x.id) || IN_REVIEW_TOO.has(y.id)));
+    !apart(x, y) && (scope(x) === scope(y) || (scope(x) !== "diagram" && scope(y) !== "diagram" && (IN_REVIEW_TOO.has(x.id) || IN_REVIEW_TOO.has(y.id))));
   const b = DEFAULTS.find((x) => x.id === id)!;
   return DEFAULTS.find((x) => x.id !== id && meet(x, b) && keymap[x.id] === combo) ?? null;
 }
