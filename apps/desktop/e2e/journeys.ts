@@ -827,6 +827,98 @@ journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ repla
   await page.keyboard.press("Meta+j");
 });
 
+journey("tutor skill page: opened on a skill's page it is scoped to that skill, a chip with its icon (not for a skill with no sources); Quiz me and ⌘K's ask take it; × leaves it out for that page, another skill page brings its own, an @ of the same skill isn't doubled, Try again sends what it sent; a source open shows the source's chip", async (page) => {
+  const asked: string[][] = [];
+  let fail = false;
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    asked.push(JSON.parse(body).args);
+    if (fail) return (fail = false), route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify("The AI is offline.") });
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `Reply ${asked.length}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }) });
+  });
+  try {
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    const chips = tutor.locator(".tutor-chips .tutor-chip");
+    const skillChip = (name: string) => chips.filter({ has: page.locator(".skill-icon") }).filter({ hasText: new RegExp(`^${name}$`) });
+    const skillPage = async (name: RegExp) => {
+      await page.getByRole("button", { name }).first().click();
+      await page.locator(".skill-page").waitFor();
+    };
+    const reply = async (n: number) => { await tutor.getByText(`Reply ${n}`).waitFor(); return asked[n - 1]!; };
+    const send = async (text: string, at?: string) => {
+      const n = asked.length;
+      await field.pressSequentially(text);
+      if (at) {
+        await field.pressSequentially(at);
+        await page.getByRole("listbox", { name: "Point the tutor at" }).getByRole("option").first().waitFor();
+        await page.keyboard.press("Enter");
+      }
+      await page.keyboard.press("Enter");
+      return reply(n + 1);
+    };
+    const skillsIn = (args: string[]) => args.filter((a) => a.startsWith("--skill="));
+    // A skill with no sources has nothing to search: no chip, nothing scoped.
+    await skillPage(/^Distributed/);
+    await page.keyboard.press("Meta+j");
+    if (await fresh.isEnabled()) await fresh.click(); // an earlier journey's thread
+    if (skillsIn(await send("Hi")).length) throw new Error("a skill with no sources was sent");
+    if (await chips.count()) throw new Error(`a skill with no sources shows a chip: ${await chips.allTextContents()}`);
+    await skillPage(/^Learning/);
+    await skillChip("Learning").waitFor();
+    if ((await chips.count()) !== 1) throw new Error(`want one chip, the skill's: ${await chips.allTextContents()}`);
+    // Quiz me with no @ in effect takes the page's skill.
+    const quiz = page.waitForRequest((r) => /"due","--start","--skill=learning"\]/.test(r.postData() ?? ""));
+    await tutor.getByRole("button", { name: "Quiz me" }).click();
+    await quiz;
+    await page.locator(".review").waitFor();
+    await page.keyboard.press("Escape");
+    await until("Esc leaves Review", async () => (await page.locator(".review").count()) === 0);
+    await skillChip("Learning").waitFor(); // the tutor stays open under Review, its chip with it
+    // ⌘K's ask, sent from the skill's page, goes scoped to it.
+    const n = asked.length;
+    await page.keyboard.press("Meta+k");
+    await page.keyboard.type("What is spacing?");
+    await page.locator("[cmdk-item]").filter({ hasText: "Ask your library" }).first().click();
+    const palette = await reply(n + 1);
+    if (skillsIn(palette).join() !== "--skill=learning" || palette.some((a) => a.startsWith("--item="))) throw new Error(`⌘K's ask was not scoped to the skill: ${palette.join(" ")}`);
+    if (skillsIn(await send("What else?")).join() !== "--skill=learning") throw new Error("the skill page's skill was not sent");
+    // × leaves it out for this page, through a trip Home and back.
+    await tutor.getByRole("button", { name: "Leave “Learning” out" }).click();
+    await until("× takes the chip away", async () => (await skillChip("Learning").count()) === 0);
+    if (skillsIn(await send("And this?")).length) throw new Error("a skill left out was still sent");
+    await page.getByRole("button", { name: /^Home/ }).first().click();
+    await skillPage(/^Learning/);
+    await field.waitFor();
+    if (await skillChip("Learning").count()) throw new Error("a skill he left out came back after a trip Home");
+    // Another skill's page brings its own chip. He @s the same skill: one chip, sent once, and Try again sends just that.
+    await skillPage(/^Teaching/);
+    await skillChip("Teaching").waitFor();
+    fail = true;
+    const m = asked.length;
+    await field.pressSequentially("Explain ");
+    await field.pressSequentially("@Teach");
+    await page.getByRole("listbox", { name: "Point the tutor at" }).getByRole("option").first().waitFor();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: "Try again" }).click();
+    const again = await reply(m + 2);
+    for (const args of [asked[m]!, again]) if (skillsIn(args).join() !== "--skill=teaching") throw new Error(`the skill went twice, or not at all: ${args.join(" ")}`);
+    if ((await chips.count()) !== 1) throw new Error(`the page's skill and its @ show as two chips: ${await chips.allTextContents()}`);
+    // With a source open, the source is the context, as before.
+    await openSource(page, TESTING);
+    await fresh.click();
+    await chips.filter({ hasText: TESTING }).waitFor();
+    if (await chips.locator(".skill-icon").count()) throw new Error("a skill chip shows beside the open source");
+    if (!(await send("Why?")).some((a) => a.startsWith("--item="))) throw new Error("the open source was not sent");
+  } finally {
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
 journey("tutor stop and copy: the send button stops a reply (⌘. too), words written by then stay, none says Stopped with Try again, a late answer is ignored; Copy copies a reply (D187)", async (page) => {
   let id = "";
   const held: (() => void)[] = [];
@@ -5831,9 +5923,19 @@ journey("review: while a card edit saves, the editor is read-only and Esc waits,
   await page.getByRole("button", { name: "Edit exercise" }).click();
   const question = page.locator("#edit-q");
   const was = await question.inputValue();
+  // Cancel shows Esc on hover, as Save shows its key; while it saves, Esc waits, so the hint goes too.
+  const cancel = page.locator(".review-edit").getByRole("button", { name: "Cancel", exact: true });
+  const cancelHint = page.locator(".hint", { hasText: /^Cancel\s*Esc$/ });
+  await cancel.hover();
+  await cancelHint.waitFor();
   await question.fill(`${was} (edited)`);
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.locator(".review-edit").getByRole("button", { name: "Save", exact: true }).click();
   await until("the save is held", async () => held);
+  const box = (await cancel.boundingBox())!;
+  await page.mouse.move(box.x - 200, box.y - 200, { steps: 8 });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
+  await page.waitForTimeout(800);
+  if (await cancelHint.isVisible()) throw new Error("Cancel's hint says Esc while the save holds Esc back");
   await question.focus();
   await page.keyboard.press("End");
   await page.keyboard.type(" and more");
@@ -6738,6 +6840,83 @@ journey("resize drags: Esc mid-drag puts the size back and stays on the page; no
   } finally {
     await ore("archive", made.meta.id).catch(() => {});
   }
+});
+
+journey("sidebar: its edge drags to resize between a min and a max, Esc puts it back, double-click resets, and the width is remembered", async (page) => {
+  const side = page.locator("nav.sidebar");
+  const edge = page.getByRole("separator", { name: "Resize the sidebar" });
+  const width = async () => Math.round((await side.boundingBox())!.width);
+  const content = async () => Math.round((await page.locator("main.main").boundingBox())!.x);
+  const near = (a: number, b: number) => Math.abs(a - b) <= 2;
+  /** Presses the edge, drags it to `x`, then lets go (or presses Esc first). */
+  const drag = async (x: number, esc = false) => {
+    const d = (await edge.boundingBox())!;
+    await page.mouse.move(d.x + d.width / 2, d.y + 300);
+    await page.mouse.down();
+    await page.mouse.move(x, d.y + 300, { steps: 5 });
+    if (esc) await page.keyboard.press("Escape");
+    await page.mouse.up();
+  };
+  const settle = (what: string, w: number) => until(what, async () => near(await width(), w) && near(await content(), w));
+  await settle("the sidebar starts at 216", 216);
+  await drag(300);
+  await settle("dragged wider, the sidebar and the content follow", 300);
+  await drag(1000);
+  await settle("it stops at its max (360 in a 1280 window)", 360);
+  await drag(40);
+  await settle("it stops at its min (180)", 180);
+  const sideways = await side.evaluate((n) => n.scrollWidth - n.clientWidth);
+  if (sideways > 0) throw new Error(`at its min the sidebar scrolls ${sideways}px sideways`);
+  await drag(300);
+  await settle("dragged back out", 300);
+  await drag(340, true);
+  await settle("Esc mid-drag puts it back", 300);
+  if (!(await side.isVisible())) throw new Error("Esc during the drag hid the sidebar");
+  await page.reload();
+  await side.waitFor();
+  await settle("the width survives a reload", 300);
+  await page.getByRole("button", { name: "Hide sidebar" }).click();
+  await side.waitFor({ state: "hidden" });
+  if (await edge.count()) throw new Error("the edge stays with the sidebar hidden");
+  await page.getByRole("button", { name: "Show sidebar" }).click();
+  await settle("hidden and shown again, it keeps its width", 300);
+  await edge.dblclick();
+  await settle("double-click resets it", 216);
+  await page.reload();
+  await side.waitFor();
+  await settle("the reset is remembered", 216);
+  await drag(1000);
+  await settle("back at its max", 360);
+  await page.setViewportSize({ width: 720, height: 700 });
+  await settle("a narrow window clamps it (40% of 720)", 288);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await settle("widened again, it comes back to the width he chose", 360);
+  // The strip leaves the title bar (the window drags there) and the sidebar's scrollbar to them.
+  const hit = (x: number, y: number) => page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest(".side-divider, .titlebar, .sidebar")?.className ?? "", [x, y]);
+  if (!(await hit(360, 10)).includes("titlebar")) throw new Error(`the title bar over the sidebar's edge is covered by: ${await hit(360, 10)}`);
+  if (!(await hit(358, 300)).includes("sidebar")) throw new Error(`the sidebar's scrollbar is covered by: ${await hit(358, 300)}`);
+  // Dragged past its max, the pointer keeps the resize cursor over the content, and no text gets selected.
+  const d = (await edge.boundingBox())!;
+  await page.mouse.move(d.x + d.width / 2, d.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(900, d.y + 300, { steps: 5 });
+  const under = await page.evaluate(([x, y]) => getComputedStyle(document.elementFromPoint(x!, y!)!).cursor, [900, d.y + 300]);
+  await page.mouse.up();
+  if (under !== "col-resize") throw new Error(`past the max the cursor over the content is ${under}`);
+  // A wide sidebar and the note panel dragged to its max: the reader keeps what it had with the sidebar at 216.
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await openSource(page, AGENTS);
+  await page.getByRole("tab", { name: "Source note" }).click().catch(() => {});
+  const note = page.getByRole("separator", { name: "Resize the side panel" });
+  const n = (await note.boundingBox())!;
+  await page.mouse.move(n.x + n.width / 2, n.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(20, n.y + 300, { steps: 6 });
+  await page.mouse.up();
+  const reader = async () => Math.round((await page.locator(".mynotes").boundingBox())!.x - (await side.boundingBox())!.width);
+  await until("the reader column keeps at least 224px at 1100", async () => (await reader()) >= 222);
+  await page.waitForTimeout(200);
+  if ((await reader()) < 222) throw new Error(`the reader column is ${await reader()}px`);
 });
 
 journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {

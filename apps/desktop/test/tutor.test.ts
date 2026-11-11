@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mentionMatches } from "../src/mentions";
+import { mentionMatches, pointedAt } from "../src/mentions";
 
 const sources = [{ id: "s1", title: "The Testing Effect" }, { id: "s2", title: "Building Effective Agents" }, { id: "s3", title: "Effortful learning" }];
 const skills = [{ id: "learning", name: "Learning" }, { id: "ai", name: "AI" }];
@@ -14,4 +14,13 @@ test("@ leaves out what he already pointed at, and lists eight at most", () => {
   expect(mentionMatches("", sources, skills, [{ kind: "skill", id: "ai", name: "AI" }]).some((m) => m.id === "ai")).toBe(false);
   const many = Array.from({ length: 20 }, (_, i) => ({ id: `x${i}`, title: `Source ${i}` }));
   expect(mentionMatches("source", many, [], []).length).toBe(8);
+});
+
+test("a message on a skill's page points at the @s in effect and that skill, once even if he @s it too", () => {
+  const learning = { kind: "skill" as const, id: "learning", name: "Learning" };
+  const source = { kind: "source" as const, id: "s1", name: "Effective agents" };
+  expect(pointedAt([], [learning])).toEqual([learning]);
+  expect(pointedAt([source], [learning])).toEqual([source, learning]);
+  expect(pointedAt([learning], [{ ...learning }])).toEqual([learning]);
+  expect(pointedAt([source], [])).toEqual([source]);
 });

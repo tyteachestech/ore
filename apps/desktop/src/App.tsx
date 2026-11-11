@@ -17,7 +17,7 @@ import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Reader, type PracticeRef } from "./Reader";
-import type { SideTab } from "./Notes";
+import { setSidebarShown, useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
 import { Settings, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
@@ -247,9 +247,11 @@ export function App() {
   const [tutorDock, setTutorDock] = useState(() => load("ore.tutor.fit") === "dock");
   const tutorDocked = tutorOpen && tutorDock;
   const openItemRef = useRef<{ id: string; title: string } | undefined>(undefined);
+  const pageSkillRef = useRef<{ id: string; name: string } | undefined>(undefined);
   const tutorFrom = useRef<HTMLElement | null>(null);
   const openTutor = (message?: string) => {
-    if (message) tutor.ask({ message, ...(openItemRef.current ? { item: openItemRef.current.id, title: openItemRef.current.title } : {}) });
+    const scope = pageSkillRef.current;
+    if (message) tutor.ask({ message, ...(openItemRef.current ? { item: openItemRef.current.id, title: openItemRef.current.title } : {}) }, scope ? [{ kind: "skill", id: scope.id, name: scope.name }] : []);
     if (!tutorOpen) tutorFrom.current = document.activeElement as HTMLElement | null;
     setTutorOpen(true);
   };
@@ -282,6 +284,10 @@ export function App() {
     }
   });
   const [hideSidebar, setHideSidebar] = useState(() => load("ore.sidebar") === "collapsed");
+  // Its edge drags it from 180 (the title bar's buttons and a short skill name still fit) to 360, or 40% of a
+  // narrow window so the content keeps its room (D44, D193). Everything sized off the sidebar reads --sidebar.
+  const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360 });
+  useLayoutEffect(() => document.documentElement.style.setProperty("--sidebar", `${sideWidth.width}px`), [sideWidth.width]);
   const [notesOpen, setNotesOpen] = useState(() => load("ore.mynotes") !== "closed");
   const [sideTab, setSideTab] = useState<SideTab>(() => (load("ore.sidetab") === "questions" ? "questions" : "note"));
   const { width, size, page, font } = useReading();
@@ -858,6 +864,8 @@ export function App() {
   const [showAnyway, setShowAnyway] = useState(false);
   useEffect(() => setShowAnyway(false), [autoHide]);
   const collapsed = hideSidebar || (autoHide && !showAnyway);
+  // A right-hand panel gives back what the shown sidebar takes past 216 (D193).
+  useLayoutEffect(() => setSidebarShown(collapsed ? 0 : sideWidth.width), [collapsed, sideWidth.width]);
 
   const toggleSidebar = useCallback(() => {
     clearTimeout(peekTimer.current);
@@ -936,6 +944,9 @@ export function App() {
    *  source, else the source's first skill, else All sources. */
   const openItem = openId ? (items ?? []).find((i) => i.id === openId) : undefined;
   openItemRef.current = openItem;
+  /** The skill whose page is the tutor's context (D191): none when it has no sources, which would leave it nothing to search. */
+  const pageSkill = onSkillPage && (items ?? []).some((i) => i.skills.includes(skill!)) ? skill : null;
+  pageSkillRef.current = pageSkill ? skills.find((s) => s.id === pageSkill) : undefined;
   const sideSkill = !openItem ? skill : skill && openItem.skills.includes(skill) ? skill : (openItem.skills.find((k) => skills.some((s) => s.id === k)) ?? null);
   /** The course the open source is a lesson of (D79). */
   const openCourse = openId ? (items ?? []).find((i) => i.id === openId)?.course?.id : undefined;
@@ -2102,7 +2113,7 @@ export function App() {
 
   const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} said={unheard.said} failed={unheard.failed} thinking={unheard.thinking} onHush={unheard.hush} />;
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}`}>
+    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}${sideWidth.dragging ? " sizing" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
       <Hint text={collapsed ? "Show sidebar" : "Hide sidebar"} keys="sidebar">
       <button
@@ -2129,6 +2140,11 @@ export function App() {
         </Hint>
       </div>
       {collapsed && <div className="side-edge" aria-hidden="true" onMouseEnter={peekIn} onMouseLeave={() => !peek && clearTimeout(peekTimer.current)} />}
+      {!collapsed && (
+        <Hint text="Drag to resize · double-click to reset" side="right">
+          <div className={`divider side-divider${sideWidth.dragging ? " dragging" : ""}`} role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" {...sideWidth.divider} />
+        </Hint>
+      )}
       <Sidebar
         skills={skills}
         skill={sideSkill}
@@ -2284,7 +2300,7 @@ export function App() {
         </Boundary>
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
       </main>
-      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name, icon: k.icon, color: k.color }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
+      {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name, icon: k.icon, color: k.color }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} skillPage={pageSkill} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
         // The note takes the room while he writes; the tutor comes back with what he sent (D128.6).
         // The exercise belongs to the source it was asked about: that one opens first if he has moved on.
         const done = (text: string | null) => {

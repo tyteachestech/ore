@@ -11,3 +11,7 @@ export function mentionMatches(query: string, sources: { id: string; title: stri
   const rank = (m: Mention) => (at(m) === 0 ? 0 : words(m) ? 1 : 2);
   return free.filter((m) => at(m) >= 0).sort((a, b) => rank(a) - rank(b)).slice(0, 8);
 }
+
+/** What a message points the tutor at: the @s in effect (D128.3), then the page's own context (the skill
+ *  page he is on), each once. */
+export const pointedAt = (carry: Mention[], page: Mention[]): Mention[] => [...carry, ...page.filter((m) => !carry.some((x) => x.kind === m.kind && x.id === m.id))];
