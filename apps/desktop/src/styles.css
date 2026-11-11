@@ -349,6 +349,12 @@ img.thumb { filter: brightness(0.86); }
 .chip .icon { vertical-align: 0; line-height: 1; }
 :root[data-chips="icon"] .chip:has(> .icon) .chip-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* A source's pills open its skill picker (SkillPicker, Linear's labels); with none, a quiet + on hover. */
+/* The skills past a row's first two, counted (D198); the count never gives way to a name. */
+.chip-more { flex: none; font-family: var(--mono); font-size: 11px; }
+.chips-rest { display: none; }
+:root[data-chips="icon"] .chips-rest { display: contents; }
+:root[data-chips="icon"] .chip-more { display: none; }
+.chips-rest .chip, .chips-rest + .chip-more { margin-left: 6px; }
 .chip + .chip { margin-left: 6px; }
 .chips-button { display: inline-flex; gap: 4px; min-width: 0; padding: 0; border-radius: 4px; }
 /* Hover and open light the ground behind them, so it shows with the names hidden too (Icon only). */

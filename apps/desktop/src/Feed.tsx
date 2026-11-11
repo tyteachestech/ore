@@ -11,7 +11,7 @@ import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { ore, opt, type Skill } from "./ore";
-import { SkillChip, SkillPicker, unfile } from "./Skills";
+import { SkillChips, SkillPicker, unfile } from "./Skills";
 import { errorText, load, save, typedLast, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
 import { citeSources, copyCited } from "./cite";
@@ -349,7 +349,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
               onCancelRename={(byKey = true) => (setRenaming(null), byKey && listRef.current?.focus({ preventScroll: true }))}
               skillsPicker={
                 <SkillPicker skills={skills} value={g.feed.skills} title={g.feed.title} onChange={(next) => refile(g.feed, next)} onCreate={onCreateSkill}>
-                  {g.feed.skills.length ? g.feed.skills.map((id) => <SkillChip key={id} skill={skills.find((k) => k.id === id) ?? { id, name: id }} />) : (
+                  {g.feed.skills.length ? <SkillChips ids={g.feed.skills} skills={skills} /> : (
                     // Where the posts he keeps from this feed are filed; shown on hover until one is set.
                     <span className="add-dest feed-skill">
                       <Plus size={12} weight="bold" aria-hidden="true" />

@@ -41,7 +41,7 @@ import { SkillPage } from "./SkillPage";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
 import { importanceActions, LEVELS } from "./importance";
-import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChip, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
+import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
 import { errorText, focusQuietly, keepScroll, keptScrolls, load, save, usable } from "./util";
 import { questionText } from "./Questions";
@@ -1839,13 +1839,7 @@ export function App() {
   ];
 
   /** The other skills a row is under, under its title (D114): its skill pills, as everywhere else. */
-  const skillsOf = (ids: string[]) => (
-    <span className="chips">
-      {ids.map((s) => (
-        <SkillChip key={s} skill={skillOf(s)} />
-      ))}
-    </span>
-  );
+  const skillsOf = (ids: string[]) => <SkillChips ids={ids} skills={skills} />;
   const view = <ViewMenu status={status} archived={archivedInSkill.length > 0} go={go} details={details} toggle={toggleDetail} />;
   // What a row's handlers and menus call, read when they run: a row re-renders only when what it
   // shows changes (below), so ↑↓ through a long list repaints two rows, not all of them.
