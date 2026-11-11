@@ -14,7 +14,7 @@ import { Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
-import { levelProgress, ore, opt, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
+import { depthText, levelProgress, ore, opt, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
 import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
@@ -420,10 +420,12 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
   const [all, setAll] = useState(false);
   const p = levelProgress(k);
   // One vocabulary with the header: the gem states, then cards not reviewed yet as empty slots.
-  const legend: [GemKind, number, string][] = [
-    ["cut", k.solid, "Cut: you'd still recall these three weeks from now"],
+  const legend: [GemKind, number, string, { seam?: boolean; polished?: boolean }?][] = [
+    ["cut", k.polished, "Polished: cut, and recalled on a case you hadn't seen", { polished: true }],
+    ["cut", k.mended, "Mended: cut, missed, and won back", { seam: true }],
+    ["cut", k.solid - k.polished - k.mended, "Cut: you'd still recall these three weeks from now"],
     ["ready", k.ready, "Glowing: cut if you recall them at their next review"],
-    ["dull", k.win_back, "Cracked: cut once, then missed. Review to polish them again"],
+    ["dull", k.win_back, "Cracked: cut once, then missed. Review to mend them"],
     ["rough", k.growing - k.ready - k.win_back, "Rough: reviewed, not near solid yet"],
     ["empty", k.new, "Not reviewed yet"],
   ];
@@ -448,17 +450,23 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
         <Popover.Content className="popover strength-pop" data-color={color} side="bottom" align="end" sideOffset={6} collisionPadding={12}>
           <div className="strength">
             <div className="strength-legend">
-              {legend.map(([kind, n, why]) =>
+              {legend.map(([kind, n, why, look]) =>
                 n > 0 ? (
-                  <Hint key={kind} text={why}>
+                  <Hint key={why} text={why}>
                     <span>
-                      <Gem kind={kind} size={16} />
+                      <Gem kind={kind} size={16} {...look} />
                       {n}
                     </span>
                   </Hint>
                 ) : null,
               )}
             </div>
+            {/* D197: the number that moves every session, while the cut count waits weeks. */}
+            {k.depth > 0 && (
+              <Hint text="How long these memories now last, added up">
+                <p className="strength-depth"><b>{depthText(k.depth)}</b> deep</p>
+              </Hint>
+            )}
             <Growth points={s.growth} />
             {k.explain.length > 0 && (
               <div className="strength-explain">

@@ -99,3 +99,23 @@ test("an ore whose ring dot is missing still counts, so the ring is told it is f
   expect(body.querySelectorAll(".dot-ring .on").length).toBe(1);
   await act(async () => (root.unmount(), body.remove()));
 }, 10_000);
+
+test("gem grades on the end screen (D197): a won-back gem carries its gold seam, a gem polished this session shows after the cut ones, and the session's depth is one line", async () => {
+  reduce = true;
+  const e = end(["ai", "ai"]) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { mended: [true, false], polished: ["ai"], depth_days: 41 });
+  const s = await mount(e as never);
+  reduce = false;
+  const gems = [...s.body.querySelectorAll(".review-cut > span")];
+  expect(gems).toHaveLength(3);
+  const seams = gems.map((g) => g.querySelectorAll('circle[fill="var(--seam)"]').length);
+  expect(seams[0]).toBeGreaterThan(0);
+  expect(seams.slice(1)).toEqual([0, 0]);
+  expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");
+  expect(s.body.querySelector(".review-depth")!.textContent).toBe("+41 days of memory");
+  await s.done();
+  // Nothing gained, nothing said.
+  const none = await mount(end([]));
+  expect(none.q(".review-depth")).toBe(0);
+  await none.done();
+});

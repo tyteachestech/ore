@@ -2,7 +2,8 @@ import { levelProgress, type Strength } from "./ore";
 import { DotRing } from "./Ring";
 
 // Gems (D90): a solid memory is a cut gem, a growing card a rough stone, one review from cut it
-// glows, and a cut gem he missed cracks until he wins it back. The level is the gem being cut: a ring
+// glows, and a cut gem he missed cracks until he wins it back. A cut gem has a grade (D197): won back, its crack is
+// mended with a gold seam it keeps (`seam`); passed on a new case, its table is polished bright (`polished`). The level is the gem being cut: a ring
 // that fills toward the next level. Drawn as halftone dots (D183, Tyler's pick B): one round dot per cell in the
 // skill's colour (`--skill`, set by `data-color` on an ancestor), its size the shade. The art lives here alone,
 // so it can be swapped.
@@ -20,25 +21,30 @@ const C = "var(--skill, var(--accent))";
 const LIGHT = `color-mix(in oklab, ${C}, white 30%)`;
 const SHINE = `color-mix(in oklab, ${C}, white 75%)`;
 /** A dot's radius in cells, by shade: the highlight touches its neighbours, the shade leaves ground between. */
-const RADIUS: Record<string, number> = { W: 0.5, H: 0.44, M: 0.36, D: 0.25 };
+const RADIUS: Record<string, number> = { W: 0.5, H: 0.44, M: 0.36, D: 0.25, C: 0.48 };
+const GOLD = "var(--seam)";
 
 /** One dot per cell; `outline` keeps only the edge cells, small, for an empty slot. */
-const dots = (rows: readonly string[], outline = false) =>
+const dots = (rows: readonly string[], outline = false, seam = false, polished = false) =>
   rows.flatMap((row, y) =>
-    [...row].map((t, x) => {
-      if (t === "." || t === "C") return null;
+    [...row].map((c, x) => {
+      // Polished: the facets facing the light (the top rows) are all highlight.
+      const t = polished && c === "H" && y < rows.length * 0.4 ? "W" : c;
+      if (t === "." || (t === "C" && !seam)) return null;
+      if (t === "C") return <circle key={`${x},${y}`} cx={x + 0.5} cy={y + 0.5} r={RADIUS.C} fill={GOLD} />;
       if (outline && [rows[y - 1]?.[x], rows[y + 1]?.[x], row[x - 1], row[x + 1]].every((n) => n && n !== ".")) return null;
       return <circle key={`${x},${y}`} cx={x + 0.5} cy={y + 0.5} r={outline ? 0.25 : RADIUS[t]} fill={outline ? C : t === "W" ? SHINE : LIGHT} />;
     }),
   );
 
 /** `breathe`: a glowing gem due today pulses slowly; one due later glows still. */
-export function Gem({ kind, size = 16, breathe }: { kind: GemKind; size?: number; breathe?: boolean }) {
+export function Gem({ kind, size = 16, breathe, seam, polished }: { kind: GemKind; size?: number; breathe?: boolean; seam?: boolean; polished?: boolean }) {
   const large = size >= 22;
-  const rows = kind === "rough" ? (large ? ROUGH_L : ROUGH) : kind === "dull" && size >= 12 ? (large ? CRACKED_L : CRACKED) : large ? CUT_L : CUT;
+  const mended = kind === "cut" && !!seam;
+  const rows = kind === "rough" ? (large ? ROUGH_L : ROUGH) : (kind === "dull" || mended) && size >= 12 ? (large ? CRACKED_L : CRACKED) : large ? CUT_L : CUT;
   return (
     <svg className="gem" data-kind={kind} data-breathe={breathe || undefined} width={size} height={size} viewBox={large ? "-1 -2.5 16 16" : "-1 -2 12 12"} aria-hidden="true">
-      {dots(rows, kind === "empty")}
+      {dots(rows, kind === "empty", mended, kind === "cut" && polished)}
     </svg>
   );
 }

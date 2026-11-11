@@ -12,7 +12,7 @@ import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
-import { lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -1394,10 +1394,15 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     return () => clearTimeout(id);
   }, [pour, up]);
   const full = stage !== "cart";
+  // D197: a cut gem that was won back carries its gold seam; a gem passed on a new case this session shows polished.
+  const cutN = s.cut?.length ?? 0;
+  const mendedN = (s.mended ?? []).filter(Boolean).length;
+  const polishedN = s.polished?.length ?? 0;
+  const gems = [...shown.map((skill, i) => ({ skill, seam: !!s.mended?.[i], polished: false })), ...(s.polished ?? []).slice(0, Math.max(0, CUT_SHOWN - shown.length)).map((skill) => ({ skill, seam: false, polished: true }))];
   return (
     <div className={`review-end${pour ? " carted" : ""}`} role="status" ref={setHost}>
       {pour && stage !== "done" && host && (
-        <CartTip host={host} lit={pour} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
+        <CartTip host={host} lit={pour} rich={s.rescued} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
       )}
       {/* D169: the tutor's mole cheers from the top of the ring, once, at the end of a session (not in the quick quiz). After the cart (D190) it comes up first. */}
       {!quick && <span className="review-mole">{up && <Mole bare size={64} mood={mood} />}</span>}
@@ -1406,22 +1411,22 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       {/* "Caught up" never hides the new cards the daily limits hold back (D65). */}
       {t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>}
       {/* D90: one cut gem per card that became solid this session, in its skill's colour. */}
-      {(s.cut?.length ?? 0) > 0 && (
-        <Hint text={`${s.cut!.length} new cut ${s.cut!.length === 1 ? "gem" : "gems"}: you'd still recall ${s.cut!.length === 1 ? "it" : "them"} three weeks from now`}>
-          <p className="review-cut" aria-label={`${s.cut!.length} became solid`}>
-            {shown.map((id, i) => (
-              // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then.
-              <span key={i} data-color={skills.find((x) => x.id === id)?.color} data-wait={i >= landed || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
-                <Gem kind="cut" size={36} />
-                {(() => {
-                  const sk = skills.find((x) => x.id === id);
-                  return sk ? <Hint text={sk.name}><span className="review-cut-skill"><SkillIcon icon={sk.icon} color={sk.color} dot /></span></Hint> : null;
-                })()}
-              </span>
-            ))}
-            {s.cut!.length > CUT_SHOWN && landed >= shown.length && <b>+{s.cut!.length - CUT_SHOWN}</b>}
-          </p>
-        </Hint>
+      {gems.length > 0 && (
+        <p className="review-cut" aria-label={[cutN && `${cutN} became solid`, mendedN && `${mendedN} won back`, polishedN && `${polishedN} polished`].filter(Boolean).join(", ")}>
+          {gems.map((g, i) => {
+            const sk = skills.find((x) => x.id === g.skill);
+            return (
+              // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then. A polished gem was cut already: it shows once the cart has poured.
+              <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: recalled on a case you hadn't seen" : g.seam ? "Mended: you missed it once and won it back" : "Cut: you'd still recall it three weeks from now"}`}>
+                <span data-color={sk?.color} data-wait={(g.polished ? landed < shown.length : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
+                  <Gem kind="cut" size={36} seam={g.seam} polished={g.polished} />
+                  {sk && <span className="review-cut-skill"><SkillIcon icon={sk.icon} color={sk.color} dot /></span>}
+                </span>
+              </Hint>
+            );
+          })}
+          {cutN > CUT_SHOWN && landed >= shown.length && <b>+{cutN - CUT_SHOWN}</b>}
+        </p>
       )}
       {s.kept > 0 ? (
         <p className="review-kept">
@@ -1431,9 +1436,17 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         // A session of misses is still the work that makes them stick (D62: no guilt copy).
         <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>
       )}
+      {/* D197: what the session did for his memory as one number that is never zero on a good day. */}
+      {(s.depth_days ?? 0) > 0 && (
+        <Hint text="How much longer today's exercises will now last, added up">
+          <p className="review-rescued review-depth" tabIndex={0}>+{depthText(s.depth_days!)} of memory</p>
+        </Hint>
+      )}
       {longGapText(s) && <p className="review-rescued">{longGapText(s)}</p>}
       {rescuedWorthSaying(s) && (
         <p className="review-rescued">
+          {/* The rich ore the cart carried (D197): one for each of these. */}
+          <i className="rich-ore" aria-hidden="true" />
           {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}
         </p>
       )}
