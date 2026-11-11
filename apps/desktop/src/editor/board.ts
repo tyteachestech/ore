@@ -59,8 +59,9 @@ export function board(
     inner.style.transform = moved(v) ? `translate(${v.x}px, ${v.y}px) scale(${v.z})` : "";
     dom.classList.toggle("moved", moved(v));
   };
-  // Not a touch: WebKit sends no click after a touch whose pointer-down was prevented.
-  fit.addEventListener("pointerdown", (e) => e.pointerType === "touch" || e.preventDefault());
+  // The press keeps the note's focus (and the phone's keyboard): its mouse-down is prevented, never its pointer-down,
+  // after which WebKit sends no click for a touch. ProseMirror leaves a prevented mouse-down alone.
+  fit.addEventListener("mousedown", (e) => e.preventDefault());
   fit.addEventListener("click", (e) => {
     e.stopPropagation();
     set(HOME);
