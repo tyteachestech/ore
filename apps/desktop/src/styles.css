@@ -2802,6 +2802,16 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-copy { position: absolute; left: 100%; bottom: 0; margin-left: 2px; opacity: 0; }
 .tutor .ask-ai.newest .tutor-copy, .tutor .ask-text:hover .tutor-copy, .tutor-copy:focus-visible { opacity: 1; }
 .tutor-copy:hover { color: var(--text); background: var(--bg-hover); }
+/* Try another reply sits over Copy; a turn's versions page under its bubble; his last message has Edit beside it (D201). */
+.tutor-again { bottom: 26px; }
+.ask-versions { display: flex; align-items: center; gap: 2px; margin: -4px 0 0 6px; color: var(--faint); font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
+.ask-versions .icon-btn { width: 20px; height: 20px; }
+.ask-versions .icon-btn:disabled { opacity: 0.35; }
+.ask-me { position: relative; }
+.ask-edit-btn { position: absolute; right: 100%; top: 50%; translate: 0 -50%; margin-right: 2px; opacity: 0; }
+.ask-me:hover .ask-edit-btn, .ask-edit-btn:focus-visible { opacity: 1; }
+.ask-edit-btn:hover { color: var(--text); background: var(--bg-hover); }
+.tutor .field.ask-edit { display: block; align-self: flex-end; width: 80%; border-radius: 14px 14px 4px 14px; }
 .tutor-stopped { margin: 0; color: var(--muted); }
 .tutor-stopped .link { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .tutor-perch { display: flex; align-items: flex-end; gap: 8px; margin-bottom: -6px; padding-left: 12px; }

@@ -1911,6 +1911,53 @@ journey("tables: a heading's button covers its column, a click or Enter shows a 
   }
 });
 
+journey("tutor versions: Try another reply keeps the first under ‹ 1 / 2 ›, Edit and ↑ put his last message back in a field, and the versions are saved with the chat (D201)", async (page) => {
+  await openSource(page, TESTING);
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  const asked = () => page.waitForRequest((r) => (r.postData() ?? "").includes('"tutor",'));
+  await field.fill("Why does this work?");
+  await page.keyboard.press("Enter");
+  await tutor.locator(".cite").first().waitFor();
+  const pager = tutor.locator(".ask-versions");
+  if (await pager.count()) throw new Error("one reply shows a pager");
+  // Another reply: the first is kept, the new one shows.
+  let sent = asked();
+  await tutor.getByRole("button", { name: "Try another reply" }).click();
+  if (!(await sent).postData()!.includes('"Why does this work?"')) throw new Error("Try another reply sent another message");
+  await pager.getByText("2 / 2").waitFor();
+  await pager.getByRole("button", { name: "Previous version" }).click();
+  await pager.getByText("1 / 2").waitFor();
+  if (!(await pager.getByRole("button", { name: "Previous version" }).isDisabled())) throw new Error("Previous is live on the first version");
+  // Edit: his message in a field, Esc leaves it, Enter sends the new words as a third version.
+  await tutor.locator(".ask-me").hover();
+  await tutor.getByRole("button", { name: "Edit your message" }).click();
+  const edit = page.getByRole("textbox", { name: "Edit your message" });
+  if ((await edit.inputValue()) !== "Why does this work?") throw new Error("the field doesn't hold his message");
+  await page.keyboard.press("Escape");
+  await tutor.locator(".ask-me", { hasText: "Why does this work?" }).waitFor();
+  if (!(await tutor.isVisible())) throw new Error("Esc in the edit field closed the tutor");
+  // ↑ in the empty field opens the same edit.
+  await field.focus();
+  await page.keyboard.press("ArrowUp");
+  await edit.fill("Why does this work, simply?");
+  sent = asked();
+  await page.keyboard.press("Enter");
+  if (!(await sent).postData()!.includes('"Why does this work, simply?"')) throw new Error("the edited message was not what was sent");
+  await pager.getByText("3 / 3").waitFor();
+  await tutor.locator(".ask-me", { hasText: "Why does this work, simply?" }).waitFor();
+  await pager.getByRole("button", { name: "Previous version" }).click();
+  await tutor.locator(".ask-me", { hasText: /^Why does this work\?$/ }).waitFor();
+  // Saved with the chat: a restart shows the same version with the others behind it.
+  const id = ((await ore("chat")) as { id: string }[])[0]!.id;
+  await until("the chat holds all three versions", async () => {
+    const c = (await ore("chat", id)) as { turns: { message: string; alt?: number; alts?: { message: string }[] }[] };
+    return c.turns.length === 1 && c.turns[0]!.alt === 1 && c.turns[0]!.alts?.length === 2 && c.turns[0]!.alts[1]!.message === "Why does this work, simply?";
+  });
+  await ore("chat", id, "--delete");
+});
+
 journey("notebook: a cell's output is folded until he opens it, a click or Enter shows it, and a highlight on the text around it still lands (D199)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "numpy.ipynb"), "--no-enrich")) as { id: string };
   try {
