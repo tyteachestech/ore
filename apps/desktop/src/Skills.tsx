@@ -8,7 +8,7 @@ import { useLite } from "./Lite";
 import { Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
 import { ore, opt, type Skill, type SkillColor } from "./ore";
-import { errorText, load, save, useFocusWhileMounted, type Notify } from "./util";
+import { errorText, load, save, settleFocus, usable, useFocusWhileMounted, type Notify } from "./util";
 
 /** How skill tags show in lists (Settings → General): icon and name, or the icon alone for a small
  *  screen or less to read; the name is then said on hover and to VoiceOver. */
@@ -504,6 +504,10 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
         () => ore("skills", "restore", JSON.stringify(removed)).then(onChanged, fail),
         () => rm().then((r) => ((removed = r.removed), onChanged()), fail),
       );
+      // Focus is often on the skill's own sidebar row (the menu gives it back there), which goes once the
+      // skills reload: it moves to the sidebar's current place instead of falling to <body>.
+      const was = document.activeElement;
+      settleFocus(() => (usable(was) ? was : document.querySelector<HTMLElement>('.sidebar button.side-main[aria-pressed="true"]') ?? document.querySelector<HTMLElement>(".sidebar button.side-main")));
       onDone(true);
     } catch (e) {
       notify(errorText(e), "error");
