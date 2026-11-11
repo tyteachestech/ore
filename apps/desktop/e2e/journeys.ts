@@ -4907,6 +4907,20 @@ journey("review: a half-typed answer survives quitting the app, for a day", asyn
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: the screen reader's summary counts the key points as he has marked them, not as the AI did", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 3, gaps: [], feedback: "", covered: [true, true] } }));
+  await startReview(page, /Teaching/);
+  await page.getByRole("textbox", { name: "Your answer" }).fill("fluency feels like knowing, so they overrate it");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const live = page.locator(".review .sr-only[aria-live]");
+  await until("the AI's marks are read out", async () => (await live.innerText()).includes("Marked 2 of 2 key points"));
+  await page.getByRole("button", { name: /^Got: .*Mark as missed$/ }).first().click();
+  await until("his correction is read out", async () => (await live.innerText()).includes("Marked 1 of 2 key points"));
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: Start review clicked before the skills have loaded still asks what to review", async (page) => {
   // Home's numbers can land before the skill list (CI, 2026-11-07): the click must not start every skill unasked.
   await page.addInitScript("window.__ORE_SLOW = { skills: 1500 }");
