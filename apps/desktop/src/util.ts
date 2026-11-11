@@ -109,20 +109,32 @@ export function useKeptScroll(ref: RefObject<HTMLElement | null>, key: string): 
 
 /** Focuses `ref` while the component is mounted and hands focus back to whatever had it before
  *  (the sources list, the reader, a field), so closing a panel never strands focus on <body>. A field
- *  the panel's action just focused (Rename from ⌘K) keeps it. */
-export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>): void {
+ *  the panel's action just focused (Rename from ⌘K) keeps it. When what opened it is gone (a sheet that
+ *  opened it has closed) or nothing had focus, `fallback` names the screen's own place for the keyboard. */
+export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>, fallback?: () => HTMLElement | null | undefined): void {
   // Read as it first renders: by its effect a field's autoFocus has already taken focus (the Add box's), and
   // the control that opened it was lost.
   const [prev] = useState(() => document.activeElement);
+  const back = useRef(fallback);
+  back.current = fallback;
   useEffect(() => {
     const panel = ref.current;
     panel?.focus();
     return () => {
       const now = document.activeElement;
       const stranded = !now || now === document.body || !!panel?.contains(now);
-      if (stranded && prev instanceof HTMLElement && prev.isConnected) prev.focus({ preventScroll: true });
+      if (!stranded) return;
+      const there = prev instanceof HTMLElement && prev !== document.body && prev.isConnected && !panel?.contains(prev) && prev.getClientRects().length > 0;
+      const to = there ? (prev as HTMLElement) : back.current?.();
+      if (to) focusQuietly(to);
     };
   }, [ref, prev]);
+}
+
+/** Focuses `el` without the keyboard ring unless the keyboard did what led here ("nothing highlighted until the
+ *  keyboard moves"): a control focused after a click shows nothing. */
+export function focusQuietly(el: HTMLElement): void {
+  el.focus({ preventScroll: true, focusVisible: byKeys } as FocusOptions);
 }
 
 // Whether the last thing he did was a key, not a click: only then does a closing editor move focus.
