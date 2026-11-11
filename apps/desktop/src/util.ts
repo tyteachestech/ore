@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FocusEvent, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type RefObject } from "react";
 
 /** A toast; `undo` adds an Undo button and puts the step on the app's history (⌘Z), and `redo`,
  *  the step again, lets ⇧⌘Z repeat it after an undo (AGENTS.md: delete acts at once, then offers Undo).
@@ -42,12 +42,79 @@ export function save(key: string, value: string): void {
   }
 }
 
+/** How far each list was scrolled, by tab, skill page or "home": one map in localStorage for the app, as every
+ *  remembered view is (the app opens one library; another is a developer's ORE_LIBRARY). */
+export function keptScrolls(): Record<string, number> {
+  try {
+    const v = JSON.parse(load("ore.list-scroll") ?? "{}");
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+export const keepScroll = (key: string, top: number) => save("ore.list-scroll", JSON.stringify({ ...keptScrolls(), [key]: Math.round(top) }));
+
+/** Keeps where `ref` was scrolled, under `key` in `keptScrolls` (Finder, Linear): back on the screen, or after a
+ *  relaunch, he is where he left it. What it holds may load or grow after it shows (rows, then their pictures),
+ *  so the place is put back as the content grows, until it is reached or he scrolls himself (3 s at most); until
+ *  then a scroll is ours and isn't kept. Written a moment after he stops scrolling, and as the screen closes. */
+export function useKeptScroll(ref: RefObject<HTMLElement | null>, key: string): void {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const want = keptScrolls()[key] ?? 0;
+    let pending = want > 0;
+    const put = () => {
+      if (!pending) return;
+      el.scrollTop = want;
+      if (el.scrollTop >= want - 1) stop();
+    };
+    // New rows (a mutation) and rows that grow (a picture loading, a ResizeObserver on each) both make room.
+    const sized = new ResizeObserver(put);
+    const watch = () => {
+      for (const c of el.children) sized.observe(c);
+    };
+    const grows = new MutationObserver(() => (watch(), put()));
+    const stop = () => {
+      pending = false;
+      grows.disconnect();
+      sized.disconnect();
+    };
+    put();
+    if (pending) (grows.observe(el, { childList: true, subtree: true }), watch());
+    const giveUp = window.setTimeout(stop, 3000);
+    let at: number | null = null;
+    let later = 0;
+    const write = () => (clearTimeout(later), at !== null && keepScroll(key, at), (at = null));
+    const on = () => {
+      if (pending) return;
+      at = el.scrollTop;
+      clearTimeout(later);
+      later = window.setTimeout(write, 250);
+    };
+    const mine = { passive: true } as const;
+    el.addEventListener("scroll", on, mine);
+    for (const t of ["wheel", "pointerdown", "keydown", "touchstart"]) el.addEventListener(t, stop, mine);
+    addEventListener("pagehide", write);
+    return () => {
+      write();
+      stop();
+      clearTimeout(giveUp);
+      removeEventListener("pagehide", write);
+      el.removeEventListener("scroll", on);
+      for (const t of ["wheel", "pointerdown", "keydown", "touchstart"]) el.removeEventListener(t, stop);
+    };
+  }, [ref, key]);
+}
+
 /** Focuses `ref` while the component is mounted and hands focus back to whatever had it before
  *  (the sources list, the reader, a field), so closing a panel never strands focus on <body>. A field
  *  the panel's action just focused (Rename from ⌘K) keeps it. */
 export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>): void {
+  // Read as it first renders: by its effect a field's autoFocus has already taken focus (the Add box's), and
+  // the control that opened it was lost.
+  const [prev] = useState(() => document.activeElement);
   useEffect(() => {
-    const prev = document.activeElement;
     const panel = ref.current;
     panel?.focus();
     return () => {
@@ -55,7 +122,7 @@ export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>): void {
       const stranded = !now || now === document.body || !!panel?.contains(now);
       if (stranded && prev instanceof HTMLElement && prev.isConnected) prev.focus({ preventScroll: true });
     };
-  }, [ref]);
+  }, [ref, prev]);
 }
 
 // Whether the last thing he did was a key, not a click: only then does a closing editor move focus.
@@ -64,6 +131,8 @@ if (typeof window !== "undefined") {
   window.addEventListener("keydown", () => (byKeys = true), true);
   window.addEventListener("pointerdown", () => (byKeys = false), true);
 }
+/** Whether the last thing he did was a key, not a click or a tap. */
+export const typedLast = () => byKeys;
 
 /** When an in-place editor (the author, a skill's goal, a new question) closes from the keyboard,
  *  Enter or Esc, focus goes back to the button that opened it, so the next Tab carries on from there

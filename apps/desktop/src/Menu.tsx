@@ -8,18 +8,22 @@ import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
 import { useSwipeDown } from "./phone/sheet";
 import { Trap } from "./Trap";
+import { keepFocusNear } from "./focus-near";
 
 /** A picked action runs once the menu has closed and handed focus back (its onCloseAutoFocus), so a
  *  field or dialog the action opens keeps the caret: run on a timer, it raced Radix's own focus return,
  *  which took the caret from a field picked with ↵ and its blur closed it again. */
+/** Once it has run, focus stays with the menu's row (`keepFocusNear`): on it after a rename field or dialog
+ *  closes, on its neighbour once it is archived or deleted. */
 function useLater() {
   const pending = useRef<(() => void) | null>(null);
   const later = (run: () => void) => () => void (pending.current = run);
   const pick = (b: MenuAction) => (b.keep ? (e: Event) => (e.preventDefault(), b.run()) : later(b.run));
-  const closed = (e: Event, keepFocus?: boolean) => {
+  const closed = (e: Event, keepFocus?: boolean, row?: HTMLElement | null) => {
     if (keepFocus) e.preventDefault();
     const run = pending.current;
     pending.current = null;
+    if (run && row && !keepFocus) keepFocusNear(row);
     if (run) setTimeout(run, 0);
   };
   return { later, pick, closed };
@@ -66,15 +70,16 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
   // (Copy, Paste, Look Up), not the object's: decided on the press, before the menu event.
   const [native, setNative] = useState(false);
   const { later, pick, closed } = useLater();
+  const row = useRef<HTMLElement | null>(null);
   // A row not on screen yet can't be right-clicked; its menu comes with it when it scrolls in.
   if (useLite() || (Array.isArray(actions) && !actions.length)) return children; // or no menu to open (the phone's title)
   return (
     <ContextMenu.Root onOpenChange={(open) => open && (opened.current = performance.now())}>
-      <ContextMenu.Trigger asChild disabled={native} onPointerDownCapture={(e) => setNative(nativeMenu(e.target, getSelection()))}>
+      <ContextMenu.Trigger asChild disabled={native} data-menu-row="" onPointerDownCapture={(e) => ((row.current = e.currentTarget as HTMLElement), setNative(nativeMenu(e.target, getSelection())))}>
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus)} onKeyDown={(e) => e.stopPropagation()}>
+        <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus, row.current)} onKeyDown={(e) => e.stopPropagation()}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <ContextMenu.Separator className="menu-sep" />}
@@ -170,7 +175,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
         <DropdownMenu.Trigger asChild>{button}</DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (hoverOnly && !keepFocus && focusRow(e, self.current), closed(e, keepFocus))} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (hoverOnly && !keepFocus && focusRow(e, self.current), closed(e, keepFocus, self.current?.closest<HTMLElement>("[data-menu-row]")))} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <DropdownMenu.Separator className="menu-sep" />}

@@ -27,6 +27,10 @@ window.__TAURI_INTERNALS__ = {
       // window.__ORE_FAIL = { enrich: "why" }: that command fails with that reason (a test of the failure path).
       const fail = window.__ORE_FAIL && window.__ORE_FAIL[args.args[0]];
       if (fail) throw fail;
+      // window.__ORE_HOLD = { "skills arrange": [800] }: the next such command waits that long before it runs at all
+      // (one entry per call), so a later one (an Undo) can run first, as two `ore` processes can on a slow machine.
+      const hold = window.__ORE_HOLD && window.__ORE_HOLD[args.args.slice(0, 2).join(" ")];
+      if (hold && hold.length) await new Promise((ok) => setTimeout(ok, hold.shift()));
       const port = window.__ORE_BRIDGE || 1421;
       // As the real app reports a missing `ore`: say what is down and how to start it, not "Failed to fetch".
       const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null }) }).catch(() => {
