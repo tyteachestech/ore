@@ -20,7 +20,7 @@ import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
-import { errorText, type Notify } from "../util";
+import { errorText, useKeptScroll, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
@@ -299,6 +299,8 @@ export function PhoneApp() {
   const cue = useRef<HTMLDivElement>(null);
   // Rendered inside the touch's own handler, so iOS lets the field take focus and bring up the keyboard.
   usePullToSearch(main, cue, () => flushSync(() => setSearching(true)));
+  // The lists share this one scroller: each keeps its own place, as Mail's tabs do (and across a relaunch).
+  useKeptScroll(main, `phone:${tab}`);
   const go = (t: TabId) => (setTab(t), setDrawer(false));
 
   useEffect(() => {

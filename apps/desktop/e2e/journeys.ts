@@ -8247,6 +8247,27 @@ journey("phone: a relaunch with a source's Collected page open comes back to it"
   await until("Collected is the page beside the source again", async () => (await collected.count()) === 1 && (await page.locator(".reader.noting").count()) === 1);
 }, "phone");
 
+journey("phone: each list keeps its scroll when he goes to another and back", async (page) => {
+  // The lists share one scroller, so a list came back where Today had left it. A short screen stands in for a long library.
+  await page.setViewportSize({ width: 390, height: 360 });
+  const main = page.locator("main.phone-page");
+  const go = async (to: string) => {
+    await tap(page, page.getByRole("button", { name: "Open menu" }));
+    await tap(page, page.locator(".phone-drawer button").filter({ hasText: to }));
+    await page.locator(".phone-shell.open").waitFor({ state: "detached" });
+  };
+  await go("Sources");
+  await page.locator(".phone-sources li").first().waitFor();
+  const end = await main.evaluate((m) => ((m.scrollTop = m.scrollHeight), m.scrollTop));
+  if (end < 50) throw new Error(`Sources is too short to scroll (${end}px)`);
+  await Bun.sleep(400); // kept a moment after he stops
+  await go("Today");
+  await main.evaluate((m) => void (m.scrollTop = 0));
+  await Bun.sleep(400);
+  await go("Sources");
+  await until(`Sources comes back at ${end}px`, async () => Math.abs((await main.evaluate((m) => m.scrollTop)) - end) <= 1);
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
