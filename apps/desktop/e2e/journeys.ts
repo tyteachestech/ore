@@ -56,7 +56,9 @@ async function safariBrowser(): Promise<Browser> {
 async function open(url: string, engine: Engine): Promise<Page> {
   const page = await (engine === "webkit" ? await safariBrowser() : browser).newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(8000);
-  page.on("pageerror", (e) => errors.push(e.message));
+  // Named for the journey that opened the page, also when it comes as the page closes (a request still in flight).
+  const of = running;
+  page.on("pageerror", (e) => errors.push(`${of}: ${e.message}`));
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
   await page.addInitScript(HYGIENE);
@@ -219,6 +221,8 @@ const HYGIENE = `(() => {
 })()`;
 
 const errors: string[] = [];
+/** The journey running now, which names the page errors of the pages it opens. */
+let running = "";
 const { url, stop } = await start();
 const browser = await chromium.launch();
 /** The Mac app runs in WebKit (WKWebView), not Chromium: a journey about what only WebKit does (its native
@@ -4019,6 +4023,7 @@ journey("list drag to select in WebKit: the box selects the rows it crosses with
   await page.getByRole("button", { name: /^All sources/ }).click();
   const rows = page.locator(".list .row");
   await rows.nth(2).waitFor();
+  await loaded(page); // the list as read, not mid-redraw (a row once had no box here)
   const list = (await page.locator(".list").boundingBox())!;
   const r0 = (await rows.nth(0).boundingBox())!;
   const r1 = (await rows.nth(1).boundingBox())!;
@@ -5333,7 +5338,8 @@ function oreCalls(page: Page) {
 async function openQuiz(): Promise<Page> {
   const quiz = await browser.newPage({ viewport: { width: 680, height: 520 } });
   quiz.setDefaultTimeout(8000);
-  quiz.on("pageerror", (e) => errors.push(e.message));
+  const of = running;
+  quiz.on("pageerror", (e) => errors.push(`${of}: ${e.message}`));
   await quiz.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}; window.__ORE_LABEL = "quiz"`);
   await quiz.addInitScript({ path: join(MOCK, "tauri.js") });
   await quiz.goto(url);
@@ -5643,28 +5649,25 @@ journey("review: a card whose source was deleted says so where the passage would
 
 journey("review picker: fresh numbers that drop the only ticked skill leave nothing to start", async (page) => {
   await page.getByRole("button", { name: "Start review" }).waitFor(); // Home has read today's numbers
-  let release!: () => void;
-  const held = new Promise<void>((ok) => (release = ok));
-  let drop = "";
-  await page.route(/\/ore$/, async (route) => {
-    if (!(route.request().postData() ?? "").includes('"today"')) return route.fallback();
-    const res = await route.fetch();
-    const t = (await res.json()) as { skills: { skill: string; due: number }[] };
-    await held;
-    await route.fulfill({ response: res, json: { ...t, skills: t.skills.filter((x) => x.skill !== drop) } });
-  });
+  // The picker's fresh read waits, in the page, until the test lets it go with one skill taken out. (A Playwright
+  // route once missed this read, sent the instant after ⌘R, and the numbers came back unchanged: 1 run in 30.)
+  await hold(page, "today");
   await page.keyboard.press("Meta+r");
   const pick = page.getByRole("dialog", { name: "What to review" });
   const rows = pick.getByRole("checkbox");
   await until("two skills or more are due", async () => (await rows.count()) > 1);
+  await until("the fresh numbers are being read", () => isHeld(page, "today"));
   const first = await rows.first().locator(".name").innerText();
-  drop = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.name === first)!.id;
+  const drop = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.name === first)!.id;
+  await page.evaluate((id) => {
+    type T = { skills: { skill: string }[] };
+    (window as unknown as { __ORE_EDIT: Record<string, (t: T) => T> }).__ORE_EDIT = { today: (t) => ({ ...t, skills: t.skills.filter((x) => x.skill !== id) }) };
+  }, drop);
   for (const row of (await rows.all()).slice(1)) if ((await row.getAttribute("aria-checked")) === "true") await row.click();
-  release();
+  await release(page, "today");
   await until("the fresh numbers land", async () => !(await pick.getByRole("checkbox", { name: new RegExp(first) }).count()));
   await pick.getByRole("button", { name: "Pick a skill" }).waitFor();
   if (await pick.getByRole("button", { name: "Pick a skill" }).isEnabled()) throw new Error("Start is on with no shown skill ticked");
-  await page.unroute(/\/ore$/);
   await page.keyboard.press("Escape");
 });
 
@@ -8213,10 +8216,16 @@ const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
   let page: Page | undefined;
+  running = name;
   const t0 = Date.now();
   try {
     page = await open(url, engine);
     await run(page);
+    // Nothing of the journey's still in flight as its page closes: a save cut off there is lost to the next
+    // journey's library, and WebKit reports the cut request as a page error. A call held and never let go fails here.
+    await until("its ore calls have answered", () => page!.evaluate(() => !(window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING)).catch(async () => {
+      throw new Error(`the journey ended with ore calls in flight: ${JSON.stringify(await page!.evaluate(() => (window as unknown as { __ORE_INFLIGHT?: string[] }).__ORE_INFLIGHT))}`);
+    });
     const broke = await page.evaluate(async () => {
       const w = window as unknown as { __hygiene?: Set<string>; __hygieneCheck?: () => Promise<void> };
       await w.__hygieneCheck?.();

@@ -48,7 +48,10 @@ async function ore(args) {
   const slow = window.__ORE_SLOW && window.__ORE_SLOW[args.args[0]];
   if (slow) await new Promise((ok) => setTimeout(ok, slow));
   if (!r.ok) throw j;
-  return j;
+  // window.__ORE_EDIT = { today: (answer) => changed }: the page gets that command's answer changed so (a test of
+  // fresh numbers), in the page itself, where no request can slip past it.
+  const edit = window.__ORE_EDIT && window.__ORE_EDIT[args.args[0]];
+  return edit ? edit(j) : j;
 }
 window.__TAURI_INTERNALS__ = {
   metadata: { currentWindow: { label }, currentWebview: { windowLabel: label, label } },
@@ -59,10 +62,14 @@ window.__TAURI_INTERNALS__ = {
     if (cmd === "ore") {
       // window.__ORE_PENDING: how many `ore` calls have not answered yet, so a test can wait for a page to finish loading.
       window.__ORE_PENDING = (window.__ORE_PENDING ?? 0) + 1;
+      // And which: window.__ORE_INFLIGHT, so a journey left waiting on one can say what it is.
+      const call = args.args.slice(0, 2).join(" ");
+      (window.__ORE_INFLIGHT ??= []).push(call);
       try {
         return await ore(args);
       } finally {
         window.__ORE_PENDING--;
+        window.__ORE_INFLIGHT.splice(window.__ORE_INFLIGHT.indexOf(call), 1);
         // window.__ORE_AFTER = { highlight: fn }: fn runs once that command's answer is in, after the code awaiting
         // it has run (a few dozen microtasks) but before the page draws it: what a click in that instant meets.
         const after = window.__ORE_AFTER && window.__ORE_AFTER[args.args[0]];
