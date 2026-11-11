@@ -36,18 +36,22 @@ export function SkillChip({ skill }: { skill: Skill }) {
 
 /** A source's skills on a row (D198, Linear's labels): the first two by name, whole, then +N with the
  *  rest named on hover, so a source under six skills never squeezes them to "L." and "Story…". Icon
- *  only shows them all, since an icon is narrower than the count. */
+ *  only shows them all, an icon being narrower than the count: the stylesheet swaps the count for the
+ *  rest (`data-chips`), so a row that doesn't re-render follows the setting too. */
 export function SkillChips({ ids, skills }: { ids: string[]; skills: Skill[] }) {
   const all = ids.map((id) => skills.find((s) => s.id === id) ?? { id, name: id });
-  const first = chipLook() === "icon" ? all : all.slice(0, 2);
-  const rest = all.slice(first.length).map((s) => s.name).join(", ");
+  const rest = all.slice(2);
+  const names = rest.map((s) => s.name).join(", ");
   return (
     <span className="chips">
-      {first.map((s) => <SkillChip key={s.id} skill={s} />)}
-      {rest && (
-        <Hint text={rest}>
-          <span className="chip chip-more" aria-label={rest}>+{all.length - first.length}</span>
-        </Hint>
+      {all.slice(0, 2).map((s) => <SkillChip key={s.id} skill={s} />)}
+      {rest.length > 0 && (
+        <>
+          <span className="chips-rest">{rest.map((s) => <SkillChip key={s.id} skill={s} />)}</span>
+          <Hint text={names}>
+            <span className="chip chip-more" aria-label={names}>+{rest.length}</span>
+          </Hint>
+        </>
       )}
     </span>
   );

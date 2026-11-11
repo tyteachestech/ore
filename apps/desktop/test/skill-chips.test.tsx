@@ -17,7 +17,7 @@ const shown = (n: number) => {
   const div = document.createElement("div");
   const root = createRoot(div);
   act(() => root.render(<HintProvider><SkillChips ids={skills.slice(0, n).map((s) => s.id)} skills={skills} /></HintProvider>));
-  const out = { names: [...div.querySelectorAll(".chip-name")].map((c) => c.textContent), more: div.querySelector(".chip-more") };
+  const out = { names: [...div.querySelectorAll(".chips > .chip .chip-name")].map((c) => c.textContent), more: div.querySelector(".chip-more") };
   act(() => root.unmount());
   return out;
 };
