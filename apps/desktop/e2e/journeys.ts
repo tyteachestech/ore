@@ -62,7 +62,7 @@ async function open(url: string, engine: Engine): Promise<Page> {
   return page;
 }
 
-// Three rules every journey checks as it runs, whatever it is about:
+// Four rules every journey checks as it runs, whatever it is about:
 // - A press stopped on its way to the document leaves an open popover deaf to it (Radix listens there), and one
 //   stopped inside a popover makes the next press outside count as inside.
 // - A modal dialog keeps Tab inside it (<Trap>, which marks its panel data-trap): without one, ⇧Tab reaches the
@@ -72,6 +72,8 @@ async function open(url: string, engine: Engine): Promise<Page> {
 //   page changes or resizes, and as the journey ends; one still being placed (Radix's first frame) or animating is
 //   looked at again. An absolute one counts only where he can see it cut by the window, not when it has scrolled
 //   out of its panel with its text.
+// - Focus never falls to <body> when the control holding it leaves the page (a row archived, a field, dialog or menu
+//   closed): what replaced it, or the control that opened it, takes it (Finder, macOS sheets). Details at the rule.
 const HYGIENE = `(() => {
   const found = (window.__hygiene = new Set());
   for (const m of ["stopPropagation", "stopImmediatePropagation"]) {
@@ -147,14 +149,74 @@ const HYGIENE = `(() => {
     if (!queued) { queued = true; painted(run); }
   };
   addEventListener("resize", queue);
+
+  // Focus that falls to <body>: the focused control left the page (its row archived, the field or dialog or menu
+  // it sat in closed) and nothing took focus after it, so ↑↓, Enter and ⌘Z have nothing to act on. Not after a
+  // press away from it (a click on blank space puts focus there on purpose), not for a button that had focus only
+  // because it was clicked (Chromium's way; WebKit, the app's engine, focuses no button on a click), not when the
+  // screen itself changed (he went somewhere: the new screen owns focus), not from a layer (dialog, menu, popover)
+  // that focus entered from <body> (⌘K pressed with nothing focused: there is nothing to give it back to), not as
+  // the page unloads. Looked at two painted frames after the loss and again 250 ms on, so a handler that moves focus on
+  // a timer has done it; only a loss both looks agree on counts.
+  const LAYERS = '[role="dialog"], [role="menu"], [role="listbox"], .popover';
+  // Where focus still falls to <body>, known and left for their own fixes (follow-ups of the lists focus fix,
+  // 2026-11-10): the control that held it, and why. Lists, the sidebar, Home, the Feed and Add are never here.
+  const ALLOW = [
+    [".review", "Review: ending a session (Esc, its end screen, Open in source) gives focus back to nothing"],
+    [".quiz", "the finish quiz and the quick quiz: the last step's button goes with the quiz"],
+    [".find-bar", "Find in a page or note: the bar closes with focus in it"],
+    [".tutor", "the tutor: closing it, or a chat deleted from its list, leaves focus nowhere"],
+    [".title-edit", "the reader's title: Enter or Esc closes its field with focus nowhere (the author's uses useFocusBack)"],
+    [".qa-piece-edit", "Review: an answer piece's editor closes with focus nowhere"],
+    [".ask input", "the reader's Questions: a new question's field closes on Enter"],
+    [".qp-link", "Explain's answer: a Key point, Retry or Later pressed with ↵ goes with the step it ends"],
+    [".try-next", "the skill page's Try it: its field closes on save"],
+    ["input[aria-label^='Rename ']", "the skill page's name field closes on Enter"],
+  ];
+  const screen = () => document.querySelector(".main")?.lastElementChild ?? null;
+  let held = null, heldScreen = null, away = false, leaving = false, losing = false, clicked = false, pressedOn = null, fromNothing = false, allowed = false;
+  const entered = new WeakMap();
+  addEventListener("focusin", (e) => {
+    const layer = e.target.closest?.(LAYERS);
+    if (layer && !entered.has(layer)) entered.set(layer, !e.relatedTarget || e.relatedTarget === document.body);
+    held = e.target; heldScreen = screen(); away = false; clicked = !!pressedOn && e.target.contains(pressedOn); fromNothing = !!layer && entered.get(layer);
+    allowed = ALLOW.some(([sel]) => e.target.closest?.(sel));
+  }, true);
+  for (const t of ["pointerup", "pointercancel"]) addEventListener(t, () => setTimeout(() => (pressedOn = null), 0), true);
+  addEventListener("pointerdown", (e) => {
+    pressedOn = e.target;
+    const a = document.activeElement;
+    const zone = a && a !== document.body ? (a.closest(LAYERS) ?? a) : null;
+    if (!zone || !zone.contains(e.target)) away = true;
+  }, true);
+  addEventListener("pagehide", () => (leaving = true));
+  addEventListener("beforeunload", () => (leaving = true));
+  const lost = () => !leaving && !away && !clicked && !fromNothing && !allowed && !!held && document.activeElement === document.body && !(held.isConnected && held.getClientRects().length) && screen() === heldScreen;
+  const name = (el) => (el.tagName.toLowerCase() + (typeof el.className === "string" && el.className.trim() ? "." + el.className.trim().split(/\\s+/).join(".") : "") + " “" + (el.getAttribute("aria-label") ?? el.value ?? el.textContent ?? "").trim().slice(0, 40) + "”");
+  const watchLoss = () => {
+    if (losing || !lost()) return;
+    losing = true;
+    const was = held;
+    painted(() => painted(() => {
+      if (!lost() || held !== was) return void (losing = false);
+      setTimeout(() => {
+        losing = false;
+        if (lost() && held === was) found.add("focus fell to <body> when the focused " + name(was) + " left the page");
+      }, 250);
+    }));
+  };
+  addEventListener("focusout", () => setTimeout(watchLoss, 0), true);
+
   // Once more as the journey ends: waits out (a second at most) any popup still animating, then checks every one.
   window.__hygieneCheck = async () => {
     for (let i = 0; i < 60 && floating().some((f) => f.busy); i++) await new Promise((r) => requestAnimationFrame(r));
     check(true);
     await new Promise((r) => painted(r));
     check(true);
+    watchLoss();
+    for (let i = 0; i < 40 && losing; i++) await new Promise((r) => setTimeout(r, 25));
   };
-  addEventListener("DOMContentLoaded", () => new MutationObserver(() => (modals(), queue())).observe(document.body, { childList: true, subtree: true }));
+  addEventListener("DOMContentLoaded", () => new MutationObserver(() => (modals(), queue(), watchLoss())).observe(document.body, { childList: true, subtree: true }));
 })()`;
 
 const errors: string[] = [];
@@ -2554,6 +2616,155 @@ journey("Home: Continue reading rows rename from their menu, in place; Esc keeps
   await page.waitForTimeout(300);
   await page.keyboard.press("Meta+z");
   await until("⌘Z puts the old title back", async () => (await row.locator(".title").count()) === 1 && (await title()) === TESTING);
+});
+
+/** The text of the focused control, or null with focus on <body>. */
+const focusedOn = (page: Page) => page.evaluate(() => (document.activeElement === document.body ? null : (document.activeElement?.textContent ?? "").trim()));
+
+// In WebKit, where a click focuses no button: after Edit skill… only the row's own memory of it can bring focus back.
+journey("Home: after Rename… or Edit skill… from a row's menu, focus is on the renamed row or tile (Finder)", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const row = page.locator(".home-read").filter({ hasText: TESTING }).first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
+  await page.keyboard.press("Enter");
+  await until("focus is on the renamed row", async () => (await focusedOn(page)) === "Testing, renamed");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the old title back", async () => (await page.locator(".home-read .title").allInnerTexts()).includes(TESTING));
+  const tile = page.locator(".home-skill").first();
+  const name = (await tile.locator(".home-open").innerText()).trim();
+  await tile.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const field = page.getByRole("dialog").getByRole("textbox").first();
+  await field.fill(`${name} too`);
+  await page.keyboard.press("Enter");
+  await until("focus is on the renamed tile", async () => (await focusedOn(page)) === `${name} too`);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the old name back", async () => (await page.locator(".home-skill .home-open").allInnerTexts()).includes(name));
+}, "webkit");
+
+journey("Home: archiving a Continue reading row or a skill tile from its menu puts focus on the one after it; ⌘Z brings it back", async (page) => {
+  await openSource(page, AGENTS);
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".home-read").nth(1).waitFor();
+  const titles = await page.locator(".home-read .title").allInnerTexts();
+  await page.locator(".home-read").first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: /^Archive/ }).click();
+  await until(`focus moves to “${titles[1]}”`, async () => (await focusedOn(page)) === titles[1]);
+  await page.keyboard.press("Meta+z");
+  await inLibrary([titles[0]!]);
+  await page.locator(".home-skill").nth(1).waitFor();
+  const names = (await page.locator(".home-skill .home-open").allInnerTexts()).map((n) => n.trim());
+  await page.locator(".home-skill").first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Archive skill" }).click();
+  await until(`focus moves to “${names[1]}”`, async () => (await focusedOn(page)) === names[1]);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z brings the skill back", async () => (await page.locator(".home-skill .home-open").allInnerTexts()).map((n) => n.trim()).includes(names[0]!));
+});
+
+journey("sidebar: a collection renamed from its menu keeps focus on its name; deleting it, or archiving a skill, puts focus on the next one", async (page) => {
+  const label = (t: RegExp) => page.locator(".side-head").filter({ hasText: t });
+  await label(/^Craft$/i).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  await page.getByLabel("Collection name").fill("Craft works");
+  await page.keyboard.press("Enter");
+  await until("focus is on the renamed collection", async () => /^craft works$/i.test((await focusedOn(page)) ?? ""));
+  await page.keyboard.press("Meta+z");
+  await label(/^Craft$/i).waitFor();
+  const heads = (await page.locator(".side-head .side-label-text").allInnerTexts()).map((t) => t.trim());
+  const next = heads[heads.findIndex((t) => /^craft$/i.test(t)) + 1]!;
+  await label(/^Craft$/i).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete collection" }).click();
+  try {
+    await until(`focus moves to “${next}” (of ${heads.join(", ")})`, async () => (await focusedOn(page)) === next).catch(async (e) => {
+      throw new Error(`${(e as Error).message}, not “${await focusedOn(page)}”`);
+    });
+  } finally {
+    // Back as it was, so the journeys after this one find Craft.
+    await page.keyboard.press("Meta+z");
+    await label(/^Craft$/i).waitFor();
+  }
+  await page.waitForLoadState("networkidle"); // the Undo's write has landed and the sidebar read it back
+  const skills = (await page.locator(".sidebar div.side-item .label").allInnerTexts()).map((t) => t.trim());
+  await page.locator(".sidebar div.side-item").first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Archive skill" }).click();
+  try {
+    await until(`focus moves to “${skills[1]}”`, async () => (await focusedOn(page)) === skills[1]).catch(async (e) => {
+      throw new Error(`${(e as Error).message}, not “${await focusedOn(page)}”`);
+    });
+  } finally {
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings the skill back", async () => (await page.locator(".sidebar div.side-item .label").allInnerTexts()).map((t) => t.trim()).includes(skills[0]!));
+  }
+});
+
+journey("Home: Back puts Home where it was scrolled, and focus on the row or tile he opened by the keyboard", async (page) => {
+  await page.setViewportSize({ width: 1280, height: 480 });
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const home = page.locator(".home");
+  await page.locator(".home-skill").last().waitFor();
+  await page.locator(".home-skill").last().scrollIntoViewIfNeeded();
+  const want = await home.evaluate((el) => el.scrollTop);
+  if (want < 40) throw new Error(`Home doesn't scroll at 480 high (${want})`);
+  await page.locator(".home-skill .home-open").last().click();
+  await page.locator(".skill-page").waitFor();
+  await page.keyboard.press("Meta+BracketLeft");
+  await page.locator(".home-skill").last().waitFor();
+  await until(`Home is back at ${want}`, async () => Math.abs((await home.evaluate((el) => el.scrollTop)) - want) < 2);
+  const row = page.locator(".home-read .home-open").first();
+  const title = (await row.innerText()).trim();
+  await row.focus();
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head").filter({ hasText: title }).waitFor();
+  await page.keyboard.press("Meta+BracketLeft");
+  await until(`focus is back on “${title}”`, async () => (await focusedOn(page)) === title);
+});
+
+journey("Add: Esc puts focus back on the + Add or Add a source that opened it, on Home, the Feed and a skill page", async (page) => {
+  const roundTrip = async (where: string, button: Locator) => {
+    await button.focus();
+    await page.keyboard.press("Enter");
+    await page.getByLabel("Link, file path or text").waitFor();
+    await page.keyboard.press("Escape");
+    await until(`${where}: focus is back on what opened Add`, () => button.evaluate((el) => el === document.activeElement));
+  };
+  await page.locator(".home-goal").waitFor();
+  await roundTrip("Home", page.getByRole("button", { name: "+ Add" }));
+  await page.getByRole("button", { name: /^Feed/ }).click();
+  await roundTrip("Feed", page.getByRole("button", { name: "+ Add" }));
+  await page.locator(".sidebar div.side-item .side-main").first().click();
+  await page.locator(".skill-page").waitFor();
+  await roundTrip("a skill page", page.getByRole("button", { name: /Add a source/ }).first());
+});
+
+journey("Home and Feed: ⌘C on the focused row copies it as Markdown with its link, as a list's selected row does", async (page) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const clip = () => page.evaluate(() => navigator.clipboard.readText());
+  await openSource(page, AGENTS);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".home-read .home-open").filter({ hasText: AGENTS }).first().focus();
+  await page.keyboard.press("Meta+c");
+  await until("Home's row is on the clipboard", async () => (await clip()) === `[${AGENTS}](https://www.anthropic.com/research/building-effective-agents)`);
+  await page.locator(".toast").filter({ hasText: "Copied as Markdown" }).waitFor();
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Copy Notes</title><link>http://localhost/</link><item><title>A post to copy</title><link>http://localhost/a-post.html</link><pubDate>${day}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", feed);
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    await page.locator(".row.post", { hasText: "A post to copy" }).waitFor();
+    await page.locator(".feed-list").focus();
+    for (let n = 0; n < 20 && !(await page.locator(".row.post.on", { hasText: "A post to copy" }).count()); n++) await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Meta+c");
+    await until("the Feed's post is on the clipboard", async () => (await clip()) === "[A post to copy](http://localhost/a-post.html)");
+  } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
 });
 
 journey("sidebar: renaming a collection to a name another one has is refused in place; Esc keeps the old name", async (page) => {
