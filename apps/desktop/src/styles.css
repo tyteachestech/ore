@@ -2525,7 +2525,16 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* At 44pt the tools don't stack beside two rows: on the phone they run in a row under the note. */
 .phone .popup { grid-template-columns: 1fr; }
 .phone .popup-tools { grid-column: 1; grid-row: 3; display: flex; justify-content: flex-end; gap: 2px; padding: 6px 0 0; border-left: 0; align-self: auto; }
-.phone .quiz-sure button, .phone .review-foot button { min-height: 44px; }
+.phone .quiz-sure button, .phone .review-foot button, .phone .quiz-foot button { min-height: 44px; }
+/* The rest of a source's small controls at 44pt too. A highlight's note field is a field, so it is that tall. */
+.phone .popup .field { min-height: 44px; }
+/* The links under a question in Collected: 44pt tall, their text still just under the question, the room below it. */
+.phone .qp-sub { row-gap: 0; padding-bottom: 0; }
+.phone .qp-link { display: inline-flex; align-items: flex-start; min-height: 44px; }
+/* The original-site link over the title: 44pt tall and above the title's top, which takes no tap, in the same place. */
+.phone .doc-head .source { position: relative; z-index: 1; min-width: 44px; line-height: 44px; margin-top: -4.5px; margin-bottom: -12.5px; }
+/* The reading pill: 28pt to the eye, 44pt to the finger. */
+.phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */

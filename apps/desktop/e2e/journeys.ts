@@ -74,6 +74,8 @@ async function openPhone(): Promise<Page> {
   const page = await (await safariBrowser()).newPage({ ...devices["iPhone 14"], viewport: { width: 390, height: 844 }, colorScheme: "dark" });
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
+  // What the app's Tauri shell gives the page and a browser lacks: an image saved with a source loads through it.
+  await page.addInitScript(`window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p, proto = "asset") => proto + "://localhost/" + encodeURIComponent(p), transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`);
   await page.addInitScript(HYGIENE);
   await page.goto(url);
   await page.locator(".phone-app").waitFor();
@@ -8266,6 +8268,50 @@ journey("phone: each list keeps its scroll when he goes to another and back", as
   await Bun.sleep(400);
   await go("Sources");
   await until(`Sources comes back at ${end}px`, async () => Math.abs((await main.evaluate((m) => m.scrollTop)) - end) <= 1);
+}, "phone");
+
+/** How far around its middle a touch still lands on the element, [wide, high] in CSS px (60 at most each way; in
+ *  0.5px steps, so up to 1px short). */
+const touchArea = (page: Page, sel: string) =>
+  page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const [cx, cy] = [r.x + r.width / 2, r.y + r.height / 2];
+    const on = (x: number, y: number) => document.elementFromPoint(x, y)?.closest(sel) === el;
+    const reach = (dx: number, dy: number) => {
+      let d = 0;
+      while (d < 60 && on(cx + dx * (d + 0.5), cy + dy * (d + 0.5))) d += 0.5;
+      return d;
+    };
+    return [reach(-1, 0) + reach(1, 0), reach(0, -1) + reach(0, 1)] as [number, number];
+  }, sel);
+
+journey("phone: the small controls of a source answer a 44pt touch", async (page) => {
+  // Apple's minimum: a link under a question, the original-site link, the pill without a section, a highlight's
+  // note field and the closing card's buttons were 17 to 42pt.
+  const fits = async (sel: string, what: string) => {
+    await page.locator(sel).first().scrollIntoViewIfNeeded();
+    const a = await touchArea(page, sel);
+    if (!a || a[0] < 43 || a[1] < 43) throw new Error(`${what} answers a touch over ${a?.join("×") ?? "nothing"}, under 44×44`);
+  };
+  await phoneSource(page, AGENTS);
+  await fits(".doc-head .source", "the original-site link");
+  await fits(".read-pill", "the reading pill");
+  await tap(page, page.getByRole("button", { name: "Back" }));
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  await fits(".qp-sub .qp-link", "Asked here");
+  await tap(page, page.locator("aside.mynotes button").filter({ hasText: "after one week" }));
+  await page.locator(".popup .field").waitFor();
+  await fits(".popup .field", "the highlight's note field");
+  await page.touchscreen.tap(195, 120);
+  await page.locator(".popup").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  await tap(page, page.getByRole("button", { name: "Just mark done" }));
+  await page.locator(".quiz-foot button").first().waitFor();
+  await fits(".quiz-foot button", "the closing card's Done");
 }, "phone");
 
 // —— run ——
