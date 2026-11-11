@@ -1641,7 +1641,12 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 /* Quiz panel (D52 to D56): the finish step and chapter recalls float at the right of the reader;
    the source is blurred past reading until an answer is checked, then passages show like find. */
 .reader.quizzing .reader-scroll { padding-right: 420px; }
-.reader-pane.hidden-src .reader-scroll { filter: blur(10px) saturate(0.6); opacity: 0.45; pointer-events: none; user-select: none; -webkit-user-select: none; }
+/* D208: hidden, the words fade and HideDots draws each line as a row of dots; the page keeps its shape. */
+.reader-scroll > * { transition: opacity var(--t-4) var(--ease-out); }
+.reader-pane.hidden-src .reader-scroll { pointer-events: none; user-select: none; -webkit-user-select: none; }
+.reader-pane.hidden-src .reader-scroll > * { opacity: 0; }
+.hide-dots { position: absolute; z-index: 1; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .reader-scroll > * { transition: none; } }
 .hidden-chip {
   position: absolute; top: 38%; left: calc((100% - 420px) / 2); transform: translateX(-50%); z-index: 7;
   display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
