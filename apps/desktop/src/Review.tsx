@@ -90,7 +90,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   notify: Notify;
   quick?: boolean;
   /** Where focus goes as it closes when what started it is gone (the What to review sheet): the screen's own place. */
-  giveBack?: () => HTMLElement | null;
+  giveBack?: () => HTMLElement | null | undefined;
 }) {
   const [queue, setQueue] = useState<DueEntry[] | null>(null);
   const [done, setDone] = useState(0);
@@ -154,7 +154,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const sureRef = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   // Closed (Esc, Done, Later on the last one), focus goes back to what started it, else to `giveBack`.
-  useFocusWhileMounted(root, giveBack);
+  useFocusWhileMounted(root, giveBack, !PHONE); // the phone's screens move focus their own way
   const reviewed = useRef(0);
   /** This window's session, named by id in every call: the main window and the quick quiz can each have
    *  one open (D76), and the last one started is not always this one. `open`: not ended yet. */
@@ -954,7 +954,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it. Let go while a
     // layer sits over it (⌘K, ⌘/) or it is paused on a source, so that layer owns focus and Esc.
     <Trap off={paused || under}>
-    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused}>
+    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="">
       <div className="review-head" data-tauri-drag-region>
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).

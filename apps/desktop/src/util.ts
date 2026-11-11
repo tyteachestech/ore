@@ -110,25 +110,61 @@ export function useKeptScroll(ref: RefObject<HTMLElement | null>, key: string): 
 /** Focuses `ref` while the component is mounted and hands focus back to whatever had it before
  *  (the sources list, the reader, a field), so closing a panel never strands focus on <body>. A field
  *  the panel's action just focused (Rename from ⌘K) keeps it. When what opened it is gone (a sheet that
- *  opened it has closed) or nothing had focus, `fallback` names the screen's own place for the keyboard. */
-export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>, fallback?: () => HTMLElement | null | undefined): void {
+ *  opened it has closed) or nothing had focus, `fallback` names the screen's own place for the keyboard (a
+ *  layer with one says so in its markup, `data-gives-back`, for the e2e guard). `on` false: none of this (the phone). */
+export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>, fallback?: () => HTMLElement | null | undefined, on = true): void {
   // Read as it first renders: by its effect a field's autoFocus has already taken focus (the Add box's), and
   // the control that opened it was lost.
   const [prev] = useState(() => document.activeElement);
   const back = useRef(fallback);
   back.current = fallback;
   useEffect(() => {
+    if (!on) return;
     const panel = ref.current;
     panel?.focus();
     return () => {
       const now = document.activeElement;
       const stranded = !now || now === document.body || !!panel?.contains(now);
       if (!stranded) return;
-      const there = prev instanceof HTMLElement && prev !== document.body && prev.isConnected && !panel?.contains(prev) && prev.getClientRects().length > 0;
-      const to = there ? (prev as HTMLElement) : back.current?.();
-      if (to) focusQuietly(to);
+      const opener = prev instanceof HTMLElement && prev !== document.body && !panel?.contains(prev) ? prev : null;
+      settleFocus(() => (opener && usable(opener) ? opener : back.current?.()));
     };
-  }, [ref, prev]);
+  }, [ref, prev, on]);
+}
+
+/** Can take focus and be seen: on the page, laid out, not disabled, hidden or inert. */
+export const usable = (el: Element | null | undefined): el is HTMLElement =>
+  el instanceof HTMLElement && el.isConnected && el.getClientRects().length > 0 && !el.matches(":disabled") && !el.closest("[hidden], [inert]");
+
+/** Puts focus on what `pick` names, and again if that goes within `ms` with focus left on <body> (Home's Start
+ *  review leaves when the review just done cleared what was due), each time on what `pick` names then. Ends at
+ *  the first press, key or focus elsewhere, or after `ms`. */
+export function settleFocus(pick: () => HTMLElement | null | undefined, ms = 2000): void {
+  let placed: HTMLElement | null = null;
+  const place = () => {
+    const to = pick();
+    if (!usable(to)) return;
+    placed = to;
+    focusQuietly(to);
+  };
+  place();
+  if (typeof MutationObserver === "undefined") return;
+  const seen = new MutationObserver(() => {
+    if (placed && !placed.isConnected && (!document.activeElement || document.activeElement === document.body)) place();
+  });
+  const stop = () => {
+    seen.disconnect();
+    clearTimeout(limit);
+    removeEventListener("pointerdown", stop, true);
+    removeEventListener("keydown", stop, true);
+    removeEventListener("focusin", away, true);
+  };
+  const away = (e: Event) => void (e.target !== placed && stop());
+  const limit = setTimeout(stop, ms);
+  seen.observe(document.body, { childList: true, subtree: true });
+  addEventListener("pointerdown", stop, true);
+  addEventListener("keydown", stop, true);
+  addEventListener("focusin", away, true);
 }
 
 /** Focuses `el` without the keyboard ring unless the keyboard did what led here ("nothing highlighted until the

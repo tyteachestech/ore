@@ -43,7 +43,7 @@ import { Thumb } from "./Thumb";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChip, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
-import { errorText, focusQuietly, keepScroll, keptScrolls, load, save } from "./util";
+import { errorText, focusQuietly, keepScroll, keptScrolls, load, save, usable } from "./util";
 import { questionText } from "./Questions";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
@@ -248,8 +248,12 @@ export function App() {
   };
   const closeTutor = () => {
     const from = tutorFrom.current;
+    // Focus moves only if the tutor had it (or nothing did): put away with ⌘J while he types in his note, it stays there.
+    const now = document.activeElement;
+    const had = !now || now === document.body || !!now.closest("aside.tutor");
     // The ✦ that opened it is hidden while the tutor is open: focus goes to the one that comes back.
     flushSync(() => setTutorOpen(false));
+    if (!had) return;
     // So is the bubble it said a reply from (D159): focus goes to the mole beside it. Opened with nothing focused
     // (its shortcut, ⌘K) or from something gone since, focus goes to the mole too: the tutor's own button.
     const back = from && from !== document.body && from.isConnected ? from : document.querySelector<HTMLElement>(".tutor-bubble");
@@ -2379,8 +2383,10 @@ export function App() {
             openSource(item, at);
           }}
           onClose={endReview}
-          // Started from a sheet (What to review) that is gone now: Home's Start review, else the view's own place.
-          giveBack={() => document.querySelector<HTMLElement>(".home .home-go") ?? listRef.current ?? document.querySelector<HTMLElement>(".reader-scroll") ?? document.querySelector<HTMLElement>(".home .home-open") ?? document.querySelector<HTMLElement>("main :is(button, a[href], [tabindex='0'])")}
+          // Started from a sheet (What to review) that is gone now, or with nothing focused: Home's Start review,
+          // else the list, the reader's text, Home's first row or tile, the page's first control (the first that
+          // can take focus; picked again if Home's refresh takes it away).
+          giveBack={() => [".home .home-go", null, ".reader-scroll", ".home .home-open", "main :is(button, a[href], [tabindex='0'])"].map((q) => (q ? document.querySelector<HTMLElement>(q) : listRef.current)).find(usable)}
           onLogged={() => setHomeTick((n) => n + 1)}
           notify={notify}
         />
