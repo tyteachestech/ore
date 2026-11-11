@@ -391,8 +391,10 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   useEffect(() => {
     // The quick quiz with nothing due says so and waits for Esc instead of closing under his hand.
-    if (queue && !queue.length && !end && !(quick && !reviewed.current)) void finish();
-  }, [queue, end, finish, quick]);
+    // Again once the last rating has saved: the queue can empty while it still is (the phone's `ore` runs in the
+    // page, so the rating saves inside the tap's own event and the queue renders before it is done).
+    if (queue && !queue.length && !end && !busy && !(quick && !reviewed.current)) void finish();
+  }, [queue, end, finish, quick, busy]);
 
   /** ⌘Z presses while a rating saved or the session wrapped up: they go to the history once that is
    *  done, so they take back the newest steps (that rating first), never an older card's meanwhile. */

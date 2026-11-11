@@ -8140,6 +8140,30 @@ journey("phone: a tap opens Source actions and works the note's keyboard bar", a
   await until("a tap on the bar's ⋯ opens Block actions", async () => (await block.getAttribute("aria-expanded")) === "true");
 }, "phone");
 
+journey("phone: the last rating of a review shows the end screen, not Wrapping up", async (page) => {
+  // The phone's `ore` runs in the page, so a rating saves inside the tap's own event: the queue emptied while
+  // Review was still busy, and the end screen waited for a tap on Close.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last()); // the picker's, every skill ticked
+  const rates = ["Again", "Hard"];
+  for (let i = 0; ; i++) {
+    if (i > 20) throw new Error("the review never ended");
+    const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+    await sure.or(page.locator(".phone-full .review-end")).or(page.getByText("Wrapping up")).first().waitFor();
+    if (!(await sure.count())) break;
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    const rating = page.locator(".phone-full button:visible").filter({ hasText: new RegExp(`^${rates[i] ?? "Good"}`) });
+    await rating.waitFor();
+    await tap(page, rating);
+    await rating.waitFor({ state: "detached" }).catch(() => {});
+  }
+  await until("the end screen comes up by itself", async () => !(await page.getByText("Wrapping up").count()) && (await page.locator(".phone-full .review-end").count()) > 0);
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
