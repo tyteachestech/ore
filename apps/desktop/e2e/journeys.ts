@@ -34,9 +34,15 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50", ORE_MOCK_ENRICH: "1" }, stdout: "ignore", stderr: "inherit" });
   const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), stdout: "ignore", stderr: "ignore" });
   const url = `http://localhost:${PORT}/`;
-  for (let i = 0; i < 100; i++) {
-    if (await fetch(url).then((r) => r.ok, () => false)) break;
-    await Bun.sleep(200);
+  // A cold vite bundles its dependencies before it answers (pdf.js among them, D202), which took over 20 s on a
+  // slow runner: the journeys then started against nothing and the first six failed on a refused connection.
+  // So wait as long as it takes within reason, and say so when it never comes up.
+  let up = false;
+  for (const end = Date.now() + 120_000; !up && Date.now() < end; up || (await Bun.sleep(200))) up = await fetch(url).then((r) => r.ok, () => false);
+  if (!up) {
+    bridge.kill();
+    vite.kill();
+    throw new Error(`vite did not answer at ${url} within 2 minutes`);
   }
   return { url, stop: () => (bridge.kill(), vite.kill()) };
 }
@@ -517,6 +523,38 @@ journey("skill page Questions: each row is one Tab stop then its ⋯, and ↑ �
   if (!(await rows.nth(1).evaluate((b) => b === document.activeElement))) throw new Error("↓ didn't move to the next question");
   await page.keyboard.press("ArrowUp");
   if (!(await rows.first().evaluate((b) => b === document.activeElement))) throw new Error("↑ didn't move back");
+});
+
+journey("skill page search: the magnifying glass in To read and Questions opens a field; a typo still finds the row, ↓ moves into it, Esc clears then closes (D203)", async (page) => {
+  await page.getByRole("button", { name: /^Learning/ }).first().click();
+  const side = page.locator(".skill-col.side");
+  const titles = () => side.locator(".list .row").allInnerTexts();
+  await until("the sources are listed", async () => (await titles()).length > 1);
+  const all = (await titles()).length;
+  await page.getByRole("button", { name: "Search sources" }).click();
+  await page.keyboard.type("retreival");
+  await until("a typo finds the source by its title", async () => {
+    const t = await titles();
+    return t.length > 0 && t.length < all && t[0]!.includes("Retrieval Beats Rereading");
+  });
+  await page.keyboard.press("Escape");
+  await until("Esc clears the search and the list is whole again", async () => (await titles()).length === all);
+  await page.keyboard.press("Escape");
+  await until("a second Esc closes the field, focus back on its button", async () => (await page.evaluate(() => document.activeElement?.tagName + ":" + document.activeElement?.getAttribute("aria-label"))) === "BUTTON:Search sources");
+
+  const asked = "Does interleaving beat blocking for motor skills?";
+  await page.getByRole("button", { name: "Add a question" }).first().click();
+  await page.getByLabel("New question").fill(asked);
+  await page.keyboard.press("Enter");
+  const rows = side.locator(".question-quote");
+  await rows.filter({ hasText: asked }).waitFor();
+  await page.getByRole("button", { name: "Search questions" }).click();
+  await page.keyboard.type("interleving");
+  await until("a typo finds the question alone", async () => (await rows.count()) === 1 && (await rows.first().innerText()).includes(asked));
+  await page.keyboard.press("ArrowDown");
+  if (!(await rows.first().evaluate((b) => b === document.activeElement))) throw new Error("↓ from the search didn't move to the question it found");
+  await page.getByLabel("Search questions").fill("zzzz");
+  await side.getByText("No questions match “zzzz”.").waitFor();
 });
 
 journey("Tab shows a focus ring on a control whose hover is a fill (Home's gear)", async (page) => {
