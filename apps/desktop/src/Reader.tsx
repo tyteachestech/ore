@@ -578,6 +578,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   const docEl = useRef<HTMLElement | null>(null);
   const ranges = useRef(new Map<string, Range>());
   const pending = useRef(new Map<string, Promise<Annotation>>());
+  /** A new highlight's stand-in id → the id its save came back with, from the moment it lands. A key or click
+   *  on its popup can come before the page has drawn the swap (a busy Mac), still naming the stand-in. */
+  const savedIds = useRef(new Map<string, string>());
+  /** Whether `a` is the highlight `id` names, by its saved id or the stand-in it had before its save landed. */
+  const isAnn = (a: Annotation, id: string) => a.id === id || a.id === savedIds.current.get(id);
   const annsRef = useRef(anns);
   annsRef.current = anns;
   const frame = useRef(0);
@@ -1426,6 +1431,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     const forget = p.notify("Highlight", "quiet", act("remove"), act("bring"));
     promise.then(
       (ann) => {
+        savedIds.current.set(tmp, ann.id);
         keptFromFeed(ann);
         if (fresh.current === tmp) fresh.current = ann.id;
         const r = ranges.current.get(tmp);
@@ -1541,8 +1547,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   }
 
   async function setIntentOf(id: string, intent: Intent, undoable = true) {
-    const was = annsRef.current.find((a) => a.id === id)?.intent;
-    setAnns((l) => l.map((a) => (a.id === id ? { ...a, intent } : a)));
+    const was = annsRef.current.find((a) => isAnn(a, id))?.intent;
+    setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, intent } : a)));
     const saved = realId(id);
     // On the history at once, so a ⌘Z right after the click takes this change back, not the step before it.
     const to = (i: Intent) => () => saved.then((rid) => setIntentOf(rid, i, false));
@@ -1551,7 +1557,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       await annotate(await saved, "--intent", intent);
     } catch (e) {
       forget?.();
-      setAnns((l) => l.map((a) => (a.id === id && was ? { ...a, intent: was } : a)));
+      setAnns((l) => l.map((a) => (isAnn(a, id) && was ? { ...a, intent: was } : a)));
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       p.notify(errorText(e), "error");
@@ -1654,14 +1660,14 @@ function ReaderView(p: Props & { reload: () => void }) {
   }
 
   async function setNoteOf(id: string, note: string, undoable = true) {
-    const was = annsRef.current.find((a) => a.id === id)?.note ?? "";
-    setAnns((l) => l.map((a) => (a.id === id ? { ...a, note } : a)));
+    const was = annsRef.current.find((a) => isAnn(a, id))?.note ?? "";
+    setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note } : a)));
     try {
       const rid = await realId(id);
       await annotate(rid, opt("note", note));
       if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {
-      setAnns((l) => l.map((a) => (a.id === id ? { ...a, note: was } : a)));
+      setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note: was } : a)));
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       p.notify(errorText(e), "error");
