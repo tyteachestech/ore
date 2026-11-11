@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
-  CardState, cardStates, calibration, raterStats, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
+  CardState, cardStates, calibration, raterStats, addCellCard, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
   readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
@@ -50,16 +50,20 @@ export const studyCommands: Record<string, Command> = {
   },
 
   card: {
-    usage: 'show|edit|set|retire|restore <id> [--review] [--variant v] [--question "<q>"] [--answer "<a>"] [--point "<key point>"]... [--state draft|live]   show parses the card (--review: the version review shows now, a variant in its turn, D66); edit opens $EDITOR; set replaces the question, answer or key points (--point, one per key point, in order: the whole rubric an Explain card is graded against; --variant edits that variant, its points one for one); retire removes it from review; restore undoes a retire, back to --state; figure <source> --src <image> --box x,y,w,h --answer <label>: a Fact card that hides that box of one of the source’s figures (fractions of its size, D166)',
-    options: { question: { type: "string" }, answer: { type: "string" }, point: { type: "string", multiple: true }, state: { type: "string" }, review: { type: "boolean" }, variant: { type: "string" }, src: { type: "string" }, box: { type: "string" } },
+    usage: 'show|edit|set|retire|restore <id> [--review] [--variant v] [--question "<q>"] [--answer "<a>"] [--point "<key point>"]... [--state draft|live]   show parses the card (--review: the version review shows now, a variant in its turn, D66); edit opens $EDITOR; set replaces the question, answer or key points (--point, one per key point, in order: the whole rubric an Explain card is graded against; --variant edits that variant, its points one for one); retire removes it from review; restore undoes a retire, back to --state; figure <source> --src <image> --box x,y,w,h --answer <label>: a Fact card that hides that box of one of the source’s figures (fractions of its size, D166); cell <source> --row <row> --column <heading> --answer <cell>: a Fact card that asks one cell of one of the source’s tables (D200)',
+    options: { question: { type: "string" }, answer: { type: "string" }, point: { type: "string", multiple: true }, state: { type: "string" }, review: { type: "boolean" }, variant: { type: "string" }, src: { type: "string" }, box: { type: "string" }, row: { type: "string" }, column: { type: "string" } },
     async run([sub, ref], f) {
-      if (!["show", "edit", "set", "retire", "restore", "figure"].includes(sub ?? "")) throw new Error("usage: ore card show|edit|set|retire|restore <id> | figure <source>");
+      if (!["show", "edit", "set", "retire", "restore", "figure", "cell"].includes(sub ?? "")) throw new Error("usage: ore card show|edit|set|retire|restore <id> | figure <source> | cell <source>");
       const lib = openLibrary();
       const id = need(ref, "<id>");
       if (sub === "figure") {
         const box = need(str(f.box), "--box x,y,w,h").split(",").map((n) => (n.trim() === "" ? NaN : Number(n)));
         const c = await addFigureCard(lib, id, { src: need(str(f.src), "--src <image>"), box, label: need(str(f.answer), "--answer <what’s under the box>") });
         return { data: { ...cardJson(lib, c), ...figureJson(lib, c) }, text: `Made card ${c.meta.id}: ${c.answer}` };
+      }
+      if (sub === "cell") {
+        const c = await addCellCard(lib, id, { row: need(str(f.row), "--row <the row’s name>"), column: need(str(f.column), "--column <the column’s heading>"), answer: need(str(f.answer), "--answer <what the cell says>") });
+        return { data: cardJson(lib, c), text: `Made card ${c.meta.id}: ${c.question}` };
       }
       if (sub === "show") {
         const c = findCard(lib, id);

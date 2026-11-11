@@ -1,8 +1,9 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
-import { ArrowDown, ArrowUp, BookOpen, CaretDown, Check, Circle, Copy, FilePdf, FileText, Image, Paperclip, PencilSimple, Plus, Quotes, SidebarRight, Square, Stack, Stop, TextAlignLeft, Trash, X, type Icon } from "./icons";
+import { ArrowClockwise, CaretLeft, CaretRight, ArrowDown, ArrowUp, BookOpen, CaretDown, Check, Circle, Copy, FilePdf, FileText, Image, Paperclip, PencilSimple, Plus, Quotes, SidebarRight, Square, Stack, Stop, TextAlignLeft, Trash, X, type Icon } from "./icons";
 import { chatGroups } from "./chat-groups";
+import { flip, shelve, versionCount, versionShown, type Version } from "./chat-versions";
 import { WithMenu } from "./Menu";
 import { citeRuns, siteName } from "./cite-pills";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -62,6 +63,8 @@ export type TutorTurn = {
   stopped?: boolean;
   /** The card he kept from this reply: its id, or "adding" while it is written. */
   kept?: string;
+  /** Its other versions (D201, chat-versions.ts): the ones not on screen, and where the shown one sits among them all. */
+  alts?: Version[]; alt?: number;
 };
 type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: boolean; exercise: Exercise | null; card: TutorCard | null; steps?: string[]; marks?: Mark[]; ai: Ai };
 /** What he has typed and not sent yet, with the @-mentions in it. */
@@ -209,14 +212,27 @@ export function useTutorChat(notify: Notify) {
     const said = t.partial?.replace(CUT_MARKS, "").trim();
     patch(chat, t.id, { ...(said ? { reply: said, citations: [], steps: [], marks: [] } : { error: "Stopped." }), stopped: true, partial: undefined, searching: undefined });
   };
-  const retry = (id: string) => {
+  /** Asks a turn again: Try again after a failure, Try another reply, or his message edited (`edited`). A
+   *  reply it already had is kept as a version he can flip back to (D201); a failure is replaced. */
+  const retry = (id: string, edited?: string) => {
     const i = now.current.findIndex((t) => t.id === id);
     if (i < 0) return;
-    const { message, item, title, mentions, pointed, files } = now.current[i]!;
+    const old = now.current[i]!;
+    const { item, title, pointed, files } = old;
+    const message = edited ?? old.message;
+    // An @ he took out of the message no longer points it.
+    const mentions = old.mentions?.filter((m) => message.includes(`@${m.name}`));
     stepsShown.delete(id); // a new reply starts its steps from the first
-    const t = { id, message, item, title, mentions, pointed, ...(files?.length ? { files } : {}) };
+    const t: TutorTurn = { id, message, item, title, ...(mentions?.length ? { mentions } : {}), pointed, ...(files?.length ? { files } : {}), ...shelve(old) };
     update((ts) => ts.map((x) => (x.id === id ? t : x)));
+    save();
     void run(t, now.current.slice(0, i));
+  };
+  /** Shows another version of a turn (D201). */
+  const version = (id: string, i: number) => {
+    stepsShown.delete(id);
+    update((ts) => ts.map((x) => (x.id === id ? flip(x, i) : x)));
+    save();
   };
   /** Keeps the reply's card on the source it cites first (else the one he asked about); ⌘Z retires it. */
   const keep = async (id: string) => {
@@ -323,7 +339,7 @@ export function useTutorChat(notify: Notify) {
   };
   /** A web page a reply cites, in his browser. */
   const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
-  return { turns, draft, setDraft, carry, drop, ask, stop, retry, attach, attaching: attaching > 0, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
+  return { turns, draft, setDraft, carry, drop, ask, stop, retry, version, attach, attaching: attaching > 0, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -399,6 +415,26 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
     setBelow(false);
   };
   const busy = turns.some((t) => t.reply === undefined && !t.error);
+  /** His last message while he edits it (D201): the text in its field. */
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const lastTurn = turns[turns.length - 1];
+  const editField = useRef<HTMLTextAreaElement>(null);
+  const editingId = editing?.id;
+  useEffect(() => {
+    const el = editField.current;
+    if (!editingId || !el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editingId]);
+  const edit = () => !busy && lastTurn && setEditing({ id: lastTurn.id, text: lastTurn.message });
+  const editDone = (sendIt: boolean) => {
+    const e = editing;
+    setEditing(null);
+    field.current?.focus();
+    if (!sendIt || !e) return;
+    const text = e.text.trim();
+    if (text && text !== lastTurn?.message) chat.retry(e.id, text);
+  };
   /** Words he selected in one reply, and where to show what he can do with them (D164, Linear's and assistant-ui's quote toolbar). */
   const [picked, setPicked] = useState<{ turn: string; text: string; x: number; y: number; below: boolean } | null>(null);
   useEffect(() => {
@@ -632,7 +668,37 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
                   : <span key={x.path} className="tutor-chip"><FileIcon kind={x.kind} /><span className="tutor-chip-title">{x.name}</span></span>))}
               </div>
             )}
-            <p className="ask-me">{lit?.turn === t.id ? <Evidence answer={t.message} quote={lit.quote} /> : marked(t.message, t.mentions ?? [])}</p>
+            {editing?.id === t.id ? (
+              // His message back in a field (ChatGPT, Claude): Enter sends it again, Esc leaves it as it was.
+              <Grow
+                rows={1}
+                className="field ask-edit"
+                aria-label="Edit your message"
+                ref={editField}
+                onBlur={() => editDone(false)}
+                value={editing.text}
+                onChange={(e) => setEditing({ id: t.id, text: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === "Escape" || (e.key === "Enter" && !e.shiftKey)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    editDone(e.key === "Enter");
+                  }
+                }}
+              />
+            ) : (
+              <p className="ask-me">
+                {lit?.turn === t.id ? <Evidence answer={t.message} quote={lit.quote} /> : marked(t.message, t.mentions ?? [])}
+                {i === turns.length - 1 && !busy && (
+                  <Hint text="Edit" side="top">
+                    <button className="icon-btn ask-edit-btn" aria-label="Edit your message" onClick={edit}>
+                      <PencilSimple size={14} aria-hidden="true" />
+                    </button>
+                  </Hint>
+                )}
+              </p>
+            )}
             <div className={`ask-ai${i === turns.length - 1 ? " newest" : ""}`}>
               <div className={`ask-text${t.reply === undefined && !t.error ? " typing" : ""}`}>
                 {t.error ? (
@@ -655,6 +721,13 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
                         {copied === t.id ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                       </button>
                     </Hint>
+                    {last && (
+                      <Hint text="Try another reply" side="top">
+                        <button className="icon-btn tutor-copy tutor-again" aria-label="Try another reply" onClick={() => chat.retry(t.id)}>
+                          <ArrowClockwise size={14} aria-hidden="true" />
+                        </button>
+                      </Hint>
+                    )}
                     <div data-reply={t.id}>
                       <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />
                     </div>
@@ -706,6 +779,14 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
                 )}
               </div>
             </div>
+            {versionCount(t) > 1 && (t.reply !== undefined || t.error) && (
+              // Its other versions (D201): the same ‹ 2 / 2 › as ChatGPT and Claude show under a message.
+              <div className="ask-versions" role="group" aria-label="Versions of this reply">
+                <Hint text="Previous version" side="top"><button className="icon-btn" aria-label="Previous version" disabled={versionShown(t) === 0} onClick={() => chat.version(t.id, versionShown(t) - 1)}><CaretLeft size={11} aria-hidden="true" /></button></Hint>
+                <span aria-live="polite">{versionShown(t) + 1} / {versionCount(t)}</span>
+                <Hint text="Next version" side="top"><button className="icon-btn" aria-label="Next version" disabled={versionShown(t) === versionCount(t) - 1} onClick={() => chat.version(t.id, versionShown(t) + 1)}><CaretRight size={11} aria-hidden="true" /></button></Hint>
+              </div>
+            )}
           </div>
           );
         })}
@@ -804,6 +885,11 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 send(input, true);
+              }
+              // ↑ in the empty field edits his last message (Slack, Claude).
+              if (e.key === "ArrowUp" && !input && !files.length && !busy && lastTurn) {
+                e.preventDefault();
+                edit();
               }
             }}
           />

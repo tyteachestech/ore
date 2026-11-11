@@ -8,6 +8,8 @@ export function nativeMenu(target: EventTarget | null, selection: Selection | nu
   if (!el) return false;
   // A diagram's preview in a note is an object with its own menu, though the note around it is text.
   if (el.closest(".note-diagram")) return false;
+  // A covered cell of a table (D200) shows no text to look up: its menu is the cover's.
+  if (el.closest(".doc td.covered")) return false;
   if (el.closest("input, textarea, [contenteditable]:not([contenteditable=false])")) return true;
   if (selection && !selection.isCollapsed && selection.rangeCount && selection.getRangeAt(0).intersectsNode(el)) return true;
   return !!el.closest(".doc") && !el.closest("a[href]");

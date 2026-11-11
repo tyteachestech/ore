@@ -412,6 +412,28 @@ export function chunks(md: string, size = 12000): string[] {
   return out;
 }
 
+/** A PDF's body in slices that each start a page (`<!-- page N -->`, core's `pdf.ts`), so the reader can
+ *  tell which page of the original is being read (D202). A long page is still cut by `chunks`. */
+export function pageChunks(md: string): string[] {
+  const out: string[] = [];
+  let cur: string[] = [];
+  const flush = () => {
+    if (cur.join("").trim()) out.push(...chunks(cur.join("\n")));
+    cur = [];
+  };
+  let fence = false;
+  for (const line of md.split("\n")) {
+    if (/^[ \t]*(?:```|~~~)/.test(line)) fence = !fence;
+    if (!fence && PAGE.test(line)) flush();
+    cur.push(line);
+  }
+  flush();
+  return out;
+}
+const PAGE = /^<!-- page (\d+) -->$/;
+/** The page a slice of `pageChunks` starts, if it starts one. */
+export const pageOf = (chunk: string): number | null => Number(PAGE.exec(chunk.slice(0, chunk.indexOf("\n") >>> 0))?.[1]) || null;
+
 /** Footnotes (`[^7]` and `[^7]: …`) as links that keep their text, so they work in any slice of a
  *  long body: GFM footnotes only resolve within one parse, and the body renders in slices (`chunks`),
  *  so a marker would show as "[^7]" and its note would vanish. A marker links to `#fn-7`, its note's
