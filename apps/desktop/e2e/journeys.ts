@@ -4186,6 +4186,22 @@ const reviewLog = () => {
 };
 type TodayNow = { active_ms: number; due: number };
 
+/** Presses ⌘L until the session ends, at most `total` + 1 times, each time waiting for the exercise on screen to be
+ *  replaced (not for its wording to change: two can read alike). Returns how many he put off. */
+async function laterAll(page: Page, total: number): Promise<number> {
+  const review = page.locator(".review");
+  let n = 0;
+  for (; n <= total && (await review.count()); n++) {
+    const shown = await page.locator(".review-card").elementHandle({ timeout: 4000 }).catch(() => null);
+    if (!shown) break;
+    await page.keyboard.press("Meta+l");
+    await page.waitForFunction((el) => !el.isConnected, shown, { timeout: 5000 });
+    await page.locator(".review-q").or(page.locator(".review-end")).first().waitFor({ timeout: 5000 }).catch(() => {});
+  }
+  await review.waitFor({ state: "detached" });
+  return n;
+}
+
 journey("review: Later puts the exercise off to the end of the session with nothing logged; ⌘Z brings it back as it was, ⇧⌘Z puts it off again (D192)", async (page) => {
   const calls = oreCalls(page);
   const logged = () => calls.calls.filter((a) => a[0] === "review").length;
@@ -4201,12 +4217,18 @@ journey("review: Later puts the exercise off to the end of the session with noth
     const first = await q.innerText();
     const total = Number(await bar.getAttribute("aria-valuemax"));
     await reveal(page);
+    // With Ask open: ⌘L from its field puts the exercise off too, and ⌘Z brings Ask back open.
+    const askToggle = page.getByRole("button", { name: "Ask about this" });
+    await askToggle.click();
+    await page.getByRole("textbox", { name: "Ask about this exercise" }).focus();
     await page.keyboard.press("Meta+l");
     await until("Later moves on", async () => (await q.innerText()) !== first);
     if (logged()) throw new Error("Later logged a review");
     if ((await step()) !== `0 of ${total}`) throw new Error(`Later moved the session bar: ${await step()}`);
     await page.keyboard.press("Meta+z");
     await until("⌘Z brings it back, its answer still shown", async () => (await q.innerText()) === first && (await good.isVisible()));
+    await until("and Ask open as he left it", async () => (await askToggle.getAttribute("aria-pressed")) === "true");
+    await page.keyboard.press("Escape"); // closes Ask
     await page.keyboard.press("Shift+Meta+z");
     await until("⇧⌘Z puts it off again", async () => (await q.innerText()) !== first);
     // The rest first, with a trip to a source and back on the way; then it comes back, last and asked afresh.
@@ -4289,18 +4311,9 @@ journey("review: putting off every exercise left, one after another, ends the se
   const calls = oreCalls(page);
   const log = reviewLog();
   await startReview(page, null);
-  const q = page.locator(".review-q");
   const total = Number(await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax"));
-  const seen: string[] = [];
-  for (let n = 0; n < total + 2 && (await page.locator(".review").count()); n++) {
-    const was = await q.innerText({ timeout: 2000 }).catch(() => null);
-    if (was === null) continue;
-    seen.push(was);
-    await page.keyboard.press("Meta+l");
-    await until("Later moves on or ends the session", async () => !(await page.locator(".review").count()) || ((await q.count()) > 0 && (await q.innerText({ timeout: 500 }).catch(() => was)) !== was));
-  }
-  await page.locator(".review").waitFor({ state: "detached" });
-  if (seen.length !== total || new Set(seen).size !== total) throw new Error(`put off ${seen.length} (${new Set(seen).size} different) of ${total} before it ended`);
+  const n = await laterAll(page, total);
+  if (n !== total) throw new Error(`put off ${n} of ${total} before it ended`);
   if (calls.calls.some((a) => a[0] === "review") || reviewLog() !== log) throw new Error("Later logged a review");
 });
 
@@ -4341,6 +4354,93 @@ journey("review: Later moves straight on to the exercise loaded ahead, and the o
   }
 });
 
+journey("review: a held ⌘L puts off one exercise, not the ones after it (D192)", async (page) => {
+  await startReview(page, /Learning/);
+  const q = page.locator(".review-q");
+  const first = await q.innerText();
+  await page.keyboard.down("Meta");
+  await page.keyboard.down("l");
+  for (let n = 0; n < 30; n++) {
+    await page.waitForTimeout(40);
+    await page.keyboard.down("l"); // held: each repeat comes with repeat: true
+  }
+  await page.keyboard.up("l");
+  await page.keyboard.up("Meta");
+  await page.waitForTimeout(400);
+  // Three exercises: repeats putting off the next two would have ended the session.
+  if (!(await page.locator(".review").count())) throw new Error("the held ⌘L put off every exercise and ended the session");
+  await until("one put off", async () => (await q.innerText()) !== first);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: ⌘Z after a quick Later brings the exercise back with its passage, even one that hadn't loaded yet (D192)", async (page) => {
+  await page.addInitScript("window.__ORE_SLOW = { show: 1500 }");
+  await page.reload();
+  await startReview(page, /Learning/);
+  const q = page.locator(".review-q");
+  const first = await q.innerText();
+  const noIdea = page.getByRole("button", { name: "No idea" });
+  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await page.keyboard.press("Meta+l"); // before its passage lands
+  await until("Later moves on", async () => (await q.innerText()) !== first);
+  await page.keyboard.press("Meta+z");
+  await until("it is back", async () => (await q.innerText()) === first);
+  await page.getByRole("button", { name: /Open in source/ }).waitFor({ timeout: 5000 });
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: Later, then Retire on the next exercise: ⌘Z twice puts that one back and then the one put off (D192)", async (page) => {
+  await startReview(page, /Learning/);
+  const q = page.locator(".review-q");
+  const first = await q.innerText();
+  await page.keyboard.press("Meta+l");
+  await until("Later moves on", async () => (await q.innerText()) !== first);
+  const second = await q.innerText();
+  await page.keyboard.press("Shift+Meta+Backspace");
+  await until("Retire moves on", async () => (await q.innerText()) !== second);
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast", { hasText: "Exercise restored" }).waitFor();
+  await page.keyboard.press("Meta+z");
+  await until("the second ⌘Z brings back the one put off", async () => (await q.innerText()) === first, 4000);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: ⌘Z from the end screen after a Later doesn't count the time spent there (D192)", async (page) => {
+  const calls = oreCalls(page);
+  const q = page.locator(".review-q");
+  const good = page.getByRole("button", { name: "Good", exact: true });
+  const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
+  try {
+    await startReview(page, /Learning/);
+    const total = Number(await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax"));
+    for (let n = 1; n < total; n++) {
+      const was = await q.innerText();
+      await reveal(page);
+      await good.click();
+      await until("the next one", async () => (await q.innerText()) !== was);
+    }
+    await reveal(page);
+    await page.keyboard.press("Meta+l");
+    await doneButton.waitFor();
+    await page.waitForTimeout(3000); // on the end screen
+    await page.keyboard.press("Meta+z");
+    await until("back on it", async () => !(await doneButton.isVisible()) && (await good.isVisible()));
+    await good.click();
+    await doneButton.waitFor();
+    const last = calls.calls.filter((a) => a[0] === "review" && !a.some((x) => x.startsWith("--undo"))).at(-1)!;
+    const ms = Number(last.find((x) => x.startsWith("--elapsed-ms="))!.split("=")[1]);
+    if (ms >= 2500) throw new Error(`the rating counted ${ms} ms: the time on the end screen went in`);
+    await page.keyboard.press("Enter");
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await calls.undoAll();
+  }
+});
+
 journey("review: a Later on the one more exercise served after a miss closed the goal passes that turn on, so the session still doesn't end on a miss (D177, D192)", async (page) => {
   const calls = oreCalls(page);
   // A one-millisecond goal, so the first rating closes it.
@@ -4372,6 +4472,16 @@ journey("review: a Later on the one more exercise served after a miss closed the
     await page.waitForTimeout(800); // a session ending on that miss would have been ended by now
     if ((await doneButton.isVisible()) || ends() > ended) throw new Error("the session ended on a miss after a Later");
     await until("that miss gets its own one more", async () => (await q.count()) > 0 && (await q.innerText()) !== next);
+    // ⌘Z takes that miss back: the turn it earned goes with it, so missing it again still earns one more.
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings the missed one back", async () => (await q.innerText()) === next && !(await again.isVisible()));
+    const ended2 = ends();
+    await reveal(page);
+    await again.click();
+    await until("the miss is logged again", async () => calls.rated.length === 3);
+    await page.waitForTimeout(800);
+    if ((await doneButton.isVisible()) || ends() > ended2) throw new Error("the session ended on a miss after ⌘Z");
+    await until("one more after it", async () => (await q.count()) > 0 && (await q.innerText()) !== next);
     await reveal(page);
     await page.getByRole("button", { name: "Good", exact: true }).click();
     await doneButton.waitFor();
@@ -4571,6 +4681,8 @@ journey("review: in the quick quiz Later puts the exercise off with nothing logg
   const quiz = await openQuiz();
   const calls = oreCalls(quiz);
   const log = reviewLog();
+  // The quick quiz asks everything due (no skill picked here).
+  const total = ((await ore("due")) as unknown[]).length;
   try {
     await emit(quiz, "quiz-open");
     const q = quiz.locator(".review-q");
@@ -4582,13 +4694,9 @@ journey("review: in the quick quiz Later puts the exercise off with nothing logg
     await until("⌘Z brings it back", async () => (await q.innerText()) === first);
     await quiz.keyboard.press("Shift+Meta+z");
     await until("⇧⌘Z puts it off again", async () => (await q.innerText()) !== first);
-    for (let n = 0; n < 12 && (await quiz.locator(".review").count()); n++) {
-      const was = await q.innerText({ timeout: 2000 }).catch(() => null);
-      if (was === null) continue;
-      await quiz.keyboard.press("Meta+l");
-      await until("Later moves on or closes the quiz", async () => !(await quiz.locator(".review").count()) || ((await q.count()) > 0 && (await q.innerText({ timeout: 500 }).catch(() => was)) !== was));
-    }
-    await quiz.locator(".review").waitFor({ state: "detached" });
+    // Every one left: one was put off already, so the rest go and the quiz closes.
+    const n = await laterAll(quiz, total);
+    if (n !== total - 1) throw new Error(`put off ${n} more of ${total} before the quiz closed`);
     if (calls.calls.some((a) => a[0] === "review") || reviewLog() !== log) throw new Error("Later logged a review in the quick quiz");
   } finally {
     await quiz.close();
