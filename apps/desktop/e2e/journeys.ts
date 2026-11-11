@@ -3447,7 +3447,12 @@ journey("list drag to select: a drag from beside the rows boxes the ones it cros
   const rows = page.locator(".list .row");
   await rows.nth(3).waitFor();
   const list = (await page.locator(".list").boundingBox())!;
-  const at = async (i: number) => (await rows.nth(i).boundingBox())!;
+  /** Row i's box, once it is drawn (the list redraws as a filter's text search comes back). */
+  const at = async (i: number) => {
+    let b: Awaited<ReturnType<Locator["boundingBox"]>> = null;
+    await until(`row ${i} is drawn`, async () => !!(b = await rows.nth(i).boundingBox()));
+    return b!;
+  };
   const mid = async (i: number) => (await at(i)).y + (await at(i)).height / 2;
   // The list's own space left of its rows, past the sidebar's resize strip (D193), where Finder starts one too.
   const edge = (await page.locator(".side-divider").boundingBox())!;
