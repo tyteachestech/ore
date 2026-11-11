@@ -62,7 +62,7 @@ function measure(box: HTMLElement, page: HTMLElement): Line[] {
   return out;
 }
 
-/** D204: when the source hides while he writes, each line of its text becomes a row of dots its own length,
+/** D205: when the source hides while he writes, each line of its text becomes a row of dots its own length,
  *  top to bottom (`--t-moment`), and the words fade under them; pictures become a sparse dot field. The words
  *  are gone but the page keeps its shape, so he still sees where he was. Showing it again runs back up in
  *  `--t-4`. Under Reduce Motion the dots are simply there. */

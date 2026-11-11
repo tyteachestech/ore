@@ -150,6 +150,9 @@ export function cardPriority(skillIds: string[], skills: Skill[]): Priority {
   return ps.length ? ps.sort()[0]! : DEFAULT_PRIORITY;
 }
 
+/** Filed under no skill there is (none, or only ids no longer in skills.yaml): What to review's No skill row (D204). */
+export const unfiled = (skillIds: string[], skills: Skill[]): boolean => !skillIds.some((id) => skills.some((s) => s.id === id));
+
 /** Filed only under archived skills (D173): its cards wait out of review, its sources off Home. */
 export const archivedOnly = (skillIds: string[], skills: Skill[]): boolean => {
   const own = skills.filter((s) => skillIds.includes(s.id));

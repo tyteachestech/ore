@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { dotsFor, grown } from "../src/HideDots";
 
-describe("hide the source as dots (D204)", () => {
+describe("hide the source as dots (D205)", () => {
   test("a line becomes a row of dots its own length, on its midline", () => {
     const d = dotsFor({ x1: 100, x2: 400, y: 50, size: 18 });
     expect(d.every(([x, y]) => y === 50 && x > 100 && x < 400)).toBe(true);
