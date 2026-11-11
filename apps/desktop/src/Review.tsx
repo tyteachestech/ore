@@ -600,7 +600,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         },
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
-    if (rating > 1) setDone((n) => n + 1);
+    // Every rating is a step, a miss too: its retry is one more step (D59), so "Exercise N of M" never shows one
+    // number for two exercises, and M grows only by that retry.
+    setDone((n) => n + 1);
     if (ahead.current) ahead.current.armed = true;
     advance(rating === 1);
     activeMs.current += Math.min(elapsed, ACTIVE_CAP_MS);

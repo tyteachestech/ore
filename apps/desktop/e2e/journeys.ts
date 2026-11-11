@@ -5284,6 +5284,40 @@ journey("review: What to review has a No skill row for exercises filed under no 
   }
 });
 
+journey("review: a miss is a step of its own and its retry one more, so \"Exercise N of M\" never repeats and M grows only by the retry (D59)", async (page) => {
+  const log = oreCalls(page);
+  try {
+    await startReview(page, null);
+    const live = page.locator(".review .sr-only[aria-live]");
+    const at = async () => {
+      const m = /^Exercise (\d+) of (\d+)\./.exec(await live.innerText());
+      if (!m) throw new Error(`no step in the label: ${await live.innerText()}`);
+      return `${m[1]} of ${m[2]}`;
+    };
+    const n = Number((await at()).split(" of ")[1]);
+    const rate = async (name: "Again" | "Good", want: string) => {
+      await reveal(page);
+      await page.getByRole("button", { name, exact: true }).click();
+      await until(`the label reads ${want}`, async () => (await at().catch(() => "")) === want).catch(async () => {
+        throw new Error(`after ${name} the label reads "${await at()}", not "${want}"`);
+      });
+    };
+    if ((await at()) !== `1 of ${n}`) throw new Error(`the first exercise reads ${await at()}`);
+    // The miss comes back a few exercises later (D59): one more step, so the next exercise is 2 of n + 1.
+    await rate("Again", `2 of ${n + 1}`);
+    for (let i = 3; i <= n + 1; i++) await rate("Good", `${i} of ${n + 1}`);
+    // The last step ends the session; among the steps was the retry, the missed exercise under a number of its own.
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("every step is rated", async () => log.rated.length === n + 1);
+    if (log.rated.filter((r) => r.card === log.rated[0]!.card).length !== 2) throw new Error(`the miss never came back: ${JSON.stringify(log.rated.map((r) => r.card))}`);
+  } finally {
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
+    await log.undoAll();
+  }
+});
+
 /** Shows the answer of the card on screen: No idea on a question, Think so on a card. */
 async function reveal(page: Page) {
   const noIdea = page.getByRole("button", { name: "No idea" });
