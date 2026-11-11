@@ -7,7 +7,7 @@ import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
 import { stampBefore } from "./transcript";
-import { errorText, focusPicked, stepLabel, type Notify } from "./util";
+import { errorText, focusPicked, keptMap, stepLabel, type Notify } from "./util";
 import { Matrix, useLate, Working } from "./Working";
 import { PixelBurst } from "./Burst";
 
@@ -38,9 +38,9 @@ type Props = NotesSync & {
 
 const SURE = ["Guess", "Think so", "Sure"] as const;
 
-// Typed text survives closing the panel (Esc) and reopening it while the reader stays open (D52).
+// Typed text survives closing the panel (Esc) and reopening it while the reader stays open (D52), and on the phone a relaunch.
 type Draft = { step: number; recall: string; answers: string[]; conf: (number | undefined)[]; use: string; leave: string; qs: Prequestion[] };
-const drafts = new Map<string, Draft>();
+const drafts = keptMap<Draft>(PHONE ? "ore.finish-drafts" : null);
 
 /** Sources whose cards failed to draft, each with its retry: one toast says them all (the latest reason),
  *  and its Try again drafts them all, so a second failure never hides the first one's way back. */

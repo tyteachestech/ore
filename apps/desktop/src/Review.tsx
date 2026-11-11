@@ -16,7 +16,7 @@ import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthS
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, keptMap, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
@@ -65,8 +65,8 @@ type End = { session: SessionEnd; today: Today; before: Today | null; next: Try 
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
 
 /** Answers typed but not checked, and how sure he said he was, by card: putting the quick quiz away
- *  (D76), Esc or Open in source keep them for when the card comes up again. */
-const drafts = new Map<string, { text: string; conf?: number }>();
+ *  (D76), Esc or Open in source keep them for when the card comes up again; on the phone, a relaunch too. */
+const drafts = keptMap<{ text: string; conf?: number }>(PHONE ? "ore.review-drafts" : null);
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
@@ -391,8 +391,10 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   useEffect(() => {
     // The quick quiz with nothing due says so and waits for Esc instead of closing under his hand.
-    if (queue && !queue.length && !end && !(quick && !reviewed.current)) void finish();
-  }, [queue, end, finish, quick]);
+    // Again once the last rating has saved: the queue can empty while it still is (the phone's `ore` runs in the
+    // page, so the rating saves inside the tap's own event and the queue renders before it is done).
+    if (queue && !queue.length && !end && !busy && !(quick && !reviewed.current)) void finish();
+  }, [queue, end, finish, quick, busy]);
 
   /** ⌘Z presses while a rating saved or the session wrapped up: they go to the history once that is
    *  done, so they take back the newest steps (that rating first), never an older card's meanwhile. */

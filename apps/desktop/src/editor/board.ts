@@ -59,7 +59,8 @@ export function board(
     inner.style.transform = moved(v) ? `translate(${v.x}px, ${v.y}px) scale(${v.z})` : "";
     dom.classList.toggle("moved", moved(v));
   };
-  fit.addEventListener("pointerdown", (e) => e.preventDefault());
+  // Not a touch: WebKit sends no click after a touch whose pointer-down was prevented.
+  fit.addEventListener("pointerdown", (e) => e.pointerType === "touch" || e.preventDefault());
   fit.addEventListener("click", (e) => {
     e.stopPropagation();
     set(HOME);

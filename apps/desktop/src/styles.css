@@ -2525,7 +2525,16 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* At 44pt the tools don't stack beside two rows: on the phone they run in a row under the note. */
 .phone .popup { grid-template-columns: 1fr; }
 .phone .popup-tools { grid-column: 1; grid-row: 3; display: flex; justify-content: flex-end; gap: 2px; padding: 6px 0 0; border-left: 0; align-self: auto; }
-.phone .quiz-sure button, .phone .review-foot button { min-height: 44px; }
+.phone .quiz-sure button, .phone .review-foot button, .phone .quiz-foot button { min-height: 44px; }
+/* The rest of a source's small controls at 44pt too. A highlight's note field is a field, so it is that tall. */
+.phone .popup .field { min-height: 44px; }
+/* The links under a question in Collected: 44pt tall, their text still just under the question, the room below it. */
+.phone .qp-sub { row-gap: 0; padding-bottom: 0; }
+.phone .qp-link { display: inline-flex; align-items: flex-start; min-height: 44px; }
+/* The original-site link over the title: 44pt tall and above the title's top, which takes no tap, in the same place. */
+.phone .doc-head .source { position: relative; z-index: 1; min-width: 44px; line-height: 44px; margin-top: -4.5px; margin-bottom: -12.5px; }
+/* The reading pill: 28pt to the eye, 44pt to the finger. */
+.phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
@@ -2586,6 +2595,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-tools > button.has { color: var(--accent); }
 .phone-tools .collected { position: static; transform: none; padding: 0; background: none; border: 0; box-shadow: none; animation: none; }
 .phone-tools .collected-chip { height: 44px; }
+/* In a source a toast sits above the bottom bar and the pill on it (Mail's Undo banner sits above its toolbar), so
+   neither loses its taps while the toast shows. */
+.phone .phone-app:has(.phone-source .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 98px); }
 /* Toast buttons are finger-sized on the phone, without growing the toast. */
 .phone .toast-undo { min-height: 44px; margin: -12px -8px -12px 0; padding: 0 8px; display: inline-flex; align-items: center; }
 .phone .toast-x { width: 44px; height: 44px; margin: -12px -14px -12px -8px; }
@@ -2912,12 +2924,15 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 
 /* Reading pill (D152, phone): where he is in the source, at the foot of the page. 28px pill: a 16px ring that
    fills as he reads and the section's name; a tap opens the sections as a bottom sheet. */
-.read-pill { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%; transform: translateX(-50%); z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: 70%; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
+.read-pill { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%; transform: translateX(-50%); transition: transform var(--t-3) ease-out; z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: 70%; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
 .read-pill:disabled { padding-right: 6px; }
 .read-pill:active:not(:disabled) { background: var(--bg-hover); }
 .read-pill svg { flex: none; color: var(--text); }
-/* The text never ends under the pill. */
-.phone-reader .reader-pane:has(.read-pill) .doc { padding-bottom: 56px; }
+/* While the bottom bar shows (D156) the pill rides above it and settles back to the foot as the bar slides away,
+   so neither covers the other's taps (Books keeps its place at the foot, clear of its controls). */
+.phone .reader:not(:is(.bars-hidden, .dragging, .noting)) .reader-pane:has(.phone-tools) .read-pill { transform: translate(-50%, -52px); }
+/* The text never ends under the pill, nor under the bar it sits on at either end of the source. */
+.phone-reader .reader-pane:has(.read-pill) .doc { padding-bottom: 108px; }
 .read-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: pill-name var(--t-2) ease-out both; }
 @keyframes pill-name { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .read-pill-name { animation: none; } }
@@ -2927,6 +2942,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .sheet .pick-row.on .name { color: var(--text); font-weight: 600; }
 .sheet .pick-row .name { color: var(--muted); font-weight: 500; }
 .phone .overlay:has(.sheet) { align-items: flex-end; padding: 0; }
+/* A bottom sheet (portaled to the body, sheetLayer) is above toasts: one never hides its rows. */
+.phone .overlay:has(.sheet, .review-pick) { z-index: 40; }
 .phone .sheet { width: 100%; padding: 20px 8px max(16px, env(safe-area-inset-bottom, 0px)); border-width: 1px 0 0; border-radius: 16px 16px 0 0; }
 .phone .sheet::before { content: ""; display: block; width: 36px; height: 5px; margin: -12px auto 14px; background: var(--border); }
 /* Action sheet (D155, phone): the ⋯ menu as one sheet of 44pt rows; a submenu swaps in behind a back

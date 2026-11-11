@@ -6,7 +6,7 @@
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 //   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
-import { chromium, webkit, type Browser, type Locator, type Page } from "playwright";
+import { chromium, devices, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,7 +50,46 @@ async function safariBrowser(): Promise<Browser> {
   }
 }
 
+/** The iPhone build (ORE_PHONE=1, src/phone) on the seeded library, started the first time a phone journey needs it
+ *  (on ORE_E2E_PHONE_PORT, vite's port + 2; E2E_PHONE_URL uses one already running). It runs the core inside the
+ *  page, so it takes no bridge; its library is a snapshot of the files when the page loads. */
+let phoneVite: { url: string; stop: () => void } | undefined;
+async function phoneApp(): Promise<string> {
+  if (process.env.E2E_PHONE_URL) return process.env.E2E_PHONE_URL;
+  if (phoneVite) return phoneVite.url;
+  const port = Number(process.env.ORE_E2E_PHONE_PORT ?? PORT + 2);
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: LIB }, stdout: "ignore", stderr: "ignore" });
+  const url = `http://localhost:${port}/`;
+  for (let i = 0; i < 100; i++) {
+    if (await fetch(url).then((r) => r.ok, () => false)) break;
+    await Bun.sleep(200);
+  }
+  phoneVite = { url, stop: () => vite.kill() };
+  // Loaded once first: what vite bundles on a first load (and the reload that follows) lands before any journey.
+  const warm = await (await safariBrowser()).newPage();
+  await warm.goto(url);
+  await warm.locator(".phone-app").waitFor({ timeout: 30000 }).catch(() => {});
+  await Bun.sleep(1000);
+  await warm.close();
+  return url;
+}
+
+/** The phone app as he holds it: WebKit at 390×844 with touch, dark (D78). Journeys tap with `tap()`, a real touch. */
+async function openPhone(): Promise<Page> {
+  const url = await phoneApp();
+  const page = await (await safariBrowser()).newPage({ ...devices["iPhone 14"], viewport: { width: 390, height: 844 }, colorScheme: "dark" });
+  page.setDefaultTimeout(8000);
+  page.on("pageerror", (e) => errors.push(e.message));
+  // What the app's Tauri shell gives the page and a browser lacks: an image saved with a source loads through it.
+  await page.addInitScript(`window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p, proto = "asset") => proto + "://localhost/" + encodeURIComponent(p), transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`);
+  await page.addInitScript(HYGIENE);
+  await page.goto(url);
+  await page.locator(".phone-app").waitFor();
+  return page;
+}
+
 async function open(url: string, engine: Engine): Promise<Page> {
+  if (engine === "phone") return openPhone();
   const page = await (engine === "webkit" ? await safariBrowser() : browser).newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
@@ -217,8 +256,9 @@ const errors: string[] = [];
 const { url, stop } = await start();
 const browser = await chromium.launch();
 /** The Mac app runs in WebKit (WKWebView), not Chromium: a journey about what only WebKit does (its native
- *  undo in a text field) runs there, in a browser launched the first time one needs it. */
-type Engine = "chromium" | "webkit";
+ *  undo in a text field) runs there, in a browser launched the first time one needs it. "phone" is the iPhone
+ *  build in WebKit with touch (openPhone). */
+type Engine = "chromium" | "webkit" | "phone";
 let safari: Browser | undefined;
 const journeys: [string, (page: Page) => Promise<void>, Engine][] = [];
 const journey = (name: string, run: (page: Page) => Promise<void>, engine: Engine = "chromium") => journeys.push([name, run, engine]);
@@ -8131,6 +8171,278 @@ journey("a11y: a row is one control with its actions beside it (axe nested-inter
   if ((await focused()).inSide) throw new Error("Tab after the arrows stayed in the sidebar");
 });
 
+// —— the iPhone build (D78): WebKit at 390×844, every press a real touch ——
+
+/** A real touch on the middle of what the locator finds, once it has stopped moving (a drawer or sheet sliding in). */
+async function tap(page: Page, target: Locator) {
+  const el = target.first();
+  await el.scrollIntoViewIfNeeded();
+  let b = await el.boundingBox();
+  for (let i = 0; i < 20; i++) {
+    await Bun.sleep(50);
+    const now = await el.boundingBox();
+    if (now && b && now.x === b.x && now.y === b.y) break;
+    b = now;
+  }
+  if (!b) throw new Error(`nothing on screen to tap: ${target}`);
+  await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+}
+
+/** Opens a source from the drawer's Sources, by its title. */
+async function phoneSource(page: Page, title: string) {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await tap(page, page.locator(".phone-sources button").filter({ hasText: title }));
+  await page.locator(".phone-reader .doc").first().waitFor();
+}
+
+journey("phone: a tap opens Source actions and works the note's keyboard bar", async (page) => {
+  // WebKit sends no click after a touch whose pointer-down was prevented: the ⋯ and the bar's buttons did nothing.
+  await phoneSource(page, TESTING);
+  const more = page.getByRole("button", { name: "Source actions" });
+  await tap(page, more);
+  await until("a tap on ⋯ opens Source actions", async () => (await more.getAttribute("aria-expanded")) === "true");
+  await page.locator(".action-sheet").waitFor();
+  await page.touchscreen.tap(195, 40); // outside the sheet, which closes it
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  await tap(page, note);
+  await page.keyboard.type("a tapped line");
+  const todo = page.locator(".kb-bar").getByRole("button", { name: "To-do" });
+  await tap(page, todo);
+  await until("a tap on the keyboard bar's To-do makes the line a to-do", async () => (await note.locator('li[data-item-type="task"]').filter({ hasText: "a tapped line" }).count()) === 1);
+  const block = page.locator(".kb-bar").getByRole("button", { name: "Block actions" });
+  await tap(page, block);
+  await until("a tap on the bar's ⋯ opens Block actions", async () => (await block.getAttribute("aria-expanded")) === "true");
+}, "phone");
+
+journey("phone: the last rating of a review shows the end screen, not Wrapping up", async (page) => {
+  // The phone's `ore` runs in the page, so a rating saves inside the tap's own event: the queue emptied while
+  // Review was still busy, and the end screen waited for a tap on Close.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last()); // the picker's, every skill ticked
+  const rates = ["Again", "Hard"];
+  for (let i = 0; ; i++) {
+    if (i > 20) throw new Error("the review never ended");
+    const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+    await sure.or(page.locator(".phone-full .review-end")).or(page.getByText("Wrapping up")).first().waitFor();
+    if (!(await sure.count())) break;
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    const rating = page.locator(".phone-full button:visible").filter({ hasText: new RegExp(`^${rates[i] ?? "Good"}`) });
+    await rating.waitFor();
+    await tap(page, rating);
+    await rating.waitFor({ state: "detached" }).catch(() => {});
+  }
+  await until("the end screen comes up by itself", async () => !(await page.getByText("Wrapping up").count()) && (await page.locator(".phone-full .review-end").count()) > 0);
+}, "phone");
+
+/** What a tap at the middle of the element would land on, as its nearest button's accessible name. */
+const tappedAt = (page: Page, sel: string) =>
+  page.evaluate((sel) => {
+    const r = document.querySelector(sel)!.getBoundingClientRect();
+    const b = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest("button");
+    return b?.getAttribute("aria-label") ?? b?.textContent?.trim() ?? "";
+  }, sel);
+
+journey("phone: the reading pill and the reader's bottom bar each keep their own taps", async (page) => {
+  // Both sat at the bottom centre: the bar covered the pill, and a tap on it opened the note.
+  await phoneSource(page, TESTING);
+  const pill = page.locator(".read-pill");
+  await page.locator(".phone-tools").waitFor();
+  await until("the pill's middle is the pill, not the bar", async () => /Sections$/.test(await tappedAt(page, ".read-pill")));
+  await tap(page, pill);
+  await until("a tap on the pill opens the sections", async () => (await pill.getAttribute("aria-expanded")) === "true");
+}, "phone");
+
+journey("phone: an Undo toast in a source leaves the bottom bar and the pill their taps", async (page) => {
+  // The toast sat on the bar for its six seconds: a tap on Collected, Note or Find hit the toast.
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Skills" }));
+  await tap(page, page.locator('.action-sheet button[aria-checked="false"]'));
+  await page.locator(".toasts").filter({ hasText: "Undo" }).waitFor();
+  if (await page.locator(".action-sheet").count()) await page.touchscreen.tap(195, 40);
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  for (const [sel, want] of [[".phone-tools > :first-child", /collected/i], [".phone-tools > :nth-child(2)", /Note/], [".phone-tools > :last-child", /^Find in source$/], [".read-pill", /Sections$/]] as const) {
+    const got = await tappedAt(page, sel);
+    if (!want.test(got)) throw new Error(`a tap on ${sel} lands on “${got}” while the toast shows`);
+  }
+}, "phone");
+
+journey("phone: a half-typed Explain answer and a Finish recall survive a relaunch", async (page) => {
+  // iOS kills a web view in the background; what he typed lived only in the page's memory.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const field = page.locator(".phone-full textarea:visible");
+  /** Rates Fact exercises Good until an Explain one comes up. */
+  const toExplain = async () => {
+    for (let i = 0; ; i++) {
+      await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
+      if (await field.count()) return;
+      if (i > 10) throw new Error("no Explain exercise came up");
+      await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+      await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+      await Bun.sleep(300);
+    }
+  };
+  await toExplain();
+  await tap(page, field);
+  await page.keyboard.type("Rereading feels fluent, so it seems learned");
+  await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+  await page.reload();
+  // The session starts again with what is left, in its own order: the answer waits with its exercise.
+  await toExplain();
+  await until("the answer comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Rereading feels fluent, so it seems learned");
+  await until("and how sure he said he was", async () => (await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).getAttribute("aria-checked").catch(() => null)) === "true");
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  await tap(page, page.locator(".review-end button").filter({ hasText: /^Done/ }));
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  const recall = page.getByPlaceholder("In your own words…");
+  await tap(page, recall);
+  await page.keyboard.type("Testing beats rereading after a delay");
+  await page.reload();
+  await until("the recall comes back after a relaunch", async () => (await recall.inputValue().catch(() => "")) === "Testing beats rereading after a delay");
+}, "phone");
+
+journey("phone: a relaunch with a source's Collected page open comes back to it", async (page) => {
+  // The page beside the source wasn't kept: a relaunch showed the note page in its place.
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  const collected = page.locator('aside.mynotes[aria-label="Collected"]');
+  await collected.waitFor();
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await until("Collected is the page beside the source again", async () => (await collected.count()) === 1 && (await page.locator(".reader.noting").count()) === 1);
+}, "phone");
+
+journey("phone: each list keeps its scroll when he goes to another and back", async (page) => {
+  // The lists share one scroller, so a list came back where Today had left it. A short screen stands in for a long library.
+  await page.setViewportSize({ width: 390, height: 360 });
+  const main = page.locator("main.phone-page");
+  const go = async (to: string) => {
+    await tap(page, page.getByRole("button", { name: "Open menu" }));
+    await tap(page, page.locator(".phone-drawer button").filter({ hasText: to }));
+    await page.locator(".phone-shell.open").waitFor({ state: "detached" });
+  };
+  await go("Sources");
+  await page.locator(".phone-sources li").first().waitFor();
+  const end = await main.evaluate((m) => ((m.scrollTop = m.scrollHeight), m.scrollTop));
+  if (end < 50) throw new Error(`Sources is too short to scroll (${end}px)`);
+  await Bun.sleep(400); // kept a moment after he stops
+  await go("Today");
+  await main.evaluate((m) => void (m.scrollTop = 0));
+  await Bun.sleep(400);
+  await go("Sources");
+  await until(`Sources comes back at ${end}px`, async () => Math.abs((await main.evaluate((m) => m.scrollTop)) - end) <= 1);
+}, "phone");
+
+/** How far around its middle a touch still lands on the element, [wide, high] in CSS px (60 at most each way; in
+ *  0.5px steps, so up to 1px short). */
+const touchArea = (page: Page, sel: string) =>
+  page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const [cx, cy] = [r.x + r.width / 2, r.y + r.height / 2];
+    const on = (x: number, y: number) => document.elementFromPoint(x, y)?.closest(sel) === el;
+    const reach = (dx: number, dy: number) => {
+      let d = 0;
+      while (d < 60 && on(cx + dx * (d + 0.5), cy + dy * (d + 0.5))) d += 0.5;
+      return d;
+    };
+    return [reach(-1, 0) + reach(1, 0), reach(0, -1) + reach(0, 1)] as [number, number];
+  }, sel);
+
+journey("phone: the small controls of a source answer a 44pt touch", async (page) => {
+  // Apple's minimum: a link under a question, the original-site link, the pill without a section, a highlight's
+  // note field and the closing card's buttons were 17 to 42pt.
+  const fits = async (sel: string, what: string) => {
+    await page.locator(sel).first().scrollIntoViewIfNeeded();
+    const a = await touchArea(page, sel);
+    if (!a || a[0] < 43 || a[1] < 43) throw new Error(`${what} answers a touch over ${a?.join("×") ?? "nothing"}, under 44×44`);
+  };
+  await phoneSource(page, AGENTS);
+  await fits(".doc-head .source", "the original-site link");
+  await fits(".read-pill", "the reading pill");
+  await tap(page, page.getByRole("button", { name: "Back" }));
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  await fits(".qp-sub .qp-link", "Asked here");
+  await tap(page, page.locator("aside.mynotes button").filter({ hasText: "after one week" }));
+  await page.locator(".popup .field").waitFor();
+  await fits(".popup .field", "the highlight's note field");
+  await page.touchscreen.tap(195, 120);
+  await page.locator(".popup").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  await tap(page, page.getByRole("button", { name: "Just mark done" }));
+  await page.locator(".quiz-foot button").first().waitFor();
+  await fits(".quiz-foot button", "the closing card's Done");
+}, "phone");
+
+/** Every row of the open bottom sheet that something else covers somewhere across its width (the reader's bar or
+ *  pill, a toast): a touch there would not reach the row. */
+const coveredRows = (page: Page) =>
+  page.evaluate(() => {
+    const sheet = document.querySelector('[role="dialog"].sheet, [role="dialog"].review-pick');
+    if (!sheet) return ["no sheet is open"];
+    return [...sheet.querySelectorAll<HTMLElement>(".pick-row")].flatMap((row) => {
+      const r = row.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= innerHeight) return [];
+      const y = r.top + r.height / 2;
+      const off = [0.1, 0.3, 0.5, 0.7, 0.9].map((f) => r.left + r.width * f).filter((x) => !row.contains(document.elementFromPoint(x, y)));
+      return off.length ? [`${row.textContent?.trim()} (at x ${off.map(Math.round).join(", ")}: ${document.elementFromPoint(off[0]!, y)?.className})`] : [];
+    });
+  });
+
+journey("phone: a bottom sheet covers the reader's bar, the pill and a toast", async (page) => {
+  // Source actions opened under the reader's floating bar, which hid part of its last rows (Archive).
+  await phoneSource(page, TESTING);
+  const check = async (what: string) => {
+    const covered = await coveredRows(page);
+    if (covered.length) throw new Error(`${what}: rows under something else: ${covered.join("; ")}`);
+  };
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await page.locator(".action-sheet").waitFor();
+  await Bun.sleep(300);
+  await check("Source actions");
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Skills" }));
+  await tap(page, page.locator('.action-sheet button[aria-checked="false"]'));
+  await page.locator(".toasts").filter({ hasText: "Undo" }).waitFor();
+  if (await page.locator(".action-sheet").count()) await page.touchscreen.tap(195, 40);
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  // Again while that toast still shows (six seconds): the sheet is over it.
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await page.locator(".action-sheet").waitFor();
+  await Bun.sleep(300);
+  if (!(await page.locator(".toasts").filter({ hasText: "Undo" }).count())) throw new Error("the toast went before the sheet opened");
+  await check("Source actions, with a toast showing");
+  await page.touchscreen.tap(195, 40);
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  await tap(page, page.locator(".read-pill"));
+  await page.locator(".sections-sheet").waitFor();
+  await Bun.sleep(300);
+  await check("Sections");
+  await page.touchscreen.tap(195, 40);
+  await page.locator(".sections-sheet").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Back" }));
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Today" }));
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await Bun.sleep(300);
+  await check("What to review");
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
@@ -8160,6 +8472,7 @@ for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) 
 }
 await browser.close();
 await safari?.close();
+phoneVite?.stop();
 // The style rules a regex can't see (nested frames, off-ramp font sizes), on the same mock.
 if (!only && shard === shards) {
   const style = Bun.spawnSync(["bun", join(MOCK, "style-check.ts"), url], { env: { ...process.env, ORE_BRIDGE: String(BRIDGE) }, stdout: "inherit", stderr: "inherit" });
