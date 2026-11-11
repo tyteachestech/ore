@@ -2590,7 +2590,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .phone-source :is(.mynotes-text, .side-tabs-root, .reader > .empty-state, .reader-loading) { padding-top: 48px; }
 .phone-source:has(.reader.bars-hidden:not(.noting)) > .phone-bar { transform: translateY(-100%); }
 .phone .reader.bars-hidden:not(.noting) .reader-tools { transform: translateY(-44px); opacity: 0; pointer-events: none; }
-.phone-tools { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); z-index: 6; display: flex; align-items: center; height: 44px; padding: 0 4px; transform: translateX(-50%); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 22px; box-shadow: var(--float); transition: transform var(--t-3) ease-out, opacity var(--t-2); white-space: nowrap; }
+.phone-tools { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); z-index: 6; display: flex; align-items: center; height: 44px; padding: 0 4px; transform: translateX(-50%); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 22px; box-shadow: var(--float); transition: transform var(--t-3) var(--ease-out), opacity var(--t-2); white-space: nowrap; }
 .phone-tools > button { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 10px; background: none; border: 0; color: var(--text); font: 500 14px var(--font); }
 .phone-tools > button.has { color: var(--accent); }
 .phone-tools .collected { position: static; transform: none; padding: 0; background: none; border: 0; box-shadow: none; animation: none; }
@@ -2924,7 +2924,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 
 /* Reading pill (D152, phone): where he is in the source, at the foot of the page. 28px pill: a 16px ring that
    fills as he reads and the section's name; a tap opens the sections as a bottom sheet. */
-.read-pill { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%; transform: translateX(-50%); transition: transform var(--t-3) ease-out; z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: 70%; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
+.read-pill { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); left: 50%; transform: translateX(-50%); transition: transform var(--t-3) var(--ease-out); z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: 70%; height: 28px; padding: 0 10px 0 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
 .read-pill:disabled { padding-right: 6px; }
 .read-pill:active:not(:disabled) { background: var(--bg-hover); }
 .read-pill svg { flex: none; color: var(--text); }
@@ -2935,7 +2935,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone-reader .reader-pane:has(.read-pill) .doc { padding-bottom: 108px; }
 .read-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: pill-name var(--t-2) ease-out both; }
 @keyframes pill-name { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .read-pill-name { animation: none; } }
+/* The pill rides with the bottom bar, so it moves on the bar's curve and time; under Reduce Motion both appear in place. */
+@media (prefers-reduced-motion: reduce) { .read-pill-name { animation: none; } .read-pill, .phone-tools { transition: none; } }
 /* The sections sheet shares the phone's bottom-sheet look (ReviewPick). */
 .sheet { width: min(420px, 90vw); padding: 18px 10px 14px; outline: none; }
 .sheet h2 { margin: 0 12px 10px; font-family: var(--round); font-size: 17px; font-weight: 700; }
