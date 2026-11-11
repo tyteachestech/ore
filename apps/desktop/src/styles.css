@@ -2586,6 +2586,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-tools > button.has { color: var(--accent); }
 .phone-tools .collected { position: static; transform: none; padding: 0; background: none; border: 0; box-shadow: none; animation: none; }
 .phone-tools .collected-chip { height: 44px; }
+/* In a source a toast sits above the bottom bar and the pill on it (Mail's Undo banner sits above its toolbar), so
+   neither loses its taps while the toast shows. */
+.phone .phone-app:has(.phone-source .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 98px); }
 /* Toast buttons are finger-sized on the phone, without growing the toast. */
 .phone .toast-undo { min-height: 44px; margin: -12px -8px -12px 0; padding: 0 8px; display: inline-flex; align-items: center; }
 .phone .toast-x { width: 44px; height: 44px; margin: -12px -14px -12px -8px; }

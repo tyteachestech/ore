@@ -8182,6 +8182,21 @@ journey("phone: the reading pill and the reader's bottom bar each keep their own
   await until("a tap on the pill opens the sections", async () => (await pill.getAttribute("aria-expanded")) === "true");
 }, "phone");
 
+journey("phone: an Undo toast in a source leaves the bottom bar and the pill their taps", async (page) => {
+  // The toast sat on the bar for its six seconds: a tap on Collected, Note or Find hit the toast.
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Skills" }));
+  await tap(page, page.locator('.action-sheet button[aria-checked="false"]'));
+  await page.locator(".toasts").filter({ hasText: "Undo" }).waitFor();
+  if (await page.locator(".action-sheet").count()) await page.touchscreen.tap(195, 40);
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  for (const [sel, want] of [[".phone-tools > :first-child", /collected/i], [".phone-tools > :nth-child(2)", /Note/], [".phone-tools > :last-child", /^Find in source$/], [".read-pill", /Sections$/]] as const) {
+    const got = await tappedAt(page, sel);
+    if (!want.test(got)) throw new Error(`a tap on ${sel} lands on “${got}” while the toast shows`);
+  }
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
