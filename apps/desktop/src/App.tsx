@@ -17,7 +17,7 @@ import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Reader, type PracticeRef } from "./Reader";
-import { useSideWidth, type SideTab } from "./Notes";
+import { setSidebarShown, useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
 import { Settings, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
@@ -864,6 +864,8 @@ export function App() {
   const [showAnyway, setShowAnyway] = useState(false);
   useEffect(() => setShowAnyway(false), [autoHide]);
   const collapsed = hideSidebar || (autoHide && !showAnyway);
+  // A right-hand panel gives back what the shown sidebar takes past 216 (D193).
+  useLayoutEffect(() => setSidebarShown(collapsed ? 0 : sideWidth.width), [collapsed, sideWidth.width]);
 
   const toggleSidebar = useCallback(() => {
     clearTimeout(peekTimer.current);
@@ -2111,7 +2113,7 @@ export function App() {
 
   const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} said={unheard.said} failed={unheard.failed} thinking={unheard.thinking} onHush={unheard.hush} />;
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}`}>
+    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}${sideWidth.dragging ? " sizing" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
       <Hint text={collapsed ? "Show sidebar" : "Hide sidebar"} keys="sidebar">
       <button

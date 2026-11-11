@@ -141,10 +141,12 @@ kbd {
   height: var(--titlebar); margin: calc(-1 * (var(--titlebar) + 6px)) -8px 6px; background: var(--bg-side);
 }
 /* Its right edge drags to resize, as the source note's divider does (D44): a 7px strip whose 1px line, on the
-   sidebar's border, lights on hover and while dragging. */
-.side-divider { position: fixed; top: 0; bottom: 0; left: calc(var(--sidebar) - 4px); width: 7px; z-index: 6; cursor: col-resize; }
-.side-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background var(--t-1) ease-out; }
+   sidebar's border, lights on hover and while dragging. It starts under the title bar (the window drags there)
+   and lies over the content, off the sidebar's scrollbar; while it drags, the whole window keeps its cursor. */
+.side-divider { position: fixed; top: var(--titlebar); bottom: 0; left: calc(var(--sidebar) - 1px); width: 7px; z-index: 6; cursor: col-resize; }
+.side-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: transparent; transition: background var(--t-1) ease-out; }
 .side-divider:hover::after, .side-divider.dragging::after { background: var(--accent); }
+.app.sizing, .app.sizing * { cursor: col-resize !important; user-select: none; -webkit-user-select: none; }
 /* Collapsed: a strip on the left edge floats the sidebar out over the content (Notion, Arc). */
 .side-edge { position: fixed; top: var(--titlebar); bottom: 0; left: 0; width: 10px; z-index: 4; }
 .sidebar.peek {
