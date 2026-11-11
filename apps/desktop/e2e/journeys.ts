@@ -372,6 +372,17 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("reader width: a recording's transcript keeps about the column an article gets in a narrow pane (D207)", async (page) => {
+  await page.setViewportSize({ width: 1180, height: 800 });
+  const width = () => page.locator(".doc").evaluate((el) => el.getBoundingClientRect().width);
+  await openSource(page, TESTING);
+  const article = await width();
+  await openSource(page, "Lecture 4");
+  await page.locator(".page.video").waitFor();
+  const transcript = await width();
+  if (transcript < article - 20) throw new Error(`transcript column ${transcript}px, article ${article}px at the same window`);
+});
+
 journey("reader width: a line holds about 66 characters at any text size, in Charter or Geist (D207)", async (page) => {
   const para = "Spacing your practice over days instead of cramming it into one evening tends to produce memories that last longer, because each return to the material comes after some forgetting has begun, and the effort of pulling it back strengthens the trace more than an easy repeat would. ";
   await page.getByRole("button", { name: "+ Add" }).click();
