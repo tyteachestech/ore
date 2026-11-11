@@ -8630,14 +8630,17 @@ const touchArea = (page: Page, sel: string) =>
     return [reach(-1, 0) + reach(1, 0), reach(0, -1) + reach(0, 1)] as [number, number];
   }, sel);
 
+/** Throws unless a touch lands on the element over at least 44×44 around its middle. */
+async function fits44(page: Page, sel: string, what: string) {
+  await page.locator(sel).first().scrollIntoViewIfNeeded();
+  const a = await touchArea(page, sel);
+  if (!a || a[0] < 43 || a[1] < 43) throw new Error(`${what} answers a touch over ${a?.join("×") ?? "nothing"}, under 44×44`);
+}
+
 journey("phone: the small controls of a source answer a 44pt touch", async (page) => {
   // Apple's minimum: a link under a question, the original-site link, the pill without a section, a highlight's
   // note field and the closing card's buttons were 17 to 42pt.
-  const fits = async (sel: string, what: string) => {
-    await page.locator(sel).first().scrollIntoViewIfNeeded();
-    const a = await touchArea(page, sel);
-    if (!a || a[0] < 43 || a[1] < 43) throw new Error(`${what} answers a touch over ${a?.join("×") ?? "nothing"}, under 44×44`);
-  };
+  const fits = (sel: string, what: string) => fits44(page, sel, what);
   await phoneSource(page, AGENTS);
   await fits(".doc-head .source", "the original-site link");
   await fits(".read-pill", "the reading pill");
@@ -8827,6 +8830,29 @@ journey("phone: a key point being typed survives a relaunch, and goes when the t
     await Bun.sleep(800);
     if ((await field.count()) && (await field.inputValue())) throw new Error("the line came back over text that changed under its anchor");
   });
+}, "phone");
+
+journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt touch", async (page) => {
+  await phoneSource(page, TESTING);
+  const action = async (name: RegExp) => {
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: name }));
+  };
+  await action(/^Rename/);
+  await fits44(page, ".doc-head .title-edit", "the title field");
+  await page.keyboard.press("Escape");
+  await action(/author/);
+  await fits44(page, ".doc-head .author-edit", "the author field");
+  await page.keyboard.press("Escape");
+  await action(/^Add a key point here/);
+  await fits44(page, ".cp-input", "the key point field");
+  await page.keyboard.press("Escape");
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Source" })); // from Collected to the source
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  await tap(page, page.locator(".phone-reader [contenteditable=true]").first());
+  await page.locator(".kb-bar").waitFor();
+  const n = await page.locator(".kb-bar > .kb-btn, .kb-bar > button").count();
+  for (let i = 1; i <= n; i++) await fits44(page, `.kb-bar > :nth-child(${i})`, `the keyboard bar's button ${i}`);
 }, "phone");
 
 // —— run ——
