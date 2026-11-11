@@ -3902,10 +3902,14 @@ journey("list drag to select on a narrow skill page (one column, the sources und
   await rows.nth(1).waitFor();
   await rows.nth(1).scrollIntoViewIfNeeded();
   // The note above loads after the rows and pushes them down: measure once they stay put.
+  // Two polls alike could fall before the note landed, so the note is waited for and five must agree.
+  await page.locator(".skill-page .ProseMirror").first().waitFor();
   let was = "";
+  let same = 0;
   await until("the rows stay put", async () => {
     const now = JSON.stringify(await rows.nth(1).boundingBox());
-    return was === (was = now);
+    same = was === (was = now) ? same + 1 : 0;
+    return same >= 5;
   });
   const list = (await page.locator(".skill-page .list").boundingBox())!;
   const r0 = (await rows.nth(0).boundingBox())!;

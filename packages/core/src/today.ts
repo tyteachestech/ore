@@ -20,11 +20,33 @@ const isWeekend = (day: string) => [0, 6].includes(new Date(`${day}T12:00:00`).g
 export const level = (solid: number) => Math.floor(Math.sqrt(solid / 5));
 export const nextLevelAt = (solid: number) => 5 * (level(solid) + 1) ** 2;
 
+/** A recall on a new case: a remixed version (D66) he passed. */
+export const passedVariant = (r: Pick<Review, "variant" | "rating">) => !!r.variant && r.rating >= 3;
+
+export type GemGrade = "cut" | "mended" | "polished";
+/** The grade of one card's gem from its reviews in time order (D197), null while it isn't solid: polished once
+ *  a remix was passed, else mended if it fell from solid and came back. The session receipt's rule; `strength` counts by the same one. */
+export function gemGrade(reviews: Pick<Review, "variant" | "rating" | "state_after">[]): GemGrade | null {
+  let solid = false;
+  let fell = false;
+  let applied = false;
+  for (const r of reviews) {
+    const after = r.state_after.stability >= SOLID_DAYS;
+    if (solid && !after) fell = true;
+    solid = after;
+    if (passedVariant(r)) applied = true;
+  }
+  return !solid ? null : applied ? "polished" : fell ? "mended" : "cut";
+}
+
 /** A skill's strength (D62, D63). `solid`: live cards with stability of 21 days or more. `growing`:
  *  live, not solid yet. `ready`: growing cards that turn solid if he recalls them (Good) at their
  *  next review, the near goal beside the level (D90); `ready_today`: those due by the end of today. `new`: drafts not reviewed yet. `win_back`: once solid, now below.
  *  `level` comes from the most solid memories the skill ever had (`peak`), so it never drops.
- *  `explain`: his solid Explain cards, the latest to turn solid first. */
+ *  `explain`: his solid Explain cards, the latest to turn solid first.
+ *  Gem grades (D197), each solid gem counted once: `polished` he has passed on a new case (a remix, D66);
+ *  `mended` he missed after it was solid and won back, and has not polished. `depth`: how long his live
+ *  memories now last, in days, added up (FSRS stability), the number that moves every session. */
 export interface Strength {
   solid: number;
   growing: number;
@@ -32,6 +54,9 @@ export interface Strength {
   ready_today: number;
   new: number;
   win_back: number;
+  mended: number;
+  polished: number;
+  depth: number;
   peak: number;
   level: number;
   next_level_at: number;
@@ -44,6 +69,8 @@ export function strength(cards: CardRow[], reviews: Review[], skill: string, w?:
   const stab = new Map<string, number>();
   const solidAt = new Map<string, string>();
   const wasSolid = new Set<string>();
+  const fell = new Set<string>();
+  const applied = new Set<string>();
   let solidNow = 0;
   let peak = 0;
   for (const r of reviews) {
@@ -53,6 +80,8 @@ export function strength(cards: CardRow[], reviews: Review[], skill: string, w?:
     stab.set(r.card, r.state_after.stability);
     if (after && !before) solidAt.set(r.card, r.ts);
     if (after) wasSolid.add(r.card);
+    if (before && !after) fell.add(r.card);
+    if (passedVariant(r)) applied.add(r.card);
     solidNow += Number(after) - Number(before);
     peak = Math.max(peak, solidNow);
   }
@@ -70,6 +99,9 @@ export function strength(cards: CardRow[], reviews: Review[], skill: string, w?:
     ready_today: ready.filter((c) => new Date(c.fsrs!.due) < tonight).length,
     new: mine.filter((c) => c.state === "draft").length,
     win_back: live.filter((c) => !isSolid(c) && wasSolid.has(c.id)).length,
+    mended: solid.filter((c) => fell.has(c.id) && !applied.has(c.id)).length,
+    polished: solid.filter((c) => applied.has(c.id)).length,
+    depth: Math.round(live.reduce((n, c) => n + (c.fsrs?.stability ?? 0), 0)),
     peak: top,
     level: level(top),
     next_level_at: nextLevelAt(top),

@@ -5,7 +5,8 @@ import { lit } from "./Ring";
 /* The end of a session (D190, Tyler's pick B of three): the ore cart that rode Review's rail rolls in over the
    ring, brakes, and its bucket tips. One dot of ore per ring dot this session lit falls out on a real arc
    (gravity, no easing curve) and becomes that dot; one rough stone per memory that went solid drops to its place
-   and is cut. Then the cart rolls off. Drawn as the mole is: round dots on a grid, shade by dot size. */
+   and is cut. Then the cart rolls off. Ore from a recall that had nearly faded (rescued, D62) is rich: bigger and
+   brighter in the heap and in the air (D197), so the harder recall is the better find. Drawn as the mole is: round dots on a grid, shade by dot size. */
 
 const CELL = 3;
 /** The cart on a 20 by 13 grid, W rim to D shade (a gem's letters). The bucket tips about its front foot. */
@@ -37,10 +38,10 @@ export const oreFor = (from: number, to: number, n: number) => Array.from({ leng
 type Flying = { el: HTMLElement; ours: boolean; x0: number; y0: number; dx: number; dy: number; T: number; t0: number; spin: number; land: () => void };
 
 /** `host` is the end screen. `lit` are the ring dots to light, in order; `stones` the colours of the gems cut
- *  (already capped to those shown). `onStone(i)` when stone i lands, `onPoured` when the ring is full, `onLeave`
+ *  (already capped to those shown); `rich` how many of the ore are rich, poured first. `onStone(i)` when stone i lands, `onPoured` when the ring is full, `onLeave`
  *  as the cart starts off (the mole comes up), `onDone` when it has gone. */
-export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone }: {
-  host: HTMLElement | null; lit: number[]; stones: (string | undefined)[];
+export function CartTip({ host, lit, rich = 0, stones, onStone, onPoured, onLeave, onDone }: {
+  host: HTMLElement | null; lit: number[]; rich?: number; stones: (string | undefined)[];
   onStone: (i: number) => void; onPoured: () => void; onLeave: () => void; onDone: () => void;
 }) {
   const layer = useRef<HTMLDivElement>(null);
@@ -114,7 +115,7 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
       // A dot the ring doesn't have still counts as poured, or the ring would never be told it is full.
       if (!c) { if (--left === 0) calls.current.onPoured(); return; }
       const ore = document.createElement("span");
-      ore.className = "cart-ore";
+      ore.className = k < rich ? "cart-ore rich" : "cart-ore";
       ore.hidden = true;
       el.appendChild(ore);
       fly(ore, true, c, 0, () => {
@@ -167,7 +168,11 @@ export function CartTip({ host, lit, stones, onStone, onPoured, onLeave, onDone 
               <Gem kind="rough" size={ROUGH} />
             </g>
           ))}
-          {HEAP.slice(HEAP.length - load).map(([x, y], i) => <circle key={i} className="cart-ore-in" cx={x} cy={y} r={1.3} />)}
+          {HEAP.slice(HEAP.length - load).map(([x, y], i) => {
+            // The heap drains from its first dot, as the rich ore pours first.
+            const isRich = i < Math.ceil((Math.min(rich, lit.length) * load) / Math.max(1, lit.length));
+            return <circle key={i} className={isRich ? "cart-ore-in rich" : "cart-ore-in"} cx={x} cy={y} r={isRich ? 1.7 : 1.3} />;
+          })}
           {dots(BUCKET, 0, BUCKET_TOP)}
           <circle className="cart-lip" cx={LIP[0]} cy={LIP[1]} r={0.1} />
         </g>

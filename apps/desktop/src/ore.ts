@@ -263,6 +263,11 @@ export type Strength = {
   ready_today: number;
   new: number;
   win_back: number;
+  /** Gem grades (D197), each solid gem once: polished on a new case, or missed once and won back. */
+  mended: number;
+  polished: number;
+  /** How long his live memories now last, in days, added up. */
+  depth: number;
   peak: number;
   level: number;
   next_level_at: number;
@@ -337,12 +342,26 @@ export function putOff(queue: DueEntry[], off: ReadonlySet<string>): DueEntry[] 
 const LONG_GAP_DAYS = 7;
 export const longGapText = (s: { longest_days?: number }) => ((s.longest_days ?? 0) >= LONG_GAP_DAYS ? `You recalled one you last saw ${s.longest_days} days ago` : null);
 
+/** A span of memory in the unit a person would say it in (D197): days to two months, months to two years, then years. */
+export function depthText(days: number): string {
+  const n = Math.round(days);
+  if (n < 60) return `${n} ${n === 1 ? "day" : "days"}`;
+  if (n < 730) return `${Math.round(n / 30.44)} months`;
+  return `${(n / 365.25).toFixed(1).replace(/\.0$/, "")} years`;
+}
+
 export type SessionEnd = {
   id: string; reviews: number; kept: number; rescued: number; caught_up?: boolean;
   /** The longest gap, in days, he recalled a card across this session (D177). */
   longest_days?: number;
   /** Cards that became solid this session, as each one's first skill (D90): one cut gem each. */
   cut?: string[];
+  /** Per cut gem, its grade (D197): mended (won back after a miss) or polished (passed as a remix); absent when all are plain. */
+  grades?: ("cut" | "mended" | "polished")[];
+  /** Gems cut before this session and polished in it, as each one's first skill (D197). */
+  polished?: string[];
+  /** How much longer the exercises he passed now last, in days added up (D197). */
+  depth_days?: number;
   /** On the week's first end screen (D69): of Explain answers marked Sure, the share the key-point check passed. */
   calibration?: { sure_n: number; sure_right: number; levels: { confidence: 1 | 2 | 3; n: number; right: number | null }[] } | null;
 };

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { lastWin, longGapText, rescuedWorthSaying, type DueEntry } from "../src/ore";
+import { depthText, lastWin, longGapText, rescuedWorthSaying, type DueEntry } from "../src/ore";
 
 test("the end screen's rescued line only when rescues are a minority of the session: over a backlog it would be every card (daily-session doc)", () => {
   expect(rescuedWorthSaying({ reviews: 20, rescued: 13 })).toBe(false);
@@ -27,4 +27,13 @@ test("the end screen names the longest gap he recalled across, from a week up (D
   expect(longGapText({ longest_days: 7 })).toBe("You recalled one you last saw 7 days ago");
   expect(longGapText({ longest_days: 6 })).toBeNull();
   expect(longGapText({})).toBeNull();
+});
+
+test("a span of memory reads in the unit a person would say it in (D197)", () => {
+  expect(depthText(1)).toBe("1 day");
+  expect(depthText(41)).toBe("41 days");
+  expect(depthText(90)).toBe("3 months");
+  expect(depthText(729)).toBe("24 months");
+  expect(depthText(730)).toBe("2 years");
+  expect(depthText(880)).toBe("2.4 years");
 });

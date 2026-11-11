@@ -108,6 +108,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`brief-ai-tutor.md`](docs/research/brief-ai-tutor.md) | The tutor chat: when AI help helps learning, products and code to borrow, design calls |
 | [`skill-strength.md`](docs/research/skill-strength.md) | Which growth metric motivates without gaming (led to D63) |
 | [`skill-metrics-motivation.md`](docs/research/skill-metrics-motivation.md) | Round 2: a near goal for strength (led to the gems, D90) |
+| [`rewarding.md`](docs/research/rewarding.md) | What makes review rewarding: mechanics and measures in the mining world (led to gem grades and depth, D197) |
 | [`brief-notetaking.md`](docs/research/brief-notetaking.md) | Active note-taking, with [evidence](docs/research/brief-notetaking-evidence.md), [practice](docs/research/brief-notetaking-practice.md), and checks against [Ahrens](docs/research/brief-notetaking-check-ahrens.md) and [Fiorella & Mayer](docs/research/brief-notetaking-check-fiorella-mayer.md) |
 | [`brief-diagramming.md`](docs/research/brief-diagramming.md) | Learner-made diagrams and maps: [evidence](docs/research/brief-diagramming-evidence.md), [tools](docs/research/brief-diagramming-tools.md) |
 | [`brief-landscape.md`](docs/research/brief-landscape.md) | Existing apps (Readwise, Anki, RemNote…) and what to take from them |
