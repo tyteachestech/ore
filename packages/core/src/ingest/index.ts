@@ -6,7 +6,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Item, type ItemType, type NewItem } from "../items.ts";
+import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
@@ -212,22 +212,39 @@ async function asEpisode(html: string, base: string, page: NewItem, opts: AddOpt
 export const PAGE_HEADING = "## From the page";
 const pageFile = (item: Item) => join(item.dir, "page.html");
 
-/** Whether a source is an episode whose page is kept and whose text isn't in it yet (D213). */
-export const hasPageText = (item: Item) => existsSync(pageFile(item)) && !item.body.includes(`\n${PAGE_HEADING}\n`);
+/** Whether a source is an episode whose page is kept and whose text he hasn't added (D213). */
+export const hasPageText = (item: Item) => existsSync(pageFile(item)) && !item.meta.page_added;
 
-/** Adds an episode's page text below its transcript (D213): the kept page read as an article is
- *  (headings, links, images saved, speaker names), under PAGE_HEADING at the end, so no highlight
- *  moves. Undone and redone as a cut is (`redoCut` takes it out, `restoreCut` puts it back). */
+/** A kept episode page's own text as the article reader makes it (headings, links, speaker names), its
+ *  images saved, as the section added below the transcript. */
+async function pageSection(html: string, url: string | undefined, title: string): Promise<{ text: string; assets: Asset[] }> {
+  const w = await (await import("./web.ts")).htmlToDoc(html, url ?? "about:blank");
+  const { body, assets } = await saveImages(dropTitle(w.markdown, title), { referer: url });
+  if (!body.trim()) throw new Error("Found no text on the page to add.");
+  return { text: `${PAGE_HEADING}\n\n${body.trim()}\n`, assets };
+}
+/** The section after a body, a blank line between them. */
+const below = (body: string, section: string) => `${body.endsWith("\n") ? "" : "\n"}\n${section}`;
+const marked = (meta: ItemMeta, id: string | undefined): ItemMeta => ({ ...meta, page_added: id });
+
+/** Adds an episode's page text below its transcript (D213), under PAGE_HEADING at the end, so no
+ *  highlight moves. The page is read and its images fetched first; the text goes in under the lock,
+ *  checked again there, so two at once add it once. Undone with `undoPageText`, redone with `redoPageText`. */
 export async function addPageText(lib: Library, ref: string): Promise<import("../cut.ts").Cut> {
   const item = findItem(lib, ref);
-  if (!existsSync(pageFile(item))) throw new Error("This source has no page kept to add text from.");
-  if (!hasPageText(item)) throw new Error("The page’s text is already in this source.");
-  const w = await (await import("./web.ts")).htmlToDoc(readFileSync(pageFile(item), "utf8"), item.meta.url ?? "about:blank");
-  const { body, assets } = await saveImages(dropTitle(w.markdown, item.meta.title), { referer: item.meta.url });
-  if (!body.trim()) throw new Error("Found no text on the page to add.");
+  const refuse = (i: Item) => {
+    if (!existsSync(pageFile(i))) throw new Error("This source has no page kept to add text from.");
+    if (!hasPageText(i)) throw new Error("The page’s text is already in this source.");
+  };
+  refuse(item);
+  const { text, assets } = await pageSection(readFileSync(pageFile(item), "utf8"), item.meta.url, item.meta.title);
   for (const a of assets) writeAtomic(join(item.dir, "assets", a.name), a.data);
-  return (await import("../cut.ts")).appendText(lib, item, `${item.body.endsWith("\n") ? "" : "\n"}\n${PAGE_HEADING}\n\n${body.trim()}\n`);
+  return (await import("../cut.ts")).appendText(lib, ref, (now) => (refuse(now), below(now.body, text)), marked);
 }
+/** Takes the added page text out again; its highlights go with it until `redoPageText`. */
+export const undoPageText = async (lib: Library, ref: string, id: string) => (await import("../cut.ts")).takeEnd(lib, ref, id, marked);
+/** Puts the page text back below the transcript, its highlights with it. */
+export const redoPageText = async (lib: Library, ref: string, id: string) => (await import("../cut.ts")).putEnd(lib, ref, id, marked);
 
 /** A text file's bytes as text, whatever wrote it: a byte-order mark names UTF-8 or UTF-16 (Windows
  *  Notepad), and bytes that aren't UTF-8 are an old editor's Windows-1252 (Latin-1), never "Caf�". */

@@ -74,6 +74,8 @@ export const ItemMetaSchema = z.object({
   url: z.string().optional(),
   // A page that plays a video (D92): the video's link; its transcript is `transcript.vtt` beside the source.
   video: z.string().optional(),
+  // An episode's own page text, added below its transcript (D213): the id of its record, while it is in.
+  page_added: z.string().optional(),
   author: z.string().optional(),
   published: z.string().optional(),
   // A PDF's tables or formulas that read as lines of text until Docling reads them (D125).

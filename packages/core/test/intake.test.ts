@@ -3,9 +3,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, tr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
-import { addPageText, addSource, addTab, addText, audioOf, hasPageText, reimportSource } from "../src/ingest/index.ts";
+import { addPageText, addSource, addTab, addText, audioOf, hasPageText, redoPageText, reimportSource, undoPageText } from "../src/ingest/index.ts";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
-import { redoCut, restoreCut } from "../src/cut.ts";
+import { cutText } from "../src/cut.ts";
 import { findItem } from "../src/items.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
@@ -1171,18 +1171,51 @@ describe("import coverage: audio and podcasts", () => {
     // The transcript's highlight stays where it was; one in the page's text goes with it on Undo, and comes back on Redo.
     expect(readAnnotations(now).find((a) => a.id === spoken.id)).toMatchObject({ start: spoken.start, end: spoken.end });
     const inPage = addHighlight(now, { exact: "For *Scientific American*", intent: "keep" });
-    await redoCut(lib, item.meta.id, added.id);
+    await undoPageText(lib, item.meta.id, added.id);
     now = findItem(lib, item.meta.id);
     expect(now.body).toBe(heard);
     expect(hasPageText(now)).toBe(true);
     expect(readAnnotations(now).map((a) => a.id)).toEqual([spoken.id]);
-    await restoreCut(lib, item.meta.id, added.id);
+    await redoPageText(lib, item.meta.id, added.id);
     now = findItem(lib, item.meta.id);
+    expect(hasPageText(now)).toBe(false);
     expect(readAnnotations(now).map((a) => a.id).sort()).toEqual([spoken.id, inPage.id].sort());
     // A source with no page kept has nothing to add.
     const lecture = await addSource(lib, mp3());
     expect(hasPageText(lecture)).toBe(false);
     await expect(addPageText(lib, lecture.meta.id)).rejects.toThrow(/no page/);
+  });
+
+  test("an episode's page text: two clicks at once add it once, and cutting its heading doesn't offer it again", async () => {
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    const lib = await tempLibrary();
+    const { meta } = await addSource(lib, EPISODE);
+    const both = await Promise.allSettled([addPageText(lib, meta.id), addPageText(lib, meta.id)]);
+    expect(both.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+    let now = findItem(lib, meta.id);
+    expect(now.body.split("## From the page").length).toBe(2);
+    // Cutting only its heading leaves the text in: nothing to offer again.
+    const at = now.body.indexOf("## From the page");
+    await cutText(lib, meta.id, at, at + 3);
+    now = findItem(lib, meta.id);
+    expect(now.body).not.toContain("## From the page");
+    expect(hasPageText(now)).toBe(false);
+    await expect(addPageText(lib, meta.id)).rejects.toThrow(/already/);
+  });
+
+  test("Undo of an episode's page text works after a cut above it", async () => {
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    const lib = await tempLibrary();
+    const { meta } = await addSource(lib, EPISODE);
+    const added = await addPageText(lib, meta.id);
+    await cutText(lib, meta.id, 0, 5); // "[00:00] Welcome back…", the transcript's first paragraph
+    await undoPageText(lib, meta.id, added.id);
+    let now = findItem(lib, meta.id);
+    expect(now.body).toBe("[01:00] Thanks for listening.\n");
+    expect(hasPageText(now)).toBe(true);
+    await redoPageText(lib, meta.id, added.id);
+    now = findItem(lib, meta.id);
+    expect(now.body.startsWith("[01:00] Thanks for listening.\n\n## From the page\n")).toBe(true);
   });
 
   test("an episode page whose audio won't come still comes in as the article", async () => {

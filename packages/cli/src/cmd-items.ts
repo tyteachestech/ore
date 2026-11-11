@@ -13,6 +13,8 @@ import {
   redoCut,
   addPageText,
   hasPageText,
+  undoPageText,
+  redoPageText,
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
@@ -538,11 +540,11 @@ export const itemCommands: Record<string, Command> = {
       const lib = openLibrary();
       const id = findItem(lib, need(ref, "<item>")).meta.id;
       if (f.undo) {
-        const c = await redoCut(lib, id, str(f.undo)!);
+        const c = await undoPageText(lib, id, str(f.undo)!);
         return { data: { id: c.id, item: id, removed: c.removed.length }, text: "Took the page’s text out again" };
       }
       if (f.redo) {
-        const item = await restoreCut(lib, id, str(f.redo)!);
+        const item = await redoPageText(lib, id, str(f.redo)!);
         return { data: { id, title: item.meta.title }, text: `Put the page’s text back in ${item.meta.title}` };
       }
       const c = await addPageText(lib, id);
