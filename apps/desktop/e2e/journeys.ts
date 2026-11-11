@@ -8348,8 +8348,9 @@ journey("phone: each list keeps its scroll when he goes to another and back", as
   const end = await main.evaluate((m) => ((m.scrollTop = m.scrollHeight), m.scrollTop));
   if (end < 50) throw new Error(`Sources is too short to scroll (${end}px)`);
   await Bun.sleep(400); // kept a moment after he stops
+  // Today has no place kept yet: it opens at its top, not where Sources was.
   await go("Today");
-  await main.evaluate((m) => void (m.scrollTop = 0));
+  await until("Today opens at its top", async () => (await main.evaluate((m) => m.scrollTop)) === 0);
   await Bun.sleep(400);
   await go("Sources");
   await until(`Sources comes back at ${end}px`, async () => Math.abs((await main.evaluate((m) => m.scrollTop)) - end) <= 1);

@@ -100,6 +100,8 @@ export function useKeptScroll(ref: RefObject<HTMLElement | null>, key: string): 
       grows.disconnect();
       sized.disconnect();
     };
+    // No place kept: the top, not where the scroller was for another key (the phone's lists share one).
+    if (!pending) el.scrollTop = 0;
     put();
     if (pending) (grows.observe(el, { childList: true, subtree: true }), watch());
     const giveUp = window.setTimeout(stop, 3000);
