@@ -19,6 +19,7 @@ import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
+import { HideDots } from "./HideDots";
 import { Hint } from "./Hint";
 import { Thumb } from "./Thumb";
 import { SkillIcon } from "./IconPicker";
@@ -2931,6 +2932,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           })}
         </div>
       )}
+      <HideDots hidden={hidden} box={scrollRef} page={pageRef} />
       <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
