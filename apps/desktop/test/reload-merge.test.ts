@@ -28,6 +28,12 @@ test("a highlight whose save has landed is not kept twice", () => {
   expect(mergeAnns([ann("a")], local, new Set(), new Map([["pending-1", "a"]])).map((a) => a.id)).toEqual(["a"]);
 });
 
+test("a key point whose save landed is listed once when a read again lands before the page draws the swap", () => {
+  const local = [ann("pending-2", { intent: "card", point: true, note: "Say it aloud" })];
+  const server = [ann("p", { intent: "card", point: true, note: "Say it aloud" })];
+  expect(mergeAnns(server, local, new Set(), new Map([["pending-2", "p"]])).map((a) => a.id)).toEqual(["p"]);
+});
+
 test("a reload drops what the library no longer has, unless it is his own change still saving", () => {
   expect(mergeAnns([], [ann("gone")], new Set()).map((a) => a.id)).toEqual([]);
 });

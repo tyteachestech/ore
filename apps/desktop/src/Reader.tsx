@@ -1408,6 +1408,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       wake(made);
       const ann = await made;
       keptFromFeed(ann);
+      savedIds.current.set(tmp, ann.id); // so a read again landing before the swap doesn't list it twice
       setAnns((l) => l.map((a) => (a.id === tmp ? ann : a)));
       const s = annStep(ann.id);
       p.notify("Key point added", "quiet", s.remove, s.bring);
@@ -1861,7 +1862,8 @@ function ReaderView(p: Props & { reload: () => void }) {
           await annotate(id, "--intent", "question", opt("note", question));
         } catch (e) {
           // Not saved: the highlight keeps what it was.
-          if (was) setAnns((l) => l.map((a) => (id && isAnn(a, id) ? was : a)));
+          // One entry: either id can match a stand-in and its saved copy, and only one is this highlight on screen.
+          if (was) setAnns((l) => { const i = l.findIndex((a) => id && isAnn(a, id)); return i < 0 ? l : l.map((a, k) => (k === i ? { ...was, id: a.id } : a)); });
           throw e;
         }
         return id;
