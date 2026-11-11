@@ -8282,6 +8282,13 @@ journey("phone: an Undo toast in a source leaves the bottom bar and the pill the
     const got = await tappedAt(page, sel);
     if (!want.test(got)) throw new Error(`a tap on ${sel} lands on “${got}” while the toast shows`);
   }
+  // On the note page the bar and the pill are gone: the toast comes back down instead of floating over the note.
+  await tap(page, page.locator(".phone-tools > :nth-child(2)"));
+  await page.locator(".reader.noting").waitFor();
+  await until("the toast sits at the foot over the note page", async () => {
+    const r = await page.locator(".toasts").boundingBox();
+    return !!r && 844 - (r.y + r.height) <= 24;
+  });
 }, "phone");
 
 journey("phone: a half-typed Explain answer and a Finish recall survive a relaunch", async (page) => {
