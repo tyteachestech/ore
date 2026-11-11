@@ -107,7 +107,7 @@
 /* Labels: section and card titles, sidebar groups, metadata. */
 .card-title h2, .home-h, .home-cont .home-h, .side-label { font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .card-title .card-icon { margin-right: 2px; }
-.skill-page .row .kind, .row .kind-line, .row .count, .side-item .count, .home-read .chip, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
+.skill-page .row .kind, .row .kind-line, .row .count, .side-item .count, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
 
 /* Big numbers in pixel type. */
 .home-solid, .hero-strength .home-solid, .home-goal h1, .review-kept b, .review-cut b { font-family: var(--pixel); font-weight: 400; }
@@ -119,13 +119,11 @@
    chips 4, what floats 12, what he reads or writes in Review 10. */
 .row, .home-read, .side-item, .pick-row, [cmdk-item], .quiz-sure button, .review-rate button { border-radius: 8px; }
 .icon-button, .icon-btn, .field, .quiz-stepper, .pick-box, .thumb, .settings-tab, .settings-btn { border-radius: 6px; }
-.chip, .chips-button { border-radius: 4px; }
 .panel, .popover, .popover.menu, .popup, .quiz, .settings-sheet { border-radius: 12px; }
 .toast, .mynotes-text, .review-passage, .quiz-answer, .quiz-leave, .quiz-verdict, .skill-badge { border-radius: 10px; }
 .gem-ring-lv { border-radius: 999px; }
 /* On the phone a reading row is a full-width line with a hairline under it (iOS list), so it keeps straight ends. */
 .phone .home-read { border-radius: 0; }
-.chip { background: transparent; box-shadow: inset 0 0 0 1px var(--border); font-size: 11px; }
 
 /* Primary buttons: flat paper white, mono caps (claude.dev's "Try Claude Code"). */
 .pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 6px; font-family: var(--mono); font-weight: 500; letter-spacing: 0.06em; }
@@ -207,10 +205,7 @@
    segmented control (shadcn Tabs, as the reader's side panel) over the note: a ground track with a border edge, the
    picked type a raised pill with its icon in colour. The note field and the tools column keep no frames. */
 .popup { border: 1px solid var(--border); border-radius: 10px; padding: 8px; width: 360px; }
-.intents { height: 32px; gap: 0; margin: 0 0 8px; padding: 3px; align-items: center; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
-.intents .intent { flex: 1; height: 24px; padding: 0 10px; border-radius: 6px; font: 500 12px var(--font); letter-spacing: 0; color: var(--faint); gap: 5px; }
-.intents .intent:hover { background: none; color: var(--text); }
-.intents .intent.on { color: var(--text); background: var(--bg-hover); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), var(--lift); }
+.intents .intent { flex: 1; gap: 5px; }
 .popup .field { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 4px 8px; }
 .popup .field:focus { box-shadow: none; }
 .popup-tools { align-self: end; border-left: 0; padding-left: 4px; gap: 2px; }
