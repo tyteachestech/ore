@@ -18,7 +18,7 @@ import { depthText, levelProgress, ore, opt, type Question, type Research, type 
 import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
-import { errorText, load, save, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { errorText, focusQuietly, load, save, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { Trap } from "./Trap";
 import { passageText } from "./text";
 
@@ -141,7 +141,12 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
           query={find.query}
           onQuery={(query) => setFind((f) => ({ ...f, query }))}
           focus={find.focus}
-          onClose={() => setFind((f) => ({ ...f, open: false }))}
+          // Closed, focus goes to the page's sources list, its keyboard home, as the reader's goes to its text; the place stays.
+          onClose={() => {
+            setFind((f) => ({ ...f, open: false }));
+            const list = pageRef.current?.querySelector<HTMLElement>(".list");
+            if (list) focusQuietly(list);
+          }}
         />
       )}
       <header className="skill-hero">
@@ -785,7 +790,10 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
   const [v, setV] = useState(() => drafts.get(id)?.text ?? initial);
   const [next, setNext] = useState(() => drafts.get(id)?.next ?? "");
   const field = useRef<HTMLTextAreaElement>(null);
-  useFocusWhileMounted(field);
+  // Saved or closed, focus goes back to what opened it, else (a menu item, gone) to its try's own row.
+  const row = useRef<HTMLElement | null>(null);
+  useEffect(() => void (row.current = field.current?.closest<HTMLElement>(".try") ?? null), []);
+  useFocusWhileMounted(field, () => (row.current?.isConnected ? row.current.querySelector<HTMLElement>(".try-check, .try-quote") : null));
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     e.stopPropagation();
     if (e.key === "Enter" && !e.shiftKey) {

@@ -7,7 +7,7 @@ import { is } from "./keys";
 import { againText, askAbout, entry } from "./lookup";
 import { ore, opt, type Research, type Skill } from "./ore";
 import { SkillChip, SkillPicker } from "./Skills";
-import { errorText } from "./util";
+import { errorText, focusQuietly } from "./util";
 import { Working } from "./Working";
 
 // Side quests (D97): a term he doesn't know. Explain gives the gist in place so he can keep reading
@@ -65,6 +65,8 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
   const [into, setInto] = useState(p.sourceSkills);
   const [tries, setTries] = useState({ gloss: 0, found: 0 });
   const rootRef = useRef<HTMLDivElement | null>(null);
+  /** Retry goes as the wait it starts takes its place: focus stays in the popup, whose keys still work. */
+  const retried = () => void (rootRef.current && focusQuietly(rootRef.current));
   const listRef = useRef<HTMLUListElement>(null);
   const looked = p.dict ? entry(p.dict) : null;
   const again = againText(p.again);
@@ -230,7 +232,7 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
           ) : "error" in gloss ? (
             <p className="lookup-body none">
               {gloss.error}{" "}
-              <button className="qp-link" onClick={() => setTries((t) => ({ ...t, gloss: t.gloss + 1 }))}>
+              <button className="qp-link" onClick={() => (setTries((t) => ({ ...t, gloss: t.gloss + 1 })), retried())}>
                 Retry
               </button>
             </p>
@@ -283,7 +285,7 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
             <p className="lookup-body none">
               {found.error} Your question is saved under Questions.{" "}
               {learn.id && (
-                <button className="qp-link" onClick={() => setTries((t) => ({ ...t, found: t.found + 1 }))}>
+                <button className="qp-link" onClick={() => (setTries((t) => ({ ...t, found: t.found + 1 })), retried())}>
                   Retry
                 </button>
               )}
