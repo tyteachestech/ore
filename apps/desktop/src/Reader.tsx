@@ -592,6 +592,18 @@ function ReaderView(p: Props & { reload: () => void }) {
   const rangeOf = (id: string | null | undefined) => (id ? ranges.current.get(idOf(id)) ?? ranges.current.get(id) : undefined);
   /** Highlights with a write of his still saving: a read again keeps his copy of them (mergeAnns). */
   const busy = useRef(new Map<string, number>());
+  /** His highlight changes still saving, from his action (a type or note waits for its highlight's create first):
+   *  the closing card's count reads once they have landed. */
+  const writing = useRef(new Set<Promise<unknown>>());
+  const track = <T,>(p: Promise<T>) => {
+    const settled = p.then(() => {}, () => {});
+    writing.current.add(settled);
+    void settled.then(() => writing.current.delete(settled));
+    return p;
+  };
+  const highlightsSaved = async () => {
+    while (writing.current.size) await Promise.all([...writing.current]);
+  };
   const annsRef = useRef(anns);
   annsRef.current = anns;
   const frame = useRef(0);
@@ -1431,7 +1443,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     // Never without a place: the core saves the match nearest it, not the first one in the source.
     args.push("--start", String(q ? q.start : sourceHint(src, index, range)));
     const tmp = `pending-${Date.now()}`;
-    const promise = ore<Annotation>(...args);
+    const promise = track(ore<Annotation>(...args));
     wakeOnLanding()(promise); // a skill page opened while it is made (4 on the focus is a try) reads it once it lands
     pending.current.set(tmp, promise);
     ranges.current.set(tmp, range);
@@ -1572,7 +1584,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     await setIntentOf(popup.id, intent);
   }
 
-  async function setIntentOf(id: string, intent: Intent, undoable = true) {
+  function setIntentOf(id: string, intent: Intent, undoable = true) {
+    return track(setIntentNow(id, intent, undoable));
+  }
+  async function setIntentNow(id: string, intent: Intent, undoable: boolean) {
     const wake = wakeOnLanding();
     const was = annOf(id)?.intent;
     setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, intent } : a)));
@@ -1686,7 +1701,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   }
 
-  async function setNoteOf(id: string, note: string, undoable = true) {
+  function setNoteOf(id: string, note: string, undoable = true) {
+    return track(setNoteNow(id, note, undoable));
+  }
+  async function setNoteNow(id: string, note: string, undoable: boolean) {
     const wake = wakeOnLanding();
     const was = annOf(id)?.note ?? "";
     setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note } : a)));
@@ -3147,6 +3165,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           notify={p.notify}
           flushNotes={notes.flush}
           onNotes={notes.apply}
+          highlightsSaved={highlightsSaved}
         />
       ) : null}
       {zoom && <FigureZoom fig={zoom} item={doc?.id ?? ""} notify={p.notify} onClose={() => setZoom(null)} />}

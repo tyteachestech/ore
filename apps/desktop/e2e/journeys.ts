@@ -6520,11 +6520,17 @@ journey("finish: a question on a source with no skill is pointed to Collected, n
   await page.keyboard.press("Enter");
   await page.locator(".doc").getByText("A first source, filed under no skill").waitFor();
   await select(page, "one passage worth asking about");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await loaded(page); // the highlight is saved
+  // Marking it a question saves after the closing card opens, as on a slow Mac (CI, 2026-11-11: "1 highlight").
+  await hold(page, "annotate");
   await page.getByRole("dialog", { name: "Highlight" }).locator(".intent.question").click();
   await page.locator(".mark-icon.question").first().waitFor();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Finish", exact: true }).click();
   await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await until("the question is still saving", () => isHeld(page, "annotate"));
+  await release(page, "annotate");
   const made = page.locator(".quiz-made-list").filter({ hasText: "1 question" });
   await made.waitFor();
   if ((await made.innerText()).includes("skill page")) throw new Error(`“${await made.innerText()}”: this source has no skill page`);
