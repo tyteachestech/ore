@@ -391,7 +391,7 @@ function useStats(skill: string): SkillStats | null {
 }
 
 /** His goal for the skill (D101), under its name in place of the why (D63): one thing he could show
- *  he can do. Click to write, Enter saves, Esc or clicking away keeps what was there. Try it opens the
+ *  he can do. Click to write, Enter or clicking away saves (D211), Esc keeps what was there. Try it opens the
  *  closed-book recall with the goal as its prompt; each try is saved, dated, in the skill note. */
 function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; lastTry: string | null; onTry: () => void; onChanged: () => void; notify: Notify }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -425,7 +425,8 @@ function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; last
         placeholder="Something you could show, like “Explain X to a beginner”"
         aria-label={`Your goal for ${skill.name}`}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => setDraft(null)}
+        // Clicking away saves (D211); an emptied field keeps the goal, only Enter clears it.
+        onBlur={() => document.hasFocus() && ((draft ?? "").trim() ? void save() : setDraft(null))}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === "Enter") void save();

@@ -2511,7 +2511,7 @@ journey("highlight note: what he types is kept when he clicks away or presses Es
   await reopen("decomposes a task", "Each step feeds the next");
 });
 
-journey("author: add one by hand from the title's menu, it survives a reload, and ⌘Z takes it back", async (page) => {
+journey("author: add one by hand from the title's menu or the empty byline field, it survives a reload, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   await page.locator(".doc-head h1").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Add author…" }).click();
@@ -2521,6 +2521,13 @@ journey("author: add one by hand from the title's menu, it survives a reload, an
   await by.filter({ hasText: "Henry Roediger" }).waitFor();
   await page.keyboard.press("Meta+z");
   await until("⌘Z removes it", async () => (await by.count()) === 0);
+  // With none, the byline holds a faint empty Author field (D210) that one click fills.
+  const empty = page.locator(".doc-head .chips .by-add");
+  await empty.waitFor();
+  await empty.click();
+  await page.getByLabel("Author").waitFor();
+  await page.keyboard.press("Escape");
+  await empty.waitFor();
   // The byline shows at once; reload only once the redo's write has reached the library (slow on CI).
   // Watched from the redo on, so the first add's write (still landing on CI) doesn't count.
   const posts: string[] = [];
@@ -4623,6 +4630,11 @@ journey("diagram: ⌘Z on a rename takes the file back with the link, ⇧⌘Z re
   const board = page.locator(".note-editor .note-diagram");
   await until("the note links it once it is saved", async () => (await board.count()) === 1, 6000);
   const name = (await page.locator(".diagram-name").inputValue())!;
+  await page.locator(".diagram-name").fill("not-this-name");
+  await page.keyboard.press("Escape"); // throws the edit away, never renames (D211)
+  await until("Esc keeps the old name", async () => (await page.locator(".diagram-name").inputValue()) === name);
+  await page.waitForTimeout(300);
+  if ((await board.getAttribute("aria-label")) !== `Diagram ${name}, click to edit`) throw new Error("Esc renamed the diagram");
   await page.locator(".diagram-name").fill("spacing-map");
   await page.keyboard.press("Enter");
   const shows = (n: string) => async () => (await board.getAttribute("aria-label")) === `Diagram ${n}, click to edit` && (await board.locator(".note-diagram-view > svg").count()) === 1;
@@ -6360,8 +6372,45 @@ journey("questions: a highlight marked as a question joins the list even when it
   await page.unroute(/\/ore$/);
 });
 
+journey("click away saves what he typed: the author, a source's title, a skill's goal; Esc throws it away", async (page) => {
+  await openSource(page, TESTING);
+  const away = () => page.locator(".doc p").first().click(); // a click in the text, as he does
+  await page.locator(".doc-head .by-add").click();
+  await page.getByLabel("Author").fill("Jeffrey Karpicke");
+  await away();
+  await page.locator(".doc-head .by").filter({ hasText: "Jeffrey Karpicke" }).waitFor();
+  await page.locator(".doc-head .by").click();
+  await page.getByLabel("Author").fill("Not this one");
+  await page.keyboard.press("Escape");
+  await page.locator(".doc-head .by").filter({ hasText: "Jeffrey Karpicke" }).waitFor();
+  await page.keyboard.press("Meta+z"); // the click-away save is one step, as Enter's is
+  await page.locator(".doc-head .by-add").waitFor();
+  await page.locator(".doc-head h1").click();
+  await page.getByLabel("Title").fill(`${TESTING} (clicked away)`);
+  await away();
+  await page.locator(".doc-head h1").filter({ hasText: "(clicked away)" }).waitFor();
+  await page.keyboard.press("Meta+z");
+  await page.locator(".doc-head h1").filter({ hasText: TESTING }).filter({ hasNotText: "(clicked away)" }).waitFor();
+  await page.locator(".sidebar .side-item:not(.side-main)").first().click();
+  await page.locator("button.skill-goal").click();
+  const goal = page.locator("input.skill-goal");
+  await goal.fill("Explain it to a friend, from memory");
+  await page.mouse.click(640, 10); // a click on nothing in particular: the title bar
+  await page.locator("button.skill-goal").filter({ hasText: "Explain it to a friend, from memory" }).waitFor();
+  // Esc in a list row, whose list takes focus back at once: that blur must not save it.
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row").filter({ hasText: AGENTS }).first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  await page.locator(".row input[aria-label=Title]").fill("Esc throws this away");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  if (await page.locator(".row").filter({ hasText: "Esc throws this away" }).count()) throw new Error("Esc saved the row's rename");
+});
+
 journey("author: a save that fails keeps the name he typed, in the field", async (page) => {
   await openSource(page, AGENTS);
+  await page.locator(".doc-head .chips .source").filter({ hasText: "anthropic.com" }).waitFor(); // where it's from ends the byline (D210)
   await page.locator(".doc-head button.by").click();
   const field = page.getByLabel("Author");
   await field.fill("A corrected author");

@@ -603,6 +603,8 @@ img.thumb { filter: brightness(0.86); }
 .doc-head .by { color: var(--text); font-size: 13px; margin-right: 4px; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-head button.by { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; cursor: text; }
 .doc-head button.by:hover { color: var(--text); }
+.doc-head .by-add { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; margin-right: 8px; color: var(--faint); cursor: text; }
+.doc-head .by-add:hover { color: var(--muted); }
 .doc-head .author-edit { font: inherit; font-size: 13px; color: var(--text); margin-right: 4px; max-width: 40ch; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -1px 0 var(--accent); outline: none; }
 .doc-thumb { display: block; height: 128px; max-width: 100%; width: auto; object-fit: cover; object-position: top; border-radius: 0; margin: 8px 0 14px; outline: 1px solid rgba(255, 255, 255, 0.08); outline-offset: -1px; }
 .doc-thumb.none { display: none; }
@@ -626,13 +628,11 @@ img.thumb { filter: brightness(0.86); }
 .course-lessons .part { width: 18px; flex-shrink: 0; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
 .course-lessons .here { color: var(--text); font-weight: 600; }
 .course-lessons .menu-item svg { margin-left: auto; color: var(--faint); }
-/* Where it's from, above the title (Reeder, Matter): a site in Geist Mono caps; a file keeps its own name. */
-.doc-head .source { display: block; margin: 8px 0 0 -4px; padding: 0 4px; border-radius: 4px; font-size: 12px; color: color-mix(in srgb, var(--muted) 45%, var(--text-read)); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.doc-head .source.site { font-size: 13px; }
+/* Where it's from, last on the byline (D210): a page's site, or a file's own name. */
+.doc-head .source { flex: none; margin-left: 10px; padding: 0 4px; border-radius: 4px; font-size: 13px; color: color-mix(in srgb, var(--muted) 45%, var(--text-read)); max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-head .source:hover { color: var(--accent); }
-.doc-head .source + h1, .doc-head .source + .title-edit { margin-top: 4px; }
 .doc-head .when { color: var(--text-read); font-size: 13px; margin-right: 2px; white-space: nowrap; }
-.doc-head .by + .when::before, .doc-head .by + span .when::before { content: "·"; margin-right: 6px; }
+.doc-head .by + .when::before, .doc-head .by + span .when::before, .doc-head .by-add + .when::before, .doc-head .by-add + span .when::before { content: "·"; margin-right: 6px; }
 
 .preq { margin: 0 0 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); max-width: var(--measure); }
 .preq-head { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; margin-left: -4px; padding: 0 4px; color: var(--muted); font-weight: 500; text-align: left; }

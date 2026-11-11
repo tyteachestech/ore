@@ -2939,14 +2939,6 @@ function ReaderView(p: Props & { reload: () => void }) {
                 og:image or site logo only repeats what the title says, and a video's picture is its player. */}
             {doc.thumbnail && (doc.type === "pdf" || doc.type === "epub") && <Thumb item={doc} className="doc-thumb" />}
             {doc.course && p.lessons && p.lessons.length > 1 && <CourseLine id={doc.id} course={doc.course} lessons={p.lessons} onOpen={p.onOpenLesson} />}
-            {/* Where it's from, above the title (Reeder, Matter): one click opens the original. */}
-            {source && (
-              <Hint text={doc.url ? "Open the original page" : "Open the original file"} keys="original">
-                <button className={`source${doc.url ? " site" : ""}`} onClick={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}>
-                  {source} ↗
-                </button>
-              </Hint>
-            )}
             {renaming ? (
               <TitleField className="title-edit" value={doc.title} onSave={(t) => retitle(doc.id, doc.title, t.trim())} onClose={() => setRenaming(false)} />
             ) : (
@@ -2958,12 +2950,12 @@ function ReaderView(p: Props & { reload: () => void }) {
                 </h1>
               </WithMenu>
             )}
-            {(doc.author || authoring || published || doc.skills.length > 0 || suggested || !PHONE) && (
+            {(doc.author || authoring || published || doc.skills.length > 0 || suggested || source || !PHONE) && (
               <div className="chips">
                 {authoring ? (
                   <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
                 ) : (
-                  doc.author &&
+                  doc.author ?
                   (PHONE ? (
                     <span className="by">{doc.author}</span>
                   ) : (
@@ -2972,7 +2964,16 @@ function ReaderView(p: Props & { reload: () => void }) {
                         {doc.author}
                       </button>
                     </Hint>
-                  ))
+                  )) : (
+                    // None found on import (D210): a faint empty field where the name goes, one click fills it (Notion's empty property).
+                    !PHONE && (
+                      <Hint text="Add author">
+                        <button className="by-add" ref={authorRef} onClick={() => setAuthoring(true)}>
+                          Author
+                        </button>
+                      </Hint>
+                    )
+                  )
                 )}
                 {published && <span className="when">{published}</span>}
                 {PHONE ? (
@@ -2994,6 +2995,14 @@ function ReaderView(p: Props & { reload: () => void }) {
                       </button>
                     </Hint>
                   </span>
+                )}
+                {/* Where it's from, last on the byline (D210): one click opens the original. */}
+                {source && (
+                  <Hint text={doc.url ? "Open the original page" : "Open the original file"} keys="original">
+                    <button className="source" onClick={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}>
+                      {source} ↗
+                    </button>
+                  </Hint>
                 )}
               </div>
             )}
