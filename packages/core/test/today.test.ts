@@ -10,7 +10,8 @@ import { endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
 import { readReviews, type Review } from "../src/reviews.ts";
 import { calibration, raterStats } from "../src/stats.ts";
 import { loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
-import { dueQueue, NO_SKILL, recordReview } from "../src/study.ts";
+import { NO_SKILL } from "../src/no-skill.ts";
+import { dueQueue, recordReview } from "../src/study.ts";
 import { level, nextLevelAt, reminderNote, skillGrowth, skillStrength, SOLID_DAYS, today } from "../src/today.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -186,7 +187,7 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(dueQueue(lib, later, { skills: ["habits"] }).map((e) => e.id)).toEqual([habit.meta.id]);
   });
 
-  test("exercises filed under no skill: Today counts them apart, and a pick takes them only with NO_SKILL (D80)", async () => {
+  test("exercises filed under no skill: Today counts them apart, and a pick takes them only with NO_SKILL (D199)", async () => {
     const { lib, item } = await library(0);
     const draft = (skills: string[], q: string) => writeNewCard(lib, { kind: "card", item: item.meta.id, skills, topics: [], content_type: "fact", question: q, answer: "A", rubric: [] });
     const filed = draft(["learning"], "Filed?");

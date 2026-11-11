@@ -5318,7 +5318,10 @@ journey("review: the header keeps its form for the session: 30 steps stay dots w
     await log.undoAll();
     for (const f of made) rmSync(f, { force: true });
     await ore("goal", "--new-per-day", String(new_per_day));
-journey("review: What to review has a No skill row for exercises filed under no skill, and every row ticked is the whole session (D80)", async (page) => {
+  }
+});
+
+journey("review: What to review has a No skill row for exercises filed under no skill, and every row ticked is the whole session (D199)", async (page) => {
   const items = (await ore("ls")) as { id: string; title: string; skills: string[] }[];
   const agents = items.find((i) => i.title === AGENTS)!;
   await ore("edit", agents.id, "--skills", "");
@@ -5342,6 +5345,21 @@ journey("review: What to review has a No skill row for exercises filed under no 
     if ((await total()) !== 1) throw new Error(`the No skill row alone gave a session of ${await total()}`);
     await page.keyboard.press("Escape");
     await page.locator(".review").waitFor({ state: "detached" });
+    // Rows that share no exercise add up to their session (the seed's Teaching exercise is also under Learning).
+    const ready = (row = "") => Number(/(\d+) exercises? ready/.exec(row)?.[1] ?? NaN);
+    const count = (name: RegExp) => ready(rows.find((r) => name.test(r)));
+    const apart = /^(Learning|Storytelling & Writing|No skill)\n/;
+    const sum = rows.filter((r) => apart.test(r)).reduce((n, r) => n + ready(r), 0);
+    await startReview(page, apart);
+    if ((await total()) !== sum) throw new Error(`Learning, Storytelling & Writing and No skill read ${sum} together, their session has ${await total()}`);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+    // No skill unticked: its exercise stays out of the session and still due, for a later one.
+    await startReview(page, /^(?!No skill)/);
+    if ((await total()) !== due - count(/^No skill\n/)) throw new Error(`without No skill the session has ${await total()}, not ${due - count(/^No skill\n/)}`);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+    if (((await ore("due", "--skill", "-")) as unknown[]).length !== 1) throw new Error("unticking No skill took its exercise out of what is due");
   } finally {
     await ore("edit", agents.id, "--skills", agents.skills.join(","));
   }

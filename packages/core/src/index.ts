@@ -29,6 +29,7 @@ export * from "./scheduler.ts";
 export * from "./sessions.ts";
 export * from "./stats.ts";
 export * from "./study.ts";
+export * from "./no-skill.ts";
 export * from "./today.ts";
 export * from "./doctor.ts";
 export * from "./optimize.ts";
