@@ -1,8 +1,9 @@
 import { PixelNote, PixelStack } from "./PixelIcon";
 import { resizeDrag } from "./drag";
+import { clampSide } from "./split";
 import * as Tabs from "@radix-ui/react-tabs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/NoteEditor";
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
@@ -303,10 +304,26 @@ export function LinkedFrom({ target, onOpen }: { target: NoteRef; onOpen: (t: Om
 
 const NOTE_WIDTH = 380;
 
-/** A right-hand panel's width, dragged on its left-edge divider between `min` and 60% of the
- *  window, remembered under `key`; double-click resets it (D44). */
-export function useSideWidth(key: string, initial: number, min = 280) {
-  const clamp = useCallback((w: number) => Math.round(Math.max(min, Math.min(w, window.innerWidth * 0.6))), [min]);
+/** How much wider than its 216 px default the shown sidebar is (0 while hidden). A right-hand panel's max gives
+ *  that much back, so the reader column never gets less than it had with the sidebar at 216 (D193). */
+let sidebarExtra = 0;
+const extraListeners = new Set<() => void>();
+const onExtra = (f: () => void) => (extraListeners.add(f), () => void extraListeners.delete(f));
+export function setSidebarShown(width: number) {
+  const extra = Math.max(0, width - 216);
+  if (extra === sidebarExtra) return;
+  sidebarExtra = extra;
+  for (const f of extraListeners) f();
+}
+
+/** A panel's width, dragged on its divider between `min` and `share` of the window (at most `cap`),
+ *  remembered under `key`; double-click resets it (D44). A right-hand panel is measured from its right
+ *  edge and gives back what a wider sidebar takes; the sidebar (`left`) from the window's left. The width
+ *  he chose is kept: a narrow window only clamps what is shown, so it comes back when the window widens. */
+export function useSideWidth(key: string, initial: number, min = 280, { left = false, share = 0.6, cap = Infinity } = {}) {
+  const [vw, setVw] = useState(() => window.innerWidth);
+  const extra = useSyncExternalStore(onExtra, () => (left ? 0 : sidebarExtra));
+  const clamp = (w: number) => clampSide(w, vw, { min, share, cap, less: extra });
   const [width, setWidth] = useState(() => {
     const w = Number(load(key));
     return Number.isFinite(w) && w > 0 ? w : initial;
@@ -314,10 +331,10 @@ export function useSideWidth(key: string, initial: number, min = 280) {
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
-    const fit = () => setWidth((w) => Math.min(w, clamp(w)));
+    const fit = () => setVw(window.innerWidth);
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, [clamp]);
+  }, []);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -327,7 +344,7 @@ export function useSideWidth(key: string, initial: number, min = 280) {
     let w = width;
     setDragging(true);
     resizeDrag(e, {
-      move: (m) => setWidth((w = clamp(right - m.clientX))),
+      move: (m) => setWidth((w = clamp(left ? m.clientX : right - m.clientX))),
       end: (ev) => {
         setDragging(false);
         if (ev) save(key, String(w));
@@ -336,10 +353,10 @@ export function useSideWidth(key: string, initial: number, min = 280) {
     });
   };
   const onDoubleClick = () => {
-    setWidth(clamp(initial));
+    setWidth(initial);
     save(key, String(initial));
   };
-  return { width: Math.min(width, clamp(width)), dragging, divider: { onPointerDown, onDoubleClick } };
+  return { width: clamp(width), dragging, divider: { onPointerDown, onDoubleClick } };
 }
 
 /** The source note (D31, D44) as the right half of a split screen: the divider drags to resize,

@@ -140,6 +140,13 @@ kbd {
   content: ""; position: sticky; top: calc(-1 * (var(--titlebar) + 6px)); z-index: 2; display: block;
   height: var(--titlebar); margin: calc(-1 * (var(--titlebar) + 6px)) -8px 6px; background: var(--bg-side);
 }
+/* Its right edge drags to resize, as the source note's divider does (D44): a 7px strip whose 1px line, on the
+   sidebar's border, lights on hover and while dragging. It starts under the title bar (the window drags there)
+   and lies over the content, off the sidebar's scrollbar; while it drags, the whole window keeps its cursor. */
+.side-divider { position: fixed; top: var(--titlebar); bottom: 0; left: calc(var(--sidebar) - 1px); width: 7px; z-index: 6; cursor: col-resize; }
+.side-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: transparent; transition: background var(--t-1) ease-out; }
+.side-divider:hover::after, .side-divider.dragging::after { background: var(--accent); }
+.app.sizing, .app.sizing * { cursor: col-resize !important; user-select: none; -webkit-user-select: none; }
 /* Collapsed: a strip on the left edge floats the sidebar out over the content (Notion, Arc). */
 .side-edge { position: fixed; top: var(--titlebar); bottom: 0; left: 0; width: 10px; z-index: 4; }
 .sidebar.peek {
@@ -2301,7 +2308,8 @@ button.home-plan:hover { color: var(--text); }
 
 /* Settings (⌘,): Codex and Linear. Sections on the left in the sidebar's style; each page is grouped
    cards of rows, a title and one line on the left, the control on the right. */
-.settings { position: fixed; inset: 0; z-index: 15; display: grid; padding: clamp(24px, 9vh, 96px) clamp(24px, 9vw, 96px); background: rgba(0, 0, 0, 0.5); }
+/* Its sections column keeps the sidebar's default width, whatever the sidebar was dragged to. */
+.settings { --sidebar: 216px; position: fixed; inset: 0; z-index: 15; display: grid; padding: clamp(24px, 9vh, 96px) clamp(24px, 9vw, 96px); background: rgba(0, 0, 0, 0.5); }
 .settings > .titlebar { position: absolute; inset: 0 0 auto; }
 .settings-sheet { position: relative; min-height: 0; overflow: hidden; background: var(--bg); border-radius: 12px; box-shadow: var(--float); }
 .settings-sheet:focus-visible { outline: none; }
