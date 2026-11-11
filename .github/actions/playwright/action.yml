@@ -1,0 +1,52 @@
+# The browsers the journeys and the bench drive, and the system packages they need, kept in the Actions cache so a
+# run doesn't download them from Ubuntu's mirrors each time (2026-11-11: the mirrors would not resolve for over an
+# hour, and every e2e and bench job hung on `playwright install --with-deps` without reaching Ore's code).
+# On a cache hit nothing is fetched: the saved packages are installed with dpkg and each browser is launched once to
+# prove it runs. If that fails (a new runner image wants other packages), or on a miss, it installs the usual way and
+# keeps what apt downloaded for next time. What the jobs test is unchanged.
+name: Playwright browsers
+description: Install Playwright's browsers and their system packages, from the cache when it has them
+inputs:
+  browsers:
+    description: The browsers to install, as `playwright install` takes them (e.g. "chromium webkit")
+    required: true
+runs:
+  using: composite
+  steps:
+    - id: key
+      shell: bash
+      # The Playwright version pins the browser builds; the runner's OS release pins which packages they need.
+      run: |
+        echo "version=$(bun -e 'console.log(require("playwright/package.json").version)')" >> "$GITHUB_OUTPUT"
+        echo "image=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/ms-playwright
+          ~/.cache/ore-playwright-debs
+        # Bump v1 to throw the cache away by hand (a hit that keeps falling back to the network is never re-saved).
+        key: playwright-v1-${{ runner.os }}-${{ steps.key.outputs.image }}-${{ steps.key.outputs.version }}-${{ inputs.browsers }}
+    - id: offline
+      if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        if ls ~/.cache/ore-playwright-debs/*.deb >/dev/null 2>&1; then
+          sudo dpkg -i ~/.cache/ore-playwright-debs/*.deb || echo "::warning::the cached packages did not all install"
+        fi
+        if bun .github/actions/playwright/launch.ts ${{ inputs.browsers }}; then
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "::warning::a cached browser would not start; installing from the network"
+        fi
+    - if: steps.offline.outputs.ok != 'true'
+      shell: bash
+      # A mirror that hangs fails this step in 8 minutes with its error, not the job's 15-minute timeout as "cancelled".
+      run: |
+        echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-ore-retries >/dev/null
+        sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -delete
+        # Headless runs use the headless shell only, so the full Chrome download is skipped.
+        timeout 480 bunx playwright install --with-deps --only-shell ${{ inputs.browsers }}
+        mkdir -p ~/.cache/ore-playwright-debs
+        cp /var/cache/apt/archives/*.deb ~/.cache/ore-playwright-debs/ 2>/dev/null || true
+        bun .github/actions/playwright/launch.ts ${{ inputs.browsers }}
