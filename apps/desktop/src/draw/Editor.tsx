@@ -43,7 +43,7 @@ type Gesture =
   | { kind: "erase"; ids: Set<string> }
   | { kind: "pan"; start: [number, number]; view: View };
 
-const LOCK = "ore.diagram.lock";
+const LOCK = "ore.diagram.keep-tool";
 const TOOLS: { tool: Tool; key: KeyId; label: string; icon: ReactNode }[] = [
   { tool: "select", key: "d-select", label: "Select", icon: <CursorClick size={16} /> },
   { tool: "hand", key: "d-hand", label: "Hand", icon: <Hand size={16} /> },
@@ -112,8 +112,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const [files, setFiles] = useState<Files>(initialFiles);
   const [sel, setSelState] = useState<string[]>([]);
   const [tool, setTool] = useState<Tool>("select");
-  // On unless he turned it off: a tool he picked stays until he picks another (V or Esc for Select).
-  const [toolLock, setToolLockState] = useState(() => load(LOCK) !== "0");
+  // Off unless he turned it on (Q): a drawn shape goes back to Select, as in Excalidraw (Tyler, 2026-11-11). The pen keeps its tool.
+  const [toolLock, setToolLockState] = useState(() => load(LOCK) === "1");
   const setToolLock = (f: (x: boolean) => boolean) => setToolLockState((x) => {
     const to = f(x);
     save(LOCK, to ? "1" : "0");
