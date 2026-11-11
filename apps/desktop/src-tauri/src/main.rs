@@ -335,6 +335,8 @@ fn remind() {
 /// refuses pages without an http(s) origin (error 153). Static, and the only thing served.
 const PLAYER_HTML: &str = include_str!("player.html");
 static PLAYER_PORT: OnceLock<Option<u16>> = OnceLock::new();
+/// Set once the app has told its pages it is quitting, so the exit that follows goes through.
+static QUITTING: AtomicBool = AtomicBool::new(false);
 
 fn serve_player() -> Option<u16> {
     let listener = TcpListener::bind("127.0.0.1:0").ok()?;
@@ -748,6 +750,20 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while running Ore")
         .run(|app, e| {
+            // ⌘Q sends the pages neither pagehide nor visibilitychange: they are told "quitting" and given a moment
+            // to write what he typed and hasn't sent (kept drafts, util.ts), then the app quits.
+            if let tauri::RunEvent::ExitRequested { api, .. } = &e {
+                if !QUITTING.swap(true, Ordering::SeqCst) {
+                    api.prevent_exit();
+                    let _ = app.emit("quitting", ());
+                    let app = app.clone();
+                    thread::spawn(move || {
+                        thread::sleep(Duration::from_millis(150));
+                        app.exit(0);
+                    });
+                    return;
+                }
+            }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = e {
                 show_main(app);

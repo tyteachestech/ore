@@ -46,15 +46,15 @@ const drafts = new Map<string, Draft>();
 /** It survives quitting the app too (for a day, `kept`), once he has typed something: kept without the questions
  *  (they are read from the source again) but with what they were and when it was written, so a draft for questions
  *  since rewritten, or older than a recall recorded since, goes instead of answering something else. */
-type KeptDraft = Omit<Draft, "qs"> & { asked: string; at: number };
+type KeptDraft = Omit<Draft, "qs"> & { asked: string };
 const keptDrafts = kept<KeptDraft>("ore.finish-drafts");
 const askedIn = (qs: Prequestion[]) => JSON.stringify(qs.map((q) => q.q));
 function keptDraft(doc: Doc): Draft | undefined {
   const k = keptDrafts.get(doc.id);
   if (!k) return undefined;
   const qs = doc.prequestions ?? [];
-  if (k.asked !== askedIn(qs) || (doc.recall && Date.parse(doc.recall.at) > k.at)) return void keptDrafts.delete(doc.id);
-  const { asked: _asked, at: _at, ...d } = k;
+  if (k.asked !== askedIn(qs) || (doc.recall && Date.parse(doc.recall.at) > (keptDrafts.at(doc.id) ?? 0))) return void keptDrafts.delete(doc.id);
+  const { asked: _asked, ...d } = k;
   return { ...d, qs };
 }
 const dropDraft = (id: string) => (drafts.delete(id), keptDrafts.delete(id));
@@ -113,7 +113,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   useEffect(() => {
     drafts.set(doc.id, { step, recall, answers, conf, use, leave, qs });
     const typed = recall !== (doc.recall?.text ?? "") || answers.some((a, i) => a !== (qs[i]?.after ?? "")) || !!use.trim() || leave !== (doc.leave_out?.text ?? "");
-    if (typed) keptDrafts.set(doc.id, { step, recall, answers, conf, use, leave, asked: askedIn(qs), at: Date.now() });
+    if (typed) keptDrafts.set(doc.id, { step, recall, answers, conf, use, leave, asked: askedIn(qs) });
     else keptDrafts.delete(doc.id);
   }, [doc.id, step, recall, answers, conf, use, leave, qs]);
 

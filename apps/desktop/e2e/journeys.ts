@@ -4891,7 +4891,12 @@ journey("review: a half-typed answer survives quitting the app, for a day", asyn
   await startReview(page, /Teaching/);
   await field.fill("an answer cut short");
   await page.getByRole("radio", { name: "Think so" }).click();
-  await Bun.sleep(500); // kept a moment after the last change
+  // ⌘Q: the shell says "quitting" (the page gets no pagehide), and what was typed a moment ago is written at once.
+  const written = await page.evaluate(() => {
+    (window as unknown as { __emit: (e: string) => void }).__emit("quitting");
+    return localStorage.getItem("ore.review-drafts") ?? "";
+  });
+  if (!written.includes("an answer cut short")) throw new Error("the answer wasn't written when the app said it was quitting");
   await page.reload();
   await startReview(page, /Teaching/);
   await until("the answer is back after the relaunch", async () => (await field.inputValue()) === "an answer cut short");
