@@ -101,7 +101,7 @@ export const studyCommands: Record<string, Command> = {
   },
 
   due: {
-    usage: "[--limit N] [--skill s]... [--all] [--start]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills (- for the ones filed under no skill); --all: every unseen draft, past the day's new-card limits; --start: a session's first fetch, opening on the likeliest recall of the first ten (D176)",
+    usage: "[--limit N] [--skill s]... [--all] [--start]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills; --all: every unseen draft, past the day's new-card limits; --start: a session's first fetch, opening on the likeliest recall of the first ten (D176)",
     options: { limit: { type: "string" }, skill: { type: "string", multiple: true }, all: { type: "boolean" }, start: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();

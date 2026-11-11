@@ -5255,35 +5255,6 @@ async function startReview(page: Page, only: RegExp | null) {
   await page.locator(".review-q").waitFor();
 }
 
-journey("review: What to review has a No skill row for exercises filed under no skill, and every row ticked is the whole session (D80)", async (page) => {
-  const items = (await ore("ls")) as { id: string; title: string; skills: string[] }[];
-  const agents = items.find((i) => i.title === AGENTS)!;
-  await ore("edit", agents.id, "--skills", "");
-  try {
-    await page.reload();
-    await page.locator(".side-item").first().waitFor();
-    const { due } = (await ore("today")) as { due: number };
-    const pick = page.getByRole("dialog", { name: "What to review" });
-    await page.getByRole("button", { name: "Start review" }).click();
-    await pick.waitFor();
-    const rows = await pick.getByRole("checkbox").allInnerTexts();
-    if (!rows.some((r) => /No skill/.test(r) && /1 exercise ready/.test(r))) throw new Error(`no "No skill · 1 exercise ready" row: ${JSON.stringify(rows)}`);
-    await page.keyboard.press("Escape");
-    const total = () => page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax").then(Number);
-    await startReview(page, null);
-    if ((await total()) !== due) throw new Error(`every row ticked gave a session of ${await total()}, Home said ${due}`);
-    await page.keyboard.press("Escape");
-    await page.locator(".review").waitFor({ state: "detached" });
-    // Only the No skill row: just that exercise, so unticking his skills never strands it either.
-    await startReview(page, /No skill/);
-    if ((await total()) !== 1) throw new Error(`the No skill row alone gave a session of ${await total()}`);
-    await page.keyboard.press("Escape");
-    await page.locator(".review").waitFor({ state: "detached" });
-  } finally {
-    await ore("edit", agents.id, "--skills", agents.skills.join(","));
-  }
-});
-
 journey("review: a miss is a step of its own and its retry one more, so \"Exercise N of M\" never repeats and M grows only by the retry (D59)", async (page) => {
   const log = oreCalls(page);
   try {

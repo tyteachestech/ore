@@ -11,7 +11,7 @@ import { findVariant } from "./remix.ts";
 import { appendReview, appendUndo, readReviews, type FsrsState, type Review } from "./reviews.ts";
 import { emptyState, loadParams, nextState, replay, retrievability } from "./scheduler.ts";
 import { openSessionId, readSessions } from "./sessions.ts";
-import { archivedOnly, cardPriority, unfiled, desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
+import { archivedOnly, cardPriority, desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
 import { retentionMetric } from "./stats.ts";
 
 export interface ReviewInput {
@@ -118,12 +118,8 @@ export function medianMs(rs: Review[], kind: "card" | "prompt", kinds: Map<strin
 /** `medianMs` for both kinds at once, for loops over the queue. */
 export const medians = (rs: Review[], kinds: Map<string, string>): Record<"card" | "prompt", number> => ({ card: medianMs(rs, "card", kinds), prompt: medianMs(rs, "prompt", kinds) });
 
-/** In a pick of skills (QueueOptions.skills, `ore due --skill -`): the cards filed under no skill, What to review's
- *  "No skill" row (D80). No skill id can be it: a slug never is "-". */
-export const NO_SKILL = "-";
-
 export interface QueueOptions {
-  /** Only cards filed under one of these skills (D80's pick), or under none with NO_SKILL; all when absent. */
+  /** Only cards filed under one of these skills (Home's skill chips, D58); all when absent. */
   skills?: string[];
   /** Apply the new-card limits (D60, D65, D144): at most `new_per_day`, and none drafted today. On by default. */
   newLimit?: boolean;
@@ -166,7 +162,7 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const cards = index.cards();
     for (const c of cards) {
       if (c.state === "retired") continue;
-      if (picked && !c.skills.some((s) => picked.has(s)) && !(picked.has(NO_SKILL) && unfiled(c.skills, skills))) continue;
+      if (picked && !c.skills.some((s) => picked.has(s))) continue;
       // An archived skill's cards wait out of review (D173), unless he picks the skill by name.
       if (!picked && archivedOnly(c.skills, skills)) continue;
       // A miss today owes one relearn pass (D21) until he answers the card again, in this session or a
