@@ -23,7 +23,8 @@ async function ore(args) {
   if (fail) throw fail;
   // window.__ORE_HOLD = { "skills arrange": [800] }: the next such command waits that long before it runs at all
   // (one entry per call), so a later one (an Undo) can run first, as two `ore` processes can on a slow machine.
-  const hold = window.__ORE_HOLD && window.__ORE_HOLD[args.args.slice(0, 2).join(" ")];
+  // A key of the command alone ({ annotate: [1500] }) holds the next one whatever it names.
+  const hold = window.__ORE_HOLD && (window.__ORE_HOLD[args.args.slice(0, 2).join(" ")] ?? window.__ORE_HOLD[args.args[0]]);
   if (hold && hold.length) await new Promise((ok) => setTimeout(ok, hold.shift()));
   const port = window.__ORE_BRIDGE || 1421;
   // As the real app reports a missing `ore`: say what is down and how to start it, not "Failed to fetch".

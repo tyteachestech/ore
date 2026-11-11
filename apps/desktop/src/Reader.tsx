@@ -41,7 +41,7 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, inOrder, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
+import { errorText, inOrder, load, save, stepLanded, stepMade, useFocusBack, useLibraryChanges, type Notify } from "./util";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
@@ -1534,6 +1534,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     const write = inOrder(`annotate ${id}`, () => ore<T>("annotate", id, ...args));
     const landed = () => setAnnWrites((n) => n + 1);
     write.then(landed, landed);
+    // A screen opened while it saves (he closes the popup and goes to the skill page at once) has read the
+    // library without it: once it lands, those screens read again, as after a step of the history.
+    const token = {};
+    stepMade(token);
+    write.then(() => stepLanded(token), () => {});
     return write;
   };
 

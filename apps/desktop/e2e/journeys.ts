@@ -5856,6 +5856,22 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   if (!mine || mine.status !== "done" || mine.uses?.length) throw new Error(`the library kept the re-plan: ${JSON.stringify(mine)}`);
 });
 
+journey("try it: a plan written just before the skill page opens shows there once it saves, though the page read its tries first", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "explaining an idea aloud all count"); // a passage no other journey highlights
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.press("4");
+  await until("the plan field has the caret", async () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Note"));
+  await page.keyboard.type("Explain it aloud on the walk home");
+  await loaded(page); // Try it has saved; only the plan's write is left
+  // The plan's write lands after the skill page has read its tries, as on a busy Mac.
+  await page.evaluate(() => ((window as unknown as { __ORE_HOLD: object }).__ORE_HOLD = { annotate: [1500] }));
+  await page.keyboard.press("Enter");
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.locator(".try").first().waitFor();
+  await until("the try shows its plan once it saves", async () => (await page.locator(".try").filter({ hasText: "Explain it aloud on the walk home" }).count()) === 1);
+});
+
 journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D148)", async (page) => {
   const calls = oreCalls(page);
   await startReview(page, null);
