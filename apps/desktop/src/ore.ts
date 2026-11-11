@@ -356,11 +356,11 @@ export type SessionEnd = {
   longest_days?: number;
   /** Cards that became solid this session, as each one's first skill (D90): one cut gem each. */
   cut?: string[];
-  /** Per cut gem, whether it was won back after a miss (D197): mended with a gold seam. */
-  mended?: boolean[];
-  /** Gems polished this session, as each one's first skill (D197): passed on a new case for the first time. */
+  /** Per cut gem, its grade (D197): mended (won back after a miss) or polished (passed as a remix); absent when all are plain. */
+  grades?: ("cut" | "mended" | "polished")[];
+  /** Gems cut before this session and polished in it, as each one's first skill (D197). */
   polished?: string[];
-  /** How much longer this session's exercises now last, in days added up (D197). */
+  /** How much longer the exercises he passed now last, in days added up (D197). */
   depth_days?: number;
   /** On the week's first end screen (D69): of Explain answers marked Sure, the share the key-point check passed. */
   calibration?: { sure_n: number; sure_right: number; levels: { confidence: 1 | 2 | 3; n: number; right: number | null }[] } | null;

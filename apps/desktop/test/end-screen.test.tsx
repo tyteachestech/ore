@@ -103,7 +103,7 @@ test("an ore whose ring dot is missing still counts, so the ring is told it is f
 test("gem grades on the end screen (D197): a won-back gem carries its gold seam, a gem polished this session shows after the cut ones, and the session's depth is one line", async () => {
   reduce = true;
   const e = end(["ai", "ai"]) as unknown as { session: Record<string, unknown> };
-  Object.assign(e.session, { mended: [true, false], polished: ["ai"], depth_days: 41 });
+  Object.assign(e.session, { grades: ["mended", "cut"], polished: ["ai"], depth_days: 41 });
   const s = await mount(e as never);
   reduce = false;
   const gems = [...s.body.querySelectorAll(".review-cut > span")];
@@ -114,6 +114,14 @@ test("gem grades on the end screen (D197): a won-back gem carries its gold seam,
   expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");
   expect(s.body.querySelector(".review-depth")!.textContent).toBe("+41 days of memory");
   await s.done();
+  // More gems than fit: the count covers the polished ones left out too.
+  const many = end(Array(8).fill("ai")) as unknown as { session: Record<string, unknown> };
+  Object.assign(many.session, { polished: ["ai", "ai"] });
+  reduce = true;
+  const m = await mount(many as never);
+  reduce = false;
+  expect(m.body.querySelector(".review-cut > b")!.textContent).toBe("+2");
+  await m.done();
   // Nothing gained, nothing said.
   const none = await mount(end([]));
   expect(none.q(".review-depth")).toBe(0);

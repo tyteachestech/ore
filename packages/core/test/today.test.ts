@@ -412,7 +412,7 @@ describe("strength breakdown and peak level (D63)", () => {
     at = await solidify(id, new Date(at.getTime() + 864e5));
     const end = await endSession(lib, at);
     expect(end.cut).toEqual(["learning"]);
-    expect(end.mended).toEqual([true]);
+    expect(end.grades).toEqual(["mended"]);
     expect(end.depth_days).toBe(Math.round(skillStrengthOf(id) - before));
     expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 2, win_back: 0, mended: 1, polished: 0 });
 
@@ -430,6 +430,17 @@ describe("strength breakdown and peak level (D63)", () => {
     await startSession(lib, at);
     await recordReview(lib, other, { rating: 1, confidence: 2, now: new Date(at.getTime() + 120e3) });
     expect((await endSession(lib, at)).depth_days).toBeUndefined();
+    // Won back after its remix pass: one gem, cut and polished at once, never two; a miss on another
+    // exercise in the same session takes nothing off what the passes added.
+    for (let i = 3; skillStrengthOf(other) >= SOLID_DAYS; i++) await recordReview(lib, other, { rating: 1, confidence: 2, now: new Date(at.getTime() + i * 60e3) });
+    await startSession(lib, new Date(at.getTime() + 864e5));
+    const low = skillStrengthOf(other);
+    at = await solidify(other, new Date(at.getTime() + 864e5));
+    await recordReview(lib, id, { rating: 1, confidence: 2, now: at });
+    const back = await endSession(lib, at);
+    expect(back).toMatchObject({ cut: ["learning"], grades: ["polished"] });
+    expect(back.polished).toBeUndefined();
+    expect(back.depth_days).toBe(Math.round(skillStrengthOf(other) - low));
   });
 
   test("the hook is his why, one line, set in skills.yaml", async () => {

@@ -1396,13 +1396,15 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const full = stage !== "cart";
   // D197: a cut gem that was won back carries its gold seam; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
-  const mendedN = (s.mended ?? []).filter(Boolean).length;
-  const polishedN = s.polished?.length ?? 0;
-  const gems = [...shown.map((skill, i) => ({ skill, seam: !!s.mended?.[i], polished: false })), ...(s.polished ?? []).slice(0, Math.max(0, CUT_SHOWN - shown.length)).map((skill) => ({ skill, seam: false, polished: true }))];
+  const mendedN = (s.grades ?? []).filter((g) => g === "mended").length;
+  const polishedN = (s.polished?.length ?? 0) + (s.grades ?? []).filter((g) => g === "polished").length;
+  // `old`: a gem that was cut before this session and polished in it; it shows once the cart has poured.
+  const gems = [...shown.map((skill, i) => ({ skill, seam: s.grades?.[i] === "mended", polished: s.grades?.[i] === "polished", old: false })), ...(s.polished ?? []).slice(0, CUT_SHOWN - shown.length).map((skill) => ({ skill, seam: false, polished: true, old: true }))];
+  const more = cutN + (s.polished?.length ?? 0) - gems.length;
   return (
     <div className={`review-end${pour ? " carted" : ""}`} role="status" ref={setHost}>
       {pour && stage !== "done" && host && (
-        <CartTip host={host} lit={pour} rich={s.rescued} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
+        <CartTip host={host} lit={pour} rich={rescuedWorthSaying(s) ? s.rescued : 0} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
       )}
       {/* D169: the tutor's mole cheers from the top of the ring, once, at the end of a session (not in the quick quiz). After the cart (D190) it comes up first. */}
       {!quick && <span className="review-mole">{up && <Mole bare size={64} mood={mood} />}</span>}
@@ -1416,16 +1418,16 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           {gems.map((g, i) => {
             const sk = skills.find((x) => x.id === g.skill);
             return (
-              // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then. A polished gem was cut already: it shows once the cart has poured.
-              <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: recalled on a case you hadn't seen" : g.seam ? "Mended: you missed it once and won it back" : "Cut: you'd still recall it three weeks from now"}`}>
-                <span data-color={sk?.color} data-wait={(g.polished ? landed < shown.length : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
+              // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then. A gem cut before today and polished now shows once the cart has poured.
+              <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: you passed it as a remix" : g.seam ? "Mended: you missed it once and won it back" : "Cut: you'd still recall it three weeks from now"}`}>
+                <span data-color={sk?.color} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
                   <Gem kind="cut" size={36} seam={g.seam} polished={g.polished} />
                   {sk && <span className="review-cut-skill"><SkillIcon icon={sk.icon} color={sk.color} dot /></span>}
                 </span>
               </Hint>
             );
           })}
-          {cutN > CUT_SHOWN && landed >= shown.length && <b>+{cutN - CUT_SHOWN}</b>}
+          {more > 0 && landed >= shown.length && <b>+{more}</b>}
         </p>
       )}
       {s.kept > 0 ? (
@@ -1436,17 +1438,17 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         // A session of misses is still the work that makes them stick (D62: no guilt copy).
         <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>
       )}
-      {/* D197: what the session did for his memory as one number that is never zero on a good day. */}
+      {/* D197: what the session's passes added to his memory, as one number. */}
       {(s.depth_days ?? 0) > 0 && (
-        <Hint text="How much longer today's exercises will now last, added up">
+        <Hint text="How much longer the exercises you passed today will now last, added up">
           <p className="review-rescued review-depth" tabIndex={0}>+{depthText(s.depth_days!)} of memory</p>
         </Hint>
       )}
       {longGapText(s) && <p className="review-rescued">{longGapText(s)}</p>}
       {rescuedWorthSaying(s) && (
         <p className="review-rescued">
-          {/* The rich ore the cart carried (D197): one for each of these. */}
-          <i className="rich-ore" aria-hidden="true" />
+          {/* The rich ore the cart carried (D197), when a cart ran. */}
+          {pour && <i className="rich-ore" aria-hidden="true" />}
           {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}
         </p>
       )}

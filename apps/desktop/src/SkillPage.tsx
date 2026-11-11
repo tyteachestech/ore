@@ -421,9 +421,9 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
   const p = levelProgress(k);
   // One vocabulary with the header: the gem states, then cards not reviewed yet as empty slots.
   const legend: [GemKind, number, string, { seam?: boolean; polished?: boolean }?][] = [
-    ["cut", k.polished, "Polished: cut, and recalled on a case you hadn't seen", { polished: true }],
-    ["cut", k.mended, "Mended: cut, missed, and won back", { seam: true }],
-    ["cut", k.solid - k.polished - k.mended, "Cut: you'd still recall these three weeks from now"],
+    ["cut", k.polished ?? 0, "Polished: cut, and passed as a remix", { polished: true }],
+    ["cut", k.mended ?? 0, "Mended: cut, missed, and won back", { seam: true }],
+    ["cut", k.solid - (k.polished ?? 0) - (k.mended ?? 0), "Cut: you'd still recall these three weeks from now"],
     ["ready", k.ready, "Glowing: cut if you recall them at their next review"],
     ["dull", k.win_back, "Cracked: cut once, then missed. Review to mend them"],
     ["rough", k.growing - k.ready - k.win_back, "Rough: reviewed, not near solid yet"],

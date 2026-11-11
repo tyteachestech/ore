@@ -23,6 +23,22 @@ export const nextLevelAt = (solid: number) => 5 * (level(solid) + 1) ** 2;
 /** A recall on a new case: a remixed version (D66) he passed. */
 export const passedVariant = (r: Pick<Review, "variant" | "rating">) => !!r.variant && r.rating >= 3;
 
+export type GemGrade = "cut" | "mended" | "polished";
+/** The grade of one card's gem from its reviews in time order (D197), null while it isn't solid: polished once
+ *  a remix was passed, else mended if it fell from solid and came back. The session receipt's rule; `strength` counts by the same one. */
+export function gemGrade(reviews: Pick<Review, "variant" | "rating" | "state_after">[]): GemGrade | null {
+  let solid = false;
+  let fell = false;
+  let applied = false;
+  for (const r of reviews) {
+    const after = r.state_after.stability >= SOLID_DAYS;
+    if (solid && !after) fell = true;
+    solid = after;
+    if (passedVariant(r)) applied = true;
+  }
+  return !solid ? null : applied ? "polished" : fell ? "mended" : "cut";
+}
+
 /** A skill's strength (D62, D63). `solid`: live cards with stability of 21 days or more. `growing`:
  *  live, not solid yet. `ready`: growing cards that turn solid if he recalls them (Good) at their
  *  next review, the near goal beside the level (D90); `ready_today`: those due by the end of today. `new`: drafts not reviewed yet. `win_back`: once solid, now below.

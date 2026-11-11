@@ -8,7 +8,7 @@ import { readReviews } from "./reviews.ts";
 import { findCard } from "./cards.ts";
 import { loadParams, retrievability } from "./scheduler.ts";
 import { desiredRetention, loadSkills } from "./skills.ts";
-import { passedVariant, SOLID_DAYS } from "./today.ts";
+import { gemGrade, type GemGrade } from "./today.ts";
 
 export interface SessionReceipt {
   type: "start" | "end";
@@ -22,12 +22,13 @@ export interface SessionReceipt {
   /** Cards that became solid memories this session (stability reached 21 days, D90), as each card's
    *  first skill, so the end screen can show one cut gem in that skill's colour. */
   cut?: string[];
-  /** Per `cut` gem, whether it had been solid before and was missed since: a won-back gem is mended (D197). */
-  mended?: boolean[];
-  /** Solid cards he passed on a new case (a remix) for the first time this session, as each one's first skill: polished (D197). */
+  /** Per `cut` gem, its grade (D197): mended when it had been solid before and was missed since, polished when
+   *  he has passed it as a remix. Absent when every one is a plain cut. */
+  grades?: GemGrade[];
+  /** Gems that were solid already and were polished this session (their first passed remix), as each one's first skill (D197). */
   polished?: string[];
-  /** How much longer this session's cards now last than before it, in whole days added up (FSRS stability);
-   *  absent when the session lost ground (D197). */
+  /** How much longer the cards he passed this session now last than before it, in whole days added up
+   *  (FSRS stability); a miss takes nothing off it (D197). */
   depth_days?: number;
   /** The longest gap, in whole days, between a card he passed this session and when he last saw it (D177):
    *  the end screen names it, so spacing's delayed gain is something he sees. */
@@ -129,17 +130,21 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
       return "";
     }
   };
-  const earlier = all.filter((x) => x.session !== id && x.ts < (own[0]?.ts ?? ""));
-  const cutNow = [...first.values()].filter((x) => x.state_before.stability < SOLID_DAYS && last.get(x.card)!.state_after.stability >= SOLID_DAYS);
-  const cut = cutNow.map((x) => skillOf(x.card));
-  const mended = cutNow.map((x) => earlier.some((e) => e.card === x.card && e.state_after.stability >= SOLID_DAYS));
-  const polished = [...new Set(own.filter(passedVariant).map((x) => x.card))]
-    .filter((card) => last.get(card)!.state_after.stability >= SOLID_DAYS && !earlier.some((e) => e.card === card && passedVariant(e)))
-    .map(skillOf);
-  const depth = Math.round([...first.values()].reduce((n, x) => n + last.get(x.card)!.state_after.stability - x.state_before.stability, 0));
+  // Each card's gem before this session and after it, by one rule (`gemGrade`): a card gets one gem here,
+  // when it became solid or when a solid one was polished.
+  const start = own[0]?.ts ?? "";
+  const changed = [...first.keys()].map((card) => {
+    const before = all.filter((x) => x.card === card && x.session !== id && x.ts < start);
+    return { card, before: gemGrade(before), after: gemGrade([...before, ...own.filter((x) => x.card === card)]) };
+  });
+  const cutNow = changed.filter((c) => c.after && !c.before);
+  const cut = cutNow.map((c) => skillOf(c.card));
+  const grades = cutNow.map((c) => c.after!);
+  const polished = changed.filter((c) => c.before && c.before !== "polished" && c.after === "polished").map((c) => skillOf(c.card));
+  const depth = Math.round(kept.reduce((n, x) => n + Math.max(0, last.get(x.card)!.state_after.stability - x.state_before.stability), 0));
   const gaps = kept.flatMap((x) => (x.state_before.reps > 0 && x.state_before.last_review ? [Math.floor((Date.parse(x.ts) - Date.parse(x.state_before.last_review)) / 864e5)] : []));
   const longest = Math.max(0, ...gaps);
-  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(mended.some(Boolean) ? { mended } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
+  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
   if (openSessionId(lib) === id) unlinkSync(paths.openSession(lib));
   return r;
