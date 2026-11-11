@@ -1985,6 +1985,56 @@ journey("notebook: a cell's output is folded until he opens it, a click or Enter
   }
 });
 
+journey("original: a PDF's side panel has an Original tab that draws its page, follows the page being read, and ‹ › turn to another (D202)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "textbook.pdf"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+  await page.reload();
+  await openSource(page, "Chapter 1: Learning");
+  const show = page.getByRole("button", { name: "Show side panel" });
+  if (await show.count()) await show.click();
+  await page.getByRole("tab", { name: "Original" }).click();
+  const sheet = page.locator(".original canvas");
+  const pager = page.locator(".original-pager span");
+  const drawn = (n: number) => until(`page ${n} of the original is drawn`, async () => (await sheet.getAttribute("data-page")) === String(n) && (await pager.innerText()) === `${n} / 4`, 15000);
+  await drawn(1);
+  // Something is on the sheet: a drawn page is mostly white, an undrawn canvas is clear.
+  const inked = await sheet.evaluate((c: HTMLCanvasElement) => {
+    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    let white = 0, dark = 0;
+    for (let i = 0; i < d.length; i += 4) d[i]! > 240 && d[i + 3] === 255 ? white++ : d[i]! < 100 && d[i + 3] === 255 && dark++;
+    return white > dark && dark > 100;
+  });
+  if (!inked) throw new Error("the original's page is blank");
+  // Reading on to page 3's heading brings its page up beside it.
+  await page.locator(".doc h3", { hasText: "Spacing out sessions" }).evaluate((h) => h.scrollIntoView({ block: "start" }));
+  await drawn(3);
+  // The page marks hold no text: a highlight past them still lands where he dragged.
+  await select(page, "Practice spread over days");
+  await page.locator(".popup").waitFor();
+  await page.keyboard.press("Escape");
+  // He turns ahead by hand; reading on to another page takes the panel back.
+  await page.getByRole("button", { name: "Next page" }).click();
+  await drawn(4);
+  if (!(await page.getByRole("button", { name: "Next page" }).isDisabled())) throw new Error("Next page is offered past the last page");
+  await page.getByRole("button", { name: "Previous page" }).click();
+  await page.getByRole("button", { name: "Previous page" }).click();
+  await drawn(2);
+  await page.locator(".doc h1, .doc h2").first().evaluate((h) => h.scrollIntoView({ block: "center" }));
+  await drawn(1);
+  // The tab is remembered, and a source that is no PDF has no such tab: its panel opens on the source note.
+  await openSource(page, AGENTS);
+  if (await page.getByRole("tab", { name: "Original" }).count()) throw new Error("an article got an Original tab");
+  await page.locator(".mynotes[aria-label='Source note']").waitFor();
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+  }
+});
+
 journey("a recording plays in place: its player over the transcript, his highlights as ticks, a stamp seeks it, Space plays and pauses (D167)", async (page) => {
   await openSource(page, "Lecture 4");
   const player = page.locator(".player.audio");

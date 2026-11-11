@@ -286,7 +286,10 @@ export function App() {
   const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360 });
   useLayoutEffect(() => document.documentElement.style.setProperty("--sidebar", `${sideWidth.width}px`), [sideWidth.width]);
   const [notesOpen, setNotesOpen] = useState(() => load("ore.mynotes") !== "closed");
-  const [sideTab, setSideTab] = useState<SideTab>(() => (load("ore.sidetab") === "questions" ? "questions" : "note"));
+  const [sideTab, setSideTab] = useState<SideTab>(() => {
+    const t = load("ore.sidetab");
+    return t === "questions" || t === "original" ? t : "note";
+  });
   const { width, size, page, font } = useReading();
   const keys = useKeymap();
   /** Files dragged over the window: their kinds, and the skill they would go to (null: no skill). */

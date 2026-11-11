@@ -2,7 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { Children, createContext, isValidElement, memo, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -36,7 +36,7 @@ import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
-import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
+import { chunks, pageChunks, pageOf, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
@@ -63,6 +63,8 @@ const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece o
 // The highlight note's placeholder (D94, D126); never prefilled. A plain highlight's note is open: any
 // thought he has while reading. A key point asks why it holds (self-explanation), a question asks for
 // a guess first (prediction): those two are tested later, so their prompts pay off.
+const Original = lazy(() => import("./OriginalPage"));
+
 const PLACEHOLDER: Record<Intent, string> = {
   keep: "Note…",
   card: "This works because…",
@@ -492,10 +494,10 @@ type VideoCard = { head: ReactNode; foot?: ReactNode; box: RefObject<HTMLDivElem
 
 /** The document body, rendered in slices so a 100k-word book stays responsive while it mounts. With a
  *  video card, the transcript before VIDEO_END goes in the card and the page's text follows it. */
-const Body = memo(function Body({ markdown, video, dir, cells, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
+const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; pages?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
   const split = card ? markdown.indexOf(VIDEO_END) : -1;
   const top = useMemo(() => (split > 0 ? chunks(markdown.slice(0, split)) : []), [markdown, split]);
-  const rest = useMemo(() => chunks(split > 0 ? markdown.slice(split) : markdown), [markdown, split]);
+  const rest = useMemo(() => (pages ? pageChunks : chunks)(split > 0 ? markdown.slice(split) : markdown), [markdown, split, pages]);
   const total = top.length + rest.length;
   const [shown, setShown] = useState(() => Math.min(total, 2));
   const ref = useRef<HTMLElement>(null);
@@ -519,9 +521,16 @@ const Body = memo(function Body({ markdown, video, dir, cells, onReady, card }: 
           {card.foot}
         </section>
       )}
-      {rest.slice(0, Math.max(0, shown - top.length)).map((md, i) => (
-        <Chunk key={`r${i}`} md={md} video={video} dir={dir} cells={cells} />
-      ))}
+      {rest.slice(0, Math.max(0, shown - top.length)).map((md, i) => {
+        // Where a PDF's page starts (D202), for the Original tab to follow. Page 1 needs no mark: it is what shows above the first.
+        const page = pages && i > 0 ? pageOf(md) : null;
+        return (
+          <Fragment key={`r${i}`}>
+            {page && <i hidden data-page={page} />}
+            <Chunk md={md} video={video} dir={dir} cells={cells} />
+          </Fragment>
+        );
+      })}
     </article>
   );
 });
@@ -1199,9 +1208,39 @@ function ReaderView(p: Props & { reload: () => void }) {
   const recalled = useMemo(() => new Set((doc?.chapter_recalls ?? []).map((c) => c.n)), [doc?.chapter_recalls]);
 
   // Opening the source note puts the caret in it; closing writes what is pending.
-  const notesShown = p.notesOpen && !closedBook && p.sideTab === "note";
-  const questionsShown = p.notesOpen && !closedBook && p.sideTab === "questions";
-  const panelShown = notesShown || questionsShown;
+  /** A PDF's own file, for the Original tab (D202); any other source has only the two tabs. */
+  const pdf = !PHONE && doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
+  const sideTab: SideTab = p.sideTab === "original" && !pdf ? "note" : p.sideTab;
+  const notesShown = p.notesOpen && !closedBook && sideTab === "note";
+  const questionsShown = p.notesOpen && !closedBook && sideTab === "questions";
+  const originalShown = p.notesOpen && !closedBook && sideTab === "original";
+  const panelShown = notesShown || questionsShown || originalShown;
+  /** The page of the original being read: the last page mark (`Body`) that has passed the top third of the view. */
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!originalShown || !ready || !el) return;
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      const marks = docEl.current?.querySelectorAll<HTMLElement>("[data-page]") ?? [];
+      const line = el.getBoundingClientRect().top + el.clientHeight / 3;
+      let lo = 0, hi = marks.length; // the marks are in reading order: find the first one still below the line
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if ((marks[mid]!.nextElementSibling?.getBoundingClientRect().top ?? Infinity) <= line) lo = mid + 1;
+        else hi = mid;
+      }
+      setPage(lo ? Number(marks[lo - 1]!.dataset.page) : 1);
+    };
+    const onScroll = () => (frame ||= requestAnimationFrame(read));
+    read();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [originalShown, ready, shownBody]);
 
   /** The chapter block (D115): the sign opens the source note with the chapter's title and three
    *  prompts, the source hidden (D34.4) until he ends it with ⌘↵ (recorded, then feedback) or Esc
@@ -2654,6 +2693,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
         { id: "collected", label: questionsShown ? "Close collected" : "Collected", hint: label(keys.collected), run: () => p.onShowSide("questions") },
+        ...(pdf ? [{ id: "original-page", label: originalShown ? "Close original page" : "Original page beside the text", paletteOnly: true, run: () => p.onShowSide("original") }] : []),
         ...(readingFor ? [{ id: "reading-for", label: "Show prequestions", paletteOnly: true, run: () => setPreqAsk((n) => n + 1) }] : []),
         ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", run: () => {
           setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
@@ -2973,7 +3013,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             </div>
           )}
           <TableCtx.Provider value={tables}>
-            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} onReady={onReady} card={cardMode ? videoCard : undefined} />
+            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf} onReady={onReady} card={cardMode ? videoCard : undefined} />
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
@@ -3157,9 +3197,13 @@ function ReaderView(p: Props & { reload: () => void }) {
         </div>
       )}
       {/* On the phone the note stays beside the source, a swipe away, so each keeps its place. */}
-      {(notesShown || questionsShown || (PHONE && !closedBook)) && (
-        <SidePanel tab={p.sideTab} onTab={(t) => p.onShowSide(t, true)} bodyRef={sideBody} onBodyMouseDown={p.sideTab === "note" ? clickBelow(notesField) : undefined}>
-          {notesShown || (PHONE && !questionsShown) ? (
+      {(panelShown || (PHONE && !closedBook)) && (
+        <SidePanel tab={sideTab} onTab={(t) => p.onShowSide(t, true)} original={!!pdf} bodyRef={sideBody} onBodyMouseDown={sideTab === "note" ? clickBelow(notesField) : undefined}>
+          {originalShown && pdf ? (
+            <Suspense fallback={null}>
+              <Original file={pdf} page={page} />
+            </Suspense>
+          ) : notesShown || (PHONE && !questionsShown) ? (
             <SourceNoteBody
               id={p.id}
               notes={notes}

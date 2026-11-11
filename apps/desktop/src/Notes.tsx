@@ -1,4 +1,4 @@
-import { PixelNote, PixelStack } from "./PixelIcon";
+import { PixelNote, PixelPage, PixelStack } from "./PixelIcon";
 import { resizeDrag } from "./drag";
 import { clampSide } from "./split";
 import * as Tabs from "@radix-ui/react-tabs";
@@ -361,15 +361,15 @@ export function useSideWidth(key: string, initial: number, min = 280, { left = f
 
 /** The source note (D31, D44) as the right half of a split screen: the divider drags to resize,
  *  double-click resets it, and the width is remembered. His writing only (D34.2). */
-export type SideTab = "note" | "questions";
+export type SideTab = "note" | "questions" | "original";
 
 /** The reader's right panel: one panel, two tabs (D75), like Notion's side peek. N opens the source
  *  note, C what he collected (Q too, at his questions); the same key again closes the panel. The toggle at the
  *  window's top right (⌥⌘S) shows or hides it. Resizable, width remembered. */
-export function SidePanel({ tab, onTab, bodyRef, onBodyMouseDown, children }: { tab: SideTab; onTab: (t: SideTab) => void; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
+export function SidePanel({ tab, onTab, original, bodyRef, onBodyMouseDown, children }: { tab: SideTab; onTab: (t: SideTab) => void; /** The source is a PDF: its own pages get a tab (D202). */ original?: boolean; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
   const { width, dragging, divider } = useSideWidth("ore.notewidth", NOTE_WIDTH);
   return (
-    <aside className={`mynotes${dragging ? " dragging" : ""}`} aria-label={tab === "note" ? "Source note" : "Collected"} style={{ width }}>
+    <aside className={`mynotes${dragging ? " dragging" : ""}`} aria-label={tab === "note" ? "Source note" : tab === "original" ? "Original" : "Collected"} style={{ width }}>
       <Hint text="Drag to resize · double-click to reset" side="left">
         <div
           className="divider"
@@ -388,6 +388,11 @@ export function SidePanel({ tab, onTab, bodyRef, onBodyMouseDown, children }: { 
             <Hint text="Your highlights, key points and questions from this source" keys="collected">
               <Tabs.Trigger value="questions" data-tone="read"><PixelStack className="card-icon" size={12} aria-hidden="true" />Collected</Tabs.Trigger>
             </Hint>
+            {original && (
+              <Hint text="The PDF’s own page, beside the text you are reading">
+                <Tabs.Trigger value="original"><PixelPage className="card-icon" size={12} aria-hidden="true" />Original</Tabs.Trigger>
+              </Hint>
+            )}
           </Tabs.List>
         </div>
         <Tabs.Content ref={bodyRef} value={tab} className="mynotes-text" tabIndex={-1} onMouseDown={onBodyMouseDown}>

@@ -124,6 +124,26 @@ export const PixelBook = sprite([
   "................",
 ]);
 
+/** Original: the source's own page, a sheet with a folded corner and its lines (MingCute's document). */
+export const PixelPage = sprite([
+  "................",
+  "................",
+  "...#######......",
+  "...#######.#....",
+  "...#######.##...",
+  "...#######......",
+  "...##########...",
+  "...##......##...",
+  "...##########...",
+  "...##......##...",
+  "...##########...",
+  "...##....####...",
+  "...##########...",
+  "...##########...",
+  "................",
+  "................",
+]);
+
 /** Collected: what he has gathered from a source, a stack of sheets. */
 export const PixelStack = sprite([
   "................",
