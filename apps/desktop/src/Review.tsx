@@ -11,6 +11,7 @@ import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
+import { keydownFor } from "./menubar";
 import { lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
@@ -51,10 +52,10 @@ type Passage = { item: string; title: string; quotes: { text: string; at: string
 /** An exercise as he had it on screen when he put it off: ⌘Z brings it back so (D192). `elapsed`: its clock so far. */
 type Shown = {
   card: CardFull; phase: "answer" | "checked"; answer: string; conf?: number; inHead: boolean; grade: Grade | null; marks: (boolean | undefined)[] | null;
-  remark: boolean; gradeError: string | null; passage: Passage | null; quoteAt: number; passageGone: string | null; elapsed: number;
+  remark: boolean; gradeError: string | null; passage: Passage | null; quoteAt: number; passageGone: string | null; asking: boolean; elapsed: number;
 };
 /** One Later on the history: the session before and after it (null: it ended the session), and what it changed. */
-type Put = { id: string; before: DueEntry[]; after: DueEntry[] | null; off: Set<string>; won: boolean; shown: Shown };
+type Put = { id: string; before: DueEntry[]; after: DueEntry[] | null; off: Set<string>; won: boolean; shown: Shown; forget?: Forget };
 type Rating = 1 | 2 | 3 | 4;
 /** The session receipt, and today before and after it (for the ring and level-ups). */
 /** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
@@ -165,7 +166,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const [start, setStart] = useState<Today | null>(null);
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
-  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; forget: Forget }[]>([]);
+  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; forget: Forget }[]>([]);
   const last = undos.at(-1);
   /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
   const retired = useRef(new Set<string>());
@@ -192,6 +193,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   /** The card's words as the editor last loaded them: an undo refreshes the editor only if he hasn't typed since. */
   const loaded = useRef(draft);
   const entry = queue?.[0];
+  /** For a press a Later passes on (`passOn`): the history's own keys, as he has them set. */
+  const keymap = useKeymap();
 
   useEffect(() => {
     let live = true;
@@ -296,8 +299,11 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setPassage(s.passage);
     setQuoteAt(s.quoteAt);
     setPassageGone(s.passageGone);
+    setAsking(s.asking);
     shownAt.current = Date.now() - s.elapsed;
     shownAnswerAt.current = 0;
+    // Put off before its passage landed: that reply was dropped as it moved on, so it loads now.
+    if (s.phase === "checked" && !s.passage && !s.passageGone) loadPassage(s.card);
   };
   const dropAhead = () => void (ahead.current = null);
   const loadCard = (id: string) => ore<CardFull>("card", "show", id, "--review");
@@ -563,7 +569,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
    *  ⌘Z takes it back and ⇧⌘Z gives it again: the same rating, answer and time. Throws if the write fails. */
   const submit = async (args: string[], rating: number, elapsed: number, again?: { forget: Forget; setTs: (ts: string) => void }) => {
-    const was = { queue: queue ?? [], done, activeMs: activeMs.current, off: new Set(putOffIds.current) };
+    const was = { queue: queue ?? [], done, activeMs: activeMs.current, off: new Set(putOffIds.current), won: wonLast.current };
     const r = await ore<{ ts: string }>("review", ...args);
     reviewed.current++;
     const id = args[0]!;
@@ -613,6 +619,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       reviewed.current--;
       activeMs.current = last.activeMs;
       putOffIds.current = new Set(last.off);
+      // D177's one more goes with the rating that earned it.
+      wonLast.current = last.won;
       setDone(last.done);
       setQueue(last.queue.filter((e) => !retired.current.has(e.id)));
       setUndos((u) => u.slice(0, -1));
@@ -635,8 +643,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const shownNow = (c: CardFull): Shown => {
     const base = { card: c, answer, conf, elapsed: Date.now() - shownAt.current };
     if (phase !== "checked" || (c.kind === "prompt" && !inHead && !marks && !gradeError))
-      return { ...base, phase: "answer", inHead: false, grade: null, marks: null, remark: false, gradeError: null, passage: null, quoteAt: 0, passageGone: null };
-    return { ...base, phase: "checked", inHead, grade, marks, remark, gradeError, passage, quoteAt, passageGone };
+      return { ...base, phase: "answer", inHead: false, grade: null, marks: null, remark: false, gradeError: null, passage: null, quoteAt: 0, passageGone: null, asking: false };
+    // Ask open (D192): it comes back open, its chat kept as closing and opening it keeps it.
+    return { ...base, phase: "checked", inHead, grade, marks, remark, gradeError, passage, quoteAt, passageGone, asking };
   };
 
   /** Later (D192, Anki's Bury for this session): the exercise goes to the end of the session, before or after
@@ -650,10 +659,10 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     putOffIds.current.add(card.id);
     // D177's one more after a miss was this one: put off, it is no answer, so the next one he answers takes that turn.
     wonLast.current = false;
-    if (!redo)
-      laterSteps.current.add(
-        notify("Later", "quiet", () => (mounted.current && undoLaterNow.current(p)) || Promise.resolve(), () => (mounted.current && redoLaterNow.current(p)) || Promise.resolve()),
-      );
+    if (!redo) {
+      p.forget = notify("Later", "quiet", () => (mounted.current && undoLaterNow.current(p)) || passOn(p, "undo"), () => (mounted.current && redoLaterNow.current(p)) || passOn(p, "redo"));
+      laterSteps.current.add(p.forget);
+    }
     if (!p.after) {
       void finish();
       return true;
@@ -662,26 +671,43 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     setQueue(p.after);
     return true;
   };
-  const sameOrder = (a: DueEntry[], b: DueEntry[]) => a.length === b.length && a.every((e, i) => e.id === b[i]!.id);
-  // ⌘Z right after a Later (or after steps since, taken back): the exercise shows again as he had it. One that
-  // ended the session opens it again, on that exercise. Anything else moved the session since: nothing to do.
+  /** A Later the session has moved past (its exercise has left the session: answered in the quick quiz, retired
+   *  on its next turn): nothing is left to take back, so it leaves the history and the press goes on to the step
+   *  before it, never spent on nothing. */
+  const passOn = (p: Put, what: "undo" | "redo") => {
+    setTimeout(() => {
+      if (p.forget) {
+        p.forget();
+        laterSteps.current.delete(p.forget);
+      }
+      document.body.dispatchEvent(keydownFor(keymap[what]));
+    });
+    return Promise.resolve();
+  };
+  // ⌘Z after a Later: the exercise is the current one again, as he had it, wherever the session has put it since
+  // (a step since, like a Retire, may have moved the rest). One that ended the session opens it again on it.
   undoLaterNow.current = (p) => {
-    if (busyNow.current || !queue || (p.after ? !!end || !sameOrder(queue, p.after) : !end || !sameOrder(queue, p.before))) return null;
-    putOffIds.current = p.off;
+    if (!queue) return null;
+    if (busyNow.current) return Promise.reject(new Error("Still saving. Try again in a moment."));
+    const at = queue.findIndex((e) => e.id === p.id);
+    if (at < 0 || (end && at !== 0)) return null;
+    putOffIds.current = new Set(p.off);
     wonLast.current = p.won;
-    if (!p.after) {
-      const id = end!.session.id;
+    if (end) {
+      const id = end.session.id;
       setBusy(true);
       return ore("session", "reopen", id)
         .then(() => {
           if (session.current) session.current.open = true;
+          // Its clock goes on from the Later, so the time on the end screen never counts (D60).
+          shownAt.current = Date.now() - p.shown.elapsed;
           setEnd(null);
         })
         .finally(() => setBusy(false));
     }
     dropAhead();
     restoreTo.current = { id: p.id, was: p.shown };
-    setQueue(p.before);
+    setQueue([queue[at]!, ...queue.slice(0, at), ...queue.slice(at + 1)]);
     return Promise.resolve();
   };
   redoLaterNow.current = (p) => (queue?.[0]?.id === p.id && later(p) ? Promise.resolve() : null);
@@ -865,9 +891,10 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       void retire();
       return;
     }
-    if (is(e, "later")) {
+    if (is(e, "later") && !PHONE) {
       e.preventDefault();
-      later();
+      // A held ⌘L puts off the one on screen, never the ones after it.
+      if (!e.repeat) later();
       return;
     }
     if (phase === "answer") {
@@ -1196,11 +1223,14 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                       </button>
                     </Hint>
                   )}
-                  <Hint text="Later: at the end of this session" keys="later" side="top">
-                    <button aria-label="Later" disabled={busy} onClick={() => later()}>
-                      <Clock size={14} aria-hidden="true" />
-                    </button>
-                  </Hint>
+                  {/* The Mac only for now (D192): the phone's toolbar stays as it was. */}
+                  {!PHONE && (
+                    <Hint text="Later: at the end of this session" keys="later" side="top">
+                      <button aria-label="Later" disabled={busy} onClick={() => later()}>
+                        <Clock size={14} aria-hidden="true" />
+                      </button>
+                    </Hint>
+                  )}
                   {entry.state === "draft" ? (
                     <Hint text="Delete exercise" keys="retire-card" side="top">
                       <button aria-label="Delete exercise" onClick={() => void retire()}>
