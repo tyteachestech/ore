@@ -198,6 +198,14 @@ export async function putEnd(lib: Library, ref: string, id: string, mark: Mark):
   });
 }
 
+/** Records text already at the body's end (a Reimport adding the page text again) for `takeEnd`; its id. */
+export function recordEnd(lib: Library, item: string, at: number, text: string): string {
+  const cut: Cut = { id: ulid(), item, at, text, section: false, removed: [] };
+  mkdirSync(stashDir(lib, item), { recursive: true });
+  writeAtomic(join(stashDir(lib, item), `${cut.id}.json`), JSON.stringify(cut));
+  return cut.id;
+}
+
 /** Writes the body and its record; called under the lock. */
 function write(lib: Library, item: Item, cut: Cut, next: string, meta: ItemMeta) {
   writeAtomic(item.docPath, stringifyFrontmatter({ ...meta, text_sha256: sha256(next) }, next));

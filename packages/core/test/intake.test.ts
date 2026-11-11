@@ -1218,6 +1218,39 @@ describe("import coverage: audio and podcasts", () => {
     expect(now.body.startsWith("[01:00] Thanks for listening.\n\n## From the page\n")).toBe(true);
   });
 
+  test("Reimport keeps a source's shape: an article stays the article, an episode keeps the page text he added", async () => {
+    const lib = await tempLibrary();
+    // Saved as an article (before D213, or its audio wouldn't come then): Reimport reads it as the article again.
+    serve({ [EPISODE]: { body: episodePage, type: HTML } });
+    const article = await addSource(lib, EPISODE);
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    expect((await reimportSource(lib, article.meta.id)).changed).toBe(false);
+    expect(existsSync(join(article.dir, "source.mp3"))).toBe(false);
+    expect(findItem(lib, article.meta.id).body).toBe(article.body);
+    // An episode with its page text: heard again, the page text after it, its highlight kept.
+    const lib2 = await tempLibrary();
+    const ep = await addSource(lib2, EPISODE);
+    await addPageText(lib2, ep.meta.id);
+    const inPage = addHighlight(findItem(lib2, ep.meta.id), { exact: "For *Scientific American*", intent: "keep" });
+    const vtt2 = join(mkdtempSync(join(tmpdir(), "ore-vtt-")), "out.vtt");
+    writeFileSync(vtt2, VTT.replace("Welcome back to the show.", "Welcome back."));
+    process.env.ORE_TRANSCRIBE = stand(`cat '${vtt2}'`);
+    try {
+      const r = await reimportSource(lib2, ep.meta.id);
+      expect(r.changed).toBe(true);
+      expect(r.removed).toEqual([]);
+      const now = findItem(lib2, ep.meta.id);
+      expect(now.body.startsWith("[00:00] Welcome back. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n\n## From the page\n\n**Rachel Feltman:**")).toBe(true);
+      expect(readAnnotations(now).find((a) => a.id === inPage.id)?.exact).toBe("For *Scientific American*");
+      expect(hasPageText(now)).toBe(false);
+      // Its Undo still takes the page text out.
+      await undoPageText(lib2, ep.meta.id, now.meta.page_added!);
+      expect(findItem(lib2, ep.meta.id).body).toBe("[00:00] Welcome back. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n");
+    } finally {
+      process.env.ORE_TRANSCRIBE = stand(`cat '${vttFile}'`);
+    }
+  });
+
   test("an episode page whose audio won't come still comes in as the article", async () => {
     serve({ [EPISODE]: { body: episodePage, type: HTML } }); // the audio 404s
     const item = await addSource(await tempLibrary(), EPISODE);
