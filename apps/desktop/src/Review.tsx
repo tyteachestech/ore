@@ -65,18 +65,16 @@ type End = { session: SessionEnd; today: Today; before: Today | null; next: Try 
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
 
 /** Answers typed but not checked, and how sure he said he was, by card: putting the quick quiz away
- *  (D76), Esc or Open in source keep them for when the card comes up again; on the phone, a relaunch too. */
-const drafts = kept<{ text: string; conf?: number; asked: string; at: number }>(PHONE ? "ore.review-drafts" : null);
+ *  (D76), Esc, Open in source or quitting the app keep them for when the card comes up again (for a day, `kept`). */
+const drafts = kept<{ text: string; conf?: number; asked: string }>("ore.review-drafts");
 /** What a draft was typed for: the question, or the remixed version shown (D66). One for another is dropped. */
 const askedOf = (c: CardFull) => `${c.variant ?? ""}\n${c.question}`;
-/** A draft lasts a day: today's session is the slice it was typed in (D65), and tomorrow the exercise is asked anew. */
-const DRAFT_MS = 24 * 3600_000;
 const draftFor = (c: CardFull) => {
   const d = drafts.get(c.id);
-  if (d && (d.asked !== askedOf(c) || Date.now() - d.at > DRAFT_MS)) return void drafts.delete(c.id);
+  if (d && d.asked !== askedOf(c)) return void drafts.delete(c.id);
   return d;
 };
-const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c), at: Date.now() });
+const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c) });
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
@@ -1010,9 +1008,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         </Hint>
       </div>
 
-      {/* VoiceOver hears each new card and when the AI's marks arrive, not only the end screen. */}
+      {/* VoiceOver hears each new card and the key points as marked (by the AI, or by him), not only the end screen. */}
       <div className="sr-only" aria-live="polite">
-        {card && !end && queue?.length ? `Exercise ${done + 1} of ${done + left}. ${card.question.replace(/_{4,}/g, "blank")}${grade ? `. Marked ${grade.covered.filter(Boolean).length} of ${grade.covered.length} key points` : ""}` : ""}
+        {card && !end && queue?.length ? `Exercise ${done + 1} of ${done + left}. ${card.question.replace(/_{4,}/g, "blank")}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
         {error && (

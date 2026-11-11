@@ -42,7 +42,7 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, focusQuietly, inOrder, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
+import { errorText, focusQuietly, inOrder, kept, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
@@ -567,6 +567,8 @@ type Props = {
   skills: Skill[];
   finishing: boolean;
   setFinishing: (on: boolean) => void;
+  /** Finish has saved all it has (the phone forgets that Finish was open), or a save after Done failed (it keeps it). */
+  onFinishRecorded?: (saved: boolean) => void;
   /** The side panel is open (D44), on `sideTab` (D75). */
   notesOpen: boolean;
   sideTab: SideTab;
@@ -612,6 +614,10 @@ type Props = {
   notify: Notify;
 };
 
+/** A key point being typed ("Card here"), by source: its line, its anchor and the text at it (NEAR characters). */
+const keyDrafts = kept<{ text: string; at: number; near: string }>("ore.keypoint-drafts");
+const NEAR = 64;
+
 /** A reimport (or its undo) replaces the text under every highlight range and mark, so the reader
  *  starts over on the new text rather than patching what it drew. */
 export function Reader(p: Props) {
@@ -641,6 +647,28 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [adding, setAdding] = useState<string | null>(null);
   /** Where Card here was opened: the source offset his line is anchored at. */
   const hereAt = useRef<number | null>(null);
+  // The line he was typing comes back after a relaunch (for a day, `kept`), anchored where it was, into the place he
+  // left it: the Collected field, when Collected opens (or Card here does) or is open as the source opens; never over a line in
+  // progress, and not when the source's text there has changed since (a reimport, the Mac's edit through sync).
+  const keptLine = (): string | null => {
+    const d = keyDrafts.get(p.id);
+    if (!d || !doc) return null;
+    if (doc.body.slice(d.at, d.at + NEAR) !== d.near) return void keyDrafts.delete(p.id), null;
+    hereAt.current = d.at;
+    return d.text;
+  };
+  const collectedOpen = p.notesOpen && p.sideTab === "questions";
+  useEffect(() => {
+    if (!doc || adding !== null || !collectedOpen) return;
+    const line = keptLine();
+    if (line !== null) setAdding(line);
+  }, [doc, p.id, collectedOpen]);
+  useEffect(() => {
+    const at = hereAt.current;
+    if (adding === null || !doc) return;
+    if (adding.trim() && at !== null) keyDrafts.set(p.id, { text: adding, at, near: doc.body.slice(at, at + NEAR) });
+    else keyDrafts.delete(p.id);
+  }, [adding, doc, p.id]);
   /** He asked for the key point field (+, Card here, a failed save): it takes focus once, not on every remount. */
   const focusAdd = useRef(false);
   const [addAsk, setAddAsk] = useState(0);
@@ -1560,10 +1588,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** A key point of his own ("Card here", Tyler, 2026-10-29; D118): a line he types, anchored where he is now, drafted from the whole source. */
   function cardHere() {
     if (popup) closePopup();
-    // A draft he kept stays anchored where he started it.
-    if (adding === null) hereAt.current = here();
+    // A draft he kept stays anchored where he started it, one kept across a relaunch too.
+    const restored = adding === null ? keptLine() : null;
+    if (adding === null && restored === null) hereAt.current = here();
     focusAdd.current = true;
-    setAdding((cur) => cur ?? "");
+    setAdding((cur) => cur ?? restored ?? "");
     setAddAsk((n) => n + 1);
     p.onShowSide("questions", true);
   }
@@ -2364,7 +2393,8 @@ function ReaderView(p: Props & { reload: () => void }) {
         markPlace();
         return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
       }
-      return p.notify(`That part of the page wasn’t saved with it.${doc?.url && doc.type !== "snippet" ? " Reimport the source from its ⋯ menu to fetch it again." : ""}`, "error");
+      // The phone can't reimport (D78): the step is the Mac's.
+      return p.notify(`That part of the page wasn’t saved with it.${doc?.url && doc.type !== "snippet" ? (PHONE ? " Reimport the source on your Mac to fetch it again." : " Reimport the source from its ⋯ menu to fetch it again.") : ""}`, "error");
     }
     if (/^(?:https?|mailto):/i.test(href)) return void openUrl(href).catch((e) => p.notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
     p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. Add it with ${label(keys.file)} to read it here.`, "error");
@@ -2661,7 +2691,8 @@ function ReaderView(p: Props & { reload: () => void }) {
         { id: "rename", label: "Rename…", hint: label(keys.rename), divider: true, run: () => setRenaming(true) },
         { id: "author", label: doc.author ? "Edit author…" : "Add author…", run: () => setAuthoring(true) },
         // A PDF or EPUB file is read again from the copy kept with it, so a better reader reaches it.
-        ...((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub" ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
+        // Not on the phone: it can't fetch a page (its CSP) or reread an original (not in its library), D78; like Listen.
+        ...(!PHONE && ((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub") ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
         ...(PHONE ? [] : [{ id: "find", label: "Find in source…", hint: label(keys.filter), paletteOnly: true, run: openFind }]),
         ...(p.skills.length
           ? [{
@@ -3264,7 +3295,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               anns={anns}
               timeOf={timeOf}
               adding={adding}
-              onAdding={(on) => (on ? cardHere() : setAdding(null))}
+              onAdding={(on) => (on ? cardHere() : (setAdding(null), keyDrafts.delete(p.id)))}
               onEdit={setAdding}
               addAsk={addAsk}
               takeAddFocus={() => {
@@ -3306,6 +3337,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             scrollRef.current?.focus({ preventScroll: true });
           }}
           onDone={p.onDone}
+          onMarked={p.onFinishRecorded}
           nextLesson={nextUp && { title: nextUp.title, open: () => (p.onChanged(), p.onOpenLesson(nextUp.id)) }}
           notify={p.notify}
           flushNotes={notes.flush}
@@ -3355,9 +3387,9 @@ function ReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>; onOp
   );
 }
 
-/** Prequestion guesses typed but not yet stored, by source and question: leaving the source keeps them for when
- *  he comes back (Enter still stores one). */
-const preqDrafts = new Map<string, string>();
+/** Prequestion guesses typed but not yet stored, by source and question (a rewritten question is another key):
+ *  leaving the source or quitting the app keeps them for when he comes back (for a day, `kept`); Enter stores one. */
+const preqDrafts = kept<string>("ore.preq-drafts");
 
 /** "What do you already know?" — short attempts before reading, stored and never scored (D18). Question rows; the one
  *  you are on opens an answer line, Enter stores it and opens the next unanswered one. */
@@ -3385,8 +3417,8 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
   // One answer line open at a time (Perplexity "Related"): the rest stay visible as things to read for.
   // Coming back with a guess he hadn't stored opens its line again.
   const [at, setAt] = useState(() => {
-    const kept = qs.findIndex((_, i) => preqDrafts.has(draftKey(i)));
-    return kept >= 0 ? kept : qs.findIndex((q) => !q.before);
+    const left = qs.findIndex((_, i) => preqDrafts.get(draftKey(i)) !== undefined);
+    return left >= 0 ? left : qs.findIndex((q) => !q.before);
   });
   const edit = (i: number, text: string) => {
     setVals((v) => v.map((x, j) => (j === i ? text : x)));
@@ -3399,7 +3431,7 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
   const focusLine = useRef(false);
   // Open while they can still do their work: before he starts reading. Once he has highlighted or is reading,
   // the block folds to its one line so the text comes first; one click opens it again.
-  const [open, setOpen] = useState(() => qs.some((_, i) => preqDrafts.has(draftKey(i))) || (qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length));
+  const [open, setOpen] = useState(() => qs.some((_, i) => preqDrafts.get(draftKey(i)) !== undefined) || (qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length));
   // The row he just answered plays a short check-in, so the move from typing to answered reads as done.
   const [just, setJust] = useState(-1);
   if (!qs.length && !waiting && !onRetry) return null;

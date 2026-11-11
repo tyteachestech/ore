@@ -4963,6 +4963,63 @@ journey("review: Esc keeps a half-typed answer and how sure he was, for when the
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: a half-typed answer survives quitting the app, for a day", async (page) => {
+  // On the Mac it lived in memory only: quitting Ore lost it (daily-session.md: nothing is lost when a session is cut short).
+  await page.clock.install();
+  await page.reload();
+  await page.locator(".side-item").first().waitFor();
+  const field = page.getByRole("textbox", { name: "Your answer" });
+  await startReview(page, /Teaching/);
+  await field.fill("an answer cut short");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  // ⌘Q: the shell says "quitting" (the page gets no pagehide), and what was typed a moment ago is written at once.
+  const written = await page.evaluate(() => {
+    (window as unknown as { __emit: (e: string) => void }).__emit("quitting");
+    return localStorage.getItem("ore.review-drafts") ?? "";
+  });
+  if (!written.includes("an answer cut short")) throw new Error("the answer wasn't written when the app said it was quitting");
+  await page.reload();
+  await startReview(page, /Teaching/);
+  await until("the answer is back after the relaunch", async () => (await field.inputValue()) === "an answer cut short");
+  await until("so is how sure he was", async () => (await page.getByRole("radio", { name: "Think so" }).getAttribute("aria-checked")) === "true");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  // A day on, it is asked anew.
+  await page.clock.fastForward("25:00:00");
+  await page.reload();
+  await startReview(page, /Teaching/);
+  await until("a day on the answer starts empty", async () => (await field.inputValue()) === "");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: the screen reader's summary counts the key points as he has marked them, not as the AI did", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 3, gaps: [], feedback: "", covered: [true, true] } }));
+  await startReview(page, /Teaching/);
+  await page.getByRole("textbox", { name: "Your answer" }).fill("fluency feels like knowing, so they overrate it");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const live = page.locator(".review .sr-only[aria-live]");
+  await until("the AI's marks are read out", async () => (await live.innerText()).includes("Marked 2 of 2 key points"));
+  await page.getByRole("button", { name: /^Got: .*Mark as missed$/ }).first().click();
+  await until("his correction is read out", async () => (await live.innerText()).includes("Marked 1 of 2 key points"));
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+journey("review: with no AI marks (the check failed), the screen reader counts the ones he sets", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { grade: "AI is signed out." }));
+  await startReview(page, /Teaching/);
+  await page.getByRole("textbox", { name: "Your answer" }).fill("fluency feels like knowing");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const live = page.locator(".review .sr-only[aria-live]");
+  await page.getByRole("button", { name: /Mark as got$/ }).first().click();
+  await until("his mark is read out", async () => (await live.innerText()).includes("Marked 1 of 2 key points"));
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: Start review clicked before the skills have loaded still asks what to review", async (page) => {
   // Home's numbers can land before the skill list (CI, 2026-11-07): the click must not start every skill unasked.
   await page.addInitScript("window.__ORE_SLOW = { skills: 1500 }");
@@ -8672,14 +8729,17 @@ const touchArea = (page: Page, sel: string) =>
     return [reach(-1, 0) + reach(1, 0), reach(0, -1) + reach(0, 1)] as [number, number];
   }, sel);
 
+/** Throws unless a touch lands on the element over at least 44×44 around its middle. */
+async function fits44(page: Page, sel: string, what: string) {
+  await page.locator(sel).first().scrollIntoViewIfNeeded();
+  const a = await touchArea(page, sel);
+  if (!a || a[0] < 43 || a[1] < 43) throw new Error(`${what} answers a touch over ${a?.join("×") ?? "nothing"}, under 44×44`);
+}
+
 journey("phone: the small controls of a source answer a 44pt touch", async (page) => {
   // Apple's minimum: a link under a question, the original-site link, the pill without a section, a highlight's
   // note field and the closing card's buttons were 17 to 42pt.
-  const fits = async (sel: string, what: string) => {
-    await page.locator(sel).first().scrollIntoViewIfNeeded();
-    const a = await touchArea(page, sel);
-    if (!a || a[0] < 43 || a[1] < 43) throw new Error(`${what} answers a touch over ${a?.join("×") ?? "nothing"}, under 44×44`);
-  };
+  const fits = (sel: string, what: string) => fits44(page, sel, what);
   await phoneSource(page, AGENTS);
   await fits(".doc-head .source", "the original-site link");
   await fits(".read-pill", "the reading pill");
@@ -8819,6 +8879,163 @@ journey("phone: a kept draft goes when the Mac changes what it answered, and not
     await page.getByText("Explain why rereading misleads learners.").first().waitFor();
     if ((await field.inputValue()) !== "") throw new Error("the answer typed for the old question came back under the new one");
   });
+}, "phone");
+
+journey("phone: a Finish recall typed a day ago starts empty, as Review's answers do", async (page) => {
+  await page.clock.install();
+  await page.reload();
+  await page.locator(".phone-app").waitFor();
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  const recall = page.getByPlaceholder("In your own words…");
+  await tap(page, recall);
+  await page.keyboard.type("Typed yesterday");
+  await Bun.sleep(500);
+  await page.reload();
+  await until("the same day it comes back", async () => (await recall.inputValue().catch(() => "")) === "Typed yesterday");
+  await page.clock.fastForward("25:00:00");
+  await page.reload();
+  await recall.waitFor();
+  await until("a day on it is gone", async () => (await recall.inputValue()) === "");
+}, "phone");
+
+journey("phone: a relaunch once Finish has marked the source Done never opens Finish again", async (page) => {
+  // The phone kept "Finish open" through the closing moment: a relaunch then opened Recall for a source already Done.
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  await tap(page, page.getByRole("button", { name: "Just mark done" }));
+  await page.locator(".quiz-foot button").filter({ hasText: /^Done/ }).waitFor();
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await Bun.sleep(500);
+  if (await page.getByPlaceholder("In your own words…").count()) throw new Error("the relaunch opened Finish's Recall for a source already Done");
+}, "phone");
+
+journey("phone: a key point being typed survives a relaunch, and goes when the text under it changed", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Add a key point here" }));
+  const field = page.getByRole("textbox", { name: "Key point" });
+  await field.waitFor();
+  await page.keyboard.type("Retrieval beats rereading after a week");
+  await Bun.sleep(500);
+  await page.reload();
+  await until("the line comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
+  // Left on the source, it waits for its field: opening Collected later brings it back, and so does Add a key point here.
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+  await page.locator(".reader:not(.noting)").waitFor();
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await Bun.sleep(300);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  await page.locator('aside.mynotes[aria-label="Collected"]').waitFor();
+  await until("opening Collected brings it back", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Add a key point here" }));
+  await until("Add a key point here brings it back", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
+  await macChanges((lib) => itemFile(lib, "the-testing-effect", "doc.md"), "# The Testing Effect: Why Retrieval Beats Rereading\n", "# The Testing Effect: Why Retrieval Beats Rereading\n\nA new opening paragraph the Mac added.\n", async () => {
+    await page.reload();
+    await page.locator(".phone-reader .doc").first().waitFor();
+    await Bun.sleep(800);
+    if (await field.count()) throw new Error("the line came back over text that changed under its anchor");
+    await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: "Add a key point here" }));
+    await field.waitFor();
+    if (await field.inputValue()) throw new Error("the line came back over text that changed under its anchor");
+  });
+}, "phone");
+
+journey("phone: Source actions offers no Reimport, which needs the Mac", async (page) => {
+  // The phone can't fetch a page or reread an original (its CSP and its library leave both to the Mac, D78):
+  // offered, Reimport failed blaming the connection. Like Listen, it isn't offered.
+  await phoneSource(page, AGENTS);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await page.locator(".action-sheet").waitFor();
+  if (await page.locator(".action-sheet button").filter({ hasText: "Reimport" }).count()) throw new Error("Reimport is offered on the phone");
+}, "phone");
+
+journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt touch", async (page) => {
+  await phoneSource(page, TESTING);
+  const action = async (name: RegExp) => {
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: name }));
+  };
+  await action(/^Rename/);
+  await fits44(page, ".doc-head .title-edit", "the title field");
+  await page.keyboard.press("Escape");
+  await action(/author/);
+  await fits44(page, ".doc-head .author-edit", "the author field");
+  await page.keyboard.press("Escape");
+  await action(/^Add a key point here/);
+  await fits44(page, ".cp-input", "the key point field");
+  await page.keyboard.press("Escape");
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+  if (!(await page.locator(".preq-input").count())) await tap(page, page.locator(".preq-head"));
+  await fits44(page, ".preq-input", "the empty answer to What do you already know?");
+  await action(/^Finish/);
+  await fits44(page, '[aria-label="Leave anything out?"]', "Finish's Leave anything out?");
+  await tap(page, page.getByRole("button", { name: "Close quiz" }));
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  await tap(page, page.locator(".phone-reader [contenteditable=true]").first());
+  await page.locator(".kb-bar").waitFor();
+  const n = await page.locator(".kb-bar > .kb-btn, .kb-bar > button").count();
+  for (let i = 1; i <= n; i++) await fits44(page, `.kb-bar > :nth-child(${i})`, `the keyboard bar's button ${i}`);
+}, "phone");
+
+journey("phone: Finish's closing card keeps its unsaved line through a failed save and a relaunch; Done recorded drops the recall", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  // A recall whose save fails, and he marks the source done without it.
+  await tap(page, page.getByPlaceholder("In your own words…"));
+  await page.keyboard.type("A recall he chose not to save");
+  await until("what he typed is kept", async () => (await page.evaluate(() => localStorage.getItem("ore.finish-drafts") ?? "")).includes("chose not to save"));
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { recall: "The disk is full." }));
+  await tap(page, page.getByRole("button", { name: "Continue" }));
+  await tap(page, page.getByRole("button", { name: "Mark done without saving" }));
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  // Done is recorded: the recall he left unsaved is not kept to come back next time.
+  await page.locator("#quiz-use").waitFor();
+  await until("the dropped recall is no longer kept", async () => !(await page.evaluate(() => localStorage.getItem("ore.finish-drafts") ?? "")).includes("chose not to save"));
+  // The closing card's own line, whose save fails: Finish stays open with it, and so does a relaunch.
+  await tap(page, page.locator("#quiz-use"));
+  await page.keyboard.type("Use it before every exam");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { notes: "The disk is full." }));
+  await tap(page, page.locator(".quiz-foot button").filter({ hasText: /^Done/ }));
+  await page.getByText("The disk is full.").first().waitFor();
+  await Bun.sleep(500);
+  await page.reload();
+  await until("the relaunch comes back to the closing card with its line", async () => (await page.locator("#quiz-use").inputValue().catch(() => "")) === "Use it before every exam");
+}, "phone");
+
+journey("phone: a link to a part of the page that wasn't saved says the next step is on the Mac", async (page) => {
+  // The toast said to Reimport from ⋯, which the phone doesn't offer.
+  await macChanges((lib) => itemFile(lib, "building-effective-agents", "doc.md"), "\n# Building Effective Agents\n", "\n# Building Effective Agents\n\nSee [the missing part](#a-part-not-saved).\n", async () => {
+    await phoneSource(page, AGENTS);
+    await tap(page, page.locator(".phone-reader .doc a").filter({ hasText: "the missing part" }));
+    const toast = page.locator(".toasts").filter({ hasText: "wasn’t saved" });
+    await toast.waitFor();
+    const said = await toast.innerText();
+    if (said.includes("⋯") || !said.includes("Mac")) throw new Error(`the toast gives a step the phone can't take: “${said}”`);
+  });
+}, "phone");
+
+journey("phone: a half-typed answer to What do you already know? survives a relaunch", async (page) => {
+  await phoneSource(page, TESTING);
+  const field = page.locator(".preq-input");
+  if (!(await field.count())) await tap(page, page.locator(".preq-head"));
+  await tap(page, field);
+  await page.keyboard.type("Retrieval changes what I can remember");
+  await Bun.sleep(500);
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await until("the answer comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval changes what I can remember");
 }, "phone");
 
 // —— run ——
