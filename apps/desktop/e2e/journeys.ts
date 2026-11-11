@@ -8914,11 +8914,13 @@ journey("phone: a key point being typed survives a relaunch, and goes when the t
   await page.locator(".reader:not(.noting)").waitFor();
   await page.reload();
   await page.locator(".phone-reader .doc").first().waitFor();
+  await Bun.sleep(300);
   await tap(page, page.locator(".phone-tools > :first-child"));
   await page.locator('aside.mynotes[aria-label="Collected"]').waitFor();
-  await Bun.sleep(300);
-  if (await field.count()) throw new Error("the kept line came back with Collected, not where he left it");
+  await until("opening Collected brings it back", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
   await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
   await tap(page, page.getByRole("button", { name: "Source actions" }));
   await tap(page, page.locator(".action-sheet button").filter({ hasText: "Add a key point here" }));
   await until("Add a key point here brings it back", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");

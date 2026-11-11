@@ -647,7 +647,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** Where Card here was opened: the source offset his line is anchored at. */
   const hereAt = useRef<number | null>(null);
   // The line he was typing comes back after a relaunch (for a day, `kept`), anchored where it was, into the place he
-  // left it: the Collected field, when it opens (Card here) or is open as the source opens; never over a line in
+  // left it: the Collected field, when Collected opens (or Card here does) or is open as the source opens; never over a line in
   // progress, and not when the source's text there has changed since (a reimport, the Mac's edit through sync).
   const keptLine = (): string | null => {
     const d = keyDrafts.get(p.id);
@@ -656,14 +656,12 @@ function ReaderView(p: Props & { reload: () => void }) {
     hereAt.current = d.at;
     return d.text;
   };
-  const addTried = useRef(false);
+  const collectedOpen = p.notesOpen && p.sideTab === "questions";
   useEffect(() => {
-    if (!doc || addTried.current) return;
-    addTried.current = true;
-    if (adding !== null || !(p.notesOpen && p.sideTab === "questions")) return;
+    if (!doc || adding !== null || !collectedOpen) return;
     const line = keptLine();
     if (line !== null) setAdding(line);
-  }, [doc, p.id]);
+  }, [doc, p.id, collectedOpen]);
   useEffect(() => {
     const at = hereAt.current;
     if (adding === null || !doc) return;
