@@ -8,8 +8,8 @@ import { join, relative } from "node:path";
 // is: by file and the layer it is on (its component and class), or else the function that builds it.
 const HANDLERS: Record<string, string> = {
   "Tutor.tsx Popover.Content popover menu tutor-chats": "a picked chat puts focus in the field; Esc leaves Radix's default, back to the chat's title",
-  "Menu.tsx ContextMenu.Content popover menu-list": "`closed`: Radix's default, back to the row he right-clicked, unless keepFocus (the picked action moves focus itself)",
-  "Menu.tsx DropdownMenu.Content popover menu-list": "`closed`, as the right-click menu; a hover-only ⋯ (which can't hold focus) gives it to its row (`focusRow`)",
+  "Menu.tsx ContextMenu.Content popover menu-list": "`closed`: Radix's default, back to the row he right-clicked, unless keepFocus (the picked action moves focus itself); after a pick, `keepFocusNear` keeps it on the row, or on its neighbour once the row is gone",
+  "Menu.tsx DropdownMenu.Content popover menu-list": "`closed`, as the right-click menu (`keepFocusNear` after a pick); a hover-only ⋯ (which can't hold focus) gives it to its row (`focusRow`)",
   "Skills.tsx Popover.Content popover menu skill-picker": "to `returnFocus` when the caller passes one (the field it was opened from), else Radix's default, its trigger",
   "Peek.tsx Popover.Content popover peek": "nowhere new: a hover preview that never takes focus (onOpenAutoFocus is cancelled too), so there is nothing to give back",
   "draw/Editor.tsx Popover.Content popover draw-colour": "to the diagram itself (onDone, tintDone), where its keys work, not to the swatch",
