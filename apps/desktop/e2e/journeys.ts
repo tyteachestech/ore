@@ -2937,6 +2937,28 @@ journey("Feed: a post its menu takes away (Mark read in Unread, Unfollow) leaves
   }
 });
 
+// CI's Linux runner (2026-11-11): ⌘Z right after a collection's rename, while the rename still saved, ran its
+// `ore skills arrange` beside the rename's, and the rename's could land last.
+journey("sidebar: ⌘Z while a collection's rename still saves puts the old name back, in the sidebar and the library, and it stays", async (page) => {
+  const label = (t: RegExp) => page.locator(".side-head").filter({ hasText: t });
+  await page.evaluate(() => ((window as unknown as { __ORE_HOLD: Record<string, number[]> }).__ORE_HOLD = { "skills arrange": [900] }));
+  await label(/^Craft$/i).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  await page.getByLabel("Collection name").fill("Craft slowly");
+  await page.keyboard.press("Enter");
+  await label(/^Craft slowly$/i).waitFor();
+  await page.keyboard.press("Meta+z");
+  await label(/^Craft$/i).waitFor();
+  const shown: string[] = [];
+  for (const end = Date.now() + 2000; Date.now() < end; await page.waitForTimeout(25)) {
+    const names = (await page.locator(".side-head .side-label-text").allInnerTexts()).map((t) => t.trim()).join(", ");
+    if (shown.at(-1) !== names) shown.push(names);
+  }
+  if (shown.some((n) => /craft slowly/i.test(n))) throw new Error(`the old name came back and went: ${shown.join(" → ")}`);
+  const kept = ((await ore("skills")) as { collection?: string }[]).map((s) => s.collection);
+  if (!kept.includes("Craft") || kept.includes("Craft slowly")) throw new Error(`the library kept the rename: ${[...new Set(kept)].join(", ")}`);
+});
+
 journey("sidebar: renaming a collection to a name another one has is refused in place; Esc keeps the old name", async (page) => {
   const head = page.locator(".side-head").filter({ hasText: /^Craft$/i });
   await head.click({ button: "right" });

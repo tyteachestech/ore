@@ -1405,20 +1405,28 @@ export function App() {
 
   /** Lays out the sidebar at once (optimistic), then saves through `ore skills arrange`; a failure
    *  puts the old layout back. */
+  /** The sidebar's layout writes, one after another, as a source's are (inOrder): a ⌘Z pressed while a rename
+   *  still saves waits for it, or the two `ore skills arrange` runs race and the rename can land last. The
+   *  skills are read again once the latest settles, so an earlier read never shows a step already taken back. */
+  const layoutWrites = useRef<{ last: Promise<unknown>; queued: number }>({ last: Promise.resolve(), queued: 0 });
   const arrange = async (layout: SkillLayout, fromHistory = false) => {
     const byId = new Map(skills.map((s) => [s.id, s]));
     setSkills(layout.flatMap((g) => g.skills.flatMap((id) => {
       const s = byId.get(id);
       return s ? [{ ...s, collection: g.collection || undefined }] : [];
     })));
+    const q = layoutWrites.current;
+    const n = ++q.queued;
+    const write = q.last.then(() => ore("skills", "arrange", JSON.stringify(layout)));
+    q.last = write.catch(() => {});
     try {
-      await ore("skills", "arrange", JSON.stringify(layout));
+      await write;
     } catch (e) {
       // From the history (undo or redo): it puts the step back and says why.
       if (fromHistory) throw e;
       notify(errorText(e), "error");
     } finally {
-      reloadSkills();
+      if (n === q.queued) reloadSkills();
     }
   };
   /** Removes a collection: its skills join the ones in none, with Undo. */

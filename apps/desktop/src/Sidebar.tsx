@@ -6,7 +6,7 @@ import {
 import { RowSensor } from "./drag";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Fragment, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Hint } from "./Hint";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
@@ -16,6 +16,7 @@ import { useSideCursor } from "./SideCursor";
 import { ore, opt, type Skill } from "./ore";
 import { layoutOf, skillGroups, UNGROUPED, type SkillLayout } from "./Skills";
 import { errorText, load, save } from "./util";
+import { focusQuietly } from "./focus-near";
 
 const CLOSED = "ore.side-closed";
 const ARCHIVED_OPEN = "ore.side-archived-open";
@@ -465,8 +466,26 @@ function useRoving(nav: RefObject<HTMLElement | null>) {
   };
   // After every render: new skills and reopened groups come with tabindex -1.
   useEffect(apply);
+  // A collection renamed, or its rename undone, is drawn again under its new name (its key is its name): the item
+  // that had focus is gone with focus on <body>, so the one drawn in its place takes it.
+  const held = useRef<{ el: HTMLElement; at: number } | null>(null);
+  useLayoutEffect(() => {
+    const h = held.current;
+    if (!h || h.el.isConnected || (document.activeElement && document.activeElement !== document.body)) return;
+    held.current = null;
+    const now = nav.current?.querySelectorAll<HTMLElement>(ITEMS)[h.at];
+    if (now) focusQuietly(now);
+  });
+  // Only while focus is still there: a press or focus anywhere outside the sidebar lets it go.
+  useEffect(() => {
+    const away = (e: Event) => void (nav.current?.contains(e.target as Node) || (held.current = null));
+    addEventListener("pointerdown", away, true);
+    addEventListener("focusin", away, true);
+    return () => (removeEventListener("pointerdown", away, true), removeEventListener("focusin", away, true));
+  }, [nav]);
   const onFocus = (e: FocusEvent<HTMLElement>) => {
     const t = e.target as HTMLElement;
+    held.current = t.matches(ITEMS) ? { el: t, at: [...nav.current!.querySelectorAll(ITEMS)].indexOf(t) } : null;
     if (!t.matches(`${ITEMS}, ${TOOLS}`)) return;
     // The stop is the row's item, so ⇧Tab back from the content lands on it, not on a hover-only ⋯.
     last.current = t.matches(ITEMS) ? t : t.closest(".side-item, .side-head")?.querySelector<HTMLElement>(ITEMS) ?? t;
