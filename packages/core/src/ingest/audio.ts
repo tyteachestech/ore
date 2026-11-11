@@ -113,66 +113,9 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   const tags = html.match(/<meta\b[^>]*>/gi) ?? [];
   const attr = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
   const meta = (p: string) => tags.map((t) => ((attr(t, "property") ?? attr(t, "name"))?.toLowerCase() === p ? attr(t, "content") : undefined)).find(Boolean);
-  const audio = pageAudio(html, url, true);
+  const audio = meta("og:audio") ?? meta("og:audio:url") ?? html.match(/<(?:audio|source)[^>]+src=["']([^"']+\.(?:mp3|m4a)[^"']*)["']/i)?.[1];
   if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
-  return { audio, title: meta("og:title"), show: meta("og:site_name") };
-}
-
-/** An address that says it is an episode: a `/podcast/`, `/podcasts/`, `/episode/` or `/episodes/` part. */
-const EPISODE_PATH = /\/(?:podcasts?|episodes?)(?:\/|$)/i;
-const AUDIO_FILE = /\.(?:mp3|m4a|aac|wav|flac|aiff)(?:[?#]|$)/i;
-
-/** The audio file a page is the episode of, or undefined when the page is an article (D122, D167).
- *  The rule: a page is an episode when it names one audio as its own, in the page's metadata
- *  (`og:audio`; JSON-LD whose page-level node is a PodcastEpisode or RadioEpisode with its
- *  `associatedMedia` or `audio`, or is itself an AudioObject), or when it plays exactly one audio (an
- *  `<audio>`/`<source>` file, or a Megaphone episode player, whose enclosure is its id's MP3) and its
- *  address says it is an episode. So a news story that plays a clip, or offers a read-aloud of itself
- *  (an Article's AudioObject), stays the article. `player` is an episode link's own page (Overcast,
- *  Pocket Casts): any audio it plays is the episode. */
-export function pageAudio(html: string, url: string, player = false): string | undefined {
-  const abs = (u: string) => {
-    try {
-      return new URL(u.replace(/&amp;/g, "&"), url).href;
-    } catch {
-      return undefined;
-    }
-  };
-  const tags = html.match(/<meta\b[^>]*>/gi) ?? [];
-  const attr = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
-  const og = tags.map((t) => (/^og:audio(?::url|:secure_url)?$/i.test(attr(t, "property") ?? attr(t, "name") ?? "") ? attr(t, "content") : undefined)).find(Boolean);
-  const declared = og ?? ldAudio(html);
-  if (declared) return abs(declared);
-  const found = new Set<string>();
-  for (const m of html.matchAll(/<(?:audio|source)\b[^>]*\bsrc=["']([^"']+)["']/gi)) if (AUDIO_FILE.test(m[1]!)) found.add(abs(m[1]!) ?? "");
-  for (const m of html.matchAll(/<iframe\b[^>]*\bsrc=["'](?:https?:)?\/\/(?:playlist|player)\.megaphone\.fm\/(?:\?(?:[^"']*&(?:amp;)?)?e=)?([A-Z0-9]+)\b/gi)) found.add(`https://traffic.megaphone.fm/${m[1]}.mp3`);
-  found.delete("");
-  const one = [...found];
-  if (player) return one[0];
-  return one.length === 1 && EPISODE_PATH.test(new URL(url).pathname) ? one[0] : undefined;
-}
-
-/** The audio a page's JSON-LD names as the page: a page-level PodcastEpisode's (or RadioEpisode's)
- *  media, or a page-level AudioObject. Media nested in an Article is a read-aloud, not this. */
-function ldAudio(html: string): string | undefined {
-  const types = (n: Record<string, unknown>) => [n["@type"]].flat().map(String);
-  const media = (v: unknown): string | undefined => [v].flat().map((m) => (m && typeof m === "object" ? (m as Record<string, unknown>).contentUrl : undefined)).find((u): u is string => typeof u === "string");
-  for (const m of html.matchAll(/<script\b[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
-    let data: unknown;
-    try {
-      data = JSON.parse(m[1]!);
-    } catch {
-      continue;
-    }
-    const nodes = [data].flat().flatMap((n) => (n && typeof n === "object" ? [n as Record<string, unknown>, ...[(n as Record<string, unknown>)["@graph"] ?? []].flat()] : [])) as Record<string, unknown>[];
-    for (const n of nodes) {
-      if (!n || typeof n !== "object") continue;
-      const t = types(n);
-      const u = t.some((x) => /^(?:PodcastEpisode|RadioEpisode)$/.test(x)) ? media(n.associatedMedia) ?? media(n.audio) : t.includes("AudioObject") && typeof n.contentUrl === "string" ? n.contentUrl : undefined;
-      if (u) return u;
-    }
-  }
-  return undefined;
+  return { audio: new URL(audio.replace(/&amp;/g, "&"), url).href, title: meta("og:title"), show: meta("og:site_name") };
 }
 
 /** Titles compared as words: case, punctuation and "&" vs "and" aside. */

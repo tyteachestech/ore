@@ -1119,49 +1119,6 @@ describe("import coverage: audio and podcasts", () => {
     expect(item.meta.author).toBe("Learning Show");
   });
 
-  // D122, D167: a publisher's own episode page (Scientific American's, words rewritten) plays its
-  // episode in a Megaphone player; it comes in as the Apple link does, audio kept and heard.
-  test("a publisher's episode page: its player's audio, kept and heard", async () => {
-    const url = "https://www.scientificamerican.com/podcast/episode/how-the-tiny-soybean-took-over-the-american-diet/";
-    serve({
-      [url]: { body: readFileSync(join(FIX, "audio", "episode-page.html"), "utf8"), type: HTML },
-      "https://traffic.megaphone.fm/SAM9228418236.mp3": { body: new Uint8Array(4096), type: "audio/mpeg" },
-    });
-    const item = await addSource(await tempLibrary(), url);
-    expect(item.meta).toMatchObject({ title: "Soybeans: The crop that quietly took over America", author: "Rachel Feltman, Alli Rodgers, Sushmita Pathak, Alex Sugiura", published: "2026-11-04T06:00:00-05:00", url });
-    expect(item.body).toBe("[00:00] Welcome back to the show. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n");
-    expect(readFileSync(join(item.dir, "source.mp3")).length).toBe(4096);
-    expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.mp3") });
-  });
-
-  // An article page is an episode only when the page names its audio as its own (og:audio, a
-  // PodcastEpisode), or plays one audio and its address says it is an episode. A news story with a
-  // clip, or with a read-aloud of itself (an Article's AudioObject), stays the article.
-  const prose = "<p>" + "Forecasters expect a wetter season along the coast, and towns are planning for it. ".repeat(12) + "</p>";
-  test("a page that names its audio is the episode; a news story with a clip stays the article", async () => {
-    const fetched: string[] = [];
-    const pages: Record<string, string> = {
-      "https://show.test/sleep": `<html><head><title>Sleep and memory</title><meta property="og:audio" content="https://cdn.show.test/sleep.mp3"></head><body><article><h1>Sleep and memory</h1>${prose}</article></body></html>`,
-      "https://radio.test/shows/17": `<html><head><title>Episode 17</title><script type="application/ld+json">{"@context":"https://schema.org","@type":"PodcastEpisode","name":"Episode 17","associatedMedia":{"@type":"MediaObject","contentUrl":"https://cdn.radio.test/17.m4a"}}</script></head><body><article><h1>Episode 17</h1>${prose}</article></body></html>`,
-      "https://news.test/2026/11/storm-season": `<html><head><title>Storm season</title><script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"Storm season","audio":{"@type":"AudioObject","contentUrl":"https://news.test/read-aloud.mp3"}}</script></head><body><article><h1>Storm season</h1>${prose}<audio controls src="/clips/mayor.mp3"></audio>${prose}</article></body></html>`,
-    };
-    globalThis.fetch = (async (input: string | URL | Request) => {
-      const u = String(input instanceof Request ? input.url : input);
-      fetched.push(u);
-      if (pages[u]) return new Response(pages[u], { headers: { "content-type": HTML } });
-      if (/\.(mp3|m4a)$/.test(u)) return new Response(new Uint8Array(4096), { headers: { "content-type": u.endsWith("mp3") ? "audio/mpeg" : "audio/mp4" } });
-      return new Response("not found", { status: 404 });
-    }) as unknown as typeof fetch;
-    const lib = await tempLibrary();
-    expect(audioOf(await addSource(lib, "https://show.test/sleep"))).not.toBeNull();
-    expect(audioOf(await addSource(lib, "https://radio.test/shows/17"))).not.toBeNull();
-    const story = await addSource(lib, "https://news.test/2026/11/storm-season");
-    expect(audioOf(story)).toBeNull();
-    expect(story.body).toContain("Forecasters expect a wetter season");
-    expect(existsSync(join(story.dir, "source.html"))).toBe(true);
-    expect(fetched.filter((u) => /\.mp3$/.test(u) && u.includes("news.test"))).toEqual([]);
-  });
-
   // D122: a Spotify link is heard from the same episode in the show's public feed.
   const SPOTIFY = "https://open.spotify.com/episode/3TxjF2mZy9S9I9GL5eZ8sq";
   const spotifyPage = readFileSync(join(FIX, "audio", "spotify-episode.html"), "utf8");
