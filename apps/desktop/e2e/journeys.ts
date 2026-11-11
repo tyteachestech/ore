@@ -65,6 +65,12 @@ async function phoneApp(): Promise<string> {
     await Bun.sleep(200);
   }
   phoneVite = { url, stop: () => vite.kill() };
+  // Loaded once first: what vite bundles on a first load (and the reload that follows) lands before any journey.
+  const warm = await (await safariBrowser()).newPage();
+  await warm.goto(url);
+  await warm.locator(".phone-app").waitFor({ timeout: 30000 }).catch(() => {});
+  await Bun.sleep(1000);
+  await warm.close();
   return url;
 }
 
