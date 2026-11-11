@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { COLS, HEAD, MOVES, REST, ROWS, moleDots, step, type State } from "../src/Mole";
+import { COLS, HEAD, MOVES, REST, ROWS, advance, moleDots, puppet, start, type State } from "../src/Mole";
 
 // D214: the mole is a puppet, a smooth shape sampled onto the fixed dot grid. Its body glides (dot sizes change),
 // its face stays whole dots.
@@ -7,29 +7,17 @@ const at = (s: Partial<State> = {}) => moleDots({ ...REST, ...s });
 const cells = (d: ReturnType<typeof moleDots>, tone: string) => d.flatMap(([c, r, , t]) => (t === tone ? [[c, r]] : []));
 const key = (d: ReturnType<typeof moleDots>) => d.map(([c, r, rad, t]) => `${c},${r},${rad.toFixed(2)},${t}`).sort();
 
-/** Plays a mood for `ms` at 60 Hz the way the component does (beats, waving, two half steps a frame). */
+/** Plays a mood for `ms` at 60 Hz, frame by frame as the component does. */
 function play(name: keyof typeof MOVES, ms: number) {
-  const m = MOVES[name], v = { ...REST, ...m.from }, vel = Object.fromEntries(Object.keys(REST).map((k) => [k, 0])) as State;
-  const to = { ...REST, ...m.to };
-  for (const [k, x] of Object.entries(m.kick ?? {})) vel[k as keyof State] += x;
-  const frames: State[] = [];
-  let fired = 0;
-  for (let t = 0; t <= ms; t += 1000 / 60) {
-    while (fired < (m.at ?? []).length && t >= m.at![fired]![0]) {
-      const b = m.at![fired++]![1];
-      Object.assign(to, b.to);
-      for (const [k, x] of Object.entries(b.kick ?? {})) vel[k as keyof State] += x;
-    }
-    step(v, vel, to, 1 / 120);
-    step(v, vel, to, 1 / 120);
-    frames.push({ ...v });
-  }
+  const s = puppet(), frames: State[] = [];
+  start(s, name, 0);
+  for (let t = 1000 / 60; t <= ms; t += 1000 / 60) { advance(s, t, 1 / 60); frames.push({ ...s.v }); }
   return frames;
 }
 
 test("every frame of every move stays on the grid, over one row of dirt", () => {
   for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[])
-    for (const s of play(name, MOVES[name].end ?? MOVES[name].loop!)) {
+    for (const s of play(name, 2 * (MOVES[name].end ?? MOVES[name].loop!))) {
       const d = moleDots(s);
       for (const [c, r, rad] of d) {
         expect(Number.isInteger(c) && Number.isInteger(r)).toBe(true);
@@ -80,9 +68,20 @@ test("surprised opens an O under the nose; happy and cheer close their eyes to a
   expect(cells(at(MOVES.happy.still), "glint")).toHaveLength(0);
 });
 
-test("each move's springs settle on its still pose, so the frames can stop", () => {
-  const settle = (name: keyof typeof MOVES) => play(name, 6000).at(-1)!;
-  for (const name of ["happy", "surprised"] as const) expect(key(moleDots(settle(name)))).toEqual(key(at(MOVES[name].still)));
+test("a move plays, rests, and its springs settle so the frames can stop", () => {
+  for (const name of ["happy", "surprised", "cheer"] as const) {
+    const s = puppet();
+    start(s, name, 0);
+    const mid = MOVES[name].end! - 100;
+    let t = 0, moving = true;
+    for (; t < mid; t += 1000 / 60) advance(s, t, 1 / 60);
+    // Before it rests it has reached its still pose.
+    expect(key(moleDots(s.v))).toEqual(key(at(MOVES[name].still)));
+    for (; moving && t < 20_000; t += 1000 / 60) moving = advance(s, t, 1 / 60);
+    expect(moving).toBe(false);
+    expect(s.mood).toBe("idle");
+    expect(key(moleDots(s.v))).toEqual(key(at()));
+  }
 });
 
 test("each mood's still pose (reduced motion, hidden window) shows the whole mole out of its hole", () => {

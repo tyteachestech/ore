@@ -55,12 +55,16 @@ export type Dot = [c: number, r: number, radius: number, tone: Tone];
 export function moleDots(s: State): Dot[] {
   const out: Dot[] = [], bottom = ROWS - 1.5, ry = Math.max(4, bottom - s.top);
   const fx = s.hx * 0.8 + s.lx * 0.35, fy = s.y + s.ly * 0.25;
-  const paw = (side: number, c: number, r: number) => {
-    const w = s.pw, lift = side ? s.pawR : s.pawL, top = ROWS - 4 - lift + s.y;
+  // Each paw a rounded box, and a box one dot wider that keeps the head apart from it.
+  const paws = [0, 1].map((side) => {
+    const w = s.pw, top = ROWS - 4 - (side ? s.pawR : s.pawL) + s.y;
     const x0 = side ? COLS - w - 0.25 : -0.25, x1 = x0 + w - 0.5, y0 = top - 0.25, y1 = ROWS + 1;
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, hw = (x1 - x0) / 2, hh = Math.max(0.3, (y1 - y0) / 2), rad = Math.min(1, hh);
-    // The paw, and a box one dot wider that keeps the head apart from it.
-    return [roundBox(c, r, cx, cy, hw, hh, rad), roundBox(c, r, cx, cy, hw + 1, hh, rad)] as const;
+    const hh = Math.max(0.3, (y1 - y0) / 2);
+    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, hw: (x1 - x0) / 2, hh, rad: Math.min(1, hh) };
+  });
+  const paw = (i: number, c: number, r: number) => {
+    const b = paws[i]!;
+    return [roundBox(c, r, b.cx, b.cy, b.hw, b.hh, b.rad), roundBox(c, r, b.cx, b.cy, b.hw + 1, b.hh, b.rad)] as const;
   };
   const marks = face(s, fx, fy);
   for (let r = -HEAD; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) {
@@ -98,6 +102,7 @@ function paths(dots: Dot[]): Record<Tone, string> {
   return by;
 }
 
+const LIMITS: [Key, number, number][] = [["rx", 8, 11.5], ["top", -2.5, 6], ["ex", 2, 4.5]];
 /** One spring step of `dt` seconds toward `to`. */
 export function step(v: State, vel: State, to: State, dt: number) {
   for (const k of KEYS) {
@@ -105,7 +110,8 @@ export function step(v: State, vel: State, to: State, dt: number) {
     vel[k] += (st * (to[k] - v[k]) - da * vel[k]) * dt;
     v[k] += vel[k] * dt;
   }
-  v.rx = clamp(v.rx, 8, 11.5); v.top = clamp(v.top, -2.5, 6); v.ex = clamp(v.ex, 2, 4.5);
+  // At a limit the value stops there, so it springs back from it at once instead of sticking.
+  for (const [k, lo, hi] of LIMITS) if (v[k] < lo || v[k] > hi) { v[k] = clamp(v[k], lo, hi); vel[k] = 0; }
 }
 
 export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer";
@@ -130,12 +136,51 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   cheer: { to: { arc: 1, nose: 1, ex: 3 }, wave: 900, at: [[900, { to: { ...HAPPY, pawL: 0, pawR: 0 }, kick: { top: -14 } }]], end: 2400, still: HAPPY },
 };
 
+/** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */
+export type Puppet = { v: State; vel: State; to: State; move: Move | null; mood: Mood; t0: number; fired: number };
+const zero = () => Object.fromEntries(KEYS.map((k) => [k, 0])) as State;
+export const puppet = (): Puppet => ({ v: { ...REST }, vel: zero(), to: { ...REST }, move: null, mood: "idle", t0: 0, fired: 0 });
+const push = (s: Puppet, b: Beat) => {
+  Object.assign(s.to, b.to);
+  for (const [k, x] of Object.entries(b.kick ?? {})) s.vel[k as Key] += x;
+};
+/** Starts a mood's move at `now`. */
+export function start(s: Puppet, mood: Exclude<Mood, "idle">, now: number) {
+  const m = MOVES[mood];
+  Object.assign(s, { move: m, mood, t0: now, fired: 0, to: { ...REST } });
+  Object.assign(s.v, m.from);
+  push(s, m);
+}
+/** Shows `pose` at once, with nothing moving. */
+export function hold(s: Puppet, mood: Mood, pose: Partial<State>) {
+  Object.assign(s, { move: null, mood, to: { ...REST, ...pose }, v: { ...REST, ...pose }, vel: zero() });
+}
+const settled = (s: Puppet) => KEYS.every((k) => Math.abs(s.to[k] - s.v[k]) < 0.002 && Math.abs(s.vel[k]) < 0.002);
+/** One frame at `now` (ms), `dt` s after the last: the beats now due, the waving paws, a loop or the rest, then the
+ *  springs. True while it is still moving. */
+export function advance(s: Puppet, now: number, dt: number) {
+  const m = s.move, t = now - s.t0;
+  if (m) {
+    const at = m.at ?? [];
+    while (s.fired < at.length && t >= at[s.fired]![0]) push(s, at[s.fired++]![1]);
+    if (m.wave && t < m.wave) {
+      const ph = (t / 360) * 2 * Math.PI;
+      Object.assign(s.to, { pawL: 2 + 1.1 * Math.cos(ph), pawR: 2 - 1.1 * Math.cos(ph), top: REST.top - 0.35 * Math.abs(Math.sin(ph)) });
+    }
+    if (m.loop && t >= m.loop) start(s, s.mood as Exclude<Mood, "idle">, now);
+    else if (m.end && t >= m.end) Object.assign(s, { move: null, mood: "idle", to: { ...REST } });
+  }
+  // Two half steps keep the stiff eye spring steady at 60 Hz.
+  step(s.v, s.vel, s.to, dt / 2);
+  step(s.v, s.vel, s.to, dt / 2);
+  return !!s.move || !settled(s);
+}
+
 /** In its button the sprite sits 3.3 dots below a square's top, so its dirt lands low and it pokes out of the ground. */
 const LIFT = 3.3;
 const BLINK_MS = 120, LOOK_MS = 900;
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
-const settled = (v: State, vel: State, to: State) => KEYS.every((k) => Math.abs(to[k] - v[k]) < 0.002 && Math.abs(vel[k]) < 0.002);
 
 /** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite; the dome may
  *  rise into the room above it). `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
@@ -143,80 +188,57 @@ const settled = (v: State, vel: State, to: State) => KEYS.every((k) => Math.abs(
  *  `cue` replays the mood for a new event (another reply landing). Frames run only while it moves. Still under
  *  reduced motion and while the window is hidden (a mood shows its still pose). */
 export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean }) {
+  const svg = useRef<SVGSVGElement>(null);
   const tones = useRef<Partial<Record<Tone, SVGPathElement | null>>>({});
-  const p = useRef({ v: { ...REST }, vel: { ...REST, ...Object.fromEntries(KEYS.map((k) => [k, 0])) } as State, to: { ...REST }, move: null as Move | null, t0: 0, fired: 0, frame: 0, last: 0 });
+  const p = useRef(puppet());
+  const run = useRef({ frame: 0, last: 0 });
   const looking = useRef(look);
   looking.current = look;
 
+  // `data-mood` is the move it is playing (or showing still), for tests.
   const draw = () => {
     const d = paths(moleDots(p.current.v));
     for (const t of ORDER) tones.current[t]?.setAttribute("d", d[t]);
+    svg.current?.setAttribute("data-mood", p.current.mood);
   };
-  // Springs run while anything is moving or a beat is still to come, then stop.
+  // Frames run while anything moves or a beat is still to come, then stop.
   const tick = (now: number) => {
-    const s = p.current, m = s.move, t = now - s.t0;
-    const dt = Math.min(0.033, (now - s.last) / 1000);
-    s.last = now;
-    if (m) {
-      const at = m.at ?? [];
-      while (s.fired < at.length && t >= at[s.fired]![0]) {
-        const b = at[s.fired++]![1];
-        Object.assign(s.to, b.to);
-        for (const [k, v] of Object.entries(b.kick ?? {})) s.vel[k as Key] += v;
-      }
-      if (m.wave && t < m.wave) {
-        const ph = (t / 360) * 2 * Math.PI;
-        Object.assign(s.to, { pawL: 2 + 1.1 * Math.cos(ph), pawR: 2 - 1.1 * Math.cos(ph), top: REST.top - 0.35 * Math.abs(Math.sin(ph)) });
-      }
-      if (m.loop && t >= m.loop) start(m, now);
-      else if (m.end && t >= m.end) { s.move = null; s.to = { ...REST }; }
-    }
-    // Two half steps keep the stiff eye spring steady at 60 Hz.
-    step(s.v, s.vel, s.to, dt / 2);
-    step(s.v, s.vel, s.to, dt / 2);
+    const dt = Math.min(0.033, Math.max(0, (now - run.current.last) / 1000));
+    run.current.last = now;
+    const moving = advance(p.current, now, dt);
     draw();
-    if (!s.move && settled(s.v, s.vel, s.to)) { s.frame = 0; return; }
-    s.frame = requestAnimationFrame(tick);
+    run.current.frame = moving ? requestAnimationFrame(tick) : 0;
   };
   const wake = () => {
-    const s = p.current;
-    if (s.frame) return;
-    s.last = performance.now();
-    s.frame = requestAnimationFrame(tick);
+    if (run.current.frame) return;
+    run.current.last = performance.now();
+    run.current.frame = requestAnimationFrame(tick);
   };
-  const start = (m: Move, now: number) => {
-    const s = p.current;
-    Object.assign(s, { move: m, t0: now, fired: 0, to: { ...REST, ...m.to } });
-    Object.assign(s.v, m.from);
-    for (const [k, v] of Object.entries(m.kick ?? {})) s.vel[k as Key] += v;
-  };
-  const rest = (pose: Partial<State>) => {
-    const s = p.current;
-    if (s.frame) cancelAnimationFrame(s.frame);
-    Object.assign(s, { move: null, frame: 0, to: { ...REST, ...pose }, v: { ...REST, ...pose } });
-    for (const k of KEYS) s.vel[k] = 0;
-    draw();
-  };
+  const stop = () => { cancelAnimationFrame(run.current.frame); run.current.frame = 0; };
 
   // A mood's move, set up before the first paint so the frame before it never shows (a peek starts in the hole).
   // Reduced motion, or a hidden window, shows its still pose; a window shown again plays it then (a move that
   // already played once stays done).
   useLayoutEffect(() => {
+    const s = p.current;
     if (mood === "idle") {
-      if (p.current.move) { p.current.move = null; p.current.to = { ...REST }; wake(); } else draw();
+      if (still() || document.hidden) { stop(); hold(s, "idle", {}); draw(); return; }
+      Object.assign(s, { move: null, mood: "idle", to: { ...REST } });
+      draw();
+      wake();
       return;
     }
     const move = MOVES[mood];
     let played = false;
-    const run = () => {
-      if (still() || document.hidden) return rest(move.still);
+    const play = () => {
+      if (still() || document.hidden) { stop(); hold(s, mood, move.still); draw(); return; }
       played = !move.loop;
-      start(move, performance.now());
+      start(s, mood, performance.now());
       draw();
       wake();
     };
-    const shown = () => { if (!document.hidden && !played) run(); };
-    run();
+    const shown = () => { if (!document.hidden && !played) play(); };
+    play();
     document.addEventListener("visibilitychange", shown);
     return () => document.removeEventListener("visibilitychange", shown);
   }, [mood, cue]);
@@ -230,39 +252,39 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
       timers.add(id);
     };
     const quiet = () => !!p.current.move || looking.current || document.hidden || still();
-    const hold = (pose: Partial<State>, ms: number) => {
+    const brief = (pose: Partial<State>, ms: number) => {
       Object.assign(p.current.to, pose);
       wake();
       later(() => { if (!p.current.move) { for (const k of Object.keys(pose) as Key[]) p.current.to[k] = REST[k]; wake(); } }, ms);
     };
-    const blinks = () => later(() => { if (!quiet()) hold({ open: 0 }, BLINK_MS); if (alive) blinks(); }, between(5000, 9000));
+    const blinks = () => later(() => { if (!quiet()) brief({ open: 0 }, BLINK_MS); if (alive) blinks(); }, between(5000, 9000));
     const turns = () =>
       later(() => {
         if (!quiet()) {
           const first = Math.random() < 0.5 ? -1 : 1;
-          hold({ lx: first, hx: first * 0.45 }, LOOK_MS);
-          if (Math.random() < 0.5) later(() => { if (!quiet()) hold({ lx: -first, hx: -first * 0.45 }, LOOK_MS); }, LOOK_MS + 400);
+          brief({ lx: first, hx: first * 0.45 }, LOOK_MS);
+          if (Math.random() < 0.5) later(() => { if (!quiet()) brief({ lx: -first, hx: -first * 0.45 }, LOOK_MS); }, LOOK_MS + 400);
         }
         if (alive) turns();
       }, between(15000, 20000));
     blinks();
     turns();
-    return () => { alive = false; timers.forEach(clearTimeout); if (p.current.frame) cancelAnimationFrame(p.current.frame); p.current.frame = 0; };
+    return () => { alive = false; timers.forEach(clearTimeout); stop(); };
   }, []);
 
-  // Hovered or focused: it faces him and blinks.
+  // Hovered or focused: it faces him and blinks. Its eyes open again however soon the pointer leaves.
   useEffect(() => {
     if (!look || p.current.move || still()) return;
-    const s = p.current;
+    const s = p.current, open = () => { s.to.open = REST.open; wake(); };
     Object.assign(s.to, { lx: 0, ly: 0, hx: 0, open: 0 });
     wake();
-    const id = window.setTimeout(() => { s.to.open = REST.open; wake(); }, BLINK_MS);
-    return () => clearTimeout(id);
+    const id = window.setTimeout(open, BLINK_MS);
+    return () => { clearTimeout(id); open(); };
   }, [look]);
 
   // The dirt sits low in the button, so the mole reads as poking out of the ground at its foot.
   return (
-    <svg className="mole" data-mood={mood} width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : `0 ${-LIFT} ${COLS} ${COLS}`} overflow="visible" aria-hidden="true">
+    <svg ref={svg} className="mole" width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : `0 ${-LIFT} ${COLS} ${COLS}`} overflow="visible" aria-hidden="true">
       {ORDER.map((t) => (
         <path key={t} ref={(el) => { tones.current[t] = el; }} className={`mole-${t}`} />
       ))}
