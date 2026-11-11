@@ -8,7 +8,7 @@ import { readReviews } from "./reviews.ts";
 import { findCard } from "./cards.ts";
 import { loadParams, retrievability } from "./scheduler.ts";
 import { desiredRetention, loadSkills } from "./skills.ts";
-import { SOLID_DAYS } from "./today.ts";
+import { passedVariant, SOLID_DAYS } from "./today.ts";
 
 export interface SessionReceipt {
   type: "start" | "end";
@@ -22,6 +22,13 @@ export interface SessionReceipt {
   /** Cards that became solid memories this session (stability reached 21 days, D90), as each card's
    *  first skill, so the end screen can show one cut gem in that skill's colour. */
   cut?: string[];
+  /** Per `cut` gem, whether it had been solid before and was missed since: a won-back gem is mended (D197). */
+  mended?: boolean[];
+  /** Solid cards he passed on a new case (a remix) for the first time this session, as each one's first skill: polished (D197). */
+  polished?: string[];
+  /** How much longer this session's cards now last than before it, in whole days added up (FSRS stability);
+   *  absent when the session lost ground (D197). */
+  depth_days?: number;
   /** The longest gap, in whole days, between a card he passed this session and when he last saw it (D177):
    *  the end screen names it, so spacing's delayed gain is something he sees. */
   longest_days?: number;
@@ -98,7 +105,8 @@ export function endSession(lib: Library, now = new Date(), caughtUp = false, whi
 function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null): SessionReceipt {
   if (!id) throw new Error("no open session (ore session start)");
   if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
-  const own = readReviews(lib).filter((x) => x.session === id);
+  const all = readReviews(lib);
+  const own = all.filter((x) => x.session === id);
   // A card counts once, by its first answer this session; a relearn pass doesn't make it kept.
   const first = new Map([...own].reverse().map((x) => [x.card, x]));
   const w = loadParams(lib);
@@ -114,18 +122,24 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
   const rescued = kept.filter((x) => x.state_before.reps > 0 && retrievability(x.state_before, new Date(x.ts), 0.9, w) < rescuedAt(target(x.card)));
   // Solid before its first answer this session, or not; solid after its last one.
   const last = new Map(own.map((x) => [x.card, x]));
-  const cut = [...first.values()]
-    .filter((x) => x.state_before.stability < SOLID_DAYS && last.get(x.card)!.state_after.stability >= SOLID_DAYS)
-    .map((x) => {
-      try {
-        return findCard(lib, x.card).meta.skills[0] ?? "";
-      } catch {
-        return "";
-      }
-    });
+  const skillOf = (card: string) => {
+    try {
+      return findCard(lib, card).meta.skills[0] ?? "";
+    } catch {
+      return "";
+    }
+  };
+  const earlier = all.filter((x) => x.session !== id && x.ts < (own[0]?.ts ?? ""));
+  const cutNow = [...first.values()].filter((x) => x.state_before.stability < SOLID_DAYS && last.get(x.card)!.state_after.stability >= SOLID_DAYS);
+  const cut = cutNow.map((x) => skillOf(x.card));
+  const mended = cutNow.map((x) => earlier.some((e) => e.card === x.card && e.state_after.stability >= SOLID_DAYS));
+  const polished = [...new Set(own.filter(passedVariant).map((x) => x.card))]
+    .filter((card) => last.get(card)!.state_after.stability >= SOLID_DAYS && !earlier.some((e) => e.card === card && passedVariant(e)))
+    .map(skillOf);
+  const depth = Math.round([...first.values()].reduce((n, x) => n + last.get(x.card)!.state_after.stability - x.state_before.stability, 0));
   const gaps = kept.flatMap((x) => (x.state_before.reps > 0 && x.state_before.last_review ? [Math.floor((Date.parse(x.ts) - Date.parse(x.state_before.last_review)) / 864e5)] : []));
   const longest = Math.max(0, ...gaps);
-  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
+  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(mended.some(Boolean) ? { mended } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
   if (openSessionId(lib) === id) unlinkSync(paths.openSession(lib));
   return r;
