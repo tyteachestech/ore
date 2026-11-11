@@ -41,8 +41,12 @@ export function continueReading(items: Item[], recent: string[]): Item[] {
   ];
 }
 
-/** The row or tile he last opened from Home by the keyboard: Back puts focus on it again (Finder). */
+/** The row or tile he last opened from Home by the keyboard: Back puts focus on it again (Finder). Any other
+ *  way back to Home forgets it. */
 let openedByKeys: string | null = null;
+let backHome = false;
+/** Back (⌘[, the back arrow) is landing on Home. */
+export const comingBackHome = () => void (backHome = true);
 
 export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource: openSource, onOpenSkill: openSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, onCopy, skillMenu, onRetry, notify }: {
   items: Item[];
@@ -165,7 +169,9 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
     if (!onCopy) return;
     const onKey = (e: KeyboardEvent) => {
       if (blocked || e.defaultPrevented || !is(e, "copy") || inTextField(e) || getSelection()?.toString()) return;
-      const id = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(".home .home-read")?.dataset.id;
+      // Only a row he can see is focused (its keyboard ring), never one focus was put on quietly after a click.
+      const on = document.activeElement as HTMLElement | null;
+      const id = on?.matches(":focus-visible") ? on.closest<HTMLElement>(".home .home-read")?.dataset.id : undefined;
       const item = id ? items.find((i) => i.id === id) : undefined;
       if (!item) return;
       e.preventDefault();
@@ -177,11 +183,18 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
 
   // Back on Home he is where he was: scrolled there, and on the row or tile he opened by the keyboard, once it is drawn.
   const root = useRef<HTMLDivElement>(null);
-  useKeptScroll(root, "ore.home-scroll");
+  useKeptScroll(root, "home");
+  // Read once as Home opens (kept through StrictMode's second run): where Back should put focus, if it was Back.
+  const backTo = useRef<string | null>(null);
   useLayoutEffect(() => {
-    const el = openedByKeys && root.current?.querySelector<HTMLElement>(`${openedByKeys} .home-open`);
+    const to = backHome ? openedByKeys : null;
+    (backHome = false), (openedByKeys = null);
+    if (to) backTo.current = to;
+  }, []);
+  useLayoutEffect(() => {
+    const el = backTo.current && root.current?.querySelector<HTMLElement>(`${backTo.current} .home-open`);
     if (!el) return;
-    openedByKeys = null;
+    backTo.current = null;
     if (!document.activeElement || document.activeElement === document.body) focusQuietly(el);
   });
 

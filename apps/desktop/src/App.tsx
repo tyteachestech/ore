@@ -28,7 +28,7 @@ import { OnScreen } from "./Lite";
 import { citeSources, copyCited } from "./cite";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Boundary } from "./Boundary";
-import { Home } from "./Home";
+import { comingBackHome, Home } from "./Home";
 import { Feed, feedProof, type FeedPost, type FoundFeed } from "./Feed";
 import { dueSkills, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { Review } from "./Review";
@@ -43,7 +43,7 @@ import { Thumb } from "./Thumb";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChip, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
-import { errorText, load, save } from "./util";
+import { errorText, keepScroll, keptScrolls, load, save } from "./util";
 import { questionText } from "./Questions";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
@@ -153,16 +153,6 @@ function empty(status: Tab, keys: Record<KeyId, string>): ReactNode {
       No finished sources yet. Press <b>{label(keys["finish-source"])}</b> in the reader to finish one.
     </>
   );
-}
-
-/** How far each list was scrolled, by tab or skill page. */
-function listScrolls(): Record<string, number> {
-  try {
-    const v = JSON.parse(load("ore.list-scroll") ?? "{}");
-    return v && typeof v === "object" ? v : {};
-  } catch {
-    return {};
-  }
 }
 
 /** The tab and skill filter the app reopens on (To read on first run). */
@@ -932,9 +922,10 @@ export function App() {
     [addSources, openSource, showSide],
   );
 
-  const history = useHistory({ openId, skill, status, place }, (v) => {
+  const history = useHistory({ openId, skill, status, place }, (v, by) => {
     if (v.openId && !(items ?? []).some((i) => i.id === v.openId)) return false;
     if (v.skill && !skills.some((s) => s.id === v.skill)) return false;
+    if (by < 0 && v.place === "home" && !v.openId && !v.skill) comingBackHome();
     setJumpTo(undefined);
     setFinishing(false);
     setStatus(v.status);
@@ -1274,7 +1265,7 @@ export function App() {
     if (!listShown || !scrollAt || !list) return;
     const el = list.closest<HTMLElement>(".skill-col") ?? list;
     // The same element serves every tab: a list never scrolled (or left at the top) starts at the top.
-    const want = listScrolls()[scrollAt] ?? 0;
+    const want = keptScrolls()[scrollAt] ?? 0;
     el.scrollTop = want;
     // The row he has selected stays in view (Finder, Raindrop), though opening it moved it up (D110).
     const sel = keyed && found ? document.getElementById(`row-${lineKey(found)}`) : null;
@@ -1296,7 +1287,7 @@ export function App() {
     if (pending) grows.observe(el, { childList: true, subtree: true });
     const giveUp = window.setTimeout(stop, 3000);
     const on = () => {
-      if (!pending) save("ore.list-scroll", JSON.stringify({ ...listScrolls(), [scrollAt]: Math.round(el.scrollTop) }));
+      if (!pending) keepScroll(scrollAt, el.scrollTop);
     };
     const mine = { passive: true } as const;
     el.addEventListener("scroll", on, mine);
@@ -2482,7 +2473,7 @@ const sameView = (a: View, b: View) => a.openId === b.openId && a.skill === b.sk
 
 /** Back and forward through the views he opened (a source, a skill page, a sources tab), like a
  *  browser. `restore` shows a view, or returns false for one that no longer exists, which is skipped. */
-function useHistory(view: View, restore: (v: View) => boolean) {
+function useHistory(view: View, restore: (v: View, by: -1 | 1) => boolean) {
   const h = useRef<{ stack: View[]; at: number }>({ stack: [], at: -1 });
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const restoreRef = useRef(restore);
@@ -2501,7 +2492,7 @@ function useHistory(view: View, restore: (v: View) => boolean) {
     let from = h.current.at;
     for (let at = from + by; at >= 0 && at < stack.length; ) {
       h.current.at = at; // set first, so the view change it causes is not recorded as a new step
-      if (restoreRef.current(stack[at]!)) break;
+      if (restoreRef.current(stack[at]!, by)) break;
       // Gone since (a source deleted, a feed preview dropped): it leaves the history, so an arrow with
       // nowhere left to go goes dim instead of doing nothing.
       stack.splice(at, 1);

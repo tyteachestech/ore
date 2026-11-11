@@ -42,35 +42,65 @@ export function save(key: string, value: string): void {
   }
 }
 
-/** Keeps where `ref` was scrolled, under `key` (Finder, Linear): back on the screen, or after a relaunch, he is
- *  where he left it. What it holds may load after it shows, so the place is put back as the content grows,
- *  until it is reached or he scrolls himself (3 s at most); until then a scroll is ours and isn't saved. */
+/** How far each list was scrolled, by tab, skill page or "home": one map in localStorage for the app, as every
+ *  remembered view is (the app opens one library; another is a developer's ORE_LIBRARY). */
+export function keptScrolls(): Record<string, number> {
+  try {
+    const v = JSON.parse(load("ore.list-scroll") ?? "{}");
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+export const keepScroll = (key: string, top: number) => save("ore.list-scroll", JSON.stringify({ ...keptScrolls(), [key]: Math.round(top) }));
+
+/** Keeps where `ref` was scrolled, under `key` in `keptScrolls` (Finder, Linear): back on the screen, or after a
+ *  relaunch, he is where he left it. What it holds may load or grow after it shows (rows, then their pictures),
+ *  so the place is put back as the content grows, until it is reached or he scrolls himself (3 s at most); until
+ *  then a scroll is ours and isn't kept. Written a moment after he stops scrolling, and as the screen closes. */
 export function useKeptScroll(ref: RefObject<HTMLElement | null>, key: string): void {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const want = Number(load(key)) || 0;
+    const want = keptScrolls()[key] ?? 0;
     let pending = want > 0;
-    const grows = new MutationObserver(() => put());
-    const stop = () => {
-      pending = false;
-      grows.disconnect();
-    };
     const put = () => {
       if (!pending) return;
       el.scrollTop = want;
       if (el.scrollTop >= want - 1) stop();
     };
+    // New rows (a mutation) and rows that grow (a picture loading, a ResizeObserver on each) both make room.
+    const sized = new ResizeObserver(put);
+    const watch = () => {
+      for (const c of el.children) sized.observe(c);
+    };
+    const grows = new MutationObserver(() => (watch(), put()));
+    const stop = () => {
+      pending = false;
+      grows.disconnect();
+      sized.disconnect();
+    };
     put();
-    if (pending) grows.observe(el, { childList: true, subtree: true });
+    if (pending) (grows.observe(el, { childList: true, subtree: true }), watch());
     const giveUp = window.setTimeout(stop, 3000);
-    const on = () => void (pending || save(key, String(Math.round(el.scrollTop))));
+    let at: number | null = null;
+    let later = 0;
+    const write = () => (clearTimeout(later), at !== null && keepScroll(key, at), (at = null));
+    const on = () => {
+      if (pending) return;
+      at = el.scrollTop;
+      clearTimeout(later);
+      later = window.setTimeout(write, 250);
+    };
     const mine = { passive: true } as const;
     el.addEventListener("scroll", on, mine);
     for (const t of ["wheel", "pointerdown", "keydown", "touchstart"]) el.addEventListener(t, stop, mine);
+    addEventListener("pagehide", write);
     return () => {
+      write();
       stop();
       clearTimeout(giveUp);
+      removeEventListener("pagehide", write);
       el.removeEventListener("scroll", on);
       for (const t of ["wheel", "pointerdown", "keydown", "touchstart"]) el.removeEventListener(t, stop);
     };

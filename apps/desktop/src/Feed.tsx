@@ -12,9 +12,10 @@ import { is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { ore, opt, type Skill } from "./ore";
 import { SkillChip, SkillPicker, unfile } from "./Skills";
-import { errorText, load, save, useLibraryChanges, type Notify } from "./util";
+import { errorText, load, save, typedLast, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
 import { citeSources, copyCited } from "./cite";
+import { focusQuietly } from "./focus-near";
 
 export type FeedPost = { feed: string; url: string; title: string; author?: string; published?: string; image?: string; read: boolean; feed_title: string; preview?: string };
 type FeedInfo = { url: string; title: string; site?: string; skills: string[]; followed_at: string; checked_at?: string; error?: string };
@@ -198,14 +199,23 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
 
   /** A post as its linked title, as a source row copies (⌘C). */
   const copyPost = (p: FeedPost) => void copyCited(citeSources([p])).then(() => notify("Copied as Markdown"), (e) => notify(errorText(e), "error"));
+  /** A post its menu takes out of view (Mark read in Unread, Unfollow): the cursor goes on to the next post that
+   *  stays, else the one before, as the mark-read key moves it (Mail), and the list keeps focus, not <body>. */
+  const moveOn = (from: FeedPost, gone: (x: FeedPost) => boolean) => {
+    const at = order.indexOf(from);
+    const next = [...order.slice(at + 1), ...order.slice(0, Math.max(0, at)).reverse()].find((x) => !gone(x));
+    if (next) setCursor(next.url);
+    if (typedLast()) setKeyed(true);
+    if (listRef.current) focusQuietly(listRef.current);
+  };
   const postActions = (p: FeedPost): MenuAction[] => {
     const f = feeds.find((x) => x.url === p.feed);
     return [
       { id: "open", label: "Open", hint: "↵", run: () => open(p) },
-      { id: "read", label: p.read ? "Mark unread" : "Mark read", hint: label(keys["mark-read"]), run: () => setRead(p, !p.read) },
+      { id: "read", label: p.read ? "Mark unread" : "Mark read", hint: label(keys["mark-read"]), run: () => (!p.read && show === "unread" && moveOn(p, (x) => x === p), setRead(p, !p.read)) },
       { id: "original", label: "Open original", run: () => void openUrl(p.url).catch((e) => notify(errorText(e), "error")) },
       { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copyPost(p) },
-      ...(f ? [{ id: "unfollow", label: `Unfollow ${f.title}`, danger: true, divider: true, run: () => unfollow(f) }] : []),
+      ...(f ? [{ id: "unfollow", label: `Unfollow ${f.title}`, danger: true, divider: true, run: () => (moveOn(p, (x) => x.feed === f.url), unfollow(f)) }] : []),
     ];
   };
   const feedActions = (f: FeedInfo): MenuAction[] => {
