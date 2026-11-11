@@ -124,6 +124,8 @@ export interface NewItem {
   video?: string;
   /** The video's captions (WebVTT), for a page that plays one (D92). */
   transcript?: string;
+  /** An episode's own web page (D213), kept as `page.html` beside its audio: its text is one click away. */
+  page?: string;
   author?: string;
   published?: string;
   source_app?: string;
@@ -172,6 +174,7 @@ export async function createItem(lib: Library, input: NewItem): Promise<Item> {
   await withLock(paths.lock(lib), () => {
     if (input.source) writeAtomic(join(dir, `source.${input.source.ext}`), input.source.data);
     if (input.transcript) writeAtomic(join(dir, "transcript.vtt"), input.transcript);
+    if (input.page) writeAtomic(join(dir, "page.html"), input.page);
     for (const a of input.assets ?? []) writeAtomic(join(dir, "assets", a.name), a.data);
     writeAtomic(docPath, stringifyFrontmatter(meta, body));
   });

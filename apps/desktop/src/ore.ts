@@ -96,6 +96,8 @@ export type Item = {
   tables?: "reading" | "read";
   tables_error?: string;
   tables_reader?: boolean;
+  /** An episode whose own page is kept and whose text isn't in it yet (D213): one click adds it. */
+  page_text?: boolean;
   skills: string[];
   suggested_skill?: { name: string; hook?: string };
   prequestions?: Prequestion[];

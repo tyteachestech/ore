@@ -141,6 +141,19 @@ async function apply(lib: Library, item: Item, c: Omit<Cut, "removed">): Promise
   return cut;
 }
 
+/** Adds `text` at the end of a source's body (an episode's page text, D213), recorded as a cut of it
+ *  so it is undone with `redoCut` (taken out, its highlights with it) and redone with `restoreCut`. */
+export async function appendText(lib: Library, item: Item, text: string): Promise<Cut> {
+  const cut: Cut = { id: ulid(), item: item.meta.id, at: item.body.length, text, section: false, removed: [] };
+  await withLock(paths.lock(lib), () => {
+    const next = item.body + text;
+    writeAtomic(item.docPath, stringifyFrontmatter({ ...item.meta, text_sha256: sha256(next) }, next));
+    mkdirSync(stashDir(lib, item.meta.id), { recursive: true });
+    writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify(cut));
+  });
+  return cut;
+}
+
 const readCut = (lib: Library, item: Item, id: string): Cut => {
   const file = join(stashDir(lib, item.meta.id), `${id}.json`);
   if (!existsSync(file)) throw new Error("There is no removed text with that id.");

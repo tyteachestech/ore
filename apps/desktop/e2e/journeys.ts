@@ -2211,6 +2211,35 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
+journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D213)", async (page) => {
+  const lecture = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title.startsWith("Lecture 4"))!;
+  const dir = ((await ore("show", lecture.id)) as { dir: string }).dir;
+  const button = page.getByRole("button", { name: "Add the page’s text" });
+  const doc = page.locator(".doc");
+  // A recording with no page kept has nothing to add.
+  await openSource(page, "Lecture 4");
+  await page.locator(".player.audio").waitFor();
+  if (await button.count()) throw new Error("a recording with no page offered its text");
+  const article = "<p>" + "Spacing your practice tests across days makes what you recall last for months. ".repeat(10) + "</p>";
+  writeFileSync(join(dir, "page.html"), `<html><head><title>Lecture 4</title></head><body><article><h1>Lecture 4</h1><h2>Show notes</h2>${article}</article></body></html>`);
+  try {
+    await openSource(page, TESTING);
+    await openSource(page, "Lecture 4");
+    await button.click();
+    await doc.getByRole("heading", { name: "From the page" }).waitFor();
+    await doc.getByRole("heading", { name: "Show notes" }).waitFor();
+    await until("the button goes once the text is in", async () => (await button.count()) === 0);
+    await page.mouse.click(5, 300);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes the page's text out", async () => (await doc.getByRole("heading", { name: "From the page" }).count()) === 0);
+    await button.waitFor();
+  } finally {
+    const now = (await ore("show", lecture.id)) as { body: string };
+    rmSync(join(dir, "page.html"), { force: true });
+    if (now.body.includes("## From the page")) throw new Error("the page's text stayed in the lecture");
+  }
+});
+
 journey("a playing source takes YouTube's K J L beside Space and the arrows: K plays and pauses, J back 15 s, L on 30 s, never from a field (D195)", async (page) => {
   await openSource(page, "Lecture 4");
   const player = page.locator(".player.audio");

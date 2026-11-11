@@ -169,6 +169,7 @@ ore archive <item> [--undo]           sets archived_at: hidden from lists, quest
 ore reimport <item> [--undo]          fetches a linked source's original again and updates it in place (D93); --undo puts the old version back, again redoes
 ore tables <item> | --install | --remove | --status   reads a PDF's tables and display formulas with Docling into its text, highlights kept (D125); `ore show` gives `tables: reading|read` or `tables_error`; --install downloads Docling (about 2 GB, optional), --remove deletes it
 ore cut <item> --from N --to M [--section]   removes junk from a source's text (D111): the blocks the body offsets touch, or the section under the heading at N; highlights after it shift exactly, ones inside it go (cards and questions stay); `--undo <cut-id>` puts it back, `--redo <cut-id>` takes it out again. Not inside a video transcript
+ore page-text <item>   adds an episode's own page text below its transcript (D213), read from the page kept beside it (`page.html`): headings, links, images, speaker names; no highlight moves; `--undo <cut-id>` takes it out again, `--redo <cut-id>` puts it back
 ore pin <item> [--undo]               sets pinned_at: listed first, in the order pinned, in every source list it is in
 ore add <url> --course [--skill s]     a Claude Academy course (or lesson) or YouTube playlist: one source per lesson, in order (D79); again: only missing lessons, and page text for lessons added as bare videos (D92)
 ore course preview <url> | set <course> [--title t] [--skills a,b] | archive <course> [--undo] | lessons <course>

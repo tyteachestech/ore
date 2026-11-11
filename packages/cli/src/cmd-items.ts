@@ -11,6 +11,8 @@ import {
   cutText,
   restoreCut,
   redoCut,
+  addPageText,
+  hasPageText,
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
@@ -197,6 +199,7 @@ export const itemCommands: Record<string, Command> = {
         body: item.body, annotations,
         ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
         ...(item.meta.type !== "youtube" && !item.meta.video && { audio: audioOf(item) ?? undefined }),
+        ...(hasPageText(item) && { page_text: true }),
       };
       const text = f.annotations
         ? annotations.map(annotationLine).join("\n") || "No annotations."
@@ -525,6 +528,26 @@ export const itemCommands: Record<string, Command> = {
       const words = c.text.split(/\s+/).filter(Boolean).length;
       const data = { id: c.id, item: id, at: c.at, words, section: c.section, removed: c.removed.map((a) => ({ id: a.id, exact: a.exact, intent: a.intent })) };
       return { data, text: `Removed ${words} word(s)${c.removed.length ? ` and ${c.removed.length} highlight(s)` : ""}; undo with ore cut ${id} --undo ${c.id}` };
+    },
+  },
+
+  "page-text": {
+    usage: "<item> | <item> --undo|--redo <cut-id>   add an episode's own page text below its transcript (D213), from the page kept beside it (page.html): headings, links, images; highlights stay where they are; --undo <cut-id> takes it out again, --redo puts it back",
+    options: { undo: { type: "string" }, redo: { type: "string" } },
+    async run([ref], f) {
+      const lib = openLibrary();
+      const id = findItem(lib, need(ref, "<item>")).meta.id;
+      if (f.undo) {
+        const c = await redoCut(lib, id, str(f.undo)!);
+        return { data: { id: c.id, item: id, removed: c.removed.length }, text: "Took the page’s text out again" };
+      }
+      if (f.redo) {
+        const item = await restoreCut(lib, id, str(f.redo)!);
+        return { data: { id, title: item.meta.title }, text: `Put the page’s text back in ${item.meta.title}` };
+      }
+      const c = await addPageText(lib, id);
+      const words = c.text.split(/\s+/).filter(Boolean).length;
+      return { data: { id: c.id, item: id, words }, text: `Added the page’s text (${words} words); undo with ore page-text ${id} --undo ${c.id}` };
     },
   },
 
