@@ -324,6 +324,15 @@ export function lastWin(queue: DueEntry[]): DueEntry[] | null {
   return best < 0 ? null : [queue[best]!, ...queue.slice(0, best), ...queue.slice(best + 1)];
 }
 
+/** Later (D192, Anki's Bury for one session): the exercise on screen goes to the end of the session, nothing
+ *  recorded. `off` is what he has put off this session before. Null when every exercise left, this one too,
+ *  has been put off: the session ends and they stay due, so Laters in a row can never go round forever. */
+export function putOff(queue: DueEntry[], off: ReadonlySet<string>): DueEntry[] | null {
+  const [head, ...rest] = queue;
+  if (!head || rest.every((e) => off.has(e.id))) return null;
+  return [...rest, head];
+}
+
 /** The gap worth naming on the end screen (D177): a week or more. */
 const LONG_GAP_DAYS = 7;
 export const longGapText = (s: { longest_days?: number }) => ((s.longest_days ?? 0) >= LONG_GAP_DAYS ? `You recalled one you last saw ${s.longest_days} days ago` : null);

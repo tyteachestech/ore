@@ -273,7 +273,7 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
             <span className="ex-dest">
               into
               <SkillPicker skills={p.skills} value={into} title="the sources" onChange={(next) => setInto(next)} onCreate={p.onCreateSkill}>
-                {into.length ? into.map((id) => <SkillChip key={id} skill={p.skills.find((k) => k.id === id) ?? { id, name: id }} />) : <span className="chip">No skill</span>}
+                {into.length ? into.map((id) => <SkillChip key={id} skill={p.skills.find((k) => k.id === id) ?? { id, name: id }} />) : <span className="chip suggested">No skill</span>}
               </SkillPicker>
             </span>
           </div>

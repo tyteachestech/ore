@@ -3,7 +3,7 @@ import { Window } from "happy-dom";
 
 const w = new Window();
 for (const k of ["window", "document", "KeyboardEvent"] as const) (globalThis as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k];
-const { clash, is, isCustom, rebind, resetKeys, restore, saved } = await import("../src/keys");
+const { BINDINGS, clash, is, isCustom, rebind, resetKeys, restore, saved } = await import("../src/keys");
 const { keydownFor, runMenu } = await import("../src/menubar");
 
 const press = (combo: string) => keydownFor(combo);
@@ -34,6 +34,10 @@ describe("shortcut editor (Settings › Keyboard shortcuts)", () => {
     expect(clash("edit-card", "Meta+Enter")?.id).toBe("finish");
     expect(clash("finish", "KeyE")?.id).toBe("edit-card");
     expect(clash("ask", "Ctrl+Alt+KeyQ")?.id).toBe("quick-quiz");
+    // Later's ⌘L (D192) is free in Review, works with the answer half typed, and is Review's own.
+    expect(clash("later", "Meta+KeyL")).toBeNull();
+    expect(rebind("later", "KeyL")).toBe("Needs ⌘, ⌃ or ⌥");
+    expect(clash("finish", "Meta+KeyL")?.id).toBe("later");
   });
 
   test("any shortcut can be removed, and a menu click still runs it", () => {
@@ -97,6 +101,58 @@ describe("shortcut editor: Review's keys", () => {
     expect(rebind("edit-card", "Digit5")).toBeNull();
     resetKeys();
   });
+});
+
+describe("shortcut editor: the player's second keys (YouTube's K J L)", () => {
+  test("K, J and L are second keys for play, back and forward, and L stays Listen", () => {
+    resetKeys();
+    expect(is(press("KeyK"), "play-alt")).toBe(true);
+    expect(is(press("KeyJ"), "back-alt")).toBe(true);
+    expect(is(press("KeyL"), "forward-alt")).toBe(true);
+    expect(is(press("KeyL"), "listen")).toBe(true);
+  });
+
+  test("Listen works only on a source with no sound of its own, so it never meets the keys that need one", () => {
+    resetKeys();
+    expect(clash("forward-alt", "KeyL")).toBeNull();
+    expect(clash("listen", "KeyL")).toBeNull();
+    expect(clash("listen", "KeyJ")).toBeNull();
+    expect(rebind("listen", "KeyK")).toBeNull();
+    resetKeys();
+  });
+
+  test("they still meet every key that works on a playing source, and read-aloud's own keys meet Listen", () => {
+    resetKeys();
+    expect(clash("forward-alt", "KeyA")?.id).toBe("archive");
+    expect(clash("back-alt", "KeyH")?.id).toBe("highlight");
+    expect(clash("play-alt", "KeyL")?.id).toBe("forward-alt");
+    expect(clash("forward", "KeyJ")?.id).toBe("back-alt");
+    // Space and [ ] drive read-aloud on an article too, where L is Listen.
+    expect(clash("listen", "Space")?.id).toBe("play");
+    expect(clash("play", "KeyL")?.id).toBe("listen");
+    expect(rebind("forward-alt", "ArrowLeft")).toBe("← is reserved");
+    resetKeys();
+  });
+});
+
+test("every shortcut has its own name, so the editor's messages say which one", () => {
+  const names = BINDINGS.map((b) => b.label);
+  expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([]);
+  expect(BINDINGS.find((b) => b.id === "play-alt")!.label).toBe("Play / pause (second key)");
+});
+
+test("a key he saved on a command wins over a new default on the same key, which loads not assigned", async () => {
+  (globalThis as Record<string, unknown>).localStorage = w.localStorage;
+  // J was free when he gave it to Recall this chapter; K on Listen never meets the player's K.
+  w.localStorage.setItem("ore.keys", JSON.stringify({ section: "KeyJ", listen: "KeyK" }));
+  const fresh = (await import("../src/keys.ts?ownkey")) as typeof import("../src/keys");
+  expect(fresh.is(press("KeyJ"), "section")).toBe(true);
+  expect(fresh.is(press("KeyJ"), "back-alt")).toBe(false);
+  expect(fresh.clash("back-alt", "KeyJ")?.id).toBe("section");
+  expect(fresh.is(press("KeyK"), "listen")).toBe(true);
+  expect(fresh.is(press("KeyK"), "play-alt")).toBe(true);
+  expect(fresh.isCustom("back-alt")).toBe(true);
+  delete (globalThis as Record<string, unknown>).localStorage;
 });
 
 test("a saved shortcut the rules now refuse is dropped when the keymap loads", async () => {

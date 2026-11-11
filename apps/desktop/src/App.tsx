@@ -17,7 +17,7 @@ import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Reader, type PracticeRef } from "./Reader";
-import type { SideTab } from "./Notes";
+import { setSidebarShown, useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
 import { Settings, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
@@ -284,6 +284,10 @@ export function App() {
     }
   });
   const [hideSidebar, setHideSidebar] = useState(() => load("ore.sidebar") === "collapsed");
+  // Its edge drags it from 180 (the title bar's buttons and a short skill name still fit) to 360, or 40% of a
+  // narrow window so the content keeps its room (D44, D193). Everything sized off the sidebar reads --sidebar.
+  const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360 });
+  useLayoutEffect(() => document.documentElement.style.setProperty("--sidebar", `${sideWidth.width}px`), [sideWidth.width]);
   const [notesOpen, setNotesOpen] = useState(() => load("ore.mynotes") !== "closed");
   const [sideTab, setSideTab] = useState<SideTab>(() => (load("ore.sidetab") === "questions" ? "questions" : "note"));
   const { width, size, page, font } = useReading();
@@ -662,7 +666,8 @@ export function App() {
   // are greyed out where they do nothing.
   const keysRef = useRef(keys);
   keysRef.current = keys;
-  useEffect(() => setMenu(keys, { reader: !!openId, review: !!reviewing }), [keys, openId, reviewing]);
+  const [sound, setSound] = useState(false);
+  useEffect(() => setMenu(keys, { reader: !!openId, review: !!reviewing, sound: !!openId && sound }), [keys, openId, reviewing, sound]);
   useEffect(() => {
     const un = listenMenu(() => keysRef.current);
     return () => void un.then((f) => f());
@@ -866,6 +871,8 @@ export function App() {
   const [showAnyway, setShowAnyway] = useState(false);
   useEffect(() => setShowAnyway(false), [autoHide]);
   const collapsed = hideSidebar || (autoHide && !showAnyway);
+  // A right-hand panel gives back what the shown sidebar takes past 216 (D193).
+  useLayoutEffect(() => setSidebarShown(collapsed ? 0 : sideWidth.width), [collapsed, sideWidth.width]);
 
   const toggleSidebar = useCallback(() => {
     clearTimeout(peekTimer.current);
@@ -2111,7 +2118,7 @@ export function App() {
 
   const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} said={unheard.said} failed={unheard.failed} thinking={unheard.thinking} onHush={unheard.hush} />;
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}`}>
+    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}${sideWidth.dragging ? " sizing" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
       <Hint text={collapsed ? "Show sidebar" : "Hide sidebar"} keys="sidebar">
       <button
@@ -2138,6 +2145,11 @@ export function App() {
         </Hint>
       </div>
       {collapsed && <div className="side-edge" aria-hidden="true" onMouseEnter={peekIn} onMouseLeave={() => !peek && clearTimeout(peekTimer.current)} />}
+      {!collapsed && (
+        <Hint text="Drag to resize · double-click to reset" side="right">
+          <div className={`divider side-divider${sideWidth.dragging ? " dragging" : ""}`} role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" {...sideWidth.divider} />
+        </Hint>
+      )}
       <Sidebar
         skills={skills}
         skill={sideSkill}
@@ -2198,6 +2210,7 @@ export function App() {
             onArchive={(item) => void (item.archived_at ? restoreSource(item) : archiveSource(item))}
             lessons={openCourse ? lessonsOf(items ?? [], openCourse) : undefined}
             onOpenLesson={(id) => openSource(id)}
+            onSound={setSound}
             onPin={(item) => void pinSource(item)}
             onMove={(item, to) => void moveSource(item, to)}
             notesOpen={sideShown}

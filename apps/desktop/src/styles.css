@@ -140,6 +140,13 @@ kbd {
   content: ""; position: sticky; top: calc(-1 * (var(--titlebar) + 6px)); z-index: 2; display: block;
   height: var(--titlebar); margin: calc(-1 * (var(--titlebar) + 6px)) -8px 6px; background: var(--bg-side);
 }
+/* Its right edge drags to resize, as the source note's divider does (D44): a 7px strip whose 1px line, on the
+   sidebar's border, lights on hover and while dragging. It starts under the title bar (the window drags there)
+   and lies over the content, off the sidebar's scrollbar; while it drags, the whole window keeps its cursor. */
+.side-divider { position: fixed; top: var(--titlebar); bottom: 0; left: calc(var(--sidebar) - 1px); width: 7px; z-index: 6; cursor: col-resize; }
+.side-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: transparent; transition: background var(--t-1) ease-out; }
+.side-divider:hover::after, .side-divider.dragging::after { background: var(--accent); }
+.app.sizing, .app.sizing * { cursor: col-resize !important; user-select: none; -webkit-user-select: none; }
 /* Collapsed: a strip on the left edge floats the sidebar out over the content (Notion, Arc). */
 .side-edge { position: fixed; top: var(--titlebar); bottom: 0; left: 0; width: 10px; z-index: 4; }
 .sidebar.peek {
@@ -293,6 +300,9 @@ img.thumb { filter: brightness(0.86); }
 /* Chips that don't fit end in an ellipsis, each, never sliced at the row's edge. */
 .row-line .chips { flex-wrap: nowrap; min-width: 0; }
 .row-line .chips .chip { min-width: 0; }
+/* A skill beside the byline sits on its line, now that nothing boxes it. */
+.row-line .chip { height: auto; line-height: inherit; }
+.row-line .chip-name { line-height: inherit; }
 .chip .icon { flex: none; }
 .row .snip { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .snip mark { background: var(--keep); color: var(--text); border-radius: 2px; }
@@ -329,24 +339,25 @@ img.thumb { filter: brightness(0.86); }
 /* On hover and selected rows, metadata steps up to muted (faint on selected is under 4.5:1). */
 .row:is(:hover, .on) :is(.kind, .sub, .snip, .col, .by, .course-next, .part), .note-menu-row.on .sub { color: var(--muted); }
 .chips { display: flex; gap: 4px; flex-wrap: wrap; }
-/* Skill pill: one opaque matte fill tinted from the skill colour, white text, no outline (≥6.5:1 for every
-   skill colour). Flex-centred so emoji and glyph icons sit on the text's midline. */
-.chip { display: inline-flex; align-items: center; gap: 4px; height: 18px; font-size: 11px; line-height: 1; color: var(--text); background: var(--bg-active); border: 0; border-radius: 9px; padding: 0 7px; white-space: nowrap; max-width: min(100%, 28ch); }
+/* A skill on a source, one build everywhere (Tyler's pick C, 2026-11-10): its icon in its colour and its name
+   in `muted`, no fill and no edge, so a row holds no box. Flex-centred so the icon sits on the text's midline. */
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 18px; font-size: 12px; line-height: 1; color: var(--muted); background: none; border: 0; border-radius: 4px; padding: 0; white-space: nowrap; max-width: min(100%, 28ch); }
 /* A long skill name ends in … (its whole name on hover, SkillChip) instead of pushing the card wider. */
 .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 16px; } /* tall enough for g and y */
-.chip[data-color] { background: color-mix(in srgb, var(--skill) 40%, var(--bg-card)); }
 .chip .icon { vertical-align: 0; line-height: 1; }
-:root[data-chips="icon"] .chip:has(> .icon) { padding: 0 5px; }
 :root[data-chips="icon"] .chip:has(> .icon) .chip-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* A source's pills open its skill picker (SkillPicker, Linear's labels); with none, a quiet + on hover. */
-.chips-button { display: inline-flex; gap: 4px; min-width: 0; padding: 0; border-radius: 9px; }
-.chips-button:hover .chip, .chips-button[aria-expanded="true"] .chip { filter: brightness(1.15); }
+.chip + .chip { margin-left: 6px; }
+.chips-button { display: inline-flex; gap: 4px; min-width: 0; padding: 0; border-radius: 4px; }
+/* Hover and open light the ground behind them, so it shows with the names hidden too (Icon only). */
+.chips-button:hover, .chips-button[aria-expanded="true"] { background: var(--bg-active); box-shadow: 0 0 0 3px var(--bg-active); }
+.chips-button:hover .chip, .chips-button[aria-expanded="true"] .chip { color: var(--text); }
 .chips-add { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border-radius: 9px; color: var(--faint); opacity: 0; }
 .chips-add:hover, .chips-add[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 .row:hover .chips-add, .doc-head:hover .chips-add, .chips-add:focus-visible, .chips-add[aria-expanded="true"] { opacity: 1; }
 .skill-picker { width: 240px; }
 .skill-picker [cmdk-item] { gap: 8px; }
-.chip.suggested { color: var(--muted); background: none; border: 1px dashed var(--border); padding-right: 3px; }
+.chip.suggested { border: 1px dashed var(--border); padding: 0 3px 0 7px; }
 .chip.suggested button:hover { color: var(--text); }
 .chip.suggested .x { color: var(--faint); padding: 0 2px; }
 /* The empty-state block is `.empty-state`, never bare `.empty`: `empty` is a modifier (`.home-plan.empty`, `.skill-goal.empty`), and a global `.empty` gave those its 18vh margin. */
@@ -581,11 +592,9 @@ img.thumb { filter: brightness(0.86); }
 .doc-thumb { display: block; height: 128px; max-width: 100%; width: auto; object-fit: cover; object-position: top; border-radius: 0; margin: 8px 0 14px; outline: 1px solid rgba(255, 255, 255, 0.08); outline-offset: -1px; }
 .doc-thumb.none { display: none; }
 .doc-head .chips { margin-bottom: 16px; align-items: center; }
-/* In the byline a skill reads as words with its icon, like the date beside it (Reeder's byline), not a boxed tag;
-   hover shows it is the skill picker. */
+/* In the byline it takes the byline's size (Reeder's byline). */
 .doc-head .chips-button { flex-wrap: wrap; }
-.doc-head .chips-button .chip { height: 22px; padding: 0 5px; font-size: 13px; color: var(--muted); background: none; box-shadow: none; border-radius: 4px; }
-.doc-head .chips-button:hover .chip, .doc-head .chips-button[aria-expanded="true"] .chip { filter: none; background: var(--bg-hover); color: var(--text); }
+.doc-head .chips-button .chip { font-size: 13px; }
 /* A lesson's place in its course (D79), above the title: course name (its lessons), "Lesson 3 of 14", ‹ ›. */
 .course-line { display: flex; align-items: center; gap: 8px; margin-top: 4px; color: var(--faint); font-size: 13px; }
 .course-line .course-name { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 60%; height: 24px; padding: 0 7px; margin-left: -7px; border-radius: 6px; color: var(--muted); }
@@ -787,7 +796,7 @@ img.thumb { filter: brightness(0.86); }
   box-shadow: var(--float); padding: 8px;
   user-select: none; -webkit-user-select: none; cursor: default;
 }
-.intents { display: flex; gap: 4px; margin-bottom: 6px; grid-column: 1; }
+.intents { grid-column: 1; margin: 0 0 8px; }
 .intent { flex: 1; height: 26px; border-radius: 6px; color: var(--muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .intent:hover { background: var(--bg-hover); }
 /* Each type keeps its colour on the icon; the chosen one fills with the same tint it paints in the text. */
@@ -1054,9 +1063,7 @@ body.resizing iframe { pointer-events: none; }
 .width-toggle:focus-visible, .note-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .note-toggle {
   display: flex; align-items: center; gap: 6px;
-  height: 24px; padding: 0 10px; border-radius: 6px; font-size: 12px; color: var(--muted); border: 1px solid var(--border);
 }
-.note-toggle:hover { background: var(--bg-hover); color: var(--text); }
 .note-toggle.has::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .mynotes {
   position: relative; flex: none; min-width: 280px; max-width: 60vw; height: 100%; display: flex; flex-direction: column;
@@ -1077,13 +1084,9 @@ body.resizing iframe { pointer-events: none; }
 /* A segmented control on the panel's head (shadcn Tabs; Tyler's pick A, 2026-11-08): a muted track, the open tab raised
    on it, each tab with its section's icon and tone (as on the skill page). Selected by aria-selected: Hint's tooltip
    trigger overwrites data-state. */
-.side-tabs { display: flex; height: 32px; padding: 3px; align-items: center; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); }
-.side-tabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 12px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--faint); }
+.side-tabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; }
 .side-tabs button .card-icon { opacity: 0.55; }
-.side-tabs button:hover { color: var(--text); }
 .side-tabs button:hover .card-icon, .side-tabs button[aria-selected="true"] .card-icon { opacity: 1; }
-.side-tabs button[aria-selected="true"] { color: var(--text); background: var(--bg-hover); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), var(--lift); }
-.side-tabs button:focus-visible { outline: none; color: var(--text); box-shadow: inset 0 0 0 2px var(--focus); }
 
 /* Questions tab (D75): his open questions for this source's skills. */
 .qp { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
@@ -1413,8 +1416,7 @@ button.skill-badge:hover { filter: brightness(1.2); }
 /* D132: one quiet line (Linear), no band: the question in muted, a small bordered Start whose hint carries the why. */
 .warm-up { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
 .warm-up b { flex: 1 1 160px; min-width: 0; font-size: 14px; font-weight: 500; color: var(--muted); }
-.warm-start { flex: none; height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); color: var(--text); font-size: 12px; font-weight: 500; }
-.warm-start:hover { background: var(--bg-hover); }
+.warm-start { flex: none; }
 /* The one playful button: a raised pill in the skill's color, Duolingo-style. */
 .pill-btn {
   flex: none; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; border-radius: 999px;
@@ -1477,7 +1479,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .gem-ring[data-finishes] > .dot-ring { filter: drop-shadow(0 0 3px var(--skill, var(--accent))); }
 .gem-ring-lv { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; height: 16px; line-height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: var(--round); font-size: 10px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .strength-side { display: flex; flex-direction: column; gap: 4px; }
-.near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--round); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .near-goal > span { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 12px; }
 .near-goal > .near-glow { color: var(--text); font-size: inherit; }
 .home-level .near-goal { gap: 10px; font-size: 12px; margin-left: 6px; }
@@ -1580,9 +1582,6 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .question.done .question-answers { color: var(--muted); }
 .question-src { padding: 0; font-size: 12px; color: var(--faint); }
 .question-src:hover { color: var(--text); text-decoration: underline; }
-.question-maybe { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 6px 34px; }
-.question-maybe .chip { text-decoration: none; border-style: dashed; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.question-maybe .chip:hover { color: var(--text); text-decoration: none; }
 .skill-col.side .qa-box { margin: 4px 8px 8px 34px; }
 .found { list-style: none; margin: 8px 0 0; padding: 0 0 0 12px; border-left: 2px solid var(--research-solid); display: grid; gap: 8px; }
 .found li { display: flex; gap: 12px; align-items: flex-start; }
@@ -1933,11 +1932,15 @@ button.home-plan:hover { color: var(--text); }
 .home-read .row-rename { flex: 1; min-width: 0; height: 26px; margin: 0 -6px; padding: 0 6px; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: inherit; color: var(--text); }
 .home-read .course-of { flex: none; max-width: 35%; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Settings' segmented controls are the side panel's (D135): a track with a hairline edge, the chosen one a raised pill. */
-.seg { display: flex; align-items: center; gap: 2px; height: 32px; padding: 3px; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); }
-.seg-item { min-width: 28px; height: 24px; padding: 0 8px; border-radius: 6px; color: var(--faint); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.seg-item:hover:not(:disabled) { color: var(--text); }
-.seg-item[data-state="on"] { background: var(--bg-hover); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), var(--lift); }
-.seg-item:focus-visible { outline: none; color: var(--text); box-shadow: inset 0 0 0 2px var(--focus); }
+/* The segmented control has one build wherever it appears (D135): the side panel's tabs, the highlight's types
+   and Settings' choices. A 32px `bg` track with a 1px edge, a well on any ground; each option 24px,
+   12px/500 faint; the chosen one a raised bg-hover pill. */
+.seg, .side-tabs, .intents { display: flex; align-items: center; gap: 0; height: 32px; padding: 3px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+.seg-item, .side-tabs button, .intents .intent { min-width: 28px; height: 24px; padding: 0 10px; border-radius: 6px; color: var(--faint); font: 500 12px var(--font); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.seg-item:hover:not(:disabled), .side-tabs button:hover, .intents .intent:hover { color: var(--text); }
+.seg-item[data-state="on"], .side-tabs button[aria-selected="true"], .intents .intent.on { background: var(--bg-hover); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), var(--lift); }
+.intents .intent:not(.on):hover { background: none; }
+.seg-item:focus-visible, .side-tabs button:focus-visible { outline: none; color: var(--text); box-shadow: inset 0 0 0 2px var(--focus); }
 .switch { position: relative; width: 32px; height: 18px; flex: none; border-radius: 999px; background: var(--bg-active); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); transition: background-color var(--t-2); }
 .switch[data-state="checked"] { background: var(--c-green); }
 .switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
@@ -2299,7 +2302,8 @@ button.home-plan:hover { color: var(--text); }
 
 /* Settings (⌘,): Codex and Linear. Sections on the left in the sidebar's style; each page is grouped
    cards of rows, a title and one line on the left, the control on the right. */
-.settings { position: fixed; inset: 0; z-index: 15; display: grid; padding: clamp(24px, 9vh, 96px) clamp(24px, 9vw, 96px); background: rgba(0, 0, 0, 0.5); }
+/* Its sections column keeps the sidebar's default width, whatever the sidebar was dragged to. */
+.settings { --sidebar: 216px; position: fixed; inset: 0; z-index: 15; display: grid; padding: clamp(24px, 9vh, 96px) clamp(24px, 9vw, 96px); background: rgba(0, 0, 0, 0.5); }
 .settings > .titlebar { position: absolute; inset: 0 0 auto; }
 .settings-sheet { position: relative; min-height: 0; overflow: hidden; background: var(--bg); border-radius: 12px; box-shadow: var(--float); }
 .settings-sheet:focus-visible { outline: none; }
@@ -2338,8 +2342,11 @@ button.home-plan:hover { color: var(--text); }
 .settings-link:hover { color: var(--text); background: var(--bg-hover); }
 .settings-link:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .settings-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); color: var(--muted); user-select: text; -webkit-user-select: text; }
-.settings-btn { flex: none; height: 28px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--text); }
-.settings-btn:hover { background: var(--bg-hover); }
+.settings-btn { flex: none; }
+/* The small button, one build (Tyler's pick A, 2026-11-10): Add, Finish, Start and Settings' buttons. 26px, a 1px
+   edge, no fill, the sans at 12px/500. The mono is kept for a screen's main action and the answers in Review. */
+.note-toggle, .warm-start, .settings-btn { height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text); font: 500 12px var(--font); }
+.note-toggle:hover, .warm-start:hover, .settings-btn:hover { background: var(--bg-hover); }
 .settings-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .settings-select { display: inline-flex; align-items: center; gap: 8px; min-width: 104px; justify-content: space-between; font-variant-numeric: tabular-nums; }
 .settings-select svg { flex: none; color: var(--faint); }
