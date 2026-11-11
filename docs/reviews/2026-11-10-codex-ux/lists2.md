@@ -18,3 +18,22 @@ What changed in the setup: the prompt says covered means "do not propose it agai
 | F2 A Home source cannot be dragged onto a skill | Yes | Left for Tyler |
 
 Guard: a fourth rule in the e2e `HYGIENE` script. When the focused control leaves the page and focus is still on nothing a moment later, the journey fails. Beyond the findings it caught the peeked sidebar sliding away with focus inside it (fixed), and about ten places on other screens, listed in the guard's `ALLOW` with a reason each, to fix when those screens are next worked on: Review closing, the finish quiz and the quick quiz, the Find bar, the tutor closing, the reader's title and New question fields, Review's answer-piece editor, Explain's buttons, and the skill page's Try it and name fields.
+
+Follow-up, 2026-11-11: every `ALLOW` entry fixed, and the list is empty. With it emptied, the guard failed 57 journeys on the old code (37 of them Review's); each now returns focus by what already existed:
+
+| Entry | Where focus goes now | How |
+|---|---|---|
+| Review closing (Esc, Done, Later on the last, Leave review) | What started it, else Home's Start review, else the list, the reader's text or Home's first row | `useFocusWhileMounted` in Review, with a new optional `fallback` |
+| The tutor closing; a chat deleted from its list | What opened it, else the mole button | `closeTutor` |
+| The Find bar on a skill page | The page's sources list (the reader's already went to its text) | SkillPage's `onClose` |
+| The reader's title field | The page's text (the title is no control of its own) | `useFocusBack`, as the author's |
+| An answer piece's editor | The piece; emptied (it goes), the answer field | `useFocusBack` |
+| A new question's field | The + that opened it, else the panel's Ask a question | its own give-back once the field is gone |
+| Explain's Retry | The Explain popup, whose keys still work | `focusQuietly` |
+| Try it's field | What opened it, else its try's row | `useFocusWhileMounted` with `fallback` |
+| The skill page's name field | Already went back to the name on Enter or Esc: the journey's click on the name opened it by accident, then a script blur closed it. The journey now presses Esc there and checks focus is on the name |  |
+| The finish quiz | Already went back to the text on Esc (Done leaves the source). The flagged buttons were Review's, which share the class; a journey step now checks Esc |  |
+| The quick quiz | Its own window, which hides on close and has no guard; nothing to fix |  |
+
+Programmatic focus shows the keyboard ring only after a key (`focusQuietly`), checked in Chromium and WebKit for Review and the tutor by key and by mouse.
+
