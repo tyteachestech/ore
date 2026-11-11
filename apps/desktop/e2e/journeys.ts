@@ -8926,6 +8926,18 @@ journey("phone: Finish's closing card keeps its unsaved line through a failed sa
   await until("the relaunch comes back to the closing card with its line", async () => (await page.locator("#quiz-use").inputValue().catch(() => "")) === "Use it before every exam");
 }, "phone");
 
+journey("phone: a link to a part of the page that wasn't saved says the next step is on the Mac", async (page) => {
+  // The toast said to Reimport from ⋯, which the phone doesn't offer.
+  await macChanges((lib) => itemFile(lib, "building-effective-agents", "doc.md"), "\n# Building Effective Agents\n", "\n# Building Effective Agents\n\nSee [the missing part](#a-part-not-saved).\n", async () => {
+    await phoneSource(page, AGENTS);
+    await tap(page, page.locator(".phone-reader .doc a").filter({ hasText: "the missing part" }));
+    const toast = page.locator(".toasts").filter({ hasText: "wasn’t saved" });
+    await toast.waitFor();
+    const said = await toast.innerText();
+    if (said.includes("⋯") || !said.includes("Mac")) throw new Error(`the toast gives a step the phone can't take: “${said}”`);
+  });
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
