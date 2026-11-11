@@ -830,6 +830,12 @@ export function App() {
     peekTimer.current = window.setTimeout(() => setPeek(true), 200);
   }, []);
   const peekOut = useCallback(() => clearTimeout(peekTimer.current), []);
+  /** The sidebar is going away with focus in it: focus goes to the view's list where it has one (Tyler,
+   *  2026-11-08), else the text or the page's first control, never to <body> with it. */
+  const leaveSidebar = useCallback(() => {
+    if (!document.activeElement?.closest(".sidebar")) return;
+    setTimeout(() => (listRef.current ?? document.querySelector<HTMLElement>(".reader-scroll") ?? document.querySelector<HTMLElement>("main :is(button, a[href], [tabindex='0'])"))?.focus({ preventScroll: true }));
+  }, []);
   // Out, it goes 300 ms after anything that can let it go, unless something still holds it: the pointer
   // on it, the edge or the toggle, a field in it, or one of its menus (portaled outside it, so its
   // trigger in the sidebar, open, stands for it). Not on the sidebar's mouseleave alone: the pointer on
@@ -841,7 +847,7 @@ export function App() {
       !!(document.querySelector(".sidebar:hover, .side-edge:hover, .side-toggle:hover, .sidebar[data-state=open], .sidebar [data-state=open]") || document.activeElement?.closest(".sidebar input"));
     const look = () => {
       clearTimeout(t);
-      t = window.setTimeout(() => !held() && setPeek(false), 300);
+      t = window.setTimeout(() => !held() && (leaveSidebar(), setPeek(false)), 300);
     };
     const events = ["pointerout", "pointerup", "keyup", "focusout"] as const;
     for (const e of events) document.addEventListener(e, look);
@@ -849,7 +855,7 @@ export function App() {
       clearTimeout(t);
       for (const e of events) document.removeEventListener(e, look);
     };
-  }, [peek]);
+  }, [peek, leaveSidebar]);
 
   // In a narrow window, a source with its note open hides the sidebar so the column keeps its measure
   // (D27), as Notion does; it comes back when the window widens or the note closes. ⌘\ still shows it.
@@ -864,15 +870,13 @@ export function App() {
   const toggleSidebar = useCallback(() => {
     clearTimeout(peekTimer.current);
     setPeek(false);
-    // Hidden with focus in it: focus goes to the view's list where it has one (Tyler, 2026-11-08), else the text or the page's first control.
-    if (!collapsed && document.activeElement?.closest(".sidebar"))
-      setTimeout(() => (listRef.current ?? document.querySelector<HTMLElement>(".reader-scroll") ?? document.querySelector<HTMLElement>("main :is(button, a[href], [tabindex='0'])"))?.focus({ preventScroll: true }));
+    if (!collapsed) leaveSidebar();
     if (autoHide && !hideSidebar) return setShowAnyway((v) => !v);
     setHideSidebar((v) => {
       save("ore.sidebar", v ? "open" : "collapsed");
       return !v;
     });
-  }, [autoHide, hideSidebar, collapsed]);
+  }, [autoHide, hideSidebar, collapsed, leaveSidebar]);
 
   /** Back from Settings; Home re-reads the goal it may have changed. */
   const closeSettings = useCallback(() => {
@@ -2274,8 +2278,9 @@ export function App() {
             onCreateSkill={createSkill}
             onSettings={() => setSettings({ section: "review" })}
             // Home renames its own rows (onRename); the shortcuts act on the list's selected row, so
-            // Home shows none.
-            sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => ({ ...a, hint: undefined }))}
+            // Home shows none but ⌘C, which copies the focused row (onCopy).
+            sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => (a.id === "copy" ? a : { ...a, hint: undefined }))}
+            onCopy={(i) => copySources([i])}
             onRename={(i, t) => retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
             onRetry={reload}

@@ -14,6 +14,7 @@ import { ore, opt, type Skill } from "./ore";
 import { SkillChip, SkillPicker, unfile } from "./Skills";
 import { errorText, load, save, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
+import { citeSources, copyCited } from "./cite";
 
 export type FeedPost = { feed: string; url: string; title: string; author?: string; published?: string; image?: string; read: boolean; feed_title: string; preview?: string };
 type FeedInfo = { url: string; title: string; site?: string; skills: string[]; followed_at: string; checked_at?: string; error?: string };
@@ -195,12 +196,15 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     );
   };
 
+  /** A post as its linked title, as a source row copies (⌘C). */
+  const copyPost = (p: FeedPost) => void copyCited(citeSources([p])).then(() => notify("Copied as Markdown"), (e) => notify(errorText(e), "error"));
   const postActions = (p: FeedPost): MenuAction[] => {
     const f = feeds.find((x) => x.url === p.feed);
     return [
       { id: "open", label: "Open", hint: "↵", run: () => open(p) },
       { id: "read", label: p.read ? "Mark unread" : "Mark read", hint: label(keys["mark-read"]), run: () => setRead(p, !p.read) },
       { id: "original", label: "Open original", run: () => void openUrl(p.url).catch((e) => notify(errorText(e), "error")) },
+      { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copyPost(p) },
       ...(f ? [{ id: "unfollow", label: `Unfollow ${f.title}`, danger: true, divider: true, run: () => unfollow(f) }] : []),
     ];
   };
@@ -228,6 +232,9 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     } else if (e.key === "Enter" && current) {
       e.preventDefault();
       open(current);
+    } else if (current && is(e.nativeEvent, "copy") && !getSelection()?.toString()) {
+      e.preventDefault();
+      copyPost(current);
     } else if (current && is(e.nativeEvent, "mark-read")) {
       e.preventDefault();
       // The selection moves on, as Mail's does, so a run of posts is marked one key at a time.

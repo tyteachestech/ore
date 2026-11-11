@@ -1,8 +1,8 @@
 import { GearSix } from "./icons";
-import { useCallback, useEffect, useState, type ComponentProps, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type ReactNode } from "react";
 import { gemHint, GemRing, NearGoal } from "./Gem";
 import { Hint } from "./Hint";
-import { label, useKeymap } from "./keys";
+import { inTextField, is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
 import { lessonsOf, levelProgress, nextLesson, opt, ore, PHONE, touched, type DueEntry, type Item, type Skill, type Today } from "./ore";
@@ -14,7 +14,8 @@ import { archivedOnly, SkillChip, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
 import { Roll } from "./Roll";
-import { errorText, load, useLibraryChanges, type Notify } from "./util";
+import { errorText, load, typedLast, useKeptScroll, useLibraryChanges, type Notify } from "./util";
+import { focusQuietly } from "./focus-near";
 import { TitleField } from "./TitleField";
 
 const day = () => new Date().toLocaleDateString("sv-SE");
@@ -40,7 +41,10 @@ export function continueReading(items: Item[], recent: string[]): Item[] {
   ];
 }
 
-export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource, onOpenSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, skillMenu, onRetry, notify }: {
+/** The row or tile he last opened from Home by the keyboard: Back puts focus on it again (Finder). */
+let openedByKeys: string | null = null;
+
+export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource: openSource, onOpenSkill: openSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, onCopy, skillMenu, onRetry, notify }: {
   items: Item[];
   /** The library has no sources yet (loaded, not loading): Home says how to add the first. */
   empty?: boolean;
@@ -63,12 +67,16 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   sourceMenu?: (item: Item) => MenuAction[];
   /** Saves a source's title, typed in place on its row from Rename…. */
   onRename?: (item: Item, title: string) => Promise<boolean>;
+  /** ⌘C on a focused Continue reading row: copies it as Markdown with its link, as the source lists do. */
+  onCopy?: (item: Item) => void;
   skillMenu?: (skill: Skill) => MenuAction[];
   /** Try again also reloads what failed with today's numbers: the sources and the skills. */
   onRetry?: () => void;
   notify: Notify;
 }) {
   const keys = useKeymap();
+  const onOpenSource = (id: string) => ((openedByKeys = typedLast() ? `.home-read[data-id="${CSS.escape(id)}"]` : null), openSource(id));
+  const onOpenSkill = (id: string) => ((openedByKeys = typedLast() ? `.home-skill[data-id="${CSS.escape(id)}"]` : null), openSkill(id));
   const [renaming, setRenaming] = useState<string | null>(null);
   /** Rename… after Open, as in the source list, typed on the row itself. */
   const withRename = (acts: MenuAction[], i: Item): MenuAction[] =>
@@ -152,10 +160,35 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   // An archived skill's sources wait off Home too (D173).
   const reading = continueReading(items, recent).filter((i) => !archivedOnly(i.skills, skills)).slice(0, 5);
 
+  // ⌘C on the focused Continue reading row copies it, as on a list's selected row; never selected text or a field's.
+  useEffect(() => {
+    if (!onCopy) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (blocked || e.defaultPrevented || !is(e, "copy") || inTextField(e) || getSelection()?.toString()) return;
+      const id = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(".home .home-read")?.dataset.id;
+      const item = id ? items.find((i) => i.id === id) : undefined;
+      if (!item) return;
+      e.preventDefault();
+      onCopy(item);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [items, onCopy, blocked]);
+
+  // Back on Home he is where he was: scrolled there, and on the row or tile he opened by the keyboard, once it is drawn.
+  const root = useRef<HTMLDivElement>(null);
+  useKeptScroll(root, "ore.home-scroll");
+  useLayoutEffect(() => {
+    const el = openedByKeys && root.current?.querySelector<HTMLElement>(`${openedByKeys} .home-open`);
+    if (!el) return;
+    openedByKeys = null;
+    if (!document.activeElement || document.activeElement === document.body) focusQuietly(el);
+  });
+
   const split = useSplit("ore.home-split", 1 / 3);
   const two = reading.length > 0 && shown.length > 0 && !!today;
   return (
-    <div className="home">
+    <div className="home" ref={root}>
       <section className="home-today" aria-label="Today">
         {error && (
           <div role="alert">
@@ -246,13 +279,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 <div className="home-read" data-id={i.id} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpenSource(i.id)}>
                   <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
-                    <TitleField
-                      value={i.title}
-                      onSave={(t) => onRename!(i, t)}
-                      // Focus goes back to the row, as the sources list's rename does, so Tab carries on from it;
-                      // after this key, so a held Enter's repeat doesn't open the source.
-                      onClose={(byKey) => (setRenaming(null), byKey && setTimeout(() => document.querySelector<HTMLElement>(`.home-read[data-id="${i.id}"] .home-open`)?.focus({ preventScroll: true })))}
-                    />
+                    // Focus goes back to the row once it closes, as after any pick from its menu (keepFocusNear).
+                    <TitleField value={i.title} onSave={(t) => onRename!(i, t)} onClose={() => setRenaming(null)} />
                   ) : (
                     <button className="title home-open" onClick={() => onOpenSource(i.id)}>{i.title}</button>
                   )}
@@ -318,7 +346,7 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
   const [fan, setFan] = useState<DueEntry[] | null>(null);
   const due = k?.due ?? 0;
   const tile = (
-    <div {...trigger} className="home-skill" data-color={s.color} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpen()}>
+    <div {...trigger} className="home-skill" data-id={s.id} data-color={s.color} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpen()}>
       <span className="home-skill-top">
         <span className={`mark${s.icon && s.color ? " tile" : ""}`} data-color={s.color} aria-hidden="true">
           <SkillIcon icon={s.icon} color={s.color} dot />
