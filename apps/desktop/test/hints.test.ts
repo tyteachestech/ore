@@ -7,8 +7,8 @@ import { BINDINGS } from "../src/keys";
 // that binding, through <Hint keys=…> or an inline label(keys.<id>). A binding with no on-screen
 // control is listed here with the reason; add a control's hint instead whenever one exists.
 const NO_CONTROL: Record<string, string> = {
-  "go-toread": "label(keys[v.key]) in the sources view menu (ViewMenu, TABS)",
-  "go-done": "label(keys[v.key]) in the sources view menu (ViewMenu, TABS)",
+  "go-toread": "the list title's menu shows no shortcuts (Tyler, 2026-11-11); the Mac menu bar's Go menu and ⌘K show it",
+  "go-done": "as go-toread",
   questions: "opens the Collected tab with the open passage as his answer's quote; the tab itself shows C (collected)",
   keep: "Hint keys={i} on the highlight popup's intent buttons",
   question: "Hint keys={i} on the highlight popup's intent buttons",

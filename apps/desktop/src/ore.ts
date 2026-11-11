@@ -133,7 +133,10 @@ export function pinBetween(before?: string, after?: string): string {
 }
 
 /** What a list's search knows a source by (`ranked`): its title first, then its course, author, site, skills and type. */
-export const searchFields = (i: Item, site?: string, skills: string[] = []): (string | undefined)[] => [i.title, i.course?.title, i.author, site, ...skills, i.type];
+export const searchFields = (i: Item, site?: string, skills: string[] = []): (string | undefined)[] => [i.title, i.course?.title, i.author, siteName(site), ...skills, i.type];
+/** A site as searched: its name without the ending ("nytimes" for nytimes.com, "bbc.co" for bbc.co.uk), or
+ *  "com" would find nearly every web page as one types "Complete" (bench "filter sources"). */
+const siteName = (site?: string) => site?.replace(/\.[^.]+$/, "");
 /** The lesson to open next: the first one not done (null when all are). */
 export const nextLesson = (lessons: Item[]): Item | null => lessons.find((l) => l.status !== "done") ?? null;
 /** EPUB chapter recall (D18); `n` is the number in the body's `<!-- chapter N -->` marker. */

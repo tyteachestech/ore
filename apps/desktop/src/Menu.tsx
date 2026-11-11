@@ -1,4 +1,4 @@
-import { CaretLeft, CaretRight, Check, DotsThree } from "./icons";
+import { CaretLeft, CaretRight, DotsThree, Tick } from "./icons";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
@@ -100,7 +100,7 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
                         <ContextMenu.CheckboxItem key={b.id} className="menu-item check" checked={b.checked} onSelect={pick(b)}>
                           <span className="menu-tick">
                             <ContextMenu.ItemIndicator>
-                              <Check size={12} weight="bold" />
+                              <Tick />
                             </ContextMenu.ItemIndicator>
                           </span>
                           {b.icon}
@@ -196,7 +196,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
                         <DropdownMenu.CheckboxItem key={b.id} className="menu-item check" checked={b.checked} onSelect={pick(b)}>
                           <span className="menu-tick">
                             <DropdownMenu.ItemIndicator>
-                              <Check size={12} weight="bold" />
+                              <Tick />
                             </DropdownMenu.ItemIndicator>
                           </span>
                           {b.icon}
@@ -211,7 +211,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
               <DropdownMenu.CheckboxItem className="menu-item check" checked={a.checked} onSelect={pick(a)}>
                 <span className="menu-tick">
                   <DropdownMenu.ItemIndicator>
-                    <Check size={12} weight="bold" />
+                    <Tick />
                   </DropdownMenu.ItemIndicator>
                 </span>
                 {a.icon}
@@ -296,7 +296,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
                     <Fragment key={a.id}>
                       {a.divider && !step && <div className="sheet-sep" role="separator" />}
                       <button className={`pick-row${a.danger ? " danger" : ""}`} role={a.checked === undefined ? undefined : "checkbox"} aria-checked={a.checked} onClick={() => pick(a)}>
-                        {step && <span className="menu-tick">{a.checked && <Check size={12} weight="bold" />}</span>}
+                        {step && <span className="menu-tick">{a.checked && <Tick />}</span>}
                         {a.icon}
                         <span className="name">{a.label}</span>
                         {a.sub && <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />}

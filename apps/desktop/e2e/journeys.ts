@@ -372,6 +372,50 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("reader width: a line holds about 66 characters at any text size, in Charter or Geist (D207)", async (page) => {
+  const para = "Spacing your practice over days instead of cramming it into one evening tends to produce memories that last longer, because each return to the material comes after some forgetting has begun, and the effort of pulling it back strengthens the trace more than an easy repeat would. ";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# Measure check\n\n${para.repeat(8)}`);
+  await page.keyboard.press("Enter");
+  const p = page.locator(".doc p").filter({ hasText: "Spacing your practice" }).first();
+  await p.waitFor();
+  // Mean characters per full line (the last line of the paragraph is left out).
+  const perLine = () => p.evaluate((el) => {
+    const n = el.firstChild!;
+    const s = n.textContent ?? "";
+    const r = document.createRange();
+    const lines: number[] = [];
+    let top: number | null = null, count = 0;
+    for (let i = 0; i < s.length; i++) {
+      r.setStart(n, i); r.setEnd(n, i + 1);
+      const box = r.getClientRects()[0];
+      if (!box) continue;
+      const y = Math.round(box.top);
+      if (top !== null && y !== top) { lines.push(count); count = 0; }
+      top = y; count++;
+    }
+    return lines.reduce((a, b) => a + b, 0) / lines.length;
+  });
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  try {
+    for (const font of ["charter", "geist"]) {
+      for (const size of [14, 17, 22]) {
+        await page.evaluate(([f, px]) => {
+          document.documentElement.dataset.font = f as string;
+          document.documentElement.style.setProperty("--read-size", `${px}px`);
+        }, [font, size] as const);
+        const chars = await perLine();
+        if (chars < 60 || chars > 72) throw new Error(`${font} at ${size}px: ${chars.toFixed(1)} characters a line, want about 66`);
+      }
+    }
+  } finally {
+    await page.evaluate(() => {
+      document.documentElement.dataset.font = "charter";
+      document.documentElement.style.setProperty("--read-size", "17px");
+    });
+  }
+});
+
 journey("add a pasted ChatGPT answer: its headings and table come in, which its plain text loses", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   const box = page.getByLabel("Link, file path or text");

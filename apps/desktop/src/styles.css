@@ -67,11 +67,17 @@
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
   /* SF Pro Rounded: only where he answers or sees progress (review questions and buttons, big numbers). */
   --round: ui-rounded, "SF Pro Rounded", var(--font);
-  --measure: 60ch;
+  /* The reading column (D207): sized in the reading text's own em, so a line holds about 66 characters
+     (Medium; Narrow about 55, Wide about 75) at every text size. Measured on the golden docs' prose in
+     Charter; Geist sets wider, so it gets a wider column for the same count. */
+  --measure-em: 28;
+  --face-width: 1;
+  --measure: calc(var(--read-size, 17px) * var(--measure-em) * var(--face-width));
 }
-/* Reading width (width.ts): the reader's column, Narrow / Medium / Wide. */
-:root[data-width="narrow"] { --measure: 52ch; }
-:root[data-width="wide"] { --measure: 74ch; }
+/* Reading width (reading.ts): the reader's column, Narrow / Medium / Wide. */
+:root[data-width="narrow"] { --measure-em: 23.5; }
+:root[data-width="wide"] { --measure-em: 31.5; }
+:root[data-font="geist"] { --face-width: 1.14; }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -2275,7 +2281,9 @@ button.home-plan:hover { color: var(--text); }
 .menu-item kbd { margin-left: auto; color: var(--faint); }
 .menu-item.check { gap: 8px; padding-left: 6px; }
 .menu-item.check > .skill-icon { flex: none; }
-.menu-tick { flex: none; width: 14px; display: grid; place-items: center; color: var(--accent); }
+/* The tick's column: 16px holds the Tick's ink (12.5px) whole; the indicator is a flex box so the sprite centres on the row, not on the text baseline. */
+.menu-tick { flex: none; width: 16px; height: 20px; display: grid; place-items: center; color: var(--accent); }
+.menu-tick > span { display: flex; }
 .menu-sep { height: 1px; margin: 4px 6px; background: var(--border); }
 .doc-head .title-edit { display: block; width: 100%; font-size: 30px; line-height: 1.25; font-weight: 700; margin: 8px 0 6px; letter-spacing: -0.01em; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -1px 0 var(--accent); }
 .row { position: relative; }
