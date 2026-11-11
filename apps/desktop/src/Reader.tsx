@@ -19,6 +19,7 @@ import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
+import { HideDots } from "./HideDots";
 import { Hint } from "./Hint";
 import { Thumb } from "./Thumb";
 import { SkillIcon } from "./IconPicker";
@@ -41,7 +42,7 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, inOrder, kept, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
+import { errorText, focusQuietly, inOrder, kept, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
@@ -451,17 +452,24 @@ function ColumnHead({ children, style }: { children?: ReactNode; style?: CSSProp
  *  the row that opens it is outside the index. It folds again the next time the source is opened. */
 function Output({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  // The row goes when it opens: if it had focus (Enter on it), the output it showed takes it, so the keys
+  // don't fall to nothing. A click in the Mac's webview focuses no button, and then nothing moves.
+  const out = useRef<HTMLPreElement>(null);
+  const hadFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (open && hadFocus.current && out.current) focusQuietly(out.current);
+  }, [open]);
   return (
     <>
       {!open && (
         <Hint text="Guess it first, then show">
-          <button className="output-fold" data-noindex="" onClick={() => setOpen(true)}>
+          <button className="output-fold" data-noindex="" onClick={(e) => { hadFocus.current = document.activeElement === e.currentTarget; setOpen(true); }}>
             <CaretRight size={12} />
             Output
           </button>
         </Hint>
       )}
-      <pre className="output" hidden={!open}>{children}</pre>
+      <pre ref={out} tabIndex={-1} className="output" hidden={!open}>{children}</pre>
     </>
   );
 }
@@ -2957,6 +2965,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           })}
         </div>
       )}
+      <HideDots hidden={hidden} box={scrollRef} page={pageRef} />
       <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">

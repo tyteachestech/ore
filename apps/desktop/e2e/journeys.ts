@@ -372,6 +372,58 @@ journey("add pasted text: it opens in the reader", async (page) => {
   await page.locator(".doc").getByText("Mixing problem types forces you").waitFor();
 });
 
+journey("reader width: a line holds about 66 characters at any text size, in Charter or Geist (D207)", async (page) => {
+  const para = "Spacing your practice over days instead of cramming it into one evening tends to produce memories that last longer, because each return to the material comes after some forgetting has begun, and the effort of pulling it back strengthens the trace more than an easy repeat would. ";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# Measure check\n\n${para.repeat(8)}`);
+  await page.keyboard.press("Enter");
+  const p = page.locator(".doc p").filter({ hasText: "Spacing your practice" }).first();
+  await p.waitFor();
+  // Mean characters per full line (the last line of the paragraph is left out).
+  const perLine = () => p.evaluate((el) => {
+    const n = el.firstChild!;
+    const s = n.textContent ?? "";
+    const r = document.createRange();
+    const lines: number[] = [];
+    let top: number | null = null, count = 0;
+    for (let i = 0; i < s.length; i++) {
+      r.setStart(n, i); r.setEnd(n, i + 1);
+      const box = r.getClientRects()[0];
+      if (!box) continue;
+      const y = Math.round(box.top);
+      if (top !== null && y !== top) { lines.push(count); count = 0; }
+      top = y; count++;
+    }
+    return lines.reduce((a, b) => a + b, 0) / lines.length;
+  });
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  try {
+    for (const font of ["charter", "geist"]) {
+      for (const size of [14, 17, 22]) {
+        await page.evaluate(([f, px]) => {
+          document.documentElement.dataset.font = f as string;
+          document.documentElement.style.setProperty("--read-size", `${px}px`);
+        }, [font, size] as const);
+        if (font === "geist") {
+          // Geist ships with the app, so its count here is the count on the Mac.
+          const chars = await perLine();
+          if (chars < 60 || chars > 72) throw new Error(`${font} at ${size}px: ${chars.toFixed(1)} characters a line, want about 66`);
+        } else {
+          // Linux has no macOS Charter (its Bitstream twin sets narrower), so check the column is 31 of its em,
+          // the width measured on the Mac to hold about 66.
+          const em = await p.evaluate((el) => el.closest(".doc")!.getBoundingClientRect().width / parseFloat(getComputedStyle(el).fontSize));
+          if (Math.abs(em - 31) > 0.2) throw new Error(`charter at ${size}px: column is ${em.toFixed(2)}em, want 31`);
+        }
+      }
+    }
+  } finally {
+    await page.evaluate(() => {
+      document.documentElement.dataset.font = "charter";
+      document.documentElement.style.setProperty("--read-size", "17px");
+    });
+  }
+});
+
 journey("add a pasted ChatGPT answer: its headings and table come in, which its plain text loses", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   const box = page.getByLabel("Link, file path or text");
@@ -2065,6 +2117,8 @@ journey("notebook: a cell's output is folded until he opens it, a click or Enter
   await out.waitFor();
   if (!(await out.innerText()).includes("array([0, 2, 4])")) throw new Error(`the output reads “${await out.innerText()}”`);
   if (await fold.count()) throw new Error("the row stays after the output is shown");
+  // The row he pressed Enter on is gone: focus goes to the output it showed, never to nothing.
+  await until("focus is on the output it showed", () => page.evaluate(() => document.activeElement?.matches("pre.output") ?? false));
   // An article's plain text block is not an output.
   await openSource(page, AGENTS);
   if (await page.locator(".doc .output-fold").count()) throw new Error("an article got a folded output");
@@ -4115,6 +4169,21 @@ async function boxDrag(page: Page, x: number, y: number, x2: number, y2: number,
   if (release) await page.mouse.up();
 }
 
+/** Waits until every \`ore\` call the page made has answered and what came back is drawn, three frames running
+ *  with none outstanding (the mock counts them in \`window.__ORE_PENDING\`). A skill page draws its sources before
+ *  its stats and note arrive, which then push them down: a press measured before that lands above the list. */
+async function loaded(page: Page) {
+  await until("the page has loaded what it asked for", () => page.evaluate(() => new Promise<boolean>((done) => {
+    let frames = 0;
+    const look = () => {
+      if ((window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING) return done(false);
+      if (++frames === 3) return done(true);
+      requestAnimationFrame(() => setTimeout(look));
+    };
+    look();
+  })));
+}
+
 journey("list drag to select: a drag from beside the rows boxes the ones it crosses, back up lets them go, ⇧ adds, Esc mid-drag puts the selection back, ⋯ acts on them all, a click on blank space clears; a drag from a row still carries the row (D194)", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const rows = page.locator(".list .row");
@@ -4207,6 +4276,7 @@ journey("list drag to select on a skill page: a drag from the column beside its 
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const rows = page.locator(".skill-page .list .row");
   await rows.nth(1).waitFor();
+  await loaded(page);
   const list = (await page.locator(".skill-page .list").boundingBox())!;
   const r0 = (await rows.nth(0).boundingBox())!;
   const r1 = (await rows.nth(1).boundingBox())!;
@@ -4222,6 +4292,7 @@ journey("list drag to select in WebKit: the box selects the rows it crosses with
   await page.getByRole("button", { name: /^All sources/ }).click();
   const rows = page.locator(".list .row");
   await rows.nth(2).waitFor();
+  await loaded(page); // the list as read, not mid-redraw (a row once had no box here)
   const list = (await page.locator(".list").boundingBox())!;
   const r0 = (await rows.nth(0).boundingBox())!;
   const r1 = (await rows.nth(1).boundingBox())!;
@@ -4238,6 +4309,7 @@ journey("list drag to select in WebKit: the box selects the rows it crosses with
   await page.locator(".sidebar .side-item", { hasText: "Teaching" }).first().click();
   const srow = page.locator(".skill-page .list .row").first();
   await srow.waitFor();
+  await loaded(page);
   const note = page.locator(".skill-page .note-editor [contenteditable=true]").first();
   await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
   await page.keyboard.press("Meta+End");
@@ -4248,6 +4320,9 @@ journey("list drag to select in WebKit: the box selects the rows it crosses with
   const sl = (await page.locator(".skill-page .list").boundingBox())!;
   await page.mouse.click(sl.x + sl.width + 6, (await srow.boundingBox())!.y + 8);
   await until("the press on blank space let the words go", async () => !(await page.evaluate(() => getSelection()!.toString())));
+  // That press blurred the note, which saves it: the page closes only once the save has answered (WebKit reports
+  // a request cut off by a closing page as a page error, which fails the run).
+  await loaded(page);
 }, "webkit");
 
 journey("list drag to select on a narrow skill page (one column, the sources under the note): one box, the list's, and the list keeps the keys (D194)", async (page) => {
@@ -4255,17 +4330,9 @@ journey("list drag to select on a narrow skill page (one column, the sources und
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const rows = page.locator(".skill-page .list .row");
   await rows.nth(1).waitFor();
+  // The note and stats above load after the rows and push them down: measure once they have.
+  await loaded(page);
   await rows.nth(1).scrollIntoViewIfNeeded();
-  // The note above loads after the rows and pushes them down: measure once they stay put.
-  // Two polls alike could fall before the note landed, so the note is waited for and five must agree.
-  await page.locator(".skill-page .ProseMirror").first().waitFor();
-  let was = "";
-  let same = 0;
-  await until("the rows stay put", async () => {
-    const now = JSON.stringify(await rows.nth(1).boundingBox());
-    same = was === (was = now) ? same + 1 : 0;
-    return same >= 5;
-  });
   const list = (await page.locator(".skill-page .list").boundingBox())!;
   const r0 = (await rows.nth(0).boundingBox())!;
   const r1 = (await rows.nth(1).boundingBox())!;
