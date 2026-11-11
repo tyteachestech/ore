@@ -6842,7 +6842,56 @@ journey("resize drags: Esc mid-drag puts the size back and stays on the page; no
   }
 });
 
-journey("undo that fails, quiet step: a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {
+journey("sidebar: its edge drags to resize between a min and a max, Esc puts it back, double-click resets, and the width is remembered", async (page) => {
+  const side = page.locator("nav.sidebar");
+  const edge = page.getByRole("separator", { name: "Resize the sidebar" });
+  const width = async () => Math.round((await side.boundingBox())!.width);
+  const content = async () => Math.round((await page.locator("main.main").boundingBox())!.x);
+  const near = (a: number, b: number) => Math.abs(a - b) <= 2;
+  /** Presses the edge, drags it to `x`, then lets go (or presses Esc first). */
+  const drag = async (x: number, esc = false) => {
+    const d = (await edge.boundingBox())!;
+    await page.mouse.move(d.x + d.width / 2, d.y + 300);
+    await page.mouse.down();
+    await page.mouse.move(x, d.y + 300, { steps: 5 });
+    if (esc) await page.keyboard.press("Escape");
+    await page.mouse.up();
+  };
+  const settle = (what: string, w: number) => until(what, async () => near(await width(), w) && near(await content(), w));
+  await settle("the sidebar starts at 216", 216);
+  await drag(300);
+  await settle("dragged wider, the sidebar and the content follow", 300);
+  await drag(1000);
+  await settle("it stops at its max (360 in a 1280 window)", 360);
+  await drag(40);
+  await settle("it stops at its min (180)", 180);
+  const sideways = await side.evaluate((n) => n.scrollWidth - n.clientWidth);
+  if (sideways > 0) throw new Error(`at its min the sidebar scrolls ${sideways}px sideways`);
+  await drag(300);
+  await settle("dragged back out", 300);
+  await drag(340, true);
+  await settle("Esc mid-drag puts it back", 300);
+  if (!(await side.isVisible())) throw new Error("Esc during the drag hid the sidebar");
+  await page.reload();
+  await side.waitFor();
+  await settle("the width survives a reload", 300);
+  await page.getByRole("button", { name: "Hide sidebar" }).click();
+  await side.waitFor({ state: "hidden" });
+  if (await edge.count()) throw new Error("the edge stays with the sidebar hidden");
+  await page.getByRole("button", { name: "Show sidebar" }).click();
+  await settle("hidden and shown again, it keeps its width", 300);
+  await edge.dblclick();
+  await settle("double-click resets it", 216);
+  await page.reload();
+  await side.waitFor();
+  await settle("the reset is remembered", 216);
+  await drag(1000);
+  await settle("back at its max", 360);
+  await page.setViewportSize({ width: 720, height: 700 });
+  await settle("a narrow window clamps it (40% of 720)", 288);
+});
+
+journey("undo that fails, quiet step:a rename's failed ⌘Z stays on the history, so the next ⌘Z takes it back", async (page) => {
   const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { edit: why } : {}), why);
   await openSource(page, AGENTS);
   const title = () => page.locator(".doc-head h1").innerText();

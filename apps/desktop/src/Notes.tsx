@@ -1,5 +1,6 @@
 import { PixelNote, PixelStack } from "./PixelIcon";
 import { resizeDrag } from "./drag";
+import { clampSide } from "./split";
 import * as Tabs from "@radix-ui/react-tabs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
@@ -303,10 +304,11 @@ export function LinkedFrom({ target, onOpen }: { target: NoteRef; onOpen: (t: Om
 
 const NOTE_WIDTH = 380;
 
-/** A right-hand panel's width, dragged on its left-edge divider between `min` and 60% of the
- *  window, remembered under `key`; double-click resets it (D44). */
-export function useSideWidth(key: string, initial: number, min = 280) {
-  const clamp = useCallback((w: number) => Math.round(Math.max(min, Math.min(w, window.innerWidth * 0.6))), [min]);
+/** A panel's width, dragged on its divider between `min` and `share` of the window (at most `cap`),
+ *  remembered under `key`; double-click resets it (D44). A right-hand panel is measured from its right
+ *  edge; the sidebar (`left`) from the window's left. */
+export function useSideWidth(key: string, initial: number, min = 280, { left = false, share = 0.6, cap = Infinity } = {}) {
+  const clamp = useCallback((w: number) => clampSide(w, window.innerWidth, { min, share, cap }), [min, share, cap]);
   const [width, setWidth] = useState(() => {
     const w = Number(load(key));
     return Number.isFinite(w) && w > 0 ? w : initial;
@@ -327,7 +329,7 @@ export function useSideWidth(key: string, initial: number, min = 280) {
     let w = width;
     setDragging(true);
     resizeDrag(e, {
-      move: (m) => setWidth((w = clamp(right - m.clientX))),
+      move: (m) => setWidth((w = clamp(left ? m.clientX : right - m.clientX))),
       end: (ev) => {
         setDragging(false);
         if (ev) save(key, String(w));

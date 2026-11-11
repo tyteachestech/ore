@@ -17,7 +17,7 @@ import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Reader, type PracticeRef } from "./Reader";
-import type { SideTab } from "./Notes";
+import { useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
 import { Settings, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
@@ -284,6 +284,10 @@ export function App() {
     }
   });
   const [hideSidebar, setHideSidebar] = useState(() => load("ore.sidebar") === "collapsed");
+  // Its edge drags it from 180 (the title bar's buttons and a short skill name still fit) to 360, or 40% of a
+  // narrow window so the content keeps its room (D44, D193). Everything sized off the sidebar reads --sidebar.
+  const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360 });
+  useLayoutEffect(() => document.documentElement.style.setProperty("--sidebar", `${sideWidth.width}px`), [sideWidth.width]);
   const [notesOpen, setNotesOpen] = useState(() => load("ore.mynotes") !== "closed");
   const [sideTab, setSideTab] = useState<SideTab>(() => (load("ore.sidetab") === "questions" ? "questions" : "note"));
   const { width, size, page, font } = useReading();
@@ -2134,6 +2138,11 @@ export function App() {
         </Hint>
       </div>
       {collapsed && <div className="side-edge" aria-hidden="true" onMouseEnter={peekIn} onMouseLeave={() => !peek && clearTimeout(peekTimer.current)} />}
+      {!collapsed && (
+        <Hint text="Drag to resize · double-click to reset" side="right">
+          <div className={`divider side-divider${sideWidth.dragging ? " dragging" : ""}`} role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" {...sideWidth.divider} />
+        </Hint>
+      )}
       <Sidebar
         skills={skills}
         skill={sideSkill}
