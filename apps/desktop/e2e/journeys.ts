@@ -1826,6 +1826,69 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
+journey("a playing source takes YouTube's K J L beside Space and the arrows: K plays and pauses, J back 15 s, L on 30 s, never from a field (D195)", async (page) => {
+  await openSource(page, "Lecture 4");
+  const player = page.locator(".player.audio");
+  await player.waitFor();
+  await until("its length is read from the file", async () => (await player.locator(".time").innerText()).includes("1:00"));
+  const at = async () => (await player.locator(".time").innerText()).trim().split(/\s/)[0]!;
+  const secs = async () => { const [m, s] = (await at()).split(":").map(Number); return m! * 60 + s!; };
+  const paused = async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1;
+  await page.locator(".doc .ts").filter({ hasText: "00:30" }).click();
+  await until("the stamp plays it", async () => (await player.getByRole("button", { name: "Pause" }).count()) === 1);
+  await page.mouse.click(5, 300);
+  await page.keyboard.press("k");
+  await until("K pauses it", paused);
+  const t0 = await secs();
+  await page.keyboard.press("j");
+  await until("J goes back 15 seconds", async () => (await secs()) === Math.max(0, t0 - 15));
+  await page.keyboard.press("j");
+  await page.keyboard.press("j");
+  await until("and stops at the start", async () => (await secs()) === 0);
+  await page.keyboard.press("l");
+  await until("L goes on 30 seconds", async () => (await secs()) === 30);
+  await page.keyboard.press("l");
+  await page.keyboard.press("l");
+  await until("and stops at the end", async () => (await secs()) === 60);
+  await page.keyboard.press("j");
+  await until("J again", async () => (await secs()) === 45);
+  if (!(await paused())) throw new Error("J or L started it playing");
+  // Typed into find, they are letters.
+  await page.keyboard.press("Meta+f");
+  const find = page.getByPlaceholder("Find", { exact: true });
+  await find.waitFor();
+  await page.keyboard.type("kjl");
+  await page.waitForTimeout(300);
+  if ((await secs()) !== 45 || !(await paused())) throw new Error(`K J L typed into find drove the player (${await at()})`);
+  if ((await find.inputValue()) !== "kjl") throw new Error(`find holds "${await find.inputValue()}"`);
+  await page.keyboard.press("Escape");
+  // Typed into the source note and the tutor's field, too.
+  const still = async (where: string) => {
+    await page.waitForTimeout(300);
+    if ((await secs()) !== 45 || !(await paused())) throw new Error(`K J L typed into ${where} drove the player (${await at()})`);
+  };
+  await page.getByRole("tab", { name: "Source note" }).click();
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  await note.click();
+  await page.keyboard.type("kjl");
+  await still("the source note");
+  await until("the note holds the letters", async () => (await note.innerText()).includes("kjl"));
+  await page.keyboard.press("Meta+j");
+  const ask = page.getByRole("textbox", { name: "Message the tutor" });
+  await ask.waitFor();
+  await ask.click();
+  await page.keyboard.type("kjl");
+  await still("the tutor");
+  if ((await ask.inputValue()) !== "kjl") throw new Error(`the tutor's field holds "${await ask.inputValue()}"`);
+  await ask.fill("");
+  await page.keyboard.press("Escape");
+  await page.mouse.click(5, 300);
+  await page.keyboard.press("k");
+  await until("K plays it again", async () => (await player.getByRole("button", { name: "Pause" }).count()) === 1);
+  await page.keyboard.press("k");
+  await until("and pauses", paused);
+});
+
 journey("highlight note: a long note's hover preview stays inside the window", async (page) => {
   await openSource(page, AGENTS);
   const popup = page.getByRole("dialog", { name: "Highlight" });
