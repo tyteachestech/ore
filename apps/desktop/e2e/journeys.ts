@@ -7691,6 +7691,8 @@ journey("list: an archive whose save hangs never freezes the list; a read starte
     if (await row.isVisible()) throw new Error("the archived row came back while its save hung");
   } finally {
     await page.evaluate(() => void ((window as unknown as W).__ORE_SLOW = {}));
+    await release(page, "archive"); // its answer comes in now, and the list reads it before the page closes
+    await loaded(page);
     await ore("archive", made.id);
     await ore("archive", ((await ore("ls", "--archived")) as { id: string; title: string }[]).find((i) => i.title === AGENTS)!.id, "--undo");
   }

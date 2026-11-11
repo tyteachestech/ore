@@ -29,7 +29,7 @@ async function ore(args) {
   // window.__ORE_HOLD = { "skills arrange": [800] }: the next such command waits that long before it runs at all
   // (one entry per call), so a later one (an Undo) can run first, as two `ore` processes can on a slow machine.
   // A key of the command alone ({ annotate: [1500] }) holds the next one whatever it names. An entry "manual"
-  // holds it until the test calls window.__ORE_RELEASE(key); window.__ORE_HELD lists the keys waiting so.
+  // holds it until the test calls window.__ORE_RELEASE(key); window.__ORE_HELD lists the keys waiting so (and slow answers).
   const two = args.args.slice(0, 2).join(" ");
   const key = window.__ORE_HOLD && (window.__ORE_HOLD[two] ? two : window.__ORE_HOLD[args.args[0]] ? args.args[0] : null);
   const hold = key && window.__ORE_HOLD[key];
@@ -46,7 +46,13 @@ async function ore(args) {
   const j = await r.json();
   // window.__ORE_SLOW = { ls: 800 }: that command's answer comes back that much later (a race test).
   const slow = window.__ORE_SLOW && window.__ORE_SLOW[args.args[0]];
-  if (slow) await new Promise((ok) => setTimeout(ok, slow));
+  // window.__ORE_RELEASE(command) lets a slow answer in at once, so a journey ends with nothing in flight.
+  if (slow)
+    await new Promise((ok) => {
+      const h = { key: args.args[0], ok: () => (clearTimeout(t), ok()) };
+      const t = setTimeout(() => (held.splice(held.indexOf(h), 1), ok()), slow);
+      held.push(h);
+    });
   if (!r.ok) throw j;
   // window.__ORE_EDIT = { today: (answer) => changed }: the page gets that command's answer changed so (a test of
   // fresh numbers), in the page itself, where no request can slip past it.
