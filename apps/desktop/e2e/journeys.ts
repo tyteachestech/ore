@@ -5311,6 +5311,72 @@ async function startReview(page: Page, only: RegExp | null) {
   await page.locator(".review-q").waitFor();
 }
 
+journey("review: a rating always moves \"Exercise N of M\" on, and a miss adds its retry as one more step (D59)", async (page) => {
+  const log = oreCalls(page);
+  try {
+    await startReview(page, null);
+    const live = page.locator(".review .sr-only[aria-live]");
+    const at = async () => {
+      const m = /^Exercise (\d+) of (\d+)\./.exec(await live.innerText());
+      if (!m) throw new Error(`no step in the label: ${await live.innerText()}`);
+      return `${m[1]} of ${m[2]}`;
+    };
+    const n = Number((await at()).split(" of ")[1]);
+    const rate = async (name: "Again" | "Good", want: string) => {
+      await reveal(page);
+      await page.getByRole("button", { name, exact: true }).click();
+      await until(`the label reads ${want}`, async () => (await at().catch(() => "")) === want).catch(async () => {
+        throw new Error(`after ${name} the label reads "${await at()}", not "${want}"`);
+      });
+    };
+    if ((await at()) !== `1 of ${n}`) throw new Error(`the first exercise reads ${await at()}`);
+    // The miss comes back a few exercises later (D59): one more step, so the next exercise is 2 of n + 1.
+    await rate("Again", `2 of ${n + 1}`);
+    for (let i = 3; i <= n + 1; i++) await rate("Good", `${i} of ${n + 1}`);
+    // The last step ends the session; among the steps was the retry, the missed exercise under a number of its own.
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("every step is rated", async () => log.rated.length === n + 1);
+    if (log.rated.filter((r) => r.card === log.rated[0]!.card).length !== 2) throw new Error(`the miss never came back: ${JSON.stringify(log.rated.map((r) => r.card))}`);
+  } finally {
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
+    await log.undoAll();
+  }
+});
+
+journey("review: the header keeps its form for the session: 30 steps stay dots when a miss makes them 31", async (page) => {
+  const log = oreCalls(page);
+  const { new_per_day } = (await ore("today")) as { new_per_day: number };
+  const made: string[] = [];
+  try {
+    await ore("goal", "--new-per-day", "100");
+    const due = ((await ore("today")) as { due: number }).due;
+    // Drafts written as files (no `ore` command makes a plain one), so the session is exactly 30 steps.
+    const cards = join(LIB, "cards");
+    const model = readdirSync(cards).find((f) => /^\w{26}\.md$/.test(f) && /^state: draft$/m.test(readFileSync(join(cards, f), "utf8")))!;
+    const text = readFileSync(join(cards, model), "utf8");
+    for (let i = 0; i < 30 - due; i++) {
+      const id = `01M7HEAD000000000000${String(i).padStart(6, "0")}`;
+      writeFileSync(join(cards, `${id}.md`), text.replace(/^id: .*$/m, `id: ${id}`).replace(/^created: .*$/m, "created: 2026-01-01T00:00:00.000Z").replace(/\n---\n(.)/, `\n---\n(${i}) $1`));
+      made.push(join(cards, `${id}.md`));
+    }
+    await startReview(page, null);
+    const dots = page.locator(".review .review-steps");
+    if ((await dots.getAttribute("aria-valuemax")) !== "30") throw new Error(`the session has ${await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax")} steps, not 30`);
+    await reveal(page);
+    await page.getByRole("button", { name: "Again", exact: true }).click();
+    await until("the miss adds its retry", async () => (await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax")) === "31");
+    if (!(await dots.isVisible())) throw new Error("a miss at 30 steps switched the step dots to the bar");
+  } finally {
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
+    await log.undoAll();
+    for (const f of made) rmSync(f, { force: true });
+    await ore("goal", "--new-per-day", String(new_per_day));
+  }
+});
+
 /** Shows the answer of the card on screen: No idea on a question, Think so on a card. */
 async function reveal(page: Page) {
   const noIdea = page.getByRole("button", { name: "No idea" });

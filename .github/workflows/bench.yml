@@ -3,10 +3,10 @@
 name: bench
 on:
   pull_request:
-    paths: [apps/desktop/**, packages/**, package.json, bun.lock, tsconfig.json, .github/workflows/bench.yml]
+    paths: [apps/desktop/**, packages/**, package.json, bun.lock, tsconfig.json, .github/workflows/bench.yml, .github/actions/**]
   push:
     branches: [master]
-    paths: [apps/desktop/**, packages/**, package.json, bun.lock, tsconfig.json, .github/workflows/bench.yml]
+    paths: [apps/desktop/**, packages/**, package.json, bun.lock, tsconfig.json, .github/workflows/bench.yml, .github/actions/**]
 concurrency:
   group: bench-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -20,7 +20,9 @@ jobs:
         with:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps --only-shell chromium
+      - uses: ./.github/actions/playwright
+        with:
+          browsers: chromium
       # The compiled CLI, as the installed app runs it (D30); the baseline was recorded on this runner type.
       # A slower runner gets room by its time at fixed work (bench.ts, RUNNER). A runner busy with other jobs can
       # still slow one pass, so a slow step fails only when a second pass is slow too: a real regression is slow both times.

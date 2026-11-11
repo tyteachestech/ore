@@ -41,9 +41,11 @@ jobs:
         with:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
-      # Headless runs use the headless shell only, so the full Chrome download is skipped. WebKit is for the
-      # journeys about what only the Mac app's engine does (its native undo in a text field).
-      - run: bunx playwright install --with-deps --only-shell chromium webkit
+      # WebKit is for the journeys about what only the Mac app's engine does (its native undo in a text field).
+      # From the cache when it has them, so a run doesn't wait on Ubuntu's mirrors (.github/actions/playwright).
+      - uses: ./.github/actions/playwright
+        with:
+          browsers: chromium webkit
       - run: bun run e2e
         env:
           ORE_E2E_SHARD: ${{ matrix.shard }}/4
@@ -52,3 +54,7 @@ jobs:
         with:
           name: e2e-screenshots-${{ matrix.shard }}
           path: /tmp/ore-e2e-*.png
+      # The release build under the release CSP, in WebKit (apps/desktop/e2e/release-check.ts): what only the installed
+      # app breaks, which the journeys on the dev server never see. On one shard, where WebKit is already installed.
+      - if: matrix.shard == 1
+        run: bun run --cwd apps/desktop build && bun run release:check
