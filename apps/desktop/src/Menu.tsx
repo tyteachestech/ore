@@ -6,7 +6,7 @@ import { Hint } from "./Hint";
 import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
-import { useSwipeDown } from "./phone/sheet";
+import { sheetLayer, useSwipeDown } from "./phone/sheet";
 import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
 
@@ -280,7 +280,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
       <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} data-no-drag onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; }} onMouseDown={(e) => e.preventDefault()}>
         {icon ?? <DotsThree size={16} aria-hidden="true" />}
       </button>
-      {open && (
+      {open && sheetLayer(
         <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
           <Trap>
             <div ref={box} className="panel sheet action-sheet" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); step ? setStepId(null) : close(); } }}>

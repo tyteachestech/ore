@@ -2942,6 +2942,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .sheet .pick-row.on .name { color: var(--text); font-weight: 600; }
 .sheet .pick-row .name { color: var(--muted); font-weight: 500; }
 .phone .overlay:has(.sheet) { align-items: flex-end; padding: 0; }
+/* A bottom sheet (portaled to the body, sheetLayer) is above toasts: one never hides its rows. */
+.phone .overlay:has(.sheet, .review-pick) { z-index: 40; }
 .phone .sheet { width: 100%; padding: 20px 8px max(16px, env(safe-area-inset-bottom, 0px)); border-width: 1px 0 0; border-radius: 16px 16px 0 0; }
 .phone .sheet::before { content: ""; display: block; width: 36px; height: 5px; margin: -12px auto 14px; background: var(--border); }
 /* Action sheet (D155, phone): the ⋯ menu as one sheet of 44pt rows; a submenu swaps in behind a back

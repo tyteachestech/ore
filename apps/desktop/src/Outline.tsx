@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { Arrow, ARROW_H, playHop, still } from "./SideCursor";
 import { PHONE } from "./ore";
 import { Trap } from "./Trap";
-import { useSwipeDown } from "./phone/sheet";
+import { sheetLayer, useSwipeDown } from "./phone/sheet";
 
 /** Most lines the collapsed outline shows; deeper levels drop out until it fits. */
 const MAX_LINES = 40;
@@ -182,7 +182,7 @@ export function ReadingPill(place: Place) {
         </svg>
         {name && <span key={current} className="read-pill-name">{name}</span>}
       </button>
-      {open && (
+      {open && sheetLayer(
         <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
           <Trap>
             <div ref={box} className="panel sheet sections-sheet" role="dialog" aria-modal="true" aria-label="Sections" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } }}>

@@ -4,7 +4,7 @@ import { SkillIcon } from "./IconPicker";
 import { is } from "./keys";
 import { Trap } from "./Trap";
 import { PHONE, type Skill, type Today } from "./ore";
-import { useSwipeDown } from "./phone/sheet";
+import { sheetLayer, useSwipeDown } from "./phone/sheet";
 import { load, save } from "./util";
 
 const PICK = "ore.review-pick";
@@ -100,7 +100,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
     }
   };
 
-  return (
+  return sheetLayer(
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Trap>
       <div ref={box} className="panel review-pick" role="dialog" aria-modal="true" aria-label="What to review" tabIndex={-1} onKeyDown={onKey}>

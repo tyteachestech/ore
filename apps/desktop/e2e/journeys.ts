@@ -8320,6 +8320,60 @@ journey("phone: the small controls of a source answer a 44pt touch", async (page
   await fits(".quiz-foot button", "the closing card's Done");
 }, "phone");
 
+/** Every row of the open bottom sheet that something else covers somewhere across its width (the reader's bar or
+ *  pill, a toast): a touch there would not reach the row. */
+const coveredRows = (page: Page) =>
+  page.evaluate(() => {
+    const sheet = document.querySelector('[role="dialog"].sheet, [role="dialog"].review-pick');
+    if (!sheet) return ["no sheet is open"];
+    return [...sheet.querySelectorAll<HTMLElement>(".pick-row")].flatMap((row) => {
+      const r = row.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= innerHeight) return [];
+      const y = r.top + r.height / 2;
+      const off = [0.1, 0.3, 0.5, 0.7, 0.9].map((f) => r.left + r.width * f).filter((x) => !row.contains(document.elementFromPoint(x, y)));
+      return off.length ? [`${row.textContent?.trim()} (at x ${off.map(Math.round).join(", ")}: ${document.elementFromPoint(off[0]!, y)?.className})`] : [];
+    });
+  });
+
+journey("phone: a bottom sheet covers the reader's bar, the pill and a toast", async (page) => {
+  // Source actions opened under the reader's floating bar, which hid part of its last rows (Archive).
+  await phoneSource(page, TESTING);
+  const check = async (what: string) => {
+    const covered = await coveredRows(page);
+    if (covered.length) throw new Error(`${what}: rows under something else: ${covered.join("; ")}`);
+  };
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await page.locator(".action-sheet").waitFor();
+  await Bun.sleep(300);
+  await check("Source actions");
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Skills" }));
+  await tap(page, page.locator('.action-sheet button[aria-checked="false"]'));
+  await page.locator(".toasts").filter({ hasText: "Undo" }).waitFor();
+  if (await page.locator(".action-sheet").count()) await page.touchscreen.tap(195, 40);
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  // Again while that toast still shows (six seconds): the sheet is over it.
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await page.locator(".action-sheet").waitFor();
+  await Bun.sleep(300);
+  if (!(await page.locator(".toasts").filter({ hasText: "Undo" }).count())) throw new Error("the toast went before the sheet opened");
+  await check("Source actions, with a toast showing");
+  await page.touchscreen.tap(195, 40);
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  await tap(page, page.locator(".read-pill"));
+  await page.locator(".sections-sheet").waitFor();
+  await Bun.sleep(300);
+  await check("Sections");
+  await page.touchscreen.tap(195, 40);
+  await page.locator(".sections-sheet").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Back" }));
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Today" }));
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await Bun.sleep(300);
+  await check("What to review");
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
