@@ -2,6 +2,7 @@ import { Plugin, PluginKey, type EditorState } from "@milkdown/kit/prose/state";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { $prose } from "@milkdown/kit/utils";
 import { blocksOf, BlockSelection, selectBlocks, type Block } from "./blockops";
+import { crossing, drawBox } from "../marquee";
 
 // Notion's drag to select blocks (D188). A drag that starts beside the note (its gutter, the space
 // around its blocks) draws a box and selects every block it passes; a drag that starts in a block's
@@ -28,7 +29,7 @@ function spans(view: EditorView): Span[] {
 
 /** The blocks between two heights, selected from the one at `y0` to the one at `y1`; null when none are. */
 export function between(state: EditorState, all: Span[], y0: number, y1: number): BlockSelection | null {
-  const hit = all.filter((s) => s.bottom > Math.min(y0, y1) && s.top < Math.max(y0, y1));
+  const hit = crossing(all, y0, y1);
   if (!hit.length) return null;
   const [a, h] = y0 <= y1 ? [hit[0]!, hit.at(-1)!] : [hit.at(-1)!, hit[0]!];
   return selectBlocks(state.doc, a.block.from, h.block.from);
@@ -79,9 +80,7 @@ export const dragSelPlugin = $prose(() => {
         // The box he is dragging, from where he pressed (it moves with the note when it scrolls).
         const h = host();
         const r = h.getBoundingClientRect();
-        const box = (drag.box ??= h.appendChild(Object.assign(document.createElement("div"), { className: "block-marquee" })));
-        const x0 = drag.x - r.left, y0 = drag.from, x1 = e.clientX - r.left, y1 = e.clientY - r.top;
-        Object.assign(box.style, { left: `${Math.min(x0, x1)}px`, top: `${Math.min(y0, y1)}px`, width: `${Math.abs(x1 - x0)}px`, height: `${Math.abs(y1 - y0)}px` });
+        drag.box = drawBox(drag.box, h, drag.x - r.left, drag.from, e.clientX - r.left, e.clientY - r.top);
         window.getSelection()?.removeAllRanges(); // words of the page around the note don't select with it
       };
 
