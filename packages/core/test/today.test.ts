@@ -4,13 +4,14 @@ import { join } from "node:path";
 import { findCard, writeCardContent, writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
+import { appendJsonl } from "../src/fsutil.ts";
 import { paths } from "../src/library.ts";
 import { endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
 import { readReviews, type Review } from "../src/reviews.ts";
 import { calibration, raterStats } from "../src/stats.ts";
 import { loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
 import { dueQueue, recordReview } from "../src/study.ts";
-import { level, nextLevelAt, reminderNote, skillGrowth, skillStrength, today } from "../src/today.ts";
+import { level, nextLevelAt, reminderNote, skillGrowth, skillStrength, SOLID_DAYS, today } from "../src/today.ts";
 import { tempLibrary } from "./helpers.ts";
 
 /** Drafts wait until the day after they were written (D65), so queue checks run a day later. */
@@ -385,6 +386,61 @@ describe("strength breakdown and peak level (D63)", () => {
     await recordReview(lib, id, { rating: 3, confidence: 2, now: at });
     expect(skillStrength(lib, "learning")).toMatchObject({ solid: 1, growing: 0, ready: 0 });
     expect((await endSession(lib, at)).cut).toEqual(["learning"]);
+  });
+
+  test("gem grades and depth (D197): a won-back gem is mended, one passed on a new case is polished, and a session says how much longer its memories now last", async () => {
+    const { lib, item, cards } = await library(1);
+    const id = cards[0]!.meta.id;
+    const other = writeNewCard(lib, { kind: "prompt", item: item.meta.id, skills: ["learning"], topics: [], content_type: "concept", question: "Why?", answer: "A", rubric: ["a"] }).meta.id;
+    const solidify = async (card: string, from: Date) => {
+      let t = from;
+      for (let i = 0; i < 8 && (skillStrengthOf(card)) < SOLID_DAYS; i++) t = new Date((await recordReview(lib, card, { rating: 3, confidence: 2, now: t })).due_next);
+      return t;
+    };
+    const skillStrengthOf = (card: string) => readReviews(lib).findLast((r) => r.card === card)?.state_after.stability ?? 0;
+    let at = await solidify(id, new Date("2026-01-01T09:00:00Z"));
+    at = new Date(Math.max(at.getTime(), (await solidify(other, new Date("2026-01-01T09:00:00Z"))).getTime()));
+    let s = skillStrength(lib, "learning", at);
+    expect(s).toMatchObject({ solid: 2, mended: 0, polished: 0 });
+    expect(s.depth).toBe(Math.round(skillStrengthOf(id) + skillStrengthOf(other)));
+
+    // Missed: it cracks. Won back in a later session: the gem is cut again, mended this time.
+    await recordReview(lib, id, { rating: 1, confidence: 3, now: at });
+    expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 1, win_back: 1, mended: 0 });
+    await startSession(lib, at);
+    const before = skillStrengthOf(id);
+    at = await solidify(id, new Date(at.getTime() + 864e5));
+    const end = await endSession(lib, at);
+    expect(end.cut).toEqual(["learning"]);
+    expect(end.grades).toEqual(["mended"]);
+    expect(end.depth_days).toBe(Math.round(skillStrengthOf(id) - before));
+    expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 2, win_back: 0, mended: 1, polished: 0 });
+
+    // Passed on a new case (a remix, D66): polished, once; a polished gem is counted there, not as mended.
+    const v = { id: "V1", rev: 1, card: other, type: "new-case" as const, setting: "a kitchen", question: "A new case?", answer: "A", rubric: ["a"], maps: [0], status: "ready" as const, created: at.toISOString(), ai: { vendor: "claude", model: "m", prompt_version: "variant@1" } };
+    appendJsonl(paths.variants(lib, other), v);
+    await startSession(lib, at);
+    await recordReview(lib, other, { rating: 3, confidence: 2, now: at, variant: v.id });
+    expect((await endSession(lib, at)).polished).toEqual(["learning"]);
+    expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 2, mended: 1, polished: 1 });
+    await startSession(lib, at);
+    await recordReview(lib, other, { rating: 3, confidence: 2, now: new Date(at.getTime() + 60e3), variant: v.id });
+    expect((await endSession(lib, at)).polished ?? []).toEqual([]);
+    // A session of misses lost ground: nothing to say.
+    await startSession(lib, at);
+    await recordReview(lib, other, { rating: 1, confidence: 2, now: new Date(at.getTime() + 120e3) });
+    expect((await endSession(lib, at)).depth_days).toBeUndefined();
+    // Won back after its remix pass: one gem, cut and polished at once, never two; a miss on another
+    // exercise in the same session takes nothing off what the passes added.
+    for (let i = 3; skillStrengthOf(other) >= SOLID_DAYS; i++) await recordReview(lib, other, { rating: 1, confidence: 2, now: new Date(at.getTime() + i * 60e3) });
+    await startSession(lib, new Date(at.getTime() + 864e5));
+    const low = skillStrengthOf(other);
+    at = await solidify(other, new Date(at.getTime() + 864e5));
+    await recordReview(lib, id, { rating: 1, confidence: 2, now: at });
+    const back = await endSession(lib, at);
+    expect(back).toMatchObject({ cut: ["learning"], grades: ["polished"] });
+    expect(back.polished).toBeUndefined();
+    expect(back.depth_days).toBe(Math.round(skillStrengthOf(other) - low));
   });
 
   test("the hook is his why, one line, set in skills.yaml", async () => {
