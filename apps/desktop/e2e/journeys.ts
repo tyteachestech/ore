@@ -160,31 +160,36 @@ const HYGIENE = `(() => {
   // a timer has done it; only a loss both looks agree on counts.
   const LAYERS = '[role="dialog"], [role="menu"], [role="listbox"], .popover';
   // Where focus still falls to <body>, known and left for their own fixes (follow-ups of the lists focus fix,
-  // 2026-11-10): the control that held it, and why. Lists, the sidebar, Home, the Feed and Add are never here.
+  // 2026-11-10): the control that held it, matched exactly (the element itself, scoped by its screen), and why.
+  // Lists, the sidebar, Home, the Feed, Add and the skill editor are never here.
   const ALLOW = [
-    [".review", "Review: ending a session (Esc, its end screen, Open in source) gives focus back to nothing"],
-    [".quiz", "the finish quiz and the quick quiz: the last step's button goes with the quiz"],
-    [".find-bar", "Find in a page or note: the bar closes with focus in it"],
-    [".tutor", "the tutor: closing it, or a chat deleted from its list, leaves focus nowhere"],
-    [".title-edit", "the reader's title: Enter or Esc closes its field with focus nowhere (the author's uses useFocusBack)"],
-    [".qa-piece-edit", "Review: an answer piece's editor closes with focus nowhere"],
-    [".ask input", "the reader's Questions: a new question's field closes on Enter"],
-    [".qp-link", "Explain's answer: a Key point, Retry or Later pressed with ↵ goes with the step it ends"],
-    [".try-next", "the skill page's Try it: its field closes on save"],
-    ["input[aria-label^='Rename ']", "the skill page's name field closes on Enter"],
+    ["div.review[role=dialog], div.review[role=dialog] *", "Review: ending a session (Esc, its end screen, Open in source) gives focus back to nothing, wherever it was on the card"],
+    ["section.quiz .quiz-go", "the finish quiz and the quick quiz: the last step's button goes with the quiz"],
+    [".find-bar input", "Find in a page or note: the bar closes with focus in its field"],
+    ["aside.tutor textarea.grow", "the tutor: closing it with focus in its field leaves focus nowhere"],
+    ["aside.tutor .tutor-title", "the tutor: a chat deleted from its list takes the title that held focus"],
+    [".doc-head .title-edit", "the reader's title: Enter or Esc closes its field with focus nowhere (the author's uses useFocusBack)"],
+    [".qa-answers .qa-piece-edit", "the reader's Questions: an answer piece's editor closes with focus nowhere"],
+    ["div.ask > input[aria-label='New question']", "the reader's Questions: a new question's field closes on Enter"],
+    [".explain .qp-link", "Explain's answer: a Key point, Retry or Later pressed with ↵ goes with the step it ends"],
+    [".skill-page .try-next", "the skill page's Try it: its field closes on save"],
+    [".skill-page h1.skill-name input", "the skill page's own name field closes on Enter (not the Edit skill… dialog's)"],
   ];
   const screen = () => document.querySelector(".main")?.lastElementChild ?? null;
-  let held = null, heldScreen = null, away = false, leaving = false, losing = false, clicked = false, pressedOn = null, fromNothing = false, allowed = false;
+  let held = null, heldScreen = null, away = false, leaving = false, losing = false, clicked = false, pressedOn = null, fromNothing = false, allowed = false, rightAt = -Infinity;
   const entered = new WeakMap();
   addEventListener("focusin", (e) => {
     const layer = e.target.closest?.(LAYERS);
-    if (layer && !entered.has(layer)) entered.set(layer, !e.relatedTarget || e.relatedTarget === document.body);
+    // A menu a right-click opened came from the row under the pointer, though Chromium's press on a row that takes
+    // no focus had already put focus on <body>: a pick that loses focus there counts.
+    if (layer && !entered.has(layer)) entered.set(layer, (!e.relatedTarget || e.relatedTarget === document.body) && performance.now() - rightAt > 1000);
     held = e.target; heldScreen = screen(); away = false; clicked = !!pressedOn && e.target.contains(pressedOn); fromNothing = !!layer && entered.get(layer);
-    allowed = ALLOW.some(([sel]) => e.target.closest?.(sel));
+    allowed = ALLOW.some(([sel]) => e.target.matches?.(sel));
   }, true);
   for (const t of ["pointerup", "pointercancel"]) addEventListener(t, () => setTimeout(() => (pressedOn = null), 0), true);
   addEventListener("pointerdown", (e) => {
     pressedOn = e.target;
+    if (e.button === 2) rightAt = performance.now();
     const a = document.activeElement;
     const zone = a && a !== document.body ? (a.closest(LAYERS) ?? a) : null;
     if (!zone || !zone.contains(e.target)) away = true;
@@ -2809,7 +2814,19 @@ journey("Home and Feed: ⌘C on the focused row copies it as Markdown with its l
   const clip = () => page.evaluate(() => navigator.clipboard.readText());
   await openSource(page, AGENTS);
   await page.getByRole("button", { name: /^Home/ }).click();
-  await page.locator(".home-read .home-open").filter({ hasText: AGENTS }).first().focus();
+  const row = page.locator(".home-read .home-open").filter({ hasText: AGENTS }).first();
+  // A row focused quietly (after a click, no ring) copies nothing: ⌘C acts on a row he can see is focused.
+  await page.evaluate(() => navigator.clipboard.writeText("before"));
+  await row.focus();
+  if (!(await row.evaluate((el) => el.matches(":focus-visible")))) {
+    await page.keyboard.press("Meta+c");
+    await page.waitForTimeout(300);
+    if ((await clip()) !== "before") throw new Error("⌘C copied a row that showed no focus");
+  }
+  // Reached by the keyboard, its ring shows and ⌘C copies it.
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await until("the row has keyboard focus", () => row.evaluate((el) => el === document.activeElement && el.matches(":focus-visible")));
   await page.keyboard.press("Meta+c");
   await until("Home's row is on the clipboard", async () => (await clip()) === `[${AGENTS}](https://www.anthropic.com/research/building-effective-agents)`);
   await page.locator(".toast").filter({ hasText: "Copied as Markdown" }).waitFor();
@@ -2825,6 +2842,96 @@ journey("Home and Feed: ⌘C on the focused row copies it as Markdown with its l
     await page.keyboard.press("Meta+c");
     await until("the Feed's post is on the clipboard", async () => (await clip()) === "[A post to copy](http://localhost/a-post.html)");
   } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
+journey("Home: focus put on a row after an archive never comes back later: a review he starts and leaves ends with it left alone", async (page) => {
+  await openSource(page, AGENTS);
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".home-read").nth(1).waitFor();
+  const titles = await page.locator(".home-read .title").allInnerTexts();
+  await page.locator(".home-read").first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: /^Archive/ }).click();
+  await until(`focus moves to “${titles[1]}”`, async () => (await focusedOn(page)) === titles[1]);
+  try {
+    // Later, something else: a review started with ⌘R where focus is, clicked through and left.
+    await page.waitForTimeout(400);
+    await page.keyboard.press("Meta+r");
+    const pick = page.getByRole("dialog", { name: "What to review" });
+    await pick.waitFor();
+    await pick.locator(".home-go").click();
+    await page.locator(".review-q").waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+    await page.waitForTimeout(600);
+    if ((await focusedOn(page)) === titles[1]) throw new Error("focus jumped back to the row the archive left it on, long after");
+  } finally {
+    await page.keyboard.press("Meta+z");
+    await inLibrary([titles[0]!]);
+  }
+});
+
+journey("Home: archiving the only Continue reading row puts focus on what is left of Home, a skill tile, not <body>", async (page) => {
+  await openSource(page, AGENTS);
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const rows = page.locator(".home-read");
+  await rows.nth(1).waitFor();
+  const titles = await page.locator(".home-read .title").allInnerTexts();
+  try {
+    for (let n = titles.length; n > 0; n--) {
+      await rows.first().click({ button: "right" });
+      await page.getByRole("menuitem", { name: /^Archive/ }).click();
+      await until(`${n - 1} rows left`, async () => (await rows.count()) === n - 1);
+    }
+    const tiles = (await page.locator(".home-skill .home-open").allInnerTexts()).map((t) => t.trim());
+    await until("focus is on a skill tile", async () => tiles.includes((await focusedOn(page)) ?? ""));
+  } finally {
+    for (let n = 0; n < titles.length; n++) await page.keyboard.press("Meta+z");
+    await inLibrary(titles);
+  }
+});
+
+journey("Home: a row opened by the keyboard gets focus back on Back only, not when Home is reached another way", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const row = page.locator(".home-read .home-open").first();
+  const title = (await row.innerText()).trim();
+  await row.focus();
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head").filter({ hasText: title }).waitFor();
+  await page.keyboard.press("Meta+0"); // Go to Home, not Back
+  await page.locator(".home-read").first().waitFor();
+  await page.waitForTimeout(500);
+  if ((await focusedOn(page)) === title) throw new Error("Home put focus on the row though he came by Go to Home, not Back");
+});
+
+journey("Feed: a post its menu takes away (Mark read in Unread, Unfollow) leaves focus on the Feed's list", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const items = ["First to go", "Second post", "Third post"].map((t, i) => `<item><title>${t}</title><link>http://localhost/p${i}.html</link><pubDate>${day}</pubDate></item>`).join("");
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Gone Notes</title><link>http://localhost/</link>${items}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", feed);
+    await page.evaluate(() => localStorage.setItem("ore.feed.show", "unread"));
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const post = (t: string) => page.locator(".row.post", { hasText: t });
+    await post("First to go").waitFor();
+    await post("First to go").click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Mark read" }).click();
+    await until("the post goes from Unread", async () => (await post("First to go").count()) === 0);
+    await until("focus is on the Feed's list", () => page.evaluate(() => !!document.activeElement?.matches(".feed-list")));
+    // The cursor waits on the next post: ↵ by the keyboard would open it.
+    await post("Second post").hover();
+    await page.getByRole("button", { name: "Actions for Second post" }).click();
+    await page.getByRole("menuitem", { name: /^Unfollow/ }).click();
+    await until("its posts go", async () => (await post("Second post").count()) === 0);
+    await until("focus is on the Feed's list again", () => page.evaluate(() => !!document.activeElement?.matches(".feed-list")));
+  } finally {
+    await page.evaluate(() => localStorage.removeItem("ore.feed.show"));
     await ore("feed", "unfollow", feed).catch(() => {});
     server.stop(true);
   }
