@@ -711,6 +711,10 @@ img.thumb { filter: brightness(0.86); }
 .doc code { font-family: var(--mono); font-size: 0.86em; background: var(--bg-raised); border-radius: 4px; padding: 1px 4px; }
 .doc pre { background: var(--bg-raised); padding: 12px 14px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
 .doc pre code { background: none; padding: 0; }
+/* A notebook cell's output, folded until he has guessed it (D199): a row the shape of the block it opens into. */
+.doc .output-fold { display: flex; align-items: center; gap: 6px; width: 100%; margin: 0 0 1.05em; padding: 6px 10px; border-radius: 8px; background: var(--bg-raised); color: var(--faint); font: 500 12px var(--font); text-align: left; }
+.doc .output-fold:hover { color: var(--text); background: var(--bg-hover); }
+.doc pre:has(+ .output-fold), .doc pre:has(+ pre.output) { margin-bottom: 6px; }
 .doc img { max-width: 100%; height: auto; border-radius: 6px; }
 /* Figure zoom (D143): a figure in the text shows it opens; open, it fills the window over the page's own
    colour. It grows from its place (a move on screen: strong ease-in-out, 250ms) as the page fades (ease-out);

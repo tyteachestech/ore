@@ -1864,6 +1864,33 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
 });
 
+journey("notebook: a cell's output is folded until he opens it, a click or Enter shows it, and a highlight on the text around it still lands (D199)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "numpy.ipynb"), "--no-enrich")) as { id: string };
+  try {
+  await page.reload();
+  await openSource(page, "Introducing NumPy");
+  const fold = page.locator(".doc .output-fold");
+  const out = page.locator(".doc pre.output");
+  await fold.waitFor();
+  if (await out.isVisible()) throw new Error("the output shows before he has guessed it");
+  if (!(await page.locator(".doc pre").first().innerText()).includes("np.arange(3) * 2")) throw new Error("the cell's code is not shown");
+  // The hidden output is still the text the highlights are placed in: one after it lands where he dragged.
+  await select(page, "Shapes stretch to match");
+  await page.locator(".popup").waitFor();
+  await page.keyboard.press("Escape");
+  await fold.focus();
+  await page.keyboard.press("Enter");
+  await out.waitFor();
+  if (!(await out.innerText()).includes("array([0, 2, 4])")) throw new Error(`the output reads “${await out.innerText()}”`);
+  if (await fold.count()) throw new Error("the row stays after the output is shown");
+  // An article's plain text block is not an output.
+  await openSource(page, AGENTS);
+  if (await page.locator(".doc .output-fold").count()) throw new Error("an article got a folded output");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
 journey("a recording plays in place: its player over the transcript, his highlights as ticks, a stamp seeks it, Space plays and pauses (D167)", async (page) => {
   await openSource(page, "Lecture 4");
   const player = page.locator(".player.audio");

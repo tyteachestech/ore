@@ -2,7 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { Children, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { Children, isValidElement, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -333,8 +333,37 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
   );
 }
 
-const Chunk = memo(function Chunk({ md, video, dir }: { md: string; video: boolean; dir: string }) {
-  const parts = useMemo(() => withImages(video ? stamped : components, dir), [video, dir]);
+/** A notebook cell's output (D199): folded until he has guessed it, the same step as a prequestion (D18).
+ *  The text stays in the DOM, hidden, so the text index and his highlights don't move when it opens;
+ *  the row that opens it is outside the index. It folds again the next time the source is opened. */
+function Output({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      {!open && (
+        <Hint text="Guess it first, then show">
+          <button className="output-fold" data-noindex="" onClick={() => setOpen(true)}>
+            <CaretRight size={12} />
+            Output
+          </button>
+        </Hint>
+      )}
+      <pre className="output" hidden={!open}>{children}</pre>
+    </>
+  );
+}
+/** In a notebook's doc.md a cell's output is the `text` block after its code (core's notebook.ts). */
+const notebook: Components = {
+  ...components,
+  pre: ({ children }) => {
+    const code = Children.toArray(children)[0];
+    const out = isValidElement<{ className?: string }>(code) && /\blanguage-text\b/.test(code.props.className ?? "");
+    return out ? <Output>{children}</Output> : <pre>{children}</pre>;
+  },
+};
+
+const Chunk = memo(function Chunk({ md, video, dir, cells }: { md: string; video: boolean; dir: string; cells?: boolean }) {
+  const parts = useMemo(() => withImages(video ? stamped : cells ? notebook : components, dir), [video, dir, cells]);
   return (
     <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={parts} skipHtml>
       {footnotes(md)}
@@ -352,7 +381,7 @@ type VideoCard = { head: ReactNode; foot?: ReactNode; box: RefObject<HTMLDivElem
 
 /** The document body, rendered in slices so a 100k-word book stays responsive while it mounts. With a
  *  video card, the transcript before VIDEO_END goes in the card and the page's text follows it. */
-const Body = memo(function Body({ markdown, video, dir, onReady, card }: { markdown: string; video: boolean; dir: string; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
+const Body = memo(function Body({ markdown, video, dir, cells, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
   const split = card ? markdown.indexOf(VIDEO_END) : -1;
   const top = useMemo(() => (split > 0 ? chunks(markdown.slice(0, split)) : []), [markdown, split]);
   const rest = useMemo(() => chunks(split > 0 ? markdown.slice(split) : markdown), [markdown, split]);
@@ -373,14 +402,14 @@ const Body = memo(function Body({ markdown, video, dir, onReady, card }: { markd
           {card.head}
           <div className="vc-transcript" ref={card.box} hidden={!card.open || !card.transcript}>
             {top.slice(0, shown).map((md, i) => (
-              <Chunk key={i} md={md} video={video} dir={dir} />
+              <Chunk key={i} md={md} video={video} dir={dir} cells={cells} />
             ))}
           </div>
           {card.foot}
         </section>
       )}
       {rest.slice(0, Math.max(0, shown - top.length)).map((md, i) => (
-        <Chunk key={`r${i}`} md={md} video={video} dir={dir} />
+        <Chunk key={`r${i}`} md={md} video={video} dir={dir} cells={cells} />
       ))}
     </article>
   );
@@ -2828,7 +2857,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               <BackToCurrent dir="up" onClick={follow} />
             </div>
           )}
-          <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} onReady={onReady} card={cardMode ? videoCard : undefined} />
+          <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} onReady={onReady} card={cardMode ? videoCard : undefined} />
           {!doc.body.trim() && (
             <p className="doc-empty">
               {video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
