@@ -79,7 +79,7 @@ spacing:
   row: 40px
   titlebar: 38px
   sidebar: 216px
-  measure: 60ch
+  measure: 28em
 ---
 
 # Design System: Ore desktop
@@ -93,7 +93,7 @@ The source of truth is `apps/desktop/src/styles.css`, with the Terminal look (D1
 There are two modes in one window:
 
 - **Operate** (Home, review, sources list, ⌘K palette, add panel). Raycast: dense rows, a quiet sidebar, shortcuts shown on hover through `Hint`, and no chrome. Panel footers keep their `kbd` hints.
-- **Read** (reader, prequestions, finish). Notion: one 60ch column (about 70 characters of Charter), 17px text, nothing moving behind the text.
+- **Read** (reader, prequestions, finish). Notion: one column of about 66 characters at any text size (D207), 17px text, nothing moving behind the text.
 
 Two choices are intentional:
 
