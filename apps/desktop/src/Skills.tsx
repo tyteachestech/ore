@@ -228,10 +228,11 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
   /** `saving` for the blur's timeout, which runs after the render it was made in. */
   const busy = useRef(false);
   /** True once the name is saved (or unchanged); a failed save keeps his draft in the field. */
-  const save = async () => {
+  const save = async (byKey = true) => {
     const v = (draft ?? "").trim().replace(/\s+/g, " ");
     if (!v) return false;
-    const close = () => ((refocus.current = true), setDraft(null), true);
+    // Focus goes back to the name after Enter; a click away leaves it where he clicked.
+    const close = () => ((refocus.current = byKey), setDraft(null), true);
     if (v === skill.name) return close();
     const to = (name: string) => () => ore("skills", "set", skill.id, opt("name", name)).then(onRenamed);
     setSaving((busy.current = true));
@@ -274,10 +275,15 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
         aria-label={`Rename ${skill.name}`}
         autoComplete="off"
         onChange={(e) => setDraft(e.target.value)}
-        // Clicking away keeps the old name; a focus that comes straight back (a dialog opening) does not count.
+        // Clicking away saves the name (Finder); an empty one keeps the old. A focus that comes straight
+        // back (a dialog opening), or leaving the app, does not count.
         onBlur={(e) => {
           const input = e.currentTarget;
-          setTimeout(() => !busy.current && document.activeElement !== input && setDraft(null), 0);
+          setTimeout(() => {
+            if (busy.current || document.activeElement === input || !document.hasFocus()) return;
+            if (!input.value.trim()) setDraft(null);
+            else void save(false);
+          }, 0);
         }}
         onKeyDown={(e) => {
           e.stopPropagation();

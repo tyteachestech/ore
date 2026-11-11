@@ -117,6 +117,8 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
   }, [key, name]);
 
   /** Renames the file (once one is saved) and the note's link; the name is a slug, as files are. */
+  /** Enter or Esc settled the name: the blur they end with saves nothing more. */
+  const nameSettled = useRef(false);
   const rename = useCallback(
     async (raw: string) => {
       const to = raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
@@ -192,7 +194,7 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
     <Trap>
     <div ref={box} className="diagram" role="dialog" aria-modal="true" aria-label="Diagram">
       <div className="diagram-head">
-        {/* Rename in place (Linear's title): Enter saves, Esc or clicking away keeps the old name. */}
+        {/* Rename in place (Linear's title): Enter or clicking away saves (D211), Esc keeps the old name. */}
         <input
           className="diagram-name"
           value={current}
@@ -202,15 +204,18 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
             e.stopPropagation();
             if (e.key === "Enter") {
               e.preventDefault();
+              nameSettled.current = true;
               void rename(current).then(() => (e.target as HTMLInputElement).blur());
             }
             if (e.key === "Escape") {
               e.preventDefault();
+              nameSettled.current = true;
               setCurrent(nameRef.current);
               (e.target as HTMLInputElement).blur();
             }
           }}
-          onBlur={() => setCurrent(nameRef.current)}
+          onFocus={() => (nameSettled.current = false)}
+          onBlur={() => (!nameSettled.current && document.hasFocus() && current !== nameRef.current ? void rename(current) : setCurrent(nameRef.current))}
         />
         {failed && (
           <span className="diagram-failed" role="alert">
