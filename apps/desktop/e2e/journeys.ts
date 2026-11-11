@@ -159,22 +159,9 @@ const HYGIENE = `(() => {
   // the page unloads. Looked at two painted frames after the loss and again 250 ms on, so a handler that moves focus on
   // a timer has done it; only a loss both looks agree on counts.
   const LAYERS = '[role="dialog"], [role="menu"], [role="listbox"], .popover';
-  // Where focus still falls to <body>, known and left for their own fixes (follow-ups of the lists focus fix,
-  // 2026-11-10): the control that held it, matched exactly (the element itself, scoped by its screen), and why.
-  // Lists, the sidebar, Home, the Feed, Add and the skill editor are never here.
-  const ALLOW = [
-    ["div.review[role=dialog], div.review[role=dialog] *", "Review: ending a session (Esc, its end screen, Open in source) gives focus back to nothing, wherever it was on the card"],
-    ["section.quiz .quiz-go", "the finish quiz and the quick quiz: the last step's button goes with the quiz"],
-    [".find-bar input", "Find in a page or note: the bar closes with focus in its field"],
-    ["aside.tutor textarea.grow", "the tutor: closing it with focus in its field leaves focus nowhere"],
-    ["aside.tutor .tutor-title", "the tutor: a chat deleted from its list takes the title that held focus"],
-    [".doc-head .title-edit", "the reader's title: Enter or Esc closes its field with focus nowhere (the author's uses useFocusBack)"],
-    [".qa-answers .qa-piece-edit", "the reader's Questions: an answer piece's editor closes with focus nowhere"],
-    ["div.ask > input[aria-label='New question']", "the reader's Questions: a new question's field closes on Enter"],
-    [".explain .qp-link", "Explain's answer: a Key point, Retry or Later pressed with ↵ goes with the step it ends"],
-    [".skill-page .try-next", "the skill page's Try it: its field closes on save"],
-    [".skill-page h1.skill-name input", "the skill page's own name field closes on Enter (not the Edit skill… dialog's)"],
-  ];
+  // Where focus may still fall to <body>, known and left for a fix of its own: [the control that held it, matched
+  // exactly and scoped by its screen, why]. Empty since the follow-up to the lists fix (2026-11-11).
+  const ALLOW = [];
   const screen = () => document.querySelector(".main")?.lastElementChild ?? null;
   let held = null, heldScreen = null, away = false, leaving = false, losing = false, clicked = false, pressedOn = null, fromNothing = false, allowed = false, rightAt = -Infinity;
   const entered = new WeakMap();
@@ -6003,8 +5990,11 @@ journey("skill recall: a warm-up saved to the skill note is a step, so ⌘Z take
     await dialog.waitFor({ state: "detached" });
     const note = async () => ((await ore("notes", `--skill=${k.id}`)) as { text: string }).text;
     await until("the recall is in the note", async () => (await note()).includes("with the grain"));
-    await page.locator(".skill-page h1, .skill-head").first().click({ position: { x: 4, y: 4 } }).catch(() => {});
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    // Out of the note, onto the page: a click on the name opens it for a rename, and Esc puts focus back on the name.
+    await page.locator(".skill-page h1.skill-name button").click();
+    await page.getByLabel("Rename Whittling").waitFor();
+    await page.keyboard.press("Escape");
+    await until("Esc gives the name its focus back", () => page.evaluate(() => !!document.activeElement?.matches(".skill-page h1.skill-name button")));
     await page.keyboard.press("Meta+z");
     await until("⌘Z takes the recall out of the note", async () => !(await note()).includes("with the grain"));
     await page.keyboard.press("Shift+Meta+z");
@@ -6235,6 +6225,11 @@ journey("finish: drafting the cards starts on Done, not after the moment, so clo
   await page.locator(".doc").getByText("A short page whose cards are drafted").waitFor();
   const enriched: number[] = [];
   page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["enrich"') && enriched.push(Date.now()));
+  // Esc out of the finish quiz puts focus back in the text (the hygiene guard checks it never falls to <body>).
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.locator("section.quiz").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Esc puts focus in the text", () => page.evaluate(() => !!document.activeElement?.matches(".reader-scroll")));
   await page.getByRole("button", { name: "Finish", exact: true }).click();
   await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.getByRole("button", { name: "Done", exact: true }).click();
