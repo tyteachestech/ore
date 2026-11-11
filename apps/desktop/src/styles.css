@@ -2568,8 +2568,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .doc-head .source { position: relative; z-index: 1; min-width: 44px; line-height: 44px; margin-top: -4.5px; margin-bottom: -12.5px; }
 /* The reading pill: 28pt to the eye, 44pt to the finger. */
 .phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
-/* Rename, Add author and a key point being typed: fields 44pt tall to the finger. */
-.phone .doc-head :is(.title-edit, .author-edit), .phone .cp-input { min-height: 44px; }
+/* Rename, Add author, a key point, a guess before reading and Leave anything out?: fields 44pt tall to the finger. */
+.phone .doc-head :is(.title-edit, .author-edit), .phone .cp-input, .phone .preq-input, .phone .quiz-leave { min-height: 44px; }
 /* The note's keyboard bar: nine 44pt buttons are wider than a 390pt iPhone; it scrolls the last few points sideways. */
 .phone .kb-bar { overflow-x: auto; scrollbar-width: none; }
 .phone .kb-btn { flex: 1 0 44px; }

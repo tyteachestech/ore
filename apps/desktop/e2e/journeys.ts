@@ -8909,7 +8909,7 @@ journey("phone: a key point being typed survives a relaunch, and goes when the t
   await Bun.sleep(500);
   await page.reload();
   await until("the line comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
-  // Left on the source, it waits for the field: Collected alone shows none, Add a key point here brings it back.
+  // Left on the source, it waits for its field: opening Collected later brings it back, and so does Add a key point here.
   await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
   await page.locator(".reader:not(.noting)").waitFor();
   await page.reload();
@@ -8961,7 +8961,12 @@ journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt
   await action(/^Add a key point here/);
   await fits44(page, ".cp-input", "the key point field");
   await page.keyboard.press("Escape");
-  await tap(page, page.locator(".phone-back").filter({ hasText: "Source" })); // from Collected to the source
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+  if (!(await page.locator(".preq-input").count())) await tap(page, page.locator(".preq-head"));
+  await fits44(page, ".preq-input", "the empty answer to What do you already know?");
+  await action(/^Finish/);
+  await fits44(page, '[aria-label="Leave anything out?"]', "Finish's Leave anything out?");
+  await tap(page, page.getByRole("button", { name: "Close quiz" }));
   await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
   await tap(page, page.locator(".phone-reader [contenteditable=true]").first());
   await page.locator(".kb-bar").waitFor();
