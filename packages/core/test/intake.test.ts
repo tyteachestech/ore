@@ -12,7 +12,7 @@ import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
 import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { xlsxToDoc } from "../src/ingest/sheets.ts";
-import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
+import { pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
 import { chapterLines } from "../src/ai/recall.ts";
@@ -1308,6 +1308,21 @@ describe("import coverage: audio and podcasts", () => {
       expect([u, audioOf(item), existsSync(join(item.dir, "source.html"))]).toEqual([u, null, true]);
     }
     expect(fetched.filter((u) => /\.(mp3|m4a|mp4)(?:\?|$)/.test(u) && !/cdn\.(radio|show)\.test\/(17|sleep|18)/.test(u))).toEqual([]);
+  });
+
+  test("one episode under two addresses is one audio; a show's og:type is not an episode's; player pages hear any audio type and a Megaphone player", async () => {
+    // A redirector (Podtrac) in front of the Megaphone file the player plays; og:audio beside a player of two formats.
+    expect(pageAudio(`<audio src="https://dts.podtrac.com/redirect.mp3/traffic.megaphone.fm/ABC1234567.mp3"></audio><iframe src="https://playlist.megaphone.fm/?e=ABC1234567"></iframe>`, "https://show.test/podcast/episode/21")).toBe("https://dts.podtrac.com/redirect.mp3/traffic.megaphone.fm/ABC1234567.mp3");
+    expect(pageAudio(`<meta property="og:audio" content="https://cdn.show.test/20.mp3"><audio><source src="https://cdn.show.test/20.m4a"><source src="https://cdn.show.test/20.mp3"></audio>`, "https://show.test/episodes/20")).toBe("https://cdn.show.test/20.mp3");
+    // A show's page names its latest episode's audio: only an episode's type counts, else the address rule.
+    const latest = `<meta property="og:audio" content="https://cdn.show.test/latest.mp3">`;
+    expect(pageAudio(`<meta property="og:type" content="music.podcast">${latest}`, "https://show.test/")).toBeUndefined();
+    expect(pageAudio(`<meta property="og:type" content="podcast">${latest}`, "https://show.test/")).toBeUndefined();
+    expect(pageAudio(`<meta property="og:type" content="podcast:episode">${latest}`, "https://show.test/")).toBe("https://cdn.show.test/latest.mp3");
+    // A player's own page: any audio the Mac hears, a Megaphone player, a file whose type is mid-path.
+    expect(pageAudio(`<audio src="/ep.aac"></audio>`, "https://overcast.fm/+x", true)).toBe("https://overcast.fm/ep.aac");
+    expect(pageAudio(`<iframe src="https://player.megaphone.fm/SAM9228418236"></iframe>`, "https://overcast.fm/+x", true)).toBe("https://traffic.megaphone.fm/SAM9228418236.mp3");
+    expect(pageAudio(`<audio src="https://cdn.pca.test/ep13.mp3/stream"></audio>`, "https://pca.st/episode/abc", true)).toBe("https://cdn.pca.test/ep13.mp3/stream");
   });
 
   // D122: a Spotify link is heard from the same episode in the show's public feed.
