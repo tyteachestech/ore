@@ -6,6 +6,9 @@
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 //   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
+//   ORE_E2E_REPEAT=30                each picked journey that many times in a row, to catch a flaky one
+//   ORE_E2E_CPU=6                    Chromium's CPU slowed that many times, as a busy CI runner is
+//   ORE_E2E_SLOW='{"ls":800}'        those `ore` commands answer that many ms late (window.__ORE_SLOW), to widen a race
 import { chromium, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -57,6 +60,8 @@ async function open(url: string, engine: Engine): Promise<Page> {
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
   await page.addInitScript(HYGIENE);
+  if (process.env.ORE_E2E_SLOW) await page.addInitScript(`window.__ORE_SLOW = ${process.env.ORE_E2E_SLOW}`);
+  if (process.env.ORE_E2E_CPU && engine === "chromium") await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.ORE_E2E_CPU) });
   await page.goto(url);
   await page.locator(".side-item").first().waitFor();
   return page;
@@ -3846,6 +3851,20 @@ journey("note drag to select: a drag down the gutter boxes the blocks it passes,
 const pickedRows = (page: Page) => page.locator(".list .row.sel .title").allInnerTexts();
 /** The titles of the list's rows at these places. */
 const rowTitles = (page: Page, ...at: number[]) => Promise.all(at.map((i) => page.locator(".list .row").nth(i).locator(".title").innerText()));
+/** Waits until every \`ore\` call the page made has answered and what came back is drawn, three frames running
+ *  with none outstanding (the mock counts them in \`window.__ORE_PENDING\`). A skill page draws its sources before
+ *  its stats and note arrive, which then push them down: a press measured before that lands above the list. */
+async function loaded(page: Page) {
+  await until("the page has loaded what it asked for", () => page.evaluate(() => new Promise<boolean>((done) => {
+    let frames = 0;
+    const look = () => {
+      if ((window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING) return done(false);
+      if (++frames === 3) return done(true);
+      requestAnimationFrame(() => setTimeout(look));
+    };
+    look();
+  })));
+}
 /** Presses at (x, y), drags to (x2, y2) and, unless told not to, lets go. */
 async function boxDrag(page: Page, x: number, y: number, x2: number, y2: number, release = true) {
   await page.mouse.move(x, y);
@@ -3942,10 +3961,44 @@ journey("list drag to select: a drag from beside the rows boxes the ones it cros
   await until("dropped on no skill, nothing is picked", async () => !(await page.locator(".row-ghost").count()) && !(await pickedRows(page)).length);
 });
 
+journey("list drag to select survives a refresh of the same list landing mid-drag: the box goes on and picks the rows it reaches (D194)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".list .row");
+  await rows.nth(2).waitFor();
+  await loaded(page);
+  const at = async (i: number) => (await rows.nth(i).boundingBox())!;
+  const mid = async (i: number) => (await at(i)).y + (await at(i)).height / 2;
+  const edge = (await page.locator(".side-divider").boundingBox())!;
+  const x = (edge.x + edge.width + (await at(0)).x) / 2;
+  // Pinning a row reads the list again after it writes; that read answers late, while the box is being dragged.
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW: object }).__ORE_SLOW = { ls: 1500 }));
+  const pinned = (await rowTitles(page, 2))[0]!;
+  await rows.nth(2).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Pin to top" }).click();
+  await until("pinned on screen at once", async () => (await rowTitles(page, 0))[0] === pinned);
+  await boxDrag(page, x, (await at(0)).y + 10, x + 240, await mid(1), false);
+  await until("two picked", async () => (await pickedRows(page)).length === 2);
+  if (!(await page.evaluate(() => (window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING))) throw new Error("the list was read again before the drag: nothing landed mid-drag");
+  await loaded(page); // the late read lands
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = undefined));
+  await page.mouse.move(x + 240, await mid(2), { steps: 4 });
+  await until("the box goes on to the third row", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 2)).join());
+  if ((await page.locator(".marquee").count()) !== 1) throw new Error("the box went with the refresh");
+  await page.mouse.up();
+  await until("released, the three stay", async () => (await pickedRows(page)).length === 3 && !(await page.locator(".marquee").count()));
+  // Unpin it for the journeys after this one (one row's menu, so the pick goes first).
+  await page.keyboard.press("Escape");
+  await until("the pick is cleared", async () => !(await pickedRows(page)).length);
+  await rows.filter({ hasText: pinned }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Unpin" }).click();
+  await until("unpinned", async () => !(await page.locator(".row.pinned").count()));
+});
+
 journey("list drag to select on a skill page: a drag from the column beside its sources selects the ones it crosses; a click there clears (D194)", async (page) => {
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const rows = page.locator(".skill-page .list .row");
   await rows.nth(1).waitFor();
+  await loaded(page);
   const list = (await page.locator(".skill-page .list").boundingBox())!;
   const r0 = (await rows.nth(0).boundingBox())!;
   const r1 = (await rows.nth(1).boundingBox())!;
@@ -3977,6 +4030,7 @@ journey("list drag to select in WebKit: the box selects the rows it crosses with
   await page.locator(".sidebar .side-item", { hasText: "Teaching" }).first().click();
   const srow = page.locator(".skill-page .list .row").first();
   await srow.waitFor();
+  await loaded(page);
   const note = page.locator(".skill-page .note-editor [contenteditable=true]").first();
   await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
   await page.keyboard.press("Meta+End");
@@ -3994,17 +4048,9 @@ journey("list drag to select on a narrow skill page (one column, the sources und
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const rows = page.locator(".skill-page .list .row");
   await rows.nth(1).waitFor();
+  // The note and stats above load after the rows and push them down: measure once they have.
+  await loaded(page);
   await rows.nth(1).scrollIntoViewIfNeeded();
-  // The note above loads after the rows and pushes them down: measure once they stay put.
-  // Two polls alike could fall before the note landed, so the note is waited for and five must agree.
-  await page.locator(".skill-page .ProseMirror").first().waitFor();
-  let was = "";
-  let same = 0;
-  await until("the rows stay put", async () => {
-    const now = JSON.stringify(await rows.nth(1).boundingBox());
-    same = was === (was = now) ? same + 1 : 0;
-    return same >= 5;
-  });
   const list = (await page.locator(".skill-page .list").boundingBox())!;
   const r0 = (await rows.nth(0).boundingBox())!;
   const r1 = (await rows.nth(1).boundingBox())!;
@@ -7999,7 +8045,7 @@ journey("a11y: a row is one control with its actions beside it (axe nested-inter
 // —— run ——
 
 let failed = 0;
-const picked = journeys.filter(([name]) => !only || name.includes(only));
+const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
   let page: Page | undefined;

@@ -17,6 +17,26 @@ window.__copy = async (text) => {
   window.__emit("tauri://focus");
   await new Promise((r) => setTimeout(r, 50));
 };
+async function ore(args) {
+  // window.__ORE_FAIL = { enrich: "why" }: that command fails with that reason (a test of the failure path).
+  const fail = window.__ORE_FAIL && window.__ORE_FAIL[args.args[0]];
+  if (fail) throw fail;
+  // window.__ORE_HOLD = { "skills arrange": [800] }: the next such command waits that long before it runs at all
+  // (one entry per call), so a later one (an Undo) can run first, as two `ore` processes can on a slow machine.
+  const hold = window.__ORE_HOLD && window.__ORE_HOLD[args.args.slice(0, 2).join(" ")];
+  if (hold && hold.length) await new Promise((ok) => setTimeout(ok, hold.shift()));
+  const port = window.__ORE_BRIDGE || 1421;
+  // As the real app reports a missing `ore`: say what is down and how to start it, not "Failed to fetch".
+  const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null }) }).catch(() => {
+    throw `The mock bridge isn’t answering on port ${port}. Start it: PORT=${port} bun scripts/mock/bridge.ts`;
+  });
+  const j = await r.json();
+  // window.__ORE_SLOW = { ls: 800 }: that command's answer comes back that much later (a race test).
+  const slow = window.__ORE_SLOW && window.__ORE_SLOW[args.args[0]];
+  if (slow) await new Promise((ok) => setTimeout(ok, slow));
+  if (!r.ok) throw j;
+  return j;
+}
 window.__TAURI_INTERNALS__ = {
   metadata: { currentWindow: { label }, currentWebview: { windowLabel: label, label } },
   transformCallback: (f) => (callbacks.set(++cb, f), cb),
@@ -24,24 +44,13 @@ window.__TAURI_INTERNALS__ = {
   convertFileSrc: (p) => "http://localhost:" + (window.__ORE_BRIDGE || 1421) + "/file?p=" + encodeURIComponent(p),
   async invoke(cmd, args) {
     if (cmd === "ore") {
-      // window.__ORE_FAIL = { enrich: "why" }: that command fails with that reason (a test of the failure path).
-      const fail = window.__ORE_FAIL && window.__ORE_FAIL[args.args[0]];
-      if (fail) throw fail;
-      // window.__ORE_HOLD = { "skills arrange": [800] }: the next such command waits that long before it runs at all
-      // (one entry per call), so a later one (an Undo) can run first, as two `ore` processes can on a slow machine.
-      const hold = window.__ORE_HOLD && window.__ORE_HOLD[args.args.slice(0, 2).join(" ")];
-      if (hold && hold.length) await new Promise((ok) => setTimeout(ok, hold.shift()));
-      const port = window.__ORE_BRIDGE || 1421;
-      // As the real app reports a missing `ore`: say what is down and how to start it, not "Failed to fetch".
-      const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null }) }).catch(() => {
-        throw `The mock bridge isn’t answering on port ${port}. Start it: PORT=${port} bun scripts/mock/bridge.ts`;
-      });
-      const j = await r.json();
-      // window.__ORE_SLOW = { ls: 800 }: that command's answer comes back that much later (a race test).
-      const slow = window.__ORE_SLOW && window.__ORE_SLOW[args.args[0]];
-      if (slow) await new Promise((ok) => setTimeout(ok, slow));
-      if (!r.ok) throw j;
-      return j;
+      // window.__ORE_PENDING: how many `ore` calls have not answered yet, so a test can wait for a page to finish loading.
+      window.__ORE_PENDING = (window.__ORE_PENDING ?? 0) + 1;
+      try {
+        return await ore(args);
+      } finally {
+        window.__ORE_PENDING--;
+      }
     }
     if (cmd === "ore_cancel") return void (await fetch("http://localhost:" + (window.__ORE_BRIDGE || 1421) + "/cancel", { method: "POST", body: JSON.stringify({ job: args.job }) }).catch(() => {}));
     // `window.__ORE_PLAYER_PORT` (an earlier init script) points the player at fake-player.ts.
