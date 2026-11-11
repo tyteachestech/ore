@@ -3388,9 +3388,9 @@ function ReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>; onOp
   );
 }
 
-/** Prequestion guesses typed but not yet stored, by source and question: leaving the source keeps them for when
- *  he comes back (Enter still stores one). */
-const preqDrafts = new Map<string, string>();
+/** Prequestion guesses typed but not yet stored, by source and question (a rewritten question is another key):
+ *  leaving the source or quitting the app keeps them for when he comes back (for a day, `kept`); Enter stores one. */
+const preqDrafts = kept<string>("ore.preq-drafts");
 
 /** "What do you already know?" — short attempts before reading, stored and never scored (D18). Question rows; the one
  *  you are on opens an answer line, Enter stores it and opens the next unanswered one. */
@@ -3418,8 +3418,8 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
   // One answer line open at a time (Perplexity "Related"): the rest stay visible as things to read for.
   // Coming back with a guess he hadn't stored opens its line again.
   const [at, setAt] = useState(() => {
-    const kept = qs.findIndex((_, i) => preqDrafts.has(draftKey(i)));
-    return kept >= 0 ? kept : qs.findIndex((q) => !q.before);
+    const left = qs.findIndex((_, i) => preqDrafts.get(draftKey(i)) !== undefined);
+    return left >= 0 ? left : qs.findIndex((q) => !q.before);
   });
   const edit = (i: number, text: string) => {
     setVals((v) => v.map((x, j) => (j === i ? text : x)));
@@ -3432,7 +3432,7 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
   const focusLine = useRef(false);
   // Open while they can still do their work: before he starts reading. Once he has highlighted or is reading,
   // the block folds to its one line so the text comes first; one click opens it again.
-  const [open, setOpen] = useState(() => qs.some((_, i) => preqDrafts.has(draftKey(i))) || (qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length));
+  const [open, setOpen] = useState(() => qs.some((_, i) => preqDrafts.get(draftKey(i)) !== undefined) || (qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length));
   // The row he just answered plays a short check-in, so the move from typing to answered reads as done.
   const [just, setJust] = useState(-1);
   if (!qs.length && !waiting && !onRetry) return null;

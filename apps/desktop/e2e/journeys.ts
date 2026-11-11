@@ -9007,6 +9007,18 @@ journey("phone: a link to a part of the page that wasn't saved says the next ste
   });
 }, "phone");
 
+journey("phone: a half-typed answer to What do you already know? survives a relaunch", async (page) => {
+  await phoneSource(page, TESTING);
+  const field = page.locator(".preq-input");
+  if (!(await field.count())) await tap(page, page.locator(".preq-head"));
+  await tap(page, field);
+  await page.keyboard.type("Retrieval changes what I can remember");
+  await Bun.sleep(500);
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await until("the answer comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval changes what I can remember");
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
