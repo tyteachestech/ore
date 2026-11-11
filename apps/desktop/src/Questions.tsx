@@ -5,7 +5,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
-import { errorText, focusQuietly, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { errorText, focusQuietly, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { passageText } from "./text";
 
 // D75: answering a question where the answer turns up. One answer model on the skill page and in the
@@ -331,19 +331,23 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
   // click in WebKit, a key), to the panel's own Ask a question. A click away leaves it where it landed.
   const [opener] = useState(() => document.activeElement as HTMLElement | null);
   const field = useRef<HTMLInputElement>(null);
-  const giveBack = () => {
+  // Enter or Esc marks it; the give-back runs as the field goes (this unmounts), one tick later, and only if
+  // focus is still on nothing then: a press or a focus elsewhere meanwhile wins. Nothing polls.
+  const giving = useRef(false);
+  const giveBack = () => void (giving.current = true);
+  useEffect(() => {
     const f = field.current;
     const panel = f?.closest<HTMLElement>(".collected") ?? f?.closest<HTMLElement>(".skill-page") ?? f?.closest<HTMLElement>("section");
-    const plus = panel?.querySelector<HTMLElement>("button[aria-label='Ask a question'], button[aria-label='Add a question']");
-    // Once the field has gone, and only if nothing else took focus meanwhile.
-    const after = (tries: number) => {
-      if (f?.isConnected) return void (tries > 0 && setTimeout(() => after(tries - 1), 16));
-      if (document.activeElement && document.activeElement !== document.body) return;
-      const to = opener && opener !== document.body && opener.isConnected && opener.getClientRects().length ? opener : plus;
-      if (to?.isConnected) focusQuietly(to);
+    return () => {
+      if (!giving.current) return;
+      const plus = panel?.querySelector<HTMLElement>("button[aria-label='Ask a question'], button[aria-label='Add a question']");
+      setTimeout(() => {
+        if (document.activeElement && document.activeElement !== document.body) return;
+        const to = opener && opener !== document.body && usable(opener) ? opener : plus;
+        if (usable(to)) focusQuietly(to);
+      });
     };
-    setTimeout(() => after(60));
-  };
+  }, [opener]);
   const add = async () => {
     if (!text.trim() || busy) return;
     setBusy(true);

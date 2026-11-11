@@ -18,7 +18,7 @@ import { depthText, levelProgress, ore, opt, type Question, type Research, type 
 import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
-import { errorText, focusQuietly, load, save, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { errorText, focusQuietly, load, save, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { Trap } from "./Trap";
 import { passageText } from "./text";
 
@@ -141,11 +141,14 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
           query={find.query}
           onQuery={(query) => setFind((f) => ({ ...f, query }))}
           focus={find.focus}
-          // Closed, focus goes to the page's sources list, its keyboard home, as the reader's goes to its text; the place stays.
+          // Closed, focus goes back to what it searched: the skill note (from a ⌘K match in it), else the page's
+          // sources list, its keyboard home, as the reader's goes to its text; else the skill's name. The place stays.
           onClose={() => {
+            const note = find.note;
             setFind((f) => ({ ...f, open: false }));
-            const list = pageRef.current?.querySelector<HTMLElement>(".list");
-            if (list) focusQuietly(list);
+            const page = pageRef.current;
+            const to = [note ? noteCol.current?.querySelector<HTMLElement>(".skill-note [contenteditable='true']") : null, page?.querySelector<HTMLElement>(".list"), page?.querySelector<HTMLElement>("h1.skill-name button")].find(usable);
+            if (to) focusQuietly(to);
           }}
         />
       )}
