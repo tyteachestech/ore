@@ -1,4 +1,5 @@
-import { Archive, CaretRight, Check, Collapse, Expand, Plus, Target, X } from "./icons";
+import { Archive, CaretRight, Check, Collapse, Expand, MagnifyingGlass, Plus, Target, X } from "./icons";
+import { ranked } from "./match";
 import { ImportanceIcon, levelOf } from "./importance";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
@@ -15,7 +16,7 @@ import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
 import { depthText, levelProgress, ore, opt, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
-import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
+import { AnswerBox, AskQuestion, announce, questionText, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
 import { errorText, focusQuietly, load, save, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
@@ -26,6 +27,8 @@ type Props = {
   skill: Skill;
   /** The list's title: which sources it shows (To read, Done, Archived). */
   view: ReactNode;
+  /** The sources' search (D203): what is typed narrows the list below; `keys` moves from the field into the rows. */
+  search: { value: string; set: (v: string) => void; keys: (e: ReactKeyboardEvent<HTMLInputElement>) => void };
   targets: LinkTarget[];
   blocked: boolean;
   onOpen: (t: Omit<LinkTarget, "title">) => void;
@@ -53,7 +56,7 @@ type Props = {
 
 /** A skill's page (D46): the D23 stats as chips in the header, then two equal columns that each
  *  scroll on their own, so a long note (D41) never buries his questions (D47) and sources. */
-export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children }: Props) {
+export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children }: Props) {
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
@@ -117,6 +120,7 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  const [searching, setSearching] = useState(false);
   const split = useSplit("ore.skill-split");
   const stats = useStats(skill.id);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -212,14 +216,15 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
             icon={PixelBook}
             tone="read"
             menu={view}
-            actions={[{ id: "add", label: "Add source", hint: label(keys.add), run: onAddSource }]}
-            action={
+            actions={[{ id: "search", label: "Search sources", run: () => setSearching(true) }, { id: "add", label: "Add source", hint: label(keys.add), run: onAddSource }]}
+            action={<>
+              <HeadSearch label="Search sources" value={search.value} onChange={search.set} open={searching} setOpen={setSearching} onKeys={search.keys} />
               <Hint text={`Add a source to ${skill.name}`} keys="add">
                 <button className="icon-btn" aria-label={`Add a source to ${skill.name}`} onClick={onAddSource}>
                   <Plus size={14} weight="bold" aria-hidden="true" />
                 </button>
               </Hint>
-            }
+            </>}
           >
             {children}
           </Fold>
@@ -294,6 +299,47 @@ function foldedIds(): string[] {
 
 /** A card that folds to its header, Notion toggle-heading style; the summary stays
  *  in the header so a folded section still says what is in it. Folds are remembered for every skill. */
+/** A section's search (D203), Linear's: a magnifying glass in the header that becomes a field. What is
+ *  typed narrows the section's rows, best match first. Esc clears it, then closes it; so does leaving it empty. */
+function HeadSearch({ label, value, onChange, open, setOpen, onKeys }: { label: string; value: string; onChange: (v: string) => void; open: boolean; setOpen: (o: boolean) => void; onKeys: (e: ReactKeyboardEvent<HTMLInputElement>) => void }) {
+  const button = useRef<HTMLButtonElement>(null);
+  const field = useRef<HTMLInputElement>(null);
+  const shown = open || !!value;
+  useFocusBack(shown, button);
+  useEffect(() => {
+    if (open) field.current?.focus({ preventScroll: true });
+  }, [open]);
+  if (!shown)
+    return (
+      <Hint text={label}>
+        <button className="icon-btn" ref={button} aria-label={label} onClick={() => setOpen(true)}>
+          <MagnifyingGlass size={14} aria-hidden="true" />
+        </button>
+      </Hint>
+    );
+  return (
+    <label className="filter head-search">
+      <MagnifyingGlass size={13} aria-hidden="true" />
+      <input
+        ref={field}
+        value={value}
+        spellCheck={false}
+        aria-label={label}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            if (value) onChange("");
+            else setOpen(false);
+          } else onKeys(e);
+        }}
+      />
+    </label>
+  );
+}
+
 /** A card that folds. With `menu`, the menu is its title (the caret alone folds it), as a button
  *  can't hold another. */
 /** `actions`: the card's right-click menu (its create action), which unfolds it first, as its + does. */
@@ -551,24 +597,41 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
 
   const { setStatus, remove } = useQuestionEdits(setQs, notify);
 
-  const open = (qs ?? []).filter((q) => q.status !== "done");
-  const answered = (qs ?? []).filter((q) => q.status === "done");
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const find = query.trim();
+  /** Searched (D203): by the question first, then its source and what he has answered; answered ones show with the rest. */
+  const found = useMemo(() => (find ? ranked(qs ?? [], find, (q) => [questionText(q), q.item_title, ...q.answers.map((a) => a.text)]) : (qs ?? [])), [qs, find]);
+  const open = found.filter((q) => q.status !== "done");
+  const answered = found.filter((q) => q.status === "done");
   return (
     <Fold
       id="questions"
       title="Questions"
       icon={PixelQuestion}
       tone="question"
-      summary={open.length ? `${open.length} open` : null}
+      summary={open.length && !find ? `${open.length} open` : null}
       summaryFolded
-      actions={[{ id: "ask", label: "Add a question", run: () => setAsking(true) }]}
-      action={
+      actions={[{ id: "search", label: "Search questions", run: () => setSearching(true) }, { id: "ask", label: "Add a question", run: () => setAsking(true) }]}
+      action={<>
+        <HeadSearch
+          label="Search questions"
+          value={query}
+          onChange={setQuery}
+          open={searching}
+          setOpen={setSearching}
+          onKeys={(e) => {
+            if (e.key !== "ArrowDown" && e.key !== "Enter") return;
+            e.preventDefault();
+            e.currentTarget.closest(".skill-card")?.querySelector<HTMLElement>(".question-quote")?.focus();
+          }}
+        />
         <Hint text="Add a question">
           <button className="icon-btn" ref={askRef} aria-label="Add a question" onClick={() => setAsking(true)}>
             <Plus size={14} weight="bold" aria-hidden="true" />
           </button>
         </Hint>
-      }
+      </>}
     >
       {asking && (
         <AskQuestion
@@ -584,20 +647,21 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
         />
       )}
       {qs && !qs.length && !asking && <p className="quiet">No questions yet. Add one with +, or highlight a passage as a question while you read.</p>}
-      {(showAll ? open : open.slice(0, QUESTION_CAP)).map((q) => (
+      {find && !found.length && <p className="quiet">No questions match “{find}”.</p>}
+      {(showAll || find ? open : open.slice(0, QUESTION_CAP)).map((q) => (
         <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />
       ))}
-      {open.length > QUESTION_CAP && (
+      {!find && open.length > QUESTION_CAP && (
         <button className="answered-toggle" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
           {showAll ? "Show fewer" : `Show all ${open.length}`}
         </button>
       )}
       {answered.length > 0 && (
         <>
-          <button className="answered-toggle" aria-expanded={showAnswered} onClick={() => setShowAnswered(!showAnswered)}>
+          {!find && <button className="answered-toggle" aria-expanded={showAnswered} onClick={() => setShowAnswered(!showAnswered)}>
             {showAnswered ? "Hide answered" : `Answered (${answered.length})`}
-          </button>
-          {showAnswered &&
+          </button>}
+          {(showAnswered || !!find) &&
             answered.map((q) => <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />)}
         </>
       )}
