@@ -4813,6 +4813,76 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
   await page.keyboard.press("Escape");
 });
 
+journey("diagram: a drawn box is selected under Select, Enter right after waits for its label, the right-click menu cuts, copies and pastes, and a line near level lands level", async (page) => {
+  await openSource(page, TESTING);
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/diagram");
+  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+  await page.keyboard.press("Enter");
+  const draw = page.locator(".diagram .draw");
+  await draw.focus();
+  const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
+  const rects = page.locator(".diagram .draw-canvas > g rect");
+  const tool = () => page.locator(".draw-tool[aria-pressed=true]").first().getAttribute("aria-label");
+  // Drag a box, then Enter as Excalidraw starts a label: the label already open waits for the words (Tyler 2026-11-11).
+  await page.keyboard.press("r");
+  await page.mouse.move(c.x + 200, c.y + 150);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 260, c.y + 190, { steps: 4 });
+  await page.mouse.move(c.x + 340, c.y + 230, { steps: 4 });
+  await page.mouse.up();
+  await page.locator(".draw-text").waitFor();
+  await page.keyboard.press("Enter");
+  if (!(await page.locator(".draw-text").count())) throw new Error("Enter on a box just drawn closed its label");
+  await page.keyboard.type("Concept");
+  await page.keyboard.press("Enter");
+  await until("the box is labelled", async () => (await page.locator(".diagram .draw-canvas > g text").allTextContents()).join("").includes("Concept"));
+  await until("the tool is Select", async () => (await tool()) === "Select");
+  // A click on the box picks it; it never draws a second one over it.
+  await page.keyboard.press("Escape");
+  await page.mouse.click(c.x + 210, c.y + 160);
+  await until("the click selects the box", async () => (await page.locator(".diagram .sr-only[aria-live]").textContent()) === "Selected: Concept");
+  if ((await rects.count()) !== 1) throw new Error(`a click on the drawn box made ${await rects.count()} boxes`);
+  // Right-click: Copy, then Paste on empty canvas makes a second box; Cut takes one away.
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.mouse.click(c.x + 210, c.y + 160, { button: "right" });
+  await page.getByRole("menuitem", { name: /^Copy\b(?! style| as)/ }).click();
+  await until("Copy puts the box on the clipboard", async () => (await page.evaluate(() => navigator.clipboard.readText())).includes("excalidraw/clipboard"));
+  await page.mouse.click(c.x + 700, c.y + 500, { button: "right" });
+  await page.getByRole("menuitem", { name: /^Paste\b(?! style)/ }).click();
+  await until("Paste makes a copy", async () => (await rects.count()) === 2);
+  await page.mouse.click(c.x + 210, c.y + 160, { button: "right" });
+  await page.getByRole("menuitem", { name: /^Cut\b/ }).click();
+  await until("Cut takes the box away", async () => (await rects.count()) === 1);
+  // A line drawn 2° off level lands level, with a guide through it while the drag lasts (Tyler 2026-11-11); ⌘ draws it as is.
+  const lines = page.locator(".diagram .draw-canvas > g path");
+  const lineAt = async (dy: number, mod?: string) => {
+    const n = await lines.count();
+    await page.keyboard.press("l");
+    if (mod) await page.keyboard.down(mod);
+    await page.mouse.move(c.x + 200, c.y + 400);
+    await page.mouse.down();
+    await page.mouse.move(c.x + 300, c.y + 400 + dy / 2, { steps: 4 });
+    await page.mouse.move(c.x + 400, c.y + 400 + dy, { steps: 4 });
+    const guide = await page.locator(".draw-angle-guide").count();
+    await page.mouse.up();
+    if (mod) await page.keyboard.up(mod);
+    await until("the line is drawn", async () => (await lines.count()) > n);
+    if (await page.locator(".draw-angle-guide").count()) throw new Error("the angle guide stayed after the drag");
+    const ys = [...((await lines.last().getAttribute("d")) ?? "").matchAll(/[ML]\s*(-?[\d.]+)[ ,](-?[\d.]+)/g)].map((m) => Number(m[2]));
+    return { guide, flat: ys.length >= 2 && Math.abs(ys[0]! - ys.at(-1)!) < 0.01 };
+  };
+  const snapped = await lineAt(7);
+  if (!snapped.guide || !snapped.flat) throw new Error(`a line 2° off level: guide ${snapped.guide}, level ${snapped.flat}`);
+  const free = await lineAt(7, "Meta");
+  if (free.guide || free.flat) throw new Error("⌘ still snapped the line level");
+  const steep = await lineAt(40);
+  if (steep.guide || steep.flat) throw new Error("a line 11° off level was snapped");
+});
+
 journey("diagram: align and space from keys and the picker, drags snap to edges and equal gaps (⌘ off), and a node goes with its links", async (page) => {
   await openSource(page, "A very long title about the neuroscience");
   // The editing journey leaves a diagram at the note's end: open it if the preview has rendered, else make one.
