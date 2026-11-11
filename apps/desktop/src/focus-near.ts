@@ -23,18 +23,19 @@ export function focusQuietly(el: HTMLElement): void {
 
 let watching: (() => void) | null = null;
 
-/** Keeps focus near `row` after an action on it: whenever focus falls to <body> (the rename field or dialog the
+/** Keeps focus near `start` after an action on it: whenever focus falls to <body> (the rename field or dialog the
  *  action opened has closed, the row was archived), it goes to the row's control; with the row gone, to the row
  *  now in its place among its kind (a renamed collection comes back as a new element there), else the last.
  *  It lets go once focus settles somewhere else, on a press outside the row and its layers (a click away puts
  *  focus where it lands), or when no row of its kind is left (he went to another screen). One at a time. */
-export function keepFocusNear(row: HTMLElement): void {
+export function keepFocusNear(start: HTMLElement): void {
+  let row = start;
   watching?.();
   // An editor (the note, whose diagrams have a menu) is no row: it puts the caret back itself.
   if (row.querySelector('[contenteditable="true"]')) return;
   const kind = `${row.tagName.toLowerCase()}.${CSS.escape(row.classList[0] ?? "")}`;
   const peers = () => [...document.querySelectorAll<HTMLElement>(kind)];
-  const at = peers().indexOf(row);
+  let at = peers().indexOf(row);
   if (at < 0 || !row.classList.length) return;
   let queued = false;
   const check = () => {
@@ -50,7 +51,9 @@ export function keepFocusNear(row: HTMLElement): void {
     const to = (row.isConnected ? row : null) ?? now[Math.min(at, now.length - 1)];
     const control = to && rowControl(to);
     if (!control) return void (now.length || stop());
-    if (to !== row) stop();
+    // From here it keeps focus near the row that took it, which a reload of the list may draw again.
+    row = to;
+    at = now.indexOf(to);
     focusQuietly(control);
   };
   // A couple of frames later, so the screen's own handler moves focus first when it has one.
