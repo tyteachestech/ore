@@ -29,6 +29,8 @@ type Props = NotesSync & {
   keyPoint?: { on: boolean; toggle: () => void };
   onCancel: () => void;
   onDone: () => void;
+  /** The source is recorded Done (before the closing moment ends): the phone stops keeping Finish open for a relaunch. */
+  onMarked?: () => void;
   /** The library's skills, for the colour of the finished burst (D153). */
   skills?: Skill[];
   /** In a course (D79): the lesson to read next, which the closing card can open instead of going back. */
@@ -75,7 +77,7 @@ function sayUndrafted(notify: Notify, why: string) {
 /** The finish step as a quiz panel beside the blurred source (D52 to D56): free recall first, then
  *  each prequestion is answered, rated for confidence and checked against its key points, with the
  *  source shown only after the attempt. */
-export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, nextLesson, notify, flushNotes, onNotes, skills }: Props) {
+export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, onMarked, nextLesson, notify, flushNotes, onNotes, skills }: Props) {
   // The finished badge bursts in the colour of the source's first coloured skill (D153).
   const burstColor = doc.skills.map((id) => skills?.find((s) => s.id === id)?.color).find(Boolean);
   const draft = drafts.get(doc.id) ?? keptDraft(doc);
@@ -209,6 +211,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   async function markDone() {
     await ore("status", doc.id, "done");
     setMarked(true);
+    onMarked?.();
   }
 
   /** D100: before the questions, leave out the ones past where he stopped or that his note rules out

@@ -8798,6 +8798,19 @@ journey("phone: a Finish recall typed a day ago starts empty, as Review's answer
   await until("a day on it is gone", async () => (await recall.inputValue()) === "");
 }, "phone");
 
+journey("phone: a relaunch once Finish has marked the source Done never opens Finish again", async (page) => {
+  // The phone kept "Finish open" through the closing moment: a relaunch then opened Recall for a source already Done.
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  await tap(page, page.getByRole("button", { name: "Just mark done" }));
+  await page.locator(".quiz-foot button").filter({ hasText: /^Done/ }).waitFor();
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await Bun.sleep(500);
+  if (await page.getByPlaceholder("In your own words…").count()) throw new Error("the relaunch opened Finish's Recall for a source already Done");
+}, "phone");
+
 // —— run ——
 
 let failed = 0;

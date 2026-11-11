@@ -286,6 +286,9 @@ export function PhoneApp() {
   }, [noting]);
   const [jumpTo, setJumpTo] = useState<string | undefined>();
   const [finishing, setFinishing] = useState(!!start.finishing);
+  /** Finish has recorded the source Done: a relaunch from here on never opens Finish again (its closing moment shows). */
+  const [recorded, setRecorded] = useState(false);
+  useEffect(() => void (finishing || setRecorded(false)), [finishing]);
   const [reviewing, setReviewing] = useState<{ pick: string[] | null; run: number } | null>(start.review && { pick: start.review.pick, run: 0 });
   const [tick, setTick] = useState(0);
   const { notify, view: toast } = useToast();
@@ -305,9 +308,9 @@ export function PhoneApp() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, side, finishing, review: reviewing && { pick: reviewing.pick } } satisfies Place));
+      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, side, finishing: finishing && !recorded, review: reviewing && { pick: reviewing.pick } } satisfies Place));
     } catch {}
-  }, [tab, skill, skillNote, openId, noting, side, finishing, reviewing]);
+  }, [tab, skill, skillNote, openId, noting, side, finishing, recorded, reviewing]);
   const tabNow = useRef(tab);
   tabNow.current = tab;
   const refresh = useCallback(async () => {
@@ -472,6 +475,7 @@ export function PhoneApp() {
             skills={skills}
             finishing={finishing}
             setFinishing={setFinishing}
+            onFinishRecorded={() => setRecorded(true)}
             notesOpen={noting}
             sideTab={side}
             onShowSide={(t) => (setSide(t), setNoting(true))}

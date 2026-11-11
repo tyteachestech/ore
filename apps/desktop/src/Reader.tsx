@@ -558,6 +558,8 @@ type Props = {
   skills: Skill[];
   finishing: boolean;
   setFinishing: (on: boolean) => void;
+  /** Finish recorded the source Done (the phone forgets that Finish was open). */
+  onFinishRecorded?: () => void;
   /** The side panel is open (D44), on `sideTab` (D75). */
   notesOpen: boolean;
   sideTab: SideTab;
@@ -3298,6 +3300,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             scrollRef.current?.focus({ preventScroll: true });
           }}
           onDone={p.onDone}
+          onMarked={p.onFinishRecorded}
           nextLesson={nextUp && { title: nextUp.title, open: () => (p.onChanged(), p.onOpenLesson(nextUp.id)) }}
           notify={p.notify}
           flushNotes={notes.flush}
