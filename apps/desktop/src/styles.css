@@ -867,9 +867,11 @@ img.thumb { filter: brightness(0.86); }
 
 /* Video sources (D48 to D50): the player pinned at the top of the column, the transcript under it.
    Eleven Reader: spoken text bright, the rest dimmed, a "Back to current" pill when scrolled away. */
-.page.video { padding-left: 88px; max-width: calc(var(--measure) + 120px); }
-.reader-scroll > .page.video { --lead: 88px; }
-.player-pin { position: sticky; top: 0; z-index: 5; max-width: calc(var(--measure) + 88px); margin: 0 0 22px -88px; padding: 14px 0 0 88px; background: var(--bg); }
+/* The gutter is just the timestamps and the margin marks (64px) and the right side 16px, so a transcript keeps
+   about as much of its measure as an article does in a narrow pane (D207). */
+.page.video { padding-left: 64px; padding-right: 16px; max-width: calc(var(--measure) + 80px); }
+.reader-scroll > .page.video { --lead: 64px; }
+.player-pin { position: sticky; top: 0; z-index: 5; max-width: calc(var(--measure) + 64px); margin: 0 0 22px -64px; padding: 14px 0 0 64px; background: var(--bg); }
 .player-pin::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px; background: linear-gradient(var(--bg), transparent); pointer-events: none; }
 .player { position: relative; width: min(100%, 40vh * 16 / 9); container-type: inline-size; }
 .video-frame { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #000; }
@@ -942,7 +944,7 @@ body.resizing iframe { pointer-events: none; }
 .page.vcard.listening .vc-transcript { color: var(--faint); }
 .doc .tp { position: relative; }
 .doc .ts {
-  position: absolute; right: calc(100% + 18px); top: 0; line-height: inherit; font-size: 11px; color: var(--faint);
+  position: absolute; right: calc(100% + 12px); top: 0; line-height: inherit; font-size: 11px; color: var(--faint);
   font-variant-numeric: tabular-nums; user-select: none; -webkit-user-select: none; cursor: pointer; border-radius: 4px; padding: 0 3px;
 }
 .doc .ts:hover { color: var(--text); background: var(--bg-hover); }
@@ -2405,7 +2407,7 @@ button.home-plan:hover { color: var(--text); }
 /* The keyboard reading focus (Focus.tsx, Readwise Reader): a quiet wash with a bar at its left edge. */
 .focus-box { position: absolute; z-index: 0; pointer-events: none; border-radius: 6px; background: color-mix(in srgb, var(--accent) 7%, transparent); box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 70%, transparent); }
 .marks { position: absolute; inset: 0; pointer-events: none; --mark-gap: 20px; }
-.page.video .marks { --mark-gap: 76px; }
+.page.video .marks { --mark-gap: 54px; }
 .mark-icon {
   position: absolute; pointer-events: auto; width: 16px; height: 16px; margin-left: calc(-1 * var(--mark-gap)); transform: translate(-50%, -50%);
   display: grid; place-items: center; border-radius: 4px; color: var(--hue); opacity: 0.75; transition: opacity var(--t-1) ease-out;
