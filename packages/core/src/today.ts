@@ -126,7 +126,7 @@ export interface Today {
   met: boolean;
   caught_up: boolean;
   due: number;
-  /** Of `due`, the cards filed under no skill: What to review's "No skill" row (D203). */
+  /** Of `due`, the cards filed under no skill: What to review's "No skill" row (D204). */
   no_skill_due: number;
   new_today: number;
   /** New cards held back by the daily limits (D65): "caught up" must not hide them. */

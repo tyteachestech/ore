@@ -187,7 +187,7 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(dueQueue(lib, later, { skills: ["habits"] }).map((e) => e.id)).toEqual([habit.meta.id]);
   });
 
-  test("exercises filed under no skill: Today counts them apart, and a pick takes them only with NO_SKILL (D203)", async () => {
+  test("exercises filed under no skill: Today counts them apart, and a pick takes them only with NO_SKILL (D204)", async () => {
     const { lib, item } = await library(0);
     const draft = (skills: string[], q: string) => writeNewCard(lib, { kind: "card", item: item.meta.id, skills, topics: [], content_type: "fact", question: q, answer: "A", rubric: [] });
     const filed = draft(["learning"], "Filed?");

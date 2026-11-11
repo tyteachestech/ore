@@ -120,7 +120,7 @@ export function medianMs(rs: Review[], kind: "card" | "prompt", kinds: Map<strin
 export const medians = (rs: Review[], kinds: Map<string, string>): Record<"card" | "prompt", number> => ({ card: medianMs(rs, "card", kinds), prompt: medianMs(rs, "prompt", kinds) });
 
 export interface QueueOptions {
-  /** Only cards filed under one of these skills (D80's pick), or under none with NO_SKILL (D203); all when absent. */
+  /** Only cards filed under one of these skills (D80's pick), or under none with NO_SKILL (D204); all when absent. */
   skills?: string[];
   /** Apply the new-card limits (D60, D65, D144): at most `new_per_day`, and none drafted today. On by default. */
   newLimit?: boolean;
