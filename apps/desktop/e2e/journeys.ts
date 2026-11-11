@@ -4817,14 +4817,17 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
 
 journey("diagram: a drawn box is selected under Select, Enter right after waits for its label, the right-click menu cuts, copies and pastes, and a line near level lands level", async (page) => {
   await openSource(page, TESTING);
-  if (await page.locator(".diagram").count()) await page.locator(".diagram-done").click(); // an earlier journey's drawing
-  await until("no drawing is open", async () => (await page.locator(".diagram").count()) === 0);
   const note = page.locator(".note-editor [contenteditable=true]").first();
-  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
-  // At the top of the note, on a line of its own: the end may already be a diagram another journey drew.
-  await page.keyboard.press("Meta+ArrowUp");
+  // An earlier journey's drawing can still be open, or open as the source loads: Done closes it first.
+  await until("the note takes the caret", async () => {
+    if (await page.locator(".diagram").count()) await page.locator(".diagram-done").click();
+    // On the first line's words, not the middle of the note, where a diagram's preview would take the click.
+    await note.locator("p", { hasText: /\w/ }).first().click({ timeout: 1000 }).catch(() => {});
+    return !(await page.locator(".diagram").count()) && (await note.evaluate((e) => e.contains(document.activeElement)));
+  });
+  // A new line after a paragraph of words: either end of the note may already be a diagram another journey drew.
+  await page.keyboard.press("End");
   await page.keyboard.press("Enter");
-  await page.keyboard.press("ArrowUp");
   await page.keyboard.type("/diagram");
   await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
   await page.keyboard.press("Enter");
@@ -4887,6 +4890,19 @@ journey("diagram: a drawn box is selected under Select, Enter right after waits 
   if (free.guide || free.flat) throw new Error("⌘ still snapped the line level");
   const steep = await lineAt(40);
   if (steep.guide || steep.flat) throw new Error("a line 11° off level was snapped");
+  // A double-click on a selected arrow's middle opens its label, as in Excalidraw; it no longer adds a bend there.
+  await page.keyboard.press("a");
+  await page.mouse.move(c.x + 560, c.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 710, c.y + 100, { steps: 4 });
+  await page.mouse.move(c.x + 860, c.y + 100, { steps: 4 });
+  await page.mouse.up();
+  await until("the arrow is drawn and selected", async () => (await tool()) === "Select");
+  await page.mouse.dblclick(c.x + 710, c.y + 100);
+  await page.locator(".draw-text").waitFor({ timeout: 2000 }).catch(() => { throw new Error("a double-click on the arrow's middle opened no label"); });
+  await page.keyboard.type("strengthens");
+  await page.keyboard.press("Enter");
+  await until("the arrow is labelled", async () => (await page.locator(".diagram .draw-canvas > g text").allTextContents()).join("").includes("strengthens"));
 });
 
 journey("diagram: align and space from keys and the picker, drags snap to edges and equal gaps (⌘ off), and a node goes with its links", async (page) => {

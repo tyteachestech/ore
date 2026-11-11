@@ -38,7 +38,7 @@ type Gesture =
   | { kind: "rotate"; before: El[]; starts: El[]; about: Pt; a0: number }
   | { kind: "create"; before: El[]; id: string; start: Pt; type: Shape }
   | { kind: "line"; before: El[]; id: string; start: Pt; startOn: string | null }
-  | { kind: "point"; before: El[]; id: string; index: number }
+  | { kind: "point"; before: El[]; id: string; index: number; mid?: Pt }
   | { kind: "draw"; before: El[]; id: string; pts: Pt[] }
   | { kind: "erase"; ids: Set<string> }
   | { kind: "pan"; start: [number, number]; view: View };
@@ -956,15 +956,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     const pt = pointAt(p);
     if (pt) {
       const line = selected[0]!;
-      let next = line;
-      let index = pt.index;
-      if (pt.mid) {
-        const pts = absPoints(line);
-        pts.splice(pt.index, 0, midOf(pts[pt.index - 1]!, pts[pt.index]!));
-        next = withPoints(line, pts);
-        setEls(els.map((x) => (x.id === line.id ? next : x)));
-      }
-      g.current = { kind: "point", before: els, id: line.id, index };
+      // A midpoint becomes a bend only once it is dragged, so a double-click there labels the arrow (Excalidraw).
+      g.current = { kind: "point", before: els, id: line.id, index: pt.index, mid: pt.mid ? p : undefined };
       return;
     }
     const h = handleAt(p);
@@ -1137,6 +1130,11 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       const line = els.find((x) => x.id === cur.id);
       if (!line) return;
       const pts = absPoints(line);
+      if (cur.mid) {
+        if (dist(cur.mid, p) * live.current.view.zoom < 3) return;
+        pts.splice(cur.index, 0, midOf(pts[cur.index - 1]!, pts[cur.index]!));
+        cur.mid = undefined;
+      }
       const ends = cur.index === 0 || cur.index === pts.length - 1;
       const target = ends && line.type === "arrow" ? bindTarget(els, p, 8 / live.current.view.zoom, new Set([line.id])) : null;
       setHot(target?.id ?? null);
