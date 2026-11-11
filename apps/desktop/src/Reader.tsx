@@ -46,6 +46,7 @@ import { errorText, focusQuietly, inOrder, load, save, useFocusBack, useLibraryC
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
+import { paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
@@ -851,12 +852,12 @@ function ReaderView(p: Props & { reload: () => void }) {
     const changed = i !== currentWord.current;
     if (changed) {
       currentWord.current = i;
-      if (i < 0) CSS.highlights.delete("hl-spoken");
+      if (i < 0) unpaint("hl-spoken");
       else {
         // A new range each time: WebKit repaints only the new extent when one is moved in place,
         // so text behind a rewind stayed lit until something else repainted it.
         spoken.current = skeletonRange(index, words.pos[0]!, words.end[i]!);
-        CSS.highlights.set("hl-spoken", new Highlight(spoken.current));
+        paint("hl-spoken", [spoken.current]);
       }
     }
     // A folded transcript keeps its place; the card's box scrolls, not the page.
@@ -944,7 +945,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     speaker.current = new Speaker(list, rate, {
       sentence: (i) => {
         sentence.current = list[i]!;
-        CSS.highlights.set("hl-listen", new Highlight(list[i]!));
+        paint("hl-listen", [list[i]!]);
         showSentence();
       },
       end: stopListening,
@@ -963,7 +964,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     speaker.current?.pause();
     speaker.current = null;
     sentence.current = null;
-    CSS.highlights.delete("hl-listen");
+    unpaint("hl-listen");
     setListen(null);
     setAway(null);
   }
@@ -1120,13 +1121,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     setPainted((cur) => (cur.length === next.length && cur.every((x, i) => x.a === next[i]!.a && x.r === next[i]!.r) ? cur : next));
     // Hidden behind the quiz, highlight colors would show where the answers are (D52).
     for (const i of INTENTS) {
-      const h = new Highlight(...(hidden ? [] : by[i]));
-      h.priority = 1; // above hl-spoken, so a highlight in a playing transcript keeps its own text colour
-      CSS.highlights.set(`hl-${i}`, h);
+      // Above hl-spoken, so a highlight in a playing transcript keeps its own text colour.
+      paint(`hl-${i}`, hidden ? [] : by[i], 1);
     }
     const active = popup && map.get(popup.id);
-    if (active) CSS.highlights.set("hl-active", new Highlight(active));
-    else CSS.highlights.delete("hl-active");
+    paint("hl-active", active ? [active] : []);
     // `q:start:end` is a quote a card points to (D99), not a highlight.
     const q = p.jumpTo?.match(/^q:(\d+):(\d+)$/);
     const jump = jumped.current ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }) : p.jumpTo && map.get(p.jumpTo);
@@ -1134,10 +1133,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (jump && el) {
       jumped.current = true;
       toThird(jump);
-      CSS.highlights.set("hl-active", new Highlight(jump));
+      paint("hl-active", [jump]);
     }
   }, [ready, anns, body, popup?.id, hidden, repaint]);
-  useEffect(() => () => CSS.highlights.clear(), []);
+  useEffect(() => () => unpaintAll(), []);
   // A ⌘K match in a highlight or its note: land on it with its popup open, once its range is painted.
   const landed = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -1176,16 +1175,16 @@ function ReaderView(p: Props & { reload: () => void }) {
   useEffect(() => {
     const index = idx.current;
     const el = scrollRef.current;
-    CSS.highlights.delete("hl-evidence");
-    CSS.highlights.delete("hl-evidence-on");
+    unpaint("hl-evidence");
+    unpaint("hl-evidence-on");
     setEvidence([]);
     if (!reveal || !ready || !index || !el || body === undefined || !src) return;
     const rs = reveal.quotes.map((q) => rangeFor(index, src, body, q));
     setEvidence(rs);
     const cur = rs[reveal.at];
-    CSS.highlights.set("hl-evidence", new Highlight(...rs.filter((r, i): r is Range => !!r && i !== reveal.at)));
+    paint("hl-evidence", rs.filter((r, i): r is Range => !!r && i !== reveal.at));
     if (cur) {
-      CSS.highlights.set("hl-evidence-on", new Highlight(cur));
+      paint("hl-evidence-on", [cur]);
       toThird(cur, "smooth");
     }
   }, [reveal, ready, body]);
@@ -1492,8 +1491,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     const r = rangeFor(index, src, body, { exact: m.quote, prefix: "", suffix: "", start: m.start ?? 0 });
     if (!r) return p.notify("Couldn’t find that passage in the text any more.", "error");
     toThird(r, "smooth");
-    CSS.highlights.set("hl-evidence-on", new Highlight(r));
-    window.setTimeout(() => CSS.highlights.delete("hl-evidence-on"), 2400);
+    paint("hl-evidence-on", [r]);
+    window.setTimeout(() => unpaint("hl-evidence-on"), 2400);
   }
 
   /** From the Collected tab (D64): scroll the passage a third of the way down the text in view (below a
@@ -1978,13 +1977,13 @@ function ReaderView(p: Props & { reload: () => void }) {
     // Where it sits in the body: the AI reads its paragraph, and the rest of the source is searched for it.
     const q = src && doc && idx.current ? sourceQuote(src, doc.body, idx.current, range) : null;
     const again = q && doc ? againIn(doc.body, q.start + q.exact.length, word) : { sections: [], later: false };
-    CSS.highlights.set("hl-lookup", new Highlight(range));
+    paint("hl-lookup", [range]);
     setLookup({ word, range, ann, ...at, start: q?.start, again });
     void define(word).then((text) => setLookup((cur) => (cur?.range === range ? { ...cur, text } : cur)));
   }
 
   function closeLookUp() {
-    CSS.highlights.delete("hl-lookup");
+    unpaint("hl-lookup");
     setLookup(null);
     scrollRef.current?.focus({ preventScroll: true });
   }
