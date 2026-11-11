@@ -1293,8 +1293,8 @@ function nothingDue(t: Today | null, pick: string[] | null): string {
   return t?.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Nothing is due right now.";
 }
 
-/** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). */
-/** `suggested`: the rating ↵ gives, named in the bar as its button is (Again, Hard, Good or Easy); none, no ↵. */
+/** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). `suggested`: the rating ↵ gives,
+ *  named in the bar as its button is (Again, Hard, Good or Easy); none, no ↵. */
 function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);
