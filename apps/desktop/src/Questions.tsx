@@ -5,7 +5,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
-import { errorText, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { errorText, focusQuietly, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { passageText } from "./text";
 
 // D75: answering a question where the answer turns up. One answer model on the skill page and in the
@@ -202,10 +202,15 @@ function Piece({ text, from, onSave, onEditing }: {
     onEditing(draft === null ? null : { to: draft, from: text, close: () => setDraft(null) });
     return () => onEditing(null);
   }, [draft, text]);
+  // Closed by Enter or Esc, focus goes back to the piece; emptied (it goes), to the answer field it belongs to.
+  const piece = useRef<HTMLButtonElement>(null);
+  const answer = useRef<HTMLElement | null>(null);
+  useFocusBack(draft !== null, piece, answer);
+  const box = (li: HTMLLIElement | null) => void (li && (answer.current = li.closest(".qa-box")?.querySelector<HTMLElement>(".field:not(.qa-piece-edit)") ?? null));
   if (draft === null)
     return (
-      <li>
-        <button className="qa-piece" aria-label={`Edit: ${text}`} onClick={() => setDraft(text)}>
+      <li ref={box}>
+        <button ref={piece} className="qa-piece" aria-label={`Edit: ${text}`} onClick={() => setDraft(text)}>
           {text}
         </button>
         {from && <span className="qa-from"> · {from}</span>}
@@ -214,11 +219,13 @@ function Piece({ text, from, onSave, onEditing }: {
   const done = () => {
     const to = draft.trim();
     const typed = draft;
+    // Emptied, the piece goes: focus goes on to the answer field now, not to a piece about to leave.
+    if (!to && answer.current) focusQuietly(answer.current);
     setDraft(null);
     if (to !== text) void onSave(to).then((ok) => ok || setDraft(typed));
   };
   return (
-    <li>
+    <li ref={box}>
       <Grow
         autoFocus
         className="field qa-piece-edit"
@@ -320,6 +327,27 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Asked (Enter) or dropped (Esc), focus goes back to the + that opened it; opened with nothing focused (a
+  // click in WebKit, a key), to the panel's own Ask a question. A click away leaves it where it landed.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
+  const field = useRef<HTMLInputElement>(null);
+  // Enter or Esc marks it; the give-back runs as the field goes (this unmounts), one tick later, and only if
+  // focus is still on nothing then: a press or a focus elsewhere meanwhile wins. Nothing polls.
+  const giving = useRef(false);
+  const giveBack = () => void (giving.current = true);
+  useEffect(() => {
+    const f = field.current;
+    const panel = f?.closest<HTMLElement>(".collected") ?? f?.closest<HTMLElement>(".skill-page") ?? f?.closest<HTMLElement>("section");
+    return () => {
+      if (!giving.current) return;
+      const plus = panel?.querySelector<HTMLElement>("button[aria-label='Ask a question'], button[aria-label='Add a question']");
+      setTimeout(() => {
+        if (document.activeElement && document.activeElement !== document.body) return;
+        const to = opener && opener !== document.body && usable(opener) ? opener : plus;
+        if (usable(to)) focusQuietly(to);
+      });
+    };
+  }, [opener]);
   const add = async () => {
     if (!text.trim() || busy) return;
     setBusy(true);
@@ -331,6 +359,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
           await ore("annotate", r.annotation.id, "--status", "deleted").catch(() => {});
           throw e;
         });
+      giveBack();
       onDone(true);
       // Asking goes on the history: ⌘Z takes the question back, ⇧⌘Z asks it again.
       const set = (status: string) => ore("annotate", r.annotation.id, "--status", status).then(() => onDone(true));
@@ -343,6 +372,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
   return (
     <div className="ask">
       <input
+        ref={field}
         autoFocus
         className="field"
         aria-label="New question"
@@ -362,6 +392,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
             void add();
           } else if (e.key === "Escape") {
             e.preventDefault();
+            giveBack();
             onDone(false);
           }
         }}

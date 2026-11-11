@@ -18,7 +18,7 @@ import { depthText, levelProgress, ore, opt, type Question, type Research, type 
 import { AnswerBox, AskQuestion, announce, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
-import { errorText, load, save, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { errorText, focusQuietly, load, save, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { Trap } from "./Trap";
 import { passageText } from "./text";
 
@@ -141,7 +141,15 @@ export function SkillPage({ skill, view, targets, blocked, onOpen, onQuestion, o
           query={find.query}
           onQuery={(query) => setFind((f) => ({ ...f, query }))}
           focus={find.focus}
-          onClose={() => setFind((f) => ({ ...f, open: false }))}
+          // Closed, focus goes back to what it searched: the skill note (from a ⌘K match in it), else the page's
+          // sources list, its keyboard home, as the reader's goes to its text; else the skill's name. The place stays.
+          onClose={() => {
+            const note = find.note;
+            setFind((f) => ({ ...f, open: false }));
+            const page = pageRef.current;
+            const to = [note ? noteCol.current?.querySelector<HTMLElement>(".skill-note [contenteditable='true']") : null, page?.querySelector<HTMLElement>(".list"), page?.querySelector<HTMLElement>("h1.skill-name button")].find(usable);
+            if (to) focusQuietly(to);
+          }}
         />
       )}
       <header className="skill-hero">
@@ -785,7 +793,10 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
   const [v, setV] = useState(() => drafts.get(id)?.text ?? initial);
   const [next, setNext] = useState(() => drafts.get(id)?.next ?? "");
   const field = useRef<HTMLTextAreaElement>(null);
-  useFocusWhileMounted(field);
+  // Saved or closed, focus goes back to what opened it, else (a menu item, gone) to its try's own row.
+  const row = useRef<HTMLElement | null>(null);
+  useEffect(() => void (row.current = field.current?.closest<HTMLElement>(".try") ?? null), []);
+  useFocusWhileMounted(field, () => (row.current?.isConnected ? row.current.querySelector<HTMLElement>(".try-check, .try-quote") : null));
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     e.stopPropagation();
     if (e.key === "Enter" && !e.shiftKey) {

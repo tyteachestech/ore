@@ -1,4 +1,4 @@
-import { typedLast } from "./util";
+import { focusQuietly } from "./util";
 
 /** Where focus goes when what held it goes away (Finder): an action picked from a row's menu (Rename…, Edit…,
  *  Archive, Delete) leaves focus on that row, or, once the row is gone, on the next one in its list (else the
@@ -26,11 +26,7 @@ export function rowControl(row: Element): HTMLElement | null {
   return [...row.querySelectorAll<HTMLElement>(CONTROL)].find((el) => !el.matches(HOVER_ONLY) && shown(el)) ?? null;
 }
 
-/** Focuses `el` without the keyboard ring unless the keyboard did what led here ("nothing highlighted until the
- *  keyboard moves"): a row focused after a mouse pick shows nothing. */
-export function focusQuietly(el: HTMLElement): void {
-  el.focus({ preventScroll: true, focusVisible: typedLast() } as FocusOptions);
-}
+export { focusQuietly };
 
 /** Where focus goes for a row: its control, else the list around it that takes focus (a Feed post, which is
  *  only a line of the Feed's list). */

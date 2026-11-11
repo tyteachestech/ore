@@ -16,7 +16,7 @@ import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthS
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
@@ -73,7 +73,7 @@ const drafts = new Map<string, { text: string; conf?: number }>();
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave }: {
+export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Hidden while he reads the source a card opened; it waits on that card, its keys off. */
@@ -89,6 +89,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   onLogged?: () => void;
   notify: Notify;
   quick?: boolean;
+  /** Where focus goes as it closes when what started it is gone (the What to review sheet): the screen's own place. */
+  giveBack?: () => HTMLElement | null | undefined;
 }) {
   const [queue, setQueue] = useState<DueEntry[] | null>(null);
   const [done, setDone] = useState(0);
@@ -151,6 +153,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   const field = useRef<HTMLTextAreaElement>(null);
   const sureRef = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  // Closed (Esc, Done, Later on the last one), focus goes back to what started it, else to `giveBack`.
+  useFocusWhileMounted(root, giveBack, !PHONE); // the phone's screens move focus their own way
   const reviewed = useRef(0);
   /** This window's session, named by id in every call: the main window and the quick quiz can each have
    *  one open (D76), and the last one started is not always this one. `open`: not ended yet. */
@@ -950,7 +954,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it. Let go while a
     // layer sits over it (⌘K, ⌘/) or it is paused on a source, so that layer owns focus and Esc.
     <Trap off={paused || under}>
-    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused}>
+    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="">
       <div className="review-head" data-tauri-drag-region>
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).

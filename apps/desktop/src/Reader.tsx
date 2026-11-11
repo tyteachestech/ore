@@ -517,6 +517,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   const hidden = (closedBook && !reveal) || hideSource;
   const scrollRef = useRef<HTMLDivElement>(null);
   useFocusBack(authoring, authorRef, scrollRef);
+  // The title isn't a control of its own (one click renames it): its field closed by Enter or Esc, focus goes to the text.
+  useFocusBack(renaming, scrollRef);
   const readerRef = useRef<HTMLDivElement>(null);
   /** ⌘F: open with the bump that refocuses it; the query stays for the next ⌘F, as in Safari. `note`:
    *  opened by ⌘K on a match in the source note, so it searches only there. */
