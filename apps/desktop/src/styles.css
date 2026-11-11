@@ -888,12 +888,9 @@ body.resizing iframe { pointer-events: none; }
 .controls { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 46px; }
 .transport { display: flex; align-items: center; gap: 10px; }
 .controls-end { justify-self: end; display: flex; align-items: center; }
-.ctl.play { width: 38px; height: 38px; border-radius: 50%; background: var(--text); color: var(--bg); }
-.ctl.play:hover:not(:disabled) { background: #fff; color: var(--bg); transform: scale(1.04); }
-.ctl.play:disabled { background: var(--bg-active); color: var(--faint); }
-.ctl.skip { width: 34px; height: 34px; border-radius: 50%; }
-.skip-icon { position: relative; display: grid; place-items: center; }
-.skip-icon > span { position: absolute; font: 400 11px var(--mono); line-height: 1; }
+/* Plain transport (D209): −15 ▶ +30, no circled arrows and no disc, like the time and speed beside them. */
+.ctl.play { width: 34px; height: 34px; color: var(--text); }
+.ctl.skip { padding: 0 8px; font: 400 13px var(--mono); font-variant-numeric: tabular-nums; }
 .ctl { flex: none; height: 32px; min-width: 32px; border-radius: 6px; display: grid; place-items: center; color: var(--text-read); }
 .ctl:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .ctl:disabled { color: var(--faint); }

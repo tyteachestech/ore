@@ -1,4 +1,4 @@
-import { ArrowClockwise, ArrowCounterClockwise, Pause, Play } from "./icons";
+import { Pause, Play } from "./icons";
 import { resizeDrag } from "./drag";
 import * as Popover from "@radix-ui/react-popover";
 import * as Slider from "@radix-ui/react-slider";
@@ -393,7 +393,7 @@ function useVideoWidth(box: RefObject<HTMLDivElement | null>) {
 }
 
 /** The pinned video and its control row (D48). Copies Eleven Reader's player: a full-width scrubber,
- *  then back 15, a round play button and forward 30 in the middle, time on the left and speed on
+ *  then −15, play and +30 as plain text and a dot triangle in the middle (D209), time on the left and speed on
  *  the right. YouTube's own controls are off. Every control shows its shortcut on hover (Hint). */
 export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ticks = [] }: { player: Player; title: string; onFinish: () => void; onOpen: () => void; audio?: boolean; ticks?: number[] }) {
   const [scrub, setScrub] = useState<number | null>(null);
@@ -466,7 +466,7 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ti
         <div className="transport">
           <Hint text="Back 15 seconds" keys={["back", "back-alt"]} side="top">
             <button className="ctl skip" aria-label="Back 15 seconds" onClick={() => player.skip(-15)} disabled={off}>
-              <SkipIcon by={15} back />
+              <span aria-hidden="true">−15</span>
             </button>
           </Hint>
           <Hint text={player.playing ? "Pause" : "Play"} keys={["play", "play-alt"]} side="top">
@@ -476,7 +476,7 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ti
           </Hint>
           <Hint text="Forward 30 seconds" keys={["forward", "forward-alt"]} side="top">
             <button className="ctl skip" aria-label="Forward 30 seconds" onClick={() => player.skip(30)} disabled={off}>
-              <SkipIcon by={30} />
+              <span aria-hidden="true">+30</span>
             </button>
           </Hint>
         </div>
@@ -493,18 +493,6 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ti
         </div>
       </div>
     </div>
-  );
-}
-
-/** A circular arrow with the seconds inside, like Eleven Reader's and Apple Podcasts' skip buttons: the pixel
- *  arrow (icons.tsx) at 32px, the seconds in the pixel mono over its middle. */
-function SkipIcon({ by, back = false }: { by: number; back?: boolean }) {
-  const Arrow = back ? ArrowCounterClockwise : ArrowClockwise;
-  return (
-    <span className="skip-icon" aria-hidden="true">
-      <Arrow size={32} />
-      <span>{by}</span>
-    </span>
   );
 }
 
