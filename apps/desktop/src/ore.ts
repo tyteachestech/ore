@@ -237,6 +237,8 @@ export type Today = {
   due: number;
   new_today: number;
   new_waiting: number;
+  /** Of `due`, the exercises filed under no skill: What to review's "No skill" row (D204). */
+  no_skill_due: number;
   estimate_ms: number;
   /** Today's slice: the most urgent cards that fit what is left of the goal (D65). */
   slice_ms: number;

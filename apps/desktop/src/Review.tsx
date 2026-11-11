@@ -16,7 +16,7 @@ import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthS
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
@@ -65,8 +65,18 @@ type End = { session: SessionEnd; today: Today; before: Today | null; next: Try 
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
 
 /** Answers typed but not checked, and how sure he said he was, by card: putting the quick quiz away
- *  (D76), Esc or Open in source keep them for when the card comes up again. */
-const drafts = new Map<string, { text: string; conf?: number }>();
+ *  (D76), Esc or Open in source keep them for when the card comes up again; on the phone, a relaunch too. */
+const drafts = kept<{ text: string; conf?: number; asked: string; at: number }>(PHONE ? "ore.review-drafts" : null);
+/** What a draft was typed for: the question, or the remixed version shown (D66). One for another is dropped. */
+const askedOf = (c: CardFull) => `${c.variant ?? ""}\n${c.question}`;
+/** A draft lasts a day: today's session is the slice it was typed in (D65), and tomorrow the exercise is asked anew. */
+const DRAFT_MS = 24 * 3600_000;
+const draftFor = (c: CardFull) => {
+  const d = drafts.get(c.id);
+  if (d && (d.asked !== askedOf(c) || Date.now() - d.at > DRAFT_MS)) return void drafts.delete(c.id);
+  return d;
+};
+const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c), at: Date.now() });
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
@@ -332,9 +342,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       (c) => {
         if (!live) return;
         setCard(c);
-        const kept = c.kind === "prompt" ? drafts.get(c.id) : undefined;
-        setAnswer(kept?.text ?? "");
-        setConf(kept?.conf);
+        const draft = c.kind === "prompt" ? draftFor(c) : undefined;
+        setAnswer(draft?.text ?? "");
+        setConf(draft?.conf);
         shownAt.current = Date.now();
       },
       (e) => live && setError(errorText(e)),
@@ -391,8 +401,10 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   useEffect(() => {
     // The quick quiz with nothing due says so and waits for Esc instead of closing under his hand.
-    if (queue && !queue.length && !end && !(quick && !reviewed.current)) void finish();
-  }, [queue, end, finish, quick]);
+    // Again once the last rating has saved: the queue can empty while it still is (the phone's `ore` runs in the
+    // page, so the rating saves inside the tap's own event and the queue renders before it is done).
+    if (queue && !queue.length && !end && !busy && !(quick && !reviewed.current)) void finish();
+  }, [queue, end, finish, quick, busy]);
 
   /** ⌘Z presses while a rating saved or the session wrapped up: they go to the history once that is
    *  done, so they take back the newest steps (that rating first), never an older card's meanwhile. */
@@ -730,6 +742,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       await ore("card", "retire", card.id);
       const { id, state } = card;
       retired.current.add(id);
+      drafts.delete(id); // what he typed goes with it
       notify(
         entry?.state === "draft" ? "Exercise deleted" : "Exercise retired",
         "info",
@@ -833,7 +846,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
 
   const pickSure = (n: number) => {
     setConf(n);
-    if (card?.kind === "prompt") drafts.set(card.id, { text: answer, conf: n });
+    if (card?.kind === "prompt") keepDraft(card, answer, n);
     if (card?.kind === "card") {
       setPhase("checked");
       shownAnswerAt.current = Date.now();
@@ -1060,13 +1073,13 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
                   value={answer}
                   onChange={(e) => {
                     setAnswer(e.target.value);
-                    drafts.set(card.id, { text: e.target.value, conf });
+                    keepDraft(card, e.target.value, conf);
                   }}
                 />
                 <div className={`quiz-label${askSure ? " ask" : ""}`} id="review-sure">
                   How sure are you?
                 </div>
-                <Sure refEl={sureRef} conf={conf} onPick={(n) => (conf === n ? (setConf(undefined), drafts.set(card.id, { text: answer })) : pickSure(n))} />
+                <Sure refEl={sureRef} conf={conf} onPick={(n) => (conf === n ? (setConf(undefined), keepDraft(card, answer)) : pickSure(n))} />
                 <div className="review-foot">
                   {card.in_head_ok && (
                     <Hint text="Answered in my head" keys="in-head" side="top">
@@ -1280,7 +1293,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested !== undefined} variant={!!card.variant} inHead={!!card.in_head_ok} />}
+      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} />}
     </div>
     </Trap>
   );
@@ -1293,8 +1306,9 @@ function nothingDue(t: Today | null, pick: string[] | null): string {
   return t?.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Nothing is due right now.";
 }
 
-/** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). */
-function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; kind: CardFull["kind"]; suggested: boolean; variant: boolean; inHead: boolean }) {
+/** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). `suggested`: the rating ↵ gives,
+ *  named in the bar as its button is (Again, Hard, Good or Easy); none, no ↵. */
+function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);
   const rows: [string, string][] =
@@ -1305,7 +1319,7 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
             [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
           : [["1 2 3", "How sure, then show"], [k("later"), "Later"], ["Esc", "Leave"]]
-        : [["1–4", "Rate"], ...(suggested ? [["↵", kind === "card" ? "Good" : "Suggested"] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], ["Esc", "Leave"]];
+        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">
       {rows.map(([key, what]) => (
