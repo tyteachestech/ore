@@ -1917,7 +1917,7 @@ journey("highlight: a triple click keeps the paragraph as one step, so one ⌘Z 
   if (left.some((t) => t.includes("Rereading"))) throw new Error(`one ⌘Z left ${JSON.stringify(left)}`);
 });
 
-journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to the jump again, before leaving the source", async (page) => {
+journey("reader: the outline opens after a short rest, and ⌘[ after an outline jump goes back to where he was, ⌘] to the jump again, before leaving the source", async (page) => {
   const part = (n: number) => `## Part ${n}\n\n` + `Part ${n} says one thing at length, so the source runs long enough to scroll. `.repeat(12);
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill(`# A long read in parts\n\n${Array.from({ length: 10 }, (_, i) => part(i + 1)).join("\n\n")}`);
@@ -1926,7 +1926,10 @@ journey("reader: ⌘[ after an outline jump goes back to where he was, ⌘] to t
   await page.waitForTimeout(500);
   const top = () => page.evaluate(() => Math.round(document.querySelector(".reader-scroll")?.scrollTop ?? -1000));
   const from = await top();
+  const shown = () => page.locator(".outline-panel").evaluate((el) => getComputedStyle(el).opacity === "1");
   await page.locator("nav.outline").hover();
+  if (await shown()) throw new Error("a passing pointer opened the outline at once; it waits a moment first");
+  await until("resting on the outline opens it", shown);
   await page.locator(".outline-panel button").filter({ hasText: "Part 9" }).click();
   await until("the outline jumps", async () => (await top()) > from + 400);
   const jumped = await top();
