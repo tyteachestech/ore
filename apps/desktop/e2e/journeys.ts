@@ -4817,10 +4817,14 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
 
 journey("diagram: a drawn box is selected under Select, Enter right after waits for its label, the right-click menu cuts, copies and pastes, and a line near level lands level", async (page) => {
   await openSource(page, TESTING);
+  if (await page.locator(".diagram").count()) await page.locator(".diagram-done").click(); // an earlier journey's drawing
+  await until("no drawing is open", async () => (await page.locator(".diagram").count()) === 0);
   const note = page.locator(".note-editor [contenteditable=true]").first();
   await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
-  await page.keyboard.press("Meta+ArrowDown");
+  // At the top of the note, on a line of its own: the end may already be a diagram another journey drew.
+  await page.keyboard.press("Meta+ArrowUp");
   await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowUp");
   await page.keyboard.type("/diagram");
   await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
   await page.keyboard.press("Enter");

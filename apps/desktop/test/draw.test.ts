@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
+import { STROKES,
   addChild, addMap, addMatrix, align, bounds, centre, DEFAULT_STYLE, distribute, duplicate, edgePoint, fitLink, flowDir, fromScene, growMatrix, labelOf,
   layoutMatrix, minLabelWidth, nearestIn, nextCell, parseMap, remove, reorder, resize, rotate, route, byId, setLabel, shape, snapBox, toScene, topAt, move, type El, type Scene,
 } from "../src/draw/model";
@@ -49,6 +49,10 @@ describe("diagram files (Excalidraw's format)", () => {
     expect(dark("#1e1e1e")).toBe("#f2f1ec");
     expect(dark("transparent")).toBe("transparent");
     expect(dark("#a5d8ff")).toMatch(/^#[0-9a-f]{6}$/);
+    // The presets are the note's text colours, read from styles.css so the two never drift apart.
+    const css = readFileSync(join(import.meta.dir, "../src/styles.css"), "utf8");
+    const c = (n: string) => css.match(new RegExp(`--c-${n}:\\s*(#[0-9a-f]{6})`))![1];
+    expect([STROKES[1], STROKES[2], STROKES[3], STROKES[4]].map((x) => dark(x!))).toEqual([c("red"), c("green"), c("blue"), c("orange")]);
   });
 });
 
