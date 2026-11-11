@@ -41,11 +41,11 @@ const SURE = ["Guess", "Think so", "Sure"] as const;
 // Typed text survives closing the panel (Esc) and reopening it while the reader stays open (D52).
 type Draft = { step: number; recall: string; answers: string[]; conf: (number | undefined)[]; use: string; leave: string; qs: Prequestion[] };
 const drafts = new Map<string, Draft>();
-/** On the phone it survives a relaunch too, once he has typed something: kept without the questions (they are read
- *  from the source again) but with what they were and when it was written, so a draft for questions the Mac has
+/** It survives quitting the app too (for a day, `kept`), once he has typed something: kept without the questions
+ *  (they are read from the source again) but with what they were and when it was written, so a draft for questions
  *  since rewritten, or older than a recall recorded since, goes instead of answering something else. */
 type KeptDraft = Omit<Draft, "qs"> & { asked: string; at: number };
-const keptDrafts = kept<KeptDraft>(PHONE ? "ore.finish-drafts" : null);
+const keptDrafts = kept<KeptDraft>("ore.finish-drafts");
 const askedIn = (qs: Prequestion[]) => JSON.stringify(qs.map((q) => q.q));
 function keptDraft(doc: Doc): Draft | undefined {
   const k = keptDrafts.get(doc.id);

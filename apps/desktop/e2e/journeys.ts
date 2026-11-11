@@ -4882,6 +4882,31 @@ journey("review: Esc keeps a half-typed answer and how sure he was, for when the
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: a half-typed answer survives quitting the app, for a day", async (page) => {
+  // On the Mac it lived in memory only: quitting Ore lost it (daily-session.md: nothing is lost when a session is cut short).
+  await page.clock.install();
+  await page.reload();
+  await page.locator(".side-item").first().waitFor();
+  const field = page.getByRole("textbox", { name: "Your answer" });
+  await startReview(page, /Teaching/);
+  await field.fill("an answer cut short");
+  await page.getByRole("radio", { name: "Think so" }).click();
+  await Bun.sleep(500); // kept a moment after the last change
+  await page.reload();
+  await startReview(page, /Teaching/);
+  await until("the answer is back after the relaunch", async () => (await field.inputValue()) === "an answer cut short");
+  await until("so is how sure he was", async () => (await page.getByRole("radio", { name: "Think so" }).getAttribute("aria-checked")) === "true");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  // A day on, it is asked anew.
+  await page.clock.fastForward("25:00:00");
+  await page.reload();
+  await startReview(page, /Teaching/);
+  await until("a day on the answer starts empty", async () => (await field.inputValue()) === "");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: Start review clicked before the skills have loaded still asks what to review", async (page) => {
   // Home's numbers can land before the skill list (CI, 2026-11-07): the click must not start every skill unasked.
   await page.addInitScript("window.__ORE_SLOW = { skills: 1500 }");
@@ -8738,6 +8763,25 @@ journey("phone: a kept draft goes when the Mac changes what it answered, and not
     await page.getByText("Explain why rereading misleads learners.").first().waitFor();
     if ((await field.inputValue()) !== "") throw new Error("the answer typed for the old question came back under the new one");
   });
+}, "phone");
+
+journey("phone: a Finish recall typed a day ago starts empty, as Review's answers do", async (page) => {
+  await page.clock.install();
+  await page.reload();
+  await page.locator(".phone-app").waitFor();
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  const recall = page.getByPlaceholder("In your own words…");
+  await tap(page, recall);
+  await page.keyboard.type("Typed yesterday");
+  await Bun.sleep(500);
+  await page.reload();
+  await until("the same day it comes back", async () => (await recall.inputValue().catch(() => "")) === "Typed yesterday");
+  await page.clock.fastForward("25:00:00");
+  await page.reload();
+  await recall.waitFor();
+  await until("a day on it is gone", async () => (await recall.inputValue()) === "");
 }, "phone");
 
 // —— run ——

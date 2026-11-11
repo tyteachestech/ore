@@ -42,34 +42,70 @@ export function save(key: string, value: string): void {
   }
 }
 
-/** Drafts by id, kept in localStorage under `key` as well (null: memory only). The phone's use it: iOS ends a web view
- *  left in the background, and what he typed must be there on the relaunch, as in Notes. Written a moment after the
- *  last change, and at once as the page is hidden or goes (iOS may end it any time after), never on each keystroke. */
+/** A draft lasts a day: today's session is the slice it was typed in (D65); tomorrow it is asked anew. */
+export const DRAFT_MS = 24 * 3600_000;
+
+/** What he typed and hasn't sent, by id, kept in localStorage under `key`: an app quit, or iOS ending a web view left
+ *  in the background, never loses it (daily-session.md: nothing is lost when a session is cut short; Notes). Each
+ *  lasts DRAFT_MS from its last change. Written a moment after the last change, and at once as the page is hidden or
+ *  goes; each write puts only its own changes over what is stored, so another window (the quick quiz) keeps its own. */
 export type Kept<V> = { get(id: string): V | undefined; set(id: string, v: V): void; delete(id: string): void };
-export function kept<V>(key: string | null): Kept<V> {
-  const m = new Map<string, V>();
-  if (!key) return { get: (id) => m.get(id), set: (id, v) => void m.set(id, v), delete: (id) => void m.delete(id) };
-  try {
-    for (const [k, v] of JSON.parse(load(key) ?? "[]") as [string, V][]) m.set(k, v);
-  } catch {}
-  let dirty = false;
+type Stamped<V> = { v: V; at: number };
+export function kept<V>(key: string): Kept<V> {
+  const read = (): Map<string, Stamped<V>> => {
+    try {
+      const rows = JSON.parse(load(key) ?? "[]") as [string, Stamped<V>][];
+      return new Map(rows.filter(([, e]) => e && typeof e.at === "number" && "v" in e));
+    } catch {
+      return new Map();
+    }
+  };
+  let m = read();
+  const mine = new Set<string>();
   let later = 0;
   const flush = () => {
     clearTimeout(later);
-    if (dirty) save(key, JSON.stringify([...m]));
-    dirty = false;
+    if (!mine.size) return;
+    const now = read();
+    for (const id of mine) {
+      const e = m.get(id);
+      if (e) now.set(id, e);
+      else now.delete(id);
+    }
+    mine.clear();
+    for (const [id, e] of now) if (Date.now() - e.at > DRAFT_MS) now.delete(id);
+    save(key, JSON.stringify([...now]));
+    m = now;
   };
-  const changed = () => {
-    dirty = true;
+  const changed = (id: string) => {
+    mine.add(id);
     clearTimeout(later);
     later = window.setTimeout(flush, 300);
   };
   addEventListener("pagehide", flush);
   document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flush());
+  // Another window wrote: take its drafts, keeping ours not yet written.
+  addEventListener("storage", (e: StorageEvent) => {
+    if (e.key !== key) return;
+    const now = read();
+    for (const id of mine) {
+      const own = m.get(id);
+      if (own) now.set(id, own);
+      else now.delete(id);
+    }
+    m = now;
+  });
   return {
-    get: (id) => m.get(id),
-    set: (id, v) => (m.set(id, v), changed()),
-    delete: (id) => void (m.delete(id) && changed()),
+    get: (id) => {
+      const e = m.get(id);
+      if (!e) return undefined;
+      if (Date.now() - e.at <= DRAFT_MS) return e.v;
+      m.delete(id);
+      changed(id);
+      return undefined;
+    },
+    set: (id, v) => (m.set(id, { v, at: Date.now() }), changed(id)),
+    delete: (id) => void (m.delete(id) && changed(id)),
   };
 }
 
