@@ -5,7 +5,7 @@ import { readItemDir } from "./items.ts";
 import type { Library } from "./library.ts";
 import { readReviews, type Review } from "./reviews.ts";
 import { readSessions } from "./sessions.ts";
-import { loadSkills, reviewSettings } from "./skills.ts";
+import { loadSkills, reviewSettings, unfiled } from "./skills.ts";
 import { localDay } from "./ids.ts";
 import { loadParams, nextState } from "./scheduler.ts";
 import { activeMs as active, dueQueue, medians } from "./study.ts";
@@ -126,6 +126,8 @@ export interface Today {
   met: boolean;
   caught_up: boolean;
   due: number;
+  /** Of `due`, the cards filed under no skill: What to review's "No skill" row (D80). */
+  no_skill_due: number;
   new_today: number;
   /** New cards held back by the daily limits (D65): "caught up" must not hide them. */
   new_waiting: number;
@@ -183,7 +185,8 @@ export function today(lib: Library, now = new Date()): Today {
     const med = medians(reviews, new Map(cards.map((c) => [c.id, c.kind])));
     const estimate = queue.reduce((t, e) => t + med[e.kind], 0);
     const w = loadParams(lib);
-    const skills = loadSkills(lib).skills.map((k) => {
+    const skillList = loadSkills(lib).skills;
+    const skills = skillList.map((k) => {
       const { explain: _, ...st } = strength(cards, reviews, k.id, w, now);
       return { skill: k.id, due: k.archived ? 0 : queue.filter((e) => e.skills.includes(k.id)).length, ...st };
     });
@@ -195,6 +198,7 @@ export function today(lib: Library, now = new Date()): Today {
       met,
       caught_up: caughtUp,
       due: queue.length,
+      no_skill_due: queue.filter((e) => unfiled(e.skills, skillList)).length,
       new_today: done.filter((r) => r.finishing).length,
       new_waiting: cards.filter((c) => c.state !== "retired" && !c.fsrs).length - queue.filter((e) => !e.due && !e.relearn).length,
       estimate_ms: estimate,
