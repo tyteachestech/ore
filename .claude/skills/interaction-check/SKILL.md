@@ -57,6 +57,7 @@ has to ask for something obvious, add a row here in the same PR.**
 |---|---|---|
 | Any list | ⇧-click and ⇧↑↓ extend a selection from its anchor, ⌘-click toggles, ⌘A selects all, Esc clears; ⋯ and right-click act on the whole selection with one Undo (not ⌘K, D178) | Linear, Finder |
 | Any list | Dragging a selection files every item in it | Finder, Things |
+| Any list | A drag from blank space (the list's padding, below the last row, the column beside it) draws the box and selects the rows it crosses, live; ⇧ adds, ⌘ toggles, Esc puts the selection back; a click there with no drag clears it. Never from a row, a control or a scrollbar (D194, `marquee.ts`; the note editor's D188) | Finder |
 | Any list | ⌘C on a selected row copies it as Markdown with its link | Notion, Linear |
 | Any list or row with actions | One control per row for a screen reader: the title (or the list's own focus) opens it, the row's ⋯ and chips sit beside it, never inside a `button` or `option`; a list whose rows hold controls is a `grid` of `row`s (ARIA's layout grid). A click anywhere on the row still opens it. axe's `nested-interactive` runs in the e2e a11y journey | Linear, WAI-ARIA APG |
 | Sidebar | One Tab stop: the item last focused (or the view shown) keeps it; ↑↓ Home End move between items, → reaches the row’s ⋯ and + (on a closed collection it opens it), ← comes back (on an open collection closes it, on a skill goes up to its collection), Tab goes on to the content | VS Code’s tree, Finder’s sidebar |
