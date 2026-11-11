@@ -2,7 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { Children, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -36,7 +36,7 @@ import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
-import { chunks, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
+import { chunks, pageChunks, pageOf, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
@@ -63,6 +63,8 @@ const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece o
 // The highlight note's placeholder (D94, D126); never prefilled. A plain highlight's note is open: any
 // thought he has while reading. A key point asks why it holds (self-explanation), a question asks for
 // a guess first (prediction): those two are tested later, so their prompts pay off.
+const Original = lazy(() => import("./OriginalPage"));
+
 const PLACEHOLDER: Record<Intent, string> = {
   keep: "Note…",
   card: "This works because…",
@@ -114,6 +116,8 @@ const components: Components = {
     );
     return <a href={href} draggable={false}>{children}</a>;
   },
+  table: ({ children }) => <DocTable>{children}</DocTable>,
+  th: ({ children, style }) => <ColumnHead style={style}>{children}</ColumnHead>,
 };
 
 // A transcript paragraph opens with "[mm:ss]" (D49): shown in a gutter left of the text, never
@@ -333,8 +337,146 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
   );
 }
 
-const Chunk = memo(function Chunk({ md, video, dir }: { md: string; video: boolean; dir: string }) {
-  const parts = useMemo(() => withImages(video ? stamped : components, dir), [video, dir]);
+/** What a table needs from the reader to make an exercise of a cell (D200). */
+const TableCtx = createContext<{ item: string; notify: Notify } | null>(null);
+/** A table's columns he has covered, for its headings' buttons. */
+const ColumnsCtx = createContext<{ covered: ReadonlySet<number>; toggle: (i: number) => void } | null>(null);
+const bodyCells = (table: HTMLTableElement, i: number) => [...table.tBodies].flatMap((b) => [...b.rows]).map((r) => r.cells[i]).filter((c): c is HTMLTableCellElement => !!c);
+const cellText = (c: Element | undefined) => (c?.textContent ?? "").replace(/\s+/g, " ").trim();
+/** A cover is a class on the cell: its text stays where the text index and his highlights have it. */
+function setCover(td: HTMLTableCellElement, on: boolean) {
+  td.classList.toggle("covered", on);
+  if (on) {
+    td.tabIndex = 0;
+    td.setAttribute("role", "button");
+    td.setAttribute("aria-label", "Covered. Show it");
+  } else for (const a of ["tabindex", "role", "aria-label"]) td.removeAttribute(a);
+}
+
+/** A table he can test himself on (D200): a heading's button covers its column, a click or Enter on a covered
+ *  cell shows that one, and right-click on a covered cell makes a Fact exercise of it. Covers last while the source is open. */
+function DocTable({ children }: { children?: ReactNode }) {
+  const ctx = useContext(TableCtx);
+  const table = useRef<HTMLTableElement>(null);
+  const at = useRef<HTMLTableCellElement | null>(null);
+  const [covered, setCovered] = useState<ReadonlySet<number>>(new Set());
+  const toggle = useCallback((i: number) => {
+    if (!table.current) return;
+    const cells = bodyCells(table.current, i);
+    const on = !cells.some((c) => c.classList.contains("covered"));
+    for (const c of cells) if (cellText(c)) setCover(c, on);
+    setCovered((s) => {
+      const next = new Set(s);
+      if (on) next.add(i);
+      else next.delete(i);
+      return next;
+    });
+  }, []);
+  const show = (td: HTMLTableCellElement) => {
+    setCover(td, false);
+    const i = td.cellIndex;
+    if (table.current && !bodyCells(table.current, i).some((c) => c.classList.contains("covered"))) setCovered((s) => new Set([...s].filter((n) => n !== i)));
+  };
+  const coveredAt = (e: { target: EventTarget }) => (e.target as Element).closest?.<HTMLTableCellElement>("td.covered") ?? null;
+  const exercise = async (td: HTMLTableCellElement) => {
+    if (!ctx || !table.current) return;
+    const row = cellText((td.parentElement as HTMLTableRowElement).cells[0]);
+    const column = cellText(table.current.tHead?.rows[0]?.cells[td.cellIndex]);
+    try {
+      const c = await ore<CardFull>("card", "cell", ctx.item, opt("row", row), opt("column", column), opt("answer", cellText(td)));
+      ctx.notify("Exercise made", "info", () => ore("card", "retire", c.id), () => ore("card", "restore", c.id, "--state=draft"));
+    } catch (e) {
+      ctx.notify(`Couldn’t make the exercise: ${errorText(e)}`, "error");
+    }
+  };
+  const actions = (): MenuAction[] => {
+    const cell = at.current;
+    if (!cell || !table.current?.contains(cell)) return [];
+    // Only a covered cell has this menu: anywhere else in the text right-click is the Mac's own (D83).
+    if (!cell.classList.contains("covered")) return [];
+    const i = cell.cellIndex;
+    return [
+      { id: "show", label: "Show", run: () => show(cell) },
+      { id: "column", label: "Show this column", run: () => toggle(i) },
+      ...(ctx && i > 0 ? [{ id: "exercise", label: "Make an exercise of this cell", divider: true, run: () => void exercise(cell) }] : []),
+    ];
+  };
+  const cols = useMemo(() => ({ covered, toggle }), [covered, toggle]);
+  return (
+    <ColumnsCtx.Provider value={cols}>
+      <WithMenu actions={actions}>
+        <table
+          ref={table}
+          onContextMenuCapture={(e) => (at.current = (e.target as Element).closest("td"))}
+          onClick={(e) => {
+            const td = coveredAt(e);
+            if (td) show(td);
+          }}
+          onKeyDown={(e) => {
+            const td = coveredAt(e);
+            if (!td || (e.key !== "Enter" && e.key !== " ")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            show(td);
+          }}
+        >
+          {children}
+        </table>
+      </WithMenu>
+    </ColumnsCtx.Provider>
+  );
+}
+function ColumnHead({ children, style }: { children?: ReactNode; style?: CSSProperties }) {
+  const cols = useContext(ColumnsCtx);
+  const th = useRef<HTMLTableCellElement>(null);
+  const [i, setI] = useState(-1);
+  useLayoutEffect(() => setI(th.current?.cellIndex ?? -1), []);
+  const on = !!cols?.covered.has(i);
+  return (
+    <th ref={th} style={style}>
+      {children}
+      {cols && (
+        <Hint text={on ? "Show this column" : "Cover this column to test yourself"}>
+          <button className="col-cover" data-noindex="" aria-label={on ? "Show this column" : "Cover this column"} aria-pressed={on} onClick={() => cols.toggle(i)}>
+            {on ? <Eye size={14} /> : <EyeSlash size={14} />}
+          </button>
+        </Hint>
+      )}
+    </th>
+  );
+}
+
+/** A notebook cell's output (D199): folded until he has guessed it, the same step as a prequestion (D18).
+ *  The text stays in the DOM, hidden, so the text index and his highlights don't move when it opens;
+ *  the row that opens it is outside the index. It folds again the next time the source is opened. */
+function Output({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      {!open && (
+        <Hint text="Guess it first, then show">
+          <button className="output-fold" data-noindex="" onClick={() => setOpen(true)}>
+            <CaretRight size={12} />
+            Output
+          </button>
+        </Hint>
+      )}
+      <pre className="output" hidden={!open}>{children}</pre>
+    </>
+  );
+}
+/** In a notebook's doc.md a cell's output is the `text` block after its code (core's notebook.ts). */
+const notebook: Components = {
+  ...components,
+  pre: ({ children }) => {
+    const code = Children.toArray(children)[0];
+    const out = isValidElement<{ className?: string }>(code) && /\blanguage-text\b/.test(code.props.className ?? "");
+    return out ? <Output>{children}</Output> : <pre>{children}</pre>;
+  },
+};
+
+const Chunk = memo(function Chunk({ md, video, dir, cells }: { md: string; video: boolean; dir: string; cells?: boolean }) {
+  const parts = useMemo(() => withImages(video ? stamped : cells ? notebook : components, dir), [video, dir, cells]);
   return (
     <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={parts} skipHtml>
       {footnotes(md)}
@@ -352,10 +494,10 @@ type VideoCard = { head: ReactNode; foot?: ReactNode; box: RefObject<HTMLDivElem
 
 /** The document body, rendered in slices so a 100k-word book stays responsive while it mounts. With a
  *  video card, the transcript before VIDEO_END goes in the card and the page's text follows it. */
-const Body = memo(function Body({ markdown, video, dir, onReady, card }: { markdown: string; video: boolean; dir: string; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
+const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; pages?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
   const split = card ? markdown.indexOf(VIDEO_END) : -1;
   const top = useMemo(() => (split > 0 ? chunks(markdown.slice(0, split)) : []), [markdown, split]);
-  const rest = useMemo(() => chunks(split > 0 ? markdown.slice(split) : markdown), [markdown, split]);
+  const rest = useMemo(() => (pages ? pageChunks : chunks)(split > 0 ? markdown.slice(split) : markdown), [markdown, split, pages]);
   const total = top.length + rest.length;
   const [shown, setShown] = useState(() => Math.min(total, 2));
   const ref = useRef<HTMLElement>(null);
@@ -373,15 +515,22 @@ const Body = memo(function Body({ markdown, video, dir, onReady, card }: { markd
           {card.head}
           <div className="vc-transcript" ref={card.box} hidden={!card.open || !card.transcript}>
             {top.slice(0, shown).map((md, i) => (
-              <Chunk key={i} md={md} video={video} dir={dir} />
+              <Chunk key={i} md={md} video={video} dir={dir} cells={cells} />
             ))}
           </div>
           {card.foot}
         </section>
       )}
-      {rest.slice(0, Math.max(0, shown - top.length)).map((md, i) => (
-        <Chunk key={`r${i}`} md={md} video={video} dir={dir} />
-      ))}
+      {rest.slice(0, Math.max(0, shown - top.length)).map((md, i) => {
+        // Where a PDF's page starts (D202), for the Original tab to follow. Page 1 needs no mark: it is what shows above the first.
+        const page = pages && i > 0 ? pageOf(md) : null;
+        return (
+          <Fragment key={`r${i}`}>
+            {page && <i hidden data-page={page} />}
+            <Chunk md={md} video={video} dir={dir} cells={cells} />
+          </Fragment>
+        );
+      })}
     </article>
   );
 });
@@ -911,6 +1060,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   };
 
+  const notifyNow = useRef(p.notify);
+  notifyNow.current = p.notify;
+  /** For the tables in the text (D200); a Feed post being read is not a source yet, so it makes no exercises. */
+  const tables = useMemo(() => (doc && !doc.preview ? { item: doc.id, notify: ((...a) => notifyNow.current(...a)) as Notify } : null), [doc?.id, doc?.preview]);
   const onReady = useCallback((el: HTMLElement) => {
     docEl.current = el;
     idx.current = indexText(el);
@@ -1055,9 +1208,39 @@ function ReaderView(p: Props & { reload: () => void }) {
   const recalled = useMemo(() => new Set((doc?.chapter_recalls ?? []).map((c) => c.n)), [doc?.chapter_recalls]);
 
   // Opening the source note puts the caret in it; closing writes what is pending.
-  const notesShown = p.notesOpen && !closedBook && p.sideTab === "note";
-  const questionsShown = p.notesOpen && !closedBook && p.sideTab === "questions";
-  const panelShown = notesShown || questionsShown;
+  /** A PDF's own file, for the Original tab (D202); any other source has only the two tabs. */
+  const pdf = !PHONE && doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
+  const sideTab: SideTab = p.sideTab === "original" && !pdf ? "note" : p.sideTab;
+  const notesShown = p.notesOpen && !closedBook && sideTab === "note";
+  const questionsShown = p.notesOpen && !closedBook && sideTab === "questions";
+  const originalShown = p.notesOpen && !closedBook && sideTab === "original";
+  const panelShown = notesShown || questionsShown || originalShown;
+  /** The page of the original being read: the last page mark (`Body`) that has passed the top third of the view. */
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!originalShown || !ready || !el) return;
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      const marks = docEl.current?.querySelectorAll<HTMLElement>("[data-page]") ?? [];
+      const line = el.getBoundingClientRect().top + el.clientHeight / 3;
+      let lo = 0, hi = marks.length; // the marks are in reading order: find the first one still below the line
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if ((marks[mid]!.nextElementSibling?.getBoundingClientRect().top ?? Infinity) <= line) lo = mid + 1;
+        else hi = mid;
+      }
+      setPage(lo ? Number(marks[lo - 1]!.dataset.page) : 1);
+    };
+    const onScroll = () => (frame ||= requestAnimationFrame(read));
+    read();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [originalShown, ready, shownBody]);
 
   /** The chapter block (D115): the sign opens the source note with the chapter's title and three
    *  prompts, the source hidden (D34.4) until he ends it with ⌘↵ (recorded, then feedback) or Esc
@@ -2510,6 +2693,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
         { id: "collected", label: questionsShown ? "Close collected" : "Collected", hint: label(keys.collected), run: () => p.onShowSide("questions") },
+        ...(pdf ? [{ id: "original-page", label: originalShown ? "Close original page" : "Original page beside the text", paletteOnly: true, run: () => p.onShowSide("original") }] : []),
         ...(readingFor ? [{ id: "reading-for", label: "Show prequestions", paletteOnly: true, run: () => setPreqAsk((n) => n + 1) }] : []),
         ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", run: () => {
           setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
@@ -2828,7 +3012,9 @@ function ReaderView(p: Props & { reload: () => void }) {
               <BackToCurrent dir="up" onClick={follow} />
             </div>
           )}
-          <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} onReady={onReady} card={cardMode ? videoCard : undefined} />
+          <TableCtx.Provider value={tables}>
+            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf} onReady={onReady} card={cardMode ? videoCard : undefined} />
+          </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
               {video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
@@ -3011,9 +3197,13 @@ function ReaderView(p: Props & { reload: () => void }) {
         </div>
       )}
       {/* On the phone the note stays beside the source, a swipe away, so each keeps its place. */}
-      {(notesShown || questionsShown || (PHONE && !closedBook)) && (
-        <SidePanel tab={p.sideTab} onTab={(t) => p.onShowSide(t, true)} bodyRef={sideBody} onBodyMouseDown={p.sideTab === "note" ? clickBelow(notesField) : undefined}>
-          {notesShown || (PHONE && !questionsShown) ? (
+      {(panelShown || (PHONE && !closedBook)) && (
+        <SidePanel tab={sideTab} onTab={(t) => p.onShowSide(t, true)} original={!!pdf} bodyRef={sideBody} onBodyMouseDown={sideTab === "note" ? clickBelow(notesField) : undefined}>
+          {originalShown && pdf ? (
+            <Suspense fallback={null}>
+              <Original file={pdf} page={page} />
+            </Suspense>
+          ) : notesShown || (PHONE && !questionsShown) ? (
             <SourceNoteBody
               id={p.id}
               notes={notes}

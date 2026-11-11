@@ -1914,6 +1914,179 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
 });
 
+journey("tables: a heading's button covers its column, a click or Enter shows a cell, right-click on a covered one makes an exercise of it and Undo takes it back (D200)", async (page) => {
+  const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Sampling settings\n\nHow the draw is made.\n\n| Setting | What it changes | Range |\n|---|---|---|\n| Temperature | How flat the odds are | 0 to 1.5 |\n| Top-p | How much of the tail stays | 0.8 to 1 |\n| Top-k | How many words stay | 20 to 100 |\n\nChange one at a time." }) })).json()) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Sampling settings");
+    const table = page.locator(".doc table");
+    const covered = table.locator("td.covered");
+    const head = table.locator("th").nth(2);
+    await head.hover();
+    await head.getByRole("button", { name: "Cover this column" }).click();
+    await until("the column's three cells are covered", async () => (await covered.count()) === 3);
+    if ((await table.locator("tbody tr").first().locator("td").nth(2).evaluate((td) => getComputedStyle(td).color)) !== "rgba(0, 0, 0, 0)") throw new Error("a covered cell still shows its text");
+    // A click shows one cell; Enter shows the one the keyboard is on.
+    await covered.first().click();
+    await until("a click shows that cell", async () => (await covered.count()) === 2);
+    await covered.first().focus();
+    await page.keyboard.press("Enter");
+    await until("Enter shows the focused cell", async () => (await covered.count()) === 1);
+    // The text under a cover is still there for a highlight after the table.
+    await select(page, "Change one at a time");
+    await page.locator(".popup").waitFor();
+    await page.keyboard.press("Escape");
+    // The heading's button shows what is left.
+    await head.getByRole("button", { name: "Show this column" }).click();
+    await until("the button shows the rest", async () => (await covered.count()) === 0);
+    // Right-click a covered cell: an exercise that asks the cell by its row and column.
+    await head.hover();
+    await head.getByRole("button", { name: "Cover this column" }).click();
+    await covered.nth(1).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Make an exercise of this cell" }).click();
+    await page.locator(".toast", { hasText: "Exercise made" }).waitFor();
+    const cards = async () => ((await ore("cards", `--item=${made.id}`)) as { question: string; answer: string; state: string }[]).filter((c) => c.state !== "retired");
+    await until("the exercise asks the cell", async () => (await cards()).some((c) => c.question === "Top-p · Range?" && c.answer === "0.8 to 1"));
+    await page.locator(".toast", { hasText: "Exercise made" }).getByRole("button", { name: "Undo" }).click();
+    await until("Undo retires it", async () => (await cards()).length === 0);
+    // The row's own name makes no exercise: it is the question's half.
+    await table.locator("th").first().hover();
+    await table.locator("th").first().getByRole("button", { name: "Cover this column" }).click();
+    await table.locator("tbody td.covered").first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Show", exact: true }).waitFor();
+    if (await page.getByRole("menuitem", { name: "Make an exercise of this cell" }).count()) throw new Error("the row's own name offers an exercise");
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
+journey("tutor versions: Try another reply keeps the first under ‹ 1 / 2 ›, Edit and ↑ put his last message back in a field, and the versions are saved with the chat (D201)", async (page) => {
+  await openSource(page, TESTING);
+  await page.keyboard.press("Meta+j");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const field = page.getByRole("textbox", { name: "Message the tutor" });
+  const asked = () => page.waitForRequest((r) => (r.postData() ?? "").includes('"tutor",'));
+  await field.fill("Why does this work?");
+  await page.keyboard.press("Enter");
+  await tutor.locator(".cite").first().waitFor();
+  const pager = tutor.locator(".ask-versions");
+  if (await pager.count()) throw new Error("one reply shows a pager");
+  // Another reply: the first is kept, the new one shows.
+  let sent = asked();
+  await tutor.getByRole("button", { name: "Try another reply" }).click();
+  if (!(await sent).postData()!.includes('"Why does this work?"')) throw new Error("Try another reply sent another message");
+  await pager.getByText("2 / 2").waitFor();
+  await pager.getByRole("button", { name: "Previous version" }).click();
+  await pager.getByText("1 / 2").waitFor();
+  if (!(await pager.getByRole("button", { name: "Previous version" }).isDisabled())) throw new Error("Previous is live on the first version");
+  // Edit: his message in a field, Esc leaves it, Enter sends the new words as a third version.
+  await tutor.locator(".ask-me").hover();
+  await tutor.getByRole("button", { name: "Edit your message" }).click();
+  const edit = page.getByRole("textbox", { name: "Edit your message" });
+  if ((await edit.inputValue()) !== "Why does this work?") throw new Error("the field doesn't hold his message");
+  await page.keyboard.press("Escape");
+  await tutor.locator(".ask-me", { hasText: "Why does this work?" }).waitFor();
+  if (!(await tutor.isVisible())) throw new Error("Esc in the edit field closed the tutor");
+  // ↑ in the empty field opens the same edit.
+  await field.focus();
+  await page.keyboard.press("ArrowUp");
+  await edit.fill("Why does this work, simply?");
+  sent = asked();
+  await page.keyboard.press("Enter");
+  if (!(await sent).postData()!.includes('"Why does this work, simply?"')) throw new Error("the edited message was not what was sent");
+  await pager.getByText("3 / 3").waitFor();
+  await tutor.locator(".ask-me", { hasText: "Why does this work, simply?" }).waitFor();
+  await pager.getByRole("button", { name: "Previous version" }).click();
+  await tutor.locator(".ask-me", { hasText: /^Why does this work\?$/ }).waitFor();
+  // Saved with the chat: a restart shows the same version with the others behind it.
+  const id = ((await ore("chat")) as { id: string }[])[0]!.id;
+  await until("the chat holds all three versions", async () => {
+    const c = (await ore("chat", id)) as { turns: { message: string; alt?: number; alts?: { message: string }[] }[] };
+    return c.turns.length === 1 && c.turns[0]!.alt === 1 && c.turns[0]!.alts?.length === 2 && c.turns[0]!.alts[1]!.message === "Why does this work, simply?";
+  });
+  await ore("chat", id, "--delete");
+});
+
+journey("notebook: a cell's output is folded until he opens it, a click or Enter shows it, and a highlight on the text around it still lands (D199)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "numpy.ipynb"), "--no-enrich")) as { id: string };
+  try {
+  await page.reload();
+  await openSource(page, "Introducing NumPy");
+  const fold = page.locator(".doc .output-fold");
+  const out = page.locator(".doc pre.output");
+  await fold.waitFor();
+  if (await out.isVisible()) throw new Error("the output shows before he has guessed it");
+  if (!(await page.locator(".doc pre").first().innerText()).includes("np.arange(3) * 2")) throw new Error("the cell's code is not shown");
+  // The hidden output is still the text the highlights are placed in: one after it lands where he dragged.
+  await select(page, "Shapes stretch to match");
+  await page.locator(".popup").waitFor();
+  await page.keyboard.press("Escape");
+  await fold.focus();
+  await page.keyboard.press("Enter");
+  await out.waitFor();
+  if (!(await out.innerText()).includes("array([0, 2, 4])")) throw new Error(`the output reads “${await out.innerText()}”`);
+  if (await fold.count()) throw new Error("the row stays after the output is shown");
+  // An article's plain text block is not an output.
+  await openSource(page, AGENTS);
+  if (await page.locator(".doc .output-fold").count()) throw new Error("an article got a folded output");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
+journey("original: a PDF's side panel has an Original tab that draws its page, follows the page being read, and ‹ › turn to another (D202)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "textbook.pdf"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+  await page.reload();
+  await openSource(page, "Chapter 1: Learning");
+  const show = page.getByRole("button", { name: "Show side panel" });
+  if (await show.count()) await show.click();
+  await page.getByRole("tab", { name: "Original" }).click();
+  const sheet = page.locator(".original canvas");
+  const pager = page.locator(".original-pager span");
+  const drawn = (n: number) => until(`page ${n} of the original is drawn`, async () => (await sheet.getAttribute("data-page")) === String(n) && (await pager.innerText()) === `${n} / 4`, 15000);
+  await drawn(1);
+  // Something is on the sheet: a drawn page is mostly white, an undrawn canvas is clear.
+  const inked = await sheet.evaluate((c: HTMLCanvasElement) => {
+    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    let white = 0, dark = 0;
+    for (let i = 0; i < d.length; i += 4) d[i]! > 240 && d[i + 3] === 255 ? white++ : d[i]! < 100 && d[i + 3] === 255 && dark++;
+    return white > dark && dark > 100;
+  });
+  if (!inked) throw new Error("the original's page is blank");
+  // Reading on to page 3's heading brings its page up beside it.
+  await page.locator(".doc h3", { hasText: "Spacing out sessions" }).evaluate((h) => h.scrollIntoView({ block: "start" }));
+  await drawn(3);
+  // The page marks hold no text: a highlight past them still lands where he dragged.
+  await select(page, "Practice spread over days");
+  await page.locator(".popup").waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".doc h3", { hasText: "Spacing out sessions" }).evaluate((h) => h.scrollIntoView({ block: "start" }));
+  await drawn(3);
+  // He turns ahead by hand; reading on to another page takes the panel back.
+  await page.getByRole("button", { name: "Next page" }).click();
+  await drawn(4);
+  if (!(await page.getByRole("button", { name: "Next page" }).isDisabled())) throw new Error("Next page is offered past the last page");
+  await page.getByRole("button", { name: "Previous page" }).click();
+  await page.getByRole("button", { name: "Previous page" }).click();
+  await drawn(2);
+  await page.locator(".doc h1, .doc h2").first().evaluate((h) => h.scrollIntoView({ block: "center" }));
+  await drawn(1);
+  // The tab is remembered, and a source that is no PDF has no such tab: its panel opens on the source note.
+  await openSource(page, AGENTS);
+  if (await page.getByRole("tab", { name: "Original" }).count()) throw new Error("an article got an Original tab");
+  await page.locator(".mynotes[aria-label='Source note']").waitFor();
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+  }
+});
+
 journey("a recording plays in place: its player over the transcript, his highlights as ticks, a stamp seeks it, Space plays and pauses (D167)", async (page) => {
   await openSource(page, "Lecture 4");
   const player = page.locator(".player.audio");
@@ -5371,7 +5544,7 @@ journey("review: the header keeps its form for the session: 30 steps stay dots w
   }
 });
 
-journey("review: What to review has a No skill row for exercises filed under no skill, and every row ticked is the whole session (D199)", async (page) => {
+journey("review: What to review has a No skill row for exercises filed under no skill, and every row ticked is the whole session (D203)", async (page) => {
   const items = (await ore("ls")) as { id: string; title: string; skills: string[] }[];
   const agents = items.find((i) => i.title === AGENTS)!;
   await ore("edit", agents.id, "--skills", "");

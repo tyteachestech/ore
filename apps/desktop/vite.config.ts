@@ -106,7 +106,8 @@ export default defineConfig({
   clearScreen: false,
   // Imported only by the lazy diagram chunk: found late, Vite would re-bundle and reload the page the
   // first time a diagram opens in dev (it lost the reader in the e2e diagram journey on a fresh checkout).
-  optimizeDeps: { include: ["react-dom/server", "react-colorful"] },
+  // Named here so the dev server bundles them at start: one found later (a lazy chunk's) reloads the page mid-use.
+  optimizeDeps: { include: ["react-dom/server", "react-colorful", "pdfjs-dist/legacy/build/pdf.mjs"] },
   // Its own cache of bundled dependencies, so the phone build and the Mac one can run side by side (the e2e phone journeys).
   cacheDir: PHONE ? "node_modules/.vite-phone" : undefined,
   server: { port: 1420, strictPort: true, host: PHONE ? true : undefined, watch: { ignored: ["**/src-tauri/**"] } },

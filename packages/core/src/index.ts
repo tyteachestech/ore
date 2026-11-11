@@ -19,6 +19,7 @@ export * from "./diagrams.ts";
 export * from "./skills.ts";
 export * from "./cards.ts";
 export * from "./figure.ts";
+export * from "./cell.ts";
 export * from "./courses.ts";
 export * from "./feeds.ts";
 export * from "./db.ts";

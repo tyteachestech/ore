@@ -28,7 +28,7 @@ export const rememberToday = (t: Today) => void (seen = t);
 export const lastToday = () => seen;
 
 /** Skills with cards due, Focus first, then most due first: the ones a session would help most. Last, "No skill"
- *  for the exercises filed under none, so every row ticked is the whole session and unticking it is his call (D80, D199). */
+ *  for the exercises filed under none, so every row ticked is the whole session and unticking it is his call (D80, D203). */
 export const dueSkills = (today: Today, skills: Skill[]) => [
   ...today.skills
     .filter((x) => x.due > 0)
