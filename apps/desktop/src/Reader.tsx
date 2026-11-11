@@ -41,7 +41,7 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, inOrder, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
+import { errorText, inOrder, kept, load, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
@@ -605,6 +605,10 @@ type Props = {
   notify: Notify;
 };
 
+/** A key point being typed ("Card here"), by source: its line, its anchor and the text at it (NEAR characters). */
+const keyDrafts = kept<{ text: string; at: number; near: string }>("ore.keypoint-drafts");
+const NEAR = 64;
+
 /** A reimport (or its undo) replaces the text under every highlight range and mark, so the reader
  *  starts over on the new text rather than patching what it drew. */
 export function Reader(p: Props) {
@@ -634,6 +638,24 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [adding, setAdding] = useState<string | null>(null);
   /** Where Card here was opened: the source offset his line is anchored at. */
   const hereAt = useRef<number | null>(null);
+  // The line he was typing comes back after a relaunch (for a day, `kept`), anchored where it was; not when the
+  // source's text there has changed since (a reimport, the Mac's edit through sync).
+  const addTried = useRef(false);
+  useEffect(() => {
+    if (!doc || addTried.current) return;
+    addTried.current = true;
+    const d = keyDrafts.get(p.id);
+    if (!d) return;
+    if (doc.body.slice(d.at, d.at + NEAR) !== d.near) return keyDrafts.delete(p.id);
+    hereAt.current = d.at;
+    setAdding((cur) => cur ?? d.text);
+  }, [doc, p.id]);
+  useEffect(() => {
+    const at = hereAt.current;
+    if (adding === null || !doc) return;
+    if (adding.trim() && at !== null) keyDrafts.set(p.id, { text: adding, at, near: doc.body.slice(at, at + NEAR) });
+    else keyDrafts.delete(p.id);
+  }, [adding, doc, p.id]);
   /** He asked for the key point field (+, Card here, a failed save): it takes focus once, not on every remount. */
   const focusAdd = useRef(false);
   const [addAsk, setAddAsk] = useState(0);
@@ -3258,7 +3280,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               anns={anns}
               timeOf={timeOf}
               adding={adding}
-              onAdding={(on) => (on ? cardHere() : setAdding(null))}
+              onAdding={(on) => (on ? cardHere() : (setAdding(null), keyDrafts.delete(p.id)))}
               onEdit={setAdding}
               addAsk={addAsk}
               takeAddFocus={() => {

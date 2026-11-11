@@ -8811,6 +8811,24 @@ journey("phone: a relaunch once Finish has marked the source Done never opens Fi
   if (await page.getByPlaceholder("In your own words…").count()) throw new Error("the relaunch opened Finish's Recall for a source already Done");
 }, "phone");
 
+journey("phone: a key point being typed survives a relaunch, and goes when the text under it changed", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Add a key point here" }));
+  const field = page.getByRole("textbox", { name: "Key point" });
+  await field.waitFor();
+  await page.keyboard.type("Retrieval beats rereading after a week");
+  await Bun.sleep(500);
+  await page.reload();
+  await until("the line comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
+  await macChanges((lib) => itemFile(lib, "the-testing-effect", "doc.md"), "# The Testing Effect: Why Retrieval Beats Rereading\n", "# The Testing Effect: Why Retrieval Beats Rereading\n\nA new opening paragraph the Mac added.\n", async () => {
+    await page.reload();
+    await page.locator(".phone-reader .doc").first().waitFor();
+    await Bun.sleep(800);
+    if ((await field.count()) && (await field.inputValue())) throw new Error("the line came back over text that changed under its anchor");
+  });
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
