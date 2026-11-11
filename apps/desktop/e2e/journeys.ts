@@ -3335,11 +3335,11 @@ journey("note drag to select: a drag down the gutter boxes the blocks it passes,
   await page.mouse.move(one.x - 12, one.y + 4);
   await page.mouse.down();
   await page.mouse.move(one.x - 10, two.y + two.height / 2, { steps: 6 });
-  await page.locator(".block-marquee").waitFor();
+  await page.locator(".marquee").waitFor();
   await until("the box selects the two blocks it passes", async () => (await picked()).join() === "Drag one here,Drag two here");
   await page.mouse.move(one.x - 10, three.y + three.height / 2, { steps: 4 });
   await page.mouse.up();
-  await until("and the third, once it reaches it; the box goes on release", async () => (await picked()).length === 3 && (await page.locator(".block-marquee").count()) === 0);
+  await until("and the third, once it reaches it; the box goes on release", async () => (await picked()).length === 3 && (await page.locator(".marquee").count()) === 0);
   await page.locator(".note-editor p", { hasText: "Drag three" }).click();
   await until("a click lets go", async () => (await picked()).length === 0);
   // Through text: words first, whole blocks from the next block on.
@@ -3366,6 +3366,109 @@ journey("note drag to select: a drag down the gutter boxes the blocks it passes,
   await page.keyboard.press("Backspace");
   await until("and gone", async () => (await page.locator(".note-editor p", { hasText: "Drag" }).count()) === 0);
 });
+
+/** The titles of the rows picked in the list (⇧-click, ⌘-click or the box), in list order. */
+const pickedRows = (page: Page) => page.locator(".list .row.sel .title").allInnerTexts();
+/** The titles of the list's rows at these places. */
+const rowTitles = (page: Page, ...at: number[]) => Promise.all(at.map((i) => page.locator(".list .row").nth(i).locator(".title").innerText()));
+/** Presses at (x, y), drags to (x2, y2) and, unless told not to, lets go. */
+async function boxDrag(page: Page, x: number, y: number, x2: number, y2: number, release = true) {
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x2, y2, { steps: 8 });
+  if (release) await page.mouse.up();
+}
+
+journey("list drag to select: a drag from beside the rows boxes the ones it crosses, back up lets them go, ⇧ adds, Esc mid-drag puts the selection back, ⋯ acts on them all, a click on blank space clears; a drag from a row still carries the row (D194)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".list .row");
+  await rows.nth(3).waitFor();
+  const list = (await page.locator(".list").boundingBox())!;
+  const at = async (i: number) => (await rows.nth(i).boundingBox())!;
+  const mid = async (i: number) => (await at(i)).y + (await at(i)).height / 2;
+  const x = list.x + 4; // the list's own space, left of its rows (Finder starts one there)
+  await boxDrag(page, x, (await at(0)).y + 10, x + 240, await mid(2), false);
+  await page.locator(".marquee").waitFor();
+  await until("the rows it crosses are selected as it goes", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 2)).join());
+  await page.mouse.move(x + 240, await mid(0), { steps: 4 });
+  await until("back up, the rows it left are let go", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0)).join());
+  await page.keyboard.press("Escape");
+  await until("Esc mid-drag puts back the selection there was (none) and takes the box away", async () => !(await pickedRows(page)).length && !(await page.locator(".marquee").count()));
+  await page.mouse.move(x + 240, await mid(2), { steps: 4 });
+  if ((await pickedRows(page)).length) throw new Error("the drag went on after Esc");
+  await page.mouse.up();
+  await boxDrag(page, x, (await at(0)).y + 10, x + 240, await mid(1));
+  await until("released, the selection stays and the box goes", async () => (await pickedRows(page)).length === 2 && !(await page.locator(".marquee").count()));
+  // ⇧ held at the start adds to what was there.
+  await page.keyboard.down("Shift");
+  await boxDrag(page, x, (await at(3)).y + 10, x + 240, await mid(3));
+  await page.keyboard.up("Shift");
+  await until("⇧ adds the row it crosses", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 3)).join());
+  await page.keyboard.down("Shift");
+  await boxDrag(page, x, (await at(2)).y + 10, x + 240, await mid(2), false);
+  await until("a ⇧ drag takes the row in as it goes", async () => (await pickedRows(page)).length === 4);
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("Shift");
+  await page.mouse.up();
+  await until("Esc puts back the three", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 3)).join());
+  // The selection is one made with ⇧-click: the ⋯ of any row in it acts on all three.
+  await rows.nth(1).hover();
+  await rows.nth(1).getByRole("button", { name: "Actions for 3 sources" }).click();
+  await page.getByRole("menuitem", { name: /^Move 3 sources to/ }).waitFor();
+  await page.keyboard.press("Escape");
+  await until("the menu closed", async () => !(await page.getByRole("menu").count()));
+  // A press on blank space with no drag clears it, as in Finder.
+  await page.mouse.click(x, (await at(1)).y + 10);
+  await until("a click on blank space clears the selection", async () => !(await pickedRows(page)).length);
+  // Below the last row: up over it.
+  const lastAt = (await rows.count()) - 1;
+  const last = await at(lastAt);
+  if (last.y + last.height + 30 < list.y + list.height) {
+    await boxDrag(page, x + 300, last.y + last.height + 20, x + 320, await mid(lastAt));
+    await until("a drag from below the last row selects it", async () => (await pickedRows(page)).join() === (await rowTitles(page, lastAt)).join());
+    await page.mouse.click(x, (await at(1)).y + 10);
+  }
+  // A drag that starts on a row carries the row (to file it on a skill), and boxes nothing.
+  await boxDrag(page, (await at(0)).x + 60, await mid(0), (await at(0)).x + 60, await mid(3), false); // on its picture
+  await page.locator(".row-ghost").waitFor();
+  if ((await page.locator(".marquee").count()) || (await pickedRows(page)).length) throw new Error("a drag from a row drew the box");
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  // One click on a row still opens it.
+  const title = (await rowTitles(page, 1))[0]!;
+  await rows.nth(1).click();
+  await page.locator(".doc-head").filter({ hasText: title }).waitFor();
+});
+
+journey("list drag to select on a skill page: a drag from the column beside its sources selects the ones it crosses; a click there clears (D194)", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const rows = page.locator(".skill-page .list .row");
+  await rows.nth(1).waitFor();
+  const list = (await page.locator(".skill-page .list").boundingBox())!;
+  const r0 = (await rows.nth(0).boundingBox())!;
+  const r1 = (await rows.nth(1).boundingBox())!;
+  const x = list.x + list.width + 6; // right of the rows, in the column
+  await boxDrag(page, x, r0.y + 8, x - 200, r1.y + r1.height / 2);
+  await until("both rows are selected", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1)).join());
+  await page.mouse.click(x, r0.y + 8);
+  await until("a click beside them clears", async () => !(await pickedRows(page)).length);
+});
+
+journey("list drag to select in WebKit: the box selects the rows it crosses without their text, and the list has the keys after it: ⇧↓ goes on, Esc clears (D194)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".list .row");
+  await rows.nth(2).waitFor();
+  const list = (await page.locator(".list").boundingBox())!;
+  const r0 = (await rows.nth(0).boundingBox())!;
+  const r1 = (await rows.nth(1).boundingBox())!;
+  await boxDrag(page, list.x + 4, r0.y + 10, list.x + 200, r1.y + r1.height / 2);
+  await until("both rows are selected", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1)).join());
+  if (await page.evaluate(() => !!window.getSelection()?.toString())) throw new Error("the drag selected the rows' text");
+  await page.keyboard.press("Shift+ArrowDown");
+  await until("⇧↓ goes on from the row the box reached, as after a ⇧-click", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 2)).join());
+  await page.keyboard.press("Escape");
+  await until("Esc clears it", async () => !(await pickedRows(page)).length);
+}, "webkit");
 
 journey("note block selection: Esc selects a block, ⇧↓ takes in the list, the ⋮⋮ drags both, Backspace and ⌘Z", async (page) => {
   const tops = () => page.locator(".note-editor .ProseMirror > *").evaluateAll((els) => els.map((e) => e.tagName));

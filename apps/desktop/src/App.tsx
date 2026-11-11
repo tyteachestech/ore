@@ -3,6 +3,7 @@ import { DotBar } from "./Ring";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
+import { blankStart, dragRows, type RowPick } from "./marquee";
 import { TitleField } from "./TitleField";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -1164,6 +1165,29 @@ export function App() {
   };
   // A pick belongs to the list it was made in.
   useEffect(unpick, [status, skill, q, openId, place]);
+  /** A drag from blank space beside the rows boxes the ones it crosses (D194, Finder; the note's D188):
+   *  a pick like ⇧-click's, from the row it began by to the one it reached; ⇧ adds, ⌘ toggles. */
+  const boxPick = (): RowPick => {
+    const was = { picked, anchor: anchor.current, cursor };
+    return {
+      ids: itemIds,
+      held: picked.length ? picked : keyedItem ? [keyedItem] : [],
+      pick: (ids, from, to) => {
+        setPicked(ids);
+        anchor.current = from;
+        if (to) setCursor(to);
+      },
+      cancel: () => {
+        setPicked(was.picked);
+        anchor.current = was.anchor;
+        setCursor(was.cursor);
+      },
+      click: () => {
+        unpick();
+        setKeyed(false);
+      },
+    };
+  };
   /** The selected source; a course row stands for the lesson it opens. */
   const current = currentLine && (currentLine.kind === "item" ? currentLine.item : lessonFirst(currentLine));
   const currentCourse = currentLine?.kind === "course" ? currentLine : null;
@@ -1804,8 +1828,17 @@ export function App() {
   const view = <ViewMenu status={status} archived={archivedInSkill.length > 0} go={go} details={details} toggle={toggleDetail} />;
   // What a row's handlers and menus call, read when they run: a row re-renders only when what it
   // shows changes (below), so ↑↓ through a long list repaints two rows, not all of them.
-  const live = useRef({ openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked });
-  live.current = { openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked };
+  const live = useRef({ openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked, boxPick });
+  live.current = { openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked, boxPick };
+  useEffect(() => {
+    if (!listShown) return;
+    const down = (e: MouseEvent) => {
+      const list = listRef.current;
+      if (list && !overlayRef.current && blankStart(e, list)) dragRows(e, list, live.current.boxPick());
+    };
+    window.addEventListener("mousedown", down);
+    return () => window.removeEventListener("mousedown", down);
+  }, [listShown]);
   /** A row's optional details last, at fixed widths, so they line up down the list whatever the chips.
    *  A course takes its lessons' author and its first added date. */
   const detailCols = (r: { url?: string }, captured: string[]) => {
