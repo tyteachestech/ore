@@ -1,160 +1,225 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
-/* The tutor's mole (D168, redrawn D169): its head and two paws over a strip of dirt, drawn as round dots on a
-   22 by 18 grid, like Nothing's dot glyphs. Every dot is the same size; only its tone changes. The face is an
-   Animal Crossing mole's: a lighter muzzle, black eyes with one highlight, a pink nose.
-   It never leaves the grid: each move shifts whole dots (a blink, a glance, a hop, a paw tap), stepped like an
-   8-bit sprite, so every pose is one grid from `moleGrid`. A mood is a timeline of poses (MOVES). */
+/* The tutor's mole (D168, drawn D169, a puppet since D214): its head and two paws over a strip of dirt, drawn as
+   round dots on a 22 by 18 grid, like Nothing's dot glyphs. The face is an Animal Crossing mole's: a lighter
+   muzzle, black eyes with one highlight, a pink nose.
+   It moves like a puppet: each value of its shape (how high it stands, its dome, its paws, where it looks) follows a
+   spring, and every frame the smooth shape is sampled onto the fixed grid. A dot's size says how much of it the
+   shape covers, so the head and paws glide (halftone, D183). The face reads as features, so eyes, glints, the nose
+   and the mouth stay whole dots that move a whole column at a time and never shimmer. */
 export const COLS = 22, ROWS = 18;
 const MID = (COLS - 1) / 2;
+/** Rows of room above the grid, so the dome never runs off its top. */
+export const HEAD = 3;
 
 export type Tone = "fur" | "muzzle" | "white" | "paw" | "eye" | "glint" | "nose" | "dirt";
-export type Pose = {
-  /** Head: half width in dots, top row, and how square its dome is (2 round, 4 boxy). */
-  rx: number; top: number; ex: number;
-  eyes: "open" | "tall" | "half" | "shut" | "arc";
-  /** Where the eyes look, in whole dots. */
-  lx: number; ly: number;
-  /** A bigger nose (2 by 2) when excited. */
-  nose2: boolean;
-  /** Paw width, and how many rows each paw is raised. */
-  paw: 5 | 6; pawL: number; pawR: number;
-  /** Rows the head and paws have sunk into the hole. */
-  y: number;
+/** The puppet's values. y: rows sunk into the hole. top: the dome's top row. rx: head half width. ex: how square the
+ *  dome is (2 round, 4 boxy). hx: head lean. lx, ly: where the eyes look. open: 1 open, 0 shut. tall: wide eyes.
+ *  arc: ∩ eyes. nose: a bigger nose. pawL, pawR: rows each paw is raised. pw: paw width. kick: dirt swell. mouth: an o, then an O. */
+export const REST = { y: 0, top: -0.3, rx: 10.2, ex: 2.6, hx: 0, lx: 0, ly: 0, open: 1, tall: 0, arc: 0, nose: 0, pawL: 0, pawR: 0, pw: 5, kick: 0, mouth: 0 };
+export type State = typeof REST;
+type Key = keyof State;
+const KEYS = Object.keys(REST) as Key[];
+/** Spring per value: [stiffness, damping]. Eyes snap; the body carries a little bounce. */
+const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx: [210, 16], ex: [200, 22], hx: [70, 13], lx: [90, 15], ly: [90, 15], open: [900, 52], tall: [420, 26], arc: [320, 30], nose: [300, 26], pawL: [260, 14], pawR: [260, 14], pw: [260, 24], kick: [160, 9], mouth: [380, 22] };
+
+const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const roundBox = (px: number, py: number, cx: number, cy: number, hw: number, hh: number, rad: number) => {
+  const qx = Math.abs(px - cx) - hw + rad, qy = Math.abs(py - cy) - hh + rad;
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rad;
 };
-export const REST: Pose = { rx: 10.2, top: -0.3, ex: 2.6, eyes: "open", lx: 0, ly: 0, nose2: false, paw: 5, pawL: 0, pawR: 0, y: 0 };
 
-const PAWS = { 5: [".ppp.", "ppppp", "ppppp"], 6: [".pppp.", "pppppp", "pppppp"] } as const;
+/** The face as whole dots, keyed r * 100 + c. Its position rounds to a dot; how open the eyes are picks a drawn shape. */
+function face(s: State, fx: number, fy: number) {
+  const m = new Map<number, Tone>(), set = (r: number, c: number, t: Tone) => m.set(r * 100 + c, t);
+  const ox = Math.round(fx + s.lx * 0.65), oy = Math.round(fy + s.ly * 0.75), er = 7 + oy;
+  for (const c0 of [5 + ox, 15 + ox]) {
+    if (s.arc > 0.5) { for (const [dc, dr] of [[0, 1], [1, 0], [2, 0], [3, 1]] as const) set(er + 1 + dr, c0 - 1 + dc, "eye"); continue; }
+    const rows = s.open < 0.35 ? [er + 2] : s.open < 0.75 ? [er + 1, er + 2] : s.tall > 0.5 ? [er - 1, er, er + 1, er + 2] : [er, er + 1, er + 2];
+    for (const r of rows) { set(r, c0, "eye"); set(r, c0 + 1, "eye"); }
+    // One highlight, top right of each eye (the light comes from the upper right).
+    if (rows.length > 2) set(rows[0]!, c0 + 1, "glint");
+  }
+  const nx = Math.round(fx * 1.1), nr = 11 + oy;
+  for (const c of [10 + nx, 11 + nx]) { set(nr, c, "nose"); if (s.nose > 0.5) set(nr + 1, c, "nose"); }
+  // The mouth, under the nose: a small o, then a round O when he's surprised.
+  const mr = 13 + oy + (s.nose > 0.5 ? 1 : 0);
+  if (s.mouth > 0.25) { set(mr, 10 + nx, "eye"); set(mr, 11 + nx, "eye"); }
+  if (s.mouth > 0.7) { set(mr + 1, 10 + nx, "eye"); set(mr + 1, 11 + nx, "eye"); }
+  return m;
+}
 
-/** The pose as a grid of tones, null where there is no dot. The last row is the dirt; nothing goes below it. */
-export function moleGrid(pose: Partial<Pose> = {}): (Tone | null)[][] {
-  const p = { ...REST, ...pose };
-  const g: (Tone | null)[][] = Array.from({ length: ROWS }, () => Array<Tone | null>(COLS).fill(null));
-  const put = (r: number, c: number, v: Tone | null) => { if (r >= 0 && r < ROWS - 1 && c >= 0 && c < COLS) g[r]![c] = v; };
-  // Face marks only land on the head, so a sunk mole's eyes never float over the dirt.
-  const face = (r: number, c: number, v: Tone) => { if (g[r]?.[c]) g[r]![c] = v; };
-  const bottom = ROWS - 1.5, ry = bottom - p.top;
-  for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) {
-    const dx = (c - MID) / p.rx, dy = (r - p.y + 0.5 - bottom) / ry;
-    if (Math.abs(dx) ** p.ex + Math.abs(dy) ** p.ex <= 1) g[r]![c] = "fur";
+export type Dot = [c: number, r: number, radius: number, tone: Tone];
+/** Every dot of the mole in state `s`, rows from -HEAD (room above the grid) to the dirt at ROWS - 1. */
+export function moleDots(s: State): Dot[] {
+  const out: Dot[] = [], bottom = ROWS - 1.5, ry = Math.max(4, bottom - s.top);
+  const fx = s.hx * 0.8 + s.lx * 0.35, fy = s.y + s.ly * 0.25;
+  const paw = (side: number, c: number, r: number) => {
+    const w = s.pw, lift = side ? s.pawR : s.pawL, top = ROWS - 4 - lift + s.y;
+    const x0 = side ? COLS - w - 0.25 : -0.25, x1 = x0 + w - 0.5, y0 = top - 0.25, y1 = ROWS + 1;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, hw = (x1 - x0) / 2, hh = Math.max(0.3, (y1 - y0) / 2), rad = Math.min(1, hh);
+    // The paw, and a box one dot wider that keeps the head apart from it.
+    return [roundBox(c, r, cx, cy, hw, hh, rad), roundBox(c, r, cx, cy, hw + 1, hh, rad)] as const;
+  };
+  const marks = face(s, fx, fy);
+  for (let r = -HEAD; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) {
+    const up = clamp((bottom - (r - s.y + 0.5)) / ry);
+    const dx = (c - MID - s.hx * up) / s.rx, dy = (r - s.y + 0.5 - bottom) / ry;
+    // Squarer at the cheeks, round at the crown.
+    const e = lerp(s.ex, 2, clamp((-dy - 0.45) / 0.55)), f = (Math.abs(dx) ** e + Math.abs(dy) ** e) ** (1 / e);
+    let head = dy > 0.3 ? 0 : clamp(((1 - f) * Math.min(s.rx, ry)) / 0.5 + 0.6);
+    const [pl, gl] = paw(0, c, r), [pr, gr] = paw(1, c, r);
+    const pawCov = clamp(-Math.min(pl, pr) * 4);
+    head *= clamp(Math.min(gl, gr) * 4);
+    if (pawCov > 0.15) { out.push([c, r, 0.44 * pawCov ** 0.6, "paw"]); continue; }
+    if (head <= 0.15) continue;
+    const mark = head >= 0.5 ? marks.get(r * 100 + c) : undefined;
+    if (mark) { out.push([c, r, mark === "eye" ? 0.56 : 0.44, mark]); continue; }
+    // Fur, then the muzzle: a light bell from between the eyes to the dirt, whitest in the middle.
+    const mx = c - MID - fx, my = r - 12.2 - fy;
+    const tone: Tone = (mx / 3.4) ** 2 + (my / 3) ** 2 <= 1 ? "white" : (mx / 4.6) ** 2 + (my / 3.8) ** 2 <= 1 ? "muzzle" : "fur";
+    out.push([c, r, 0.44 * head ** 0.6, tone]);
   }
-  // The muzzle: a light bell from between the eyes to the dirt, whitest in the middle.
-  const my = 12.2 + p.y;
-  for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) {
-    if (!g[r]![c] || ((c - MID) / 4.6) ** 2 + ((r - my) / 3.8) ** 2 > 1) continue;
-    g[r]![c] = ((c - MID) / 3.4) ** 2 + ((r - my) / 3) ** 2 <= 1 ? "white" : "muzzle";
+  // The dirt swells where he comes up through it.
+  for (let c = 0; c < COLS; c++) out.push([c, ROWS - 1, 0.44 * (1 + 0.22 * clamp(s.kick, -1, 1) * Math.exp(-(((c - MID) / 6) ** 2))), "dirt"]);
+  return out;
+}
+
+/** One path per tone, painted back to front: eyes over the face, glints over the eyes. */
+const ORDER: Tone[] = ["dirt", "fur", "muzzle", "white", "paw", "nose", "eye", "glint"];
+function paths(dots: Dot[]): Record<Tone, string> {
+  const by = Object.fromEntries(ORDER.map((t) => [t, ""])) as Record<Tone, string>;
+  for (const [c, r, rad, t] of dots) {
+    if (rad < 0.05) continue;
+    const x = c + 0.5 - rad;
+    by[t] += `M${x.toFixed(2)} ${r + 0.5}a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(2 * rad).toFixed(2)} 0a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(-2 * rad).toFixed(2)} 0`;
   }
-  const eL = 5 + p.lx, eR = 15 + p.lx, er = 7 + p.ly + p.y;
-  if (p.eyes === "arc") {
-    // Happy: each eye a ∩, four dots wide.
-    for (const c0 of [eL - 1, eR - 1]) for (const [dc, dr] of [[0, 1], [1, 0], [2, 0], [3, 1]] as const) face(er + 1 + dr, c0 + dc, "eye");
-  } else if (p.eyes === "shut") {
-    for (const c0 of [eL, eR]) { face(er + 2, c0, "eye"); face(er + 2, c0 + 1, "eye"); }
-  } else {
-    const rows = p.eyes === "tall" ? [er - 1, er, er + 1, er + 2] : p.eyes === "half" ? [er + 1, er + 2] : [er, er + 1, er + 2];
-    for (const c0 of [eL, eR]) {
-      for (const r of rows) { face(r, c0, "eye"); face(r, c0 + 1, "eye"); }
-      // One highlight, top right of each eye (the light comes from the upper right).
-      if (p.eyes !== "half") face(rows[0]!, c0 + 1, "glint");
-    }
+  return by;
+}
+
+/** One spring step of `dt` seconds toward `to`. */
+export function step(v: State, vel: State, to: State, dt: number) {
+  for (const k of KEYS) {
+    const [st, da] = SPRING[k];
+    vel[k] += (st * (to[k] - v[k]) - da * vel[k]) * dt;
+    v[k] += vel[k] * dt;
   }
-  const nr = 11 + p.y;
-  for (const c of [10, 11]) { face(nr, c, "nose"); if (p.nose2) face(nr + 1, c, "nose"); }
-  // The paws: solid white, rounded at the top, hooked over the dirt. A one-dot gap that follows each paw's edge
-  // keeps it apart from the head; its rounded corners keep the fur behind them.
-  for (const side of [0, 1]) {
-    const w = p.paw, c0 = side ? COLS - w : 0, lift = side ? p.pawR : p.pawL, top = ROWS - 4 - lift + p.y;
-    PAWS[w].forEach((row, i) => {
-      const cols = [...row].flatMap((ch, j) => (ch === "p" ? [c0 + j] : []));
-      const gap = side ? Math.min(...cols) - 1 : Math.max(...cols) + 1;
-      if (g[top + i]?.[gap] === "fur" || g[top + i]?.[gap] === "muzzle") put(top + i, gap, null);
-      for (const c of cols) put(top + i, c, "paw");
-    });
-  }
-  g[ROWS - 1]!.fill("dirt");
-  return g;
+  v.rx = clamp(v.rx, 8, 11.5); v.top = clamp(v.top, -2.5, 6); v.ex = clamp(v.ex, 2, 4.5);
 }
 
 export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer";
-/** Poses held from their time (ms) until the next; at `end` a loop starts over and any other move rests.
+/** A mood: where each value should settle (`to`), where it starts (`from`), pushes that set it moving (`kick`), timed
+ *  changes after (`at`), paws waving until `wave` ms, and when it rests (`end`) or starts over (`loop`).
  *  `still` is the one pose shown under reduced motion or in a hidden window. */
-type Move = { keys: [ms: number, pose: Partial<Pose>][]; end: number; loop?: boolean; still: Partial<Pose> };
-const HAPPY: Partial<Pose> = { eyes: "arc", nose2: true, paw: 6, ex: 3.6, rx: 10, top: 1 };
-const CHEER: Partial<Pose> = { eyes: "arc", nose2: true, ex: 3 };
-const WIDE: Partial<Pose> = { eyes: "tall", nose2: true, rx: 10.4, top: 2 };
-const UP_R: Partial<Pose> = { lx: 1, ly: -1 }, UP_L: Partial<Pose> = { lx: -1, ly: -1 };
+type Beat = { to?: Partial<State>; kick?: Partial<State> };
+type Move = Beat & { from?: Partial<State>; at?: [ms: number, Beat][]; wave?: number; end?: number; loop?: number; still: Partial<State> };
+const HAPPY: Partial<State> = { arc: 1, nose: 1, pw: 6, ex: 3.6, rx: 10, top: 0.6 };
+const WIDE: Partial<State> = { tall: 1, nose: 1, mouth: 1, rx: 10.4, top: 1.4 };
 export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
-  // Out of the hole: rises in three steps, overshoots a dot, settles, blinks.
-  peek: { keys: [[0, { y: 17 }], [90, { y: 9 }], [180, { y: 5 }], [270, { y: 2 }], [360, { top: 1.3 }], [450, { top: -0.3 }], [540, {}], [1200, { eyes: "shut" }], [1330, {}]], end: 1330, still: {} },
-  // Looks up to one side and taps a paw, then the other.
-  thinking: { loop: true, keys: [[0, UP_R], [400, { ...UP_R, pawR: 1 }], [600, UP_R], [800, { ...UP_R, pawR: 1 }], [1000, UP_R], [2000, UP_L], [2400, { ...UP_L, pawL: 1 }], [2600, UP_L], [2800, { ...UP_L, pawL: 1 }], [3000, UP_L]], end: 4000, still: UP_R },
+  // Up out of the hole with a spray of dirt, then a blink.
+  peek: { from: { y: 18 }, at: [[260, { kick: { kick: 9 } }], [1200, { to: { open: 0 } }], [1330, { to: { open: 1 } }]], end: 1500, still: {} },
+  // Looks up to one side and taps a paw twice, then the other.
+  thinking: { to: { lx: 1, ly: -1, hx: 0.6 }, loop: 4000, still: { lx: 1, ly: -1 },
+    at: [[400, { kick: { pawR: 16 } }], [800, { kick: { pawR: 16 } }], [2000, { to: { lx: -1, hx: -0.6 } }], [2400, { kick: { pawL: 16 } }], [2800, { kick: { pawL: 16 } }]] },
   // Arc eyes and a hop with both paws.
-  happy: { keys: [[0, HAPPY], [100, { ...HAPPY, top: 0, pawL: 1, pawR: 1 }], [220, HAPPY]], end: 1800, still: HAPPY },
-  // Wide eyes and a jolt.
-  surprised: { keys: [[0, WIDE], [80, { ...WIDE, rx: 10, top: -0.4 }], [180, WIDE]], end: 1400, still: WIDE },
-  // Both paws waving, a bounce on each beat, then it settles pleased.
-  cheer: { keys: [[0, { ...CHEER, pawL: 3, pawR: 1 }], [180, { ...CHEER, top: -0.4, pawL: 1, pawR: 3 }], [360, { ...CHEER, pawL: 3, pawR: 1 }], [540, { ...CHEER, top: -0.4, pawL: 1, pawR: 3 }], [720, { ...CHEER, pawL: 3, pawR: 1 }], [900, HAPPY]], end: 2400, still: HAPPY },
-};
-/** One path per tone: a circle per dot (eyes a little bigger, so each reads as one black shape). */
-function paths(g: (Tone | null)[][]): [Tone, string][] {
-  const by = new Map<Tone, string[]>();
-  g.forEach((row, r) => row.forEach((t, c) => {
-    if (!t) return;
-    const rad = t === "eye" ? 0.56 : 0.44, x = c + 0.5 - rad, y = r + 0.5;
-    if (!by.has(t)) by.set(t, []);
-    by.get(t)!.push(`M${x.toFixed(2)} ${y}a${rad} ${rad} 0 1 0 ${2 * rad} 0a${rad} ${rad} 0 1 0 ${-2 * rad} 0`);
-  }));
-  // Painted back to front: eyes over the face, glints over the eyes.
-  const order: Tone[] = ["dirt", "fur", "muzzle", "white", "paw", "nose", "eye", "glint"];
-  return order.filter((t) => by.has(t)).map((t) => [t, by.get(t)!.join("")]);
-}
-const cache = new Map<string, [Tone, string][]>();
-const drawn = (p: Partial<Pose>) => {
-  const k = JSON.stringify(p);
-  if (!cache.has(k)) cache.set(k, paths(moleGrid(p)));
-  return cache.get(k)!;
+  happy: { to: HAPPY, kick: { top: -26, pawL: 14, pawR: 14, kick: 6 }, end: 1800, still: HAPPY },
+  // A jolt, wide eyes and an O.
+  surprised: { to: WIDE, kick: { top: -34, rx: -5 }, end: 1400, still: WIDE },
+  // Both paws waving, bobbing on each beat, then a last hop and it settles pleased.
+  cheer: { to: { arc: 1, nose: 1, ex: 3 }, wave: 900, at: [[900, { to: { ...HAPPY, pawL: 0, pawR: 0 }, kick: { top: -14 } }]], end: 2400, still: HAPPY },
 };
 
 /** In its button the sprite sits 3.3 dots below a square's top, so its dirt lands low and it pokes out of the ground. */
 const LIFT = 3.3;
-const BLINK_MS = 130, LOOK_MS = 900;
+const BLINK_MS = 120, LOOK_MS = 900;
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
+const settled = (v: State, vel: State, to: State) => KEYS.every((k) => Math.abs(to[k] - v[k]) < 0.002 && Math.abs(vel[k]) < 0.002);
 
-/** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite). `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
+/** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite; the dome may
+ *  rise into the room above it). `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
  *  5 to 9 s and glances to a side every 15 to 20 s. `look` (hover or focus on its button) faces him with a blink.
- *  Still under reduced motion and while the window is hidden (a mood shows its still pose). */
+ *  `cue` replays the mood for a new event (another reply landing). Frames run only while it moves. Still under
+ *  reduced motion and while the window is hidden (a mood shows its still pose). */
 export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean }) {
-  const [pose, setPose] = useState<Partial<Pose>>({});
-  const [busy, setBusy] = useState(false);
+  const tones = useRef<Partial<Record<Tone, SVGPathElement | null>>>({});
+  const p = useRef({ v: { ...REST }, vel: { ...REST, ...Object.fromEntries(KEYS.map((k) => [k, 0])) } as State, to: { ...REST }, move: null as Move | null, t0: 0, fired: 0, frame: 0, last: 0 });
   const looking = useRef(look);
   looking.current = look;
-  const resting = useRef(true);
-  const blink = useRef<() => void>(() => {});
 
-  // A mood's move: its first pose now (so the frame before it never shows), the rest at their times; a loop starts
-  // over, any other move hands back to rest. `cue` replays the same mood for a new event (another reply landing).
-  // Reduced motion, or a hidden window, shows its still pose; a window shown again plays it then (a move that already played once stays done).
-  useEffect(() => {
-    if (mood === "idle") { setBusy(false); setPose({}); return; }
+  const draw = () => {
+    const d = paths(moleDots(p.current.v));
+    for (const t of ORDER) tones.current[t]?.setAttribute("d", d[t]);
+  };
+  // Springs run while anything is moving or a beat is still to come, then stop.
+  const tick = (now: number) => {
+    const s = p.current, m = s.move, t = now - s.t0;
+    const dt = Math.min(0.033, (now - s.last) / 1000);
+    s.last = now;
+    if (m) {
+      const at = m.at ?? [];
+      while (s.fired < at.length && t >= at[s.fired]![0]) {
+        const b = at[s.fired++]![1];
+        Object.assign(s.to, b.to);
+        for (const [k, v] of Object.entries(b.kick ?? {})) s.vel[k as Key] += v;
+      }
+      if (m.wave && t < m.wave) {
+        const ph = (t / 360) * 2 * Math.PI;
+        Object.assign(s.to, { pawL: 2 + 1.1 * Math.cos(ph), pawR: 2 - 1.1 * Math.cos(ph), top: REST.top - 0.35 * Math.abs(Math.sin(ph)) });
+      }
+      if (m.loop && t >= m.loop) start(m, now);
+      else if (m.end && t >= m.end) { s.move = null; s.to = { ...REST }; }
+    }
+    // Two half steps keep the stiff eye spring steady at 60 Hz.
+    step(s.v, s.vel, s.to, dt / 2);
+    step(s.v, s.vel, s.to, dt / 2);
+    draw();
+    if (!s.move && settled(s.v, s.vel, s.to)) { s.frame = 0; return; }
+    s.frame = requestAnimationFrame(tick);
+  };
+  const wake = () => {
+    const s = p.current;
+    if (s.frame) return;
+    s.last = performance.now();
+    s.frame = requestAnimationFrame(tick);
+  };
+  const start = (m: Move, now: number) => {
+    const s = p.current;
+    Object.assign(s, { move: m, t0: now, fired: 0, to: { ...REST, ...m.to } });
+    Object.assign(s.v, m.from);
+    for (const [k, v] of Object.entries(m.kick ?? {})) s.vel[k as Key] += v;
+  };
+  const rest = (pose: Partial<State>) => {
+    const s = p.current;
+    if (s.frame) cancelAnimationFrame(s.frame);
+    Object.assign(s, { move: null, frame: 0, to: { ...REST, ...pose }, v: { ...REST, ...pose } });
+    for (const k of KEYS) s.vel[k] = 0;
+    draw();
+  };
+
+  // A mood's move, set up before the first paint so the frame before it never shows (a peek starts in the hole).
+  // Reduced motion, or a hidden window, shows its still pose; a window shown again plays it then (a move that
+  // already played once stays done).
+  useLayoutEffect(() => {
+    if (mood === "idle") {
+      if (p.current.move) { p.current.move = null; p.current.to = { ...REST }; wake(); } else draw();
+      return;
+    }
     const move = MOVES[mood];
-    const timers = new Set<number>();
-    const later = (fn: () => void, ms: number) => { const id = window.setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); };
     let played = false;
     const run = () => {
-      if (still() || document.hidden) { setPose(move.still); setBusy(!!move.loop); return; }
+      if (still() || document.hidden) return rest(move.still);
       played = !move.loop;
-      setPose(move.keys[0]![1]);
-      for (const [ms, p] of move.keys.slice(1)) later(() => setPose(p), ms);
-      later(() => (move.loop && !document.hidden ? run() : (setBusy(!!move.loop), setPose(move.loop ? move.still : {}))), move.end);
+      start(move, performance.now());
+      draw();
+      wake();
     };
-    const shown = () => { if (!document.hidden && !played) { timers.forEach(clearTimeout); timers.clear(); run(); } };
-    setBusy(true);
+    const shown = () => { if (!document.hidden && !played) run(); };
     run();
     document.addEventListener("visibilitychange", shown);
-    return () => { timers.forEach(clearTimeout); document.removeEventListener("visibilitychange", shown); };
+    return () => document.removeEventListener("visibilitychange", shown);
   }, [mood, cue]);
-  resting.current = !busy;
 
   // At rest: blinks and glances, never while it is facing him, hidden, or asked for less motion.
   useEffect(() => {
@@ -164,40 +229,42 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
       const id = window.setTimeout(() => { timers.delete(id); fn(); }, ms);
       timers.add(id);
     };
-    const quiet = () => !resting.current || looking.current || document.hidden || still();
-    const show = (p: Partial<Pose>, ms: number) => {
-      setPose(p);
-      later(() => setPose((q) => (q === p && resting.current ? {} : q)), ms);
+    const quiet = () => !!p.current.move || looking.current || document.hidden || still();
+    const hold = (pose: Partial<State>, ms: number) => {
+      Object.assign(p.current.to, pose);
+      wake();
+      later(() => { if (!p.current.move) { for (const k of Object.keys(pose) as Key[]) p.current.to[k] = REST[k]; wake(); } }, ms);
     };
-    blink.current = () => { if (resting.current && !still()) show({ eyes: "shut" }, BLINK_MS); };
-    const blinks = () => later(() => { if (!quiet()) blink.current(); if (alive) blinks(); }, between(5000, 9000));
+    const blinks = () => later(() => { if (!quiet()) hold({ open: 0 }, BLINK_MS); if (alive) blinks(); }, between(5000, 9000));
     const turns = () =>
       later(() => {
         if (!quiet()) {
           const first = Math.random() < 0.5 ? -1 : 1;
-          show({ lx: first }, LOOK_MS);
-          if (Math.random() < 0.5) later(() => { if (!quiet()) show({ lx: -first }, LOOK_MS); }, LOOK_MS + 400);
+          hold({ lx: first, hx: first * 0.45 }, LOOK_MS);
+          if (Math.random() < 0.5) later(() => { if (!quiet()) hold({ lx: -first, hx: -first * 0.45 }, LOOK_MS); }, LOOK_MS + 400);
         }
         if (alive) turns();
       }, between(15000, 20000));
     blinks();
     turns();
-    return () => { alive = false; timers.forEach(clearTimeout); };
+    return () => { alive = false; timers.forEach(clearTimeout); if (p.current.frame) cancelAnimationFrame(p.current.frame); p.current.frame = 0; };
   }, []);
 
   // Hovered or focused: it faces him and blinks.
   useEffect(() => {
-    if (!look) return;
-    if (resting.current) setPose({});
-    blink.current();
+    if (!look || p.current.move || still()) return;
+    const s = p.current;
+    Object.assign(s.to, { lx: 0, ly: 0, hx: 0, open: 0 });
+    wake();
+    const id = window.setTimeout(() => { s.to.open = REST.open; wake(); }, BLINK_MS);
+    return () => clearTimeout(id);
   }, [look]);
 
-  const d = useMemo(() => drawn(pose), [pose]);
   // The dirt sits low in the button, so the mole reads as poking out of the ground at its foot.
   return (
-    <svg className="mole" width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : `0 ${-LIFT} ${COLS} ${COLS}`} aria-hidden="true">
-      {d.map(([tone, path]) => (
-        <path key={tone} className={`mole-${tone}`} d={path} />
+    <svg className="mole" data-mood={mood} width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : `0 ${-LIFT} ${COLS} ${COLS}`} overflow="visible" aria-hidden="true">
+      {ORDER.map((t) => (
+        <path key={t} ref={(el) => { tones.current[t] = el; }} className={`mole-${t}`} />
       ))}
     </svg>
   );
