@@ -558,8 +558,8 @@ type Props = {
   skills: Skill[];
   finishing: boolean;
   setFinishing: (on: boolean) => void;
-  /** Finish recorded the source Done (the phone forgets that Finish was open). */
-  onFinishRecorded?: () => void;
+  /** Finish has saved all it has (the phone forgets that Finish was open), or a save after Done failed (it keeps it). */
+  onFinishRecorded?: (saved: boolean) => void;
   /** The side panel is open (D44), on `sideTab` (D75). */
   notesOpen: boolean;
   sideTab: SideTab;

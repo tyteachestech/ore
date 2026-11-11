@@ -29,8 +29,9 @@ type Props = NotesSync & {
   keyPoint?: { on: boolean; toggle: () => void };
   onCancel: () => void;
   onDone: () => void;
-  /** The source is recorded Done (before the closing moment ends): the phone stops keeping Finish open for a relaunch. */
-  onMarked?: () => void;
+  /** Finish has saved all it has (true), or a save after Done failed and it stays open with his work (false): the
+   *  phone keeps Finish open for a relaunch only while something is left to save. */
+  onMarked?: (saved: boolean) => void;
   /** The library's skills, for the colour of the finished burst (D153). */
   skills?: Skill[];
   /** In a course (D79): the lesson to read next, which the closing card can open instead of going back. */
@@ -92,6 +93,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const [answers, setAnswers] = useState(() => draft?.answers ?? qs.map((q) => q.after ?? ""));
   const [conf, setConf] = useState<(number | undefined)[]>(() => draft?.conf ?? qs.map((q) => q.confidence));
   const [use, setUse] = useState(draft?.use ?? "");
+  /** Marked done by "Just mark done"; otherwise the closing card asks, Done or Keep reading (2026-10-31). */
+  const [marked, setMarked] = useState(false);
   const [checked, setChecked] = useState<boolean[]>(() => qs.map(() => false));
   const [busy, setBusy] = useState(false);
   const [pointsError, setPointsError] = useState<string | null>(null);
@@ -112,10 +115,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
 
   useEffect(() => {
     drafts.set(doc.id, { step, recall, answers, conf, use, leave, qs });
-    const typed = recall !== (doc.recall?.text ?? "") || answers.some((a, i) => a !== (qs[i]?.after ?? "")) || !!use.trim() || leave !== (doc.leave_out?.text ?? "");
-    if (typed) keptDrafts.set(doc.id, { step, recall, answers, conf, use, leave, asked: askedIn(qs) });
+    // Once the source is Done only the closing card's line is his unsaved work.
+    const typed = marked ? !!use.trim() : recall !== (doc.recall?.text ?? "") || answers.some((a, i) => a !== (qs[i]?.after ?? "")) || !!use.trim() || leave !== (doc.leave_out?.text ?? "");
+    if (typed) keptDrafts.set(doc.id, marked ? { step, recall: "", answers: [], conf: [], use, leave: "", asked: askedIn(qs) } : { step, recall, answers, conf, use, leave, asked: askedIn(qs) });
     else keptDrafts.delete(doc.id);
-  }, [doc.id, step, recall, answers, conf, use, leave, qs]);
+  }, [doc.id, step, recall, answers, conf, use, leave, qs, marked]);
 
   // D56: key points for every prequestion, written while he does the free recall.
   const pointsRun = useRef<Promise<unknown> | null>(null);
@@ -205,13 +209,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   /** Saving the recall failed: offer a way out that doesn't need it. */
   const [recallFailed, setRecallFailed] = useState(false);
 
-  /** Marked done by "Just mark done"; otherwise the closing card asks, Done or Keep reading (2026-10-31). */
-  const [marked, setMarked] = useState(false);
   const [moment, setMoment] = useState(false);
   async function markDone() {
     await ore("status", doc.id, "done");
     setMarked(true);
-    onMarked?.();
+    // The recall and answers he didn't save are left behind with the source Done; only the closing card's line remains.
+    dropDraft(doc.id);
   }
 
   /** D100: before the questions, leave out the ones past where he stopped or that his note rules out
@@ -287,9 +290,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       if (use.trim()) onNotes((await ore<Notes>("notes", doc.id, opt("append", use.trim()), opt("heading", "Use and connections"))).text);
     } catch (e) {
       notify(errorText(e), "error");
+      onMarked?.(false);
       setBusy(false);
       return;
     }
+    onMarked?.(true);
     dropDraft(doc.id);
     // Drafting starts at once, so a window closed during the moment still drafts the cards.
     let gone = () => {};
@@ -325,6 +330,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       const left = await applyScope();
       if (left === null) return;
       await markDone();
+      onMarked?.(true);
       setStep(left + 1);
     } catch (e) {
       notify(errorText(e), "error");

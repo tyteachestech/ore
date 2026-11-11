@@ -475,7 +475,7 @@ export function PhoneApp() {
             skills={skills}
             finishing={finishing}
             setFinishing={setFinishing}
-            onFinishRecorded={() => setRecorded(true)}
+            onFinishRecorded={setRecorded}
             notesOpen={noting}
             sideTab={side}
             onShowSide={(t) => (setSide(t), setNoting(true))}

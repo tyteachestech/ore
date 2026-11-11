@@ -8887,6 +8887,32 @@ journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt
   for (let i = 1; i <= n; i++) await fits44(page, `.kb-bar > :nth-child(${i})`, `the keyboard bar's button ${i}`);
 }, "phone");
 
+journey("phone: Finish's closing card keeps its unsaved line through a failed save and a relaunch; Done recorded drops the recall", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  // A recall whose save fails, and he marks the source done without it.
+  await tap(page, page.getByPlaceholder("In your own words…"));
+  await page.keyboard.type("A recall he chose not to save");
+  await until("what he typed is kept", async () => (await page.evaluate(() => localStorage.getItem("ore.finish-drafts") ?? "")).includes("chose not to save"));
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { recall: "The disk is full." }));
+  await tap(page, page.getByRole("button", { name: "Continue" }));
+  await tap(page, page.getByRole("button", { name: "Mark done without saving" }));
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  // Done is recorded: the recall he left unsaved is not kept to come back next time.
+  await page.locator("#quiz-use").waitFor();
+  await until("the dropped recall is no longer kept", async () => !(await page.evaluate(() => localStorage.getItem("ore.finish-drafts") ?? "")).includes("chose not to save"));
+  // The closing card's own line, whose save fails: Finish stays open with it, and so does a relaunch.
+  await tap(page, page.locator("#quiz-use"));
+  await page.keyboard.type("Use it before every exam");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { notes: "The disk is full." }));
+  await tap(page, page.locator(".quiz-foot button").filter({ hasText: /^Done/ }));
+  await page.getByText("The disk is full.").first().waitFor();
+  await Bun.sleep(500);
+  await page.reload();
+  await until("the relaunch comes back to the closing card with its line", async () => (await page.locator("#quiz-use").inputValue().catch(() => "")) === "Use it before every exam");
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
