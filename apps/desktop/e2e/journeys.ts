@@ -5289,6 +5289,38 @@ journey("review: a miss is a step of its own and its retry one more, so \"Exerci
   }
 });
 
+journey("review: the header keeps its form for the session: 30 steps stay dots when a miss makes them 31", async (page) => {
+  const log = oreCalls(page);
+  const { new_per_day } = (await ore("today")) as { new_per_day: number };
+  const made: string[] = [];
+  try {
+    await ore("goal", "--new-per-day", "100");
+    const due = ((await ore("today")) as { due: number }).due;
+    // Drafts written as files (no `ore` command makes a plain one), so the session is exactly 30 steps.
+    const cards = join(LIB, "cards");
+    const model = readdirSync(cards).find((f) => /^\w{26}\.md$/.test(f) && /^state: draft$/m.test(readFileSync(join(cards, f), "utf8")))!;
+    const text = readFileSync(join(cards, model), "utf8");
+    for (let i = 0; i < 30 - due; i++) {
+      const id = `01M7HEAD000000000000${String(i).padStart(6, "0")}`;
+      writeFileSync(join(cards, `${id}.md`), text.replace(/^id: .*$/m, `id: ${id}`).replace(/^created: .*$/m, "created: 2026-01-01T00:00:00.000Z").replace(/\n---\n(.)/, `\n---\n(${i}) $1`));
+      made.push(join(cards, `${id}.md`));
+    }
+    await startReview(page, null);
+    const dots = page.locator(".review .review-steps");
+    if ((await dots.getAttribute("aria-valuemax")) !== "30") throw new Error(`the session has ${await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax")} steps, not 30`);
+    await reveal(page);
+    await page.getByRole("button", { name: "Again", exact: true }).click();
+    await until("the miss adds its retry", async () => (await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax")) === "31");
+    if (!(await dots.isVisible())) throw new Error("a miss at 30 steps switched the step dots to the bar");
+  } finally {
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
+    await log.undoAll();
+    for (const f of made) rmSync(f, { force: true });
+    await ore("goal", "--new-per-day", String(new_per_day));
+  }
+});
+
 /** Shows the answer of the card on screen: No idea on a question, Think so on a card. */
 async function reveal(page: Page) {
   const noIdea = page.getByRole("button", { name: "No idea" });
