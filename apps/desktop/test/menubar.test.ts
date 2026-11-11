@@ -3,13 +3,14 @@ import { Window } from "happy-dom";
 
 const w = new Window();
 for (const k of ["window", "document", "KeyboardEvent"] as const) (globalThis as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k];
-const { BINDINGS, comboOf } = await import("../src/keys");
+const { BINDINGS, comboOf, is, rebind, resetKeys } = await import("../src/keys");
 const { keydownFor, menuSpec, runMenu } = await import("../src/menubar");
 
 const keymap = Object.fromEntries(BINDINGS.map((b) => [b.id, b.combo])) as Parameters<typeof menuSpec>[0];
 type Row = { id?: string; label?: string; accel?: string | null; enabled?: boolean; predef?: string };
-const rows = (where = { reader: false, review: false }) => menuSpec(keymap, where).flatMap((m) => m.items as Row[]);
-const row = (id: string, where?: { reader: boolean; review: boolean }) => rows(where).find((r) => r.id === `ore:${id}`)!;
+type Where = { reader: boolean; review: boolean; sound?: boolean };
+const rows = (where: Where = { reader: false, review: false }) => menuSpec(keymap, where).flatMap((m) => m.items as Row[]);
+const row = (id: string, where?: Where) => rows(where).find((r) => r.id === `ore:${id}`)!;
 
 describe("menu bar", () => {
   test("shows ⌘ ⌃ ⌥ shortcuts from the keymap, never a plain key or a system-wide one", () => {
@@ -71,5 +72,33 @@ describe("menu bar", () => {
     expect(keys).toBe(2);
     field.remove();
     window.removeEventListener("keydown", on as unknown as EventListener);
+  });
+
+  test("Listen is greyed out on a source with sound of its own, where it does nothing (D195)", () => {
+    expect(row("listen", { reader: true, review: false }).enabled).toBe(true);
+    expect(row("listen", { reader: true, review: false, sound: true }).enabled).toBe(false);
+    expect(row("rename", { reader: true, review: false, sound: true }).enabled).toBe(true);
+  });
+
+  test("a menu click runs its own command, never one in the other scope that shares its key", () => {
+    resetKeys();
+    const seen: string[] = [];
+    const on = (e: KeyboardEvent) => {
+      for (const id of ["listen", "forward-alt", "play-alt"] as const) if (is(e, id)) seen.push(id);
+    };
+    window.addEventListener("keydown", on as unknown as EventListener);
+    runMenu("listen", keymap, 20000);
+    expect(seen).toEqual(["listen"]);
+    // Listen moved to the player's K: the menu still runs Listen.
+    rebind("listen", "KeyK");
+    seen.length = 0;
+    runMenu("listen", { ...keymap, listen: "KeyK" }, 21000);
+    expect(seen).toEqual(["listen"]);
+    // The key itself still reaches both; the reader picks by the source (Reader.tsx).
+    seen.length = 0;
+    document.body.dispatchEvent(keydownFor("KeyL"));
+    expect(seen).toEqual(["forward-alt"]);
+    window.removeEventListener("keydown", on as unknown as EventListener);
+    resetKeys();
   });
 });

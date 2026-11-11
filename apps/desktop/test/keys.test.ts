@@ -3,7 +3,7 @@ import { Window } from "happy-dom";
 
 const w = new Window();
 for (const k of ["window", "document", "KeyboardEvent"] as const) (globalThis as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k];
-const { clash, is, isCustom, rebind, resetKeys, restore, saved } = await import("../src/keys");
+const { BINDINGS, clash, is, isCustom, rebind, resetKeys, restore, saved } = await import("../src/keys");
 const { keydownFor, runMenu } = await import("../src/menubar");
 
 const press = (combo: string) => keydownFor(combo);
@@ -129,6 +129,26 @@ describe("shortcut editor: the player's second keys (YouTube's K J L)", () => {
     expect(rebind("forward-alt", "ArrowLeft")).toBe("← is reserved");
     resetKeys();
   });
+});
+
+test("every shortcut has its own name, so the editor's messages say which one", () => {
+  const names = BINDINGS.map((b) => b.label);
+  expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([]);
+  expect(BINDINGS.find((b) => b.id === "play-alt")!.label).toBe("Play / pause (second key)");
+});
+
+test("a key he saved on a command wins over a new default on the same key, which loads not assigned", async () => {
+  (globalThis as Record<string, unknown>).localStorage = w.localStorage;
+  // J was free when he gave it to Recall this chapter; K on Listen never meets the player's K.
+  w.localStorage.setItem("ore.keys", JSON.stringify({ section: "KeyJ", listen: "KeyK" }));
+  const fresh = (await import("../src/keys.ts?ownkey")) as typeof import("../src/keys");
+  expect(fresh.is(press("KeyJ"), "section")).toBe(true);
+  expect(fresh.is(press("KeyJ"), "back-alt")).toBe(false);
+  expect(fresh.clash("back-alt", "KeyJ")?.id).toBe("section");
+  expect(fresh.is(press("KeyK"), "listen")).toBe(true);
+  expect(fresh.is(press("KeyK"), "play-alt")).toBe(true);
+  expect(fresh.isCustom("back-alt")).toBe(true);
+  delete (globalThis as Record<string, unknown>).localStorage;
 });
 
 test("a saved shortcut the rules now refuse is dropped when the keymap loads", async () => {

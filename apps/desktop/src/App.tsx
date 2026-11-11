@@ -662,7 +662,8 @@ export function App() {
   // are greyed out where they do nothing.
   const keysRef = useRef(keys);
   keysRef.current = keys;
-  useEffect(() => setMenu(keys, { reader: !!openId, review: !!reviewing }), [keys, openId, reviewing]);
+  const [sound, setSound] = useState(false);
+  useEffect(() => setMenu(keys, { reader: !!openId, review: !!reviewing, sound: !!openId && sound }), [keys, openId, reviewing, sound]);
   useEffect(() => {
     const un = listenMenu(() => keysRef.current);
     return () => void un.then((f) => f());
@@ -2194,6 +2195,7 @@ export function App() {
             onArchive={(item) => void (item.archived_at ? restoreSource(item) : archiveSource(item))}
             lessons={openCourse ? lessonsOf(items ?? [], openCourse) : undefined}
             onOpenLesson={(id) => openSource(id)}
+            onSound={setSound}
             onPin={(item) => void pinSource(item)}
             onMove={(item, to) => void moveSource(item, to)}
             notesOpen={sideShown}

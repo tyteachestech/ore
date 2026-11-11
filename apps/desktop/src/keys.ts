@@ -64,11 +64,11 @@ const DEFAULTS = [
   { id: "bad-version", label: "Bad version: show the original exercise", group: "Review", combo: "KeyB" },
   // YouTube's K J L sit beside Space ← →, on a video or a recording only (D195).
   { id: "play", label: "Play / pause", group: "Video and listening", combo: "Space" },
-  { id: "play-alt", label: "Play / pause", group: "Video and listening", combo: "KeyK", scope: "sound" },
+  { id: "play-alt", label: "Play / pause (second key)", group: "Video and listening", combo: "KeyK", scope: "sound" },
   { id: "back", label: "Back 15 seconds", group: "Video and listening", combo: "ArrowLeft" },
-  { id: "back-alt", label: "Back 15 seconds", group: "Video and listening", combo: "KeyJ", scope: "sound" },
+  { id: "back-alt", label: "Back 15 seconds (second key)", group: "Video and listening", combo: "KeyJ", scope: "sound" },
   { id: "forward", label: "Forward 30 seconds", group: "Video and listening", combo: "ArrowRight" },
-  { id: "forward-alt", label: "Forward 30 seconds", group: "Video and listening", combo: "KeyL", scope: "sound" },
+  { id: "forward-alt", label: "Forward 30 seconds (second key)", group: "Video and listening", combo: "KeyL", scope: "sound" },
   { id: "slower", label: "Slower", group: "Video and listening", combo: "BracketLeft" },
   { id: "faster", label: "Faster", group: "Video and listening", combo: "BracketRight" },
   { id: "keep", label: "Highlight (no key point or question)", group: "Highlight", combo: "Digit1" },
@@ -234,10 +234,18 @@ export function comboOf(e: KeyboardEvent): Combo | null {
   return [...mods, e.code].join("+");
 }
 
-/** A menu click replays its binding as a keydown (menubar.ts); one with no keys carries the command. */
+/** A menu click replays its binding as a keydown carrying its command (menubar.ts). */
 export type CommandEvent = KeyboardEvent & { command?: KeyId };
 
-export const is = (e: KeyboardEvent, id: KeyId) => (keymap[id] ? comboOf(e) === keymap[id] : (e as CommandEvent).command === id);
+const byId = (id: KeyId) => DEFAULTS.find((x) => x.id === id)!;
+
+/** Whether a keydown runs `id`. A menu click's replay never runs a command its own can't meet (Listen's
+ *  L is not the player's L, D195); with no keys, only the command matches. */
+export const is = (e: KeyboardEvent, id: KeyId) => {
+  const command = (e as CommandEvent).command;
+  if (!keymap[id]) return command === id;
+  return comboOf(e) === keymap[id] && !(command && command !== id && apart(byId(command), byId(id)));
+};
 
 /** Whether a keydown lands in a text field, where a plain letter is typing. */
 export const inTextField = (e: KeyboardEvent) => {
@@ -296,14 +304,19 @@ export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["no-idea", "in-hea
 /** App keys that work in Review too (⌘↵, the passage arrows, Undo and Redo, by its button and the toast), and the quick quiz, which works from any app. */
 const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-next", "passage-prev", "undo", "redo", "quick-quiz"]);
 
-/** The binding that already has `combo` where `id` works (the app, Review, or the diagram editor), if any. */
+const scope = (x: Binding) => (x.scope === "diagram" ? "diagram" : IN_REVIEW.has(x.id) ? "review" : "app");
+/** A source has sound of its own or it hasn't, so their keys are never live together. */
+function apart(x: Binding, y: Binding) {
+  return (x.scope === "sound" && y.scope === "silent") || (x.scope === "silent" && y.scope === "sound");
+}
+/** Whether two bindings can be live at once (the app, Review, the diagram editor, a source with or without sound). */
+const meet = (x: Binding, y: Binding) =>
+  !apart(x, y) && (scope(x) === scope(y) || (scope(x) !== "diagram" && scope(y) !== "diagram" && (IN_REVIEW_TOO.has(x.id) || IN_REVIEW_TOO.has(y.id))));
+
+/** The binding that already has `combo` where `id` works, if any. */
 export function clash(id: KeyId, combo: Combo): (Binding & { id: KeyId }) | null {
   if (!combo) return null;
-  const scope = (x: Binding) => (x.scope === "diagram" ? "diagram" : IN_REVIEW.has(x.id) ? "review" : "app");
-  const apart = (x: Binding, y: Binding) => (x.scope === "sound" && y.scope === "silent") || (x.scope === "silent" && y.scope === "sound");
-  const meet = (x: Binding, y: Binding) =>
-    !apart(x, y) && (scope(x) === scope(y) || (scope(x) !== "diagram" && scope(y) !== "diagram" && (IN_REVIEW_TOO.has(x.id) || IN_REVIEW_TOO.has(y.id))));
-  const b = DEFAULTS.find((x) => x.id === id)!;
+  const b = byId(id);
   return DEFAULTS.find((x) => x.id !== id && meet(x, b) && keymap[x.id] === combo) ?? null;
 }
 
@@ -339,9 +352,15 @@ export const isCustom = (id: KeyId) => id in overrides;
 export const defaultOf = (id: KeyId): Combo => DEFAULTS.find((x) => x.id === id)!.combo;
 
 /** The saved shortcuts the rules still allow: one saved before a key was reserved (the palette on ⌘A)
- *  or for a command since removed is dropped, and that command gets its default back. */
+ *  or for a command since removed is dropped, and that command gets its default back. A default that
+ *  came later on a key he gave another command (the player's J, D195) gives way: it loads not assigned. */
 function kept(saved: Record<string, Combo>): Record<string, Combo> {
-  return Object.fromEntries(Object.entries(saved).filter(([id, combo]) => typeof combo === "string" && DEFAULTS.some((b) => b.id === id) && !invalid(id as KeyId, combo)));
+  const ok = Object.fromEntries(Object.entries(saved).filter(([id, combo]) => typeof combo === "string" && DEFAULTS.some((b) => b.id === id) && !invalid(id as KeyId, combo)));
+  for (const b of DEFAULTS) {
+    if (b.id in ok || !b.combo) continue;
+    if (DEFAULTS.some((x) => x.id in ok && ok[x.id] === b.combo && meet(x, b))) ok[b.id] = "";
+  }
+  return ok;
 }
 overrides = kept(read());
 keymap = build();

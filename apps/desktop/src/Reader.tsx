@@ -428,6 +428,8 @@ type Props = {
   /** The course this source is a lesson of, its lessons in order (D79), and opening one of them. */
   lessons?: Item[];
   onOpenLesson: (id: string) => void;
+  /** Whether the open source has sound of its own (a video or a recording): the menu bar greys out Listen there. */
+  onSound?: (sound: boolean) => void;
   onPin: (item: Item) => void;
   onMove: (item: Item, to: Item["status"]) => void;
   /** A highlight to scroll to once the text is ready (a question on the skill page, D47), or
@@ -596,6 +598,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   // A kept recording (D167) plays as a video does, on its own audio: the same following, stamps and keys.
   const audio = doc?.transcript ? null : (doc?.audio ?? null);
   const video = useMemo(() => doc?.transcript ?? (audio ? { video: "", words: audio.words } : null), [doc?.transcript, audio]);
+  const { onSound } = p;
+  useEffect(() => onSound?.(!!video), [onSound, video]);
   const youtube = useYouTube(doc?.transcript?.video, p.id);
   const recording = useAudio(audio?.file, p.id);
   const player = audio ? recording : youtube;

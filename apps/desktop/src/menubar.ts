@@ -55,7 +55,8 @@ function accel(id: KeyId, combo: Combo): string | null {
   return combo.replace("Meta", "Super");
 }
 
-export type Where = { reader: boolean; review: boolean };
+/** `sound`: the open source has sound of its own (a video or a recording), where Listen does nothing. */
+export type Where = { reader: boolean; review: boolean; sound?: boolean };
 
 export function menuSpec(keymap: Record<KeyId, Combo>, where: Where) {
   return MENUS.map((m) => ({
@@ -65,7 +66,8 @@ export function menuSpec(keymap: Record<KeyId, Combo>, where: Where) {
       if (it === "-") return { predef: "separator" };
       if (it.startsWith("@")) return { predef: it.slice(1) };
       const id = it as KeyId;
-      const enabled = IN_REVIEW.has(id) ? where.review : m.when ? where[m.when] && !where.review : true;
+      const silent = "scope" in binding(id) && binding(id).scope === "silent";
+      const enabled = (IN_REVIEW.has(id) ? where.review : m.when ? where[m.when] && !where.review : true) && !(silent && where.sound);
       return { id: `ore:${id}`, label: LABEL[id] ?? binding(id).label, accel: accel(id, keymap[id]), enabled };
     }),
   }));
@@ -133,7 +135,7 @@ export function runMenu(id: KeyId, keymap: Record<KeyId, Combo>, now = performan
   // A field ignores plain-key shortcuts, so those go to the page; ⌘, ⌃ and ⌥ ones work where he is.
   const global = "global" in binding(id) && binding(id).global;
   const e: CommandEvent = keydownFor(combo);
-  if (!combo) e.command = id; // not assigned: the handler matches the command instead of keys
+  e.command = id; // with no keys the handler matches the command; with keys, never one its own can't meet
   // Undo in the note or diagram editor is theirs: the press goes to where he is.
   const here = global || ((id === "undo" || id === "redo") && (document.activeElement as HTMLElement | null)?.isContentEditable);
   ((here && document.activeElement) || document.body).dispatchEvent(e);
