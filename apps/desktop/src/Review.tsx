@@ -604,8 +604,8 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         },
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
-    // Every rating is a step, a miss too: its retry is one more step (D59), so "Exercise N of M" never shows one
-    // number for two exercises, and M grows only by that retry.
+    // Every rating is a step, a miss too: a rating always moves "Exercise N of M" on, and a miss adds its retry
+    // as one more step (D59).
     setDone((n) => n + 1);
     if (ahead.current) ahead.current.armed = true;
     advance(rating === 1);

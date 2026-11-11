@@ -5255,7 +5255,7 @@ async function startReview(page: Page, only: RegExp | null) {
   await page.locator(".review-q").waitFor();
 }
 
-journey("review: a miss is a step of its own and its retry one more, so \"Exercise N of M\" never repeats and M grows only by the retry (D59)", async (page) => {
+journey("review: a rating always moves \"Exercise N of M\" on, and a miss adds its retry as one more step (D59)", async (page) => {
   const log = oreCalls(page);
   try {
     await startReview(page, null);
