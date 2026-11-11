@@ -2013,6 +2013,8 @@ journey("original: a PDF's side panel has an Original tab that draws its page, f
   await select(page, "Practice spread over days");
   await page.locator(".popup").waitFor();
   await page.keyboard.press("Escape");
+  await page.locator(".doc h3", { hasText: "Spacing out sessions" }).evaluate((h) => h.scrollIntoView({ block: "start" }));
+  await drawn(3);
   // He turns ahead by hand; reading on to another page takes the panel back.
   await page.getByRole("button", { name: "Next page" }).click();
   await drawn(4);
