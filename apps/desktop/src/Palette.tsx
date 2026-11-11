@@ -1,3 +1,4 @@
+import { fold, WORDS } from "./match";
 import { GraduationCap, X } from "./icons";
 import { Command } from "cmdk";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -405,8 +406,7 @@ export function titleScore(title: string, query: string): number {
   const t = fold(title);
   const q = fold(query).trim();
   const exact = t.trim() === q ? 1 : 0;
-  // A word keeps a trailing # or + (C#, C++, F#), or "c#" would match every title with a c-word.
-  const terms = q.match(/[\p{L}\p{N}_]+[#+]*/gu) ?? [];
+  const terms = q.match(WORDS) ?? [];
   // No letters: emoji (🔥) match the titles that hold them; punctuation alone (: . -) matches nothing.
   if (!terms.length) return /\p{Extended_Pictographic}/u.test(q) && t.includes(q) ? 1 + (t.startsWith(q) ? 0.5 : 0) + exact : 0;
   let score = 0;
@@ -419,8 +419,6 @@ export function titleScore(title: string, query: string): number {
   }
   return score / terms.length + (t.startsWith(terms[0]!) ? 0.5 : 0) + exact;
 }
-/** Lower case with accents taken off, so "cafe" and "Café" are one word. */
-const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 /** One line of a search snippet: FTS5 brackets the matched words; a bracket around anything
  *  else is the source's own Markdown and stays as written. */

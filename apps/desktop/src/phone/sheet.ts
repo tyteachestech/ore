@@ -1,6 +1,13 @@
 // A bottom sheet on the iPhone closes with a swipe down, as iOS sheets do: it follows the finger, and let go
 // past a quarter of its height (or with a flick) it slides away, otherwise it springs back.
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, type ReactElement, type RefObject } from "react";
+import { createPortal } from "react-dom";
+import { PHONE } from "../ore";
+
+/** A bottom sheet's layer on the phone: on the body, so it covers the whole screen it opened from, the reader's
+ *  floating bar and pill included (inside that screen it sat in the layer of its ⋯ or pill, under the bar), and
+ *  above toasts (styles.css). On the Mac it stays where it is. */
+export const sheetLayer = (sheet: ReactElement) => (PHONE ? createPortal(sheet, document.body) : sheet);
 
 export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => void, on: boolean) {
   const close = useRef(onClose);

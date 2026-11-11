@@ -42,6 +42,37 @@ export function save(key: string, value: string): void {
   }
 }
 
+/** Drafts by id, kept in localStorage under `key` as well (null: memory only). The phone's use it: iOS ends a web view
+ *  left in the background, and what he typed must be there on the relaunch, as in Notes. Written a moment after the
+ *  last change, and at once as the page is hidden or goes (iOS may end it any time after), never on each keystroke. */
+export type Kept<V> = { get(id: string): V | undefined; set(id: string, v: V): void; delete(id: string): void };
+export function kept<V>(key: string | null): Kept<V> {
+  const m = new Map<string, V>();
+  if (!key) return { get: (id) => m.get(id), set: (id, v) => void m.set(id, v), delete: (id) => void m.delete(id) };
+  try {
+    for (const [k, v] of JSON.parse(load(key) ?? "[]") as [string, V][]) m.set(k, v);
+  } catch {}
+  let dirty = false;
+  let later = 0;
+  const flush = () => {
+    clearTimeout(later);
+    if (dirty) save(key, JSON.stringify([...m]));
+    dirty = false;
+  };
+  const changed = () => {
+    dirty = true;
+    clearTimeout(later);
+    later = window.setTimeout(flush, 300);
+  };
+  addEventListener("pagehide", flush);
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flush());
+  return {
+    get: (id) => m.get(id),
+    set: (id, v) => (m.set(id, v), changed()),
+    delete: (id) => void (m.delete(id) && changed()),
+  };
+}
+
 /** How far each list was scrolled, by tab, skill page or "home": one map in localStorage for the app, as every
  *  remembered view is (the app opens one library; another is a developer's ORE_LIBRARY). */
 export function keptScrolls(): Record<string, number> {
@@ -80,6 +111,8 @@ export function useKeptScroll(ref: RefObject<HTMLElement | null>, key: string): 
       grows.disconnect();
       sized.disconnect();
     };
+    // No place kept: the top, not where the scroller was for another key (the phone's lists share one).
+    if (!pending) el.scrollTop = 0;
     put();
     if (pending) (grows.observe(el, { childList: true, subtree: true }), watch());
     const giveUp = window.setTimeout(stop, 3000);

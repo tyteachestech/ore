@@ -50,7 +50,7 @@ export function KeyboardBar({ view, targets }: { view: () => EditorView | undefi
   const { from, to, empty } = v.state.selection;
   if (!empty && !(v.state.selection instanceof BlockSelection))
     return createPortal(
-      <div className="kb-bar" onPointerDown={(e) => e.preventDefault()}>
+      <div className="kb-bar" onMouseDown={(e) => e.preventDefault()}>
         <SelectionBar key={`${from}-${to}`} view={view} sel={{ from, to, x: 0, y: 0 }} targets={targets} onDone={redraw} docked />
       </div>,
       document.body,
@@ -78,7 +78,7 @@ export function KeyboardBar({ view, targets }: { view: () => EditorView | undefi
     redraw();
   };
   return createPortal(
-    <div className="kb-bar" role="toolbar" aria-label="Note blocks" onPointerDown={(e) => e.preventDefault()}>
+    <div className="kb-bar" role="toolbar" aria-label="Note blocks" onMouseDown={(e) => e.preventDefault()}>
       {BUTTONS.map((b) => (
         <button
           key={b.a}
@@ -86,7 +86,7 @@ export function KeyboardBar({ view, targets }: { view: () => EditorView | undefi
           aria-label={b.label}
           aria-pressed={b.a === "todo" || b.a === "bullet" || b.a === "heading" ? active(b.a) : undefined}
           disabled={(b.a === "indent" || b.a === "outdent") && !s.inList}
-          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => tap(b.a)}
         >
           {b.icon}
@@ -104,7 +104,7 @@ export function KeyboardBar({ view, targets }: { view: () => EditorView | undefi
           if (!o) v.focus();
         }}
       />
-      <button className="kb-btn" aria-label="Hide the keyboard" onPointerDown={(e) => e.preventDefault()} onClick={() => (v.dom as HTMLElement).blur()}>
+      <button className="kb-btn" aria-label="Hide the keyboard" onMouseDown={(e) => e.preventDefault()} onClick={() => (v.dom as HTMLElement).blur()}>
         <Keyboard size={16} />
       </button>
     </div>,
