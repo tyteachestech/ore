@@ -6,7 +6,7 @@
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 //   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
-import { chromium, webkit, type Browser, type Locator, type Page } from "playwright";
+import { chromium, devices, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,7 +50,38 @@ async function safariBrowser(): Promise<Browser> {
   }
 }
 
+/** The iPhone build (ORE_PHONE=1, src/phone) on the seeded library, started the first time a phone journey needs it
+ *  (on ORE_E2E_PHONE_PORT, vite's port + 2; E2E_PHONE_URL uses one already running). It runs the core inside the
+ *  page, so it takes no bridge; its library is a snapshot of the files when the page loads. */
+let phoneVite: { url: string; stop: () => void } | undefined;
+async function phoneApp(): Promise<string> {
+  if (process.env.E2E_PHONE_URL) return process.env.E2E_PHONE_URL;
+  if (phoneVite) return phoneVite.url;
+  const port = Number(process.env.ORE_E2E_PHONE_PORT ?? PORT + 2);
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: LIB }, stdout: "ignore", stderr: "ignore" });
+  const url = `http://localhost:${port}/`;
+  for (let i = 0; i < 100; i++) {
+    if (await fetch(url).then((r) => r.ok, () => false)) break;
+    await Bun.sleep(200);
+  }
+  phoneVite = { url, stop: () => vite.kill() };
+  return url;
+}
+
+/** The phone app as he holds it: WebKit at 390×844 with touch, dark (D78). Journeys tap with `tap()`, a real touch. */
+async function openPhone(): Promise<Page> {
+  const url = await phoneApp();
+  const page = await (await safariBrowser()).newPage({ ...devices["iPhone 14"], viewport: { width: 390, height: 844 }, colorScheme: "dark" });
+  page.setDefaultTimeout(8000);
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.addInitScript(HYGIENE);
+  await page.goto(url);
+  await page.locator(".phone-app").waitFor();
+  return page;
+}
+
 async function open(url: string, engine: Engine): Promise<Page> {
+  if (engine === "phone") return openPhone();
   const page = await (engine === "webkit" ? await safariBrowser() : browser).newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
@@ -217,8 +248,9 @@ const errors: string[] = [];
 const { url, stop } = await start();
 const browser = await chromium.launch();
 /** The Mac app runs in WebKit (WKWebView), not Chromium: a journey about what only WebKit does (its native
- *  undo in a text field) runs there, in a browser launched the first time one needs it. */
-type Engine = "chromium" | "webkit";
+ *  undo in a text field) runs there, in a browser launched the first time one needs it. "phone" is the iPhone
+ *  build in WebKit with touch (openPhone). */
+type Engine = "chromium" | "webkit" | "phone";
 let safari: Browser | undefined;
 const journeys: [string, (page: Page) => Promise<void>, Engine][] = [];
 const journey = (name: string, run: (page: Page) => Promise<void>, engine: Engine = "chromium") => journeys.push([name, run, engine]);
@@ -8062,6 +8094,52 @@ journey("a11y: a row is one control with its actions beside it (axe nested-inter
   if ((await focused()).inSide) throw new Error("Tab after the arrows stayed in the sidebar");
 });
 
+// —— the iPhone build (D78): WebKit at 390×844, every press a real touch ——
+
+/** A real touch on the middle of what the locator finds, once it has stopped moving (a drawer or sheet sliding in). */
+async function tap(page: Page, target: Locator) {
+  const el = target.first();
+  await el.scrollIntoViewIfNeeded();
+  let b = await el.boundingBox();
+  for (let i = 0; i < 20; i++) {
+    await Bun.sleep(50);
+    const now = await el.boundingBox();
+    if (now && b && now.x === b.x && now.y === b.y) break;
+    b = now;
+  }
+  if (!b) throw new Error(`nothing on screen to tap: ${target}`);
+  await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+}
+
+/** Opens a source from the drawer's Sources, by its title. */
+async function phoneSource(page: Page, title: string) {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await tap(page, page.locator(".phone-sources button").filter({ hasText: title }));
+  await page.locator(".phone-reader .doc").first().waitFor();
+}
+
+journey("phone: a tap opens Source actions and works the note's keyboard bar", async (page) => {
+  // WebKit sends no click after a touch whose pointer-down was prevented: the ⋯ and the bar's buttons did nothing.
+  await phoneSource(page, TESTING);
+  const more = page.getByRole("button", { name: "Source actions" });
+  await tap(page, more);
+  await until("a tap on ⋯ opens Source actions", async () => (await more.getAttribute("aria-expanded")) === "true");
+  await page.locator(".action-sheet").waitFor();
+  await page.touchscreen.tap(195, 40); // outside the sheet, which closes it
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  await tap(page, note);
+  await page.keyboard.type("a tapped line");
+  const todo = page.locator(".kb-bar").getByRole("button", { name: "To-do" });
+  await tap(page, todo);
+  await until("a tap on the keyboard bar's To-do makes the line a to-do", async () => (await note.locator('li[data-item-type="task"]').filter({ hasText: "a tapped line" }).count()) === 1);
+  const block = page.locator(".kb-bar").getByRole("button", { name: "Block actions" });
+  await tap(page, block);
+  await until("a tap on the bar's ⋯ opens Block actions", async () => (await block.getAttribute("aria-expanded")) === "true");
+}, "phone");
+
 // —— run ——
 
 let failed = 0;
@@ -8091,6 +8169,7 @@ for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) 
 }
 await browser.close();
 await safari?.close();
+phoneVite?.stop();
 // The style rules a regex can't see (nested frames, off-ramp font sizes), on the same mock.
 if (!only && shard === shards) {
   const style = Bun.spawnSync(["bun", join(MOCK, "style-check.ts"), url], { env: { ...process.env, ORE_BRIDGE: String(BRIDGE) }, stdout: "inherit", stderr: "inherit" });

@@ -240,6 +240,8 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   const open = controlled ?? own;
   // The press that opens it keeps focus where it is (a note's text under the keyboard bar), as Radix's
   // trigger does; an owner that preventDefault()s the press keeps it from opening (the drag handle).
+  // Kept on the mouse-down, never the pointer-down: WebKit sends no click after a touch whose pointer-down
+  // was prevented, so on the phone the tap did nothing.
   const held = useRef(false);
   const [stepId, setStepId] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -275,7 +277,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   };
   return (
     <>
-      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} data-no-drag onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; e.preventDefault(); }}>
+      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} data-no-drag onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; }} onMouseDown={(e) => e.preventDefault()}>
         {icon ?? <DotsThree size={16} aria-hidden="true" />}
       </button>
       {open && (
