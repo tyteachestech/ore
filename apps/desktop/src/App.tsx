@@ -1083,7 +1083,13 @@ export function App() {
       clearTimeout(t);
     };
   }, [q]);
-  const byTitle = useMemo(() => (q ? ranked(tabRows, q, (r) => searchFields(r, siteOf(r.url), r.skills.map((id) => skills.find((s) => s.id === id)?.name ?? id))) : tabRows), [tabRows, q, skills]);
+  /** What each row is searched by, worked out once per list and not on every key: a site is a parsed URL
+   *  and a skill a lookup, which on a big library was most of a key's time (bench "filter sources"). */
+  const fieldsOf = useMemo(() => {
+    const names = new Map(skills.map((s) => [s.id, s.name]));
+    return new Map(tabRows.map((r) => [r, searchFields(r, siteOf(r.url), r.skills.map((id) => names.get(id) ?? id))]));
+  }, [tabRows, skills]);
+  const byTitle = useMemo(() => (q ? ranked(tabRows, q, (r) => fieldsOf.get(r)!) : tabRows), [tabRows, q, fieldsOf]);
   const byText = useMemo(
     () => (q && hits.q === q ? tabRows.filter((r) => hits.snip.has(r.id) && !byTitle.includes(r)) : []),
     [tabRows, byTitle, hits, q],

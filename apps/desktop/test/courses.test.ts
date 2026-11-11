@@ -21,4 +21,10 @@ describe("courses in lists (D79)", () => {
     expect(finds(lesson("Lesson 3: Prompts", 3, "inbox"), "prompts")).toBe(true);
     expect(finds(source("Other", "inbox"), "ai fluency")).toBe(false);
   });
+
+  test("a site is searched by its name, not its .com, which every web page shares", () => {
+    const page = source("Other", "inbox");
+    expect(rankScore(searchFields(page, "nytimes.com"), "nytimes")).toBeGreaterThan(0);
+    expect(rankScore(searchFields(page, "nytimes.com"), "com")).toBe(0);
+  });
 });
