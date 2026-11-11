@@ -3970,28 +3970,33 @@ journey("list drag to select survives a refresh of the same list landing mid-dra
   const mid = async (i: number) => (await at(i)).y + (await at(i)).height / 2;
   const edge = (await page.locator(".side-divider").boundingBox())!;
   const x = (edge.x + edge.width + (await at(0)).x) / 2;
-  // Pinning a row reads the list again after it writes; that read answers late, while the box is being dragged.
-  await page.evaluate(() => ((window as unknown as { __ORE_SLOW: object }).__ORE_SLOW = { ls: 1500 }));
+  // Pinning a row reads the list again after it writes (`ls` and `ls --archived`); those reads are held until the
+  // box is being dragged, then let go, so they land mid-drag.
+  await hold(page, "ls", 2);
   const pinned = (await rowTitles(page, 2))[0]!;
-  await rows.nth(2).click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Pin to top" }).click();
-  await until("pinned on screen at once", async () => (await rowTitles(page, 0))[0] === pinned);
-  await boxDrag(page, x, (await at(0)).y + 10, x + 240, await mid(1), false);
-  await until("two picked", async () => (await pickedRows(page)).length === 2);
-  if (!(await page.evaluate(() => (window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING))) throw new Error("the list was read again before the drag: nothing landed mid-drag");
-  await loaded(page); // the late read lands
-  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = undefined));
-  await page.mouse.move(x + 240, await mid(2), { steps: 4 });
-  await until("the box goes on to the third row", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 2)).join());
-  if ((await page.locator(".marquee").count()) !== 1) throw new Error("the box went with the refresh");
-  await page.mouse.up();
-  await until("released, the three stay", async () => (await pickedRows(page)).length === 3 && !(await page.locator(".marquee").count()));
-  // Unpin it for the journeys after this one (one row's menu, so the pick goes first).
-  await page.keyboard.press("Escape");
-  await until("the pick is cleared", async () => !(await pickedRows(page)).length);
-  await rows.filter({ hasText: pinned }).first().click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Unpin" }).click();
-  await until("unpinned", async () => !(await page.locator(".row.pinned").count()));
+  try {
+    await rows.nth(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Pin to top" }).click();
+    await until("pinned on screen at once", async () => (await rowTitles(page, 0))[0] === pinned);
+    await boxDrag(page, x, (await at(0)).y + 10, x + 240, await mid(1), false);
+    await until("two picked", async () => (await pickedRows(page)).length === 2);
+    await until("the list's read again is waiting", () => isHeld(page, "ls"));
+    const landed = answered(page, "ls");
+    await release(page, "ls");
+    await landed;
+    await loaded(page); // and drawn
+    await page.mouse.move(x + 240, await mid(2), { steps: 4 });
+    await until("the box goes on to the third row", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 2)).join());
+    if ((await page.locator(".marquee").count()) !== 1) throw new Error("the box went with the refresh");
+    await page.mouse.up();
+    await until("released, the three stay", async () => (await pickedRows(page)).length === 3 && !(await page.locator(".marquee").count()));
+  } finally {
+    // Unpinned for the journeys after this one, whatever happened above.
+    await page.mouse.up().catch(() => {});
+    await release(page, "ls").catch(() => {});
+    const row = ((await ore("ls")) as { id: string; title: string; pinned_at?: string }[]).find((i) => i.title === pinned);
+    if (row?.pinned_at) await ore("pin", row.id, "--undo");
+  }
 });
 
 journey("list drag to select on a skill page: a drag from the column beside its sources selects the ones it crosses; a click there clears (D194)", async (page) => {
@@ -5856,6 +5861,19 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   if (!mine || mine.status !== "done" || mine.uses?.length) throw new Error(`the library kept the re-plan: ${JSON.stringify(mine)}`);
 });
 
+/** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
+const hold = (page: Page, key: string, calls = 1) => page.evaluate(([k, n]) => {
+  const w = window as unknown as { __ORE_HOLD?: Record<string, unknown[]> };
+  (w.__ORE_HOLD ??= {})[k] = Array(n).fill("manual");
+}, [key, calls] as const);
+const release = (page: Page, key: string) => page.evaluate((k) => (window as unknown as { __ORE_RELEASE: (k: string) => void }).__ORE_RELEASE(k), key);
+/** Whether an `ore <key>` is waiting on its hold right now. */
+const isHeld = (page: Page, key: string) => page.evaluate((k) => (window as unknown as { __ORE_HELD: string[] }).__ORE_HELD.includes(k), key);
+/** Resolves once the page's next `ore <cmd>` has answered. */
+const answered = (page: Page, cmd: string) => page.waitForResponse((r) => r.url().endsWith("/ore") && (JSON.parse(r.request().postData() ?? "{}") as { args?: string[] }).args?.[0] === cmd);
+/** The tries on the skill page whose text has `text`. */
+const tryRows = (page: Page, text: string) => page.locator(".try").filter({ hasText: text });
+
 journey("try it: a plan written just before the skill page opens shows there once it saves, though the page read its tries first", async (page) => {
   await openSource(page, TESTING);
   await select(page, "explaining an idea aloud all count"); // a passage no other journey highlights
@@ -5864,12 +5882,110 @@ journey("try it: a plan written just before the skill page opens shows there onc
   await until("the plan field has the caret", async () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Note"));
   await page.keyboard.type("Explain it aloud on the walk home");
   await loaded(page); // Try it has saved; only the plan's write is left
-  // The plan's write lands after the skill page has read its tries, as on a busy Mac.
-  await page.evaluate(() => ((window as unknown as { __ORE_HOLD: object }).__ORE_HOLD = { annotate: [1500] }));
+  // The plan's write waits until the skill page has read its tries, as on a busy Mac.
+  await hold(page, "annotate");
   await page.keyboard.press("Enter");
+  const read = answered(page, "tries");
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
-  await page.locator(".try").first().waitFor();
-  await until("the try shows its plan once it saves", async () => (await page.locator(".try").filter({ hasText: "Explain it aloud on the walk home" }).count()) === 1);
+  await read;
+  if (!(await isHeld(page, "annotate")) || (await tryRows(page, "Explain it aloud on the walk home").count())) throw new Error("the skill page did not read its tries before the plan saved");
+  await release(page, "annotate");
+  await until("the try shows its plan once it saves", async () => (await tryRows(page, "Explain it aloud on the walk home").count()) === 1);
+});
+
+journey("try it: a plan written while its highlight is still being made shows on a skill page opened meanwhile, once both save", async (page) => {
+  await searchPick(page, "spaced repetition scheduling", "Notes on spaced repetition scheduling (FSRS)"); // in Done, so ⌘K finds it
+  await page.locator(".doc-head").filter({ hasText: "Notes on spaced repetition scheduling (FSRS)" }).waitFor();
+  await hold(page, "highlight"); // the highlight itself is still being made when he goes
+  await select(page, "FSRS models stability and difficulty");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.press("4");
+  await until("the plan field has the caret", async () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Note"));
+  await page.keyboard.type("Check stability before each exam");
+  await page.keyboard.press("Enter");
+  const read = answered(page, "tries");
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await read;
+  if (!(await isHeld(page, "highlight")) || (await tryRows(page, "Check stability before each exam").count())) throw new Error("the skill page did not read its tries before the highlight was made");
+  await release(page, "highlight");
+  await until("the try shows with its plan once both save", async () => (await tryRows(page, "Check stability before each exam").count()) === 1);
+});
+
+journey("try it: a plan typed and left unsent (he clicks away) shows on the skill page he went to, once it saves", async (page) => {
+  await searchPick(page, "Story Spine", "The Story Spine"); // in Done, so ⌘K finds it
+  await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
+  await select(page, "The spine forces cause and effect");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.press("4");
+  await until("the plan field has the caret", async () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Note"));
+  await page.keyboard.type("Outline the next talk as a spine");
+  await loaded(page); // the try is made; the plan is saved only as the source closes
+  await hold(page, "annotate");
+  const read = answered(page, "tries");
+  await page.locator(".sidebar .side-item", { hasText: "Storytelling" }).first().click(); // no Enter
+  await read;
+  if (!(await isHeld(page, "annotate")) || (await tryRows(page, "Outline the next talk as a spine").count())) throw new Error("the plan saved before the skill page read its tries");
+  await release(page, "annotate");
+  await until("the try shows its plan once it saves", async () => (await tryRows(page, "Outline the next talk as a spine").count()) === 1);
+});
+
+journey("try it: 4 on the reading focus makes a try that shows on a skill page opened while it saves", async (page) => {
+  await openSource(page, "A very long title about the neuroscience of habit formation");
+  await page.locator(".doc").getByText("Habits form when a cue").waitFor();
+  await loaded(page);
+  await hold(page, "highlight");
+  await page.keyboard.press("ArrowDown"); // the reading focus, on the source's first line
+  await page.keyboard.press("4"); // a try of it, in one `ore highlight --intent apply`
+  await until("the try is being made", () => isHeld(page, "highlight"));
+  await page.keyboard.press("Escape");
+  const read = answered(page, "tries");
+  await page.locator(".sidebar .side-item", { hasText: /^Habits$/ }).first().click();
+  const shown = (await (await read).json()) as unknown[];
+  if (shown.length) throw new Error("the skill page read a try before the one being made");
+  await release(page, "highlight");
+  await until("the try shows once it is made", async () => (await page.locator(".try").count()) === 1);
+});
+
+journey("highlight note: a click on the highlight in the instant its save lands opens it with the note he wrote, and closing it keeps the note", async (page) => {
+  await openSource(page, TESTING);
+  await hold(page, "highlight");
+  await select(page, "Confidence matters as much as accuracy");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.type("Ask how sure before checking"); // typing with the popup open writes its note
+  await page.keyboard.press("Enter");
+  await until("the popup closed", async () => !(await page.getByRole("dialog", { name: "Highlight" }).count()));
+  // A click on the passage as the save's answer comes in, before the page has drawn it.
+  const at = await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("Confidence matters");
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i + 3);
+      r.setEnd(n, i + 4);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    }
+    return null;
+  });
+  if (!at) throw new Error("the passage is not on the page");
+  await page.evaluate((at) => {
+    (window as unknown as { __ORE_AFTER: Record<string, () => void> }).__ORE_AFTER = {
+      highlight: () => {
+        getSelection()?.removeAllRanges();
+        document.elementFromPoint(at.x, at.y)!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: at.x, clientY: at.y, button: 0, detail: 1 }));
+      },
+    };
+  }, at);
+  await release(page, "highlight");
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  await until("the popup opens with his note", async () => (await popup.getByLabel("Note").inputValue()) === "Ask how sure before checking");
+  await page.keyboard.press("Escape");
+  await loaded(page);
+  const doc = (await ore("show", (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === TESTING)!.id, "--annotations")) as { annotations: { exact: string; note?: string }[] };
+  const mine = doc.annotations.find((a) => a.exact.startsWith("Confidence matters"));
+  if (mine?.note !== "Ask how sure before checking") throw new Error(`the note was lost: ${JSON.stringify(mine)}`);
 });
 
 journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D148)", async (page) => {

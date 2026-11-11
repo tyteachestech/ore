@@ -41,7 +41,8 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, inOrder, load, save, stepLanded, stepMade, useFocusBack, useLibraryChanges, type Notify } from "./util";
+import { errorText, inOrder, load, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
+import { mergeAnns } from "./anns";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
@@ -581,8 +582,16 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** A new highlight's stand-in id → the id its save came back with, from the moment it lands. A key or click
    *  on its popup can come before the page has drawn the swap (a busy Mac), still naming the stand-in. */
   const savedIds = useRef(new Map<string, string>());
-  /** Whether `a` is the highlight `id` names, by its saved id or the stand-in it had before its save landed. */
-  const isAnn = (a: Annotation, id: string) => a.id === id || a.id === savedIds.current.get(id);
+  /** A highlight's id as the library knows it: a stand-in whose save has landed is its saved id. The save's answer
+   *  moves `ranges` and `fresh` to the saved id at once, while the highlights and the popup say the stand-in until
+   *  the page draws again, so every lookup goes through these and either id finds the same highlight. */
+  const idOf = (id: string) => savedIds.current.get(id) ?? id;
+  const sameId = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && idOf(a) === idOf(b);
+  const isAnn = (a: Annotation, id: string) => sameId(a.id, id);
+  const annOf = (id: string | null | undefined) => (id ? annsRef.current.find((a) => sameId(a.id, id)) : undefined);
+  const rangeOf = (id: string | null | undefined) => (id ? ranges.current.get(idOf(id)) ?? ranges.current.get(id) : undefined);
+  /** Highlights with a write of his still saving: a read again keeps his copy of them (mergeAnns). */
+  const busy = useRef(new Map<string, number>());
   const annsRef = useRef(anns);
   annsRef.current = anns;
   const frame = useRef(0);
@@ -634,7 +643,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** In a video, when a highlight is spoken: the right edge of its row in the Collected tab. */
   const timeOf = words
     ? (a: Annotation) => {
-        const r = ranges.current.get(a.id);
+        const r = rangeOf(a.id);
         const i = r && idx.current ? wordAtOffset(words, skeletonOffset(idx.current, r.startContainer, r.startOffset)) : -1;
         return i >= 0 ? clock(words.time[i]!) : null;
       }
@@ -846,7 +855,9 @@ function ReaderView(p: Props & { reload: () => void }) {
         setDoc(d);
         // Enrich runs once, right after `ore add`: long after that with nothing to show, it failed.
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
-        setAnns((d.annotations ?? []).filter(visible));
+        // Read again (a wake), what he made or changed here that is still saving stays as he has it.
+        const server = (d.annotations ?? []).filter(visible);
+        setAnns(opened.current === p.id ? (l) => mergeAnns(server, l, new Set(busy.current.keys()), savedIds.current) : server);
         // Opening starts it and moves it up To read (D110); a preview isn't listed, so it's left alone.
         if (!d.preview && opened.current !== p.id) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
         opened.current = p.id;
@@ -1179,7 +1190,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** Writes what he typed in the popup's note, however it closes: a click away, Esc, another
    *  highlight, leaving the source. Only Remove (and a selection dropped untouched) throws it away. */
   function keepNote(pop = popupNow.current) {
-    const ann = pop && annsRef.current.find((a) => a.id === pop.id);
+    const ann = pop && annOf(pop.id);
     if (!pop || !ann) return;
     const note = pop.note.trim();
     if (note !== (ann.note ?? "")) void setNoteOf(pop.id, note);
@@ -1200,7 +1211,7 @@ function ReaderView(p: Props & { reload: () => void }) {
    *  the popup lifts away, its margin mark pops in three pixel steps and the passage glows once. Only transform
    *  and opacity animate, on inert copies, so the next selection or key never waits; skipped under reduced motion. */
   function settle(id: string, note: string) {
-    const ann = annsRef.current.find((a) => a.id === id);
+    const ann = annOf(id);
     const page = pageRef.current;
     if (!ann || !page || (ann.intent === "keep" && !note.trim())) return;
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -1224,7 +1235,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       mark.classList.add("settle");
       setTimeout(() => mark.classList.remove("settle"), 240);
     });
-    const range = ranges.current.get(id);
+    const range = rangeOf(id);
     if (range) {
       const box = page.getBoundingClientRect();
       const glow = document.createElement("div");
@@ -1289,10 +1300,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     const page = pageRef.current;
     if (!popup?.id || !page) return;
     const obs = new ResizeObserver(() => {
-      const range = ranges.current.get(popup.id);
+      const range = rangeOf(popup.id);
       // The text moved under the pointer: keep the side, centre on the passage again.
       const at = range && popupAt(range, { up: aimRef.current.up });
-      if (at) setPopup((cur) => (cur && cur.id === popup.id ? { ...cur, ...at } : cur));
+      if (at) setPopup((cur) => (cur && sameId(cur.id, popup.id) ? { ...cur, ...at } : cur));
     });
     obs.observe(page);
     return () => obs.disconnect();
@@ -1314,11 +1325,11 @@ function ReaderView(p: Props & { reload: () => void }) {
    *  video's player) and open its popup, whose ▶ plays from there. */
   function jumpToHighlight(id: string) {
     const el = scrollRef.current;
-    const range = ranges.current.get(id);
+    const range = rangeOf(id);
     if (!el || !range) return;
     toThird(range);
     fresh.current = null;
-    openPopup(id, range, anns.find((a) => a.id === id)?.note ?? "");
+    openPopup(id, range, annOf(id)?.note ?? "");
   }
 
   /** A jump from Collected to the passage; on the phone, on the source's page once it has slid back in. */
@@ -1391,8 +1402,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
     const tmp = `pending-${Date.now()}`;
     setAnns((l) => [...l, { id: tmp, rev: 0, intent: "card", exact: "", prefix: "", suffix: "", start: at, end: at, note: line, status: "open", point: true }]);
+    const wake = wakeOnLanding();
     try {
-      const ann = await ore<Annotation>("highlight", p.id, "--at", String(at), opt("note", line));
+      const made = ore<Annotation>("highlight", p.id, "--at", String(at), opt("note", line));
+      wake(made);
+      const ann = await made;
       keptFromFeed(ann);
       setAnns((l) => l.map((a) => (a.id === tmp ? ann : a)));
       const s = annStep(ann.id);
@@ -1417,6 +1431,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     args.push("--start", String(q ? q.start : sourceHint(src, index, range)));
     const tmp = `pending-${Date.now()}`;
     const promise = ore<Annotation>(...args);
+    wakeOnLanding()(promise); // a skill page opened while it is made (4 on the focus is a try) reads it once it lands
     pending.current.set(tmp, promise);
     ranges.current.set(tmp, range);
     setAnns((l) => [...l, { id: tmp, rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open" }]);
@@ -1530,36 +1545,42 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** Highlight writes that have settled. A highlight shows its mark at once, but `ore questions` only
    *  knows it once the write lands, so the Questions list reads again after each one (its `marked`). */
   const [annWrites, setAnnWrites] = useState(0);
-  const annotate = <T = unknown,>(id: string, ...args: string[]) => {
+  // A screen opened while it saves (he closes the popup and goes to the skill page at once) has read the library
+  // without it: once it lands, those screens read again (`wake`, taken at his action, before any wait).
+  const annotateWaking = <T = unknown,>(wake: (w: Promise<unknown>) => void, id: string, ...args: string[]) => {
+    busy.current.set(id, (busy.current.get(id) ?? 0) + 1);
     const write = inOrder(`annotate ${id}`, () => ore<T>("annotate", id, ...args));
-    const landed = () => setAnnWrites((n) => n + 1);
+    const landed = () => {
+      const n = (busy.current.get(id) ?? 1) - 1;
+      if (n) busy.current.set(id, n);
+      else busy.current.delete(id);
+      setAnnWrites((k) => k + 1);
+    };
     write.then(landed, landed);
-    // A screen opened while it saves (he closes the popup and goes to the skill page at once) has read the
-    // library without it: once it lands, those screens read again, as after a step of the history.
-    const token = {};
-    stepMade(token);
-    write.then(() => stepLanded(token), () => {});
+    wake(write);
     return write;
   };
+  const annotate = <T = unknown,>(id: string, ...args: string[]) => annotateWaking<T>(wakeOnLanding(), id, ...args);
 
   /** The popup's marks are switches on one highlight (D118): Key point or Question, again for neither. */
   async function setIntent(want: Intent) {
     if (!popup) return;
-    const now = annsRef.current.find((a) => a.id === popup.id)?.intent;
+    const now = annOf(popup.id)?.intent;
     const intent = want !== "keep" && want === now ? "keep" : want;
     if (intent === "card" || intent === "apply") noteRef.current?.focus();
     await setIntentOf(popup.id, intent);
   }
 
   async function setIntentOf(id: string, intent: Intent, undoable = true) {
-    const was = annsRef.current.find((a) => isAnn(a, id))?.intent;
+    const wake = wakeOnLanding();
+    const was = annOf(id)?.intent;
     setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, intent } : a)));
     const saved = realId(id);
     // On the history at once, so a ⌘Z right after the click takes this change back, not the step before it.
     const to = (i: Intent) => () => saved.then((rid) => setIntentOf(rid, i, false));
     const forget = undoable && was && was !== intent ? p.notify(`Changed to ${LABEL[intent]}`, "quiet", to(was), to(intent)) : undefined;
     try {
-      await annotate(await saved, "--intent", intent);
+      await annotateWaking(wake, await saved, "--intent", intent);
     } catch (e) {
       forget?.();
       setAnns((l) => l.map((a) => (isAnn(a, id) && was ? { ...a, intent: was } : a)));
@@ -1627,7 +1648,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** An edge let go: the passage is saved where it now ends, and the popup comes back beside it. */
   async function dropEdge(id: string, range: Range, was: Range) {
     const index = idx.current;
-    const a = annsRef.current.find((x) => x.id === id);
+    const a = annOf(id);
     const note = popup?.id === id ? popup.note : (a?.note ?? "");
     const same = range.compareBoundaryPoints(Range.START_TO_START, was) === 0 && range.compareBoundaryPoints(Range.END_TO_END, was) === 0;
     if (same || !a || !doc || !src || !index) return openPopup(id, was, note);
@@ -1642,11 +1663,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     const to: Span = { exact: q.exact, start: q.start, range };
     // Resized, it is a highlight he worked on: Esc now keeps it, as Enter does. A move that fails puts
     // the edge back, and the highlight is untouched again.
-    const wasFresh = fresh.current === id;
+    const wasFresh = sameId(fresh.current, id);
     if (wasFresh) fresh.current = null;
     let rid: string | undefined;
     ranges.current.set(id, range);
-    setAnns((l) => l.map((x) => (x.id === id ? { ...x, exact: q.exact, start: q.start, end: q.start + q.exact.length } : x)));
+    setAnns((l) => l.map((x) => (isAnn(x, id) ? { ...x, exact: q.exact, start: q.start, end: q.start + q.exact.length } : x)));
     setRepaint((n) => n + 1);
     openPopup(id, range, note);
     try {
@@ -1656,7 +1677,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       p.notify("Moved the highlight’s edge", "quiet", s.back, s.again);
     } catch (e) {
       ranges.current.set(id, was);
-      setAnns((l) => l.map((x) => (x.id === id ? { ...x, exact: from.exact, start: from.start, end: from.start + from.exact.length } : x)));
+      setAnns((l) => l.map((x) => (isAnn(x, id) ? { ...x, exact: from.exact, start: from.start, end: from.start + from.exact.length } : x)));
       setRepaint((n) => n + 1);
       setPopup((cur) => (cur?.id === id ? { ...cur, ...popupAt(was) } : cur));
       if (wasFresh && fresh.current === null) fresh.current = rid ?? id;
@@ -1665,11 +1686,12 @@ function ReaderView(p: Props & { reload: () => void }) {
   }
 
   async function setNoteOf(id: string, note: string, undoable = true) {
-    const was = annsRef.current.find((a) => isAnn(a, id))?.note ?? "";
+    const wake = wakeOnLanding();
+    const was = annOf(id)?.note ?? "";
     setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note } : a)));
     try {
       const rid = await realId(id);
-      await annotate(rid, opt("note", note));
+      await annotateWaking(wake, rid, opt("note", note));
       if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {
       setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note: was } : a)));
@@ -1738,11 +1760,11 @@ function ReaderView(p: Props & { reload: () => void }) {
    *  goes with the text (its cards stay). Undo puts the text and its highlights back. */
   async function cutOut() {
     if (!popup || !doc) return;
-    const range = ranges.current.get(popup.id);
+    const range = rangeOf(popup.id);
     const section = !!(range && (range.startContainer.nodeType === 1 ? (range.startContainer as Element) : range.startContainer.parentElement)?.closest("h1, h2, h3, h4, h5, h6"));
     const id = popup.id;
-    const ann = annsRef.current.find((a) => a.id === id);
-    const untouched = fresh.current === id && ann?.intent === "keep" && !ann.note && !popup.note.trim();
+    const ann = annOf(id);
+    const untouched = sameId(fresh.current, id) && ann?.intent === "keep" && !ann.note && !popup.note.trim();
     closePopup(false);
     const d = doc;
     try {
@@ -1768,11 +1790,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** "Start from here" (D49): plays from the highlight's first word. A fresh, untouched selection
    *  was only a way to point, so its Keep highlight goes; an existing highlight stays. */
   function startHere() {
-    const range = popup && ranges.current.get(popup.id);
+    const range = popup && rangeOf(popup.id);
     if (!popup || !range || !words || !idx.current) return;
     const i = wordAtOffset(words, skeletonOffset(idx.current, range.startContainer, range.startOffset));
-    const ann = annsRef.current.find((a) => a.id === popup.id);
-    const drop = fresh.current === popup.id && ann?.intent === "keep" && !ann.note && !popup.note.trim();
+    const ann = annOf(popup.id);
+    const drop = sameId(fresh.current, popup.id) && ann?.intent === "keep" && !ann.note && !popup.note.trim();
     if (i >= 0) seekTo(words.time[i]!, true);
     if (drop) void remove(false);
     else closePopup();
@@ -1783,8 +1805,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   function lookUp(range: Range, from: Popup | null) {
     let ann: string | null = null;
     if (from) {
-      const a = annsRef.current.find((x) => x.id === from.id);
-      const drop = fresh.current === from.id && a?.intent === "keep" && !a.note && !from.note.trim();
+      const a = annOf(from.id);
+      const drop = sameId(fresh.current, from.id) && a?.intent === "keep" && !a.note && !from.note.trim();
       if (drop) void remove(false);
       else {
         ann = from.id;
@@ -1821,9 +1843,9 @@ function ReaderView(p: Props & { reload: () => void }) {
       return;
     }
     const id = await realId(ann);
-    openPopup(id, ranges.current.get(id) ?? range, annsRef.current.find((a) => a.id === id)?.note ?? "");
+    openPopup(id, rangeOf(id) ?? range, annOf(id)?.note ?? "");
     requestAnimationFrame(() => noteRef.current?.focus());
-    if (annsRef.current.find((a) => a.id === id)?.intent !== "card") await setIntentOf(id, "card");
+    if (annOf(id)?.intent !== "card") await setIntentOf(id, "card");
   }
 
   /** Learn this (D97): the term becomes his question, worded `question` (a Keep he had there turns into
@@ -1833,13 +1855,13 @@ function ReaderView(p: Props & { reload: () => void }) {
     try {
       if (!id && lookup?.ann) id = await realId(lookup.ann);
       if (id) {
-        const was = annsRef.current.find((a) => a.id === id);
-        setAnns((l) => l.map((a) => (a.id === id ? { ...a, intent: "question", note: question } : a)));
+        const was = annOf(id);
+        setAnns((l) => l.map((a) => (id && isAnn(a, id) ? { ...a, intent: "question", note: question } : a)));
         try {
           await annotate(id, "--intent", "question", opt("note", question));
         } catch (e) {
           // Not saved: the highlight keeps what it was.
-          if (was) setAnns((l) => l.map((a) => (a.id === id ? was : a)));
+          if (was) setAnns((l) => l.map((a) => (id && isAnn(a, id) ? was : a)));
           throw e;
         }
         return id;
@@ -2005,7 +2027,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       if (!inField && !inNote && is(e, "questions")) {
         // A highlight just made, or one open in the popup, is the passage his answer is about.
         e.preventDefault();
-        const quote = popup ? annsRef.current.find((a) => a.id === popup.id)?.exact : null;
+        const quote = popup ? annOf(popup.id)?.exact : null;
         if (popup) closePopup();
         if (quote) setSideQuote(quote.replace(/\s+/g, " ").trim());
         p.onShowSide("questions", !!quote);
@@ -2019,7 +2041,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       if (!PHONE && !inField && !inNote && is(e, "look-up")) {
         e.preventDefault();
         if (lookup) return closeLookUp();
-        const range = popup ? ranges.current.get(popup.id) : pointer.current && docEl.current && wordAt(pointer.current.x, pointer.current.y, docEl.current);
+        const range = popup ? rangeOf(popup.id) : pointer.current && docEl.current && wordAt(pointer.current.x, pointer.current.y, docEl.current);
         // The key follows the popup's Explain button: a term, not a passage (a 2000-character highlight isn't one).
         if (range && !lookable(range.toString())) p.notify("Explain works on a word or a short phrase. Select up to three words, then try again.");
         else if (range) lookUp(range, popup);
@@ -2097,7 +2119,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         } else if (is(e, "cut-text") && canCut) {
           e.preventDefault();
           void cutOut();
-        } else if (plain && e.key === "Escape" && popup && fresh.current === popup.id && !popup.note.trim() && annsRef.current.find((a) => a.id === popup.id)?.intent === "keep") {
+        } else if (plain && e.key === "Escape" && popup && sameId(fresh.current, popup.id) && !popup.note.trim() && annOf(popup.id)?.intent === "keep") {
           // Esc cancels: a selection he just made and didn't touch goes away; Enter or a click keeps it (D15).
           e.preventDefault();
           void remove(false);
@@ -2279,7 +2301,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     const range = id && ranges.current.get(id);
     if (id && range) {
       fresh.current = null;
-      openPopup(id, range, annsRef.current.find((a) => a.id === id)?.note ?? "", { x: e.clientX, y: e.clientY });
+      openPopup(id, range, annOf(id)?.note ?? "", { x: e.clientX, y: e.clientY });
     }
   };
 
@@ -2334,7 +2356,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     frame.current = requestAnimationFrame(() => {
       frame.current = 0;
       const id = hitTest(ranges.current, x, y);
-      const note = id ? annsRef.current.find((a) => a.id === id)?.note : undefined;
+      const note = id ? annOf(id)?.note : undefined;
       setTip((cur) => (id && note ? (cur?.id === id ? cur : { id, x, y, text: note }) : null));
     });
   };
@@ -2362,7 +2384,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   const copy = (c: Cited, done: string) => copyCited(c).then(() => p.notify(done), (e) => p.notify(errorText(e), "error"));
   /** A highlight as a quote with its source (Readwise), and his note under it. */
   const copyHighlight = (id: string, note?: string) => {
-    const a = annsRef.current.find((x) => x.id === id);
+    const a = annOf(id);
     if (doc && a) void copy(citeQuote(a.exact, doc, note ?? a.note), "Copied with source");
   };
 
@@ -2460,12 +2482,12 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   };
 
-  const intent = (popup && anns.find((a) => a.id === popup.id)?.intent) || "keep";
-  const popupRange = popup && ranges.current.get(popup.id);
+  const intent = (popup && anns.find((a) => sameId(a.id, popup.id))?.intent) || "keep";
+  const popupRange = popup && rangeOf(popup.id);
   const canLookUp = !PHONE && !!popupRange && lookable(popupRange.toString());
   // Junk can be cut from the text, but not from a transcript: its words are timed to the video (D111).
   const popupEl = popupRange && (popupRange.startContainer.nodeType === 1 ? (popupRange.startContainer as Element) : popupRange.startContainer.parentElement);
-  const canCut = !!popupEl && (!video || cardMode) && !popupEl.closest(".video-card") && !annsRef.current.find((a) => a.id === popup?.id)?.point;
+  const canCut = !!popupEl && (!video || cardMode) && !popupEl.closest(".video-card") && !annOf(popup?.id)?.point;
   const inHeading = !!popupEl?.closest("h1, h2, h3, h4, h5, h6");
   /** The open source's actions, Readwise Reader's document menu: ⋯ at the top right, right-click on
    *  the title, and ⌘K, each with its shortcut. */
@@ -2563,7 +2585,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     <Collected
       anns={anns}
       ready={ready}
-      rectOf={(id) => ranges.current.get(id)?.getBoundingClientRect()}
+      rectOf={(id) => rangeOf(id)?.getBoundingClientRect()}
       onOpen={() => {
         if (popup) closePopup();
         p.onShowSide("questions", true);
@@ -2857,12 +2879,12 @@ function ReaderView(p: Props & { reload: () => void }) {
           )}
           {ready && <Marks marks={marks} />}
           {ready && popup && !hidden && docEl.current && ranges.current.has(popup.id) && (() => {
-            const a = anns.find((x) => x.id === popup.id);
+            const a = anns.find((x) => sameId(x.id, popup.id));
             if (!a || a.point || popup.id.startsWith("pending-")) return null;
             const id = popup.id;
             return (
               <Grab
-                range={ranges.current.get(id)!}
+                range={rangeOf(id)!}
                 intent={a.intent}
                 root={docEl.current}
                 onDragging={setDragging}

@@ -17,15 +17,27 @@ window.__copy = async (text) => {
   window.__emit("tauri://focus");
   await new Promise((r) => setTimeout(r, 50));
 };
+const held = [];
+Object.defineProperty(window, "__ORE_HELD", { get: () => held.map((h) => h.key) });
+window.__ORE_RELEASE = (key) => {
+  for (let i = held.length - 1; i >= 0; i--) if (held[i].key === key) held.splice(i, 1)[0].ok();
+};
 async function ore(args) {
   // window.__ORE_FAIL = { enrich: "why" }: that command fails with that reason (a test of the failure path).
   const fail = window.__ORE_FAIL && window.__ORE_FAIL[args.args[0]];
   if (fail) throw fail;
   // window.__ORE_HOLD = { "skills arrange": [800] }: the next such command waits that long before it runs at all
   // (one entry per call), so a later one (an Undo) can run first, as two `ore` processes can on a slow machine.
-  // A key of the command alone ({ annotate: [1500] }) holds the next one whatever it names.
-  const hold = window.__ORE_HOLD && (window.__ORE_HOLD[args.args.slice(0, 2).join(" ")] ?? window.__ORE_HOLD[args.args[0]]);
-  if (hold && hold.length) await new Promise((ok) => setTimeout(ok, hold.shift()));
+  // A key of the command alone ({ annotate: [1500] }) holds the next one whatever it names. An entry "manual"
+  // holds it until the test calls window.__ORE_RELEASE(key); window.__ORE_HELD lists the keys waiting so.
+  const two = args.args.slice(0, 2).join(" ");
+  const key = window.__ORE_HOLD && (window.__ORE_HOLD[two] ? two : window.__ORE_HOLD[args.args[0]] ? args.args[0] : null);
+  const hold = key && window.__ORE_HOLD[key];
+  if (hold && hold.length) {
+    const h = hold.shift();
+    if (h === "manual") await new Promise((ok) => held.push({ key, ok }));
+    else await new Promise((ok) => setTimeout(ok, h));
+  }
   const port = window.__ORE_BRIDGE || 1421;
   // As the real app reports a missing `ore`: say what is down and how to start it, not "Failed to fetch".
   const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null }) }).catch(() => {
@@ -51,6 +63,15 @@ window.__TAURI_INTERNALS__ = {
         return await ore(args);
       } finally {
         window.__ORE_PENDING--;
+        // window.__ORE_AFTER = { highlight: fn }: fn runs once that command's answer is in, after the code awaiting
+        // it has run (a few dozen microtasks) but before the page draws it: what a click in that instant meets.
+        const after = window.__ORE_AFTER && window.__ORE_AFTER[args.args[0]];
+        if (after) {
+          delete window.__ORE_AFTER[args.args[0]];
+          let hops = 40;
+          const hop = () => (hops-- > 0 ? Promise.resolve().then(hop) : after());
+          void Promise.resolve().then(hop);
+        }
       }
     }
     if (cmd === "ore_cancel") return void (await fetch("http://localhost:" + (window.__ORE_BRIDGE || 1421) + "/cancel", { method: "POST", body: JSON.stringify({ job: args.job }) }).catch(() => {}));
