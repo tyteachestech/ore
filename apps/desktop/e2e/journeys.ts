@@ -2226,7 +2226,11 @@ journey("an episode with its page kept: one click adds the page's text below the
     await openSource(page, TESTING);
     await openSource(page, "Lecture 4");
     await button.click();
-    await doc.getByRole("heading", { name: "From the page" }).waitFor();
+    // From the click until the text shows, the button never comes back to be clicked twice.
+    for (const end = Date.now() + 5000; !(await doc.getByRole("heading", { name: "From the page" }).count()); await Bun.sleep(20)) {
+      if (await button.count()) throw new Error("the button came back before the page's text showed");
+      if (Date.now() > end) throw new Error("timed out: the page's text shows");
+    }
     await doc.getByRole("heading", { name: "Show notes" }).waitFor();
     await until("the button goes once the text is in", async () => (await button.count()) === 0);
     await page.mouse.click(5, 300);
@@ -2234,9 +2238,10 @@ journey("an episode with its page kept: one click adds the page's text below the
     await until("⌘Z takes the page's text out", async () => (await doc.getByRole("heading", { name: "From the page" }).count()) === 0);
     await button.waitFor();
   } finally {
-    const now = (await ore("show", lecture.id)) as { body: string };
+    // Later journeys read the lecture as seeded: its text without the page's, whatever failed here.
+    const now = (await ore("show", lecture.id)) as { page_added?: string };
+    if (now.page_added) await ore("page-text", lecture.id, "--undo", now.page_added);
     rmSync(join(dir, "page.html"), { force: true });
-    if (now.body.includes("## From the page")) throw new Error("the page's text stayed in the lecture");
   }
 });
 

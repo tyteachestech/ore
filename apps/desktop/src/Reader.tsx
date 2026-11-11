@@ -2648,10 +2648,11 @@ function ReaderView(p: Props & { reload: () => void }) {
       p.onChanged();
       const step = (flag: string) => () => ore("page-text", d.id, flag, c.id).then(() => (p.reload(), p.onChanged()));
       p.notify(`Added the page’s text, ${c.words} ${c.words === 1 ? "word" : "words"}`, "info", step("--undo"), step("--redo"));
+      // Still adding until the reload replaces this view with the source as it is now (page_text gone),
+      // so the button never shows again in between to be clicked twice.
     } catch (e) {
-      p.notify(errorText(e), "error");
-    } finally {
       setAddingPage(false);
+      p.notify(errorText(e), "error");
     }
   };
 
