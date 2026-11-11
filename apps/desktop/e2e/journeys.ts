@@ -8197,6 +8197,45 @@ journey("phone: an Undo toast in a source leaves the bottom bar and the pill the
   }
 }, "phone");
 
+journey("phone: a half-typed Explain answer and a Finish recall survive a relaunch", async (page) => {
+  // iOS kills a web view in the background; what he typed lived only in the page's memory.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const field = page.locator(".phone-full textarea:visible");
+  /** Rates Fact exercises Good until an Explain one comes up. */
+  const toExplain = async () => {
+    for (let i = 0; ; i++) {
+      await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
+      if (await field.count()) return;
+      if (i > 10) throw new Error("no Explain exercise came up");
+      await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+      await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+      await Bun.sleep(300);
+    }
+  };
+  await toExplain();
+  await tap(page, field);
+  await page.keyboard.type("Rereading feels fluent, so it seems learned");
+  await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+  await page.reload();
+  // The session starts again with what is left, in its own order: the answer waits with its exercise.
+  await toExplain();
+  await until("the answer comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Rereading feels fluent, so it seems learned");
+  await until("and how sure he said he was", async () => (await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).getAttribute("aria-checked").catch(() => null)) === "true");
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  await tap(page, page.locator(".review-end button").filter({ hasText: /^Done/ }));
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  const recall = page.getByPlaceholder("In your own words…");
+  await tap(page, recall);
+  await page.keyboard.type("Testing beats rereading after a delay");
+  await page.reload();
+  await until("the recall comes back after a relaunch", async () => (await recall.inputValue().catch(() => "")) === "Testing beats rereading after a delay");
+}, "phone");
+
 // —— run ——
 
 let failed = 0;

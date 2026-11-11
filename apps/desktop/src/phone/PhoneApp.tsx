@@ -146,7 +146,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
 type TabId = "today" | "sources" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
-type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; review: { pick: string[] | null } | null };
+type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; finishing?: boolean; review: { pick: string[] | null } | null };
 const PLACE = "ore-phone-place";
 function loadPlace(): Place {
   try {
@@ -285,7 +285,7 @@ export function PhoneApp() {
     return () => clearTimeout(t);
   }, [noting]);
   const [jumpTo, setJumpTo] = useState<string | undefined>();
-  const [finishing, setFinishing] = useState(false);
+  const [finishing, setFinishing] = useState(!!start.finishing);
   const [reviewing, setReviewing] = useState<{ pick: string[] | null; run: number } | null>(start.review && { pick: start.review.pick, run: 0 });
   const [tick, setTick] = useState(0);
   const { notify, view: toast } = useToast();
@@ -303,9 +303,9 @@ export function PhoneApp() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, review: reviewing && { pick: reviewing.pick } } satisfies Place));
+      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, finishing, review: reviewing && { pick: reviewing.pick } } satisfies Place));
     } catch {}
-  }, [tab, skill, skillNote, openId, noting, reviewing]);
+  }, [tab, skill, skillNote, openId, noting, finishing, reviewing]);
   const tabNow = useRef(tab);
   tabNow.current = tab;
   const refresh = useCallback(async () => {

@@ -42,6 +42,26 @@ export function save(key: string, value: string): void {
   }
 }
 
+/** A Map kept in localStorage under `key` as well (null: memory only). The phone's drafts use it: iOS ends a web
+ *  view left in the background, and what he typed must be there on the relaunch, as in Notes. */
+export function keptMap<V>(key: string | null): Map<string, V> {
+  const m = new Map<string, V>();
+  if (!key) return m;
+  try {
+    for (const [k, v] of JSON.parse(load(key) ?? "[]") as [string, V][]) m.set(k, v);
+  } catch {}
+  const write = () => save(key, JSON.stringify([...m]));
+  const set = m.set.bind(m);
+  const remove = m.delete.bind(m);
+  m.set = (k, v) => (set(k, v), write(), m);
+  m.delete = (k) => {
+    const had = remove(k);
+    if (had) write();
+    return had;
+  };
+  return m;
+}
+
 /** How far each list was scrolled, by tab, skill page or "home": one map in localStorage for the app, as every
  *  remembered view is (the app opens one library; another is a developer's ORE_LIBRARY). */
 export function keptScrolls(): Record<string, number> {

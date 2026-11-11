@@ -16,7 +16,7 @@ import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthS
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, keptMap, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { Trap } from "./Trap";
@@ -65,8 +65,8 @@ type End = { session: SessionEnd; today: Today; before: Today | null; next: Try 
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
 
 /** Answers typed but not checked, and how sure he said he was, by card: putting the quick quiz away
- *  (D76), Esc or Open in source keep them for when the card comes up again. */
-const drafts = new Map<string, { text: string; conf?: number }>();
+ *  (D76), Esc or Open in source keep them for when the card comes up again; on the phone, a relaunch too. */
+const drafts = keptMap<{ text: string; conf?: number }>(PHONE ? "ore.review-drafts" : null);
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
