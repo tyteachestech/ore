@@ -24,7 +24,13 @@ export function shown(src: string): string[] {
     ...[...code.matchAll(/`((?:[^`\\\n]|\\.)*)`/g)].flatMap((m) => m[1]!.split(/\$\{[^{}]*\}/)),
     ...[...code.matchAll(/>([^<>{}=;()]+)</g)].map((m) => m[1]!),
   ];
-  return texts.map((t) => t.replace(/\s+/g, " ").trim()).filter((t) => says(t) && !/^[.#]/.test(t));
+  // A lone "card" or "cards" is a code id (an intent, a kind, a command) unless it is shown: a literal inside a JSX
+  // child's braces (`>{n} {n === 1 ? "card" : "cards"}<`), or one half of a singular/plural pair, which no id is.
+  const lone = [
+    ...[...code.matchAll(/(?<=(?:[^=\-]>|\})[^<>{}=;:,()[\]]*)\{([^{}]*)\}/g)].flatMap((m) => [...m[1]!.matchAll(/"(cards?)"/g)].map((l) => l[1]!)),
+    ...(/"card"\s*:\s*"cards"|"cards"\s*:\s*"card"/.test(code) ? ["card", "cards"] : []),
+  ];
+  return [...texts.map((t) => t.replace(/\s+/g, " ").trim()).filter((t) => says(t) && !/^[.#]/.test(t)), ...new Set(lone)];
 }
 
 test("the check sees a label, a message with a name in it and JSX text, and leaves code alone", () => {
@@ -32,6 +38,9 @@ test("the check sees a label, a message with a name in it and JSX text, and leav
   expect(shown("notify(`Couldn’t make the card: ${errorText(e)}`)")).toEqual(["Couldn’t make the card:"]);
   expect(shown("<button>\n  Card\n</button>")).toEqual(["Card"]);
   expect(shown('if (a.intent === "card" && card.kind !== "prompt") el.closest(".video-card");')).toEqual([]);
+  expect(shown('<span className="due">{due} {due === 1 ? "card" : "cards"} ready</span>')).toEqual(["card", "cards"]);
+  expect(shown('const unit = n === 1 ? "card" : "cards";')).toEqual(["card", "cards"]);
+  expect(shown('<Hint keys="card">{x}</Hint>; setIntentOf(id, passageKey ? "keep" : "card"); { kind: "card" }')).toEqual([]);
 });
 
 test("nothing the app shows says card: it is an exercise (D181)", () => {

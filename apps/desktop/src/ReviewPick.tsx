@@ -115,7 +115,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
                 <SkillIcon icon={s.icon} color={s.color} dot />
               </span>
               <span className="name">{s.name}</span>
-              <span className="due">{due} {due === 1 ? "card" : "cards"} ready</span>
+              <span className="due">{due} {due === 1 ? "exercise" : "exercises"} ready</span>
             </button>
           ))}
         </div>

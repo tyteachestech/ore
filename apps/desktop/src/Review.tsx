@@ -93,6 +93,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   giveBack?: () => HTMLElement | null | undefined;
 }) {
   const [queue, setQueue] = useState<DueEntry[] | null>(null);
+  /** The header's form, chosen from the session's length at its first exercise: step dots up to 30, else a bar.
+   *  A miss adds a step, so deciding on every rating flipped a 30-step session to the bar. */
+  const asDots = useRef(true);
   const [done, setDone] = useState(0);
   const [card, setCard] = useState<CardFull | null>(null);
   const [phase, setPhase] = useState<Phase>("answer");
@@ -223,6 +226,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         // An empty queue ends the session at once, and why ("nothing due in the skills you picked",
         // new cards waiting) reads today: let it land first.
         if (!q.length) await t;
+        asDots.current = q.length <= 30;
         setQueue(q);
       } catch (e) {
         setError(errorText(e));
@@ -600,7 +604,9 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         },
       );
     setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
-    if (rating > 1) setDone((n) => n + 1);
+    // Every rating is a step, a miss too: a rating always moves "Exercise N of M" on, and a miss adds its retry
+    // as one more step (D59).
+    setDone((n) => n + 1);
     if (ahead.current) ahead.current.armed = true;
     advance(rating === 1);
     activeMs.current += Math.min(elapsed, ACTIVE_CAP_MS);
@@ -965,7 +971,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
               </div>
             </Hint>
           )
-        ) : done + left <= 30 && !end ? (
+        ) : asDots.current && !end ? (
           <div className="quiz-steps review-steps" role="progressbar" aria-label="Session" aria-valuemin={0} aria-valuemax={done + left} aria-valuenow={done}>
             {Array.from({ length: done + left }, (_, i) => (
               <span key={i} className={i < done ? "done" : i === done ? "now" : ""} />
