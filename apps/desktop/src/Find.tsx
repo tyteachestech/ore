@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, X } from "./icons";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Hint } from "./Hint";
+import { paint, unpaint } from "./paint";
 
 // Find in the open source (⌘F), the Claude app's and Safari's find bar: one list over every pane
 // on screen, the source first and then the side panel, so the count reads left to right as he sees
@@ -126,15 +127,10 @@ function reveal(r: Range) {
   el.scrollTop += rect.top - (v.top + (v.bottom - v.top) / 3);
 }
 
-function paint(all: Range[], on: Range | undefined) {
+function show(all: Range[], on: Range | undefined) {
   // Above highlights and the spoken text, so the current match always reads.
-  const h = new Highlight(...all.filter((r) => r !== on));
-  h.priority = 2;
-  CSS.highlights.set("find", h);
-  if (!on) return void CSS.highlights.delete("find-on");
-  const cur = new Highlight(on);
-  cur.priority = 3;
-  CSS.highlights.set("find-on", cur);
+  paint("find", all.filter((r) => r !== on), 2);
+  paint("find-on", on ? [on] : [], 3);
 }
 
 /** The find bar at the top right of the source. `roots` lists what it searches, left to right;
@@ -199,10 +195,10 @@ export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump 
     };
   }, [within, query]);
 
-  useEffect(() => paint(found, found[at]), [found, at]);
+  useEffect(() => show(found, found[at]), [found, at]);
   useEffect(() => () => {
-    CSS.highlights.delete("find");
-    CSS.highlights.delete("find-on");
+    unpaint("find");
+    unpaint("find-on");
   }, []);
 
   const step = (d: 1 | -1) => {

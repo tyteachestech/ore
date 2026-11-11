@@ -761,6 +761,8 @@ img.thumb { filter: brightness(0.86); }
 
 /* Highlighted text is always full contrast: the intent layers sit above the video's spoken/unspoken dimming
    (priority 1, Reader.tsx), so they set their own colour. */
+/* For one frame after a highlight's range leaves: WebKit won't repaint what it tinted otherwise (paint.ts). */
+.repaint { outline: 1px solid transparent; }
 ::highlight(hl-keep) { background-color: var(--keep); color: var(--text); }
 /* D124: a key point is blue so it never reads as a plain highlight; its star in the margin says it comes back. */
 ::highlight(hl-card) { background-color: var(--card); color: var(--text); }
