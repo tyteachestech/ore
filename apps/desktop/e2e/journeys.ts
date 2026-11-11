@@ -3386,7 +3386,14 @@ journey("list drag to select: a drag from beside the rows boxes the ones it cros
   const list = (await page.locator(".list").boundingBox())!;
   const at = async (i: number) => (await rows.nth(i).boundingBox())!;
   const mid = async (i: number) => (await at(i)).y + (await at(i)).height / 2;
-  const x = list.x + 4; // the list's own space, left of its rows (Finder starts one there)
+  // The list's own space left of its rows, past the sidebar's resize strip (D193), where Finder starts one too.
+  const edge = (await page.locator(".side-divider").boundingBox())!;
+  const x = (edge.x + edge.width + (await at(0)).x) / 2;
+  // A press on that strip resizes the sidebar and never draws the box.
+  await boxDrag(page, edge.x + edge.width / 2, (await at(0)).y + 10, edge.x + 60, await mid(2), false);
+  if ((await page.locator(".marquee").count()) || (await pickedRows(page)).length) throw new Error("a drag from the sidebar's edge drew the box");
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
   await boxDrag(page, x, (await at(0)).y + 10, x + 240, await mid(2), false);
   await page.locator(".marquee").waitFor();
   await until("the rows it crosses are selected as it goes", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 2)).join());
@@ -3463,7 +3470,9 @@ journey("list drag to select in WebKit: the box selects the rows it crosses with
   const list = (await page.locator(".list").boundingBox())!;
   const r0 = (await rows.nth(0).boundingBox())!;
   const r1 = (await rows.nth(1).boundingBox())!;
-  await boxDrag(page, list.x + 4, r0.y + 10, list.x + 200, r1.y + r1.height / 2);
+  const edge = (await page.locator(".side-divider").boundingBox())!;
+  const x = (edge.x + edge.width + r0.x) / 2; // left of the rows, past the sidebar's resize strip
+  await boxDrag(page, x, r0.y + 10, list.x + 200, r1.y + r1.height / 2);
   await until("both rows are selected", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1)).join());
   if (await page.evaluate(() => !!window.getSelection()?.toString())) throw new Error("the drag selected the rows' text");
   await page.keyboard.press("Shift+ArrowDown");
