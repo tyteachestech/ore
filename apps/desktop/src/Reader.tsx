@@ -2,7 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { Children, isValidElement, memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { Children, createContext, isValidElement, memo, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -114,6 +114,8 @@ const components: Components = {
     );
     return <a href={href} draggable={false}>{children}</a>;
   },
+  table: ({ children }) => <DocTable>{children}</DocTable>,
+  th: ({ children, style }) => <ColumnHead style={style}>{children}</ColumnHead>,
 };
 
 // A transcript paragraph opens with "[mm:ss]" (D49): shown in a gutter left of the text, never
@@ -330,6 +332,115 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
       {shown && !draft && <div className="figure-tip">Drag over a part to make an exercise of it</div>}
     </div>,
     document.body,
+  );
+}
+
+/** What a table needs from the reader to make an exercise of a cell (D200). */
+const TableCtx = createContext<{ item: string; notify: Notify } | null>(null);
+/** A table's columns he has covered, for its headings' buttons. */
+const ColumnsCtx = createContext<{ covered: ReadonlySet<number>; toggle: (i: number) => void } | null>(null);
+const bodyCells = (table: HTMLTableElement, i: number) => [...table.tBodies].flatMap((b) => [...b.rows]).map((r) => r.cells[i]).filter((c): c is HTMLTableCellElement => !!c);
+const cellText = (c: Element | undefined) => (c?.textContent ?? "").replace(/\s+/g, " ").trim();
+/** A cover is a class on the cell: its text stays where the text index and his highlights have it. */
+function setCover(td: HTMLTableCellElement, on: boolean) {
+  td.classList.toggle("covered", on);
+  if (on) {
+    td.tabIndex = 0;
+    td.setAttribute("role", "button");
+    td.setAttribute("aria-label", "Covered. Show it");
+  } else for (const a of ["tabindex", "role", "aria-label"]) td.removeAttribute(a);
+}
+
+/** A table he can test himself on (D200): a heading's button covers its column, a click or Enter on a covered
+ *  cell shows that one, and right-click on a covered cell makes a Fact exercise of it. Covers last while the source is open. */
+function DocTable({ children }: { children?: ReactNode }) {
+  const ctx = useContext(TableCtx);
+  const table = useRef<HTMLTableElement>(null);
+  const at = useRef<HTMLTableCellElement | null>(null);
+  const [covered, setCovered] = useState<ReadonlySet<number>>(new Set());
+  const toggle = useCallback((i: number) => {
+    if (!table.current) return;
+    const cells = bodyCells(table.current, i);
+    const on = !cells.some((c) => c.classList.contains("covered"));
+    for (const c of cells) if (cellText(c)) setCover(c, on);
+    setCovered((s) => {
+      const next = new Set(s);
+      if (on) next.add(i);
+      else next.delete(i);
+      return next;
+    });
+  }, []);
+  const show = (td: HTMLTableCellElement) => {
+    setCover(td, false);
+    const i = td.cellIndex;
+    if (table.current && !bodyCells(table.current, i).some((c) => c.classList.contains("covered"))) setCovered((s) => new Set([...s].filter((n) => n !== i)));
+  };
+  const coveredAt = (e: { target: EventTarget }) => (e.target as Element).closest?.<HTMLTableCellElement>("td.covered") ?? null;
+  const exercise = async (td: HTMLTableCellElement) => {
+    if (!ctx || !table.current) return;
+    const row = cellText((td.parentElement as HTMLTableRowElement).cells[0]);
+    const column = cellText(table.current.tHead?.rows[0]?.cells[td.cellIndex]);
+    try {
+      const c = await ore<CardFull>("card", "cell", ctx.item, opt("row", row), opt("column", column), opt("answer", cellText(td)));
+      ctx.notify("Exercise made", "info", () => ore("card", "retire", c.id), () => ore("card", "restore", c.id, "--state=draft"));
+    } catch (e) {
+      ctx.notify(`Couldn’t make the exercise: ${errorText(e)}`, "error");
+    }
+  };
+  const actions = (): MenuAction[] => {
+    const cell = at.current;
+    if (!cell || !table.current?.contains(cell)) return [];
+    // Only a covered cell has this menu: anywhere else in the text right-click is the Mac's own (D83).
+    if (!cell.classList.contains("covered")) return [];
+    const i = cell.cellIndex;
+    return [
+      { id: "show", label: "Show", run: () => show(cell) },
+      { id: "column", label: "Show this column", run: () => toggle(i) },
+      ...(ctx && i > 0 ? [{ id: "exercise", label: "Make an exercise of this cell", divider: true, run: () => void exercise(cell) }] : []),
+    ];
+  };
+  const cols = useMemo(() => ({ covered, toggle }), [covered, toggle]);
+  return (
+    <ColumnsCtx.Provider value={cols}>
+      <WithMenu actions={actions}>
+        <table
+          ref={table}
+          onContextMenuCapture={(e) => (at.current = (e.target as Element).closest("td"))}
+          onClick={(e) => {
+            const td = coveredAt(e);
+            if (td) show(td);
+          }}
+          onKeyDown={(e) => {
+            const td = coveredAt(e);
+            if (!td || (e.key !== "Enter" && e.key !== " ")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            show(td);
+          }}
+        >
+          {children}
+        </table>
+      </WithMenu>
+    </ColumnsCtx.Provider>
+  );
+}
+function ColumnHead({ children, style }: { children?: ReactNode; style?: CSSProperties }) {
+  const cols = useContext(ColumnsCtx);
+  const th = useRef<HTMLTableCellElement>(null);
+  const [i, setI] = useState(-1);
+  useLayoutEffect(() => setI(th.current?.cellIndex ?? -1), []);
+  const on = !!cols?.covered.has(i);
+  return (
+    <th ref={th} style={style}>
+      {children}
+      {cols && (
+        <Hint text={on ? "Show this column" : "Cover this column to test yourself"}>
+          <button className="col-cover" data-noindex="" aria-label={on ? "Show this column" : "Cover this column"} aria-pressed={on} onClick={() => cols.toggle(i)}>
+            {on ? <Eye size={14} /> : <EyeSlash size={14} />}
+          </button>
+        </Hint>
+      )}
+    </th>
   );
 }
 
@@ -940,6 +1051,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   };
 
+  const notifyNow = useRef(p.notify);
+  notifyNow.current = p.notify;
+  /** For the tables in the text (D200); a Feed post being read is not a source yet, so it makes no exercises. */
+  const tables = useMemo(() => (doc && !doc.preview ? { item: doc.id, notify: ((...a) => notifyNow.current(...a)) as Notify } : null), [doc?.id, doc?.preview]);
   const onReady = useCallback((el: HTMLElement) => {
     docEl.current = el;
     idx.current = indexText(el);
@@ -2857,7 +2972,9 @@ function ReaderView(p: Props & { reload: () => void }) {
               <BackToCurrent dir="up" onClick={follow} />
             </div>
           )}
-          <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} onReady={onReady} card={cardMode ? videoCard : undefined} />
+          <TableCtx.Provider value={tables}>
+            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} onReady={onReady} card={cardMode ? videoCard : undefined} />
+          </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
               {video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}

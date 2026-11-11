@@ -1864,6 +1864,53 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
 });
 
+journey("tables: a heading's button covers its column, a click or Enter shows a cell, right-click on a covered one makes an exercise of it and Undo takes it back (D200)", async (page) => {
+  const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Sampling settings\n\nHow the draw is made.\n\n| Setting | What it changes | Range |\n|---|---|---|\n| Temperature | How flat the odds are | 0 to 1.5 |\n| Top-p | How much of the tail stays | 0.8 to 1 |\n| Top-k | How many words stay | 20 to 100 |\n\nChange one at a time." }) })).json()) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Sampling settings");
+    const table = page.locator(".doc table");
+    const covered = table.locator("td.covered");
+    const head = table.locator("th").nth(2);
+    await head.hover();
+    await head.getByRole("button", { name: "Cover this column" }).click();
+    await until("the column's three cells are covered", async () => (await covered.count()) === 3);
+    if ((await table.locator("tbody tr").first().locator("td").nth(2).evaluate((td) => getComputedStyle(td).color)) !== "rgba(0, 0, 0, 0)") throw new Error("a covered cell still shows its text");
+    // A click shows one cell; Enter shows the one the keyboard is on.
+    await covered.first().click();
+    await until("a click shows that cell", async () => (await covered.count()) === 2);
+    await covered.first().focus();
+    await page.keyboard.press("Enter");
+    await until("Enter shows the focused cell", async () => (await covered.count()) === 1);
+    // The text under a cover is still there for a highlight after the table.
+    await select(page, "Change one at a time");
+    await page.locator(".popup").waitFor();
+    await page.keyboard.press("Escape");
+    // The heading's button shows what is left.
+    await head.getByRole("button", { name: "Show this column" }).click();
+    await until("the button shows the rest", async () => (await covered.count()) === 0);
+    // Right-click a covered cell: an exercise that asks the cell by its row and column.
+    await head.hover();
+    await head.getByRole("button", { name: "Cover this column" }).click();
+    await covered.nth(1).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Make an exercise of this cell" }).click();
+    await page.locator(".toast", { hasText: "Exercise made" }).waitFor();
+    const cards = async () => ((await ore("cards", `--item=${made.id}`)) as { question: string; answer: string; state: string }[]).filter((c) => c.state !== "retired");
+    await until("the exercise asks the cell", async () => (await cards()).some((c) => c.question === "Top-p · Range?" && c.answer === "0.8 to 1"));
+    await page.locator(".toast", { hasText: "Exercise made" }).getByRole("button", { name: "Undo" }).click();
+    await until("Undo retires it", async () => (await cards()).length === 0);
+    // The row's own name makes no exercise: it is the question's half.
+    await table.locator("th").first().hover();
+    await table.locator("th").first().getByRole("button", { name: "Cover this column" }).click();
+    await table.locator("tbody td.covered").first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Show", exact: true }).waitFor();
+    if (await page.getByRole("menuitem", { name: "Make an exercise of this cell" }).count()) throw new Error("the row's own name offers an exercise");
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
 journey("notebook: a cell's output is folded until he opens it, a click or Enter shows it, and a highlight on the text around it still lands (D199)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "numpy.ipynb"), "--no-enrich")) as { id: string };
   try {
