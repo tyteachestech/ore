@@ -68,16 +68,17 @@
   /* SF Pro Rounded: only where he answers or sees progress (review questions and buttons, big numbers). */
   --round: ui-rounded, "SF Pro Rounded", var(--font);
   /* The reading column (D207): sized in the reading text's own em, so a line holds about 66 characters
-     (Medium; Narrow about 55, Wide about 75) at every text size. Measured on the golden docs' prose in
-     Charter; Geist sets wider, so it gets a wider column for the same count. */
-  --measure-em: 28;
+     (Medium; Narrow about 55, Wide about 75) at every text size. Charter's em is from macOS Charter in the
+     release build (28em held about 60; Linux's Bitstream Charter sets narrower, so the cloud can't measure it);
+     Geist's ships with the app, so its count is measured in the e2e journey "reader width:". */
+  --measure-em: 31;
   --face-width: 1;
   --measure: calc(var(--read-size, 17px) * var(--measure-em) * var(--face-width));
 }
 /* Reading width (reading.ts): the reader's column, Narrow / Medium / Wide. */
-:root[data-width="narrow"] { --measure-em: 23.5; }
-:root[data-width="wide"] { --measure-em: 31.5; }
-:root[data-font="geist"] { --face-width: 1.14; }
+:root[data-width="narrow"] { --measure-em: 26; }
+:root[data-width="wide"] { --measure-em: 34.5; }
+:root[data-font="geist"] { --face-width: 1.03; }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }

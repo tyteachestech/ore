@@ -79,7 +79,7 @@ spacing:
   row: 40px
   titlebar: 38px
   sidebar: 216px
-  measure: 28em
+  measure: 31em
 ---
 
 # Design System: Ore desktop

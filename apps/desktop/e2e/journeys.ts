@@ -404,8 +404,16 @@ journey("reader width: a line holds about 66 characters at any text size, in Cha
           document.documentElement.dataset.font = f as string;
           document.documentElement.style.setProperty("--read-size", `${px}px`);
         }, [font, size] as const);
-        const chars = await perLine();
-        if (chars < 60 || chars > 72) throw new Error(`${font} at ${size}px: ${chars.toFixed(1)} characters a line, want about 66`);
+        if (font === "geist") {
+          // Geist ships with the app, so its count here is the count on the Mac.
+          const chars = await perLine();
+          if (chars < 60 || chars > 72) throw new Error(`${font} at ${size}px: ${chars.toFixed(1)} characters a line, want about 66`);
+        } else {
+          // Linux has no macOS Charter (its Bitstream twin sets narrower), so check the column is 31 of its em,
+          // the width measured on the Mac to hold about 66.
+          const em = await p.evaluate((el) => el.closest(".doc")!.getBoundingClientRect().width / parseFloat(getComputedStyle(el).fontSize));
+          if (Math.abs(em - 31) > 0.2) throw new Error(`charter at ${size}px: column is ${em.toFixed(2)}em, want 31`);
+        }
       }
     }
   } finally {
