@@ -93,7 +93,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
               key: `text ${r.kind} ${r.ref}`,
               item,
               title: items.find((i) => i.id === item)?.title ?? r.title,
-              what: intent ? (LABEL[intent] ?? "highlight").toLowerCase() : r.kind === "notes" ? "source note" : r.kind === "card" ? "card" : undefined,
+              what: intent ? (LABEL[intent] ?? "highlight").toLowerCase() : r.kind === "notes" ? "source note" : r.kind === "card" ? "exercise" : undefined,
               at: r.kind === "item" ? `find:${query}` : r.kind === "notes" ? `note:${query}` : r.kind === "annotation" ? `ann:${r.ref}` : r.annotation && `ann:${r.annotation}`,
               snippet: r.snippet,
             });
