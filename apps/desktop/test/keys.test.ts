@@ -34,6 +34,10 @@ describe("shortcut editor (Settings › Keyboard shortcuts)", () => {
     expect(clash("edit-card", "Meta+Enter")?.id).toBe("finish");
     expect(clash("finish", "KeyE")?.id).toBe("edit-card");
     expect(clash("ask", "Ctrl+Alt+KeyQ")?.id).toBe("quick-quiz");
+    // Later's ⌘L (D192) is free in Review, works with the answer half typed, and is Review's own.
+    expect(clash("later", "Meta+KeyL")).toBeNull();
+    expect(rebind("later", "KeyL")).toBe("Needs ⌘, ⌃ or ⌥");
+    expect(clash("finish", "Meta+KeyL")?.id).toBe("later");
   });
 
   test("any shortcut can be removed, and a menu click still runs it", () => {
