@@ -12,7 +12,7 @@
 import { chromium, devices, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { $ } from "bun";
 
 const MOCK = join(import.meta.dir, "../scripts/mock");
@@ -3432,6 +3432,38 @@ journey("Home: ⌘-click and ⇧-click pick Continue reading rows, ⋯ acts on t
   await page.mouse.up();
   await page.getByText(`Filed “${title}” under ${names[k]}`).first().waitFor();
   if (await page.locator(".doc-head").count()) throw new Error("the drop opened the source");
+  // ⌘Z takes it back off the skill.
+  const id = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === title)!.id;
+  await page.keyboard.press("Meta+KeyZ");
+  await until("⌘Z takes the drop back", async () => !((await ore("show", id)) as { skills: string[] }).skills.includes(ids[k]!));
+});
+
+journey("All sources: a row dragged onto a sidebar skill is filed there, and ⌘Z takes it back off (F22)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row", { hasText: TESTING }).first();
+  await row.waitFor();
+  const under = ((await ore("ls")) as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!;
+  const targets = page.locator(".sidebar .side-item[data-drop-skill]:not([data-drop-skill=''])");
+  const ids = await targets.evaluateAll((els) => els.map((el) => el.getAttribute("data-drop-skill")!));
+  const k = ids.findIndex((id) => !under.skills.includes(id));
+  const name = (await targets.nth(k).innerText()).trim();
+  const from = (await row.boundingBox())!;
+  const to = (await targets.nth(k).boundingBox())!;
+  await page.mouse.move(from.x + 60, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 100, from.y + from.height / 2, { steps: 4 });
+  await page.locator(".row-ghost").waitFor();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  // A real write takes a moment: ⌘Z pressed at once, before it lands, still takes the drop back.
+  await page.evaluate(() => ((window as { __ORE_SLOW?: Record<string, number> }).__ORE_SLOW = { edit: 600 }));
+  await page.mouse.up();
+  await page.keyboard.press("Meta+KeyZ");
+  await page.evaluate(() => delete (window as { __ORE_SLOW?: unknown }).__ORE_SLOW);
+  const on = async () => ((await ore("show", under.id)) as { skills: string[] }).skills.includes(ids[k]!);
+  await page.getByText(`Undone: Filed “${TESTING}” under ${name}`).first().waitFor();
+  await until("⌘Z takes the drop back", async () => !(await on()));
+  await page.waitForTimeout(800);
+  if (await on()) throw new Error("the drop's write landed after its undo");
 });
 
 journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at once, ⇧⌘U marks the selected one, Esc clears (F9)", async (page) => {
@@ -3445,7 +3477,7 @@ journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at on
     const post = (n: number) => page.locator(".row.post", { hasText: `Pick post ${n}` });
     await post(3).waitFor();
     // In Unread a read post leaves the list; in All it stays, dimmed.
-    const isRead = async (n: number) => !(await post(n).count()) || (await post(n).getAttribute("class"))!.includes("read");
+    const isRead = (n: number) => post(n).evaluateAll((els) => !els.length || els[0]!.classList.contains("read"));
     await post(1).click({ modifiers: ["Meta"] });
     await post(3).click({ modifiers: ["Shift"] });
     await until("⌘-click then ⇧-click pick three posts", async () => (await page.locator(".row.post.sel").count()) === 3);
@@ -3459,6 +3491,13 @@ journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at on
     await page.getByRole("menuitem", { name: "Mark 2 read" }).click();
     await until("both are read", async () => (await isRead(1)) && (await isRead(2)));
     await page.getByText("Marked 2 posts read").first().waitFor();
+    await page.keyboard.press("Meta+KeyZ");
+    await until("⌘Z marks both unread again", async () => !(await isRead(1)) && !(await isRead(2)));
+    await post(2).click({ modifiers: ["Meta"] });
+    await post(1).click({ modifiers: ["Meta"] });
+    await post(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Mark 2 read" }).click();
+    await until("both are read again", async () => (await isRead(1)) && (await isRead(2)));
     await until("the pick is cleared", async () => (await page.locator(".row.post.sel").count()) === 0);
     await page.locator(".feed-list").focus();
     for (let n = 0; n < 20 && !(await page.locator(".row.post.on", { hasText: "Pick post 3" }).count()); n++) await page.keyboard.press("ArrowDown");
@@ -9555,7 +9594,7 @@ journey("phone: reopening on a source that left the library lands on Today, not 
 }, "phone");
 
 journey("phone: a link added is read on the phone itself; one it can't read waits for the Mac, and Remove takes it off", async (page) => {
-  // D227: the link is saved to the inbox, then the phone imports it with the Mac's own importer.
+  // D235: the link is saved to the inbox, then the phone imports it with the Mac's own importer.
   const para = "Mixing kinds of problems in one sitting makes each one harder to start and easier to keep. ";
   const article = `<html><head><title>Interleaving in practice</title></head><body><article><h1>Interleaving in practice</h1>${`<p>${para.repeat(5)}</p>`.repeat(4)}</article></body></html>`;
   await page.route("https://example.com/articles/interleaving", (r) => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", headers: { "access-control-allow-origin": "*" }, body: article }));
@@ -9584,7 +9623,7 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
 }, "phone");
 
 journey("phone: a YouTube link is in the library at once and says its transcript comes from the Mac", async (page) => {
-  // D227: no yt-dlp on a phone, so the video comes in with its title and plays; the Mac fills the transcript.
+  // D235: no yt-dlp on a phone, so the video comes in with its title and plays; the Mac fills the transcript.
   await page.route("https://www.youtube.com/oembed?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ title: "How spacing works", author_name: "Learning Lab" }) }));
   await page.route(/ytimg\.com|youtube(-nocookie)?\.com\/(embed|iframe_api)/, (r) => r.abort());
   await tap(page, page.getByRole("button", { name: "Add a link" }));
@@ -9600,7 +9639,7 @@ journey("phone: a YouTube link is in the library at once and says its transcript
 }, "phone");
 
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
-  // D227: the file is saved to the inbox beside its item, then imported here like a link.
+  // D235: the file is saved to the inbox beside its item, then imported here like a link.
   const files = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
   const pick = async (name: string) => {
     await tap(page, page.getByRole("button", { name: "Add a link" }));
@@ -10046,6 +10085,80 @@ const itemFile = (lib: string, slug: string, name: string) => {
   return join(lib, "items", year, readdirSync(join(lib, "items", year)).find((d) => d.startsWith(slug))!, name);
 };
 const cardFile = (lib: string, text: string) => join(lib, "cards", readdirSync(join(lib, "cards")).find((f) => f.endsWith(".md") && readFileSync(join(lib, "cards", f), "utf8").includes(text))!);
+
+journey("phone: Review's ⋯ puts an exercise off with Later before its answer, and edits it after (D235)", async (page) => {
+  // The phone's Review had no Later (D192 kept it on the Mac) and Edit only in a toolbar beside Ask, which needs the Mac.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const q = page.locator(".review-q");
+  await q.waitFor();
+  const first = await q.innerText();
+  const more = page.getByRole("button", { name: "Exercise actions" });
+  await tap(page, more);
+  if (await page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }).count()) throw new Error("Edit shows before the answer, which would give it away");
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+  await until("Later moves on", async () => (await q.innerText()) !== first);
+  if (await page.getByRole("button", { name: "Ask about this" }).count()) throw new Error("Ask is on the phone, which can't run the AI");
+  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await tap(page, more);
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
+  await page.getByRole("button", { name: "Save" }).waitFor();
+}, "phone");
+
+journey("phone: the note's keyboard bar moves a block, edits a table and adds a picture; a diagram opens to view (D235)", async (page) => {
+  const notes = (lib: string) => itemFile(lib, "the-testing-effect", "notes.md");
+  const diagram = join(dirname(itemFile(PHONE_LIB, "the-testing-effect", "notes.md")), "diagrams", "loop.excalidraw");
+  mkdirSync(dirname(diagram), { recursive: true });
+  writeFileSync(diagram, JSON.stringify({ type: "excalidraw", version: 2, elements: [{ id: "a", type: "rectangle", x: 0, y: 0, width: 160, height: 70, angle: 0, strokeColor: "#1e1e1e", backgroundColor: "transparent", fillStyle: "solid", strokeWidth: 2, roughness: 0, opacity: 100, seed: 1, version: 1, isDeleted: false, boundElements: [], groupIds: [], roundness: null }], appState: {}, files: {} }));
+  const extra = "\n\n![Diagram](diagrams/loop.excalidraw)\n\n| Term | Meaning |\n| --- | --- |\n| Spacing | Gaps between reviews |\n\nfirst line\n\nsecond line\n\nthird line";
+  try {
+    await macChanges(notes, "= hypercorrection", `= hypercorrection${extra}`, async () => {
+      await page.reload();
+      await page.locator(".phone-app").waitFor();
+      await phoneSource(page, TESTING);
+      await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+      const note = page.locator(".phone-reader [contenteditable=true]").first();
+      const bar = page.locator(".kb-bar");
+      // Move: ⋮⋮ ▸ Move picks the block up, ↑ carries it, Done puts the caret back in it.
+      await tap(page, note.locator("p").filter({ hasText: "third line" }));
+      await tap(page, bar.getByRole("button", { name: "Block actions" }));
+      await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Move", exact: true }));
+      await tap(page, bar.getByRole("button", { name: "Move up" }));
+      await tap(page, bar.getByRole("button", { name: "Move up" }));
+      await tap(page, bar.getByRole("button", { name: "Done moving" }));
+      await until("third line moved above first line", async () => {
+        const t = await note.innerText();
+        return t.indexOf("third line") < t.indexOf("first line");
+      });
+      // A table cell swaps the block kinds for the table's edits.
+      await tap(page, note.locator("td").filter({ hasText: "Gaps" }));
+      await bar.getByRole("button", { name: "Table actions" }).waitFor();
+      if (await bar.getByRole("button", { name: "To-do" }).count()) throw new Error("the bar offers To-do inside a table cell");
+      const rows = await note.locator("tr").count();
+      await tap(page, bar.getByRole("button", { name: "Table actions" }));
+      await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Insert row below", exact: true }));
+      await until("a row was added", async () => (await note.locator("tr").count()) === rows + 1);
+      // A picture: iOS's own sheet answers the file field.
+      await tap(page, note.locator("p").filter({ hasText: "second line" }));
+      const chooser = page.waitForEvent("filechooser");
+      await tap(page, bar.getByRole("button", { name: "Add a picture" }));
+      await (await chooser).setFiles({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
+      await until("the picture is in the note", async () => (await note.locator("img.note-image").count()) === 1);
+      // A diagram opens to view, with no way to draw on it.
+      await tap(page, note.locator(".note-diagram").first());
+      const view = page.locator(".diagram-view");
+      await view.locator(".diagram-art svg").waitFor();
+      if (await page.locator(".kb-bar").count()) throw new Error("the keyboard bar stayed over the diagram");
+      if (await view.locator(".draw, [role=toolbar]").count()) throw new Error("the phone's diagram has drawing tools");
+      await tap(page, view.getByRole("button", { name: "Done" }));
+      await view.waitFor({ state: "detached" });
+    });
+  } finally {
+    rmSync(dirname(diagram), { recursive: true, force: true });
+  }
+}, "phone");
 
 journey("phone: a kept draft goes when the Mac changes what it answered, and nothing is kept before he types", async (page) => {
   // Kept drafts outlived their questions: Finish kept one (with a copy of the questions) the moment it opened, and

@@ -2,7 +2,7 @@ import {
   catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, listChats, readChat, saveChat, deleteChat, attachToChat, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
-import { int, need, readStdin, str, strs } from "./util.ts";
+import { fromBase64, int, need, readStdin, str, strs } from "./util.ts";
 
 function enrichText(r: EnrichResult): string {
   if (r.skipped) return `${r.title}: skipped (${r.skipped})`;
@@ -136,7 +136,7 @@ export const aiCommands: Record<string, Command> = {
       const lib = openLibrary();
       if (str(f.attach)) {
         const from = str(f.attach)!;
-        const c = await attachToChat(lib, from === "-" ? { name: need(str(f.name), "--name"), data: Buffer.from(await readStdin(), "base64") } : from);
+        const c = await attachToChat(lib, from === "-" ? { name: need(str(f.name), "--name"), data: fromBase64(await readStdin()) } : from);
         return { data: { ...c, root: lib.root }, text: `Attached ${c.name} as ${c.path}` };
       }
       if (f.set) {

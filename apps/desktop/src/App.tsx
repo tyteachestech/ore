@@ -1720,11 +1720,14 @@ export function App() {
   const pinSource = async (item: Item, undoable = true) => {
     const pinned_at = item.pinned_at ? undefined : new Date().toISOString();
     setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at } : i)) ?? all);
+    const write = ore("pin", item.id, ...(pinned_at ? [] : ["--undo"]));
+    // On the history at once, so ⌘Z before the write lands still takes it back (F20).
+    const flip = (on: boolean) => () => write.then(() => pinSource({ ...item, pinned_at: on ? undefined : "x" }, false));
+    const forget = undoable ? notify(pinned_at ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(!pinned_at), flip(!!pinned_at)) : undefined;
     try {
-      await ore("pin", item.id, ...(pinned_at ? [] : ["--undo"]));
-      const flip = (on: boolean) => () => pinSource({ ...item, pinned_at: on ? undefined : "x" }, false);
-      if (undoable) notify(pinned_at ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(!pinned_at), flip(!!pinned_at));
+      await write;
     } catch (e) {
+      forget?.();
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
@@ -1761,16 +1764,29 @@ export function App() {
     setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
     // Filing under an archived skill brings it back (D173); Undo archives it again.
     const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
+    const write = what.write(next);
+    const slot = `refile:${[...what.ids].join(",")}`;
+    // The step goes on the history at once, so ⌘Z pressed before the write lands still takes it back
+    // (F20); its undo waits for the write first.
+    const forget = changed
+      ? notify(
+          next.includes(changed.id) ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`,
+          "info",
+          () => write.then(() => refile(what, before, next, undefined, true)).then(() => rearchive(revived)),
+          () => refile(what, next, before, undefined, true),
+          undefined,
+          undefined,
+          slot,
+        )
+      : undefined;
     try {
-      await what.write(next);
-      if (changed) {
-        const on = next.includes(changed.id);
-        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true).then(() => rearchive(revived)), () => refile(what, next, before, undefined, true));
-      }
+      await write;
     } catch (e) {
+      forget?.();
       // From the history (undo or redo): it puts the step back and says why.
       if (fromHistory) throw e;
-      notify(errorText(e), "error");
+      // In place of the toast that said it was filed.
+      notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
     } finally {
       void refresh();
       // Filing under an archived skill brings it back (D173): the sidebar shows it in its place again.
