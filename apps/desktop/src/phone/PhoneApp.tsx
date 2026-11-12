@@ -219,13 +219,19 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   });
   return (
     // Rename… goes after Open, and edits the title in place (Finder, the Mac's rows); not on an archived row.
-    <WithMenu actions={() => row.menu(item).flatMap((a) => (a.id === "open" && !item.archived_at ? [a, { id: "rename", label: "Rename…", run: () => setRenaming(true) }] : [a]))}>
+    <WithMenu actions={() => row.menu(item).map((a) => (a.id === "rename" ? { ...a, run: () => setRenaming(true) } : a))}>
       <li>
         {side && <span className={`phone-swipe ${side}`}>{side === "left" ? (item.archived_at ? "Restore" : "Archive") : item.status === "done" ? "To read" : "Done"}</span>}
         {renaming && (
           <div className="phone-row-rename">
             <Thumb item={item} className="thumb phone-thumb" />
-            <TitleField value={item.title} onSave={(t) => row.retitle(item, t)} onClose={() => (flushSync(() => setRenaming(false)), ref.current?.focus({ preventScroll: true }))} />
+            <TitleField value={item.title} onSave={(t) => row.retitle(item, t)} onClose={() => {
+              // The Return that saved it can still click the row it hands focus back to (F36): that is not a tap.
+              swiped.current = true;
+              setTimeout(() => (swiped.current = false), 350);
+              flushSync(() => setRenaming(false));
+              ref.current?.focus({ preventScroll: true });
+            }} />
           </div>
         )}
         {/* Hidden, not gone, while renaming: its swipes and hold are on this element. */}
@@ -759,6 +765,8 @@ export function PhoneApp() {
       { id: "restore", label: "Restore", run: () => restore(item) },
     ] : [
       { id: "open", label: "Open", run: () => open(item.id) },
+      // Each list types the new title on its own row: SwipeRow and Today's Home set what Rename… runs (F37).
+      { id: "rename", label: "Rename…", run: () => {} },
       { id: "review-source", label: "Review this source", run: () => setReviewing({ pick: null, source: item.id, run: 0 }) },
       { id: "pin", label: item.pinned_at ? "Unpin" : "Pin to top", run: () => void pin(item) },
       { id: "move", label: item.status === "done" ? "Move to To read" : "Move to Done", run: () => row.toggle(item) },

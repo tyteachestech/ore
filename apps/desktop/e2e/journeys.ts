@@ -3621,6 +3621,19 @@ journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space
   if (!shown.includes("⌘R")) throw new Error(`Home's menu shows no Rename key: “${shown}”`);
 });
 
+// WebKit leaves a clicked button unfocused, so the first ⇧↓ after a ⌘-click found no row to grow from (F34).
+journey("Home: after a ⌘-click picks a row, the first ⇧↓ grows the pick (Finder)", async (page) => {
+  await openSource(page, AGENTS);
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const rows = page.locator(".home-read");
+  await rows.nth(1).waitFor();
+  await rows.nth(0).locator(".home-open").click({ modifiers: ["Meta"] });
+  await until("⌘-click picks the row", async () => (await page.locator(".home-read.sel").count()) === 1);
+  await page.keyboard.press("Shift+ArrowDown");
+  await until("the first ⇧↓ picks two rows", async () => (await page.locator(".home-read.sel").count()) === 2);
+}, "webkit");
+
 journey("Home and Feed: ⌘C on the focused row copies it as Markdown with its link, as a list's selected row does", async (page) => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   const clip = () => page.evaluate(() => navigator.clipboard.readText());
@@ -4396,6 +4409,17 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   await page.keyboard.press("Escape");
   await page.keyboard.press("Meta+1");
   await until("⌘1 goes back to To read", async () => (await on("To read")) === "true");
+  // Arrows walk the tabs as in any tab list: the open tab keeps focus, so a second arrow goes on (F33).
+  await tabs.getByRole("tab", { name: "To read" }).click();
+  await page.keyboard.press("ArrowRight");
+  await until("→ opens Done", async () => (await on("Done")) === "true");
+  await page.waitForTimeout(100);
+  await page.keyboard.press("ArrowLeft");
+  await until("a second arrow goes back to To read", async () => (await on("To read")) === "true");
+  // ⌘1, with no tab focused, still hands the keys to the list (Linear).
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.keyboard.press("Meta+2");
+  await until("⌘2 focuses the list", () => page.evaluate(() => !document.activeElement?.closest("[role=tablist]") && document.activeElement !== document.body));
 });
 
 journey("reader questions: ask one, ⌘Z takes it back; its ⋯ menu marks it answered and deletes it, ⌘Z each", async (page) => {
@@ -9601,6 +9625,38 @@ journey("phone: a long press on a Today source opens its menu", async (page) => 
   await renamed.waitFor();
   await press(page, renamed);
   await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
+}, "phone");
+
+journey("phone: a held row in a skill's list opens its own menu only; Rename… is on Today's rows too, and its Return opens nothing (F35–F37)", async (page) => {
+  // Today's rows rename in place, as the Sources list's do (D225).
+  await press(page, page.locator(".home-read").first());
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const today = page.locator(".home-read input");
+  await today.fill("Renamed on Today");
+  await today.press("Enter");
+  await page.locator(".home-read", { hasText: "Renamed on Today" }).waitFor();
+  // The Sources list's Return saves and stays on the list.
+  await page.evaluate(() => localStorage.setItem("ore-phone-place", JSON.stringify({ tab: "sources", skill: null, openId: null, review: null })));
+  await page.reload();
+  await press(page, page.locator(".phone-sources li button").first());
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const field = page.locator(".phone-row-rename input");
+  await field.fill("Renamed in Sources");
+  await field.press("Enter");
+  await page.locator(".phone-sources li button", { hasText: "Renamed in Sources" }).waitFor();
+  await Bun.sleep(400);
+  if (await page.locator(".phone-reader").count()) throw new Error("Return in the rename field opened the source");
+  // On a skill's page a held row is under the section's own menu: a finger's pointer still opens only the row's.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
+  const row = page.locator(".phone-skill .phone-sources li button").first();
+  await row.waitFor();
+  const b = (await row.boundingBox())!;
+  await row.evaluate((el, [x, y]) => el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "touch", isPrimary: true, clientX: x, clientY: y })), [b.x + b.width / 2, b.y + b.height / 2]);
+  await press(page, row, 900);
+  await page.getByRole("menuitem", { name: "Review this source" }).waitFor();
+  await Bun.sleep(200);
+  if (await page.getByRole("menuitem", { name: "Search sources" }).count()) throw new Error("the section's menu opened over the row's");
 }, "phone");
 
 journey("phone: a long press on a skill, on Today or in the drawer, opens the skill's menu, and Review this skill reviews it", async (page) => {

@@ -197,6 +197,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
         setPicked(ids.slice(Math.min(a, b), Math.max(a, b) + 1));
       }
       if (e.metaKey || !anchor.current || !reading.some((r) => r.id === anchor.current)) anchor.current = i.id;
+      // WebKit leaves a clicked button unfocused; ⇧↑↓ grow the pick from the focused row (F34, Finder).
+      (e.currentTarget as HTMLElement).closest(".home-read")?.querySelector<HTMLElement>(".home-open")?.focus({ preventScroll: true });
       return;
     }
     setPicked([]);

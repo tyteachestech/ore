@@ -672,7 +672,8 @@ export function App() {
     setOpenId(null);
     setFinishing(false);
     // The list takes the keys at once (Linear's ⌘1), also when it was not on screen (Home, a source).
-    requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
+    // A folder tab chosen by click or arrow keeps focus, so the next arrow moves on to the next tab (F33).
+    requestAnimationFrame(() => document.activeElement?.closest("[role=tablist]") || listRef.current?.focus({ preventScroll: true }));
   }, []);
 
 
