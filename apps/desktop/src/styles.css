@@ -367,7 +367,7 @@ img.thumb { filter: brightness(0.86); }
 /* Hover and open light the ground behind them, so it shows with the names hidden too (Icon only). */
 .chips-button:hover, .chips-button[aria-expanded="true"] { background: var(--bg-active); box-shadow: 0 0 0 3px var(--bg-active); }
 .chips-button:hover .chip, .chips-button[aria-expanded="true"] .chip { color: var(--text); }
-.chips-add { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border-radius: 9px; color: var(--faint); opacity: 0; }
+.chips-add { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-block: -1px; padding: 0; border-radius: 10px; color: var(--faint); opacity: 0; }
 .chips-add:hover, .chips-add[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 .row:hover .chips-add, .doc-head:hover .chips-add, .chips-add:focus-visible, .chips-add[aria-expanded="true"] { opacity: 1; }
 .skill-picker { width: 240px; }
@@ -1103,7 +1103,7 @@ body.resizing iframe { pointer-events: none; }
 .width-toggle:hover, .width-toggle[aria-expanded="true"], .width-toggle.on { background: var(--bg-hover); color: var(--text); }
 /* Top right of Home and All sources, in the title bar (App.tsx). */
 .main-tools { position: absolute; top: 7px; right: 12px; z-index: 6; display: flex; align-items: center; gap: 6px; }
-.width-toggle:focus-visible, .note-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.width-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .note-toggle {
   display: flex; align-items: center; gap: 6px;
 }
@@ -2418,7 +2418,7 @@ button.home-plan:hover { color: var(--text); }
    edge, no fill, the sans at 12px/500. The mono is kept for a screen's main action and the answers in Review. */
 .note-toggle, .warm-start, .settings-btn { height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text); font: 500 12px var(--font); }
 .note-toggle:hover, .warm-start:hover, .settings-btn:hover { background: var(--bg-hover); }
-.settings-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.note-toggle:focus-visible, .warm-start:focus-visible, .settings-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .settings-select { display: inline-flex; align-items: center; gap: 8px; min-width: 104px; justify-content: space-between; font-variant-numeric: tabular-nums; }
 .settings-select svg { flex: none; color: var(--faint); }
 .settings-select-label { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2433,7 +2433,7 @@ button.home-plan:hover { color: var(--text); }
 .marks { position: absolute; inset: 0; pointer-events: none; --mark-gap: 20px; }
 .page.video .marks { --mark-gap: 54px; }
 .mark-icon {
-  position: absolute; pointer-events: auto; width: 16px; height: 16px; margin-left: calc(-1 * var(--mark-gap)); transform: translate(-50%, -50%);
+  position: absolute; pointer-events: auto; width: 20px; height: 20px; padding: 0; margin-left: calc(-1 * var(--mark-gap)); transform: translate(-50%, -50%);
   display: grid; place-items: center; border-radius: 4px; color: var(--hue); opacity: 0.75; transition: opacity var(--t-1) ease-out;
 }
 .mark-icon:hover { opacity: 1; background: var(--bg-hover); }
