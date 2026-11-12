@@ -848,7 +848,7 @@ img.thumb { filter: brightness(0.86); }
 .intent.apply { --hue: var(--apply-solid); --tint: var(--apply); }
 .intent svg { color: var(--hue, currentColor); flex: none; }
 .intent.on { color: var(--text); background: var(--tint); }
-.popup .field { grid-column: 1; min-width: 0; align-self: start; min-height: 30px; max-height: 160px; padding: 5px 10px; line-height: 1.4; }
+.popup .field { grid-column: 1; min-width: 0; align-self: start; font-variant-numeric: tabular-nums; min-height: 30px; max-height: 160px; padding: 5px 10px; line-height: 1.4; }
 /* Copy, Remove text and Remove stack in one column; Play and Explain, when they show, in a second beside it.
    Pinned to the top (retro.css too), so a note growing under him never moves them from where his pointer met them. */
 .popup-tools {
