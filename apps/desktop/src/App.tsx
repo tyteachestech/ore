@@ -2420,11 +2420,11 @@ export function App() {
             onRefile={(i, next, before, k) => void refile(sourceFiling(i), next, before, k)}
             onCreateSkill={createSkill}
             onSettings={() => setSettings({ section: "review" })}
-            // Home renames its own rows (onRename); the shortcuts act on the list's selected row, so
-            // Home shows none but ⌘C, which copies the focused row (onCopy).
-            sourceMenu={(i) => rowActions(i).map((a) => (a.id === "copy" ? a : { ...a, hint: undefined }))}
+            // Home renames its own rows (onRename) and takes the lists' row keys on its focused row or pick
+            // (D232, D234), so its menus show them as the lists' do.
+            sourceMenu={rowActions}
             onCopy={(i) => copySources([i])}
-            manyMenu={(sel) => manyActions(sel).filter((a) => a.id !== "show").map((a) => (a.id === "copy" ? a : { ...a, hint: undefined }))}
+            manyMenu={(sel) => manyActions(sel).filter((a) => a.id !== "show")}
             onDragSkill={setHomeDrop}
             onDropOnSkill={(sel, id) => {
               const k = skills.find((x) => x.id === id);

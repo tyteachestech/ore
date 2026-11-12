@@ -36,3 +36,26 @@ export function typeJump(titles: string[], typed: string, from: number): number 
  *  only inside a prefix already begun ("New York"), as in Finder. */
 export const typesTitle = (e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean }, begun: boolean) =>
   !e.metaKey && !e.ctrlKey && !e.altKey && [...e.key].length === 1 && (e.key !== " " || begun);
+
+/** One list's type-select (Finder): feed it each key press with the rows' titles and the selected row. Returns the
+ *  row to select, -1 when the letters match none (the selection stays), or null when the key types no title
+ *  letter (it then ends the prefix, and the key is the list's to handle). */
+export function typeSelect() {
+  let text = "";
+  let at = 0;
+  return (e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean }, titles: string[], from: number): number | null => {
+    const now = Date.now();
+    const begun = now - at < TYPE_GAP && text !== "";
+    if (!typesTitle(e, begun)) return (text = ""), null;
+    text = (begun ? text : "") + e.key;
+    at = now;
+    return typeJump(titles, text, from);
+  };
+}
+
+/** Finder's ⇧-click and ⇧↑↓: the ids from the anchor to `to`, or from `to` alone when the anchor has left the list. */
+export function pickRun(ids: string[], anchor: string | null, to: string): string[] {
+  const b = ids.indexOf(to);
+  const a = anchor && ids.includes(anchor) ? ids.indexOf(anchor) : b;
+  return ids.slice(Math.min(a, b), Math.max(a, b) + 1);
+}
