@@ -2211,7 +2211,7 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
-journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D213)", async (page) => {
+journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D215)", async (page) => {
   const lecture = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title.startsWith("Lecture 4"))!;
   const dir = ((await ore("show", lecture.id)) as { dir: string }).dir;
   const button = page.getByRole("button", { name: "Add the page’s text" });
@@ -2545,7 +2545,7 @@ journey("highlight note: what he types is kept when he clicks away or presses Es
   await reopen("decomposes a task", "Each step feeds the next");
 });
 
-journey("author: add one by hand from the title's menu, it survives a reload, and ⌘Z takes it back", async (page) => {
+journey("author: add one by hand from the title's menu or the empty byline field, it survives a reload, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   await page.locator(".doc-head h1").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Add author…" }).click();
@@ -2555,6 +2555,13 @@ journey("author: add one by hand from the title's menu, it survives a reload, an
   await by.filter({ hasText: "Henry Roediger" }).waitFor();
   await page.keyboard.press("Meta+z");
   await until("⌘Z removes it", async () => (await by.count()) === 0);
+  // With none, the byline holds a faint empty Author field (D210) that one click fills.
+  const empty = page.locator(".doc-head .chips .by-add");
+  await empty.waitFor();
+  await empty.click();
+  await page.getByLabel("Author").waitFor();
+  await page.keyboard.press("Escape");
+  await empty.waitFor();
   // The byline shows at once; reload only once the redo's write has reached the library (slow on CI).
   // Watched from the redo on, so the first add's write (still landing on CI) doesn't count.
   const posts: string[] = [];
@@ -4531,6 +4538,8 @@ journey("diagram: opens in a sheet centred over the window, ⇧⌘↵ gives it t
   await page.locator(".note-editor .note-diagram").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Open diagram" }).click();
   await sheet.waitFor();
+  // The drawing loads, then takes the keys (a slow runner's Esc can land before it has them).
+  await until("the opened drawing takes the keys", () => page.evaluate(() => !!document.activeElement?.closest(".diagram .draw")));
   await page.keyboard.press("Escape");
   await until("Esc closes it again", async () => (await page.locator(".diagram").count()) === 0);
   await page.locator(".note-editor .note-diagram").click({ button: "right" });
@@ -4657,6 +4666,11 @@ journey("diagram: ⌘Z on a rename takes the file back with the link, ⇧⌘Z re
   const board = page.locator(".note-editor .note-diagram");
   await until("the note links it once it is saved", async () => (await board.count()) === 1, 6000);
   const name = (await page.locator(".diagram-name").inputValue())!;
+  await page.locator(".diagram-name").fill("not-this-name");
+  await page.keyboard.press("Escape"); // throws the edit away, never renames (D211)
+  await until("Esc keeps the old name", async () => (await page.locator(".diagram-name").inputValue()) === name);
+  await page.waitForTimeout(300);
+  if ((await board.getAttribute("aria-label")) !== `Diagram ${name}, click to edit`) throw new Error("Esc renamed the diagram");
   await page.locator(".diagram-name").fill("spacing-map");
   await page.keyboard.press("Enter");
   const shows = (n: string) => async () => (await board.getAttribute("aria-label")) === `Diagram ${n}, click to edit` && (await board.locator(".note-diagram-view > svg").count()) === 1;
@@ -4697,11 +4711,11 @@ journey("diagram: S styles at the pointer, keys stay on the canvas, Space never 
   await page.keyboard.press("Enter");
   const boxes = () => page.locator(".diagram .draw-canvas > g rect").count();
   await until("the box is drawn", async () => (await boxes()) === 1);
-  // The tool he picked stays for the next box (Tyler 2026-11-10), its key shown against its icon; V goes back to Select.
+  // A drawn box goes back to Select, as in Excalidraw (Tyler 2026-11-11); each tool shows its key against its icon.
   const boxTool = page.locator(".draw-tools").getByRole("button", { name: "Box" });
-  if ((await boxTool.getAttribute("aria-pressed")) !== "true") throw new Error("drawing a box put the tool back on Select");
+  const selectTool = page.locator(".draw-tools").getByRole("button", { name: "Select" });
+  await until("drawing a box goes back to Select", async () => (await selectTool.getAttribute("aria-pressed")) === "true");
   if ((await boxTool.locator(".draw-key").textContent()) !== "R") throw new Error("the Box tool doesn't show its key");
-  await page.keyboard.press("v");
   // S opens the style picker by the pointer; its keys restyle the selection and Esc closes only it.
   const rect = page.locator(".diagram .draw-canvas > g rect").first();
   await page.mouse.move(c.x + 640, c.y + 420);
@@ -4807,16 +4821,13 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
   await until("Backspace deletes it", async () => (await rect.count()) === 0);
   await page.keyboard.press("Meta+z");
   await until("⌘Z brings it back selected", async () => (await rect.count()) === 1 && (await selected()) === "Selected: Sleep");
-  // An arrow started with a click and dropped with Esc leaves no arrow and keeps the Arrow tool, as a finished one
-  // does (Tyler 2026-11-10); the next Esc goes back to Select.
+  // An arrow started with a click and dropped with Esc leaves no arrow and the Select tool, as a finished one does.
   await page.keyboard.press("Escape");
   await page.keyboard.press("a");
   await page.mouse.click(c.x + 900, c.y + 600);
   await page.keyboard.press("Escape");
   const tool = () => page.locator(".draw-tool[aria-pressed=true]").first().getAttribute("aria-label");
   await until("the dropped arrow is gone", async () => (await page.locator(".diagram .draw-canvas > g path").count()) === 0);
-  if ((await tool()) !== "Arrow") throw new Error(`dropping an arrow left the ${await tool()} tool, not Arrow`);
-  await page.keyboard.press("Escape");
   await until("the tool is Select again", async () => (await tool()) === "Select");
   // In the picker, A D F set which way a selected arrow points: one-way, both ways, no heads.
   await page.keyboard.press("a");
@@ -4836,6 +4847,96 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
   await page.keyboard.press("a");
   await until("A makes it one-way again", async () => (await paths()) === oneWay);
   await page.keyboard.press("Escape");
+});
+
+journey("diagram: a drawn box is selected under Select, Enter right after waits for its label, the right-click menu cuts, copies and pastes, and a line near level lands level", async (page) => {
+  await openSource(page, TESTING);
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  // An earlier journey's drawing can still be open, or open as the source loads: Done closes it first.
+  await until("the note takes the caret", async () => {
+    if (await page.locator(".diagram").count()) await page.locator(".diagram-done").click();
+    // On the first line's words, not the middle of the note, where a diagram's preview would take the click.
+    await note.locator("p", { hasText: /\w/ }).first().click({ timeout: 1000 }).catch(() => {});
+    return !(await page.locator(".diagram").count()) && (await note.evaluate((e) => e.contains(document.activeElement)));
+  });
+  // A new line after a paragraph of words: either end of the note may already be a diagram another journey drew.
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/diagram");
+  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+  await page.keyboard.press("Enter");
+  const draw = page.locator(".diagram .draw");
+  await draw.focus();
+  const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
+  const rects = page.locator(".diagram .draw-canvas > g rect");
+  const tool = () => page.locator(".draw-tool[aria-pressed=true]").first().getAttribute("aria-label");
+  // Drag a box, then Enter as Excalidraw starts a label: the label already open waits for the words (Tyler 2026-11-11).
+  await page.keyboard.press("r");
+  await page.mouse.move(c.x + 200, c.y + 150);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 260, c.y + 190, { steps: 4 });
+  await page.mouse.move(c.x + 340, c.y + 230, { steps: 4 });
+  await page.mouse.up();
+  await page.locator(".draw-text").waitFor();
+  await page.keyboard.press("Enter");
+  if (!(await page.locator(".draw-text").count())) throw new Error("Enter on a box just drawn closed its label");
+  await page.keyboard.type("Concept");
+  await page.keyboard.press("Enter");
+  await until("the box is labelled", async () => (await page.locator(".diagram .draw-canvas > g text").allTextContents()).join("").includes("Concept"));
+  await until("the tool is Select", async () => (await tool()) === "Select");
+  // A click on the box picks it; it never draws a second one over it.
+  await page.keyboard.press("Escape");
+  await page.mouse.click(c.x + 210, c.y + 160);
+  await until("the click selects the box", async () => (await page.locator(".diagram .sr-only[aria-live]").textContent()) === "Selected: Concept");
+  if ((await rects.count()) !== 1) throw new Error(`a click on the drawn box made ${await rects.count()} boxes`);
+  // Right-click: Copy, then Paste on empty canvas makes a second box; Cut takes one away.
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.mouse.click(c.x + 210, c.y + 160, { button: "right" });
+  await page.getByRole("menuitem", { name: /^Copy\b(?! style| as)/ }).click();
+  await until("Copy puts the box on the clipboard", async () => (await page.evaluate(() => navigator.clipboard.readText())).includes("excalidraw/clipboard"));
+  await page.mouse.click(c.x + 700, c.y + 500, { button: "right" });
+  await page.getByRole("menuitem", { name: /^Paste\b(?! style)/ }).click();
+  await until("Paste makes a copy", async () => (await rects.count()) === 2);
+  await page.mouse.click(c.x + 210, c.y + 160, { button: "right" });
+  await page.getByRole("menuitem", { name: /^Cut\b/ }).click();
+  await until("Cut takes the box away", async () => (await rects.count()) === 1);
+  // A line drawn 2° off level lands level, with a guide through it while the drag lasts (Tyler 2026-11-11); ⌘ draws it as is.
+  const lines = page.locator(".diagram .draw-canvas > g path");
+  const lineAt = async (dy: number, mod?: string) => {
+    const n = await lines.count();
+    await page.keyboard.press("l");
+    if (mod) await page.keyboard.down(mod);
+    await page.mouse.move(c.x + 200, c.y + 400);
+    await page.mouse.down();
+    await page.mouse.move(c.x + 300, c.y + 400 + dy / 2, { steps: 4 });
+    await page.mouse.move(c.x + 400, c.y + 400 + dy, { steps: 4 });
+    const guide = await page.locator(".draw-angle-guide").count();
+    await page.mouse.up();
+    if (mod) await page.keyboard.up(mod);
+    await until("the line is drawn", async () => (await lines.count()) > n);
+    if (await page.locator(".draw-angle-guide").count()) throw new Error("the angle guide stayed after the drag");
+    const ys = [...((await lines.last().getAttribute("d")) ?? "").matchAll(/[ML]\s*(-?[\d.]+)[ ,](-?[\d.]+)/g)].map((m) => Number(m[2]));
+    return { guide, flat: ys.length >= 2 && Math.abs(ys[0]! - ys.at(-1)!) < 0.01 };
+  };
+  const snapped = await lineAt(7);
+  if (!snapped.guide || !snapped.flat) throw new Error(`a line 2° off level: guide ${snapped.guide}, level ${snapped.flat}`);
+  const free = await lineAt(7, "Meta");
+  if (free.guide || free.flat) throw new Error("⌘ still snapped the line level");
+  const steep = await lineAt(40);
+  if (steep.guide || steep.flat) throw new Error("a line 11° off level was snapped");
+  // A double-click on a selected arrow's middle opens its label, as in Excalidraw; it no longer adds a bend there.
+  await page.keyboard.press("a");
+  await page.mouse.move(c.x + 560, c.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 710, c.y + 100, { steps: 4 });
+  await page.mouse.move(c.x + 860, c.y + 100, { steps: 4 });
+  await page.mouse.up();
+  await until("the arrow is drawn and selected", async () => (await tool()) === "Select");
+  await page.mouse.dblclick(c.x + 710, c.y + 100);
+  await page.locator(".draw-text").waitFor({ timeout: 2000 }).catch(() => { throw new Error("a double-click on the arrow's middle opened no label"); });
+  await page.keyboard.type("strengthens");
+  await page.keyboard.press("Enter");
+  await until("the arrow is labelled", async () => (await page.locator(".diagram .draw-canvas > g text").allTextContents()).join("").includes("strengthens"));
 });
 
 journey("diagram: align and space from keys and the picker, drags snap to edges and equal gaps (⌘ off), and a node goes with its links", async (page) => {
@@ -4869,7 +4970,6 @@ journey("diagram: align and space from keys and the picker, drags snap to edges 
     await page.locator(".draw-text").waitFor();
     await page.keyboard.type(label);
     await page.keyboard.press("Enter");
-    await page.keyboard.press("v"); // the Box tool stays until another is picked
   };
   const drag = async (x1: number, y1: number, x2: number, y2: number, mod?: string) => {
     if (mod) await page.keyboard.down(mod);
@@ -4959,7 +5059,6 @@ journey("diagram: align and space from keys and the picker, drags snap to edges 
   await drag(a.x + 40, a.y + 40, (await rects.nth(1).boundingBox())!.x + 40, bb.y + 40);
   await drop();
   await until("an arrow joins A to B", async () => (await summary())?.includes("→") ?? false);
-  await page.keyboard.press("v"); // the Arrow tool stays until another is picked
   await page.mouse.click(a.x + 40, a.y + 40);
   await page.keyboard.press("Backspace");
   await until("deleting A takes the arrow with it", async () => !(await summary())?.includes("→") && (await rects.count()) === 2);
@@ -6451,8 +6550,45 @@ journey("questions: a highlight marked as a question joins the list even when it
   await page.unroute(/\/ore$/);
 });
 
+journey("click away saves what he typed: the author, a source's title, a skill's goal; Esc throws it away", async (page) => {
+  await openSource(page, TESTING);
+  const away = () => page.locator(".doc p").first().click(); // a click in the text, as he does
+  await page.locator(".doc-head .by-add").click();
+  await page.getByLabel("Author").fill("Jeffrey Karpicke");
+  await away();
+  await page.locator(".doc-head .by").filter({ hasText: "Jeffrey Karpicke" }).waitFor();
+  await page.locator(".doc-head .by").click();
+  await page.getByLabel("Author").fill("Not this one");
+  await page.keyboard.press("Escape");
+  await page.locator(".doc-head .by").filter({ hasText: "Jeffrey Karpicke" }).waitFor();
+  await page.keyboard.press("Meta+z"); // the click-away save is one step, as Enter's is
+  await page.locator(".doc-head .by-add").waitFor();
+  await page.locator(".doc-head h1").click();
+  await page.getByLabel("Title").fill(`${TESTING} (clicked away)`);
+  await away();
+  await page.locator(".doc-head h1").filter({ hasText: "(clicked away)" }).waitFor();
+  await page.keyboard.press("Meta+z");
+  await page.locator(".doc-head h1").filter({ hasText: TESTING }).filter({ hasNotText: "(clicked away)" }).waitFor();
+  await page.locator(".sidebar .side-item:not(.side-main)").first().click();
+  await page.locator("button.skill-goal").click();
+  const goal = page.locator("input.skill-goal");
+  await goal.fill("Explain it to a friend, from memory");
+  await page.mouse.click(640, 10); // a click on nothing in particular: the title bar
+  await page.locator("button.skill-goal").filter({ hasText: "Explain it to a friend, from memory" }).waitFor();
+  // Esc in a list row, whose list takes focus back at once: that blur must not save it.
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row").filter({ hasText: AGENTS }).first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  await page.locator(".row input[aria-label=Title]").fill("Esc throws this away");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  if (await page.locator(".row").filter({ hasText: "Esc throws this away" }).count()) throw new Error("Esc saved the row's rename");
+});
+
 journey("author: a save that fails keeps the name he typed, in the field", async (page) => {
   await openSource(page, AGENTS);
+  await page.locator(".doc-head .chips .source").filter({ hasText: "anthropic.com" }).waitFor(); // where it's from ends the byline (D210)
   await page.locator(".doc-head button.by").click();
   const field = page.getByLabel("Author");
   await field.fill("A corrected author");

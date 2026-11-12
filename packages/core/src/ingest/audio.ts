@@ -163,7 +163,7 @@ export function pageAudio(html: string, url: string, player = false): string | u
   const og = abs(meta("og:audio") ?? meta("og:audio:url") ?? meta("og:audio:secure_url"));
   const declared = ldEpisodeAudio(html) ?? (og && /episode/i.test(meta("og:type") ?? "") && AUDIO_FILE.test(og) ? og : undefined);
   if (declared) return abs(declared);
-  // A player's own og:audio is its episode, whatever its address looks like (as before D213).
+  // A player's own og:audio is its episode, whatever its address looks like (as before D215).
   if (player && og) return og;
   if (!player && !EPISODE_PATH.test(new URL(url).pathname)) return undefined;
   const isAudio = (u: string) => (player ? AUDIO_ANYWHERE : AUDIO_FILE).test(new URL(u).pathname);

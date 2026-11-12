@@ -74,7 +74,7 @@ export const ItemMetaSchema = z.object({
   url: z.string().optional(),
   // A page that plays a video (D92): the video's link; its transcript is `transcript.vtt` beside the source.
   video: z.string().optional(),
-  // An episode's own page text, added below its transcript (D213): the id of its record, while it is in.
+  // An episode's own page text, added below its transcript (D215): the id of its record, while it is in.
   page_added: z.string().optional(),
   author: z.string().optional(),
   published: z.string().optional(),
@@ -126,7 +126,7 @@ export interface NewItem {
   video?: string;
   /** The video's captions (WebVTT), for a page that plays one (D92). */
   transcript?: string;
-  /** An episode's own web page (D213), kept as `page.html` beside its audio: its text is one click away. */
+  /** An episode's own web page (D215), kept as `page.html` beside its audio: its text is one click away. */
   page?: string;
   author?: string;
   published?: string;

@@ -534,7 +534,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   "page-text": {
-    usage: "<item> | <item> --undo|--redo <cut-id>   add an episode's own page text below its transcript (D213), from the page kept beside it (page.html): headings, links, images; highlights stay where they are; --undo <cut-id> takes it out again, --redo puts it back",
+    usage: "<item> | <item> --undo|--redo <cut-id>   add an episode's own page text below its transcript (D215), from the page kept beside it (page.html): headings, links, images; highlights stay where they are; --undo <cut-id> takes it out again, --redo puts it back",
     options: { undo: { type: "string" }, redo: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();

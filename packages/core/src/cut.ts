@@ -141,7 +141,7 @@ async function apply(lib: Library, item: Item, c: Omit<Cut, "removed">): Promise
   return cut;
 }
 
-/** A section at the end of a source's body (an episode's page text, D213), added, taken out and put
+/** A section at the end of a source's body (an episode's page text, D215), added, taken out and put
  *  back under the library lock, each time from the source as it is then, so two at once or a cut
  *  landing meanwhile is never overwritten. It is recorded as a cut, found again as the body's end
  *  (a cut above it moves it), and `mark` keeps the frontmatter in step: the record's id while the

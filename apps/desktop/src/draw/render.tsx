@@ -4,7 +4,12 @@
 import { memo, type ReactNode } from "react";
 import { absPoints, centre, frame, isLinear, lineHeightOf, MONO, type El, type Els, type Pt } from "./model";
 
-const ink = new Map<string, string>([["#1e1e1e", "#f2f1ec"], ["#000000", "#f2f1ec"], ["#ffffff", "#141413"]]);
+// The four colour presets show in the app's own palette (styles.css --c-red, --c-green, --c-blue, --c-orange), so a red
+// label in a diagram is the red of a note's red text beside it (Tyler, 2026-11-11). The file keeps Excalidraw's values.
+const ink = new Map<string, string>([
+  ["#1e1e1e", "#f2f1ec"], ["#000000", "#f2f1ec"], ["#ffffff", "#141413"],
+  ["#e03131", "#ff7b72"], ["#2f9e44", "#5fcf8a"], ["#1971c2", "#6aa8f7"], ["#f08c00", "#ffa657"],
+]);
 
 /** Excalidraw's dark theme (invert 93%, hue-rotate 180°), in code so exports and previews match. */
 export function dark(c: string): string {

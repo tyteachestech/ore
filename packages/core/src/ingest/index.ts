@@ -41,7 +41,7 @@ export interface AddOptions {
   regions?: Region[];
   /** The speech's language when the episode names it (its feed's), so it is heard in it. */
   language?: string;
-  /** A page that is an episode (D213): read as its episode (unset, a new add: when its audio comes),
+  /** A page that is an episode (D215): read as its episode (unset, a new add: when its audio comes),
    *  always (true: a Reimport of an episode, which must stay one), or never (false: of an article). */
   episode?: boolean;
 }
@@ -179,7 +179,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   // An article that embeds a video keeps both: its text, then the video's transcript (D92).
   const page = await pageDraft(text, base ?? `file://${name}`);
   if (page.type !== "article") return page;
-  // A page that is an episode comes in as its episode, the page kept beside it (D213).
+  // A page that is an episode comes in as its episode, the page kept beside it (D215).
   const heard = !page.video && opts.episode !== false && base && /^https?:/.test(base) ? await asEpisode(text, base, { ...page, url }, opts) : null;
   if (heard) return heard;
   // A page that is only a wall or a shell is refused, never saved as the content.
@@ -188,7 +188,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   return { ...page, url };
 }
 
-/** A page that is an episode (`pageAudio`) as its episode (D213): as an episode link gives it (the
+/** A page that is an episode (`pageAudio`) as its episode (D215): as an episode link gives it (the
  *  audio the original, to play in place, its heard transcript the text, D167), under the page's own
  *  title, author and date, with the page kept as `page.html` so its own text is one click away
  *  (`addPageText`). Audio that can't be fetched, isn't audio, or can't be heard (an older macOS,
@@ -215,11 +215,11 @@ async function asEpisode(html: string, base: string, page: NewItem, opts: AddOpt
   }
 }
 
-/** Where an episode's page text starts once he adds it (D213). */
+/** Where an episode's page text starts once he adds it (D215). */
 export const PAGE_HEADING = "## From the page";
 const pageFile = (item: Item) => join(item.dir, "page.html");
 
-/** Whether a source is an episode whose page is kept and whose text he hasn't added (D213). */
+/** Whether a source is an episode whose page is kept and whose text he hasn't added (D215). */
 export const hasPageText = (item: Item) => existsSync(pageFile(item)) && !item.meta.page_added;
 
 /** A kept episode page's own text as the article reader makes it (headings, links, speaker names), its
@@ -234,7 +234,7 @@ async function pageSection(html: string, url: string | undefined, title: string)
 const below = (body: string, section: string) => `${body.endsWith("\n") ? "" : "\n"}\n${section}`;
 const marked = (meta: ItemMeta, id: string | undefined): ItemMeta => ({ ...meta, page_added: id });
 
-/** Adds an episode's page text below its transcript (D213), under PAGE_HEADING at the end, so no
+/** Adds an episode's page text below its transcript (D215), under PAGE_HEADING at the end, so no
  *  highlight moves. The page is read and its images fetched first; the text goes in under the lock,
  *  checked again there, so two at once add it once. Undone with `undoPageText`, redone with `redoPageText`. */
 export async function addPageText(lib: Library, ref: string): Promise<import("../cut.ts").Cut> {
@@ -682,7 +682,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const pasted = type === "markdown" && !url && kept === "source.html";
   const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)) }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
   if (!draft.body.trim()) throw new Error("Found no text to read at the original now. It may have moved; open it to check.");
-  // An episode he added its page text to keeps it, after the transcript, so its highlights re-anchor (D213).
+  // An episode he added its page text to keeps it, after the transcript, so its highlights re-anchor (D215).
   const section = item.meta.page_added && draft.page ? await pageSection(draft.page, url, item.meta.title) : undefined;
   const tail = section && below(draft.body, section.text);
   if (section && tail) {
