@@ -8,7 +8,8 @@ import { parseArgs } from "@pkgjs/parseargs";
 import * as YAML from "yaml";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { existsSync, mount, mountDisk, readFileSync, rescan } from "./fs";
+import { setLibraryRoot } from "./tauri-core";
+import { existsSync, flush, mount, mountDisk, readFileSync, rescan, writeFileSync } from "./fs";
 import { ready } from "./sqlite";
 
 export const ROOT = "/lib";
@@ -56,6 +57,28 @@ g.Bun = {
   spawnSync: () => ({ exitCode: 1, stdout: new Uint8Array(), stderr: new Uint8Array() }),
 };
 
+/** Other sites go through the shell's native fetch (apps/phone/src-tauri/src/lib.rs `http_fetch`): a web view
+ *  can't read them (CORS, and the CSP's connect-src). Same-origin and data/blob URLs stay with the web view. */
+if (isTauri()) {
+  const own = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (!/^https?:/i.test(url) || new URL(url).origin === location.origin) return own(input, init);
+    const headers = [...new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)).entries()];
+    type Fetched = { status: number; url: string; headers: [string, string][]; body: string };
+    const r = await invoke<Fetched>("http_fetch", { url, method: init?.method ?? "GET", headers }).catch((e) => {
+      throw new TypeError(`fetch failed: ${e}`);
+    });
+    const bin = atob(r.body);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const res = new Response([101, 204, 205, 304].includes(r.status) ? null : bytes, { status: r.status, headers: r.headers });
+    Object.defineProperty(res, "url", { value: r.url });
+    Object.defineProperty(res, "redirected", { value: r.url !== url });
+    return res;
+  }) as typeof fetch;
+}
+
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
 function boot() {
@@ -64,6 +87,9 @@ function boot() {
       const root = await invoke<string | null>("library_dir");
       if (!root) throw new Error("Turn on iCloud Drive for Ore: Settings › your name › iCloud › Drive.");
       await mountDisk(ROOT, root, invoke);
+      // A source's own files (its images) load from the folder itself: /lib/... is the folder on disk.
+      setLibraryRoot(ROOT, root);
+      debugAdd();
     } else {
       const text = await (await fetch("/library.json")).text();
       const snap = JSON.parse(text) as Record<string, string>;
@@ -90,7 +116,9 @@ export const pull = () => (booted ? booted.then(() => exclusive(rescan)).catch((
 
 /** `ore <args> --json` in-process: the command's JSON output, or its one-line error. */
 export async function run<T>(args: string[], input: string | null): Promise<T> {
-  const lib = await boot();
+  const lib = await boot().catch((e) => {
+    throw e instanceof TypeError || e instanceof SyntaxError ? new Error(`Couldn't start: ${e.message}`) : e;
+  });
   return exclusive(() => command<T>(lib, args, input));
 }
 
@@ -131,3 +159,24 @@ function picture(path: string): string | undefined {
 const AI = new Set(["grade", "ask", "enrich", "key-points", "research", "remix", "catch-up"]);
 const needsAi = (name: string, args: string[]) =>
   AI.has(name) || (name === "inbox" && args.includes("--import")) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));
+
+/** SPIKE (phone import): `debug-add.json` in the library, a list of links, is imported at launch with
+ *  `ore add`; each one's seconds and result go to `debug-add.out.json`. */
+function debugAdd() {
+  if (!existsSync(`${ROOT}/debug-add.json`)) return;
+  const urls = JSON.parse(readFileSync(`${ROOT}/debug-add.json`)) as string[];
+  setTimeout(async () => {
+    const out: unknown[] = [];
+    for (const url of urls) {
+      const t0 = performance.now();
+      try {
+        const r = await run<{ id: string; dir?: string }>(["add", url, "--json"], null);
+        out.push({ url, secs: (performance.now() - t0) / 1000, id: r?.id, dir: r?.dir });
+      } catch (e) {
+        out.push({ url, secs: (performance.now() - t0) / 1000, error: String(e) });
+      }
+      writeFileSync(`${ROOT}/debug-add.out.json`, JSON.stringify(out, null, 1));
+      await flush();
+    }
+  }, 500);
+}
