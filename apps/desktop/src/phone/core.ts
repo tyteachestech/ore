@@ -18,7 +18,7 @@ let stdin = "";
 const g = globalThis as unknown as Record<string, unknown>;
 // What the core and CLI read from Bun and Node besides the modules above.
 g.process = {
-  env: { ...(g.process as { env?: object } | undefined)?.env, ORE_LIBRARY: ROOT, ORE_NO_ENRICH: "1", ORE_DEVICE: "iphone" },
+  env: { ...(g.process as { env?: object } | undefined)?.env, ORE_LIBRARY: ROOT, ORE_NO_ENRICH: "1", ORE_NO_TOOLS: "1", ORE_DEVICE: "iphone" },
   platform: "ios",
   pid: 1,
   cwd: () => ROOT,

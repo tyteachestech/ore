@@ -18,7 +18,7 @@ import { isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./cours
 import { dropTitle, hasText, pageDraft } from "./page.ts";
 import type { Tab } from "./tab.ts";
 import { makeThumbnail } from "./thumbnail.ts";
-import { fetchYoutube, isYoutubeUrl, srtToVtt, vttToBody, vttWords, youtubeId } from "./youtube.ts";
+import { fetchYoutube, isYoutubeUrl, owedVideo, ytDlp, srtToVtt, vttToBody, vttWords, youtubeId } from "./youtube.ts";
 export { courseCoverFile, epubCover, makeCourseCover, makeThumbnail, pageImage, thumbnailFile } from "./thumbnail.ts";
 export { transcriptOf, vttWords, youtubeId } from "./youtube.ts";
 export { embeddedVideo, pageDraft, TRANSCRIPT_HEADING, VIDEO_END } from "./page.ts";
@@ -289,6 +289,8 @@ function kindOf(name: string, ctype = ""): string | null {
 
 async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   if (opts.type === "youtube" || (!opts.type && isYoutubeUrl(url))) {
+    // No yt-dlp and no way to get it (the iPhone): the video now, its transcript owed (D227).
+    if (process.env.ORE_NO_TOOLS && isYoutubeUrl(url) && youtubeId(url) && !ytDlp()) return { type: "youtube", ...(await owedVideo(url)), body: "", source: { ext: "vtt", data: "WEBVTT\n" }, owed: ["transcript"] };
     const y = await fetchYoutube(url, { listen: true, onProgress: opts.onProgress });
     return { type: "youtube", title: y.title, url: y.url, author: y.author, published: y.published, body: y.body, source: { ext: "vtt", data: y.vtt } };
   }
@@ -468,7 +470,7 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   if (had && opts.preview) return had;
   if (had) return keep(lib, had, opts);
   const draft = isUrl ? await fromUrl(input, opts) : await fromFile(resolve(input), opts, input);
-  if (!draft.body.trim()) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
+  if (!draft.body.trim() && !draft.owed?.length) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
   const ready = await withImages(draft);
   // The same file added again (dropped twice, or a copy) is the source already here.
   const same = !isUrl && sameText(lib, ready.body);
@@ -698,6 +700,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
   const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)) }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
+  if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
   if (!draft.body.trim()) throw new Error("Found no text to read at the original now. It may have moved; open it to check.");
   // An episode he added its page text to keeps it, after the transcript, so its highlights re-anchor (D215).
   const section = item.meta.page_added && draft.page ? await pageSection(draft.page, url, item.meta.title) : undefined;
@@ -729,7 +732,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     // Read again under the lock: a background enrich may have written its questions while this one read.
     const now = readItemDir(item.dir).meta;
     const added = tail ? recordEnd(lib, item.meta.id, draft.body.length - tail.length, tail) : undefined;
-    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure };
+    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure, owed: undefined, owed_error: undefined };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);
@@ -737,6 +740,23 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const gone = readAnnotations(next).filter((a) => report.orphaned.includes(a.id) && a.intent !== "question");
   for (const a of gone) reviseAnnotation(next, a, { status: "deleted" });
   return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone };
+}
+
+/** Fills what a device with no tools left owed (D227): each such source is read again here, as a reimport,
+ *  when this device has the tools. One that fails keeps its reason and waits for a Reimport by hand, so a
+ *  video that is gone isn't asked for on every pass. */
+export async function fillOwed(lib: Library): Promise<Item[]> {
+  if (!ytDlp()) return [];
+  const filled: Item[] = [];
+  for (const i of allItems(lib)) {
+    if (!i.meta.owed?.length || i.meta.owed_error) continue;
+    try {
+      filled.push((await reimportSource(lib, i.meta.id)).item);
+    } catch (e) {
+      await updateItemMeta(lib, i.meta.id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) }));
+    }
+  }
+  return filled;
 }
 
 /** The tables and formulas Docling read in a source's PDF (D125), kept beside it as `layout.json` so a

@@ -358,12 +358,12 @@ export function App() {
       if (busy) return;
       busy = true;
       try {
-        const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+        const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[]; filled?: unknown[] }>("inbox", "--import");
         const fresh = r.added.filter((a) => !a.kept);
         if (fresh.length) notify(fresh.length === 1 ? `Added “${fresh[0]!.title}” from your iPhone` : `Added ${fresh.length} sources from your iPhone`, "info");
         for (const a of r.added.filter((a) => a.kept)) notify(`Already here: “${a.title}”, from your iPhone`, "info");
         for (const f of r.failed) notify(`Couldn’t add ${f.url} from your iPhone: ${f.error}`, "error");
-        if (r.added.length) reload();
+        if (r.added.length || r.filled?.length) reload();
       } catch (e) {
         notify(`Couldn’t bring in links from your iPhone: ${errorText(e)}`, "error");
       } finally {

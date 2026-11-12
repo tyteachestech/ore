@@ -9205,6 +9205,22 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
   await row.waitFor({ state: "detached" });
 }, "phone");
 
+journey("phone: a YouTube link is in the library at once and says its transcript comes from the Mac", async (page) => {
+  // D227: no yt-dlp on a phone, so the video comes in with its title and plays; the Mac fills the transcript.
+  await page.route("https://www.youtube.com/oembed?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ title: "How spacing works", author_name: "Learning Lab" }) }));
+  await page.route(/ytimg\.com|youtube(-nocookie)?\.com\/(embed|iframe_api)/, (r) => r.abort());
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://youtu.be/abcdefghijk");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “How spacing works”").waitFor();
+  // Not phoneSource: it waits for the text, and this source has none yet.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await tap(page, page.locator(".phone-sources button").filter({ hasText: "How spacing works" }));
+  await page.locator(".doc-empty").filter({ hasText: "The transcript comes in when Ore is open on your Mac." }).waitFor();
+}, "phone");
+
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
   // D227: the file is saved to the inbox beside its item, then imported here like a link.
   const files = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
