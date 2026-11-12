@@ -300,11 +300,10 @@ function foldedIds(): string[] {
   }
 }
 
-/** A card that folds to its header, Notion toggle-heading style; the summary stays
- *  in the header so a folded section still says what is in it. Folds are remembered for every skill. */
-/** A card that folds. With `menu`, the menu is its title (the caret alone folds it), as a button
- *  can't hold another. */
-/** `actions`: the card's right-click menu (its create action), which unfolds it first, as its + does. */
+/** A section that folds to its header (Notion's toggle heading); folds are remembered for every skill. Its
+ *  title is a folder tab, or with `menu` the tabs of its views; the caret at the far right folds it. `summary`
+ *  stays in the header so a folded section still says what is in it. `actions`: its right-click menu (its
+ *  create action), which unfolds it first, as its + does. */
 function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, action, actions = [], children }: { id: string; title: string; icon: typeof PixelBook; tone: string; summary?: ReactNode; summaryFolded?: boolean; menu?: ReactNode; action?: ReactNode; actions?: MenuAction[]; children: ReactNode }) {
   const [open, setOpen] = useState(() => !foldedIds().includes(id));
   const toggle = () => {
@@ -317,16 +316,17 @@ function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, 
     <WithMenu actions={actions.map((a) => ({ ...a, run: () => (open || toggle(), a.run()) }))}>
     <section className="skill-card fold" data-tone={tone}>
       <div className="card-head">
-        <Hint text={open ? "Fold" : "Unfold"}>
-          <button className="fold-head caret-only" aria-expanded={open} aria-label={`${open ? "Fold" : "Unfold"} ${title}`} onClick={toggle}>
-            <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
-          </button>
-        </Hint>
         {/* Picking a view of a folded section opens it, or the pick would show nothing. */}
         <span className="card-title" onClickCapture={() => menu && !open && toggle()}>{menu ?? <HeadTab icon={I} tone={tone}>{title}</HeadTab>}</span>
         {summary && !(summaryFolded && open) ? <span className="fold-sum">{summary}</span> : <span className="fold-fill" />}
         {/* Its + adds into the body, so a folded card opens first, or the new row would be hidden. */}
         {action && <span className="fold-action" onClickCapture={() => !open && toggle()}>{action}</span>}
+        {/* At the far right, past the section's actions (D226, Tyler 2026-11-12): beside the tabs it read as one more view. */}
+        <Hint text={open ? "Fold" : "Unfold"}>
+          <button className="fold-head caret-only" aria-expanded={open} aria-label={`${open ? "Fold" : "Unfold"} ${title}`} onClick={toggle}>
+            <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
+          </button>
+        </Hint>
       </div>
       {open && <div className="fold-body">{children}</div>}
     </section>
