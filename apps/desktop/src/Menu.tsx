@@ -60,39 +60,35 @@ const listOf = (a: Actions) => (typeof a === "function" ? a() : a);
 const Later = ({ children }: { children: () => ReactNode }) => <>{children()}</>;
 
 /** Opens a row's menu as a right-click under the finger would, but from the row's left edge, as iOS lines its
- *  menu up with what was pressed: at the finger's x the menu ran off a 390 pt screen. */
+ *  menu up with what was pressed: at the finger's x the menu ran off a 390 pt screen. The click WebKit may send
+ *  as that finger lifts lands on the menu that opened under it: it is the press, not a pick of the first item. */
 export function holdMenu(el: HTMLElement, y: number) {
   const x = Math.min(el.getBoundingClientRect().left + 16, innerWidth / 2);
+  const swallow = (e: Event) => (e.preventDefault(), e.stopPropagation(), done());
+  const done = () => (removeEventListener("click", swallow, true), removeEventListener("touchstart", done, true));
+  addEventListener("click", swallow, true);
+  addEventListener("touchstart", done, true); // The next touch's click is a real tap.
   el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
 }
 
 /** iOS's long-press menu on a WebKit row. WebKit on iOS sends no contextmenu for a press, and Radix's own touch
  *  timer (700 ms) gives up at the first pointermove, which a real finger always makes: so the phone decides the hold
- *  itself, once (`trackDrag`: still within 10 pt for 500 ms), and opens the menu as a right-click would. The click
- *  iOS may send as the finger lifts is the press, not a tap on the row. */
+ *  itself, once (`trackDrag`: still within 10 pt for 500 ms), and opens the menu as a right-click would. */
 function useHold(on: boolean | undefined) {
   const off = useRef<(() => void) | null>(null);
   return useCallback((el: HTMLElement | null) => {
     off.current?.();
     off.current = null;
     if (!on || !el) return;
-    let pressed = false;
-    const swallow = (e: Event) => pressed && (e.preventDefault(), e.stopPropagation(), (pressed = false));
-    const reset = () => void (pressed = false);
-    el.addEventListener("click", swallow, true);
-    el.addEventListener("touchstart", reset, { passive: true });
     const stop = trackDrag(el, () => ({
       // Text in a field or the reader keeps iOS's own press (select, Look Up).
       accept: (t) => !nativeMenu(document.elementFromPoint(t.clientX, t.clientY), getSelection()),
       begin: () => false, // A slide is a scroll or a swipe, never this.
       move: () => {},
       end: () => {},
-      hold: (_, y) => {
-        pressed = true;
-        holdMenu(el, y);
-      },
+      hold: (_, y) => holdMenu(el, y),
     }));
-    off.current = () => (stop(), el.removeEventListener("click", swallow, true), el.removeEventListener("touchstart", reset));
+    off.current = stop;
   }, [on]);
 }
 

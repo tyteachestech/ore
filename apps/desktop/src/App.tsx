@@ -214,7 +214,7 @@ export function App() {
   /** Review mode (D59) over the window, for these skills (null: all). */
   /** `run` counts sessions, so "Keep going" mounts a fresh Review. */
   /** `paused`: the source he opened from a card (Open in source); Review waits, hidden, on the same card. */
-  const [reviewing, setReviewing] = useState<{ pick: string[] | null; run: number; paused?: string } | null>(null);
+  const [reviewing, setReviewing] = useState<{ pick: string[] | null; source?: string; run: number; paused?: string } | null>(null);
   /** What to review (D80), asked by ⌘R and the palette; Home asks from its own button. */
   const [asking, setAsking] = useState<Today | null>(null);
   const [homeTick, setHomeTick] = useState(0);
@@ -762,13 +762,14 @@ export function App() {
   /** ⌘R from anywhere: the reader closes, so none of its keys fire under the review. */
   /** The source open when review started: leaving review puts him back in it, where he was. */
   const beforeReview = useRef<string | null>(null);
-  const startReview = useCallback((pick: string[] | null) => {
+  /** `source`: Review this source, only its exercises. */
+  const startReview = useCallback((pick: string[] | null, source?: string) => {
     setOpenId((id) => {
       beforeReview.current = id;
       return null;
     });
     setFinishing(false);
-    setReviewing((r) => ({ pick, run: (r?.run ?? 0) + 1 }));
+    setReviewing((r) => ({ pick, source, run: (r?.run ?? 0) + 1 }));
   }, []);
 
   /** ⌘R: ask what to review when more than one skill has cards due, else start. Home's last numbers
@@ -800,7 +801,7 @@ export function App() {
   // Leaving the source he opened from a card (Esc, the Back pill, a link) goes back to Review, on that card.
   useEffect(() => {
     if (reviewing?.paused && openId !== reviewing.paused) {
-      setReviewing((r) => r && { pick: r.pick, run: r.run });
+      setReviewing((r) => r && { pick: r.pick, source: r.source, run: r.run });
       setOpenId(null);
     }
   }, [openId, reviewing?.paused]);
@@ -1756,6 +1757,7 @@ export function App() {
   };
   const rowActions = (r: Item): MenuAction[] => [
     { id: "open", label: "Open", hint: "↵", run: () => openSource(r.id) },
+    { id: "review-source", label: "Review this source", run: () => startReview(null, r.id) },
     { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(r.id) },
     ...(r.archived_at ? [] : [{ id: "pin", label: r.pinned_at ? "Unpin" : "Pin to top", run: () => void pinSource(r) }]),
     ...pinMoves(r),
@@ -2266,6 +2268,7 @@ export function App() {
             onOpenLesson={(id) => openSource(id)}
             onSound={setSound}
             onPin={(item) => void pinSource(item)}
+            onReview={(item) => startReview(null, item.id)}
             onMove={(item, to) => void moveSource(item, to)}
             notesOpen={sideShown}
             sideTab={sideTab}
@@ -2383,6 +2386,7 @@ export function App() {
         <Boundary key={reviewing.run} onBack={() => endReview()}>
         <Review
           pick={reviewing.pick}
+          source={reviewing.source}
           skills={skills}
           paused={!!reviewing.paused}
           under={palette || help}

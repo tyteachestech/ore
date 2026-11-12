@@ -14,7 +14,9 @@ import { PixelNote } from "../PixelIcon";
 import type { NoteEditorHandle } from "../editor/NoteEditor";
 import { holdMenu, WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
-import { skillGroups } from "../Skills";
+import { SkillEditor, skillGroups } from "../Skills";
+import { TitleField } from "../TitleField";
+import { skillMenu } from "./skill-menu";
 import { lessonsOf, opt, ore, pullFromMac, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
@@ -146,7 +148,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
 type TabId = "today" | "sources" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
-type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null } | null };
+type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null; source?: string } | null };
 const PLACE = "ore-phone-place";
 function loadPlace(): Place {
   try {
@@ -156,8 +158,8 @@ function loadPlace(): Place {
   }
 }
 
-/** What a source row does, shared by its swipes and its long-press menu. */
-type RowActions = { archive: (item: Item) => void; toggle: (item: Item) => void; menu: (item: Item) => MenuAction[] };
+/** What a source row does, shared by its swipes and its long-press menu. `retitle` is false when the write failed. */
+type RowActions = { archive: (item: Item) => void; toggle: (item: Item) => void; menu: (item: Item) => MenuAction[]; retitle: (item: Item, title: string) => Promise<boolean> };
 
 /** A list row with Mail's swipes: left archives, right moves it between To read and Done. It follows the
  *  finger, and past 40% of the row (or with a flick) the action runs; otherwise it springs back. The left
@@ -166,10 +168,11 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   const ref = useRef<HTMLButtonElement>(null);
   const swiped = useRef(false);
   const [side, setSide] = useState<"left" | "right" | null>(null);
+  const [renaming, setRenaming] = useState(false);
   /** An archived row only restores, to the left. */
   const only = (dx: number) => (item.archived_at ? Math.min(0, dx) : dx);
   useHorizontalDrag(ref, {
-    accept: (t) => ((swiped.current = false), t.clientX > 24),
+    accept: (t) => ((swiped.current = false), !renaming && t.clientX > 24),
     // iOS's half second, not the menu library's 700 ms (D145.4): Radix's trigger opens on contextmenu, and clears its own timer.
     hold: (_, y) => {
       swiped.current = true; // Letting go after the menu opened is not a tap on the row.
@@ -201,13 +204,21 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
     },
   });
   return (
-    <WithMenu actions={() => row.menu(item)}>
+    // Rename… goes after Open, and edits the title in place (Finder, the Mac's rows); not on an archived row.
+    <WithMenu actions={() => row.menu(item).flatMap((a) => (a.id === "open" && !item.archived_at ? [a, { id: "rename", label: "Rename…", run: () => setRenaming(true) }] : [a]))}>
       <li>
         {side && <span className={`phone-swipe ${side}`}>{side === "left" ? (item.archived_at ? "Restore" : "Archive") : item.status === "done" ? "To read" : "Done"}</span>}
-        <button ref={ref} onClick={() => swiped.current || onOpen(item.id)} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
-          <Thumb item={item} className="thumb phone-thumb" />
-          <span className="phone-title">{item.title}</span>
-        </button>
+        {renaming ? (
+          <div className="phone-row-rename">
+            <Thumb item={item} className="thumb phone-thumb" />
+            <TitleField value={item.title} onSave={(t) => row.retitle(item, t)} onClose={() => setRenaming(false)} />
+          </div>
+        ) : (
+          <button ref={ref} onClick={() => swiped.current || onOpen(item.id)} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
+            <Thumb item={item} className="thumb phone-thumb" />
+            <span className="phone-title">{item.title}</span>
+          </button>
+        )}
       </li>
     </WithMenu>
   );
@@ -215,7 +226,8 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
 
 /** Sources by To read and Done, as one list. */
 function SourceList({ title, items, onOpen, row, head, empty = "Nothing here yet. Sources you add on the Mac come to the phone with its next install." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; empty?: string }) {
-  const toRead = (items ?? []).filter((i) => i.status !== "done").sort((a, b) => touched(b).localeCompare(touched(a)));
+  // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.
+  const toRead = (items ?? []).filter((i) => i.status !== "done").sort((a, b) => Number(!a.pinned_at) - Number(!b.pinned_at) || (a.pinned_at ?? "").localeCompare(b.pinned_at ?? "") || touched(b).localeCompare(touched(a)));
   const done = (items ?? []).filter((i) => i.status === "done");
   return (
     <div className="phone-sources">
@@ -289,7 +301,10 @@ export function PhoneApp() {
   /** Finish has recorded the source Done: a relaunch from here on never opens Finish again (its closing moment shows). */
   const [recorded, setRecorded] = useState(false);
   useEffect(() => void (finishing || setRecorded(false)), [finishing]);
-  const [reviewing, setReviewing] = useState<{ pick: string[] | null; run: number } | null>(start.review && { pick: start.review.pick, run: 0 });
+  /** `source`: Review this source, only its exercises. */
+  const [reviewing, setReviewing] = useState<{ pick: string[] | null; source?: string; run: number } | null>(start.review && { pick: start.review.pick, source: start.review.source, run: 0 });
+  /** The skill whose editor (name, icon, colour, collection) is open. */
+  const [editingSkill, setEditingSkill] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const { notify, view: toast } = useToast();
   const actions = useRef([]);
@@ -308,7 +323,7 @@ export function PhoneApp() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, side, finishing: finishing && !recorded, review: reviewing && { pick: reviewing.pick } } satisfies Place));
+      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, side, finishing: finishing && !recorded, review: reviewing && { pick: reviewing.pick, source: reviewing.source } } satisfies Place));
     } catch {}
   }, [tab, skill, skillNote, openId, noting, side, finishing, recorded, reviewing]);
   const tabNow = useRef(tab);
@@ -478,15 +493,59 @@ export function PhoneApp() {
     notify(`Restored “${item.title}”`, "info", () => apply(true), () => apply(false));
     apply(false).catch((e) => notify(errorText(e), "error"));
   };
+  /** A title edited in place: at once, put back if the write fails, with Undo (the Mac's retitle). */
+  const retitle = async (item: Item, before: string, t: string, undoable = true): Promise<boolean> => {
+    t = t.trim();
+    if (!t || t === before) return true;
+    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title: t } : i)) ?? all);
+    try {
+      await ore("edit", item.id, "--title", t);
+      if (undoable) notify(`Renamed to “${t}”`, "quiet", () => retitle(item, t, before, false), () => retitle(item, before, t, false));
+      return true;
+    } catch (e) {
+      setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title: before } : i)) ?? all);
+      if (!undoable) throw e;
+      notify(errorText(e), "error");
+      return false;
+    } finally {
+      void refresh();
+    }
+  };
+  /** Pins a source to the top of the Sources list, or unpins it, with Undo (the Mac's pinSource). */
+  const pin = async (item: Item, undoable = true) => {
+    const on = !item.pinned_at;
+    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: on ? new Date().toISOString() : undefined } : i)) ?? all);
+    try {
+      await ore("pin", item.id, ...(on ? [] : ["--undo"]));
+      const flip = (now: boolean) => () => pin({ ...item, pinned_at: now ? "x" : undefined }, false);
+      if (undoable) notify(on ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(on), flip(!on));
+    } catch (e) {
+      if (!undoable) throw e;
+      notify(errorText(e), "error");
+    } finally {
+      void refresh();
+    }
+  };
+  const menuOf = skillMenu({
+    skills,
+    refresh,
+    notify,
+    open: (s) => (setSkill(s.id), setDrawer(false)),
+    review: (s) => (setDrawer(false), setReviewing({ pick: [s.id], run: 0 })),
+    edit: (s) => (setDrawer(false), setEditingSkill(s.id)),
+  });
   const row: RowActions = {
     archive: (item) => (item.archived_at ? restore(item) : void archive(item)),
     toggle: (item) => void moveTo(item, item.status === "done" ? "reading" : "done"),
     // Long-press: the Mac row menu, less what needs a Finder or a keyboard.
+    retitle: (item, t) => retitle(item, item.title, t),
     menu: (item) => item.archived_at ? [
       { id: "open", label: "Open", run: () => open(item.id) },
       { id: "restore", label: "Restore", run: () => restore(item) },
     ] : [
       { id: "open", label: "Open", run: () => open(item.id) },
+      { id: "review-source", label: "Review this source", run: () => setReviewing({ pick: null, source: item.id, run: 0 }) },
+      { id: "pin", label: item.pinned_at ? "Unpin" : "Pin to top", run: () => void pin(item) },
       { id: "move", label: item.status === "done" ? "Move to To read" : "Move to Done", run: () => row.toggle(item) },
       ...(item.url ? [{ id: "original", label: "Open original", run: () => void openUrl(item.url!).catch((e) => notify(errorText(e), "error")) }] : []),
       ...(skills.length
@@ -507,12 +566,13 @@ export function PhoneApp() {
           <Review
             key={reviewing.run}
             pick={reviewing.pick}
+            source={reviewing.source}
             skills={skills}
             onOpenSource={(item, at) => {
               endReview();
               open(item, at);
             }}
-            onClose={(again) => (again ? setReviewing({ pick: reviewing.pick, run: reviewing.run + 1 }) : endReview())}
+            onClose={(again) => (again ? setReviewing({ ...reviewing, run: reviewing.run + 1 }) : endReview())}
             notify={notify}
           />
         </Boundary>
@@ -542,7 +602,8 @@ export function PhoneApp() {
               return c ? lessonsOf(items ?? [], c.id) : undefined;
             })()}
             onOpenLesson={(id) => open(id)}
-            onPin={() => {}}
+            onPin={(item) => void pin(item)}
+            onReview={(item) => setReviewing({ pick: null, source: item.id, run: 0 })}
             onMove={() => void refresh()}
             jumpTo={jumpTo}
             blocked={false}
@@ -591,6 +652,8 @@ export function PhoneApp() {
                 onOpenSource={(id) => open(id)}
                 onOpenSkill={setSkill}
                 sourceMenu={row.menu}
+                onRename={row.retitle}
+                skillMenu={menuOf}
                 notify={notify}
               />
             ) : (
@@ -622,10 +685,12 @@ export function PhoneApp() {
             <section key={g.collection}>
               <h2>{g.name}</h2>
               {g.skills.map((s) => (
-                <button key={s.id} onClick={() => (setSkill(s.id), setDrawer(false))}>
-                  <SkillIcon icon={s.icon} color={s.color} dot />
-                  <span className="phone-title">{s.name}</span>
-                </button>
+                <WithMenu key={s.id} actions={() => menuOf(s)} hold>
+                  <button onClick={() => (setSkill(s.id), setDrawer(false))}>
+                    <SkillIcon icon={s.icon} color={s.color} dot />
+                    <span className="phone-title">{s.name}</span>
+                  </button>
+                </WithMenu>
               ))}
             </section>
           ))}
@@ -675,6 +740,15 @@ export function PhoneApp() {
           onOpen={open}
           onCreated={(s) => (void refresh(), setSkill(s.id))}
           onClose={() => setSearching(false)}
+        />
+      )}
+      {editingSkill && skills.some((s) => s.id === editingSkill) && (
+        <SkillEditor
+          skill={skills.find((s) => s.id === editingSkill)!}
+          collections={[...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))]}
+          onSaved={() => void refresh()}
+          onClose={() => setEditingSkill(null)}
+          notify={notify}
         />
       )}
       {toast}

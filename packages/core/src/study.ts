@@ -122,6 +122,8 @@ export const medians = (rs: Review[], kinds: Map<string, string>): Record<"card"
 export interface QueueOptions {
   /** Only cards filed under one of these skills (D80's pick), or under none with NO_SKILL (D204); all when absent. */
   skills?: string[];
+  /** Only one source's cards ("Review this source"), its unseen drafts included; with `skills`, both must hold. */
+  item?: string;
   /** Apply the new-card limits (D60, D65, D144): at most `new_per_day`, and none drafted today. On by default. */
   newLimit?: boolean;
   /** A session's first fetch: its first card is a likely recall (D176). A fetch mid-session leaves the order alone. */
@@ -163,9 +165,10 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const cards = index.cards();
     for (const c of cards) {
       if (c.state === "retired") continue;
+      if (opts.item && c.item !== opts.item) continue;
       if (picked && !c.skills.some((s) => picked.has(s)) && !(picked.has(NO_SKILL) && unfiled(c.skills, skills))) continue;
       // An archived skill's cards wait out of review (D173), unless he picks the skill by name.
-      if (!picked && archivedOnly(c.skills, skills)) continue;
+      if (!picked && !opts.item && archivedOnly(c.skills, skills)) continue;
       // A miss today owes one relearn pass (D21) until he answers the card again, in this session or a
       // later one today: the session ending as the goal closes (D65), or Esc then ⌘R, doesn't drop it.
       const own = ownToday.get(c.id) ?? [];
