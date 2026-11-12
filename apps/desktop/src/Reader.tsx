@@ -675,6 +675,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [addAsk, setAddAsk] = useState(0);
   const [ask, setAsk] = useState(0);
   const [renaming, setRenaming] = useState(false);
+  const [wholeTitle, setWholeTitle] = useState(false); // the phone's long title, shown whole after a tap
   const [authoring, setAuthoring] = useState(false);
   const authorRef = useRef<HTMLButtonElement>(null);
   const askedRename = useRef(p.renameSource);
@@ -3056,7 +3057,11 @@ function ReaderView(p: Props & { reload: () => void }) {
               <WithMenu actions={PHONE ? [] : shownActions}>
                 {/* One click renames it in place, as the skill page's name does (Notion's page title);
                     a drag across it still selects the words to copy. */}
-                <h1 className={PHONE ? undefined : "renamable"} onClick={() => !PHONE && getSelection()?.isCollapsed !== false && setRenaming(true)}>
+                <h1
+                  className={PHONE ? (wholeTitle ? "whole" : undefined) : "renamable"}
+                  // On the phone a long title stops at four lines; a tap shows the rest, and another folds it.
+                  onClick={() => (PHONE ? setWholeTitle((v) => !v) : getSelection()?.isCollapsed !== false && setRenaming(true))}
+                >
                   {doc.title}
                 </h1>
               </WithMenu>

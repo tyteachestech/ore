@@ -53,15 +53,17 @@ const phoneAliases = [
   { find: /^@open-spaced-repetition\/binding$/, replacement: phone("node.ts") },
 ];
 
-// The phone's library for the feel test: the text files of ORE_PHONE_LIBRARY (a copy of his library,
-// or a demo one), served as /library.json. Binaries (PDFs, the index, git) stay behind; thumbnails go as data URLs.
+// The phone's library in a browser (the e2e journeys, `vite` at phone size): the text files of ORE_PHONE_LIBRARY
+// (a demo library, or a copy of his), served as /library.json. Binaries (PDFs, the index, git) stay behind;
+// thumbnails go as data URLs. The iPhone app reads Ore's iCloud Drive folder instead (src/phone/fs.ts), so its
+// build ships no library unless ORE_PHONE_LIBRARY is set.
 const phoneLibrary: Plugin = {
   name: "phone-library",
   configureServer(server) {
     server.middlewares.use("/library.json", (_req, res) => res.end(JSON.stringify(snapshot())));
   },
   generateBundle() {
-    this.emitFile({ type: "asset", fileName: "library.json", source: JSON.stringify(snapshot()) });
+    if (process.env.ORE_PHONE_LIBRARY) this.emitFile({ type: "asset", fileName: "library.json", source: JSON.stringify(snapshot()) });
   },
 };
 function snapshot(): Record<string, string> {

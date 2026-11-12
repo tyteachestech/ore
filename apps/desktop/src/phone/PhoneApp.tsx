@@ -15,7 +15,7 @@ import type { NoteEditorHandle } from "../editor/NoteEditor";
 import { WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
 import { skillGroups } from "../Skills";
-import { lessonsOf, opt, ore, type Item, type Skill, touched } from "../ore";
+import { lessonsOf, opt, ore, pullFromMac, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -326,7 +326,42 @@ export function PhoneApp() {
     }
   }, []);
   useEffect(() => void (tab === "archive" && refresh()), [tab, refresh]);
+  // A place saved for a source that has since left the library (deleted on the Mac, or a new build) opens on
+  // where he was before it, not on an error with the source's id.
+  const loaded = items !== null;
+  useEffect(() => {
+    const id = start.openId;
+    if (!loaded || !id || items!.some((i) => i.id === id)) return;
+    void ore<Item[]>("ls", "--archived")
+      .then((archived) => {
+        if (archived.some((i) => i.id === id)) return;
+        // Only if he is still on it: he may have opened another source (and its note) meanwhile.
+        setOpenId((now) => {
+          if (now !== id) return now;
+          setNoting(false);
+          return null;
+        });
+      })
+      .catch(() => {});
+    // Once, on the first list: later a missing source is one he just archived from inside it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
   useEffect(() => void refresh(), [refresh]);
+  // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
+  useEffect(() => {
+    const check = () =>
+      void pullFromMac().then((changed) => {
+        if (!changed) return;
+        setTick((t) => t + 1);
+        void refresh();
+      });
+    const back = () => !document.hidden && check();
+    const every = setInterval(back, 30_000);
+    const failed = (e: Event) => notify(`Couldn’t save to iCloud: ${(e as CustomEvent<string>).detail}`, "error");
+    addEventListener("visibilitychange", back);
+    addEventListener("ore:save-failed", failed);
+    return () => (clearInterval(every), removeEventListener("visibilitychange", back), removeEventListener("ore:save-failed", failed));
+  }, [refresh, notify]);
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
   // height, and keep the answer's buttons in sight when it opens.
@@ -347,21 +382,39 @@ export function PhoneApp() {
       if (!(field instanceof HTMLElement) || !field.closest(".phone-reader")) return;
       if (!field.isContentEditable) return field.scrollIntoView({ block: "nearest" });
       // The source note is one tall editor: bring the caret, not the editor, into view, once the screen has shrunk.
-      requestAnimationFrame(() => {
-        const sel = getSelection();
-        const caret = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
-        let box: HTMLElement | null = field;
-        while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
-        if (!caret || !box) return;
-        const below = caret.bottom + 24 - box.getBoundingClientRect().bottom;
-        if (below > 0) box.scrollTop += below;
-      });
+      requestAnimationFrame(keepCaret);
     };
+    // iOS reveals the caret just above its own keyboard, which leaves it under the note's keyboard bar: as he
+    // types past it, scroll the note so the line he is writing stays above the bar (Notes keeps it in sight).
+    const keepCaret = () => {
+      const field = document.activeElement;
+      if (!(field instanceof HTMLElement) || !field.isContentEditable || !field.closest(".phone-reader")) return;
+      const sel = getSelection();
+      // A caret, not a selection he is dragging out: moving the page under his finger would fight the handle.
+      if (!sel?.rangeCount || !sel.isCollapsed) return;
+      let caret = sel.getRangeAt(0).getBoundingClientRect();
+      // On a new empty line WebKit gives the caret no box: use its line's.
+      if (!caret.height) {
+        const node = sel.focusNode;
+        const line = node instanceof Element ? node : node?.parentElement;
+        if (!line) return;
+        caret = line.getBoundingClientRect();
+      }
+      let box: HTMLElement | null = field;
+      while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
+      if (!caret.height || !box) return;
+      const bar = document.querySelector(".kb-bar")?.getBoundingClientRect().top ?? Infinity;
+      const below = caret.bottom + 24 - Math.min(box.getBoundingClientRect().bottom, bar, vv.offsetTop + vv.height);
+      if (below > 0) box.scrollTop += below;
+    };
+    const typed = () => requestAnimationFrame(keepCaret);
     vv.addEventListener("resize", fit);
     vv.addEventListener("scroll", fit);
+    document.addEventListener("selectionchange", typed);
     return () => {
       vv.removeEventListener("resize", fit);
       vv.removeEventListener("scroll", fit);
+      document.removeEventListener("selectionchange", typed);
     };
   }, []);
 
