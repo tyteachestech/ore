@@ -90,3 +90,49 @@ export function snapRange(r: Range): Range {
   return out.collapsed || !out.toString().trim() ? r.cloneRange() : out;
 }
 
+
+const sentences = new Intl.Segmenter(undefined, { granularity: "sentence" });
+
+/** The span of `text` from `a` to `z` with the spaces at either end left out, as a range; null if nothing is left. */
+function trimmed(at: Map<Text, number>, text: string, a: number, z: number): Range | null {
+  while (a < z && /\s/.test(text[a]!)) a++;
+  while (z > a && /\s/.test(text[z - 1]!)) z--;
+  const start = pointAt(at, a, "start");
+  const end = pointAt(at, z, "end");
+  if (a >= z || !start || !end) return null;
+  const r = document.createRange();
+  r.setStart(...start);
+  r.setEnd(...end);
+  return r;
+}
+
+/** A double click's word grown to its sentence (D224), by the system's own sentence breaks; code and
+ *  math, which have no sentences, keep the word. */
+export function sentenceRange(word: Range): Range {
+  const node = word.startContainer;
+  if (node.nodeType !== Node.TEXT_NODE || node.parentElement?.closest(RAW)) return snapRange(word);
+  const { text, at } = blockText(node as Text);
+  const from = at.get(node as Text);
+  if (from === undefined) return snapRange(word);
+  const o = from + word.startOffset;
+  for (const s of sentences.segment(text)) {
+    if (o < s.index || o >= s.index + s.segment.length) continue;
+    return trimmed(at, text, s.index, s.index + s.segment.length) ?? snapRange(word);
+  }
+  return snapRange(word);
+}
+
+/** Blocks a double tap highlights whole (D224): a heading is a label, not a passage, and a page's
+ *  outer box would be all of it. */
+const PARAGRAPH = "p, li, td, th, figcaption, dt, dd, pre, blockquote";
+
+/** The paragraph around `node` (the innermost one, so a list item's own line, a table's cell), or null. */
+export function paragraphRange(node: Node): Range | null {
+  const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
+  const block = el?.closest(BLOCK);
+  if (!block?.matches(PARAGRAPH)) return null;
+  const first = document.createTreeWalker(block, NodeFilter.SHOW_TEXT).nextNode() as Text | null;
+  if (!first) return null;
+  const { text, at } = blockText(first);
+  return trimmed(at, text, 0, text.length);
+}

@@ -2,7 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,7 +15,7 @@ import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
 import { SearchButton, SearchField } from "./HeadSearch";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
-import { snapRange } from "./snap";
+import { paragraphRange, sentenceRange, snapRange } from "./snap";
 import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
@@ -2393,6 +2393,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   });
 
   const onScroll = () => {
+    lastScroll.current = performance.now();
     if (tip) setTip(null);
     if (PHONE && scrollRef.current && performance.now() - lastTouch.current < 2000) {
       // The bars go as he scrolls down to read and come back as he scrolls up, and at either end (Books, Obsidian).
@@ -2417,6 +2418,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     }, 150);
   };
 
+  const pressedAt = useRef({ x: 0, y: 0 });
   const onMouseDown = (e: MouseEvent) => {
     // A click that is not the third of a triple: the double-clicked word is kept now, quietly (no popup,
     // and the selection this click starts is left alone).
@@ -2425,6 +2427,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       dropWord();
       word.quiet();
     }
+    pressedAt.current = { x: e.clientX, y: e.clientY };
     setFocus(null); // the mouse takes over from the keyboard focus
     if (popup && !popupRef.current?.contains(e.target as Node)) {
       keepNote();
@@ -2502,8 +2505,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [p.id]);
 
-  // A double click's word waits out the Mac's double-click time (0.5 s by default): a third click
-  // makes it the paragraph, one highlight and one step, as Books acts on the final selection.
+  // A double click's sentence (D224) waits out the Mac's double-click time (0.5 s by default): a third
+  // click makes it the paragraph, one highlight and one step, as Books acts on the final selection.
   const wordWait = useRef<{ timer: number; quiet: () => void } | null>(null);
   const dropWord = () => {
     if (wordWait.current) clearTimeout(wordWait.current.timer);
@@ -2525,17 +2528,23 @@ function ReaderView(p: Props & { reload: () => void }) {
         // click whose selection runs past the text (the last paragraph, in WebKit) keeps the word.
         dropWord();
         const up = sel.focusNode === r.startContainer && sel.focusOffset === r.startOffset;
-        const range = r.cloneRange();
-        const aim = { x: e.clientX, y: e.clientY, up };
         const exact = e.altKey;
+        // A double click keeps its word's sentence, ⌥ just the word (D224); a double click dragged on
+        // selects by words, as the Mac does, and keeps what it covers.
+        const dragged = Math.hypot(e.clientX - pressedAt.current.x, e.clientY - pressedAt.current.y) > 3;
+        const sentence = e.detail === 2 && !exact && !dragged;
+        const range = sentence ? sentenceRange(r) : r.cloneRange();
+        const aim = { x: e.clientX, y: e.clientY, up };
         const keep = () => {
           // Whole words, unless he held ⌥ for part of one.
-          highlightRange(range, undefined, aim, !exact);
+          highlightRange(range, undefined, aim, !exact || e.detail === 2);
           setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
         };
         if (e.detail === 2) {
+          // The sentence shows selected at once, while a third click may still make it the paragraph.
+          if (sentence) sel.removeAllRanges(), sel.addRange(range);
           const timer = window.setTimeout(() => (dropWord(), keep()), 500);
-          const quiet = () => void (holderOf(range) || createHighlight(exact ? range : snapRange(range), "keep", undefined, false));
+          const quiet = () => void (holderOf(range) || createHighlight(snapRange(range), "keep", undefined, false));
           wordWait.current = { timer, quiet };
         } else keep();
       }
@@ -2595,6 +2604,44 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!r || r.collapsed) return;
     createHighlight(snapRange(r), intent);
     window.getSelection()?.removeAllRanges();
+  };
+
+  // iPhone: a double tap on a paragraph highlights all of it and opens its popup (D224), Remove a tap
+  // away. Only on plain text: a link, a figure, a timestamp or a highlight keeps its own single tap, so
+  // none of them waits to see if a second comes. A tap that stops a scroll, or one that moves, is no tap.
+  const tapAt = useRef<{ t: number; x: number; y: number } | null>(null);
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  const lastScroll = useRef(0);
+  const onTouchStart = (e: TouchEvent) => {
+    const t = e.touches[0]!;
+    const now = performance.now();
+    tapAt.current = e.touches.length === 1 && now - lastScroll.current > 150 ? { t: now, x: t.clientX, y: t.clientY } : null;
+    if (!tapAt.current) lastTap.current = null;
+  };
+  const onTouchMove = (e: TouchEvent) => {
+    const s = tapAt.current;
+    const t = e.touches[0]!;
+    if (s && Math.hypot(t.clientX - s.x, t.clientY - s.y) > 10) tapAt.current = lastTap.current = null;
+  };
+  const onTouchEnd = (e: TouchEvent) => {
+    const s = tapAt.current;
+    const prev = lastTap.current;
+    tapAt.current = null;
+    const now = performance.now();
+    if (!s || now - s.t > 300) return void (lastTap.current = null);
+    lastTap.current = { t: now, x: s.x, y: s.y };
+    if (!prev || now - prev.t > 350 || Math.hypot(s.x - prev.x, s.y - prev.y) > 24 || closedBook) return;
+    lastTap.current = null;
+    const el = docEl.current;
+    const target = document.elementFromPoint(s.x, s.y);
+    if (!el || !target || !el.contains(target) || target.closest("a[href], .ts, button, input, textarea, [contenteditable]") || zoomable(target, el)) return;
+    if (hitTest(ranges.current, s.x, s.y)) return;
+    const c = document.caretRangeFromPoint(s.x, s.y);
+    const r = c && paragraphRange(c.startContainer);
+    if (!r) return;
+    e.preventDefault(); // no click, so the new highlight's popup is not taken for a tap on it
+    window.getSelection()?.removeAllRanges();
+    highlightRange(r, undefined, { x: s.x, y: s.y, up: false });
   };
 
   const onMouseMove = (e: MouseEvent) => {
@@ -3054,7 +3101,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       )}
       <HideDots hidden={hidden} box={scrollRef} page={pageRef} />
       <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
-        <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
+        <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} {...(PHONE ? { onTouchStart, onTouchMove, onTouchEnd } : {})} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's
                 og:image or site logo only repeats what the title says, and a video's picture is its player. */}

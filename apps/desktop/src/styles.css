@@ -2548,6 +2548,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .reader-tools { top: -44px; right: 4px; }
 .phone .reader-tools button { min-width: 44px; min-height: 44px; }
 .phone .page, .phone .reader-scroll > .page { padding-left: 20px; padding-right: 20px; margin-left: 0; }
+/* A double tap highlights the paragraph (D224): never the zoom iOS gives it; a pinch still zooms. */
+.phone .page { touch-action: manipulation; }
 /* The type shows in the highlight colour; the margin icons would sit off the edge at phone margins. */
 /* The open highlight's edges, to drag (Grab.tsx; Kindle, Apple Books on iPhone): a stem the height of
    the line with a knob above the start and below the end, in the highlight's colour. */
