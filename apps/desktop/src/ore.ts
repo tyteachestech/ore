@@ -5,7 +5,7 @@ export const PHONE = import.meta.env.VITE_PHONE === "1";
 
 /** On iPhone, reads in what the Mac changed (through iCloud) since; true if anything did. Never on the Mac. */
 /** The share card's skill chips (phone/core.ts `shareSkills`); nothing on the Mac. */
-export const shareSkills = async (skills: { id: string; name: string }[]): Promise<void> => {
+export const shareSkills = async (skills: { id: string; name: string; icon?: string; color?: string }[]): Promise<void> => {
   if (PHONE) (await import("./phone/core")).shareSkills(skills);
 };
 /** A file picked on the phone goes to the inbox to be imported (phone/core.ts `queuePicked`). */
