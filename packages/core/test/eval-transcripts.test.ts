@@ -11,6 +11,7 @@ test("words: speech only, in lower case, without names, stamps or sound notes", 
   expect(words("**Jerod Santo:** Today, we're joined by [Charlie](https://x.y) — it's 3.5x faster! [laughs]")).toEqual(["today", "we're", "joined", "by", "charlie", "it's", "3", "5x", "faster"]);
   expect(words("Lex Fridman\n(00:01:15) The following is a conversation. (LAUGHTER) Right (I think).")).toEqual(["the", "following", "is", "a", "conversation", "right", "i", "think"]);
   expect(words("Ira Glass: Don’t stop.")).toEqual(["don't", "stop"]);
+  expect(words("In that year (2019) it grew (3, 4) times.")).toEqual(["in", "that", "year", "2019", "it", "grew", "3", "4", "times"]);
 });
 
 test("wer counts swapped, lost and extra words against the key", () => {

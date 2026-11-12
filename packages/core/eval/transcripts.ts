@@ -59,7 +59,7 @@ export function words(text: string): string[] {
     .replace(/!?\[([^\]\n]*)\]\([^)\n]*\)/g, "$1") // a Markdown link keeps its words
     .replace(/\[[^\]\n]{0,60}\]/g, " ")
     .replace(/(?:[A-Z][\w.'’-]*\s+){1,3}(?=\((\d{1,2}:)?\d{1,2}:\d{2}\))/g, " ") // a speaker's name before a time stamp
-    .replace(/\(([^)\n]{0,60})\)/g, (m, inner: string) => (/^(\d{1,2}:)?\d{1,2}:\d{2}$/.test(inner) || inner === inner.toUpperCase() || /^(music|applause|laughter|laughs|laughing|crosstalk|inaudible|silence)/i.test(inner) ? " " : m))
+    .replace(/\(([^)\n]{0,60})\)/g, (m, inner: string) => (/^(\d{1,2}:)?\d{1,2}:\d{2}$/.test(inner) || (/\p{L}/u.test(inner) && inner === inner.toUpperCase()) || /^(music|applause|laughter|laughs|laughing|crosstalk|inaudible|silence)/i.test(inner) ? " " : m))
     .replace(/^[\s>]*(\*\*[^*\n]{1,60}:?\*\*:?|[A-Z][\w.'’ -]{0,40}:)(?=\s)/gm, " ")
     .replace(/\b(\d{1,2}:)?\d{1,2}:\d{2}\b/g, " ")
     .toLowerCase()
@@ -258,7 +258,8 @@ async function runCase(c: Case, methods: Method[], keep: string | undefined, dir
       });
     }
   } catch (e) {
-    rows.push({ id: c.id, kind: c.kind, method: methods[0]!, error: (e as Error).message });
+    // The whole case failed (no key to score against): one row for each way it would have run.
+    for (const method of c.kind === "podcast" ? methods.filter((m) => m === "heard") : methods) rows.push({ id: c.id, kind: c.kind, method, error: (e as Error).message });
   }
   return rows;
 }
@@ -270,6 +271,7 @@ if (import.meta.main) {
   const all = (flag: string) => args.flatMap((a, i) => (a === flag && args[i + 1] ? [args[i + 1]!] : []));
   const only = all("--only"), kind = all("--kind")[0], keep = all("--keep")[0];
   const methods = (all("--method")[0]?.split(",") ?? [...METHODS]).filter((m): m is Method => (METHODS as readonly string[]).includes(m));
+  if (!methods.length) throw new Error(`--method takes ${METHODS.join(", ")}`);
   const cases = loadCases().filter((c) => (!only.length || only.includes(c.id)) && (!kind || c.kind === kind));
   if (keep) mkdirSync(keep, { recursive: true });
   const dir = mkdtempSync(join(tmpdir(), "ore-eval-transcripts-"));
