@@ -78,6 +78,10 @@ class ShareViewController: UIViewController {
     // iOS shows a share extension in its own sheet, so a see-through view left the sheet's grey above the card
     view.backgroundColor = UIColor(white: 0.11, alpha: 1)
     view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(outside(_:))))
+    // A swipe down anywhere closes it, as Done does (the sheet's own swipe can spring back).
+    let down = UISwipeGestureRecognizer(target: self, action: #selector(finish))
+    down.direction = .down
+    view.addGestureRecognizer(down)
 
     card.backgroundColor = UIColor(white: 0.11, alpha: 1)
     card.layer.cornerRadius = 16
@@ -127,8 +131,14 @@ class ShareViewController: UIViewController {
     ])
   }
 
+  /// The view appears again when a swipe on the sheet starts to put it away and springs back: the link is
+  /// saved, and the chips laid out, once.
+  private var started = false
+
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
+    guard !started else { return }
+    started = true
     Task { @MainActor in
       if let url = await link() {
         guard save(url) else { return fail("Open Ore once first, then share again.") }
