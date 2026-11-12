@@ -3,8 +3,25 @@
 # its compiled `ore` is built from (packages/, the root package.json, bun.lock, tsconfig; D30):
 # a commit on master here, or a pull (post-merge runs this too). Branch worktrees share these
 # hooks, so anything not on master returns at once. Runs in the background.
+# An open Ore keeps running the old build until it quits, so after an install it is quit (as ⌘Q, which
+# saves drafts) and reopened in the background, unless it is the frontmost app: then he is using it and
+# it is left alone until he quits it himself.
 # Log: ~/Library/Caches/ore/app-install.log
 [ "$(git rev-parse --abbrev-ref HEAD)" = master ] || exit 0
+id=com.tylerpoelking.ore
+relaunch() {
+  [ "$(osascript -e "application id \"$id\" is running")" = true ] || return 0
+  if lsappinfo info -only bundleID "$(lsappinfo front)" | grep -q "\"$id\""; then
+    echo "$(date): Ore is in front, not relaunched"; return 0
+  fi
+  osascript -e "tell application id \"$id\" to quit" || { echo "$(date): quit refused, not relaunched"; return 0; }
+  # Open the new copy by path: the old one is in the Trash with the same bundle id.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [ "$(osascript -e "application id \"$id\" is running")" = true ] || { open -g /Applications/Ore.app && echo "$(date): relaunched"; return 0; }
+    sleep 1
+  done
+  echo "$(date): Ore did not quit, not relaunched"
+}
 if [ -n "$ORE_HOOK_RANGE" ]; then changed=$(git diff --name-only "$ORE_HOOK_RANGE")
 else changed=$(git diff-tree --no-commit-id --name-only -r HEAD); fi
 echo "$changed" | grep -qE '^(apps/desktop|packages)/|^(package\.json|bun\.lock|tsconfig\.json)$' || exit 0
@@ -21,6 +38,6 @@ mkdir -p "$cache"
     built=$(git rev-parse HEAD)
     echo "$(date): installing $(git rev-parse --short HEAD)"
     # A pulled change may add a dependency (PR #114's @tailwindcss/vite broke two reinstalls).
-    if bun install --frozen-lockfile && bun run app:install; then echo "$(date): installed"; else echo "$(date): FAILED"; fi
+    if bun install --frozen-lockfile && bun run app:install; then echo "$(date): installed"; relaunch; else echo "$(date): FAILED"; fi
   done
 ) >>"$cache/app-install.log" 2>&1 &
