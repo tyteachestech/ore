@@ -142,3 +142,24 @@ describe("ingest", () => {
     expect(listItems(lib).length).toBe(1);
   });
 });
+
+describe("tracking links", () => {
+  test("a link's tracking tags are dropped, so the page added again with them is the source already here", async () => {
+    const lib = await tempLibrary();
+    const real = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("# Brief history\n\nComputers changed fast.\n", { headers: { "content-type": "text/markdown" } })) as unknown as typeof fetch;
+    try {
+      const a = await addSource(lib, "https://example.com/history?utm_source=chatgpt.com&id=7&fbclid=x#part");
+      expect(a.meta.url).toBe("https://example.com/history?id=7#part");
+      const b = await addSource(lib, "https://example.com/history?id=7&utm_medium=social#part", { skills: ["ai"] });
+      expect(b).toMatchObject({ kept: true, filed: ["ai"] });
+      expect(listItems(lib).length).toBe(1);
+      // The rest of the link is kept as written, and the same link written another way is the same source.
+      const c = await addSource(lib, "https://Example.com/other?q=a%20b&utm_source=x");
+      expect(c.meta.url).toBe("https://Example.com/other?q=a%20b");
+      expect((await addSource(lib, "https://example.com:443/other?q=a%20b")).meta.id).toBe(c.meta.id);
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+});

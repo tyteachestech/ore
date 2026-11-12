@@ -6,7 +6,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
+import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
@@ -440,6 +440,21 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
   return fromBytes(bytes, kind, path, undefined, undefined, opts);
 }
 
+// Tags a share or an ad adds to a link (utm_source=chatgpt.com, fbclid…): not part of the page, so a link is
+// kept without them, as Raindrop does, and the page added again with other tags is the source already here.
+const TRACKING = /^(utm_\w+|fbclid|gclid|dclid|gbraid|wbraid|msclkid|mc_cid|mc_eid|igshid|yclid|_hsenc|_hsmi|mkt_tok)$/i;
+function untracked(url: string): string {
+  const [, head, query, hash] = url.match(/^([^?#]*)(?:\?([^#]*))?(#.*)?$/)!;
+  if (query === undefined) return url;
+  // Only the tags go: the rest of the link is kept exactly as written.
+  const kept = query.split("&").filter((p) => p && !TRACKING.test(p.split("=")[0]!));
+  return `${head}${kept.length ? `?${kept.join("&")}` : ""}${hash ?? ""}`;
+}
+/** The same page's link, however it was written: with or without tags, the host in any case, a default port. */
+const linkKey = (url: string) => (URL.canParse(url) ? new URL(untracked(url)).href : url);
+/** The source already here from this link (a course's lessons aside); `preview` counts Feed posts being read. */
+const byLink = (lib: Library, url: string, preview = false) => allItems(lib, { preview }).find((i) => i.meta.url !== undefined && linkKey(i.meta.url) === linkKey(url) && !i.meta.course);
+
 // Ingest a URL or file into items/ with status inbox. Files dropped in
 // inbox/ are removed after a successful ingest (they now live as source.*).
 // A link already in the library isn't added twice: it comes back `kept`, filed under the new skills too.
@@ -447,8 +462,9 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   input = input.replace(/^~(?=\/)/, homedir());
   const isUrl = /^https?:\/\//i.test(input);
   if (isUrl && !URL.canParse(input)) throw new Error("That link looks cut off. Copy it again from the address bar.");
+  if (isUrl) input = untracked(input);
   if (!isUrl && /^[a-z][\w+.-]*:/i.test(input) && !existsSync(input)) throw new Error("Ore opens web links (http or https) and files. Open that one in your browser, then add the page from there.");
-  const had = isUrl ? allItems(lib, { preview: true }).find((i) => i.meta.url === input && !i.meta.course) : undefined;
+  const had = isUrl ? byLink(lib, input, true) : undefined;
   if (had && opts.preview) return had;
   if (had) return keep(lib, had, opts);
   const draft = isUrl ? await fromUrl(input, opts) : await fromFile(resolve(input), opts, input);
@@ -498,9 +514,10 @@ const readsByLink = async (url: string) =>
 /** The page open in his browser as a source (D96): signed-in, paywalled and browser-built pages come
  *  in as he sees them. A link Ore reads better by fetching (a video, a PDF) is added by its link. */
 export async function addTab(lib: Library, opts: AddOptions & { tab?: Tab } = {}): Promise<Item & Partial<Kept>> {
-  const tab = opts.tab ?? (await (await import("./tab.ts")).frontTab());
+  const front = opts.tab ?? (await (await import("./tab.ts")).frontTab());
+  const tab = { ...front, url: untracked(front.url) };
   if (await readsByLink(tab.url)) return addSource(lib, tab.url, opts);
-  const had = listItems(lib).find((i) => i.meta.url === tab.url && !i.meta.course);
+  const had = byLink(lib, tab.url);
   if (had) return addSource(lib, tab.url, opts);
   const host = new URL(tab.url).host;
   const draft = await tabDraft(tab, host);
