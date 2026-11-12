@@ -2420,7 +2420,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   const pressedAt = useRef({ x: 0, y: 0 });
   const onMouseDown = (e: MouseEvent) => {
-    // A click that is not the third of a triple: the double-clicked word is kept now, quietly (no popup,
+    // A click that is not the third of a triple: the double click's sentence is kept now, quietly (no popup,
     // and the selection this click starts is left alone).
     const word = wordWait.current;
     if (word && e.detail !== 3) {
@@ -2525,26 +2525,26 @@ function ReaderView(p: Props & { reload: () => void }) {
       const r = sel.getRangeAt(0);
       if (el.contains(r.startContainer) && el.contains(r.endContainer)) {
         // The paragraph replaces a double click's word only now that it will be highlighted: a triple
-        // click whose selection runs past the text (the last paragraph, in WebKit) keeps the word.
+        // click whose selection runs past the text (the last paragraph, in WebKit) keeps the sentence.
         dropWord();
         const up = sel.focusNode === r.startContainer && sel.focusOffset === r.startOffset;
         const exact = e.altKey;
         // A double click keeps its word's sentence, ⌥ just the word (D224); a double click dragged on
-        // selects by words, as the Mac does, and keeps what it covers.
+        // selects by words, as the Mac does, and keeps what it covers; one on a highlight opens that one.
         const dragged = Math.hypot(e.clientX - pressedAt.current.x, e.clientY - pressedAt.current.y) > 3;
-        const sentence = e.detail === 2 && !exact && !dragged;
+        const sentence = e.detail === 2 && !exact && !dragged && !holderOf(r);
         const range = sentence ? sentenceRange(r) : r.cloneRange();
         const aim = { x: e.clientX, y: e.clientY, up };
         const keep = () => {
           // Whole words, unless he held ⌥ for part of one.
-          highlightRange(range, undefined, aim, !exact || e.detail === 2);
+          highlightRange(range, undefined, aim, !exact);
           setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
         };
         if (e.detail === 2) {
           // The sentence shows selected at once, while a third click may still make it the paragraph.
           if (sentence) sel.removeAllRanges(), sel.addRange(range);
           const timer = window.setTimeout(() => (dropWord(), keep()), 500);
-          const quiet = () => void (holderOf(range) || createHighlight(snapRange(range), "keep", undefined, false));
+          const quiet = () => void (holderOf(range) || createHighlight(exact ? range : snapRange(range), "keep", undefined, false));
           wordWait.current = { timer, quiet };
         } else keep();
       }
@@ -2628,7 +2628,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     const prev = lastTap.current;
     tapAt.current = null;
     const now = performance.now();
-    if (!s || now - s.t > 300) return void (lastTap.current = null);
+    if (!s || now - s.t > 300 || !ready) return void (lastTap.current = null);
     lastTap.current = { t: now, x: s.x, y: s.y };
     if (!prev || now - prev.t > 350 || Math.hypot(s.x - prev.x, s.y - prev.y) > 24 || closedBook) return;
     lastTap.current = null;

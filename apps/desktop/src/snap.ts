@@ -109,12 +109,19 @@ function trimmed(at: Map<Text, number>, text: string, a: number, z: number): Ran
 /** A double click's word grown to its sentence (D224), by the system's own sentence breaks; code and
  *  math, which have no sentences, keep the word. */
 export function sentenceRange(word: Range): Range {
-  const node = word.startContainer;
-  if (node.nodeType !== Node.TEXT_NODE || node.parentElement?.closest(RAW)) return snapRange(word);
+  let node: Node | null = word.startContainer;
+  let offset = word.startOffset;
+  // A start between elements (just after a link, in WebKit): the text that follows it.
+  if (node.nodeType !== Node.TEXT_NODE) {
+    const after: Node | null = node.childNodes[offset] ?? null;
+    node = after && (after.nodeType === Node.TEXT_NODE ? after : document.createTreeWalker(after, NodeFilter.SHOW_TEXT).nextNode());
+    offset = 0;
+  }
+  if (!node || node.nodeType !== Node.TEXT_NODE || node.parentElement?.closest(RAW)) return snapRange(word);
   const { text, at } = blockText(node as Text);
   const from = at.get(node as Text);
   if (from === undefined) return snapRange(word);
-  const o = from + word.startOffset;
+  const o = from + offset;
   for (const s of sentences.segment(text)) {
     if (o < s.index || o >= s.index + s.segment.length) continue;
     return trimmed(at, text, s.index, s.index + s.segment.length) ?? snapRange(word);
@@ -126,7 +133,8 @@ export function sentenceRange(word: Range): Range {
  *  outer box would be all of it. */
 const PARAGRAPH = "p, li, td, th, figcaption, dt, dd, pre, blockquote";
 
-/** The paragraph around `node` (the innermost one, so a list item's own line, a table's cell), or null. */
+/** The paragraph around `node` (the innermost one, so a list item's own line without the list nested in
+ *  it, a table's cell), or null. */
 export function paragraphRange(node: Node): Range | null {
   const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
   const block = el?.closest(BLOCK);
@@ -134,5 +142,12 @@ export function paragraphRange(node: Node): Range | null {
   const first = document.createTreeWalker(block, NodeFilter.SHOW_TEXT).nextNode() as Text | null;
   if (!first) return null;
   const { text, at } = blockText(first);
-  return trimmed(at, text, 0, text.length);
+  // Its own text runs up to the first block nested in it.
+  let z = text.length;
+  for (const [n, a] of at)
+    if (n.parentElement?.closest(BLOCK) !== block) {
+      z = Math.min(z, a);
+      break;
+    }
+  return trimmed(at, text, 0, z);
 }

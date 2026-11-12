@@ -2440,9 +2440,9 @@ journey("highlight: one the core can't place says what to do, not “text not fo
 });
 
 /** The middle of a phrase in the reader, scrolled into view. */
-async function pointAt(page: Page, phrase: string) {
-  return (await page.evaluate((phrase) => {
-    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+async function pointAt(page: Page, phrase: string, root = ".doc") {
+  return (await page.evaluate(({ phrase, root }) => {
+    const walk = document.createTreeWalker(document.querySelector(root)!, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
       const i = n.data.indexOf(phrase);
       if (i < 0) continue;
@@ -2453,7 +2453,7 @@ async function pointAt(page: Page, phrase: string) {
       const b = r.getBoundingClientRect();
       return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
     }
-  }, phrase))!;
+  }, { phrase, root }))!;
 }
 
 journey("highlight: a drag that starts right after a double click keeps both, the double click's sentence without a popup", async (page) => {
@@ -9111,19 +9111,7 @@ journey("phone: a double tap highlights the paragraph and opens it, a heading an
   await phoneSource(page, TESTING);
   await page.waitForTimeout(400);
   const kept = () => page.evaluate(() => ["hl-keep", "hl-active"].flatMap((k) => [...(CSS.highlights.get(k) ?? [])].map((r) => r.toString())));
-  const at = async (phrase: string) => (await page.evaluate((phrase) => {
-    const walk = document.createTreeWalker(document.querySelector(".phone-reader .doc")!, NodeFilter.SHOW_TEXT);
-    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
-      const i = n.data.indexOf(phrase);
-      if (i < 0) continue;
-      n.parentElement!.scrollIntoView({ block: "center" });
-      const r = document.createRange();
-      r.setStart(n, i);
-      r.setEnd(n, i + 1);
-      const b = r.getBoundingClientRect();
-      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-    }
-  }, phrase))!;
+  const at = (phrase: string) => pointAt(page, phrase, ".phone-reader .doc");
   const twice = async (p: { x: number; y: number }) => {
     await page.touchscreen.tap(p.x, p.y);
     await page.touchscreen.tap(p.x, p.y);

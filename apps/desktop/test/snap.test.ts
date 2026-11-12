@@ -111,5 +111,15 @@ describe("a selection on the page snaps across inline marks", () => {
     expect(paragraphRange(textAt(el, "An item")[0])?.toString()).toBe("An item.");
     expect(paragraphRange(textAt(el, "A cell")[0])?.toString()).toBe("A cell");
     expect(paragraphRange(textAt(el, "A heading")[0])).toBeNull();
+    const nested = html("<ul><li>Parent item<ul><li>Child one.</li></ul></li></ul>");
+    expect(paragraphRange(textAt(nested, "Parent")[0])?.toString()).toBe("Parent item");
+  });
+  test("a double click whose selection starts between elements still grows to its sentence", () => {
+    const el = html("<p>See <a href='#'>this</a>word here. Next one.</p>");
+    const p = el.firstChild!;
+    const r = document.createRange();
+    r.setStart(p, 2);
+    r.setEnd(textAt(el, "word")[0], 4);
+    expect(sentenceRange(r).toString()).toBe("See thisword here.");
   });
 });
