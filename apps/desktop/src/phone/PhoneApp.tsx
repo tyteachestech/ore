@@ -4,7 +4,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Archive, BookOpen, CaretLeft, CaretRight, Check, GearSix, GraduationCap, House, MagnifyingGlass, Plus, SidebarSimple } from "../icons";
 import { flushSync } from "react-dom";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
 import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
@@ -342,6 +342,9 @@ function NewSkill({ skills, onDone }: { skills: Skill[]; onDone: (made: Skill | 
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The drawer's last rows sit where the keyboard comes up: the field, and its refusal once shown, stay above it.
+  const form = useRef<HTMLFormElement>(null);
+  useLayoutEffect(() => form.current?.scrollIntoView({ block: "nearest" }), [error]);
   const create = async () => {
     const n = name.trim().replace(/\s+/g, " ");
     if (!n) return onDone(null);
@@ -357,7 +360,7 @@ function NewSkill({ skills, onDone }: { skills: Skill[]; onDone: (made: Skill | 
     }
   };
   return (
-    <form className="phone-new-skill" onSubmit={(e) => (e.preventDefault(), void create())}>
+    <form ref={form} className="phone-new-skill" onSubmit={(e) => (e.preventDefault(), void create())}>
       <SkillIcon dot />
       <input
         autoFocus
@@ -570,10 +573,13 @@ export function PhoneApp() {
       if (!kb) return;
       document.querySelector(".phone-full .review-foot")?.scrollIntoView({ block: "end" });
       const field = document.activeElement;
+      if (!(field instanceof HTMLElement)) return;
       // ...but never past the field he is typing in: Edit exercise's question sat above the foot, under the head.
-      if (field instanceof HTMLElement && field.closest(".phone-full .review-body")) return field.scrollIntoView({ block: "nearest" });
-      // A field in the reader (a prequestion, a highlight's note) stays in sight above the keyboard.
-      if (!(field instanceof HTMLElement) || !field.closest(".phone-reader")) return;
+      if (field.closest(".phone-full .review-body")) return field.scrollIntoView({ block: "nearest" });
+      // A field in the reader (a prequestion, a highlight's note) or the drawer (New skill, with its refusal
+      // under it) stays in sight above the keyboard. Sheets and Review lift themselves by --keyboard.
+      if (field.closest(".phone-drawer")) return (field.closest("form") ?? field).scrollIntoView({ block: "nearest" });
+      if (!field.closest(".phone-reader")) return;
       if (!field.isContentEditable) return field.scrollIntoView({ block: "nearest" });
       // The source note is one tall editor: bring the caret, not the editor, into view, once the screen has shrunk.
       requestAnimationFrame(keepCaret);
