@@ -86,6 +86,7 @@ function boot() {
     if (isTauri()) {
       const root = await invoke<string | null>("library_dir");
       if (!root) throw new Error("Turn on iCloud Drive for Ore: Settings › your name › iCloud › Drive.");
+      await invoke<number>("share_inbox", { root }).catch(() => 0);
       await mountDisk(ROOT, root, invoke);
       // A source's own files (its images) load from the folder itself: /lib/... is the folder on disk.
       setLibraryRoot(ROOT, root);

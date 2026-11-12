@@ -5,7 +5,7 @@
 // (the e2e journeys, `vite` at phone size) they come from a snapshot, kept in IndexedDB (`mount`).
 
 /** `bytes`: a binary file (an image, a PDF) as written, so a rename or copy moves it whole. */
-type Entry = { text: string; mtime: number; bytes?: Uint8Array };
+type Entry = { text: string; mtime: number; bytes?: Uint8Array; unread?: true };
 const files = new Map<string, Entry>();
 /** The snapshot's paths: only these need a tombstone when deleted. */
 const shipped = new Set<string>();
@@ -138,7 +138,7 @@ function drop(p: string) {
 
 type Invoke = <T>(cmd: string, args: Record<string, unknown>) => Promise<T>;
 type Stamped = [rel: string, mtime: number, stamp: string];
-type Scan = { files: Stamped[]; waiting: string[] };
+type Scan = { files: Stamped[]; waiting: string[]; other?: string[] };
 let disk: { root: string; prefix: string; invoke: Invoke } | null = null;
 /** Each file's stamp (mtime and size) as last read or written, to tell what the Mac changed since. */
 const known = new Map<string, string>();
@@ -163,7 +163,7 @@ function queue(p: string, op: Op) {
 
 /** The files the folder's listing reports (apps/phone/src-tauri/src/lib.rs `wanted`); only these are
  *  watched for the Mac's changes. */
-const LISTED = /(\.(md|ya?ml|jsonl?|excalidraw)|\/(thumbnail|course-cover)\.(jpe?g|png|webp|gif))$/i;
+const LISTED = /(\.(md|ya?ml|jsonl?|excalidraw|vtt)|\/(thumbnail|course-cover)\.(jpe?g|png|webp|gif))$/i;
 
 /** Sends the writes made so far to the folder; resolves once they are on disk. */
 export function flush(): Promise<void> {
@@ -203,8 +203,20 @@ export async function mountDisk(prefix: string, root: string, invoke: Invoke) {
   }
   setDownloading(scan.waiting);
   await read(scan.files);
+  listOthers(scan.other);
   // iOS may suspend the app soon after it leaves the screen: what it wrote goes now.
   addEventListener("visibilitychange", () => document.hidden && void flush());
+}
+
+/** Files the phone doesn't load (a source's audio or PDF) still show in the folder's listing, so the core
+ *  finds them (`sourceFile`); the screens open them from disk (convertFileSrc). */
+function listOthers(other: string[] = []) {
+  for (const r of other) {
+    const p = `${disk!.prefix}/${r}`;
+    if (files.has(p)) continue;
+    files.set(p, { text: "", mtime: 0, unread: true });
+    addDirs(p);
+  }
 }
 
 function setDownloading(waiting: string[]) {
@@ -245,6 +257,7 @@ export async function rescan(): Promise<boolean> {
   }
   if (gone.length) pruneDirs();
   await read(changed);
+  listOthers(scan.other);
   return changed.length + gone.length > 0;
 }
 
@@ -261,6 +274,7 @@ export const existsSync = (p: string) => files.has(p) || dirs.has(p);
 export function readFileSync(p: string, _enc?: unknown): string {
   const e = files.get(p);
   if (!e) throw err("ENOENT", p);
+  if (e.unread) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
   return e.text;
 }
 export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, new TextDecoder().decode(s), Date.now(), s));
