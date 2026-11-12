@@ -3,8 +3,8 @@
 // The 40 a skill is likeliest to use were checked by hand (Tyler, 2026-11-07); the ones below read badly when
 // converted automatically. 2026-11-09 (D157, Tyler: brain, stars, people, flexing "messed up", basketball "cut off"):
 // those redrawn as plain silhouettes. Tyler, later that night: the brain still read asymmetric, so it and the basketball are mirror-symmetric now: the brain two notched lobes on a 2-pixel seam with no holes, the ball a 15-wide circle (centred on a pixel) with 1-pixel seams. The rest of those 40 read well as converted: book_2, pencil, code, terminal, music, headphone, flask, camera, chart_bar, trophy, run, bike, video, film, lightning, tent, car, briefcase, pen_2.
-// 2026-11-12 pass: 23 more drawn by hand where the converted glyph read as a blob at 20px (atom, magnet, chip, bug, robot, house,
-// plane, bird, tooth, pizza, …), each a plain silhouette with one detail, symmetric where the subject is; `ai` is the UI's Sparkle.
+// 2026-11-12 pass: 21 more drawn by hand where the converted glyph read as a blob at 20px (atom, magnet, chip, bug, house,
+// plane, tooth, pizza, …), each a plain silhouette with one detail, symmetric where the subject is; `ai` is the UI's Sparkle.
 export const FIXES: Record<string, readonly string[]> = {
   game_1: [
     "................",
@@ -834,24 +834,6 @@ export const FIXES: Record<string, readonly string[]> = {
     "................",
     "................",
   ],
-  robot: [
-    "................",
-    ".......##.......",
-    ".......##.......",
-    "..############..",
-    "..############..",
-    "..##..####..##..",
-    "####..####..####",
-    "################",
-    "..############..",
-    "..###......###..",
-    "..############..",
-    "..############..",
-    "................",
-    "................",
-    "................",
-    "................",
-  ],
   chip: [
     "................",
     ".....#....#.....",
@@ -886,24 +868,6 @@ export const FIXES: Record<string, readonly string[]> = {
     "................",
     "................",
     "................",
-    "................",
-  ],
-  bird: [
-    "................",
-    "................",
-    "................",
-    "........####....",
-    ".......######...",
-    ".......##.######",
-    ".......######...",
-    "..#...#######...",
-    "..##.########...",
-    "..##########....",
-    "..#########.....",
-    "...#######......",
-    ".....####.......",
-    "......#..#......",
-    ".....##.##......",
     "................",
   ],
   airplane: [
