@@ -9659,6 +9659,16 @@ journey("phone: a tap opens Source actions and works the note's keyboard bar", a
   await until("a tap on the bar's ⋯ opens Block actions", async () => (await block.getAttribute("aria-expanded")) === "true");
 }, "phone");
 
+journey("phone: a note's [[ link finds the library's sources", async (page) => {
+  // The phone gave its notes no link targets: [[ and the keyboard bar's link button always said "No source or skill by that name".
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  await tap(page, note);
+  await page.keyboard.type("[[Testing Eff");
+  await page.locator(".note-menu-row").filter({ hasText: TESTING }).first().waitFor();
+}, "phone");
+
 journey("phone: the last rating of a review shows the end screen, not Wrapping up", async (page) => {
   // The phone's `ore` runs in the page, so a rating saves inside the tap's own event: the queue emptied while
   // Review was still busy, and the end screen waited for a tap on Close.
