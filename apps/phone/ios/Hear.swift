@@ -66,14 +66,14 @@ public func oreTranscribe(_ path: UnsafePointer<CChar>, _ language: UnsafePointe
   if #available(iOS 26.0, *) {
     // A little time to finish if he leaves the app mid-way; iOS pauses the rest until he's back.
     var task = UIBackgroundTaskIdentifier.invalid
-    DispatchQueue.main.sync { task = UIApplication.shared.beginBackgroundTask(withName: "Hearing audio") { UIApplication.shared.endBackgroundTask(task) } }
+    DispatchQueue.main.sync { task = UIApplication.shared.beginBackgroundTask(withName: "Hearing audio") { UIApplication.shared.endBackgroundTask(task); task = .invalid } }
     let done = DispatchSemaphore(value: 0)
     Task.detached {
       result = await hear(url, lang)
       done.signal()
     }
     done.wait()
-    DispatchQueue.main.async { if task != .invalid { UIApplication.shared.endBackgroundTask(task) } }
+    DispatchQueue.main.async { if task != .invalid { UIApplication.shared.endBackgroundTask(task); task = .invalid } }
   }
   ok.pointee = result.0
   return strdup(result.1)

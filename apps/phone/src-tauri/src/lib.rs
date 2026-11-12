@@ -256,12 +256,15 @@ async fn transcribe(request: tauri::ipc::Request<'_>) -> Result<String, String> 
     let header = |k: &str| request.headers().get(k).and_then(|v| v.to_str().ok()).map(str::to_string);
     let ext = header("x-ext").filter(|e| e.chars().all(|c| c.is_ascii_alphanumeric()) && !e.is_empty()).unwrap_or_else(|| "m4a".into());
     let language = header("x-language").unwrap_or_default();
-    let path = std::env::temp_dir().join(format!("ore-hear-{}.{ext}", std::process::id()));
+    // Its own file per call: two episodes heard at once must not share one.
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!("ore-hear-{}-{n}.{ext}", std::process::id()));
     fs::write(&path, bytes).map_err(|_| "Couldn’t save the audio to hear it.".to_string())?;
     let run = path.clone();
-    let out = tauri::async_runtime::spawn_blocking(move || hear(&run, &language)).await.map_err(|e| e.to_string())?;
+    let out = tauri::async_runtime::spawn_blocking(move || hear(&run, &language)).await;
     let _ = fs::remove_file(&path);
-    out
+    out.map_err(|e| e.to_string())?
 }
 
 #[cfg(target_os = "ios")]
