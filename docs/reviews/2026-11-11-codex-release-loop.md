@@ -14,7 +14,7 @@ All 11 due exercises on his library went through to the end screen with no block
 | Sweep | Mac | iPhone | What |
 |---|---|---|---|
 | Rehearsal | 4 | | CSP-blocked KaTeX font; "cards"; exercises filed under no skill in no row (D204); a miss didn't count as a step |
-| 1 | 1 | 11 | A publisher's podcast page imported without its audio (D213). Phone: ⋯ and the note keyboard bar dead on a tap; review stuck on "Wrapping up…"; toolbar over the Sections pill and over sheets; toast over the toolbar; drafts and Collected lost on relaunch; list scroll shared; targets under 44 pt |
+| 1 | 1 | 11 | A publisher's podcast page imported without its audio (D215). Phone: ⋯ and the note keyboard bar dead on a tap; review stuck on "Wrapping up…"; toolbar over the Sections pill and over sheets; toast over the toolbar; drafts and Collected lost on relaunch; list scroll shared; targets under 44 pt |
 | 2 | 2 | 5 | A half-typed answer lost on quitting the Mac app; the screen-reader count kept the AI's marks. Phone: Finish drafts never expired; a reload in "Source finished" reopened Finish; key-point draft lost; fields under 44 pt; Reimport blamed the connection |
 | 3 | 0 | 3 | Phone: a key-point draft path; a pre-reading answer lost on reload; two fields under 44 pt |
 | 4 | | 1 | Phone: a note's to-do box under 44 pt |

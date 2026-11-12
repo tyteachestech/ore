@@ -1220,7 +1220,7 @@ describe("import coverage: audio and podcasts", () => {
 
   test("Reimport keeps a source's shape: an article stays the article, an episode keeps the page text he added", async () => {
     const lib = await tempLibrary();
-    // Saved as an article (before D213, or its audio wouldn't come then): Reimport reads it as the article again.
+    // Saved as an article (before D215, or its audio wouldn't come then): Reimport reads it as the article again.
     serve({ [EPISODE]: { body: episodePage, type: HTML } });
     const article = await addSource(lib, EPISODE);
     serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
