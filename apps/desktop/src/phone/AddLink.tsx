@@ -83,6 +83,7 @@ export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: ()
  *  comes in. Anything else the phone couldn't read keeps its reason, and the Mac tries it. */
 export function macOnly(error: string): string | null {
   if (/yt-dlp/.test(error)) return "A video comes in through your Mac.";
+  if (/Transcribing audio needs/.test(error)) return "Your Mac writes the transcript for a podcast.";
   if (/scanned pages/.test(error)) return "Your Mac reads the text in a picture or a scan.";
   if (/only on the Mac|on a Mac only/.test(error)) return "This one comes in through your Mac.";
   return null;
