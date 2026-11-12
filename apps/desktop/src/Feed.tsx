@@ -219,7 +219,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     return [
       { id: "open", label: "Open", hint: "↵", run: () => open(p) },
       { id: "read", label: p.read ? "Mark unread" : "Mark read", hint: label(keys["mark-read"]), run: () => (!p.read && show === "unread" && moveOn(p, (x) => x === p), setRead(p, !p.read)) },
-      { id: "original", label: "Open original", run: () => void openUrl(p.url).catch((e) => notify(errorText(e), "error")) },
+      { id: "original", label: "Open original", divider: true, run: () => void openUrl(p.url).catch((e) => notify(errorText(e), "error")) },
       { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copyPost(p) },
       ...(f ? [{ id: "unfollow", label: `Unfollow ${f.title}`, danger: true, divider: true, run: () => (moveOn(p, (x) => x.feed === f.url), unfollow(f)) }] : []),
     ];

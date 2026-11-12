@@ -82,9 +82,9 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   const onOpenSource = (id: string) => ((openedByKeys = typedLast() ? `.home-read[data-id="${CSS.escape(id)}"]` : null), openSource(id));
   const onOpenSkill = (id: string) => ((openedByKeys = typedLast() ? `.home-skill[data-id="${CSS.escape(id)}"]` : null), openSkill(id));
   const [renaming, setRenaming] = useState<string | null>(null);
-  /** Rename… after Open, as in the source list, typed on the row itself. */
+  /** Rename… where the source list has it, typed on the row itself. */
   const withRename = (acts: MenuAction[], i: Item): MenuAction[] =>
-    onRename ? acts.flatMap((a) => (a.id === "open" ? [a, { id: "rename", label: "Rename…", run: () => setRenaming(i.id) }] : [a])) : acts;
+    acts.flatMap((a) => (a.id !== "rename" ? [a] : onRename ? [{ ...a, run: () => setRenaming(i.id) }] : []));
   const [today, setToday] = useState<Today | null>(null);
   const [error, setError] = useState<string | null>(null);
 

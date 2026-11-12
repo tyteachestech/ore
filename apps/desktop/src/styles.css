@@ -2295,6 +2295,11 @@ button.home-plan:hover { color: var(--text); }
 .menu-item[data-state="open"] { background: var(--bg-active); }
 .menu-caret { margin-left: auto; color: var(--faint); }
 .menu-item kbd { margin-left: auto; color: var(--faint); }
+/* The item's icon (menu-icons.ts, ChatGPT's menus): 20px sprite in a 20px slot, 8px to its label; the slot stays when
+   an item has none, so the labels line up. The row starts 4px nearer the edge, where the tick of a check row sits. */
+.menu-item:has(> .menu-icon) { padding-left: 6px; }
+.menu-icon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; margin-right: -8px; color: var(--muted); }
+.menu-item.danger .menu-icon { color: inherit; }
 .menu-item.check { gap: 8px; padding-left: 6px; }
 .menu-item.check > .skill-icon { flex: none; }
 /* The tick's column: 16px holds the Tick's ink (12.5px) whole; the indicator is a flex box so the sprite centres on the row, not on the text baseline. */
