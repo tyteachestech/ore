@@ -59,6 +59,7 @@ const ICON_ONLY_OK: Record<string, string> = {
   "Reader.tsx Find in source": "phone only (PHONE): a touch screen has no hover",
   "phone/PhoneApp.tsx Open menu": "the phone app: a touch screen has no hover",
   "phone/PhoneApp.tsx Search": "the phone app: a touch screen has no hover",
+  "phone/PhoneApp.tsx Add a link": "the phone app: a touch screen has no hover",
   "phone/PhoneApp.tsx Close menu": "the phone app: a touch screen has no hover",
   "Menu.tsx label": "the phone's action sheet trigger (ActionSheet, PHONE): a touch screen has no hover",
   "editor/KeyboardBar.tsx Hide the keyboard": "the phone's keyboard bar (PHONE): a touch screen has no hover",

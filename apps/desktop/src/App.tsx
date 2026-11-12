@@ -356,6 +356,39 @@ export function App() {
     reloadSkills();
   }, [refresh, reloadSkills]);
   useEffect(reload, [reload]);
+  // Links added on the iPhone wait in the library's inbox (D223): the Mac imports them when it opens or comes
+  // back to the front, and the lists read in whatever else the phone changed meanwhile.
+  useEffect(() => {
+    let busy = false;
+    const fromPhone = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const waiting = await ore<{ error?: string }[]>("inbox");
+        if (!waiting.some((l) => !l.error)) return;
+        const r = await ore<{ added: { title: string }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+        if (r.added.length) notify(r.added.length === 1 ? `Added “${r.added[0]!.title}” from your iPhone` : `Added ${r.added.length} sources from your iPhone`, "info");
+        for (const f of r.failed) notify(`Couldn’t add ${f.url} from your iPhone: ${f.error}`, "error");
+        reload();
+      } catch {
+        // An older library or a missing inbox: nothing to bring in.
+      } finally {
+        busy = false;
+      }
+    };
+    void fromPhone();
+    // Only after a real absence (10 s away): a click on a menu or a dialog closing doesn't reload the lists.
+    let left = 0;
+    const away = () => (left = Date.now());
+    const back = () => {
+      if (!left || Date.now() - left < 10_000) return;
+      void refresh();
+      void fromPhone();
+    };
+    addEventListener("blur", away);
+    addEventListener("focus", back);
+    return () => (removeEventListener("blur", away), removeEventListener("focus", back));
+  }, [notify, refresh, reload]);
 
   useEffect(() => save("ore.view", JSON.stringify({ status, skill })), [status, skill]);
 

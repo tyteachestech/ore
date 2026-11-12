@@ -24,6 +24,7 @@ import {
 import type { Command } from "./types.ts";
 import { int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
+import { importQueued, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
 
 const INTENTS = Intent.options;
 
@@ -92,6 +93,32 @@ export const itemCommands: Record<string, Command> = {
         data: { id: item.meta.id, title: item.meta.title, type: item.meta.type, path, enrich, ...(kept ? { kept, filed: item.filed, restored: item.restored, status: item.meta.status, skills: item.meta.skills } : {}) },
         text: kept ? `Already here: ${item.meta.title} (${item.meta.id})\n  skills ${item.meta.skills.join(", ") || "none"}` : `Added: ${item.meta.title} (${item.meta.id})\n  ${item.meta.type} → ${path}\n  enrichment ${enrich}`,
       };
+    },
+  },
+
+  inbox: {
+    usage: "[--add <url> [--skill s]] [--remove <id>] [--import]   links added on the iPhone, waiting for the Mac to import them (D223): --add queues one (the phone), --import adds each with the whole import and enrichment (the Mac), --remove drops one; with none, lists them",
+    options: { add: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" } },
+    async run(_, f) {
+      const lib = openLibrary();
+      if (f.add !== undefined) {
+        const l = queueLink(lib, str(f.add) ?? "", strs(f.skill));
+        return { data: l, text: `Waiting for your Mac: ${l.url}` };
+      }
+      if (f.remove !== undefined) {
+        removeQueuedLink(lib, need(str(f.remove), "<id>"));
+        return { data: queuedLinks(lib), text: "Removed" };
+      }
+      if (f.import) {
+        const r = await importQueued(lib, async (url, skills) => {
+          const item = await addSource(lib, url, { skills });
+          if (!item.kept) startEnrich(lib, item.meta.id);
+          return { id: item.meta.id, title: item.meta.title };
+        });
+        return { data: r, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`)].join("\n") };
+      }
+      const all = queuedLinks(lib);
+      return { data: all, text: all.length ? table(all.map((l) => [l.id, l.url, l.error ?? "waiting"])) : "Nothing waiting" };
     },
   },
 

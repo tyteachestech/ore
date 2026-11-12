@@ -30,7 +30,7 @@ cards/<id>.variants.jsonl      # remixed versions of that card (D66), append-onl
 reviews/<yyyy>-<mm>.<device>.jsonl    # append-only review log, one per device (D78); source of truth for scheduling
 sessions/<yyyy>-<mm>.<device>.jsonl   # session start/end receipts (habit metric)
 chats/<id>.json                # tutor chats (D172): {id, title, created, updated, carry, turns}, the turns as the app shows them; written only through `ore chat`
-inbox/                         # dropped watcher (D95): a file added from here with `ore add` is removed after ingest
+inbox/                         # dropped watcher (D95): a file added from here with `ore add` is removed after ingest; `<id>.link.json` is a link added on the iPhone, waiting for the Mac (D223)
 .index/feeds.json              # fetched Feed posts (D107), rebuilt by `ore feed --refresh`
 .index/library.sqlite          # FTS5 index + materialized card states; gitignored; `ore reindex` rebuilds
 .ore/                          # lock, open-session marker, last-snapshot marker, background enrich logs (gitignored)
@@ -143,6 +143,7 @@ All commands accept `--json`. Exit non-zero with a one-line error on failure. Ne
 ```
 ore init [path]                       create library skeleton, AGENTS.md, skills.yaml, git init
 ore add <url|path> | --stdin [--html] | --tab [--skill s] [--type t] [--for <q>] [--no-enrich]   ingest → items/, status inbox → {id, title, type, path, enrich: started|skipped}; --stdin pasted text as Markdown (--html: the paste's HTML, its headings, tables, math, code and images kept, images saved beside it), --tab the frontmost Safari or Chrome page (D96), --for links it to a question (D75); triggers `enrich` in background unless --no-enrich
+ore inbox [--add <url> [--skill s]] [--remove <id>] [--import]   links added on the iPhone (D223): --add queues one, --import (the Mac, on opening and coming back to the front) adds each with `add` and enrichment and keeps a failure's reason in its file, --remove drops one; with none, lists them
 ore snippet --text|--stdin [--url] [--app] [--intent] [--note] [--skill s] [--no-enrich]   capture a selection as a snippet item + annotation
 ore ls [--status] [--skill] [--topic] [--archived]   items (archived ones only with --archived); JSON adds dir and source_file (absolute; the original kept at capture, if any), thumbnail (absolute; thumbnail.* beside doc.md, D77) and has_notes (the source note has text)
 ore backfill [item]   fill in missing thumbnails and PDF authors on sources added before D77 (all sources without an item)
