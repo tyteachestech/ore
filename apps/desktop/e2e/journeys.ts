@@ -1874,8 +1874,14 @@ journey("search while reading (D219): ⌘F names what it finds in; Collected has
   await page.getByRole("tab", { name: "Source note" }).click();
   await page.keyboard.press("Meta+f");
   await until("with the note open, it says so", async () => (await find.getAttribute("placeholder")) === "Find in source and note");
-  await page.keyboard.press("Escape");
+  await find.fill("just a measurement");
+  const count = page.locator(".find-count");
+  await until("words only in the note are found", async () => (await count.innerText()) === "1/1");
   await page.getByRole("tab", { name: "Collected" }).click();
+  await until("switching to Collected, the bar counts again without the note", async () => /not found/i.test(await count.innerText()));
+  if ((await find.getAttribute("placeholder")) !== "Find in source") throw new Error("the field still names the note");
+  await find.fill("");
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Filter collected" }).click();
   const field = page.getByRole("textbox", { name: "Filter collected" });
   await until("the glass opens a field with the caret", () => field.evaluate((el) => el === document.activeElement));

@@ -153,6 +153,8 @@ export function FindBar({ roots, scope, within, query, onQuery, focus, onClose, 
   const [at, setAt] = useState(0);
   const atRef = useRef(at);
   atRef.current = at;
+  const rootsRef = useRef(roots);
+  rootsRef.current = roots;
 
   useLayoutEffect(() => {
     input.current?.focus();
@@ -185,7 +187,8 @@ export function FindBar({ roots, scope, within, query, onQuery, focus, onClose, 
       if (ms.every((m) => (m.target as Element).closest?.(".find-bar") || m.target.parentElement?.closest(".find-bar"))) return;
       clearTimeout(t);
       t = window.setTimeout(() => {
-        const rs = search(roots().filter((r): r is HTMLElement => !!r), query);
+        // The latest `roots`: a tab opened or closed beside it changes what is searched (`scope`).
+        const rs = search(rootsRef.current().filter((r): r is HTMLElement => !!r), query);
         setFound(rs);
         setAt((i) => Math.min(i, Math.max(0, rs.length - 1)));
       }, 120);
@@ -195,18 +198,8 @@ export function FindBar({ roots, scope, within, query, onQuery, focus, onClose, 
       mo.disconnect();
       clearTimeout(t);
     };
-    // `scope`: a tab opened or closed changes what `roots` returns.
-  }, [within, query, scope]);
+  }, [within, query]);
 
-  // The note opened or closed beside it: count again over what is searched now.
-  const scoped = useRef(scope);
-  useEffect(() => {
-    if (scoped.current === scope) return;
-    scoped.current = scope;
-    const rs = search(roots().filter((r): r is HTMLElement => !!r), query);
-    setFound(rs);
-    setAt((i) => Math.min(i, Math.max(0, rs.length - 1)));
-  }, [scope]);
 
   useEffect(() => show(found, found[at]), [found, at]);
   useEffect(() => () => {
