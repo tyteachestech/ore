@@ -6,7 +6,6 @@ import { Archive, BookOpen, CaretLeft, CaretRight, House, MagnifyingGlass, Sideb
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
-import { pull } from "./core";
 import { trackDrag, type Drag } from "./drag";
 import { Home } from "../Home";
 import { SkillIcon } from "../IconPicker";
@@ -16,7 +15,7 @@ import type { NoteEditorHandle } from "../editor/NoteEditor";
 import { WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
 import { skillGroups } from "../Skills";
-import { lessonsOf, opt, ore, type Item, type Skill, touched } from "../ore";
+import { lessonsOf, opt, ore, pullFromMac, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -331,7 +330,7 @@ export function PhoneApp() {
   // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
   useEffect(() => {
     const check = () =>
-      void pull().then((changed) => {
+      void pullFromMac().then((changed) => {
         if (!changed) return;
         setTick((t) => t + 1);
         void refresh();
