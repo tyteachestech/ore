@@ -3,6 +3,7 @@ import { ranked } from "./match";
 import { HeadSearch } from "./HeadSearch";
 import { ImportanceIcon, levelOf } from "./importance";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
+import { HeadTab, HeadTabs } from "./HeadTabs";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { useSplit } from "./split";
@@ -182,7 +183,7 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
         <div className="skill-col" ref={noteCol} onMouseDown={clickBelow(editor)} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
           <section className="skill-card skill-note" data-tone="note" onMouseDown={clickBelow(editor)}>
             <div className="card-head">
-              <span className="card-title"><PixelNote className="card-icon" size={16} aria-hidden="true" /><h2>Your note</h2></span>
+              <span className="card-title"><HeadTab icon={PixelNote} tone="note">Your note</HeadTab></span>
               <Hint text={wide ? "Back beside sources and questions" : "Widen the note, for wide tables"}>
                 <button className="icon-btn note-widen" aria-label={wide ? "Narrow your note" : "Widen your note"} aria-pressed={wide} onClick={() => setWide((w) => !w)}>
                   {wide ? <Collapse size={14} aria-hidden="true" /> : <Expand size={14} aria-hidden="true" />}
@@ -316,13 +317,14 @@ function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, 
     <WithMenu actions={actions.map((a) => ({ ...a, run: () => (open || toggle(), a.run()) }))}>
     <section className="skill-card fold" data-tone={tone}>
       <div className="card-head">
-        <button className={`fold-head${menu ? " caret-only" : ""}`} aria-expanded={open} aria-label={menu ? `${open ? "Fold" : "Unfold"} ${title}` : undefined} onClick={toggle}>
-          <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
-          {!menu && <span className="card-title"><I className="card-icon" size={16} aria-hidden="true" /><h2>{title}</h2></span>}
-          {summary && !(summaryFolded && open) && <span className="fold-sum">{summary}</span>}
-        </button>
-        {menu && <span className="card-title"><I className="card-icon" size={16} aria-hidden="true" />{menu}</span>}
-        {menu && <span className="fold-fill" />}
+        <Hint text={open ? "Fold" : "Unfold"}>
+          <button className="fold-head caret-only" aria-expanded={open} aria-label={`${open ? "Fold" : "Unfold"} ${title}`} onClick={toggle}>
+            <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
+          </button>
+        </Hint>
+        {/* Picking a view of a folded section opens it, or the pick would show nothing. */}
+        <span className="card-title" onClickCapture={() => menu && !open && toggle()}>{menu ?? <HeadTab icon={I} tone={tone}>{title}</HeadTab>}</span>
+        {summary && !(summaryFolded && open) ? <span className="fold-sum">{summary}</span> : <span className="fold-fill" />}
         {/* Its + adds into the body, so a folded card opens first, or the new row would be hidden. */}
         {action && <span className="fold-action" onClickCapture={() => !open && toggle()}>{action}</span>}
       </div>
@@ -566,6 +568,8 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
   const found = useMemo(() => (find ? ranked(qs ?? [], find, (q) => [questionText(q), q.item_title, ...q.answers.map((a) => a.text)]) : (qs ?? [])), [qs, find]);
   const open = found.filter((q) => q.status !== "done");
   const answered = found.filter((q) => q.status === "done");
+  /** The Answered tab is there once a question is answered; a search looks through both, so it shows one tab. */
+  const byStatus = answered.length > 0 && !find;
   return (
     <Fold
       id="questions"
@@ -574,6 +578,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
       tone="question"
       summary={open.length && !find ? `${open.length} open` : null}
       summaryFolded
+      menu={<HeadTabs label="Questions shown" tabs={byStatus ? QUESTION_TABS : QUESTION_TABS.slice(0, 1)} value={byStatus && showAnswered ? "answered" : "open"} onChange={(v) => setShowAnswered(v === "answered")} />}
       actions={[{ id: "search", label: "Search questions", run: () => setSearching(true) }, { id: "ask", label: "Add a question", run: () => setAsking(true) }]}
       action={<>
         <HeadSearch
@@ -610,23 +615,17 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
       )}
       {qs && !qs.length && !asking && <p className="quiet">No questions yet. Add one with +, or highlight a passage as a question while you read.</p>}
       {find && !found.length && <p className="quiet">No questions match “{find}”.</p>}
-      {(showAll || find ? open : open.slice(0, QUESTION_CAP)).map((q) => (
+      {/* Open and Answered are the header's tabs (D226); a search looks through both. */}
+      {!(byStatus && showAnswered) && (showAll || find ? open : open.slice(0, QUESTION_CAP)).map((q) => (
         <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />
       ))}
-      {!find && open.length > QUESTION_CAP && (
+      {!find && !(byStatus && showAnswered) && open.length > QUESTION_CAP && (
         <button className="answered-toggle" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
           {showAll ? "Show fewer" : `Show all ${open.length}`}
         </button>
       )}
-      {answered.length > 0 && (
-        <>
-          {!find && <button className="answered-toggle" aria-expanded={showAnswered} onClick={() => setShowAnswered(!showAnswered)}>
-            {showAnswered ? "Hide answered" : `Answered (${answered.length})`}
-          </button>}
-          {(showAnswered || !!find) &&
-            answered.map((q) => <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />)}
-        </>
-      )}
+      {(find ? true : byStatus && showAnswered) &&
+        answered.map((q) => <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />)}
     </Fold>
   );
 }
@@ -861,6 +860,11 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
     </div>
   );
 }
+
+const QUESTION_TABS: HeadTab<"open" | "answered">[] = [
+  { id: "open", label: "Questions", icon: PixelQuestion, tone: "question" },
+  { id: "answered", label: "Answered", icon: Check, tone: "question" },
+];
 
 /** Open questions shown before "Show all", so Sources stays in view below them. */
 const QUESTION_CAP = 5;

@@ -1,7 +1,9 @@
 import { ranked } from "./match";
-import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
+import { Archive, ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
 import { DotBar } from "./Ring";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { HeadTabs, type HeadTab } from "./HeadTabs";
+import { PixelBook } from "./PixelIcon";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
 import { blankStart, dragRows, type RowPick } from "./marquee";
@@ -82,41 +84,32 @@ type Kept = { kept: true; filed: string[]; restored: boolean };
 const back = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
 const lessonFirst = (l: Extract<Line, { kind: "course" }>) => l.next ?? l.lessons[0]!;
 
-/** Which sources the list shows, as the list's title (Linear's view menu): To read, Done, and
- *  Archived once there is any. It replaces tabs with counts, which repeated what the list shows. */
 const added = (iso: string) => {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(d.getFullYear() !== new Date().getFullYear() && { year: "numeric" }) });
 };
 
+/** Which sources the list shows, as folder tabs on the list's rule (D226): To read, Done, and Archived once
+ *  there is any. The open tab's ▾ picks which details each row shows (Linear's Display properties). */
 function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; archived: boolean; go: (s: Tab) => void; details: Detail[]; toggle: (d: Detail) => void }) {
-  const views = [...TABS, ...(archived || status === "archived" ? [{ id: "archived" as Tab, label: "Archived", key: undefined }] : [])];
+  const views: HeadTab<Tab>[] = [
+    { id: "toread", label: "To read", icon: PixelBook, tone: "read", keys: "go-toread" },
+    { id: "done", label: "Done", icon: Check, tone: "done", keys: "go-done" },
+    ...(archived || status === "archived" ? [{ id: "archived" as Tab, label: "Archived", icon: Archive, tone: "archived" }] : []),
+  ];
   return (
+    <HeadTabs label="Sources shown" tabs={views} value={status} onChange={go} after={
     <DropdownMenu.Root modal={false}>
-      <Hint text="Show To read, Done or Archived, and which details each row shows">
+      <Hint text="Which details each row shows">
         <DropdownMenu.Trigger asChild>
-          <button className="view-menu">
-            <h2>{views.find((v) => v.id === status)?.label ?? "To read"}</h2>
+          <button className="view-menu" aria-label="Row details">
             <CaretDown size={11} weight="bold" aria-hidden="true" />
           </button>
         </DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="popover menu-list" align="start" sideOffset={4} collisionPadding={8}>
-          <DropdownMenu.RadioGroup value={status} onValueChange={(v) => setTimeout(() => go(v as Tab), 0)}>
-            {views.map((v) => (
-              <DropdownMenu.RadioItem key={v.id} value={v.id} className="menu-item check">
-                <span className="menu-tick">
-                  <DropdownMenu.ItemIndicator>
-                    <Tick />
-                  </DropdownMenu.ItemIndicator>
-                </span>
-                <span className="menu-label">{v.label}</span>
-              </DropdownMenu.RadioItem>
-            ))}
-          </DropdownMenu.RadioGroup>
           {/* Linear's Display properties: toggling keeps the menu open so he sees the rows change. */}
-          <DropdownMenu.Separator className="menu-sep" />
           {DETAILS.map((c) => (
             <DropdownMenu.CheckboxItem
               key={c.id}
@@ -136,6 +129,7 @@ function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; arch
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+    } />
   );
 }
 
