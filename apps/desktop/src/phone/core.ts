@@ -96,6 +96,13 @@ export const shareSkills = (skills: { id: string; name: string; icon?: string; c
 /** The inbox item the share card's Open asked to see (lib.rs `share_open`), once. */
 export const shareOpen = () => (isTauri() ? invoke<string | null>("share_open").catch(() => null) : Promise.resolve(null));
 
+/** Speech to a timed transcript in the shell (lib.rs `transcribe`): the audio goes over as raw bytes, its
+ *  WebVTT comes back, or why not in the phone's own words. It works only while Ore is on screen. */
+const hear = (data: Uint8Array, ext: string, _progress?: unknown, language?: string) =>
+  invoke<string>("transcribe", data, { headers: { "x-ext": ext, ...(language ? { "x-language": language } : {}) } }).catch((e) => {
+    throw new Error(String(e));
+  });
+
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
 function boot() {
@@ -108,6 +115,8 @@ function boot() {
       await mountDisk(ROOT, root, invoke);
       // A source's own files (its images) load from the folder itself: /lib/... is the folder on disk.
       setLibraryRoot(ROOT, root);
+      // Podcasts and audio are heard here when this iPhone can (D227): the shell runs Apple's on-device speech.
+      if (await invoke<boolean>("can_transcribe").catch(() => false)) await (await import("ore-commands")).setTranscriber(hear);
     } else {
       const text = await (await fetch("/library.json")).text();
       const snap = JSON.parse(text) as Record<string, string | null>;

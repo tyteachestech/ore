@@ -7,6 +7,8 @@ import { feedCommands } from "./cmd-feed.ts";
 
 export type { Command, Output } from "./types.ts";
 export { errorLine } from "./util.ts";
+/** For a shell that hears speech itself (the iPhone app): see audio.ts `setTranscriber`. Loaded only when asked. */
+export const setTranscriber = async (hear: Parameters<typeof import("@ore/core/ingest/audio").setTranscriber>[0]) => (await import("@ore/core/ingest/audio")).setTranscriber(hear);
 
 export const commands: Record<string, Command> = {
   init: {
