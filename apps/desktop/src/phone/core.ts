@@ -180,8 +180,13 @@ async function command<T>({ commands, errorLine }: typeof import("ore-commands")
 
 function picture(path: string): string | undefined {
   try {
-    const text = readFileSync(path);
-    return text.startsWith("data:image/") ? text : undefined;
+    const got = readFileSync(path) as string | Uint8Array;
+    if (typeof got === "string") return got.startsWith("data:image/") ? got : undefined;
+    // One this phone just saved (an import's thumbnail) is still its bytes: the same data URL the folder's read gives.
+    const kind = ({ jpg: "jpeg", jpeg: "jpeg", png: "png", webp: "webp", gif: "gif" } as Record<string, string>)[path.split(".").pop()!.toLowerCase()];
+    let bin = "";
+    for (let i = 0; i < got.length; i += 0x8000) bin += String.fromCharCode(...got.subarray(i, i + 0x8000));
+    return kind ? `data:image/${kind};base64,${btoa(bin)}` : undefined;
   } catch {
     return undefined;
   }
