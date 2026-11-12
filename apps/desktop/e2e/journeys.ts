@@ -8359,6 +8359,7 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
     for (const k of others) {
       await picker.getByRole("option").filter({ has: page.locator(".menu-label", { hasText: k.name }) }).click();
       await until(`filed under ${k.name}`, async () => (await item()).skills.includes(k.id));
+      await page.getByText(`Filed under ${k.name}`, { exact: true }).last().waitFor(); // the tick is on the history
     }
     if (closeFirst) {
       await page.keyboard.press("Escape");
@@ -8379,9 +8380,10 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
     await page.keyboard.type(k.name);
     await page.keyboard.press("Enter");
     await until(`filed under ${k.name} by keys`, async () => (await item()).skills.includes(k.id));
+    await page.getByText(`Filed under ${k.name}`, { exact: true }).last().waitFor();
   }
   // Typing after the tick is the field's to undo first; once it is undone, ⌘Z goes back to the app.
-  await page.getByText(`Filed under ${others[1]!.name}`).waitFor(); // the tick is on the history
+  await page.getByText(`Filed under ${others[1]!.name}`, { exact: true }).last().waitFor(); // the tick is on the history
   await page.keyboard.type("x");
   await page.keyboard.press("Meta+z"); // the field's: the app leaves it alone
   if (!(await item()).skills.includes(others[1]!.id)) throw new Error("⌘Z with fresh typing in the filter took a skill off");

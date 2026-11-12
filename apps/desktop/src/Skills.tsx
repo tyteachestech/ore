@@ -287,7 +287,7 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
           }, 0);
         }}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.key !== "Enter" && e.key !== "Escape") return;
           e.preventDefault(); // or the Enter would also click the name button that takes focus
           if (e.key === "Enter" && !saving) void save().then((ok) => ok && onEnter?.());
