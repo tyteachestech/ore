@@ -8245,7 +8245,37 @@ journey("typing with an input method: Enter that picks a word neither sends an a
   await label.waitFor({ state: "detached" });
 });
 
-journey("list archive: A selects the row after the archived one, so a second A archives that row; ⌘Z brings each back", async (page) => {
+journey("list type-select: typing a title's first letters selects its row, as Finder does; the same letter again steps to the next; after a pause it starts over; ↵ opens it", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const titles = () => page.locator(".list .row .title").allInnerTexts();
+  const selected = () => page.locator(".list .row[aria-selected=true] .title").innerText();
+  await until("All sources lists three sources", async () => (await titles()).length >= 3);
+  const all = await titles();
+  await page.locator(".list").focus();
+  // The last row, by the first letters of its title that no row above it shares.
+  const low = all.map((t) => t.toLowerCase());
+  const at = low.findLastIndex((t) => /^[a-z]/.test(t));
+  if (at < 1) throw new Error(`no row past the first to type to: ${all.join(" / ")}`);
+  let n = 1;
+  while (low.findIndex((t) => t.startsWith(low[at]!.slice(0, n))) !== at) n++;
+  await page.keyboard.type(low[at]!.slice(0, n), { delay: 60 });
+  await until(`typing “${low[at]!.slice(0, n)}” selects “${all[at]}”`, async () => (await selected()) === all[at]);
+  // A letter starting a row higher up, typed after a pause, starts over.
+  const first = low.findIndex((t) => /^[a-z]/.test(t));
+  await page.waitForTimeout(1200);
+  await page.keyboard.type(low[first]![0]!);
+  await until(`after a pause “${low[first]![0]}” selects “${all[first]}”`, async () => (await selected()) === all[first]);
+  const twin = low.findIndex((t, i) => i > first && t[0] === low[first]![0]);
+  if (twin > 0) {
+    await page.keyboard.type(low[first]![0]!);
+    await until(`the same letter again steps to “${all[twin]}”`, async () => (await selected()) === all[twin]);
+  }
+  const want = await selected();
+  await page.keyboard.press("Enter");
+  await until(`↵ opens “${want}”`, async () => (await page.locator(".doc-head").innerText()).includes(want));
+});
+
+journey("list archive: ⇧⌘A selects the row after the archived one, so a second ⇧⌘A archives that row; ⌘Z brings each back", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const titles = () => page.locator(".list .row .title").allInnerTexts();
   const selected = () => page.locator(".list .row[aria-selected=true] .title").innerText();
@@ -8256,9 +8286,9 @@ journey("list archive: A selects the row after the archived one, so a second A a
   await page.keyboard.press("ArrowDown");
   if ((await selected()) !== before[1]) throw new Error(`↓↓ selected “${await selected()}”, not the second row`);
   // Finder, Mail and Linear: the row after the one that went takes the selection.
-  await page.keyboard.press("a");
+  await page.keyboard.press("Shift+Meta+KeyA");
   await until(`“${before[2]}” is selected after the archive`, async () => (await selected()) === before[2]);
-  await page.keyboard.press("a");
+  await page.keyboard.press("Shift+Meta+KeyA");
   await until("the second A archives the row after", async () => !(await titles()).includes(before[2]!));
   const after = await titles();
   if (!after.includes(before[0]!)) throw new Error(`the second A archived “${before[0]}”, which he never picked`);
@@ -8583,7 +8613,7 @@ journey("stacked Undo: each ⌘Z's toast comes to the front and names the source
   await page.locator(".list").focus();
   await page.keyboard.press("ArrowDown");
   for (const t of before.slice(0, 3)) {
-    await page.keyboard.press("a");
+    await page.keyboard.press("Shift+Meta+KeyA");
     await until(`“${t}” is archived`, async () => !(await titles()).includes(t));
   }
   const front = () => page.locator(".toasts .toast").last().locator(".toast-msg").innerText();

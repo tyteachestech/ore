@@ -17,7 +17,8 @@ describe("menu bar", () => {
   test("shows ⌘ ⌃ ⌥ shortcuts from the keymap, never a plain key or a system-wide one", () => {
     expect(row("palette").accel).toBe("Super+KeyK");
     expect(row("sidebar").accel).toBe("Shift+Super+KeyS");
-    expect(row("archive").accel).toBeNull(); // "A" would fire while he types
+    expect(row("archive").accel).toBe("Shift+Super+KeyA");
+    expect(row("notes").accel).toBeNull(); // "N" would fire while he types
     expect(row("quick-quiz").accel).toBeNull(); // macOS already runs it
     const rebound = { ...keymap, palette: "Shift+Meta+KeyP" };
     expect((menuSpec(rebound, { reader: false, review: false }).flatMap((m) => m.items as Row[]).find((r) => r.id === "ore:palette")!).accel).toBe("Shift+Super+KeyP");
