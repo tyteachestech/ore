@@ -8,6 +8,8 @@ export const PHONE = import.meta.env.VITE_PHONE === "1";
 export const shareSkills = async (skills: { id: string; name: string; icon?: string; color?: string }[]): Promise<void> => {
   if (PHONE) (await import("./phone/core")).shareSkills(skills);
 };
+/** The inbox item the share card's Open asked the phone to show (phone/core.ts `shareOpen`); nothing on the Mac. */
+export const shareOpen = async (): Promise<string | null> => (PHONE ? (await import("./phone/core")).shareOpen() : null);
 /** A file picked on the phone goes to the inbox to be imported (phone/core.ts `queuePicked`). */
 export const queuePicked = async (name: string, bytes: Uint8Array, skill?: string): Promise<void> => {
   if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes, skill);

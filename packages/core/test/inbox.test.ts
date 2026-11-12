@@ -23,7 +23,8 @@ test("a queued link waits, the Mac imports it, and a failure keeps its reason", 
     return { id: "01X", title: "A" };
   });
   expect(seen).toEqual([["https://example.com/a", ["ai"]], ["https://example.com/broken", []]]);
-  expect(r.added).toEqual([{ id: "01X", title: "A", url: "https://example.com/a" }]);
+  // `inbox` names the waiting item it came from, so the phone can open what a share became.
+  expect(r.added).toEqual([{ id: "01X", title: "A", url: "https://example.com/a", inbox: expect.any(String) }]);
   expect(queuedLinks(lib).map((l) => [l.id, l.error])).toEqual([[b.id, "Couldn’t open that page (HTTP 404 from example.com)."]]);
 
   // A failed one is tried again (the Mac may have been offline), and the same failure isn't reported twice.
@@ -83,7 +84,7 @@ test("a file waits beside its item, is handed to the import by its path, and lea
     return { id: "01F", title: "Spacing notes" };
   });
   expect(seen).toEqual(["# Spacing\n\nSpace your reviews.\n"]);
-  expect(r.added).toEqual([{ id: "01F", title: "Spacing notes", url: "Spacing notes.md" }]);
+  expect(r.added).toEqual([{ id: "01F", title: "Spacing notes", url: "Spacing notes.md", inbox: q.id }]);
   expect(readdirSync(paths.inbox(lib))).toEqual([]);
   // Removed before any import: the file goes too. An item whose file hasn't arrived yet isn't listed.
   const again = queueFile(lib, src);

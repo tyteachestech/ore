@@ -93,6 +93,9 @@ const shared = () => (libraryDir ? invoke<number>("share_inbox", { root: library
 export const shareSkills = (skills: { id: string; name: string; icon?: string; color?: string }[]) =>
   void (isTauri() && invoke("share_skills", { json: JSON.stringify(shareList(skills)) }).catch(() => false));
 
+/** The inbox item the share card's Open asked to see (lib.rs `share_open`), once. */
+export const shareOpen = () => (isTauri() ? invoke<string | null>("share_open").catch(() => null) : Promise.resolve(null));
+
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
 function boot() {

@@ -23,7 +23,7 @@ import { Palette } from "../Palette";
 import { SkillEditor, skillGroups } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { courseThumb, lessonsOf, nextLesson, opt, ore, pullFromMac, shareSkills, type Item, type Skill, touched } from "../ore";
+import { courseThumb, lessonsOf, nextLesson, opt, ore, pullFromMac, shareOpen, shareSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -499,13 +499,25 @@ export function PhoneApp() {
   // own importer (D227). One this phone can't read keeps its reason, and the Mac tries it.
   const [reading, setReading] = useState(false);
   const readingNow = useRef(false);
+  // The share card's Open (D227): the app comes forward and shows what that shared item became, once it is in.
+  const came = useRef(new Map<string, string>());
+  const [wanted, setWanted] = useState<string | null>(null);
+  const jumping = useRef<() => Promise<void>>(async () => {});
+  const jump = useCallback(async () => {
+    const want = await shareOpen();
+    if (!want) return;
+    setWanted(want);
+    await pullFromMac();
+    await jumping.current();
+  }, []);
   const bringIn = useCallback(async () => {
     if (readingNow.current) return;
     readingNow.current = true;
     try {
       if (!(await ore<Waiting[]>("inbox")).length) return;
       setReading(true);
-      const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+      const r = await ore<{ added: { id: string; inbox: string; title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+      for (const a of r.added) came.current.set(a.inbox, a.id);
       for (const a of r.added) notify(a.kept ? `Already here: “${a.title}”` : `Added “${a.title}”`, "info");
       for (const f of r.failed) {
         const mac = macOnly(f.error);
@@ -519,10 +531,11 @@ export function PhoneApp() {
       void refresh();
     }
   }, [refresh, notify]);
-  useEffect(() => void (refresh().then(bringIn), planReminders()), [refresh, bringIn]);
+  jumping.current = () => refresh().then(bringIn);
+  useEffect(() => void (jump(), refresh().then(bringIn), planReminders()), [jump, refresh, bringIn]);
   // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
   useEffect(() => {
-    const check = () => void pullFromMac().then((changed) => changed && (pulled(), void bringIn()));
+    const check = () => void (jump(), pullFromMac().then((changed) => changed && (pulled(), void bringIn())));
     const back = () => !document.hidden && check();
     // Leaving the screen plans the reminders again: today's goes once the goal is met (the Mac's changes, in `pulled`).
     const seen = () => (document.hidden ? void planReminders() : check());
@@ -594,6 +607,21 @@ export function PhoneApp() {
     setNoting(false);
     setOpenId(id);
   };
+  // What the share card's Open asked for, as soon as it is in the list; given up after half a minute (it
+  // couldn't be read here, or another device took it), so it never pulls him out of something later.
+  useEffect(() => {
+    if (!wanted) return;
+    const id = came.current.get(wanted);
+    if (id && items?.some((i) => i.id === id)) {
+      setWanted(null);
+      setReviewing(null);
+      open(id);
+      return;
+    }
+    const late = setTimeout(() => setWanted(null), 30_000);
+    return () => clearTimeout(late);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wanted, items, reading]);
   /** Archive from the source's menu: back to the list at once, with Undo, as on the Mac. */
   const archive = async (item: Item) => {
     setOpenId(null);
