@@ -644,6 +644,9 @@ journey("skill page: To read's and Questions' heads line up, caret over caret an
     [...document.querySelectorAll(".skill-col.side .card-head")].map((h) => [".caret", ".card-icon"].map((s) => Math.round(h.querySelector(s)!.getBoundingClientRect().left))),
   );
   if (new Set(xs.map((x) => x.join())).size !== 1) throw new Error(`heads don't line up: ${JSON.stringify(xs)}`);
+  // The fold caret is the head's last control, at the far right: beside the tabs it read as one more view (D226).
+  const last = await page.evaluate(() => [...document.querySelectorAll(".skill-col.side .card-head")].every((h) => [...h.querySelectorAll("button")].at(-1)?.classList.contains("fold-head")));
+  if (!last) throw new Error("the fold caret is not the last control of its section's head");
 });
 
 journey("skill page Questions: each row is one Tab stop then its ⋯, and ↑ ↓ move between rows", async (page) => {
