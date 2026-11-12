@@ -322,8 +322,8 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
 
 /** Types a question in place, like a new skill in the sidebar: Enter saves it as a question snippet
  *  filed under these skills (as Raycast's Capture Question does), Esc or clicking away drops it. */
-/** `item`: the source he is asking from. A question lives under skills (D75); from a source in none, it is
- *  marked as one this source may answer, or the source that took it could never show it. */
+/** `item`: the source he is asking from. A question lives under skills (D75), and is marked as one this source
+ *  may answer: Collected lists only this source's questions (D219), so it would vanish as he asked it. */
 export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]; item?: string; onDone: (added: boolean) => void; notify: Notify }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -355,7 +355,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
     try {
       const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
       // Two writes: if the second fails, the first is taken back, so a retry never leaves a question nobody can see.
-      if (item && !skills.length)
+      if (item)
         await ore("match", item, r.annotation.id).catch(async (e) => {
           await ore("annotate", r.annotation.id, "--status", "deleted").catch(() => {});
           throw e;
@@ -468,7 +468,9 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   const find = filter?.trim();
   const listed = (qs ?? []).filter((q) => !find || rankScore([questionText(q), ...q.answers.map((a) => a.text)], find) > 0);
   const here = listed.filter((q) => q.here === "match");
-  const rest = listed.filter((q) => q.here !== "match");
+  // In Collected only those asked in this source (D219): the skill's others are on its page, and here, under
+  // "Key points" and "Highlights" from this source, they read as this source's.
+  const rest = listed.filter((q) => q.here !== "match" && (!grouped || q.here === "from"));
   const shown = all || find ? rest : rest.slice(0, CAP);
   const order = [...here, ...shown];
 
@@ -602,7 +604,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
         )}
         {qs && !order.length && !asking && !find && (
           <p className="quiet qp-empty">
-            No open questions{skills.length ? ` for ${skills.map((s) => s.name).join(" or ")}` : ""}.{" "}
+            {grouped ? "No open questions from this source." : `No open questions${skills.length ? ` for ${skills.map((s) => s.name).join(" or ")}` : ""}.`}{" "}
             <button className="qp-link" onClick={() => setAsking(true)}>
               Ask one
             </button>

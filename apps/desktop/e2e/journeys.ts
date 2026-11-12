@@ -6725,7 +6725,7 @@ journey("add box: a feed's own link followed by ↵ at once follows it, without 
   }
 });
 
-journey("questions on a source: filing it under a skill lists that skill's questions at once; one whose link to the source fails to save is taken back", async (page) => {
+journey("questions on a source: Collected lists only this source's questions, not its skill's others (D219); one whose link to the source fails to save is taken back", async (page) => {
   const k = (await ore("skills", "add", "Glassblowing")) as { id: string };
   const q = (await ore("snippet", "--text=How hot is the glory hole?", "--intent=question", `--skill=${k.id}`)) as { annotation: { id: string } };
   const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# A page in no skill\n\nGather, blow, shape, anneal." }) }).then((r) => r.json())) as { id: string };
@@ -6746,13 +6746,17 @@ journey("questions on a source: filing it under a skill lists that skill's quest
     await failNext(page, "match", null);
     await until("the half-saved question is taken back", async () => (await count()) === before);
     await page.keyboard.press("Escape");
-    // Filing the source under a skill brings that skill's questions.
+    // Filed under a skill, it still lists only its own: the skill's question asked elsewhere stays on the skill's page.
     await page.getByRole("button", { name: "Skills for A page in no skill" }).click();
     await page.locator(".skill-picker [cmdk-item]", { hasText: "Glassblowing" }).click();
     await page.keyboard.press("Escape");
-    await page.locator(".qp-line", { hasText: "How hot is the glory hole?" }).waitFor({ timeout: 3000 }).catch(() => {
-      throw new Error("the skill's question is missing until the tab is reopened");
-    });
+    await page.getByText("No open questions from this source.").waitFor();
+    if (await page.locator(".qp-line", { hasText: "How hot is the glory hole?" }).count()) throw new Error("a question asked in another source shows in this one's Collected");
+    // One he asks here stays, though the source is under a skill now.
+    await head.getByRole("button", { name: "Ask a question" }).click();
+    await page.getByLabel("New question").fill("Which gather comes first?");
+    await page.keyboard.press("Enter");
+    await page.locator(".qp-line", { hasText: "Which gather comes first?" }).waitFor();
   } finally {
     await ore("annotate", q.annotation.id, "--status", "deleted").catch(() => {});
     await ore("archive", made.id).catch(() => {});
