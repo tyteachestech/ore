@@ -5743,6 +5743,7 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   await page.locator(".review-rate .rate-1.suggested").waitFor();
   await page.locator('.review-gem .gem[data-kind="cut"]').waitFor();
   const was = await q.innerText();
+  await page.waitForTimeout(400); // a rating key right after the answer shows is ignored
   // Good, two steps over the marks: it waits, says why, and nothing is recorded.
   await page.keyboard.press("3");
   const guard = page.locator(".review-guard");
@@ -5807,6 +5808,7 @@ journey("review: Open in source pauses on the card; Back to Review picks it up w
     await page.waitForTimeout(300); // the passage loads after the answer
     if (await open.isVisible()) break;
     const was = await q.innerText();
+    await armGood(page, await page.getByText("No idea", { exact: true }).isVisible());
     await page.getByRole("button", { name: "Good", exact: true }).click();
     await until("the next card", async () => (await q.innerText()) !== was);
   }
@@ -5859,6 +5861,7 @@ journey("review: Enter activates the focused button (Again, Edit exercise, Open 
     await page.waitForTimeout(300);
     if (await open.isVisible() && (await good.getAttribute("class"))?.includes("suggested")) break;
     const was = await q.innerText();
+    await armGood(page, await page.getByText("No idea", { exact: true }).isVisible());
     await good.click();
     await until("the next card", async () => (await q.innerText()) !== was);
   }
@@ -5951,7 +5954,7 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   const done = async () => Number(await session.getAttribute("aria-valuenow"));
   const before = await done();
   // A card asks how sure he is, then shows the answer; a question asks for his answer first.
-  await page.getByRole("radio", { name: "Think so" }).or(page.getByRole("button", { name: "No idea" })).first().click();
+  await reveal(page);
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await until("the session counts the rating", async () => (await done()) === before + 1);
   await page.getByRole("button", { name: "Undo last rating" }).click();
@@ -6317,8 +6320,7 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
     const text = await q.first().textContent({ timeout: 1000 }).catch(() => null);
     if (!text) continue;
     last = text;
-    const noIdea = page.getByRole("button", { name: "No idea" });
-    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await reveal(page);
     await page.getByRole("button", { name: "Good", exact: true }).click();
     await until("the card moves on", async () => (await doneButton.isVisible()) || ((await q.count()) > 0 && ((await q.first().textContent({ timeout: 500 }).catch(() => last)) !== last)));
   }
@@ -6352,6 +6354,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
       const noIdea = page.getByRole("button", { name: "No idea" });
       await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click().catch(() => {});
       await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
+      // Good over No idea waits for a second press (D237).
+      if (await page.locator(".review-guard").isVisible()) await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
       await page.waitForTimeout(300);
     }
     await doneButton.waitFor();
@@ -6525,10 +6529,21 @@ journey("review: What to review has a No skill row for exercises filed under no 
 /** Shows the answer of the card on screen: No idea on a question, Think so on a card. */
 async function reveal(page: Page) {
   const noIdea = page.getByRole("button", { name: "No idea" });
-  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  const none = await noIdea.isVisible();
+  await (none ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await page.waitForTimeout(300); // the passage loads after the answer, and a rating key right after it is ignored
+  await armGood(page, none);
 }
+
+/** Good over No idea takes two presses (D237: a rating two steps over a miss waits for a second one). After
+ *  No idea this gives the first, so a journey about something else rates Good with one. */
+async function armGood(page: Page, noIdea: boolean) {
+  if (!noIdea) return;
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await page.locator(".review-guard").waitFor();
+}
+
 
 /** Every `ore` call a page makes, in order, and the ratings it logged (to take back after the journey). */
 function oreCalls(page: Page) {
