@@ -306,6 +306,7 @@ pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, http_fetch, share_inbox, share_skills, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");

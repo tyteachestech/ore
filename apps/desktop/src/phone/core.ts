@@ -196,13 +196,13 @@ const needsAi = (name: string, args: string[]) =>
 /** A file picked on the phone (a PDF, a book, a photo) is saved to the inbox, as a link is (D227): its bytes
  *  pass through a scratch path the folder never sees. */
 let picks = 0;
-export async function queuePicked(name: string, bytes: Uint8Array): Promise<void> {
+export async function queuePicked(name: string, bytes: Uint8Array, skill?: string): Promise<void> {
   await boot();
   const dir = `${ROOT}/.ore/pick-${++picks}`;
   mkdirSync(dir, { recursive: true });
   writeFileSync(`${dir}/${name}`, bytes);
   try {
-    await run(["inbox", "--add-file", `${dir}/${name}`, "--name", name, "--json"], null);
+    await run(["inbox", "--add-file", `${dir}/${name}`, "--name", name, ...(skill ? ["--skill", skill] : []), "--json"], null);
   } finally {
     rmSync(dir, { recursive: true });
   }

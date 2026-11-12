@@ -2,23 +2,28 @@
 // and the skills, as in Obsidian; a source and Review open full screen over it, with a way back.
 // Everything inside the screens is the Mac app's own code.
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Archive, BookOpen, CaretLeft, CaretRight, House, MagnifyingGlass, Plus, SidebarSimple } from "../icons";
+import { Archive, BookOpen, CaretLeft, CaretRight, Check, GearSix, GraduationCap, House, MagnifyingGlass, Plus, SidebarSimple } from "../icons";
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
 import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
 import { Home } from "../Home";
+import { HeadTabs, type HeadTab as HeadTabT } from "../HeadTabs";
+import { ranked } from "../match";
+import { SkillPage } from "../SkillPage";
+import { PhoneSettings } from "./Settings";
+import { planReminders } from "./reminder";
 import { SkillIcon } from "../IconPicker";
 import { NoteBody, useNotes, type SideTab } from "../Notes";
-import { PixelNote } from "../PixelIcon";
+import { PixelBook, PixelNote } from "../PixelIcon";
 import type { NoteEditorHandle } from "../editor/NoteEditor";
 import { holdMenu, WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
 import { SkillEditor, skillGroups } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { lessonsOf, opt, ore, pullFromMac, shareSkills, type Item, type Skill, touched } from "../ore";
+import { courseThumb, lessonsOf, nextLesson, opt, ore, pullFromMac, shareSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -149,7 +154,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
 type TabId = "today" | "sources" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
-type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null; source?: string } | null };
+type Place = { tab: TabId; skill: string | null; skillNote?: boolean; course?: string | null; settings?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null; source?: string } | null };
 const PLACE = "ore-phone-place";
 function loadPlace(): Place {
   try {
@@ -160,7 +165,15 @@ function loadPlace(): Place {
 }
 
 /** What a source row does, shared by its swipes and its long-press menu. `retitle` is false when the write failed. */
-type RowActions = { archive: (item: Item) => void; toggle: (item: Item) => void; menu: (item: Item) => MenuAction[]; retitle: (item: Item, title: string) => Promise<boolean> };
+type RowActions = {
+  archive: (item: Item) => void;
+  toggle: (item: Item) => void;
+  menu: (item: Item) => MenuAction[];
+  retitle: (item: Item, title: string) => Promise<boolean>;
+  /** A course row: a tap opens its lessons; a long press its menu. */
+  course: (id: string) => void;
+  courseMenu: (line: Extract<Line, { kind: "course" }>) => MenuAction[];
+};
 
 /** A list row with Mail's swipes: left archives, right moves it between To read and Done. It follows the
  *  finger, and past 40% of the row (or with a flick) the action runs; otherwise it springs back. The left
@@ -225,30 +238,76 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   );
 }
 
-/** Sources by To read and Done, as one list. */
-function SourceList({ title, items, onOpen, row, head, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; empty?: string }) {
+/** A list's lines: a source, or a course as one row standing for its lessons (D79), placed where its first lesson sorts. */
+type Line = { kind: "item"; item: Item } | { kind: "course"; id: string; title: string; url?: string; lessons: Item[]; next: Item | null };
+const toReadOrder = (a: Item, b: Item) => Number(!a.pinned_at) - Number(!b.pinned_at) || (a.pinned_at ?? "").localeCompare(b.pinned_at ?? "") || touched(b).localeCompare(touched(a));
+
+/** The tab's rows of `list` as lines, each course once where its first lesson in the tab sorts, in To read while
+ *  any lesson is left and in Done once all are (App.tsx `groups`). */
+function linesOf(list: Item[], status: "toread" | "done"): Line[] {
+  const seen = new Set<string>();
+  return list.flatMap((item): Line[] => {
+    if ((item.status === "done") !== (status === "done")) return [];
+    const c = item.course;
+    if (!c) return [{ kind: "item", item }];
+    if (seen.has(c.id)) return [];
+    seen.add(c.id);
+    const lessons = lessonsOf(list, c.id);
+    const next = nextLesson(lessons);
+    return (status === "done") === !next ? [{ kind: "course", id: c.id, title: c.title, url: c.url, lessons, next }] : [];
+  });
+}
+
+/** A course as one row (Podcasts' show): its picture, its title and the lesson a tap goes on with; the tap opens its lessons. */
+function CourseRow({ line, onCourse, menu }: { line: Extract<Line, { kind: "course" }>; onCourse: (id: string) => void; menu: (line: Extract<Line, { kind: "course" }>) => MenuAction[] }) {
+  const cover = courseThumb(line.lessons);
+  const started = line.lessons.some((l) => l.status !== "inbox");
+  return (
+    <WithMenu actions={() => menu(line)} hold>
+      <li>
+        <button className="phone-course" onClick={() => onCourse(line.id)}>
+          {cover ? <Thumb item={cover} className="thumb phone-thumb" /> : <span className="thumb phone-thumb none" aria-hidden="true"><GraduationCap size={16} /></span>}
+          <span className="phone-title phone-two">
+            <span>{line.title}</span>
+            <small>{line.next && started ? `${line.next.course!.part} · ${line.next.title}` : `${line.lessons.length} lessons`}</small>
+          </span>
+          <CaretRight size={16} aria-hidden="true" />
+        </button>
+      </li>
+    </WithMenu>
+  );
+}
+
+/** The rows of one list: sources with their swipes, courses as one row each. */
+function Rows({ lines, row, onOpen }: { lines: Line[]; row: RowActions; onOpen: (id: string) => void }) {
+  return (
+    <ul>
+      {lines.map((l) => (l.kind === "course" ? <CourseRow key={`course:${l.id}`} line={l} onCourse={row.course} menu={row.courseMenu} /> : <SwipeRow key={l.item.id} item={l.item} row={row} onOpen={onOpen} />))}
+    </ul>
+  );
+}
+
+/** Sources by To read and Done, as one list; `flat`: as given, no sections or courses (Archive, a course's lessons). */
+function SourceList({ title, items, onOpen, row, head, flat, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; flat?: boolean; empty?: string }) {
   // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.
-  const toRead = (items ?? []).filter((i) => i.status !== "done").sort((a, b) => Number(!a.pinned_at) - Number(!b.pinned_at) || (a.pinned_at ?? "").localeCompare(b.pinned_at ?? "") || touched(b).localeCompare(touched(a)));
-  const done = (items ?? []).filter((i) => i.status === "done");
+  const sorted = [...(items ?? [])].sort(toReadOrder);
   return (
     <div className="phone-sources">
       <h1>{title}</h1>
       {head}
       {items === null ? null : !items.length ? (
         <p className="phone-empty">{empty}</p>
+      ) : flat ? (
+        <Rows lines={(items ?? []).map((item) => ({ kind: "item", item }))} row={row} onOpen={onOpen} />
       ) : (
         ([
-          ["To read", toRead],
-          ["Done", done],
-        ] as const).map(([label, list]) =>
-          list.length ? (
+          ["To read", linesOf(sorted, "toread")],
+          ["Done", linesOf(items ?? [], "done")],
+        ] as const).map(([label, lines]) =>
+          lines.length ? (
             <section key={label}>
               <h2>{label}</h2>
-              <ul>
-                {list.map((i) => (
-                  <SwipeRow key={i.id} item={i} row={row} onOpen={onOpen} />
-                ))}
-              </ul>
+              <Rows lines={lines} row={row} onOpen={onOpen} />
             </section>
           ) : null,
         )
@@ -267,6 +326,53 @@ function SkillNote({ skill, notify }: { skill: string; notify: Notify }) {
     <div className="phone-page phone-note">
       <NoteBody notes={notes} editorRef={editor} targets={[]} onOpen={() => {}} label="Skill note" placeholder="What you know so far. Type / for blocks." />
     </div>
+  );
+}
+
+const SKILL_TABS: HeadTabT<"toread" | "done">[] = [
+  { id: "toread", label: "To read", icon: PixelBook, tone: "read" },
+  { id: "done", label: "Done", icon: Check, tone: "done" },
+];
+/** Sources a skill page lists before "Show all", as on the Mac, so Questions below stays in reach. */
+const SKILL_CAP = 8;
+
+/** The drawer's New skill: a name typed in place, as the Mac's sidebar and Files' New Folder do. Return or a tap
+ *  away makes it, and its page opens; empty, it goes away. A name he already has is refused in place. */
+function NewSkill({ skills, onDone }: { skills: Skill[]; onDone: (made: Skill | null) => void }) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const create = async () => {
+    const n = name.trim().replace(/\s+/g, " ");
+    if (!n) return onDone(null);
+    if (busy) return;
+    const taken = skills.find((s) => s.name.toLowerCase() === n.toLowerCase());
+    if (taken) return setError(`“${taken.name}” is taken`);
+    setBusy(true);
+    try {
+      onDone(await ore<Skill>("skills", "add", n, opt("collection", "")));
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <form className="phone-new-skill" onSubmit={(e) => (e.preventDefault(), void create())}>
+      <SkillIcon dot />
+      <input
+        autoFocus
+        aria-label="New skill name"
+        placeholder="Skill name"
+        enterKeyHint="done"
+        autoComplete="off"
+        value={name}
+        readOnly={busy}
+        onChange={(e) => (setName(e.target.value), setError(null))}
+        onBlur={() => !busy && !error && void create()}
+        onKeyDown={(e) => e.key === "Escape" && onDone(null)}
+      />
+      {error && <p className="phone-new-error" role="alert">{error}</p>}
+    </form>
   );
 }
 
@@ -306,6 +412,19 @@ export function PhoneApp() {
   const [reviewing, setReviewing] = useState<{ pick: string[] | null; source?: string; run: number } | null>(start.review && { pick: start.review.pick, source: start.review.source, run: 0 });
   /** The skill whose editor (name, icon, colour, collection) is open. */
   const [editingSkill, setEditingSkill] = useState<string | null>(null);
+  /** The course whose lessons are open, pushed over the list it was tapped in. */
+  const [course, setCourse] = useState<string | null>(start.course ?? null);
+  /** The skill page's sources: To read or Done (D226's tabs), and what its search narrows them to (D203). */
+  const [skillTab, setSkillTab] = useState<"toread" | "done">("toread");
+  const [skillQuery, setSkillQuery] = useState("");
+  const [skillAll, setSkillAll] = useState(false);
+  useEffect(() => (setSkillTab("toread"), setSkillQuery(""), setSkillAll(false)), [skill]);
+  const [settings, setSettings] = useState(!!start.settings);
+  /** The New skill field at the end of the drawer's skills. */
+  const [naming, setNaming] = useState(false);
+  const newSkillRef = useRef<HTMLButtonElement>(null);
+  /** Add a link from a skill's page files it there. */
+  const [addTo, setAddTo] = useState<string | undefined>();
   const [tick, setTick] = useState(0);
   const { notify, view: toast } = useToast();
   const actions = useRef([]);
@@ -322,15 +441,21 @@ export function PhoneApp() {
   usePullToSearch(main, cue, () => flushSync(() => setSearching(true)));
   // The lists share this one scroller: each keeps its own place, as Mail's tabs do (and across a relaunch).
   useKeptScroll(main, `phone:${tab}`);
-  const go = (t: TabId) => (setTab(t), setDrawer(false));
+  const go = (t: TabId) => (setTab(t), setSkill(null), setCourse(null), setDrawer(false));
 
   useEffect(() => {
     try {
-      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, side, finishing: finishing && !recorded, review: reviewing && { pick: reviewing.pick, source: reviewing.source } } satisfies Place));
+      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, course, settings, openId, noting, side, finishing: finishing && !recorded, review: reviewing && { pick: reviewing.pick, source: reviewing.source } } satisfies Place));
     } catch {}
-  }, [tab, skill, skillNote, openId, noting, side, finishing, recorded, reviewing]);
+  }, [tab, skill, skillNote, course, settings, openId, noting, side, finishing, recorded, reviewing]);
   const tabNow = useRef(tab);
   tabNow.current = tab;
+  /** The Mac's changes have come in: every screen reads again, and the reminders follow a goal met there. */
+  const pulled = () => {
+    setTick((t) => t + 1);
+    void refresh();
+    void planReminders();
+  };
   const refresh = useCallback(async () => {
     try {
       const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
@@ -394,22 +519,19 @@ export function PhoneApp() {
       void refresh();
     }
   }, [refresh, notify]);
-  useEffect(() => void refresh().then(bringIn), [refresh, bringIn]);
+  useEffect(() => void (refresh().then(bringIn), planReminders()), [refresh, bringIn]);
   // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
   useEffect(() => {
-    const check = () =>
-      void pullFromMac().then((changed) => {
-        if (!changed) return;
-        setTick((t) => t + 1);
-        void refresh().then(bringIn);
-      });
+    const check = () => void pullFromMac().then((changed) => changed && (pulled(), void bringIn()));
     const back = () => !document.hidden && check();
+    // Leaving the screen plans the reminders again: today's goes once the goal is met (the Mac's changes, in `pulled`).
+    const seen = () => (document.hidden ? void planReminders() : check());
     const every = setInterval(back, 30_000);
     const failed = (e: Event) => notify(`Couldn’t save to iCloud: ${(e as CustomEvent<string>).detail}`, "error");
-    addEventListener("visibilitychange", back);
+    addEventListener("visibilitychange", seen);
     addEventListener("ore:save-failed", failed);
-    return () => (clearInterval(every), removeEventListener("visibilitychange", back), removeEventListener("ore:save-failed", failed));
-  }, [refresh, notify, bringIn]);
+    return () => (clearInterval(every), removeEventListener("visibilitychange", seen), removeEventListener("ore:save-failed", failed));
+  }, [refresh, notify, bringIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
   // height, and keep the answer's buttons in sight when it opens.
@@ -569,7 +691,22 @@ export function PhoneApp() {
     review: (s) => (setDrawer(false), setReviewing({ pick: [s.id], run: 0 })),
     edit: (s) => (setDrawer(false), setEditingSkill(s.id)),
   });
+  /** A course archived from its menu: every lesson, at once, with Undo (the Mac's course Archive). */
+  const archiveCourse = (c: Extract<Line, { kind: "course" }>) => {
+    const apply = (on: boolean) => ore("course", "archive", c.id, ...(on ? [] : ["--undo"])).finally(refresh);
+    setItems((all) => all?.filter((i) => i.course?.id !== c.id) ?? all);
+    setCourse((now) => (now === c.id ? null : now));
+    notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
+    apply(true).catch((e) => notify(errorText(e), "error"));
+  };
   const row: RowActions = {
+    course: setCourse,
+    courseMenu: (c) => [
+      { id: "open", label: c.next && c.next !== c.lessons[0] ? "Continue" : "Open", run: () => open((c.next ?? c.lessons[0]!).id) },
+      { id: "lessons", label: "Show lessons", run: () => setCourse(c.id) },
+      ...(c.url ? [{ id: "original", label: "Open original", run: () => void openUrl(c.url!).catch((e) => notify(errorText(e), "error")) }] : []),
+      { id: "archive", label: "Archive course", danger: true, divider: true, run: () => archiveCourse(c) },
+    ],
     archive: (item) => (item.archived_at ? restore(item) : void archive(item)),
     toggle: (item) => void moveTo(item, item.status === "done" ? "reading" : "done"),
     // Long-press: the Mac row menu, less what needs a Finder or a keyboard.
@@ -591,6 +728,7 @@ export function PhoneApp() {
   };
   const endReview = () => {
     setReviewing(null);
+    void planReminders();
     setTick((t) => t + 1);
   };
 
@@ -658,7 +796,15 @@ export function PhoneApp() {
       </Screen>
     ) : null;
 
-  const skillName = skills.find((s) => s.id === skill)?.name;
+  const skillOf = skills.find((s) => s.id === skill);
+  const skillName = skillOf?.name;
+  const courseOf = course ? lessonsOf(items ?? [], course) : [];
+  // A skill gone from the library (deleted on the Mac) closes its page and note, as a gone source does.
+  const skillGone = loaded && !!skill && !skillOf;
+  useEffect(() => void (skillGone && (setSkill(null), setSkillNote(false))), [skillGone]);
+  // A course archived or gone (on the Mac) closes its screen.
+  const courseGone = loaded && !!course && !courseOf.length;
+  useEffect(() => void (courseGone && setCourse(null)), [courseGone]);
   const removeWaiting = async (l: Waiting) => {
     try {
       await ore("inbox", "--remove", l.id);
@@ -709,6 +855,7 @@ export function PhoneApp() {
                 items={tab === "archive" ? archived : items}
                 onOpen={open}
                 row={row}
+                flat={tab === "archive"}
                 head={tab === "sources" && <WaitingLinks links={waiting} reading={reading} onRemove={removeWaiting} />}
                 empty={tab === "archive" ? "Nothing archived. Swipe a source left to archive it." : waiting.length ? "" : undefined}
               />
@@ -742,33 +889,106 @@ export function PhoneApp() {
               ))}
             </section>
           ))}
+          {naming ? (
+            <NewSkill skills={skills} onDone={(made) => {
+              // Made, the keyboard goes as its page opens (Files' New Folder); let go, focus goes back to New skill.
+              if (made) (document.activeElement as HTMLElement | null)?.blur();
+              flushSync(() => {
+                setNaming(false);
+                if (!made) return;
+                setSkills((all) => [...all, made]);
+                setSkill(made.id);
+                setDrawer(false);
+              });
+              if (!made) newSkillRef.current?.focus({ preventScroll: true });
+              if (made) void refresh();
+            }} />
+          ) : (
+            <button ref={newSkillRef} className="phone-drawer-quiet" onClick={() => setNaming(true)}>
+              <Plus size={16} aria-hidden="true" />
+              <span className="phone-title">New skill</span>
+            </button>
+          )}
+          <button className="phone-drawer-foot" onClick={() => (setSettings(true), setDrawer(false))}>
+            <GearSix size={16} aria-hidden="true" />
+            <span className="phone-title">Settings</span>
+          </button>
         </nav>
       </div>
-      {/* A skill's sources, pushed from Today; a source opens over it. */}
-      {skill && (
+      {/* A skill's page (D46 in one column), pushed from Today or the drawer; a source opens over it. */}
+      {skill && skillOf && (
         <Screen className="phone-full" onBack={() => setSkill(null)}>
-          <Back label={tab === "today" ? "Today" : "Sources"} onClick={() => setSkill(null)} />
-          <div className="phone-page">
-            <SourceList
-              title={skillName ?? "Sources"}
-              items={items && items.filter((i) => i.skills.includes(skill))}
-              onOpen={open}
-              row={row}
-              head={
+          <Back label={tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} onClick={() => setSkill(null)} />
+          <div className="phone-page phone-skill">
+            <SkillPage
+              key={skill}
+              skill={skillOf}
+              view={<HeadTabs label="Sources shown" tabs={SKILL_TABS} value={skillTab} onChange={(v) => (setSkillTab(v), setSkillAll(false))} />}
+              search={{ value: skillQuery, set: setSkillQuery, keys: () => {} }}
+              targets={[]}
+              blocked={false}
+              onOpen={() => {}}
+              onQuestion={(q) => open(q.item, q.id)}
+              onOpenSource={(id) => open(id)}
+              onAdded={() => void refresh()}
+              onAddSource={() => (setAddTo(skill), setAdding(true))}
+              onSkillChanged={() => void refresh()}
+              importance={menuOf(skillOf).find((a) => a.id === "importance")?.sub ?? []}
+              onBringBack={() => menuOf(skillOf).find((a) => a.id === "unarchive")?.run()}
+              notify={notify}
+              onFound={() => {}}
+              noteRow={
                 <button className="phone-note-row" onClick={() => setSkillNote(true)}>
                   <PixelNote className="card-icon" size={16} aria-hidden="true" />
                   <span className="phone-title">Your note</span>
                   <CaretRight size={16} aria-hidden="true" />
                 </button>
               }
-            />
+            >
+              {(() => {
+                const mine = (items ?? []).filter((i) => i.skills.includes(skill));
+                const q = skillQuery.trim();
+                // Searched, the sources that match, best first, lessons on their own (the Mac's filter, D203).
+                const lines: Line[] = q ? ranked(mine, q, (i) => [i.title, i.course?.title ?? ""]).map((item) => ({ kind: "item", item })) : linesOf(skillTab === "toread" ? [...mine].sort(toReadOrder) : mine, skillTab);
+                const shown = q || skillAll ? lines : lines.slice(0, SKILL_CAP);
+                return (
+                  <div className="phone-sources">
+                    {!lines.length ? (
+                      <p className="quiet">{q ? `No sources match “${q}”.` : skillTab === "done" ? "Nothing done yet." : "Nothing to read. Add a link with +."}</p>
+                    ) : (
+                      <Rows lines={shown} row={row} onOpen={open} />
+                    )}
+                    {shown.length < lines.length && (
+                      <button className="answered-toggle" onClick={() => setSkillAll(true)}>
+                        Show all {lines.length}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            </SkillPage>
           </div>
         </Screen>
       )}
-      {skill && skillNote && (
+      {skillOf && skillNote && (
         <Screen className="phone-full phone-reader" onBack={() => setSkillNote(false)}>
           <Back label={skillName ?? "Back"} onClick={() => setSkillNote(false)} />
-          <SkillNote skill={skill} notify={notify} />
+          <SkillNote skill={skillOf.id} notify={notify} />
+        </Screen>
+      )}
+      {/* A course's lessons in order, pushed over the list its row was in; a lesson opens over it. */}
+      {courseOf.length > 0 && (
+        <Screen className="phone-full" onBack={() => setCourse(null)}>
+          <Back label={skillOf?.name ?? (tab === "today" ? "Today" : "Sources")} onClick={() => setCourse(null)} />
+          <div className="phone-page">
+            <SourceList title={courseOf[0]!.course!.title} items={courseOf} onOpen={open} row={row} flat />
+          </div>
+        </Screen>
+      )}
+      {settings && (
+        <Screen className="phone-full" onBack={() => setSettings(false)}>
+          <Back label={tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} onClick={() => setSettings(false)} />
+          <PhoneSettings reload={tick} onPulled={pulled} notify={notify} />
         </Screen>
       )}
       {over}
@@ -790,7 +1010,7 @@ export function PhoneApp() {
           onClose={() => setSearching(false)}
         />
       )}
-      {adding && <AddLink onClose={() => setAdding(false)} onAdded={() => void refresh().then(bringIn)} />}
+      {adding && <AddLink skill={addTo} onClose={() => (setAdding(false), setAddTo(undefined))} onAdded={() => void refresh().then(bringIn)} />}
       {editingSkill && skills.some((s) => s.id === editingSkill) && (
         <SkillEditor
           skill={skills.find((s) => s.id === editingSkill)!}

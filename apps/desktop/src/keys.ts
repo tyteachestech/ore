@@ -250,6 +250,12 @@ export const is = (e: KeyboardEvent, id: KeyId) => {
   return comboOf(e) === keymap[id] && !(command && command !== id && apart(byId(command), byId(id)));
 };
 
+/** Keeps a key press inside a popover or menu (its arrows and letters aren't for the row under it),
+ *  but lets ⌘Z and ⇧⌘Z through to the app history, so undo works wherever focus is. */
+export const keepKeysIn = (e: { stopPropagation(): void; nativeEvent: KeyboardEvent }) => {
+  if (!is(e.nativeEvent, "undo") && !is(e.nativeEvent, "redo")) e.stopPropagation();
+};
+
 /** Whether a keydown lands in a text field, where a plain letter is typing. */
 export const inTextField = (e: KeyboardEvent) => {
   const t = e.target as HTMLElement | null;

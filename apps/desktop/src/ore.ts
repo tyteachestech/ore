@@ -9,8 +9,8 @@ export const shareSkills = async (skills: { id: string; name: string }[]): Promi
   if (PHONE) (await import("./phone/core")).shareSkills(skills);
 };
 /** A file picked on the phone goes to the inbox to be imported (phone/core.ts `queuePicked`). */
-export const queuePicked = async (name: string, bytes: Uint8Array): Promise<void> => {
-  if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes);
+export const queuePicked = async (name: string, bytes: Uint8Array, skill?: string): Promise<void> => {
+  if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes, skill);
 };
 export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import("./phone/core")).pull() : false);
 

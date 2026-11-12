@@ -1,4 +1,5 @@
 import { CaretRight, House, Plus, Rss, Stack } from "./icons";
+import { keepKeysIn } from "./keys";
 import {
   closestCenter, defaultDropAnimationSideEffects, DndContext, DragOverlay, pointerWithin, useSensor, useSensors,
   type CollisionDetection, type DragEndEvent, type DragOverEvent, type DragStartEvent, type DropAnimation, type UniqueIdentifier,
@@ -434,7 +435,7 @@ function RenameField({ value, label = "Collection name", placeholder, taken, blu
       }}
       data-no-drag
       onKeyDown={(e) => {
-        e.stopPropagation();
+        keepKeysIn(e); // ⌘Z still reaches the app history
         if (e.key === "Enter") {
           e.preventDefault();
           const name = v.trim().replace(/\s+/g, " ");
