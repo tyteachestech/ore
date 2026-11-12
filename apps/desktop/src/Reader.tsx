@@ -1249,7 +1249,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   }, [reveal, ready, body]);
 
-  // Icons in the left margin (Marks): a star on each key point and a ? on each question (a plain highlight's
+  // Icons in the left margin (Marks): a gem on each key point and a ? on each question (a plain highlight's
   // tint says enough, D118), and one per "In the source" passage while a quiz answer is open, so the
   // passing orange tint is not mistaken for a highlight.
   const marks = useMemo<Mark[]>(() => {
@@ -3282,7 +3282,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                         className={`intent ${i}${intent === i ? " on" : ""}`}
                         onClick={() => void setIntent(i)}
                       >
-                        <Glyph size={14} weight={intent === i ? "fill" : "regular"} aria-hidden="true" />
+                        <Glyph size={14} aria-hidden="true" />
                         {LABEL[i]}
                       </button>
                     </Hint>
