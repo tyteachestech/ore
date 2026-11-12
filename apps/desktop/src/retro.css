@@ -115,9 +115,12 @@
 .skill-card .card-head, .list-bar { align-items: flex-end; padding-bottom: 0; }
 .skill-card .card-head > .icon-btn, .skill-card .card-head .fold-action > *, .skill-card .card-head > .fold-head { margin-bottom: 3px; }
 .card-title { align-self: flex-end; }
-.head-tabs-root { display: contents; }
 .head-tabs { display: flex; align-items: flex-end; gap: 2px; }
-.head-tab { display: flex; align-items: center; height: 34px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; }
+.head-tabs-list { display: contents; }
+.head-tab, .head-tab-after { display: flex; align-items: center; height: 34px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; }
+/* The open tab's ▾ is its right end: the tab's outline carries on around it. */
+.head-tab-after { margin-left: -2px; padding-right: 4px; border-color: var(--border); border-left: 0; border-top-left-radius: 0; background: var(--bg); }
+.head-tabs.with-after .head-tab.on { border-right: 0; border-top-right-radius: 0; padding-right: 0; }
 .head-tab.on { border-color: var(--border); background: var(--bg); padding-right: 4px; }
 .head-tab-btn { display: flex; align-items: center; height: 100%; padding: 0 7px; border-radius: 7px 7px 0 0; color: var(--faint); }
 .head-tab.on .head-tab-btn { padding: 0 8px 0 10px; cursor: default; }
@@ -130,13 +133,13 @@
 .head-tab.on .head-tab-name > * { padding-left: 8px; opacity: 1; }
 [data-tone="done"] .card-icon { color: var(--c-green); }
 [data-tone="archived"] .card-icon { color: var(--muted); }
-.head-tab .view-menu { width: 22px; height: 22px; margin: 0; padding: 0; justify-content: center; }
+.head-tab-after .view-menu { width: 22px; height: 22px; margin: 0; padding: 0; justify-content: center; }
 .list-bar { margin: 0 22px 6px; padding: 6px 0 0; border-bottom: 1px solid var(--border); }
-.list-bar > :not(.head-tabs-root) { margin-bottom: 4px; }
+.list-bar > :not(.head-tabs) { margin-bottom: 4px; }
 /* The grow is for a click (the tab list carries data-grow from a pointer press); keys switch at once. */
 @media (prefers-reduced-motion: no-preference) {
-  .head-tabs[data-grow] .head-tab-name { transition: grid-template-columns var(--t-3) var(--ease-out); }
-  .head-tabs[data-grow] .head-tab-name > * { transition: opacity var(--t-2) var(--ease-out), padding-left var(--t-3) var(--ease-out); }
+  .head-tabs-list[data-grow] .head-tab-name { transition: grid-template-columns var(--t-3) var(--ease-out); }
+  .head-tabs-list[data-grow] .head-tab-name > * { transition: opacity var(--t-2) var(--ease-out), padding-left var(--t-3) var(--ease-out); }
 }
 .card-title .card-icon { margin-right: 2px; }
 .skill-page .row .kind, .row .kind-line, .row .count, .side-item .count, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
