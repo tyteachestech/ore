@@ -57,6 +57,24 @@ describe("diagram files (Excalidraw's format)", () => {
   });
 });
 
+describe("saved and opened again (Codex sweep 4)", () => {
+  test("a dragged elbow middle, a matrix cell and a box label at the top survive the file", () => {
+    const s = box(0, 0), t = box(400, 200);
+    const arrow = { ...shape("rectangle", { x: 0, y: 0, w: 1, h: 1 }, DEFAULT_STYLE), type: "arrow", elbowed: true, points: [[0, 0], [1, 1]], startBinding: { elementId: s.id, focus: 0, gap: 6 }, endBinding: { elementId: t.id, focus: 0, gap: 6 }, customData: { oreElbow: { mid: 320 } } } as El;
+    let els: El[] = [s, t, route(arrow, byId([s, t, arrow]))];
+    els = setLabel(els, s.id, "Section", DEFAULT_STYLE);
+    els = syncAll(els.map((e) => (e.containerId === s.id ? { ...e, verticalAlign: "top" as const } : e)));
+    els = [...els, ...addMatrix([], [0, 600], 2, 2, DEFAULT_STYLE).els];
+    const back = fromScene(JSON.parse(JSON.stringify(toScene(els, null))));
+    const a = back.find((e) => e.type === "arrow")!;
+    expect(absPointsOf(route(a, byId(back)))[1]![0]).toBe(320);
+    expect(back.find((e) => e.containerId === s.id)?.verticalAlign).toBe("top");
+    expect(back.filter((e) => e.customData?.oreCell)).toHaveLength(4);
+    // A label written without its originalText (left out when it equals text) opens with its words (sweep 5).
+    expect(back.find((e) => e.containerId === s.id)?.originalText).toBe("Section");
+  });
+});
+
 describe("labels", () => {
   test("a box's label set to the top sits under its top edge, and stays there as the box grows (a section's title)", () => {
     const a = box(0, 0, 400, 300);

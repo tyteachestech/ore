@@ -320,6 +320,8 @@ export function fromScene(scene: Scene | null): El[] {
     .map((e) => ({
       x: 0, y: 0, width: 0, height: 0, angle: 0, strokeColor: STROKES[0]!, backgroundColor: "transparent", fillStyle: "solid", strokeWidth: 2,
       strokeStyle: "solid", roughness: 0, opacity: 100, groupIds: [], roundness: null, boundElements: null, locked: false, ...e,
+      // Written without it when it equals the text (compact), as Excalidraw reads it; the editor edits originalText.
+      ...(e.type === "text" && e.originalText == null ? { originalText: e.text ?? "" } : {}),
     }));
 }
 
@@ -355,7 +357,7 @@ const DEFAULTS: Record<string, unknown> = {
   angle: 0, strokeColor: "#1e1e1e", backgroundColor: "transparent", fillStyle: "solid", strokeWidth: 2, strokeStyle: "solid",
   opacity: 100, groupIds: [], frameId: null, roundness: null, boundElements: null, link: null, locked: false, isDeleted: false,
   version: undefined, versionNonce: undefined, updated: undefined, seed: undefined, index: undefined, lastCommittedPoint: null,
-  startBinding: null, endBinding: null, startArrowhead: null, containerId: null, customData: undefined, autoResize: true,
+  startBinding: null, endBinding: null, startArrowhead: null, containerId: null, autoResize: true,
   lineHeight: 1.25, verticalAlign: "top", elbowed: false, pressures: [], simulatePressure: true,
 };
 const round = (v: number) => Math.round(v * 100) / 100;
@@ -365,6 +367,8 @@ function compact(e: El): El {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(e)) {
     if (v === undefined) continue;
+    // A label's place is always written: Excalidraw reads a missing one as the top, Ore as the middle.
+    if (k === "verticalAlign" && e.containerId) { out[k] = v; continue; }
     if (k in DEFAULTS && (DEFAULTS[k] === undefined || JSON.stringify(DEFAULTS[k]) === JSON.stringify(v))) continue;
     if (k === "originalText" && v === e.text) continue; // Excalidraw copies text into it when missing
     out[k] = typeof v === "number" ? round(v) : k === "points" ? (v as Pt[]).map(([x, y]) => [round(x), round(y)]) : v;

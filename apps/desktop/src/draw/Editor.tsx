@@ -574,14 +574,17 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     );
   };
   const pasteFromMenu = async () => {
-    // An image first; WebKit can refuse that read and still give the text, so a refusal falls through to it.
+    // One read: an image, else the text it holds (WebKit refuses a second read straight after, Codex sweep 4);
+    // readText only when that read is refused.
     try {
       for (const item of await navigator.clipboard.read()) {
         const type = item.types.find((t) => t.startsWith("image/"));
         if (type) return pasteImage(new File([await item.getType(type)], "pasted", { type }));
+        if (item.types.includes("text/plain")) return pasteData(await (await item.getType("text/plain")).text());
       }
+      return;
     } catch {
-      /* text below */
+      /* readText below */
     }
     try {
       pasteData(await navigator.clipboard.readText());
