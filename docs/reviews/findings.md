@@ -62,3 +62,4 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F36 | 2026-11-12 | iPhone | Return in a Sources row's Rename field saved it and then opened the source | fixed #326 | `Return in the rename field opened the source` |
 | F37 | 2026-11-12 | iPhone, Today | Today's hold menu for a source had no Rename…, though Sources and a skill's list do (D225) | fixed #326 | `Return in Today's rename field opened the source` |
 | F38 | 2026-11-12 | iPhone | Once, the search field sat under the keyboard's accessory bar; not seen again on the repeat | open | — |
+| F39 | 2026-11-12 | Home, iPhone Today | Return in a Continue reading row's Rename field dropped focus to the page instead of the row (found by F37's journey) | fixed #326 | `Return in Today's rename field opened the source` |

@@ -17,7 +17,7 @@ import { Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
-import { depthText, levelProgress, ore, opt, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
+import { depthText, levelProgress, ore, opt, PHONE, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
 import { AnswerBox, AskQuestion, announce, questionText, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
@@ -325,7 +325,9 @@ function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, 
     save(FOLDS, JSON.stringify(next ? rest : [...rest, id]));
   };
   return (
-    <WithMenu actions={actions.map((a) => ({ ...a, run: () => (open || toggle(), a.run()) }))}>
+    // A section's right-click menu is the Mac's. On the iPhone its actions are the buttons in its head, and the
+    // menu library's own touch timer opened it over a held row's menu (F35).
+    <WithMenu actions={PHONE ? [] : actions.map((a) => ({ ...a, run: () => (open || toggle(), a.run()) }))}>
     <section className="skill-card fold" data-tone={tone}>
       <div className="card-head">
         {/* Picking a view of a folded section opens it, or the pick would show nothing. */}

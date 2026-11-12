@@ -130,11 +130,7 @@ export function WithMenu({ actions, children, keepFocus, hold, plain }: { action
   if (useLite() || (Array.isArray(actions) && !actions.length)) return children; // or no menu to open (the phone's title)
   return (
     <ContextMenu.Root onOpenChange={(open) => open && (opened.current = performance.now())}>
-      <ContextMenu.Trigger asChild ref={held} disabled={native} data-menu-row="" onPointerDownCapture={(e) => ((row.current = e.currentTarget as HTMLElement), setNative(nativeMenu(e.target, getSelection())))} onPointerDown={(e) => {
-        // A finger held on a row with its own menu opens that one: Radix's touch timer on a menu around it
-        // (a skill page's section) would open a second over it (F35). Handled defaults skip Radix's own handler.
-        if (PHONE && e.pointerType !== "mouse" && (e.target as Element).closest?.("[data-menu-row]") !== e.currentTarget && !nativeMenu(e.target, getSelection())) e.preventDefault();
-      }}>
+      <ContextMenu.Trigger asChild ref={held} disabled={native} data-menu-row="" onPointerDownCapture={(e) => ((row.current = e.currentTarget as HTMLElement), setNative(nativeMenu(e.target, getSelection())))}>
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
