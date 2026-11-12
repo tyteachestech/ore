@@ -2,9 +2,11 @@
 // `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in Ore's iCloud folder, or in the App
 // Group the app reads when it opens. A file (a PDF from Files, a photo) is copied to `inbox/<ulid>/<name>`
 // with `inbox/<ulid>.file.json` written after it. It is saved the moment the card appears; the card then offers his skills to file it under,
-// one tap each, and stays until Done, a tap above it or a swipe down (closing by itself after 3 s read as a glitch, Tyler 2026-11-12).
+// one tap each, under a preview of what was shared (its picture, title and site, drawn by Apple's LinkPresentation: Raindrop's
+// and Pocket's confirmation), from the top of the sheet iOS gives it, and stays until Done, a tap above it or a swipe down (closing by itself after 3 s read as a glitch, Tyler 2026-11-12).
 // With no skills to offer it goes by itself.
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
+import LinkPresentation
 import UIKit
 import UniformTypeIdentifiers
 
@@ -67,6 +69,8 @@ class ShareViewController: UIViewController {
   private var closing: DispatchWorkItem?
   private let card = UIView()
   private let titleLabel = UILabel()
+  private let preview = LPLinkView()
+  private var fetching: LPMetadataProvider?
   private let chips = UIStackView()
 
   private let paper = UIColor(white: 0.93, alpha: 1)
@@ -84,8 +88,8 @@ class ShareViewController: UIViewController {
     view.addGestureRecognizer(down)
 
     card.backgroundColor = UIColor(white: 0.11, alpha: 1)
-    card.layer.cornerRadius = 16
-    card.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+    // Apple's link preview follows the system's light or dark; the card is always dark.
+    overrideUserInterfaceStyle = .dark
     card.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(card)
 
@@ -113,7 +117,12 @@ class ShareViewController: UIViewController {
     chips.spacing = 8
     chips.alignment = .leading
 
-    let stack = UIStackView(arrangedSubviews: [head, chips])
+    // What was shared, so he sees it took the right thing. Hidden until there is something to show.
+    preview.isHidden = true
+    preview.isUserInteractionEnabled = false
+    preview.heightAnchor.constraint(lessThanOrEqualToConstant: 300).isActive = true
+
+    let stack = UIStackView(arrangedSubviews: [head, preview, chips])
     stack.axis = .vertical
     stack.spacing = 14
     stack.translatesAutoresizingMaskIntoConstraints = false
@@ -122,11 +131,13 @@ class ShareViewController: UIViewController {
     NSLayoutConstraint.activate([
       card.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       card.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      card.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-      stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+      // From the sheet's top, as any sheet's content: iOS sizes the sheet, so content at its foot left it mostly empty above.
+      card.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+      card.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor),
+      stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
       stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),
       stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
-      stack.bottomAnchor.constraint(equalTo: card.safeAreaLayoutGuide.bottomAnchor, constant: -18),
+      stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18),
       head.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
     ])
   }
@@ -142,8 +153,10 @@ class ShareViewController: UIViewController {
     Task { @MainActor in
       if let url = await link() {
         guard save(url) else { return fail("Open Ore once first, then share again.") }
+        show(link: url)
       } else if let p = fileProvider() {
         guard await save(file: p) else { return fail("Couldn’t save that file. Open Ore once first, then share again.") }
+        showFile()
       } else {
         return fail("Ore adds links and files. This isn’t one.")
       }
@@ -155,6 +168,34 @@ class ShareViewController: UIViewController {
       closing = work
       DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
     }
+  }
+
+  /// The page's address at once, then its title and picture when Apple's fetch has them (no page is loaded here).
+  private func show(link: String) {
+    guard let url = URL(string: link) else { return }
+    let meta = LPLinkMetadata()
+    meta.originalURL = url
+    meta.url = url
+    preview.metadata = meta
+    preview.isHidden = false
+    let provider = LPMetadataProvider()
+    provider.timeout = 10
+    fetching = provider
+    provider.startFetchingMetadata(for: url) { [weak self] got, _ in
+      guard let got else { return }
+      DispatchQueue.main.async { self?.preview.metadata = got }
+    }
+  }
+
+  /// A shared file under its name, with the picture itself when it is one.
+  private func showFile() {
+    guard let file, let rel = item["file"] as? String else { return }
+    let at = file.deletingLastPathComponent().appendingPathComponent(rel)
+    let meta = LPLinkMetadata()
+    meta.title = at.lastPathComponent
+    if UTType(filenameExtension: at.pathExtension)?.conforms(to: .image) == true { meta.imageProvider = NSItemProvider(contentsOf: at) }
+    preview.metadata = meta
+    preview.isHidden = false
   }
 
   private func link() async -> String? {
@@ -326,6 +367,7 @@ class ShareViewController: UIViewController {
 
   @objc private func finish() {
     closing?.cancel()
+    fetching?.cancel()
     extensionContext?.completeRequest(returningItems: nil)
   }
 }
