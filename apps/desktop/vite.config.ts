@@ -49,6 +49,7 @@ const phoneAliases = [
   { find: /^(node:)?os$/, replacement: phone("os.ts") },
   { find: /^(node:)?(util|child_process|crypto)$/, replacement: phone("node.ts") },
   { find: /^bun:sqlite$/, replacement: phone("sqlite.ts") },
+  { find: /^@tauri-apps\/api\/core$/, replacement: phone("tauri-core.ts") },
   // The FSRS optimizer is a native module; `ore optimize` stays on the Mac.
   { find: /^@open-spaced-repetition\/binding$/, replacement: phone("node.ts") },
 ];

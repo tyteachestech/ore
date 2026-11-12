@@ -156,6 +156,40 @@ async fn library_apply(root: String, ops: Vec<(String, Option<String>, bool)>) -
     Ok(stamps)
 }
 
+#[derive(Serialize)]
+struct Fetched {
+    status: u16,
+    url: String,
+    headers: Vec<(String, String)>,
+    body: String,
+}
+
+/// Fetches another site for an import, as the Mac's fetch would: redirects followed, the final URL and
+/// every status (a 404 too) handed back, the body as base64.
+#[tauri::command]
+async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, String)>) -> Result<Fetched, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(30)).build();
+        let mut req = agent.request(method.as_deref().unwrap_or("GET"), &url);
+        for (k, v) in &headers {
+            req = req.set(k, v);
+        }
+        let res = match req.call() {
+            Ok(r) => r,
+            Err(ureq::Error::Status(_, r)) => r,
+            Err(e) => return Err(e.to_string()),
+        };
+        let status = res.status();
+        let final_url = res.get_url().to_string();
+        let headers = res.headers_names().into_iter().filter_map(|n| res.header(&n).map(|v| (n.clone(), v.to_string()))).collect();
+        let mut body = vec![];
+        std::io::Read::read_to_end(&mut std::io::Read::take(res.into_reader(), 200 << 20), &mut body).map_err(|e| e.to_string())?;
+        Ok(Fetched { status, url: final_url, headers, body: base64::engine::general_purpose::STANDARD.encode(body) })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(target_os = "ios")]
 #[allow(unused_unsafe)]
 fn container() -> Option<PathBuf> {
@@ -187,7 +221,7 @@ pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }
