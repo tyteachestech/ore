@@ -243,7 +243,7 @@
 .intents .intent { flex: 1; gap: 5px; }
 .popup .field { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 4px 8px; }
 .popup .field:focus { box-shadow: none; }
-.popup-tools { align-self: end; border-left: 0; padding-left: 4px; gap: 2px; }
+.popup-tools { align-self: start; border-left: 0; padding-left: 4px; gap: 2px; }
 .popup-tools .intent { color: var(--faint); border-radius: 6px; }
 .popup-tools .intent:hover { color: var(--text); background: var(--bg-hover); }
 
