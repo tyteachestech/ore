@@ -11,6 +11,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setLibraryRoot } from "./tauri-core";
 import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, writeFileSync } from "./fs";
 import { ready } from "./sqlite";
+import { shareList } from "./share-skills";
 
 export const ROOT = "/lib";
 
@@ -89,8 +90,8 @@ let libraryDir: string | null = null;
 const shared = () => (libraryDir ? invoke<number>("share_inbox", { root: libraryDir }).catch(() => 0) : Promise.resolve(0));
 
 /** The share card files a link under a skill with one tap: it shows these, in the sidebar's order. */
-export const shareSkills = (skills: { id: string; name: string }[]) =>
-  void (isTauri() && invoke("share_skills", { json: JSON.stringify(skills.map(({ id, name }) => ({ id, name }))) }).catch(() => false));
+export const shareSkills = (skills: { id: string; name: string; icon?: string; color?: string }[]) =>
+  void (isTauri() && invoke("share_skills", { json: JSON.stringify(shareList(skills)) }).catch(() => false));
 
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */

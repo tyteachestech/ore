@@ -2,7 +2,8 @@
 // `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in Ore's iCloud folder, or in the App
 // Group the app reads when it opens. A file (a PDF from Files, a photo) is copied to `inbox/<ulid>/<name>`
 // with `inbox/<ulid>.file.json` written after it. It is saved the moment the card appears; the card then offers his skills to file it under,
-// one tap each, and closes by itself if he leaves it alone (Raindrop's share card).
+// one tap each, and stays until Done, a tap above it or a swipe down (closing by itself after 3 s read as a glitch, Tyler 2026-11-12).
+// With no skills to offer it goes by itself.
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
 import UIKit
 import UniformTypeIdentifiers
@@ -29,9 +30,33 @@ func groupDir() -> URL? {
   #endif
 }
 
+/// `dots` is x, y, x, y… of the lit cells of its icon on the app's 16 grid, `color` its `#rrggbb`
+/// (apps/desktop/src/phone/share-skills.ts); an older app wrote neither.
 struct Skill: Decodable {
   let id: String
   let name: String
+  let dots: [Int]?
+  let color: String?
+}
+
+/// A skill's icon as the app draws it: one round dot per cell, 0.38 of a cell in radius (dots.ts), at 20 pt.
+func dotIcon(_ dots: [Int], _ color: UIColor) -> UIImage {
+  let size: CGFloat = 20
+  let cell = size / 16
+  return UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { ctx in
+    color.setFill()
+    var i = 0
+    while i + 1 < dots.count {
+      let x = (CGFloat(dots[i]) + 0.5) * cell, y = (CGFloat(dots[i + 1]) + 0.5) * cell, r = 0.38 * cell
+      ctx.cgContext.fillEllipse(in: CGRect(x: x - r, y: y - r, width: 2 * r, height: 2 * r))
+      i += 2
+    }
+  }.withRenderingMode(.alwaysOriginal)
+}
+
+func hexColor(_ hex: String?) -> UIColor? {
+  guard let hex, hex.count == 7, hex.hasPrefix("#"), let v = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+  return UIColor(red: CGFloat((v >> 16) & 255) / 255, green: CGFloat((v >> 8) & 255) / 255, blue: CGFloat(v & 255) / 255, alpha: 1)
 }
 
 @objc(ShareViewController)
@@ -114,10 +139,11 @@ class ShareViewController: UIViewController {
       }
       titleLabel.text = "Added to Ore"
       layoutChips(skills())
-      // Left alone, the card goes by itself; a touch on it keeps it until Done.
+      // With skills to pick it stays until he closes it; with none there is nothing to do here, so it goes by itself.
+      guard shown.isEmpty else { return }
       let work = DispatchWorkItem { [weak self] in self?.finish() }
       closing = work
-      DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: work)
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
     }
   }
 
@@ -224,9 +250,11 @@ class ShareViewController: UIViewController {
       used = 0
     }
     newRow()
-    for (i, s) in all.prefix(12).enumerated() {
+    shown = Array(all.prefix(12))
+    for (i, s) in shown.enumerated() {
       var conf = UIButton.Configuration.plain()
       conf.title = s.name
+      conf.imagePadding = 6
       conf.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)
       conf.titleLineBreakMode = .byTruncatingTail
       let font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 15, weight: .medium))
@@ -249,7 +277,6 @@ class ShareViewController: UIViewController {
       row.addArrangedSubview(b)
       used += w + 8
     }
-    shown = Array(all.prefix(12))
   }
   private var shown: [Skill] = []
 
@@ -260,7 +287,10 @@ class ShareViewController: UIViewController {
     conf.background.backgroundColor = on ? paper : .clear
     conf.background.strokeColor = on ? paper : line
     conf.background.strokeWidth = 1
-    conf.baseForegroundColor = on ? UIColor(white: 0.07, alpha: 1) : muted
+    let ink = UIColor(white: 0.07, alpha: 1)
+    conf.baseForegroundColor = on ? ink : muted
+    // Its icon in the skill's colour, as in the app's lists; in the chip's ink once picked, where a pastel would wash out.
+    if let dots = shown[b.tag].dots, !dots.isEmpty { conf.image = dotIcon(dots, on ? ink : hexColor(shown[b.tag].color) ?? muted) }
     b.configuration = conf
     if on { b.accessibilityTraits.insert(.selected) } else { b.accessibilityTraits.remove(.selected) }
   }
