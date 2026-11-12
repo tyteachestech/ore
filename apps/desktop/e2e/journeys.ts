@@ -9605,7 +9605,7 @@ journey("phone: the note's keyboard bar moves a block, edits a table and adds a 
       const chooser = page.waitForEvent("filechooser");
       await tap(page, bar.getByRole("button", { name: "Add a picture" }));
       await (await chooser).setFiles({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
-      await until("the picture is in the note", async () => (await note.locator("img").count()) === 1);
+      await until("the picture is in the note", async () => (await note.locator("img.note-image").count()) === 1);
       // A diagram opens to view, with no way to draw on it.
       await tap(page, note.locator(".note-diagram").first());
       const view = page.locator(".diagram-view");
