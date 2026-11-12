@@ -2420,6 +2420,21 @@ function ReaderView(p: Props & { reload: () => void }) {
     }, 150);
   };
 
+  // A press anywhere off the popup closes it and keeps the highlight (Notion, Readwise Reader): in the
+  // margins beside the text and around the page too, not only on the page (whose press closes it below).
+  // A menu the popup opens in a portal is still the popup.
+  useEffect(() => {
+    if (!popup) return;
+    const down = (e: globalThis.MouseEvent) => {
+      const t = e.target as Element;
+      if (pageRef.current?.contains(t) || popupRef.current?.contains(t) || t.closest?.("[data-radix-popper-content-wrapper]")) return;
+      keepNote();
+      setPopup(null);
+    };
+    document.addEventListener("mousedown", down);
+    return () => document.removeEventListener("mousedown", down);
+  });
+
   const pressedAt = useRef({ x: 0, y: 0 });
   const onMouseDown = (e: MouseEvent) => {
     // A click that is not the third of a triple: the double click's sentence is kept now, quietly (no popup,

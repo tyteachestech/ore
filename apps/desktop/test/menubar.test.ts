@@ -5,6 +5,7 @@ const w = new Window();
 for (const k of ["window", "document", "KeyboardEvent"] as const) (globalThis as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k];
 const { BINDINGS, comboOf, is, rebind, resetKeys } = await import("../src/keys");
 const { keydownFor, menuSpec, runMenu } = await import("../src/menubar");
+const { History } = await import("../src/history");
 
 const keymap = Object.fromEntries(BINDINGS.map((b) => [b.id, b.combo])) as Parameters<typeof menuSpec>[0];
 type Row = { id?: string; label?: string; accel?: string | null; enabled?: boolean; predef?: string };
@@ -66,12 +67,21 @@ describe("menu bar", () => {
     const field = document.createElement("textarea");
     document.body.appendChild(field);
     field.focus();
+    // Clicked into but not typed in: macOS keeps one undo run per window, so ⌘Z is the app's.
+    runMenu("undo", keymap, 5500);
+    expect([keys, native.length]).toEqual([2, 0]);
+    field.dispatchEvent(new window.Event("input", { bubbles: true }) as unknown as Event);
     runMenu("undo", keymap, 6000);
     runMenu("redo", keymap, 7000);
-    expect([keys, native]).toEqual([1, ["undo", "redo"]]);
+    expect([keys, native]).toEqual([2, ["undo", "redo"]]);
+    // A step taken after the typing (a skill ticked from a filter he typed) is the newer one.
+    new History().push({ message: "Filed under AI", undo: async () => {} });
+    runMenu("undo", keymap, 7500);
+    expect([keys, native.length]).toEqual([3, 2]);
+    field.dispatchEvent(new window.Event("input", { bubbles: true }) as unknown as Event);
     field.setAttribute("data-app-undo", ""); // Review's empty answer: nothing of its own to undo
     runMenu("undo", keymap, 8000);
-    expect(keys).toBe(2);
+    expect(keys).toBe(4);
     field.remove();
     window.removeEventListener("keydown", on as unknown as EventListener);
   });

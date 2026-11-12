@@ -3,6 +3,7 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
+import { keepKeysIn } from "./keys";
 import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
@@ -115,7 +116,7 @@ export function WithMenu({ actions, children, keepFocus, hold }: { actions: Acti
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus, row.current)} onKeyDown={(e) => e.stopPropagation()}>
+        <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus, row.current)} onKeyDown={keepKeysIn}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <ContextMenu.Separator className="menu-sep" />}
@@ -211,7 +212,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
         <DropdownMenu.Trigger asChild>{button}</DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (hoverOnly && !keepFocus && focusRow(e, self.current), closed(e, keepFocus, self.current?.closest<HTMLElement>("[data-menu-row]")))} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (hoverOnly && !keepFocus && focusRow(e, self.current), closed(e, keepFocus, self.current?.closest<HTMLElement>("[data-menu-row]")))} onClick={(e) => e.stopPropagation()} onKeyDown={keepKeysIn}>
           <Later>{() => listOf(actions).map((a) => (
             <Fragment key={a.id}>
             {a.divider && <DropdownMenu.Separator className="menu-sep" />}

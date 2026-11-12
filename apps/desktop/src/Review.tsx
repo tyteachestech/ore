@@ -12,6 +12,7 @@ import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
+import { ownsUndo } from "./history";
 import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
@@ -862,7 +863,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
     if (paused || under) return;
-    if (is(e, "undo") && busyNow.current && !(inTextField(e) && !(e.target as HTMLElement).hasAttribute("data-app-undo"))) {
+    if (is(e, "undo") && busyNow.current && !((e.target as HTMLElement).isContentEditable || ownsUndo(e.target))) {
       // The step it should take back isn't on the history yet (or is being taken back): it waits.
       e.preventDefault();
       e.stopPropagation();
