@@ -1893,12 +1893,13 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await openSource(page, TESTING);
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
   const popup = page.getByRole("dialog", { name: "Highlight" });
-  await page.waitForTimeout(300); // the reader puts back where he was reading: a drag before that lands elsewhere
   await select(page, "ach successful retrieval changes the memory its");
   await popup.waitFor();
   await until("it snaps out to whole words", async () => (await active()) === "Each successful retrieval changes the memory itself.");
   await page.keyboard.press("Escape"); // drops the fresh one
   await popup.waitFor({ state: "hidden" });
+  // At once, before the reader has finished with the first drag: on a busy Mac its clearing of that selection came
+  // after this press and took the new one with it (the Highlight popup never came, 16 runs in 20).
   await page.keyboard.down("Alt");
   await select(page, "trengthens the route bac");
   await page.keyboard.up("Alt");

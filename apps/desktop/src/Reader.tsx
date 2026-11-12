@@ -2519,7 +2519,12 @@ function ReaderView(p: Props & { reload: () => void }) {
         const keep = () => {
           // Whole words, unless he held ⌥ for part of one.
           highlightRange(range, undefined, aim, !exact);
-          setTimeout(() => sel.removeAllRanges(), 0); // after the click, so a link under the mouse does not open
+          // After the click, so a link under the mouse does not open; and only the selection it highlighted: a drag
+          // begun since (a quick second one, on a busy Mac this runs late) keeps the selection it is making.
+          setTimeout(() => {
+            const now = sel.rangeCount ? sel.getRangeAt(0) : null;
+            if (!now || (now.compareBoundaryPoints(Range.START_TO_START, range) === 0 && now.compareBoundaryPoints(Range.END_TO_END, range) === 0)) sel.removeAllRanges();
+          }, 0);
         };
         if (e.detail === 2) {
           const timer = window.setTimeout(() => (dropWord(), keep()), 500);
