@@ -122,13 +122,8 @@ function put(p: string, text: string, mtime = Date.now(), bytes?: Uint8Array) {
   files.set(p, e);
   addDirs(p);
   if (SCRATCH.test(p)) return;
-  if (bytes && disk) return p.startsWith(disk.prefix + "/") ? queue(p, { text: base64(bytes), base64: true }) : undefined;
+  if (bytes && disk) return p.startsWith(disk.prefix + "/") ? queue(p, { bytes }) : undefined;
   persist(p, e);
-}
-function base64(b: Uint8Array): string {
-  let s = "";
-  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
-  return btoa(s);
 }
 /** The lock and the search index are rebuilt each launch, never kept. */
 const SCRATCH = /\/\.(ore|index)\//;
@@ -143,15 +138,16 @@ function drop(p: string) {
 
 // ---- on the phone: Ore's iCloud Drive folder (apps/phone/src-tauri/src/lib.rs).
 
-type Invoke = <T>(cmd: string, args: Record<string, unknown>) => Promise<T>;
+type Invoke = <T>(cmd: string, args: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }) => Promise<T>;
 type Stamped = [rel: string, mtime: number, stamp: string];
 type Scan = { files: Stamped[]; waiting: string[]; other?: string[] };
 let disk: { root: string; prefix: string; invoke: Invoke } | null = null;
 /** Each file's stamp (mtime and size) as last read or written, to tell what the Mac changed since. */
 const known = new Map<string, string>();
 /** Writes and deletes (null) not sent yet, by library path. The last one for a path wins, so an atomic
- *  write's temp file never reaches iCloud. A picture or other binary goes as base64. */
-type Op = { text: string; base64?: boolean } | null;
+ *  write's temp file never reaches iCloud. A picture, audio or other binary goes as its raw bytes, one
+ *  call each (lib.rs `library_write`): as base64 text an hour's audio cost several times its size. */
+type Op = { text: string } | { bytes: Uint8Array } | null;
 const unsent = new Map<string, Op>();
 /** Paths this phone has sent or asked to delete since launch: a delete of one still goes to the folder
  *  even before the folder's stamp for it comes back (or a folder, which has no stamp). */
@@ -187,8 +183,20 @@ export function flush(): Promise<void> {
   const { root, invoke } = disk;
   sending = sending.then(async () => {
     try {
-      const wire = ops.map(([r, op]) => [r, op?.text ?? null, !!op?.base64]);
-      for (const [r, ms, stamp] of await invoke<Stamped[]>("library_apply", { root, ops: wire })) {
+      const stamps: Stamped[] = [];
+      const enc = encodeURIComponent;
+      // In the order they were made (a folder's delete before a file written into it), text and deletes in batches.
+      let batch: [string, string | null, boolean][] = [];
+      const send = async () => {
+        if (batch.length) stamps.push(...(await invoke<Stamped[]>("library_apply", { root, ops: batch })));
+        batch = [];
+      };
+      for (const [r, op] of ops) {
+        if (!op || "text" in op) batch.push([r, op?.text ?? null, false]);
+        else (await send(), stamps.push(await invoke<Stamped>("library_write", op.bytes, { headers: { "x-root": enc(root), "x-path": enc(r) } })));
+      }
+      await send();
+      for (const [r, ms, stamp] of stamps) {
         if (LISTED.test("/" + r)) known.set(r, stamp);
         const e = files.get(`${disk!.prefix}/${r}`);
         if (e) e.mtime = ms;

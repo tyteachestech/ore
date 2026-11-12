@@ -69,13 +69,16 @@ if (isTauri()) {
     // The shell's fetch only reads: nothing the importers do sends a body.
     if (init?.body != null || (method !== "GET" && method !== "HEAD")) throw new TypeError(`fetch failed: the iPhone app only reads other sites (${method} ${url})`);
     const headers = [...new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)).entries()];
-    type Fetched = { status: number; url: string; headers: [string, string][]; body: string };
-    const r = await invoke<Fetched>("http_fetch", { url, method, headers }).catch((e) => {
-      throw new TypeError(`fetch failed: ${e}`);
-    });
-    const bin = atob(r.body);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    // Raw bytes, never base64 text (an hour's podcast as text cost eleven times its size): four bytes of
+    // length, that much JSON, then the body.
+    const got = new Uint8Array(
+      await invoke<ArrayBuffer>("http_fetch", { url, method, headers }).catch((e) => {
+        throw new TypeError(`fetch failed: ${e}`);
+      }),
+    );
+    const head = 4 + new DataView(got.buffer, got.byteOffset).getUint32(0);
+    const r = JSON.parse(new TextDecoder().decode(got.subarray(4, head))) as { status: number; url: string; headers: [string, string][] };
+    const bytes = got.subarray(head);
     // A status the web's Response can't hold (LinkedIn's 999) is a refusal: 520, so the importer says so itself.
     const status = r.status >= 200 && r.status <= 599 ? r.status : 520;
     const res = new Response([204, 205, 304].includes(status) ? null : bytes, { status, headers: r.headers });
