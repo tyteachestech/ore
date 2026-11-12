@@ -2,8 +2,8 @@
 // `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in Ore's iCloud folder, or in the App
 // Group the app reads when it opens. A file (a PDF from Files, a photo) is copied to `inbox/<ulid>/<name>`
 // with `inbox/<ulid>.file.json` written after it. It is saved the moment the card appears; the card then offers his skills to file it under,
-// one tap each, under a preview of what was shared (its picture, title and site, drawn by Apple's LinkPresentation: Raindrop's
-// and Pocket's confirmation), from the top of the sheet iOS gives it, and stays until Done, a tap above it or a swipe down (closing by itself after 3 s read as a glitch, Tyler 2026-11-12).
+// one tap each, under a preview of what was shared (its picture, title and site in one row, Raindrop's confirmation: the title Safari
+// hands over at once, the picture when Apple's LinkPresentation has fetched it), from the top of the sheet iOS gives it, and stays until Done, a tap above it or a swipe down (closing by itself after 3 s read as a glitch, Tyler 2026-11-12).
 // With no skills to offer it goes by itself.
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
 import LinkPresentation
@@ -69,7 +69,10 @@ class ShareViewController: UIViewController {
   private var closing: DispatchWorkItem?
   private let card = UIView()
   private let titleLabel = UILabel()
-  private let preview = LPLinkView()
+  private let preview = UIStackView()
+  private let thumb = UIImageView()
+  private let pageTitle = UILabel()
+  private let site = UILabel()
   private var fetching: LPMetadataProvider?
   private let chips = UIStackView()
 
@@ -88,8 +91,6 @@ class ShareViewController: UIViewController {
     view.addGestureRecognizer(down)
 
     card.backgroundColor = UIColor(white: 0.11, alpha: 1)
-    // Apple's link preview follows the system's light or dark; the card is always dark.
-    overrideUserInterfaceStyle = .dark
     card.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(card)
 
@@ -118,9 +119,34 @@ class ShareViewController: UIViewController {
     chips.alignment = .leading
 
     // What was shared, so he sees it took the right thing. Hidden until there is something to show.
+    // One row of a fixed height, drawn here on the card's dark (Apple's own preview view tints itself from the
+    // site's icon and waits seconds for its title): the picture arrives later without moving the chips under his thumb.
     preview.isHidden = true
-    preview.isUserInteractionEnabled = false
-    preview.heightAnchor.constraint(lessThanOrEqualToConstant: 300).isActive = true
+    preview.axis = .horizontal
+    preview.spacing = 12
+    preview.alignment = .center
+    thumb.isHidden = true
+    thumb.contentMode = .scaleAspectFill
+    thumb.clipsToBounds = true
+    thumb.layer.cornerRadius = 8
+    thumb.backgroundColor = line
+    pageTitle.font = .preferredFont(forTextStyle: .subheadline)
+    pageTitle.adjustsFontForContentSizeCategory = true
+    pageTitle.textColor = paper
+    pageTitle.numberOfLines = 2
+    site.font = .preferredFont(forTextStyle: .footnote)
+    site.adjustsFontForContentSizeCategory = true
+    site.textColor = muted
+    let words = UIStackView(arrangedSubviews: [pageTitle, site])
+    words.axis = .vertical
+    words.spacing = 2
+    preview.addArrangedSubview(thumb)
+    preview.addArrangedSubview(words)
+    NSLayoutConstraint.activate([
+      thumb.widthAnchor.constraint(equalToConstant: 64),
+      thumb.heightAnchor.constraint(equalToConstant: 64),
+      preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
+    ])
 
     let stack = UIStackView(arrangedSubviews: [head, preview, chips])
     stack.axis = .vertical
@@ -170,20 +196,42 @@ class ShareViewController: UIViewController {
     }
   }
 
-  /// The page's address at once, then its title and picture when Apple's fetch has them (no page is loaded here).
+  /// The title Safari hands over with the share, and the site, at once; the page's picture, and its title if
+  /// Safari gave none, when Apple's fetch has them (no page is loaded here).
   private func show(link: String) {
     guard let url = URL(string: link) else { return }
-    let meta = LPLinkMetadata()
-    meta.originalURL = url
-    meta.url = url
-    preview.metadata = meta
+    let given = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).compactMap { $0.attributedTitle?.string ?? $0.attributedContentText?.string }
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty && !$0.hasPrefix("http") }
+    let host = (url.host ?? link).replacingOccurrences(of: #"^www\."#, with: "", options: .regularExpression)
+    pageTitle.text = given ?? host
+    site.text = given == nil ? nil : host
+    site.isHidden = given == nil
     preview.isHidden = false
     let provider = LPMetadataProvider()
     provider.timeout = 10
     fetching = provider
     provider.startFetchingMetadata(for: url) { [weak self] got, _ in
       guard let got else { return }
-      DispatchQueue.main.async { self?.preview.metadata = got }
+      let title = got.title
+      DispatchQueue.main.async {
+        guard let self, given == nil, let title, !title.isEmpty else { return }
+        self.pageTitle.text = title
+        self.site.text = host
+        self.site.isHidden = false
+      }
+      self?.picture(from: got.imageProvider)
+    }
+  }
+
+  private func picture(from provider: NSItemProvider?) {
+    guard let provider, provider.canLoadObject(ofClass: UIImage.self) else { return }
+    _ = provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
+      // Drawn small before it is kept: a page's picture can be thousands of pixels wide, and an extension has little memory.
+      guard let small = (image as? UIImage)?.preparingThumbnail(of: CGSize(width: 192, height: 192)) else { return }
+      DispatchQueue.main.async {
+        self?.thumb.image = small
+        self?.thumb.isHidden = false
+      }
     }
   }
 
@@ -191,11 +239,10 @@ class ShareViewController: UIViewController {
   private func showFile() {
     guard let file, let rel = item["file"] as? String else { return }
     let at = file.deletingLastPathComponent().appendingPathComponent(rel)
-    let meta = LPLinkMetadata()
-    meta.title = at.lastPathComponent
-    if UTType(filenameExtension: at.pathExtension)?.conforms(to: .image) == true { meta.imageProvider = NSItemProvider(contentsOf: at) }
-    preview.metadata = meta
+    pageTitle.text = at.lastPathComponent
+    site.isHidden = true
     preview.isHidden = false
+    if UTType(filenameExtension: at.pathExtension)?.conforms(to: .image) == true { picture(from: NSItemProvider(contentsOf: at)) }
   }
 
   private func link() async -> String? {
