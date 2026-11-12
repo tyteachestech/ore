@@ -2635,6 +2635,27 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   };
 
+  /** An episode's own page text, added below its transcript in one step (D215), with Undo and Redo as a
+   *  cut's. Snipd's episode screen: the show notes are one tap from the player, never in its way. */
+  const [addingPage, setAddingPage] = useState(false);
+  const addPageText = async () => {
+    if (!doc || addingPage) return;
+    const d = doc;
+    setAddingPage(true);
+    try {
+      const c = await ore<{ id: string; words: number }>("page-text", d.id);
+      p.reload();
+      p.onChanged();
+      const step = (flag: string) => () => ore("page-text", d.id, flag, c.id).then(() => (p.reload(), p.onChanged()));
+      p.notify(`Added the page’s text, ${c.words} ${c.words === 1 ? "word" : "words"}`, "info", step("--undo"), step("--redo"));
+      // Still adding until the reload replaces this view with the source as it is now (page_text gone),
+      // so the button never shows again in between to be clicked twice.
+    } catch (e) {
+      setAddingPage(false);
+      p.notify(errorText(e), "error");
+    }
+  };
+
   /** Files the source under exactly `skills` (its cards follow), with Undo naming the one that changed. */
   /** The skills as last saved from here: the Questions list reads again once a filing has landed. */
   const [filed, setFiled] = useState("");
@@ -2693,6 +2714,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         // A PDF or EPUB file is read again from the copy kept with it, so a better reader reaches it.
         // Not on the phone: it can't fetch a page (its CSP) or reread an original (not in its library), D78; like Listen.
         ...(!PHONE && ((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub") ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
+        ...(doc.page_text && !PHONE ? [{ id: "page-text", label: "Add the page’s text", run: () => void addPageText() }] : []),
         ...(PHONE ? [] : [{ id: "find", label: "Find in source…", hint: label(keys.filter), paletteOnly: true, run: openFind }]),
         ...(p.skills.length
           ? [{
@@ -3054,6 +3076,19 @@ function ReaderView(p: Props & { reload: () => void }) {
           {/* The phone can't write prequestions (AI runs on the Mac): it shows the ones the Mac wrote. */}
           {/* No text, nothing to ask before reading it. */}
           {!doc.preview && <TablesLine key={doc.id} doc={doc} onRead={tablesRead} />}
+          {doc.page_text && !PHONE && (
+            <div className="page-text">
+              {addingPage ? (
+                <Working label="Adding the page’s text…" />
+              ) : (
+                <Hint text="Adds the episode page’s own text below the transcript">
+                  <button className="page-text-btn" onClick={() => void addPageText()}>
+                    Add the page’s text
+                  </button>
+                </Hint>
+              )}
+            </div>
+          )}
           {!doc.preview && (!PHONE || !!doc.prequestions?.length) && (!!doc.body.trim() || !!doc.prequestions?.length) && <Prequestions key={doc.prequestions?.length ?? 0} doc={doc} waiting={waiting || retrying} onRetry={gaveUp && !retrying ? () => void retryEnrich() : undefined} notify={p.notify} ask={preqAsk} onKept={(i, text) => setDoc((cur) => cur && { ...cur, prequestions: cur.prequestions?.map((q, j) => (j === i ? { ...q, before: text || undefined } : q)) })} />}
           {away === "up" && !video && (
             <div className="follow-up">

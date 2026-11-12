@@ -6,15 +6,16 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Item, type ItemType, type NewItem } from "../items.ts";
+import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
 import { loadSkills, setItemSkills, unarchiveFiled } from "../skills.ts";
 import { saveImages, withImages } from "./assets.ts";
+import { recordEnd } from "../cut.ts";
 import { BOT, cleanAuthor, cleanDate, FROM_TAB, refusal, wordCount } from "./check.ts";
 import { isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./course.ts";
-import { pageDraft } from "./page.ts";
+import { dropTitle, hasText, pageDraft } from "./page.ts";
 import type { Tab } from "./tab.ts";
 import { makeThumbnail } from "./thumbnail.ts";
 import { fetchYoutube, isYoutubeUrl, srtToVtt, vttToBody, vttWords, youtubeId } from "./youtube.ts";
@@ -40,6 +41,9 @@ export interface AddOptions {
   regions?: Region[];
   /** The speech's language when the episode names it (its feed's), so it is heard in it. */
   language?: string;
+  /** A page that is an episode (D215): read as its episode (unset, a new add: when its audio comes),
+   *  always (true: a Reimport of an episode, which must stay one), or never (false: of an article). */
+  episode?: boolean;
 }
 
 // The first `# ` heading outside fenced code (a `# comment` in a code block is no title).
@@ -175,11 +179,79 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   // An article that embeds a video keeps both: its text, then the video's transcript (D92).
   const page = await pageDraft(text, base ?? `file://${name}`);
   if (page.type !== "article") return page;
+  // A page that is an episode comes in as its episode, the page kept beside it (D215).
+  const heard = !page.video && opts.episode !== false && base && /^https?:/.test(base) ? await asEpisode(text, base, { ...page, url }, opts) : null;
+  if (heard) return heard;
   // A page that is only a wall or a shell is refused, never saved as the content.
   const why = !page.video && refusal(page.title, page.body, url ? new URL(url).host : fileStem(name));
   if (why) throw new Error(why);
   return { ...page, url };
 }
+
+/** A page that is an episode (`pageAudio`) as its episode (D215): as an episode link gives it (the
+ *  audio the original, to play in place, its heard transcript the text, D167), under the page's own
+ *  title, author and date, with the page kept as `page.html` so its own text is one click away
+ *  (`addPageText`). Audio that can't be fetched, isn't audio, or can't be heard (an older macOS,
+ *  another language) leaves the article as it was; a page with no text of its own (a player's wrapper)
+ *  has nothing else to keep, so it says why. Null: not an episode, or left as the article. */
+async function asEpisode(html: string, base: string, page: NewItem, opts: AddOptions): Promise<NewItem | null> {
+  const audio = (await import("./audio.ts")).pageAudio(html, base);
+  if (!audio && opts.episode) throw new Error("Couldn’t find the episode’s audio on its page any more, so it was left as it was. Open the page to check.");
+  if (!audio) return null;
+  try {
+    // An episode this machine can't hear (another computer, an older macOS) isn't downloaded for nothing.
+    if (!(await import("./audio.ts")).canTranscribe()) throw new Error("Transcribing audio needs macOS 26 or later on a Mac. If it has a transcript, copy it and paste it here instead.");
+    const res = await get(audio, new URL(audio).host);
+    const kind = kindOf(new URL(res.url || audio).pathname, res.headers.get("content-type") ?? "");
+    if (!kind || !AUDIO_TYPES.includes(kind)) {
+      await res.body?.cancel();
+      throw new Error(noPaste("The episode’s audio on that page isn’t a sound file Ore can hear."));
+    }
+    const ep = await fromBytes(await readCapped(res), kind, page.title, page.url, page.url, opts);
+    return { ...ep, title: page.title, author: page.author, published: page.published, page: html };
+  } catch (e) {
+    if (!hasText(page.body) || opts.episode) throw e;
+    return null;
+  }
+}
+
+/** Where an episode's page text starts once he adds it (D215). */
+export const PAGE_HEADING = "## From the page";
+const pageFile = (item: Item) => join(item.dir, "page.html");
+
+/** Whether a source is an episode whose page is kept and whose text he hasn't added (D215). */
+export const hasPageText = (item: Item) => existsSync(pageFile(item)) && !item.meta.page_added;
+
+/** A kept episode page's own text as the article reader makes it (headings, links, speaker names), its
+ *  images saved, as the section added below the transcript. */
+async function pageSection(html: string, url: string | undefined, title: string): Promise<{ text: string; assets: Asset[] }> {
+  const w = await (await import("./web.ts")).htmlToDoc(html, url ?? "about:blank");
+  const { body, assets } = await saveImages(dropTitle(w.markdown, title), { referer: url });
+  if (!body.trim()) throw new Error("Found no text on the page to add.");
+  return { text: `${PAGE_HEADING}\n\n${body.trim()}\n`, assets };
+}
+/** The section after a body, a blank line between them. */
+const below = (body: string, section: string) => `${body.endsWith("\n") ? "" : "\n"}\n${section}`;
+const marked = (meta: ItemMeta, id: string | undefined): ItemMeta => ({ ...meta, page_added: id });
+
+/** Adds an episode's page text below its transcript (D215), under PAGE_HEADING at the end, so no
+ *  highlight moves. The page is read and its images fetched first; the text goes in under the lock,
+ *  checked again there, so two at once add it once. Undone with `undoPageText`, redone with `redoPageText`. */
+export async function addPageText(lib: Library, ref: string): Promise<import("../cut.ts").Cut> {
+  const item = findItem(lib, ref);
+  const refuse = (i: Item) => {
+    if (!existsSync(pageFile(i))) throw new Error("This source has no page kept to add text from.");
+    if (!hasPageText(i)) throw new Error("The page’s text is already in this source.");
+  };
+  refuse(item);
+  const { text, assets } = await pageSection(readFileSync(pageFile(item), "utf8"), item.meta.url, item.meta.title);
+  for (const a of assets) writeAtomic(join(item.dir, "assets", a.name), a.data);
+  return (await import("../cut.ts")).appendText(lib, ref, (now) => (refuse(now), below(now.body, text)), marked);
+}
+/** Takes the added page text out again; its highlights go with it until `redoPageText`. */
+export const undoPageText = async (lib: Library, ref: string, id: string) => (await import("../cut.ts")).takeEnd(lib, ref, id, marked);
+/** Puts the page text back below the transcript, its highlights with it. */
+export const redoPageText = async (lib: Library, ref: string, id: string) => (await import("../cut.ts")).putEnd(lib, ref, id, marked);
 
 /** A text file's bytes as text, whatever wrote it: a byte-order mark names UTF-8 or UTF-16 (Windows
  *  Notepad), and bytes that aren't UTF-8 are an old editor's Windows-1252 (Latin-1), never "Caf�". */
@@ -560,7 +632,7 @@ export interface Reimported {
 
 // Files a reimport replaces; the previous ones wait in `.ore/reimport/<id>/` for Undo.
 // layout.json (D125) belongs to the version it was read into, so Undo takes its tables back out too.
-const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.");
+const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.") || name === "page.html";
 const stash = (lib: Library, id: string) => join(lib.root, ".ore", "reimport", id);
 
 /** Swaps a source's text files (doc.md body and kind, source.*, transcript.vtt) with the ones in `from`,
@@ -575,7 +647,7 @@ function swapFiles(item: Item, from: string) {
   const was = ItemMetaSchema.parse(old.data);
   for (const f of readdirSync(item.dir).filter(REPLACED)) unlinkSync(join(item.dir, f));
   for (const f of readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md")) copyFileSync(join(from, f), join(item.dir, f));
-  const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256 };
+  const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, page_added: was.page_added, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256 };
   writeAtomic(item.docPath, stringifyFrontmatter(meta, old.body));
   rmSync(from, { recursive: true, force: true });
   return tmp;
@@ -608,8 +680,15 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const regions = read ?? layoutOf(item.dir);
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
-  const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
+  const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)) }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
   if (!draft.body.trim()) throw new Error("Found no text to read at the original now. It may have moved; open it to check.");
+  // An episode he added its page text to keeps it, after the transcript, so its highlights re-anchor (D215).
+  const section = item.meta.page_added && draft.page ? await pageSection(draft.page, url, item.meta.title) : undefined;
+  const tail = section && below(draft.body, section.text);
+  if (section && tail) {
+    draft.body += tail;
+    draft.assets = [...(draft.assets ?? []), ...section.assets];
+  }
   if (draft.body === item.body) {
     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).
     if (String(draft.structure ?? "") !== String(item.meta.structure ?? "")) item.meta = await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: draft.structure }));
@@ -624,6 +703,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md")) unlinkSync(join(item.dir, f));
     if (draft.source) writeAtomic(join(item.dir, `source.${draft.source.ext}`), draft.source.data);
     if (draft.transcript) writeAtomic(join(item.dir, "transcript.vtt"), draft.transcript);
+    if (draft.page) writeAtomic(join(item.dir, "page.html"), draft.page);
     if (regions?.length) writeAtomic(join(item.dir, "layout.json"), JSON.stringify(regions));
     // Images are named by their content, so the previous version's stay for Undo and shared ones are not copied twice.
     for (const a of draft.assets ?? []) writeAtomic(join(item.dir, "assets", a.name), a.data);
@@ -631,7 +711,8 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     // A lesson read from its course page again (lessonOf) gains its page's link.
     // Read again under the lock: a background enrich may have written its questions while this one read.
     const now = readItemDir(item.dir).meta;
-    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure };
+    const added = tail ? recordEnd(lib, item.meta.id, draft.body.length - tail.length, tail) : undefined;
+    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);
