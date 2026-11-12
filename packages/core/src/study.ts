@@ -14,6 +14,7 @@ import { NO_SKILL } from "./no-skill.ts";
 import { openSessionId, readSessions } from "./sessions.ts";
 import { archivedOnly, cardPriority, unfiled, desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
 import { retentionMetric } from "./stats.ts";
+import { passedVariant, SOLID_DAYS } from "./today.ts";
 
 export interface ReviewInput {
   rating: 1 | 2 | 3 | 4;
@@ -278,8 +279,47 @@ export function libraryStats(lib: Library, open?: LibraryIndex): { skills: Skill
 /** A card's reviews in time and where each rating would put the next one (D149): the dates the review
  *  screen draws as a line of dots, so he sees the gaps widen while recall holds. Read from the log,
  *  nothing new stored. `now` for tests. */
-export function cardHistory(lib: Library, cardRef: string, now = new Date()): { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string> } {
+/** What a card's gem looks like (D236): `empty` never reviewed, `rough` growing, `ready` one Good review from
+ *  cut, `cut` solid, `dull` cut once and missed since. `seam`: it has been missed and won back (a gold rim it
+ *  keeps); `polished`: passed on a new case (D197). */
+export type CardGem = { kind: "empty" | "rough" | "ready" | "cut" | "dull"; seam?: boolean; polished?: boolean };
+type Rating = 1 | 2 | 3 | 4;
+
+/** A card's reviews, where each rating would put the next one (D149), and its gem: as it is now and as each
+ *  rating would leave it, with the days of memory (FSRS stability) that rating adds. */
+export function cardHistory(lib: Library, cardRef: string, now = new Date()): { reviews: { ts: string; rating: Rating }[]; next: Record<Rating, string>; gem: CardGem & { after: Record<Rating, CardGem & { days: number }> } } {
   const { retention, w, prior, before, at } = stateBefore(lib, findCard(lib, cardRef), now);
-  const due = (rating: 1 | 2 | 3 | 4) => nextState(before, at, rating, retention, w).due;
-  return { reviews: prior.map((r) => ({ ts: r.ts, rating: r.rating as 1 | 2 | 3 | 4 })), next: { 1: due(1), 2: due(2), 3: due(3), 4: due(4) } };
+  const after = (rating: Rating) => nextState(before, at, rating, retention, w);
+  const solid = (stability: number) => stability >= SOLID_DAYS;
+  const was = prior.length ? before.stability : 0;
+  // Its past, by the receipt's rule (`gemGrade`): cut once, fallen from cut, passed on a new case.
+  let cutOnce = false;
+  let fell = false;
+  let wonBack = false;
+  let last = false;
+  for (const r of prior) {
+    const s = solid(r.state_after.stability);
+    if (last && !s) fell = true;
+    if (s && fell) wonBack = true;
+    if (s) cutOnce = true;
+    last = s;
+  }
+  const polished = prior.some(passedVariant) || undefined;
+  const near = (state: FsrsState) => solid(nextState(state, new Date(state.due), 3, retention, w).stability);
+  // The rim is gold once it has fallen and been cut again; a first miss has none yet.
+  const gem = (state: FsrsState | null): CardGem => {
+    if (!state) return { kind: "empty" };
+    if (solid(state.stability)) return { kind: "cut", ...(fell ? { seam: true } : {}), ...(polished ? { polished } : {}) };
+    if (cutOnce) return { kind: "dull", ...(wonBack ? { seam: true } : {}) };
+    return { kind: near(state) ? "ready" : "rough" };
+  };
+  const then = (rating: Rating) => {
+    const a = after(rating);
+    return { ...gem(a), days: Math.max(0, Math.round(a.stability - was)) };
+  };
+  return {
+    reviews: prior.map((r) => ({ ts: r.ts, rating: r.rating as Rating })),
+    next: { 1: after(1).due, 2: after(2).due, 3: after(3).due, 4: after(4).due },
+    gem: { ...gem(prior.length ? before : null), after: { 1: then(1), 2: then(2), 3: then(3), 4: then(4) } },
+  };
 }

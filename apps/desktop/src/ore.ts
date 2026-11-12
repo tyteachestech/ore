@@ -323,7 +323,10 @@ export type CardFull = {
   /** Its reviews and where each rating puts the next one (D149); with --review only. */
   history?: CardHistory;
 };
-export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string> };
+/** A card's gem (D236); `seam`: missed and won back, `polished`: passed on a new case. */
+export type CardGem = { kind: "empty" | "rough" | "ready" | "cut" | "dull"; seam?: boolean; polished?: boolean };
+/** `gem`: as it is now and as each rating would leave it, with the days of memory that rating adds. */
+export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string>; gem?: CardGem & { after: Record<1 | 2 | 3 | 4, CardGem & { days: number }> } };
 
 /** `ore grade`: a proposed rating (never logged by itself, D21) and one mark per rubric point, with the words
  *  of his answer that earned each covered one ("" for none; absent from a grade made before D141). */

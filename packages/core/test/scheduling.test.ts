@@ -96,4 +96,40 @@ describe("card history (D149)", async () => {
     expect(h.reviews.map((r) => Date.parse(r.ts))).toEqual([T0, T0 + 3 * DAY, T0 + 4 * DAY]);
     expect(Date.parse(h.next[3])).toBeGreaterThan(T0 + 10 * DAY);
   });
+
+  test("its gem (D236): empty before a review, a rock while it grows, cut at three weeks of memory, loose when missed, and a gold rim once won back", async () => {
+    const { item: it } = await addSnippet(lib, { text: "Spacing beats cramming." });
+    const c = writeNewCard(lib, { kind: "card", item: it.meta.id, skills: ["learning"], topics: [], content_type: "fact", question: "q2", answer: "a2", rubric: [] });
+    const gem = (at: number) => cardHistory(lib, c.meta.id, new Date(at)).gem;
+    expect(gem(T0).kind).toBe("empty");
+    expect(gem(T0).after[3].kind).not.toBe("empty");
+    // Good reviews, each when it comes due, until it is cut; the step before says so.
+    let at = T0;
+    let kinds: string[] = [];
+    for (let i = 0; i < 12 && kinds.at(-1) !== "cut"; i++) {
+      const g = gem(at);
+      const said = g.after[3];
+      await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: new Date(at) });
+      at = Date.parse(cardHistory(lib, c.meta.id, new Date(at)).next[3]) - 1;
+      // What it said a Good would give is what the Good gave.
+      expect({ kind: gem(at).kind, seam: gem(at).seam }).toEqual({ kind: said.kind, seam: said.seam });
+      if (said.kind === "cut") expect(g.kind).toBe("ready");
+      expect(said.days).toBeGreaterThan(0);
+      kinds.push(gem(at).kind);
+    }
+    expect(kinds.at(-1)).toBe("cut");
+    expect(kinds.slice(0, -1).every((k) => k === "rough" || k === "ready")).toBe(true);
+    expect(gem(at).seam).toBeUndefined();
+    // A miss: it comes loose, adds no days, and has no rim yet.
+    expect(gem(at).after[1]).toEqual({ kind: "dull", days: 0 });
+    await recordReview(lib, c.meta.id, { rating: 1, confidence: 3, now: new Date(at) });
+    expect(gem(at).kind).toBe("dull");
+    // Won back: cut again with the rim, which it keeps through a later miss.
+    for (let i = 0; i < 12 && gem(at).kind !== "cut"; i++) {
+      await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: new Date(at) });
+      at = Date.parse(cardHistory(lib, c.meta.id, new Date(at)).next[3]) - 1;
+    }
+    expect(gem(at)).toMatchObject({ kind: "cut", seam: true });
+    expect(gem(at).after[1]).toEqual({ kind: "dull", seam: true, days: 0 });
+  });
 });

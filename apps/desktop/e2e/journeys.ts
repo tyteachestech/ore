@@ -5720,6 +5720,51 @@ journey("review: the screen reader's summary counts the key points as he has mar
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: Good over a miss takes a second press, and a cut gem he misses comes loose with the mole's line; ⌘Z takes both back (D237)", async (page) => {
+  // The exercise's gem is cut, whatever the seed's schedule says: its history comes back with that gem.
+  await page.route(/\/ore$/, async (route) => {
+    const args = (JSON.parse(route.request().postData() ?? "{}") as { args?: string[] }).args ?? [];
+    if (args[0] !== "card" || !args.includes("--review")) return route.continue();
+    const r = await route.fetch();
+    const j = JSON.parse(await r.text()) as { history?: Record<string, unknown>; data?: { history?: Record<string, unknown> } };
+    const h = (j.data ?? j).history;
+    if (h) {
+      h.reviews = [{ ts: new Date(Date.now() - 38 * 86_400_000).toISOString(), rating: 3 }];
+      h.gem = { kind: "cut", after: { 1: { kind: "dull", days: 0 }, 2: { kind: "cut", days: 2 }, 3: { kind: "cut", days: 9 }, 4: { kind: "cut", days: 14 } } };
+    }
+    await route.fulfill({ response: r, body: JSON.stringify(j) });
+  });
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 1, gaps: [], feedback: "", covered: [false, false] } }));
+  await startReview(page, /Teaching/);
+  const q = page.locator(".review-q");
+  await page.getByRole("textbox", { name: "Your answer" }).fill("because it is boring");
+  await page.getByRole("radio", { name: "Sure", exact: true }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await page.locator(".review-rate .rate-1.suggested").waitFor();
+  await page.locator('.review-gem .gem[data-kind="cut"]').waitFor();
+  const was = await q.innerText();
+  // Good, two steps over the marks: it waits, says why, and nothing is recorded.
+  await page.keyboard.press("3");
+  const guard = page.locator(".review-guard");
+  await guard.waitFor();
+  if (!(await guard.innerText()).includes("2 of 2 key points are marked missed. Press Good again to keep it.")) throw new Error(`the guard says: ${await guard.innerText()}`);
+  if ((await q.innerText()) !== was) throw new Error("one press of Good over a miss moved on");
+  if (await page.locator(".review-moment").count()) throw new Error("a rating that only waits showed a moment");
+  // Again, what the marks say, goes in at one press: the gem comes loose and the line is true to his Sure.
+  await page.keyboard.press("1");
+  const moment = page.locator('.review-moment[data-tone="miss"]');
+  await moment.waitFor();
+  await moment.locator('.gem[data-kind="dull"]').waitFor();
+  if (!(await moment.innerText()).includes("You were sure")) throw new Error(`the moment says: ${await moment.innerText()}`);
+  if ((await moment.innerText()).includes("days")) throw new Error("a miss showed days added");
+  // ⌘Z: the rating and its moment are both taken back.
+  await page.keyboard.press("Meta+z");
+  await moment.waitFor({ state: "detached" });
+  await until("the exercise is back", async () => (await q.innerText()) === was);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("review: with no AI marks (the check failed), the screen reader counts the ones he sets", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { grade: "AI is signed out." }));
   await startReview(page, /Teaching/);
