@@ -81,9 +81,11 @@ const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id,
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
+export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
+  /** Review this source: only its exercises, its new ones included. */
+  source?: string;
   /** Hidden while he reads the source a card opened; it waits on that card, its keys off. */
   paused?: boolean;
   /** Under the palette or the shortcuts sheet (controls-08): its keys are theirs until they close. */
@@ -230,7 +232,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
           setStart(t);
         }, () => {});
         // --start: a session opens on a likely recall (D176); the quick quiz asks the card that is next.
-        const q = await ore<DueEntry[]>("due", ...(quick ? [] : ["--start"]), ...(pick ?? []).map((s) => opt("skill", s)));
+        const q = await ore<DueEntry[]>("due", ...(quick ? [] : ["--start"]), ...pickArgs(pick, source));
         // An empty queue ends the session at once, and why ("nothing due in the skills you picked",
         // new cards waiting) reads today: let it land first.
         if (!q.length) await t;
@@ -245,14 +247,14 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       live = false;
       mounted.current = false;
     };
-  }, [pick, startTry]);
+  }, [pick, source, startTry]);
   // Gone any other way than Esc or Done (a click away from the quick quiz, Open in source from it):
   // this session ends, by its id, never another window's. Try again keeps it.
   useEffect(() => () => {
     const s = session.current;
     if (s?.open) void ore("session", "end", s.id).catch(() => {});
     session.current = null;
-  }, [pick]);
+  }, [pick, source]);
 
   // Closed: a Later recorded nothing, so ⌘Z after it has nothing of Review's to take back.
   useEffect(() => () => {
@@ -266,7 +268,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   useEffect(() => {
     if (quick || PHONE) return;
     const un = listen("quiz-closed", () => {
-      ore<DueEntry[]>("due", "--all", ...(pick ?? []).map((s) => opt("skill", s))).then((fresh) => {
+      ore<DueEntry[]>("due", "--all", ...pickArgs(pick, source)).then((fresh) => {
         const due = new Set(fresh.map((e) => e.id));
         const s = now.current;
         const started = s.phase !== "answer" || !!s.answer.trim();
@@ -274,7 +276,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
       }, () => {});
     });
     return () => void un.then((f) => f());
-  }, [quick, pick]);
+  }, [quick, pick, source]);
 
   /** A fresh start on a card: no answer, no marks, its clock not yet started. */
   const reset = () => {
@@ -383,7 +385,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         // Left before rating anything while cards were waiting: just close, they stay due.
         if (queue?.length) return onClose();
         // Nothing came up (all caught up, or the picked skills have nothing due): say so, never just vanish.
-        notify(nothingDue(before.current, pick));
+        notify(nothingDue(before.current, pick, source));
         return onClose();
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
@@ -395,7 +397,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
     } finally {
       setBusy(false);
     }
-  }, [notify, onClose, queue, quick, pick]);
+  }, [notify, onClose, queue, quick, pick, source]);
 
   useEffect(() => {
     // The quick quiz with nothing due says so and waits for Esc instead of closing under his hand.
@@ -1030,7 +1032,7 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
         )}
         {!error && !end && (!queue || (entry && !card)) && <p className="loading"><Working label="Getting your exercises…" /></p>}
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
-        {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick)}</p>}
+        {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick, source)}</p>}
 
         {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
 
@@ -1297,9 +1299,13 @@ export function Review({ pick, skills, onOpenSource, onClose, onLogged, notify, 
   );
 }
 
+/** What `ore due` is asked for: the picked skills, or one source. */
+const pickArgs = (pick: string[] | null, source?: string) => [...(pick ?? []).map((s) => opt("skill", s)), ...(source ? [opt("source", source)] : [])];
+
 /** Why a session has no cards, honestly: the pick leaves out skills with cards due, or the daily limits hold
  *  new cards back (D65), and only then "nothing is due". */
-function nothingDue(t: Today | null, pick: string[] | null): string {
+function nothingDue(t: Today | null, pick: string[] | null, source?: string): string {
+  if (source) return "Nothing from this source is due right now.";
   if (pick && t && t.due > 0) return `Nothing is due in the skills you picked today. ${t.due} ${t.due === 1 ? "exercise waits" : "exercises wait"} in the others.`;
   return t?.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Nothing is due right now.";
 }

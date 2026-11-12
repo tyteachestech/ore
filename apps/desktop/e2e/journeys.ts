@@ -9081,6 +9081,70 @@ async function phoneSource(page: Page, title: string) {
   await page.locator(".phone-reader .doc").first().waitFor();
 }
 
+/** A finger held still on the middle of the target for `ms`, then lifted, with the few points of drift a real
+ *  finger makes (Playwright's touchscreen only taps). Touch events built in the page, then the click a browser may
+ *  send on the lift, at that point: on whatever opened under the finger. */
+async function press(page: Page, target: Locator, ms = 650) {
+  let b = (await target.first().boundingBox())!;
+  for (let i = 0; i < 20; i++) {
+    await Bun.sleep(50); // Once a sliding drawer or sheet has stopped.
+    const now = (await target.first().boundingBox())!;
+    if (now.x === b.x && now.y === b.y) break;
+    b = now;
+  }
+  const [x, y] = [b.x + b.width / 2, b.y + b.height / 2];
+  const send = (type: string, dx: number) =>
+    page.evaluate(([type, x, y]) => {
+      const el = document.elementFromPoint(x as number, y as number)!;
+      const t = { clientX: x, clientY: y, target: el, identifier: 1 };
+      const e = new Event(type as string, { bubbles: true, cancelable: true });
+      Object.assign(e, { touches: type === "touchend" ? [] : [t], changedTouches: [t] });
+      el.dispatchEvent(e);
+      if (type === "touchend") document.elementFromPoint(x as number, y as number)!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: x as number, clientY: y as number }));
+    }, [type, x + dx, y] as const);
+  await send("touchstart", 0);
+  for (let i = 0; i < ms / 100; i++) (await Bun.sleep(100), await send("touchmove", i % 2 ? 2 : 0));
+  await send("touchend", 0);
+}
+
+journey("phone: a long press on a Today source opens its menu", async (page) => {
+  // Tyler 2026-11-12: holding a source on Today did nothing. Only the Sources list had the hold; Today's rows
+  // left it to Radix, whose touch timer gives up at a finger's first few points of drift.
+  await press(page, page.locator(".home-read").first());
+  await page.getByRole("menuitem", { name: /Move to (Done|To read)/ }).waitFor();
+  // The lift's click landed on the menu that opened under the finger and picked Open.
+  await Bun.sleep(300);
+  if (await page.locator(".phone-reader").count()) throw new Error("lifting the finger after the hold opened the source");
+  if (!(await page.getByRole("menuitem", { name: "Review this source" }).isVisible())) throw new Error("the menu closed as the finger lifted");
+  await page.keyboard.press("Escape");
+  // The Sources list's rows hold too, and their menu stays on screen (it ran off at the finger's x).
+  await page.evaluate(() => localStorage.setItem("ore-phone-place", JSON.stringify({ tab: "sources", skill: null, openId: null, review: null })));
+  await page.reload();
+  await press(page, page.locator(".phone-sources li button").first());
+  await page.getByRole("menuitem", { name: "Archive" }).waitFor();
+  // Renamed in place, the row still holds: its touch listeners stay on the row through the field.
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const field = page.locator(".phone-row-rename input");
+  await field.fill("A renamed source");
+  await field.press("Enter");
+  const renamed = page.locator(".phone-sources li button").filter({ hasText: "A renamed source" });
+  await renamed.waitFor();
+  await press(page, renamed);
+  await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
+}, "phone");
+
+journey("phone: a long press on a skill, on Today or in the drawer, opens the skill's menu, and Review this skill reviews it", async (page) => {
+  // Tyler 2026-11-12: skills had no menu on the phone at all. The Mac's right-click, less Delete.
+  await press(page, page.locator(".home-skill").first());
+  for (const name of ["Open", "Review this skill", "Edit skill…", "Importance", "Archive skill"]) await page.getByRole("menuitem", { name }).waitFor();
+  if (await page.getByRole("menuitem", { name: /Delete/ }).count()) throw new Error("Delete skill is on the phone's menu");
+  await page.keyboard.press("Escape");
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await press(page, page.locator(".phone-drawer section button").first());
+  await tap(page, page.getByRole("menuitem", { name: "Review this skill" }));
+  await page.locator(".phone-full .review, .phone-full .empty-state, .phone-full .loading").first().waitFor();
+}, "phone");
+
 journey("phone: reopening on a source that left the library lands on Today, not an error with its id", async (page) => {
   // Found in the Simulator: a place saved before the source was deleted (on the Mac, or by a new build) showed
   // `no item matches "01M4…"` and a lowercase "back to sources" instead of the app.

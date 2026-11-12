@@ -423,6 +423,10 @@ img.thumb { filter: brightness(0.86); }
 .skill-edit-foot { display: flex; align-items: center; gap: 12px; margin: 8px -18px 0; padding: 8px 18px; min-height: 36px; border-top: 1px solid var(--border); color: var(--faint); font-size: 12px; }
 .skill-edit-foot .right { margin-left: auto; }
 .swatches { display: flex; gap: 6px; }
+/* The iPhone's skill editor (a long press, Edit skill…): the screen's width less its gutters, the colours on two lines. */
+.phone .panel.skill-edit { width: calc(100vw - 32px); padding-bottom: 12px; }
+.phone .skill-edit .look-row { grid-template-columns: 76px minmax(0, 1fr); padding: 4px 0; }
+.phone .skill-edit .swatches { flex-wrap: wrap; gap: 8px; }
 .swatch { width: 20px; height: 20px; border-radius: 50%; background: var(--skill, transparent); border: 1px solid var(--border); }
 .swatch.small { width: 16px; height: 16px; }
 .swatch-hint { display: flex; } /* the swatch's hover hint (IconPicker.tsx Swatches) */
@@ -2488,6 +2492,12 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-sources h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 28px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .phone-sources ul { list-style: none; margin: 0; padding: 0; }
 .phone-sources li { position: relative; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* A source being renamed in place: the row's own shape, the title a field (Finder's Rename). */
+.phone-sources .phone-row-rename { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.phone-sources .phone-row-rename input { flex: 1; min-width: 0; height: 32px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: 16px var(--font); color: var(--text); }
+.phone-sources li button[hidden] { display: none; }
+/* A long press opens our menu on these (WithMenu hold), never iOS's own callout. */
+.phone :is(.home-read, .home-skill, .phone-drawer button) { -webkit-touch-callout: none; }
 .phone-sources li button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 0; background: var(--bg); border: 0; border-bottom: 1px solid var(--border); color: var(--text); text-align: left; font: 16px var(--font); }
 .phone-swipe { position: absolute; inset: 0; display: flex; align-items: center; color: var(--muted); font: 400 12px var(--mono); }
 .phone-swipe.left { justify-content: flex-end; }

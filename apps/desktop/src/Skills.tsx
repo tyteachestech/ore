@@ -310,7 +310,8 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
   collections: string[];
   onSaved: () => void;
   onClose: () => void;
-  onDelete: () => void;
+  /** None on the iPhone: deleting a skill stays on the Mac, and with it this foot (Esc is a key it has none of). */
+  onDelete?: () => void;
   notify: Notify;
 }) {
   // An icon from before D157 (an emoji, "ph:") draws nothing and core refuses it, so it reads as none: Undo clears it.
@@ -393,14 +394,16 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
           <span>Collection</span>
           <CollectionPicker value={look.collection} collections={collections} onPick={(c) => void set("collection", c)} />
         </div>
-        <div className="skill-edit-foot">
-          <button className="foot-danger" onClick={onDelete}>
-            Delete skill…
-          </button>
-          <span className="right">
-            <kbd>Esc</kbd> close
-          </span>
-        </div>
+        {onDelete && (
+          <div className="skill-edit-foot">
+            <button className="foot-danger" onClick={onDelete}>
+              Delete skill…
+            </button>
+            <span className="right">
+              <kbd>Esc</kbd> close
+            </span>
+          </div>
+        )}
       </div>
       </Trap>
     </div>

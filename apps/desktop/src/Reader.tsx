@@ -583,6 +583,8 @@ type Props = {
   renameSource: number;
   /** The open source's actions, read by ⌘K so it lists the same ones as the ⋯ menu. */
   actionsRef: { current: MenuAction[] };
+  /** Review this source: a session of only its exercises. */
+  onReview?: (item: Item) => void;
   /** Set by the reader: opens the tutor's exercise in the source note (D128.6); `done` gets what he
    *  wrote under its heading when he sends it (⌘↵), or null when he leaves with Esc. */
   practiceRef?: PracticeRef;
@@ -2853,6 +2855,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           : [{ id: "finish", label: "Finish source", hint: label(keys["finish-source"]), divider: true, run: () => p.setFinishing(true) }]),
         ...(video || PHONE ? [] : [{ id: "listen", label: listen ? "Stop listening" : "Listen", hint: label(keys.listen), run: () => (listen ? stopListening() : startListening()) }]),
         ...(focus ? [{ id: "highlight", label: "Highlight focused text", hint: label(keys.highlight), paletteOnly: true, run: () => highlightFocus("keep") }] : []),
+        ...(p.onReview ? [{ id: "review-source", label: "Review this source", run: () => p.onReview!(doc) }] : []),
         { id: "card-here", label: "Add a key point here…", hint: label(keys.card), run: cardHere },
         // The open highlight's own tools, also in ⌘K (three ways to every action); its popup has the buttons.
         ...(popup && !PHONE
