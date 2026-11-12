@@ -320,6 +320,8 @@ export function fromScene(scene: Scene | null): El[] {
     .map((e) => ({
       x: 0, y: 0, width: 0, height: 0, angle: 0, strokeColor: STROKES[0]!, backgroundColor: "transparent", fillStyle: "solid", strokeWidth: 2,
       strokeStyle: "solid", roughness: 0, opacity: 100, groupIds: [], roundness: null, boundElements: null, locked: false, ...e,
+      // Written without it when it equals the text (compact), as Excalidraw reads it; the editor edits originalText.
+      ...(e.type === "text" && e.originalText == null ? { originalText: e.text ?? "" } : {}),
     }));
 }
 

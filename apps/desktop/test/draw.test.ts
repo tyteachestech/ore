@@ -70,6 +70,8 @@ describe("saved and opened again (Codex sweep 4)", () => {
     expect(absPointsOf(route(a, byId(back)))[1]![0]).toBe(320);
     expect(back.find((e) => e.containerId === s.id)?.verticalAlign).toBe("top");
     expect(back.filter((e) => e.customData?.oreCell)).toHaveLength(4);
+    // A label written without its originalText (left out when it equals text) opens with its words (sweep 5).
+    expect(back.find((e) => e.containerId === s.id)?.originalText).toBe("Section");
   });
 });
 
