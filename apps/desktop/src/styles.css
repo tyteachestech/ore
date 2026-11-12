@@ -2612,6 +2612,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .kb-btn { flex: 1 0 44px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
+.phone .review-moment { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
 .phone .menu-item { height: 44px; }
 /* A submenu (a source's Skills) has no room beside its menu at phone width: it rises as a sheet across the bottom.
@@ -3075,6 +3076,33 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .timeline .rate-3 { --rate: var(--c-green); }
 .timeline .rate-4 { --rate: var(--c-blue); }
 .timeline + .review-rate { margin-top: 14px; }
+/* The exercise's gem beside its reviews (D237): one line, the gem on the timeline's midline. */
+.review-memory { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+.review-memory .timeline { flex: 1; margin-top: 0; }
+.review-memory + .review-rate { margin-top: 14px; }
+.review-gem { flex: none; display: inline-grid; border-radius: 4px; }
+.review-gem:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* A rating waiting for its second press. */
+.review-rate button[data-armed] { box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--rate); }
+.review-rate button[data-armed]:focus-visible { box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--rate), 0 0 0 4px var(--focus); }
+.review-guard { margin: 10px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
+/* The moment after a rating that changed the gem: it sits over the next card and never holds it back. */
+.review-moment { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: center; gap: 12px; max-width: min(520px, calc(100% - 32px)); padding: 10px 16px 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-rise var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
+.review-moment[data-tone="miss"] { animation-delay: 0s, 5.7s; }
+.moment-mole { flex: none; align-self: flex-end; display: inline-grid; margin: 0 0 -10px 4px; }
+.moment-gem { flex: none; display: inline-grid; }
+.moment-gem > .gem { grid-area: 1 / 1; }
+.moment-gem > .gem:first-child { animation: moment-was var(--t-3) var(--ease-out) 350ms both; }
+.moment-gem > .gem:last-child { animation: moment-now var(--t-moment) var(--ease-spring) 350ms both; }
+.review-moment[data-tone="miss"] .moment-gem > .gem:last-child { animation-timing-function: var(--ease-out); animation-duration: var(--t-4); }
+.moment-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--muted); font-size: 13px; line-height: 18px; }
+.moment-text b { color: var(--text); font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+@keyframes moment-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes moment-leave { to { opacity: 0; transform: translateY(4px); } }
+@keyframes moment-was { to { opacity: 0; transform: scale(0.9); } }
+@keyframes moment-now { from { opacity: 0; transform: scale(0.8); } }
+/* Still (the global rule stops every animation): only the gem it became shows. */
+@media (prefers-reduced-motion: reduce) { .moment-gem > .gem:first-child { display: none; } }
 
 /* Settings › Reading previews (D151): a choice shown as small cards of itself. 64×44 cards 6px apart, the picked
    one ringed in `focus`; arrows move and pick. A page card draws three text lines on its own page colour; a
