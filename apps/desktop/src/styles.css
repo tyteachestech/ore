@@ -1820,8 +1820,9 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 30px; height: 30px; padding: 0 6px; color: var(--muted);
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
 }
-/* A tool's key sits against its icon, on the icon's foot. */
-.draw-key { margin: 8px 0 0 -7px; font: inherit; font-size: 10px; line-height: 1; letter-spacing: 0; opacity: 0.6; }
+/* A tool's key sits in its button's bottom-right corner (Excalidraw): every tool the same square, the icon centred. */
+.draw-tool:has(.draw-key) { position: relative; width: 34px; padding: 0; }
+.draw-key { position: absolute; right: 3px; bottom: 2px; font: inherit; font-size: 9px; line-height: 1; letter-spacing: 0; opacity: 0.6; }
 .draw-tool:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .draw-tool[aria-pressed="true"] { background: var(--paper); color: var(--ink, #141413); }
 /* The lock is on by default: the closed lock says so, and the bar keeps one filled button, the tool. */
