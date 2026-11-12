@@ -95,7 +95,12 @@ function plusesOf(sel: El[], zoom: number, els: readonly El[]): { dir: Dir; p: P
     { dir: "down", p: [b.x + b.w / 2, b.y + b.h + d] },
     { dir: "left", p: [b.x - d, b.y + b.h / 2] },
     { dir: "up", p: [b.x + b.w / 2, b.y - d - 22 / zoom] },
-  ] as { dir: Dir; p: Pt }[]).filter((x) => !taken.has(x.dir));
+  ] as { dir: Dir; p: Pt }[]).filter((x) => {
+    if (taken.has(x.dir)) return false;
+    // A + over another shape would take the click meant for it.
+    const r = 10 / zoom;
+    return !els.some((o) => o.id !== e.id && isShape(o) && !isLabel(o) && (() => { const f = bounds(o); return x.p[0] + r > f.x && x.p[0] - r < f.x + f.w && x.p[1] + r > f.y && x.p[1] - r < f.y + f.h; })());
+  });
 }
 
 /** Handles for the selection: one rotated frame for a single shape, the union box for several. */
@@ -569,11 +574,16 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     );
   };
   const pasteFromMenu = async () => {
+    // An image first; WebKit can refuse that read and still give the text, so a refusal falls through to it.
     try {
       for (const item of await navigator.clipboard.read()) {
         const type = item.types.find((t) => t.startsWith("image/"));
         if (type) return pasteImage(new File([await item.getType(type)], "pasted", { type }));
       }
+    } catch {
+      /* text below */
+    }
+    try {
       pasteData(await navigator.clipboard.readText());
     } catch {
       notify("Couldn't reach the clipboard. Try ⌘V.", "error");
@@ -1190,7 +1200,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       setHot(target?.id ?? null);
       pts[cur.index] = target ? p : snapP(p, new Set([line.id]), off).p;
       const nb = pts[cur.index - 1] ?? pts[cur.index + 1];
-      const soft = !target && !off && nb ? softSnap(nb, pts[cur.index]!) : null;
+      if (e.shiftKey && !target && nb) pts[cur.index] = angleSnap(nb, pts[cur.index]!);
+      const soft = !target && !off && !e.shiftKey && nb ? softSnap(nb, pts[cur.index]!) : null;
       if (soft) pts[cur.index] = soft;
       setAngleGuide(soft && nb ? [nb, soft] : null);
       let next = withPoints(line, pts);

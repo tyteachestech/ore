@@ -50,8 +50,9 @@ describe("diagram files (Excalidraw's format)", () => {
     expect(dark("transparent")).toBe("transparent");
     expect(dark("#a5d8ff")).toMatch(/^#[0-9a-f]{6}$/);
     // The presets are the note's text colours, read from styles.css so the two never drift apart.
-    const css = readFileSync(join(import.meta.dir, "../src/styles.css"), "utf8");
-    const c = (n: string) => css.match(new RegExp(`--c-${n}:\\s*(#[0-9a-f]{6})`))![1];
+    // retro.css loads after styles.css and sets the palette the app shows, so its value is the one that counts.
+    const css = ["styles.css", "retro.css"].map((f) => readFileSync(join(import.meta.dir, "../src", f), "utf8")).join("\n");
+    const c = (n: string) => [...css.matchAll(new RegExp(`--c-${n}:\\s*(#[0-9a-f]{6})`, "g"))].at(-1)![1];
     expect([STROKES[1], STROKES[2], STROKES[3], STROKES[4]].map((x) => dark(x!))).toEqual([c("red"), c("green"), c("blue"), c("orange")]);
   });
 });
@@ -234,6 +235,11 @@ describe("keyboard maps (Tab, ⌘+arrow, ⌥+arrow)", () => {
     const r = addMap([], src, DEFAULT_STYLE, [0, 0]);
     expect(crossings(r.els)).toEqual([]);
     expect(crossings(tidy(r.els))).toEqual([]);
+    // With cycles and fan-in (Codex sweep 3).
+    const loop = "Question -prompts-> Recall\nRecall -checks-> Feedback\nFeedback -corrects-> Restudy\nRestudy -retries-> Recall\nFeedback -schedules-> Delay\nDelay -retests-> Question\nRecall -strengthens-> Memory\nSleep -consolidates-> Memory\nPractice -strengthens-> Memory\nMemory -supports-> Transfer\nExamples -support-> Transfer\nTransfer -raises-> Question\nConfidence -predicts-> Feedback\nFluency -inflates-> Confidence\nRestudy -creates-> Fluency";
+    const big = addMap([], loop, DEFAULT_STYLE, [0, 0]);
+    expect(crossings(big.els)).toEqual([]);
+    expect(crossings(tidy(big.els))).toEqual([]);
   });
 
   test("a typed map reuses nodes already drawn with the same label", () => {
