@@ -69,6 +69,9 @@ test("startled, his helmet jumps and both brows show; thinking cocks the one on 
   const think = cells(at(MOVES.thinking.still), "brow");
   expect(think).toHaveLength(4);
   expect(think.every(([c]) => c! > COLS / 2)).toBe(true);
+  // The brow sits over the eye, never on it: both eyes keep their four dots (three and a glint) as he looks up.
+  const up = at(MOVES.thinking.still);
+  expect(cells(up, "eye").length + cells(up, "glint").length).toBe(8);
 });
 
 test("the helmet never comes down over his eyes, whatever the move", () => {

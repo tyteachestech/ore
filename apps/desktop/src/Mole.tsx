@@ -40,20 +40,23 @@ const NOSE = [[9, 9], [9, 10], [10, 10]] as const;
 function face(s: State, fx: number, fy: number) {
   const m = new Map<number, Tone>();
   const ox = Math.round(fx + s.lx * 0.65), oy = Math.round(fy + s.ly * 0.75), nx = Math.round(fx * 1.1), er = 7;
-  const set = (r: number, c: number, t: Tone, dx = ox) => m.set((r + oy) * 100 + c + dx, t);
-  const both = (cells: readonly (readonly [number, number])[], t: Tone, dx = ox) => { for (const [r, c] of cells) { set(r, c, t, dx); set(r, COLS - 1 - c, t, dx); } };
-  if (s.arc > 0.5) both([[er + 1, 5], [er, 6], [er, 7], [er + 1, 8]], "eye");
-  else if (s.open < 0.35) both([[er + 1, 6], [er + 1, 7]], "eye");
+  const set = (r: number, c: number, t: Tone, dx = ox, dy = oy) => m.set((r + dy) * 100 + c + dx, t);
+  const both = (cells: readonly (readonly [number, number])[], t: Tone, dx = ox, dy = oy) => { for (const [r, c] of cells) { set(r, c, t, dx, dy); set(r, COLS - 1 - c, t, dx, dy); } };
+  // His eyes and brows never rise into the brim: a look up moves his nose and moustache, and cocks a brow.
+  const ey = Math.round(s.y + Math.max(0, s.ly));
+  if (s.arc > 0.5) both([[er + 1, 5], [er, 6], [er, 7], [er + 1, 8]], "eye", ox, ey);
+  else if (s.open < 0.35) both([[er + 1, 6], [er + 1, 7]], "eye", ox, ey);
   else {
     const top = s.tall > 0.5 ? er - 1 : er;
-    for (let r = top; r <= er + 1; r++) both([[r, 6], [r, 7]], "eye");
+    for (let r = top; r <= er + 1; r++) both([[r, 6], [r, 7]], "eye", ox, ey);
     // One highlight, top right of each eye (the light comes from the upper right).
-    set(top, 7, "glint"); set(top, 15, "glint");
+    set(top, 7, "glint", ox, ey); set(top, 15, "glint", ox, ey);
   }
-  // His brows sit under the brim: one shows, cocked, on the side he looks to, and both when his helmet jumps.
-  const brow = s.tall > 0.5 ? er - 2 : Math.max(6 - oy, er - 1);
-  if (s.lx > 0.5 || s.tall > 0.5) for (const [r, c] of span(brow, 13, 16)) set(r, c, "brow");
-  if (s.lx < -0.5 || s.tall > 0.5) for (const [r, c] of span(brow, 5, 8)) set(r, c, "brow");
+  // His brows sit under the brim, a row over his eyes: one shows, cocked, on the side he looks to, and both when
+  // his helmet jumps.
+  const brow = s.tall > 0.5 ? er - 2 : er - 1;
+  if (s.lx > 0.5 || s.tall > 0.5) for (const [r, c] of span(brow, 13, 16)) set(r, c, "brow", ox, ey);
+  if (s.lx < -0.5 || s.tall > 0.5) for (const [r, c] of span(brow, 5, 8)) set(r, c, "brow", ox, ey);
   both(NOSE, "nose", nx);
   both(s.arc > 0.5 ? SPREAD : HANG, "stache", nx);
   // The mouth, between the lobes: a small o, then a round O when he's surprised.
