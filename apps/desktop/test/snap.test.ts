@@ -97,6 +97,14 @@ describe("a selection on the page snaps across inline marks", () => {
     expect(sentenceRange(word(el, "First")).toString()).toBe("First one here.");
     expect(sentenceRange(word(el, "Last")).toString()).toBe("Last one.");
   });
+  test("a sentence goes on past an abbreviation or an initial, and still ends at a real full stop", () => {
+    const el = html("<p>Intro here. As Dr. Smith showed, e.g. in Fig. 3, the U.S. Army held firm. Mr. J. R. Tolkien wrote it. It ended, etc. Then more.</p>");
+    expect(sentenceRange(word(el, "showed")).toString()).toBe("As Dr. Smith showed, e.g. in Fig. 3, the U.S. Army held firm.");
+    expect(sentenceRange(word(el, "Army")).toString()).toBe("As Dr. Smith showed, e.g. in Fig. 3, the U.S. Army held firm.");
+    expect(sentenceRange(word(el, "Tolkien")).toString()).toBe("Mr. J. R. Tolkien wrote it.");
+    expect(sentenceRange(word(el, "Then")).toString()).toBe("Then more.");
+    expect(sentenceRange(word(el, "Intro")).toString()).toBe("Intro here.");
+  });
   test("a sentence never runs past its paragraph", () => {
     const el = html("<p>No full stop here</p><p>Next paragraph.</p>");
     expect(sentenceRange(word(el, "stop")).toString()).toBe("No full stop here");

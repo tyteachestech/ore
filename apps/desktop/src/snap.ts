@@ -92,6 +92,10 @@ export function snapRange(r: Range): Range {
 
 
 const sentences = new Intl.Segmenter(undefined, { granularity: "sentence" });
+/** A break the system puts after an abbreviation goes on (it already does before a lowercase word or a
+ *  number): an initial or a run of them (J. R., U.S.), or a title, a reference or a month before a name
+ *  or a number. "etc." is left out, as it often ends a sentence. */
+const ABBREV = /(?:^|[\s(\[“"'])(?:\p{Lu}|(?:\p{L}\.)+\p{L}|Mr|Mrs|Ms|Mx|Dr|Prof|Sr|Jr|St|Mt|Gen|Gov|Col|Capt|Lt|Sgt|Rev|Hon|Pres|Sen|Rep|No|Nos|Vol|Fig|Figs|Eq|Ch|Sec|pp?|vs|al|Inc|Ltd|Co|Corp|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.\s*$/u;
 
 /** The span of `text` from `a` to `z` with the spaces at either end left out, as a range; null if nothing is left. */
 function trimmed(at: Map<Text, number>, text: string, a: number, z: number): Range | null {
@@ -122,9 +126,12 @@ export function sentenceRange(word: Range): Range {
   const from = at.get(node as Text);
   if (from === undefined) return snapRange(word);
   const o = from + offset;
+  let a = 0;
   for (const s of sentences.segment(text)) {
-    if (o < s.index || o >= s.index + s.segment.length) continue;
-    return trimmed(at, text, s.index, s.index + s.segment.length) ?? snapRange(word);
+    const z = s.index + s.segment.length;
+    if (ABBREV.test(s.segment) && z < text.length) continue; // "Dr. | Smith": one sentence
+    if (o < z) return trimmed(at, text, a, z) ?? snapRange(word);
+    a = z;
   }
   return snapRange(word);
 }
