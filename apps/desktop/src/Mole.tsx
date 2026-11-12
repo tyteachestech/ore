@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-/* The tutor's mole (D168, drawn D169, a puppet since D219): its head and two paws over a strip of dirt, drawn as
+/* The tutor's mole (D168, drawn D169, a puppet since D214): its head and two paws over a strip of dirt, drawn as
    round dots on a 22 by 18 grid, like Nothing's dot glyphs. The face is an Animal Crossing mole's: a lighter
    muzzle, black eyes with one highlight, a pink nose.
    It moves like a puppet: each value of its shape (how high it stands, its dome, its paws, where it looks) follows a

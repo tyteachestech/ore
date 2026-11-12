@@ -2635,7 +2635,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   };
 
-  /** An episode's own page text, added below its transcript in one step (D219), with Undo and Redo as a
+  /** An episode's own page text, added below its transcript in one step (D215), with Undo and Redo as a
    *  cut's. Snipd's episode screen: the show notes are one tap from the player, never in its way. */
   const [addingPage, setAddingPage] = useState(false);
   const addPageText = async () => {
