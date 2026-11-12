@@ -35,8 +35,48 @@ test("at rest it is mirror-symmetric, with two eyes, two glints and a nose on th
   const shape = new Set(d.map((dot) => `${dot[0]},${dot[1]},${size(dot)}`));
   for (const dot of d) expect(shape.has(`${COLS - 1 - dot[0]},${dot[1]},${size(dot)}`)).toBe(true);
   expect(cells(d, "glint")).toHaveLength(2);
-  expect(cells(d, "nose").map(([c]) => c)).toEqual([10, 11]);
-  expect(cells(d, "eye")).toHaveLength(10);
+  expect(cells(d, "nose").map(([c]) => c)).toEqual([9, 10, 11, 12, 10, 11]);
+  expect(cells(d, "eye")).toHaveLength(6);
+});
+
+// D238: the old miner. A helmet with a lit lamp, a brim the grid's whole width, a moustache in two long lobes.
+test("he wears a helmet: a lamp of four dots on the midline, over a brim that spans the grid", () => {
+  const d = at();
+  expect(cells(d, "lamp")).toEqual([[10, 1], [11, 1], [10, 2], [11, 2]]);
+  expect(cells(d, "brim").map(([c]) => c)).toEqual(Array.from({ length: COLS }, (_, c) => c));
+  expect(new Set(cells(d, "brim").map(([, r]) => r))).toEqual(new Set([5]));
+  // The eyes sit under the brim, never behind it.
+  expect(Math.min(...cells(d, "eye").map(([, r]) => r!))).toBeGreaterThan(5);
+});
+
+test("his moustache hangs in two lobes to the dirt, and spreads wide when he is pleased", () => {
+  const rows = (d: ReturnType<typeof moleDots>) => cells(d, "stache").map(([, r]) => r!);
+  const hang = at(), wide = at(MOVES.happy.still);
+  expect(Math.max(...rows(hang))).toBe(ROWS - 2);
+  // Parted under the nose: nothing on the two middle columns below the lobes' join.
+  expect(cells(hang, "stache").filter(([c, r]) => (c === 10 || c === 11) && r! > 11)).toHaveLength(0);
+  expect(Math.max(...rows(wide))).toBeLessThan(14);
+  const reach = (d: ReturnType<typeof moleDots>) => Math.min(...cells(d, "stache").map(([c]) => c!));
+  expect(reach(wide)).toBeLessThan(reach(hang));
+});
+
+test("startled, his helmet jumps and both brows show; thinking cocks the one on the side he looks to", () => {
+  const brimRow = (d: ReturnType<typeof moleDots>) => Math.min(...cells(d, "brim").map(([, r]) => r!));
+  const wide = at(MOVES.surprised.still);
+  expect(brimRow(wide)).toBeLessThan(brimRow(at()));
+  expect(cells(wide, "brow")).toHaveLength(8);
+  expect(cells(at(), "brow")).toHaveLength(0);
+  const think = cells(at(MOVES.thinking.still), "brow");
+  expect(think).toHaveLength(4);
+  expect(think.every(([c]) => c! > COLS / 2)).toBe(true);
+});
+
+test("the helmet never comes down over his eyes, whatever the move", () => {
+  for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[])
+    for (const s of play(name, MOVES[name].end ?? MOVES[name].loop!)) {
+      if (s.y > 1) continue; // still coming up out of his hole
+      expect(cells(moleDots(s), "eye").length).toBeGreaterThanOrEqual(4);
+    }
 });
 
 test("the face is whole dots: eyes, glints and nose are full size wherever the body glides", () => {
