@@ -6,14 +6,15 @@ import { join } from "node:path";
 // hand-written "covered" list, so each row must say where it stands, and a fixed row must name the
 // test that keeps it fixed, which must exist.
 const root = join(import.meta.dir, "../../..");
-const SUITE = ["packages/core/test", "packages/cli/test", "apps/desktop/test", "apps/desktop/e2e", "apps/phone/test"];
+// style-check.ts is part of the suite: `bun run e2e` ends with it, and CI fails on its findings.
+const SUITE = ["packages/core/test", "packages/cli/test", "apps/desktop/test", "apps/desktop/e2e", "apps/phone/test", "apps/desktop/scripts/mock/style-check.ts"];
 
 function files(dir: string): string[] {
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });
   } catch {
-    return [];
+    return /\.tsx?$/.test(dir) ? [dir] : []; // a single file
   }
   return entries.flatMap((e) => (e.isDirectory() ? (e.name === "fixtures" || e.name === "golden" ? [] : files(join(dir, e.name))) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : []));
 }

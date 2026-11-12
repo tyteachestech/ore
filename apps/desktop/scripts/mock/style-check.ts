@@ -3,7 +3,8 @@
 //   off-ramp text   a computed UI font size outside the DESIGN.md ramp (reading text has its own scale)
 //   stray scroll    a horizontal scrollbar nobody asked for: content a few px wider than its scrolling column
 //   pixel icon      a 16-grid dot sprite (icons.tsx, PixelIcon.tsx, skill icons) drawn at a size other than 20 or 40px (16 in a chip), so
-//                   it is off the sizes the set is tuned at, or cut by a parent that hides overflow, so it reads as clipped
+//                   it is off the sizes the set is tuned at, or cut by a parent that hides overflow, so it reads as clipped,
+//                   or bigger than the button it sits in, so it sits off the button's centre (F20)
 // Run against the mock (scripts/mock/README.md): bun apps/desktop/scripts/mock/style-check.ts [http://localhost:1420/]
 // `bun run e2e` runs it too, on its own mock (ORE_BRIDGE names that mock's bridge port).
 import { chromium, type Page } from "playwright";
@@ -50,6 +51,11 @@ async function audit(page: Page, screen: string) {
       const r = el.getBoundingClientRect();
       if (!r.width || getComputedStyle(el).visibility === "hidden") continue;
       if (![16, 20, 40].includes(r.width) || r.height !== r.width) out.push(`pixel icon: ${name(el)} in ${name(el.parentElement!)} drawn at ${r.width}x${r.height}`);
+      const btn = el.parentElement?.closest("button");
+      if (btn) {
+        const u = btn.getBoundingClientRect();
+        if (r.left < u.left - 0.5 || r.right > u.right + 0.5 || r.top < u.top - 0.5 || r.bottom > u.bottom + 0.5) out.push(`pixel icon: ${name(el)} overhangs ${name(btn)} (${r.width}px in ${u.width}x${u.height})`);
+      }
       for (let up = el.parentElement; up && up !== document.body; up = up.parentElement) {
         const s = getComputedStyle(up);
         if (s.overflowX === "visible" && s.overflowY === "visible" && s.clipPath === "none") continue;
