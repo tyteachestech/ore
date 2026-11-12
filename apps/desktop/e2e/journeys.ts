@@ -100,7 +100,9 @@ async function openPhone(): Promise<Page> {
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
   // What the app's Tauri shell gives the page and a browser lacks: an image saved with a source loads through it.
-  await page.addInitScript(`window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p, proto = "asset") => proto + "://localhost/" + encodeURIComponent(p), transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`);
+  // A source's own files come from the phone build's dev server (vite.config.ts `/library-file`), as the shell's
+  // asset protocol serves them from the folder.
+  await page.addInitScript(`window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p) => "/library-file" + p, transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`);
   await page.addInitScript(HYGIENE);
   await page.goto(url);
   await page.locator(".phone-app").waitFor();
@@ -9866,6 +9868,102 @@ journey("phone: Source actions offers no Reimport, which needs the Mac", async (
   await tap(page, page.getByRole("button", { name: "Source actions" }));
   await page.locator(".action-sheet").waitFor();
   if (await page.locator(".action-sheet button").filter({ hasText: "Reimport" }).count()) throw new Error("Reimport is offered on the phone");
+}, "phone");
+
+/** A source only some phone journeys need (a video, a PDF), put in the phone's library for the journey and taken
+ *  out after; the page reloads to read it. */
+async function phoneWith(page: Page, add: () => Promise<string>, run: () => Promise<void>) {
+  const dir = await add();
+  try {
+    await page.reload();
+    await page.locator(".phone-app").waitFor();
+    await run();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+journey("phone: a picture in a source opens over the whole screen, and a tap puts it back (Books)", async (page) => {
+  await phoneSource(page, AGENTS);
+  const img = page.locator(".phone-reader .doc img").first();
+  await until("the saved picture loads from the library", () => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0));
+  await tap(page, img);
+  const big = page.locator(".figure-view img");
+  await big.waitFor();
+  await until("it opens edge to edge", async () => Math.round((await big.boundingBox())?.width ?? 0) === 390);
+  await page.touchscreen.tap(195, 120);
+  await page.locator(".figure-view").waitFor({ state: "detached" });
+  if ((await img.evaluate((i: HTMLElement) => i.style.visibility)) === "hidden") throw new Error("the picture in the text stayed hidden after closing");
+}, "phone");
+
+journey("phone: a recording plays from a bar above the bottom bar, its timestamps on screen", async (page) => {
+  await phoneSource(page, "Lecture 4");
+  const bar = page.locator(".player-pin:has(.player.audio)");
+  await bar.waitFor();
+  const b = (await bar.boundingBox())!;
+  const tools = (await page.locator(".phone-tools").boundingBox())!;
+  if (b.y + b.height > tools.y || b.y < 844 / 2) throw new Error(`the recording's bar is at ${Math.round(b.y)}–${Math.round(b.y + b.height)}, not just above the bottom bar at ${Math.round(tools.y)}`);
+  await fits44(page, ".player.audio .ctl.play", "Play");
+  const left = await page.locator(".doc .ts").first().evaluate((e) => e.getBoundingClientRect().left);
+  if (left < 0) throw new Error(`a timestamp starts at x ${Math.round(left)}, off the screen`);
+}, "phone");
+
+journey("phone: a video stays pinned under the top bar while its transcript scrolls", async (page) => {
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
+  const lines = Array.from({ length: 30 }, (_, i) => `Line ${i + 1} of the talk, long enough to wrap onto a second line on a phone.`);
+  const vtt = "WEBVTT\n\n" + lines.map((l, i) => `00:${String(i).padStart(2, "0")}:00.000 --> 00:${String(i).padStart(2, "0")}:30.000\n${l}\n`).join("\n");
+  const body = lines.map((l, i) => `[${String(i).padStart(2, "0")}:00] ${l}`).join("\n\n");
+  await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "youtube", title: "A pinned talk", url: "https://www.youtube.com/watch?v=pinnedTalk1", body, source: { ext: "vtt", data: vtt } })).dir, async () => {
+    await phoneSource(page, "A pinned talk");
+    const pin = page.locator(".player-pin");
+    await pin.waitFor();
+    await page.locator(".phone-reader .reader-scroll").evaluate((el) => (el.scrollTop = 900));
+    await until("the player sits just under the top bar", async () => {
+      const y = (await pin.boundingBox())?.y ?? -1;
+      return y >= 43 && y <= 48;
+    });
+  });
+}, "phone");
+
+journey("phone: Source actions renames a source and edits its author in place", async (page) => {
+  await phoneSource(page, TESTING);
+  const action = async (name: RegExp) => {
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: name }));
+  };
+  await action(/^Rename/);
+  const title = page.locator(".doc-head .title-edit");
+  await title.waitFor();
+  const size = await title.evaluate((e) => getComputedStyle(e).fontSize);
+  if (size !== "26px") throw new Error(`the title field is ${size}, not the title's 26px`);
+  await title.fill("Retrieval beats rereading");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head h1").filter({ hasText: "Retrieval beats rereading" }).waitFor();
+  await action(/author/);
+  const author = page.locator(".doc-head .author-edit");
+  await author.fill("A. Researcher");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head .by").filter({ hasText: "A. Researcher" }).waitFor();
+}, "phone");
+
+journey("phone: a PDF's own page opens from Source actions, turns, and Back returns to the text", async (page) => {
+  const pdf = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/textbook.pdf");
+  await phoneWith(page, async () => {
+    const r = JSON.parse(await $`bun ${join(import.meta.dir, "../../../packages/cli/src/ore.ts")} add ${pdf} --no-enrich --json`.env({ ...process.env, ORE_LIBRARY: PHONE_LIB, ORE_NO_ENRICH: "1" }).text()) as { path: string };
+    return join(PHONE_LIB, r.path, "..");
+  }, async () => {
+    await phoneSource(page, "Chapter 1");
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: "Original page" }));
+    await page.locator(".original canvas[data-page]").waitFor({ timeout: 15000 });
+    const pager = page.locator(".original-pager span");
+    const at = await pager.textContent();
+    await fits44(page, "[aria-label='Next page']", "Next page");
+    await tap(page, page.getByRole("button", { name: "Next page" }));
+    await until("Next page turns it", async () => (await pager.textContent()) !== at);
+    await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+    await until("Back returns to the text", async () => !(await page.locator(".phone-reader .reader").evaluate((e) => e.classList.contains("noting"))));
+  });
 }, "phone");
 
 journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt touch", async (page) => {

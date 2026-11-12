@@ -39,11 +39,18 @@ function persist(p: string, e: Entry | "tombstone" | null) {
  *  sync, a new build is the only way the Mac's changes arrive, so on a new snapshot each file the Mac
  *  changed (or added, or deleted) since the last one takes the Mac's version; every other phone write
  *  stays, and the phone's own logs (`*.iphone.jsonl`, D78) always do. */
-export async function mount(snapshot: Record<string, string>, id: string) {
-  for (const [p, text] of Object.entries(snapshot)) {
+export async function mount(listed: Record<string, string | null>, id: string) {
+  const snapshot: Record<string, string> = {};
+  for (const [p, text] of Object.entries(listed)) {
+    addDirs(p);
+    // A file the phone doesn't load (audio, a PDF): listed only, as the folder's listing names it.
+    if (text === null) {
+      files.set(p, { text: "", mtime: 0, unread: true });
+      continue;
+    }
+    snapshot[p] = text;
     files.set(p, { text, mtime: 1 });
     shipped.add(p);
-    addDirs(p);
   }
   // Ask iOS not to clear the phone's library when storage runs low.
   await navigator.storage?.persist?.().catch(() => false);
