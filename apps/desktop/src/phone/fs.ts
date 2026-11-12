@@ -346,7 +346,8 @@ export function readFileSync(p: string, enc?: unknown): string {
   const e = files.get(p);
   if (!e) throw err("ENOENT", p);
   if (e.unread && !e.bytes) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
-  if (enc === undefined && e.bytes) return Bytes.from(e.bytes) as unknown as string;
+  // One block copy: Bytes.from walked an hour's audio byte by byte and held over a gigabyte while it did.
+  if (enc === undefined && e.bytes) return new Bytes(e.bytes) as unknown as string;
   return e.text;
 }
 export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, "", Date.now(), s));
