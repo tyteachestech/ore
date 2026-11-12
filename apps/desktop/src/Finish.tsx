@@ -2,7 +2,7 @@ import { CaretDown, CaretUp, Check, Circle, CircleHalf, MagnifyingGlass, X } fro
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
-import { PixelStar } from "./PixelIcon";
+import { PixelGem } from "./PixelIcon";
 import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
@@ -700,7 +700,7 @@ function Stepper({ at, total, go, keyPoint }: { at: number; total: number; go: (
       {keyPoint && (
         <Hint text={keyPoint.on ? "Key point · click to unmark" : "Add as a key point"} side="top">
           <button className={`quiz-key${keyPoint.on ? " on" : ""}`} aria-pressed={keyPoint.on} aria-label="Key point" onClick={keyPoint.toggle}>
-            <PixelStar size={12} weight={keyPoint.on ? undefined : "regular"} />
+            <PixelGem size={12} weight={keyPoint.on ? undefined : "regular"} />
           </button>
         </Hint>
       )}
