@@ -49,7 +49,7 @@
   --c-red: #ff7b72;
   --c-orange: #ffa657;
   --c-yellow: #e8c24a;
-  --seam: #ffb000; /* the gold of a mended gem (D197), the one colour a gem carries beside its skill's */
+  --seam: #ffb000; /* the gold rim of a won-back gem (D197, D236), the one colour a gem carries beside its skill's */
   --ore-rich: color-mix(in oklab, var(--c-green), white 45%);
   --c-green: #5fcf8a;
   --c-teal: #4fd1c5;
@@ -246,6 +246,8 @@ kbd {
 [data-color="blue"] { --skill: var(--c-blue); }
 [data-color="purple"] { --skill: var(--c-purple); }
 [data-color="pink"] { --skill: var(--c-pink); }
+/* A won-back gem's gold rim would vanish on a skill that is gold itself: there it is white gold. */
+[data-color="yellow"], [data-color="orange"] { --seam: #fff3cf; }
 .main { position: relative; min-width: 0; height: 100%; display: flex; flex-direction: column; padding-top: var(--titlebar); }
 
 /* Sources list: its title is the view menu (To read, Done, Archived), then the filter (⌘F). */
@@ -1439,7 +1441,8 @@ body.resizing iframe { pointer-events: none; }
 [data-tone="question"] .card-icon { color: var(--question-solid); }
 [data-tone="apply"] .card-icon { color: var(--apply-solid); }
 .skill-note .card-head .card-title { margin-right: auto; }
-.hero-strength { margin-left: auto; flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; text-align: left; }
+/* It loads after the page: the negative margin keeps it inside the header's own height, so nothing below jumps when it lands (F36). */
+.hero-strength { margin: -9px 0 -9px auto; flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; text-align: left; }
 .hero-strength:hover, .hero-strength[aria-expanded="true"] { background: var(--bg-hover); }
 .hero-strength:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .strength-pop { width: 320px; padding: 14px; }
@@ -1507,14 +1510,12 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 /* Gems (D90, Gem.tsx): one slot per memory to the next level. */
 .gem-row { display: flex; align-items: center; width: 100%; min-width: 0; }
 .gem { flex: none; display: block; }
-/* Cracked: a dark slate gem with a crack, darker than any skill colour (grey skills included). */
-.gem[data-kind="dull"] { --skill: color-mix(in oklab, var(--c-gray), black 45%); }
 .gem[data-kind="empty"] { opacity: 0.35; }
-/* Glowing: the near goal. A slow breathe draws the eye; prefers-reduced-motion stops it globally. */
-.gem[data-kind="ready"] { filter: drop-shadow(0 0 1.5px var(--skill, var(--accent))) drop-shadow(0 0 4px var(--skill, var(--accent))); }
-/* Glowing and due today: a slow breathe draws the eye; prefers-reduced-motion stops it globally. */
-.gem[data-breathe] { animation: gem-glow 2.4s ease-in-out infinite; }
-@keyframes gem-glow { 50% { filter: drop-shadow(0 0 0.5px var(--skill, var(--accent))) drop-shadow(0 0 1px var(--skill, var(--accent))); } }
+/* Nearly cut and due today (D236): the swollen dots swell and settle slowly; prefers-reduced-motion stops it globally. No glow. */
+.gem[data-breathe] { animation: gem-swell 2.4s ease-in-out infinite; transform-origin: center; }
+@keyframes gem-swell { 50% { transform: scale(1.1); } }
+/* Polished (D197, D236): a faint halo of its own colour at the size the end screen draws it; the sparkle is in the art. */
+.gem[data-polished][width="36"] { background: radial-gradient(closest-side, color-mix(in oklab, var(--skill, var(--accent)) 22%, transparent) 35%, transparent 100%); }
 .gem[data-kind="rough"] { opacity: 0.8; }
 .gem-ring { position: relative; flex: none; display: inline-grid; place-items: center; }
 .gem-ring > .dot-ring { position: absolute; inset: 0; }

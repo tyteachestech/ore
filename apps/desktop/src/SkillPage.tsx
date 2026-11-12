@@ -452,10 +452,10 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
   // One vocabulary with the header: the gem states, then cards not reviewed yet as empty slots.
   const legend: [GemKind, number, string, { seam?: boolean; polished?: boolean }?][] = [
     ["cut", k.polished ?? 0, "Polished: cut, and passed as a remix", { polished: true }],
-    ["cut", k.mended ?? 0, "Mended: cut, missed, and won back", { seam: true }],
+    ["cut", k.mended ?? 0, "Won back: cut, missed, and cut again", { seam: true }],
     ["cut", k.solid - (k.polished ?? 0) - (k.mended ?? 0), "Cut: you'd still recall these three weeks from now"],
-    ["ready", k.ready, "Glowing: cut if you recall them at their next review"],
-    ["dull", k.win_back, "Cracked: cut once, then missed. Review to mend them"],
+    ["ready", k.ready, "Nearly cut: cut if you recall them at their next review"],
+    ["dull", k.win_back, "Missed: cut once, then missed. Review to win them back"],
     ["rough", k.growing - k.ready - k.win_back, "Rough: reviewed, not near solid yet"],
     ["empty", k.new, "Not reviewed yet"],
   ];
@@ -484,7 +484,7 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
                 n > 0 ? (
                   <Hint key={why} text={why}>
                     <span>
-                      <Gem kind={kind} size={16} {...look} />
+                      <Gem kind={kind} size={18} {...look} />
                       {n}
                     </span>
                   </Hint>

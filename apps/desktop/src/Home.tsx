@@ -521,7 +521,7 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
             <>
               <GemRing k={k} size={26} />
               <span className="home-solid"><Roll id={`solid:${s.id}`} value={k.solid} /></span>
-              <NearGoal k={k} size={12} due />
+              <NearGoal k={k} size={14} due />
             </>
           ) : (
             <>
