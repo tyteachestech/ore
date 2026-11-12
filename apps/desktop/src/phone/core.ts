@@ -87,7 +87,9 @@ function boot() {
       const root = await invoke<string | null>("library_dir");
       if (!root) throw new Error("Turn on iCloud Drive for Ore: Settings › your name › iCloud › Drive.");
       await invoke<number>("share_inbox", { root }).catch(() => 0);
+      mark("dir");
       await mountDisk(ROOT, root, invoke);
+      mark("mounted");
       // A source's own files (its images) load from the folder itself: /lib/... is the folder on disk.
       setLibraryRoot(ROOT, root);
       debugAdd();
@@ -97,7 +99,10 @@ function boot() {
       await mount(Object.fromEntries(Object.entries(snap).map(([p, t]) => [`${ROOT}/${p}`, t])), bytesToHex(sha256(new TextEncoder().encode(text))));
     }
     await ready(wasmUrl);
-    return await import("ore-commands");
+    mark("sqlite");
+    const m = await import("ore-commands");
+    mark("commands");
+    return m;
   })();
   // A failed start (iCloud Drive off) tries again on the next command, once he has turned it on.
   booted.catch(() => (booted = null));
@@ -120,7 +125,20 @@ export async function run<T>(args: string[], input: string | null): Promise<T> {
   const lib = await boot().catch((e) => {
     throw e instanceof TypeError || e instanceof SyntaxError ? new Error(`Couldn't start: ${e.message}`) : e;
   });
-  return exclusive(() => command<T>(lib, args, input));
+  const t0 = performance.now();
+  return exclusive(() => command<T>(lib, args, input)).finally(() => mark(`${args.slice(0, 2).join(" ")} (${Math.round(performance.now() - t0)} ms)`));
+}
+
+/** SPIKE (launch timing): each boot phase and the first commands, as ms since the page started and as
+ *  wall-clock time, in `debug-launch.json`, rewritten at each. */
+const marks: [string, number, number][] = [];
+function mark(what: string) {
+  if (marks.length > 20 || !isTauri()) return;
+  marks.push([what, Math.round(performance.now()), Date.now()]);
+  if (existsSync(`${ROOT}/skills.yaml`)) {
+    writeFileSync(`${ROOT}/debug-launch.json`, JSON.stringify({ timeOrigin: Math.round(performance.timeOrigin), marks }, null, 1));
+    void flush();
+  }
 }
 
 async function command<T>({ commands, errorLine }: typeof import("ore-commands"), args: string[], input: string | null): Promise<T> {
