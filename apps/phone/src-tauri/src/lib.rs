@@ -10,7 +10,7 @@ use serde::Serialize;
 /// What the phone loads: the text files, and a source's small picture as a data URL (as the snapshot did).
 fn wanted(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
-    [".md", ".yaml", ".yml", ".json", ".jsonl", ".excalidraw"].iter().any(|e| lower.ends_with(e)) || picture(&lower).is_some()
+    [".md", ".yaml", ".yml", ".json", ".jsonl", ".excalidraw", ".vtt"].iter().any(|e| lower.ends_with(e)) || picture(&lower).is_some()
 }
 fn picture(name: &str) -> Option<&'static str> {
     let (stem, ext) = name.rsplit_once('.')?;
@@ -49,6 +49,8 @@ struct Scan {
     files: Vec<(String, f64, String)>,
     /// Files iCloud hasn't downloaded yet; each has been asked for.
     waiting: Vec<String>,
+    /// Every other file (a source's audio, PDF, images): listed, so the core sees it, but not read.
+    other: Vec<String>,
 }
 
 /// Ore's folder in iCloud Drive, or None when iCloud Drive is off for Ore.
@@ -61,7 +63,7 @@ async fn library_dir() -> Option<String> {
 
 #[tauri::command]
 async fn library_scan(root: String) -> Scan {
-    let mut out = Scan { files: vec![], waiting: vec![] };
+    let mut out = Scan { files: vec![], waiting: vec![], other: vec![] };
     // Asks iCloud for the folder itself too, so new files the Mac added come down.
     download(Path::new(&root));
     walk(Path::new(&root), "", &mut out);
@@ -94,6 +96,8 @@ fn walk(dir: &Path, rel: &str, out: &mut Scan) {
             if let Some((ms, s)) = stamp(&path) {
                 out.files.push((r, ms, s));
             }
+        } else {
+            out.other.push(r);
         }
     }
 }
@@ -244,12 +248,40 @@ fn container() -> Option<PathBuf> {
 #[cfg(not(target_os = "ios"))]
 fn download(_: &Path) {}
 
+// The YouTube embed refuses tauri://localhost as its embedder (error 153), so it sits in a relay page served
+// on 127.0.0.1, as on the Mac (apps/desktop/src-tauri/src/main.rs, Video.tsx).
+const PLAYER_HTML: &str = include_str!("../../../desktop/src-tauri/src/player.html");
+static PLAYER_PORT: std::sync::OnceLock<Option<u16>> = std::sync::OnceLock::new();
+
+#[tauri::command]
+fn player_port() -> Option<u16> {
+    *PLAYER_PORT.get_or_init(|| {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").ok()?;
+        let port = listener.local_addr().ok()?.port();
+        std::thread::spawn(move || {
+            for mut s in listener.incoming().flatten() {
+                std::thread::spawn(move || {
+                    let _ = s.set_read_timeout(Some(std::time::Duration::from_secs(5)));
+                    let mut buf = [0u8; 4096];
+                    let n = s.read(&mut buf).unwrap_or(0);
+                    let req = String::from_utf8_lossy(&buf[..n]);
+                    let ok = req.starts_with("GET /player?") || req.starts_with("GET /player ");
+                    let (status, body) = if ok { ("200 OK", PLAYER_HTML) } else { ("404 Not Found", "") };
+                    let _ = write!(s, "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{body}", body.len());
+                });
+            }
+        });
+        Some(port)
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch, share_inbox])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch, share_inbox, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }
