@@ -69,6 +69,7 @@ class ShareViewController: UIViewController {
   private var closing: DispatchWorkItem?
   private let card = UIView()
   private let titleLabel = UILabel()
+  private let opener = UIButton(type: .system)
   private let preview = UIStackView()
   private let thumb = UIImageView()
   private let pageTitle = UILabel()
@@ -110,9 +111,21 @@ class ShareViewController: UIViewController {
     done.addTarget(self, action: #selector(finish), for: .touchUpInside)
     done.setContentHuggingPriority(.required, for: .horizontal)
 
-    let head = UIStackView(arrangedSubviews: [titleLabel, done])
+    // Open: on to the source in Ore now (ChatGPT's share goes straight to its app); Done stays in Safari.
+    opener.setTitle("Open", for: .normal)
+    opener.titleLabel?.font = .preferredFont(forTextStyle: .body)
+    opener.titleLabel?.adjustsFontForContentSizeCategory = true
+    opener.tintColor = muted
+    opener.isHidden = true
+    opener.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    opener.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    opener.addTarget(self, action: #selector(openInOre), for: .touchUpInside)
+    opener.setContentHuggingPriority(.required, for: .horizontal)
+
+    let head = UIStackView(arrangedSubviews: [titleLabel, opener, done])
     head.axis = .horizontal
     head.alignment = .center
+    head.spacing = 12
 
     chips.axis = .vertical
     chips.spacing = 8
@@ -187,6 +200,7 @@ class ShareViewController: UIViewController {
         return fail("Ore adds links and files. This isn’t one.")
       }
       titleLabel.text = "Added to Ore"
+      opener.isHidden = false
       layoutChips(skills())
       // With skills to pick it stays until he closes it; with none there is nothing to do here, so it goes by itself.
       guard shown.isEmpty else { return }
@@ -425,6 +439,25 @@ class ShareViewController: UIViewController {
   private func fail(_ why: String) {
     titleLabel.text = why
     titleLabel.numberOfLines = 0
+  }
+
+  /// Leaves the item's id for the app (lib.rs `share_open`) and brings Ore forward, which imports it and opens it.
+  /// Apple gives a share extension no call for opening its app: this walks up to the host's UIApplication, as
+  /// other apps' share extensions do, so an iOS update may stop it. Then the card just closes, as Done.
+  @objc private func openInOre() {
+    if let id = item["id"] as? String, let root = groupDir(), let url = URL(string: "ore://open") {
+      try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+      try? Data(id.utf8).write(to: root.appendingPathComponent("open"), options: .atomic)
+      var next: UIResponder? = self
+      while let r = next {
+        if let app = r as? UIApplication {
+          app.open(url, options: [:], completionHandler: nil)
+          break
+        }
+        next = r.next
+      }
+    }
+    finish()
   }
 
   @objc private func finish() {

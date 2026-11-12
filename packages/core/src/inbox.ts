@@ -99,8 +99,9 @@ export function mine(l: QueuedLink, now = Date.now(), device = deviceName()): bo
 /** Imports each waiting link that is this device's to import (`mine`) with `add`, the whole import. A link that fails keeps its reason for the phone
  *  to show and is tried again next time (the Mac may just have been offline); `failed` lists only new reasons, so
  *  the same failure isn't announced on every import. */
-export async function importQueued<T extends { id: string; title: string }>(lib: Library, add: (input: string, skills: string[]) => Promise<T>, now = Date.now()): Promise<{ added: (T & { url: string })[]; failed: QueuedLink[] }> {
-  const added: (T & { url: string })[] = [];
+export async function importQueued<T extends { id: string; title: string }>(lib: Library, add: (input: string, skills: string[]) => Promise<T>, now = Date.now()): Promise<{ added: (T & { url: string; inbox: string })[]; failed: QueuedLink[] }> {
+  // `inbox` is the waiting item's own id: the share card asks the app to open what that item became.
+  const added: (T & { url: string; inbox: string })[] = [];
   const failed: QueuedLink[] = [];
   for (const l of queuedLinks(lib)) {
     if (!mine(l, now)) continue;
@@ -118,7 +119,7 @@ export async function importQueued<T extends { id: string; title: string }>(lib:
     try {
       removeQueuedLink(lib, l.id);
     } catch {}
-    added.push({ ...got, url: l.url });
+    added.push({ ...got, url: l.url, inbox: l.id });
   }
   return { added, failed };
 }
