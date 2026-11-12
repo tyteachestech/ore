@@ -11,7 +11,11 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setLibraryRoot } from "./tauri-core";
 import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, writeFileSync } from "./fs";
 import { ready } from "./sqlite";
+import { iterableStreams } from "./streams";
 import { shareList } from "./share-skills";
+
+// Before any import runs: iOS 26 can't iterate a stream with `for await`, and pdf.js reads a PDF's text that way.
+iterableStreams();
 
 export const ROOT = "/lib";
 
