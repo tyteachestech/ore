@@ -445,10 +445,11 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
 const TRACKING = /^(utm_\w+|fbclid|gclid|dclid|gbraid|wbraid|msclkid|mc_cid|mc_eid|igshid|yclid|_hsenc|_hsmi|mkt_tok)$/i;
 export function untracked(url: string): string {
   if (!URL.canParse(url)) return url;
+  // Every link in the URL's own form (host lowercased, default port dropped), so a link matches itself with or
+  // without tags; the other query parts are kept exactly as written.
   const u = new URL(url);
-  const tags = [...u.searchParams.keys()].filter((k) => TRACKING.test(k));
-  if (!tags.length) return url;
-  for (const k of tags) u.searchParams.delete(k);
+  const kept = u.search.slice(1).split("&").filter((p) => p && !TRACKING.test(p.split("=")[0]!));
+  u.search = kept.length ? `?${kept.join("&")}` : "";
   return u.toString();
 }
 
