@@ -74,6 +74,8 @@ export const ItemMetaSchema = z.object({
   url: z.string().optional(),
   // A page that plays a video (D92): the video's link; its transcript is `transcript.vtt` beside the source.
   video: z.string().optional(),
+  // An episode's own page text, added below its transcript (D215): the id of its record, while it is in.
+  page_added: z.string().optional(),
   author: z.string().optional(),
   published: z.string().optional(),
   // A PDF's tables or formulas that read as lines of text until Docling reads them (D125).
@@ -124,6 +126,8 @@ export interface NewItem {
   video?: string;
   /** The video's captions (WebVTT), for a page that plays one (D92). */
   transcript?: string;
+  /** An episode's own web page (D215), kept as `page.html` beside its audio: its text is one click away. */
+  page?: string;
   author?: string;
   published?: string;
   source_app?: string;
@@ -172,6 +176,7 @@ export async function createItem(lib: Library, input: NewItem): Promise<Item> {
   await withLock(paths.lock(lib), () => {
     if (input.source) writeAtomic(join(dir, `source.${input.source.ext}`), input.source.data);
     if (input.transcript) writeAtomic(join(dir, "transcript.vtt"), input.transcript);
+    if (input.page) writeAtomic(join(dir, "page.html"), input.page);
     for (const a of input.assets ?? []) writeAtomic(join(dir, "assets", a.name), a.data);
     writeAtomic(docPath, stringifyFrontmatter(meta, body));
   });

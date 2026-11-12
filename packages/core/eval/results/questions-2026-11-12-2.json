@@ -1,0 +1,778 @@
+{
+  "eval": "questions",
+  "date": "2026-11-12T00:47:52.018Z",
+  "set": "62908c3e",
+  "prompt": "enrich@16",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "enrich@16",
+      "judge": "opus",
+      "all": {
+        "passed": "39/49",
+        "rate": 0.7959183673469388,
+        "ci95": [
+          0.6636272988905616,
+          0.885182729571862
+        ]
+      },
+      "prequestions": {
+        "passed": "21/21",
+        "rate": 1,
+        "ci95": [
+          0.8453561767357979,
+          0.9999999999999999
+        ]
+      },
+      "cards": {
+        "passed": "18/28",
+        "rate": 0.6428571428571429,
+        "ci95": [
+          0.4582997758222723,
+          0.7929438802754113
+        ]
+      },
+      "by_check": {
+        "one_target": 5,
+        "rubric_fits": 3,
+        "attribution": 2,
+        "clear_target": 1,
+        "faithful": 1
+      },
+      "plan_failed": [],
+      "errors": 0,
+      "wall_s": 112.3,
+      "cost_usd": 0.9986748999999999,
+      "judge_cost_usd": 0.8618853999999999,
+      "input_tokens": 715905,
+      "output_tokens": 24993,
+      "cases": [
+        {
+          "id": "notes-graveyard",
+          "questions": [
+            {
+              "n": 1,
+              "kind": "prequestion",
+              "question": "Why can saving and highlighting material feel like learning even when little of it sticks?",
+              "case": "notes-graveyard",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prequestion",
+              "question": "What kind of writing after finishing a chapter would make an idea stay with you better than collecting more notes?",
+              "case": "notes-graveyard",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prequestion",
+              "question": "Why might deleting old notes help your learning rather than hurt it?",
+              "case": "notes-graveyard",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 1,
+              "kind": "prompt",
+              "question": "Why can clipping articles and rereading your highlights leave you feeling like you've learned something when you could barely explain it afterwards?",
+              "answer": "Moving words from one place to another takes almost no thought, and text in front of you feels familiar. Familiarity is easy to mistake for knowing (the fluency illusion). Rereading strengthens that feeling without strengthening the memory, so closing the notes and explaining the idea usually brings back very little.",
+              "rubric": [
+                "Says that saving or highlighting takes little thought, so the idea isn't processed",
+                "Says that seeing text makes it feel familiar, and familiarity is mistaken for knowing",
+                "Says that rereading raises the feeling but not the memory itself"
+              ],
+              "from": "prequestion",
+              "case": "notes-graveyard",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "card",
+              "question": "In learning psychology, what is the name for mistaking the familiarity of text in front of you for actually knowing it?",
+              "answer": "The fluency illusion.",
+              "rubric": [],
+              "from": "highlights",
+              "case": "notes-graveyard",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prompt",
+              "question": "After finishing a chapter, what kind of short writing would help the idea stick better than adding more highlights to your notes, and why does it work?",
+              "answer": "Close the material and write a few sentences from memory: the main claim, why it might be true, and where you would use it. Only afterwards check what you got wrong. Writing from memory is retrieval practice, which makes the idea easier to find next time, and the errors show what to revisit. Tying it to a real problem in your own work gives the idea somewhere to live.",
+              "rubric": [
+                "Writes from memory with the material closed, covering claim, why it might be true, and where to use it",
+                "Explains that retrieval practice makes the idea easier to find later",
+                "Checks afterwards to find mistakes worth revisiting",
+                "Ties the idea to a real problem in own work"
+              ],
+              "from": "prequestion",
+              "case": "notes-graveyard",
+              "failed": [
+                "clear_target",
+                "attribution"
+              ],
+              "why": "attribution: Natarajan's own three-sentence rule and her 'somewhere to live' claim are given as plain fact without naming her; clear_target: the rubric wants her claim/why/where-to-use format, which only her article uses."
+            },
+            {
+              "n": 4,
+              "kind": "prompt",
+              "question": "According to Priya Natarajan, why can deleting old notes help your learning, and which notes does she say still belong in a searchable system?",
+              "answer": "According to Natarajan, a large unread archive acts like debt: carrying thousands of dead notes costs attention daily, while re-searching a fact costs a minute. She deletes notes not revisited in six months and not tied to a current project. This isn't against all notes: reference material like recipes or commands belongs in a searchable system. Her claim is only that notes are a poor way to learn ideas.",
+              "rubric": [
+                "Says an unread archive costs attention and makes you avoid it, like debt",
+                "Says re-finding a deleted fact is cheap by comparison",
+                "Notes that reference material still belongs in a searchable system; the argument targets notes as a way to learn ideas"
+              ],
+              "from": "prequestion",
+              "case": "notes-graveyard",
+              "failed": [
+                "one_target"
+              ],
+              "why": "one_target: it joins two questions, why deleting helps and which notes should still be kept."
+            }
+          ],
+          "plan_failed": [],
+          "ms": 39376,
+          "usage": {
+            "input_tokens": 90181,
+            "output_tokens": 2848,
+            "cost_usd": 0.134208
+          },
+          "judge_usage": {
+            "input_tokens": 34253,
+            "output_tokens": 1329,
+            "cost_usd": 0.1792006
+          },
+          "prompt_version": "enrich@16",
+          "model": "claude-sonnet-5-5"
+        },
+        {
+          "id": "sourdough",
+          "questions": [
+            {
+              "n": 1,
+              "kind": "prequestion",
+              "question": "Why might the same bread dough take four hours to rise in a summer kitchen but eight in winter?",
+              "case": "sourdough",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prequestion",
+              "question": "What has to be true of a dough, besides the presence of yeast, for it to rise up instead of spreading flat?",
+              "case": "sourdough",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prequestion",
+              "question": "How can you tell by looking at and touching a dough whether it is ready to bake, rather than relying on the clock?",
+              "case": "sourdough",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 4,
+              "kind": "prequestion",
+              "question": "Why can a dough that ferments too long end up flat, dense and very sour?",
+              "case": "sourdough",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 1,
+              "kind": "prompt",
+              "question": "In bread baking, why does the same dough need much longer to be ready in a cold kitchen than in a warm one?",
+              "answer": "Fermentation is a set of reactions run by living cells, so temperature controls its speed. Wild yeasts are most active around 24 to 27 °C, and at about 18 °C the same dough can take twice as long. Cooler, longer fermentation also tends to favour sharper acetic acid, while warmer fermentation favours milder lactic acid. So recipe times are only guides.",
+              "rubric": [
+                "Fermentation is done by living microbes, so temperature sets its speed",
+                "Yeast is most active around 24 to 27 °C, and cooler dough ferments slower (about twice as long at 18 °C)",
+                "Recipe times are only guides, so judge by the dough rather than the clock"
+              ],
+              "from": "prequestion",
+              "case": "sourdough",
+              "failed": [
+                "rubric_fits"
+              ],
+              "why": "rubric_fits: the question asks why a cold dough takes longer, but one rubric point asks him to say recipe times are only guides, which the question doesn't ask for."
+            },
+            {
+              "n": 2,
+              "kind": "prompt",
+              "question": "A baker's dough is full of active yeast but bakes into a flat, spread-out loaf. What does the dough need for the gas to make it rise upward, and why?",
+              "answer": "The dough must be able to trap the gas. Flour and water form gluten, a stretchy network of glutenin and gliadin strands, and kneading or folding lines the strands up and strengthens it. Each gas bubble inflates a pocket in the network like a balloon. Weak gluten lets the gas escape and the dough spreads flat; strong, well developed gluten holds it and the dough rises.",
+              "rubric": [
+                "Gas must be trapped, since carbon dioxide alone would bubble out of a wet paste",
+                "Gluten, a stretchy network formed from wheat proteins mixed with water, holds the bubbles",
+                "Kneading or folding strengthens the network",
+                "Weak gluten leads to a flat loaf; strong gluten to a rise"
+              ],
+              "from": "prequestion",
+              "case": "sourdough",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prompt",
+              "question": "Your bulk-risen dough looks puffy, but the recipe's time is up and you are unsure. What would you check, and how would you read each result, to decide whether to bake?",
+              "answer": "Check volume: the dough should have grown by about half to three quarters, not necessarily doubled. Then do the poke test with a floured finger. If the dent springs back at once, it needs more time. If it springs back slowly and leaves a small dent, it is ready. If it does not spring back at all, it has probably overproofed.",
+              "rubric": [
+                "Volume: grown by about half to three quarters, not necessarily doubled",
+                "Poke test: a quick spring back means it needs more time",
+                "A slow spring back leaving a small dent means ready",
+                "No spring back means probably overproofed"
+              ],
+              "from": "prequestion",
+              "case": "sourdough",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 4,
+              "kind": "prompt",
+              "question": "In sourdough, why does fermenting a dough for too long give a flat, dense, very sour loaf?",
+              "answer": "When fermentation runs too long (overproofing), the yeast keeps making gas while the acids slowly weaken the gluten, until the network can no longer hold the bubbles. The dough collapses in the oven, giving a flat, dense loaf, and the long fermentation leaves it very sour.",
+              "rubric": [
+                "Yeast keeps producing gas",
+                "Acids gradually weaken the gluten network",
+                "The weakened network can't hold the bubbles, so the dough collapses in the oven",
+                "Long fermentation also leaves it very sour"
+              ],
+              "from": "prequestion",
+              "case": "sourdough",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 5,
+              "kind": "prompt",
+              "question": "Your sourdough rises well but tastes too flat and mild. Based on what the microbes in a starter do, what could you change, and why?",
+              "answer": "A starter holds wild yeasts and lactic acid bacteria, roughly one yeast to a hundred bacteria. The yeasts make carbon dioxide (and a little alcohol) that raises the dough; the bacteria mostly make lactic and acetic acids that give the tang. For more tang, ferment cooler and longer, which tends to favour sharper acetic acid, since warmer fermentation favours milder lactic acid.",
+              "rubric": [
+                "Yeasts supply the gas for rising; bacteria supply the acids for tang",
+                "Cooler, longer fermentation tends to favour sharper acetic acid",
+                "Warmer fermentation favours milder lactic acid, so for more tang go cooler and longer"
+              ],
+              "from": "highlights",
+              "case": "sourdough",
+              "failed": [],
+              "why": ""
+            }
+          ],
+          "plan_failed": [],
+          "ms": 67954,
+          "usage": {
+            "input_tokens": 139977,
+            "output_tokens": 6772,
+            "cost_usd": 0.20829559999999997
+          },
+          "judge_usage": {
+            "input_tokens": 35788,
+            "output_tokens": 1537,
+            "cost_usd": 0.0903406
+          },
+          "prompt_version": "enrich@16",
+          "model": "claude-sonnet-5-5"
+        },
+        {
+          "id": "feedback-talk",
+          "questions": [
+            {
+              "n": 1,
+              "kind": "prequestion",
+              "question": "Why does feedback that is completely true and useful so often change nothing in how someone works?",
+              "case": "feedback-talk",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prequestion",
+              "question": "When you give a report feedback on something they did, what should you say so they can act on it the next day?",
+              "case": "feedback-talk",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prequestion",
+              "question": "How does the moment and sequence in which you give feedback change whether the person takes it in?",
+              "case": "feedback-talk",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 1,
+              "kind": "prompt",
+              "question": "In a weekly one-on-one, you tell a report something accurate about their work, they nod, and nothing changes the next week. What are the two reasons this tends to happen?",
+              "answer": "Usually the person did care; the feedback was too vague to act on (\"be more proactive\" leaves them not knowing what to do differently on Monday). Also, feedback often arrives as a threat: when people feel judged, their attention goes to defending themselves rather than to the content, so even true and useful points bounce off.",
+              "rubric": [
+                "Names vagueness: the person hears something is wrong but cannot tell what to do differently",
+                "Names threat: feeling judged shifts attention to self-defence instead of the content",
+                "Avoids blaming the report for not caring"
+              ],
+              "from": "prequestion",
+              "case": "feedback-talk",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prompt",
+              "question": "In a one-on-one, what should a manager say about something a report did so they can act on it the next day, and why does it help to say it that way?",
+              "answer": "Describe a specific behaviour, in a specific situation, and the impact it had (situation, behaviour, impact), e.g. \"in Tuesday's client call, when you jumped in before they finished, they stopped explaining the problem.\" This is about something that happened, which is changeable, rather than about character (\"you're a bad listener\" is an identity people will fight). The impact gives the reason, so it isn't just your preference and they may find a better fix.",
+              "rubric": [
+                "Names the three parts: situation, behaviour, impact",
+                "Describes an event, not a character label, because people fight identity claims",
+                "Impact supplies the reason, so it is not heard as mere preference"
+              ],
+              "from": "prequestion",
+              "case": "feedback-talk",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prompt",
+              "question": "In giving feedback to a report, how do the timing and the order of what you say affect whether they take it in?",
+              "answer": "Give it close to the event, same or next day, while details are remembered; saving it for a quarterly review makes it feel like an ambush. Ask for their view before giving yours: they may already have noticed it and so own it, or their answer shows where they start. Skip the praise-criticism-praise sandwich, since people learn the pattern and discount the praise while waiting for the \"but\"; keep praise separate and just as specific.",
+              "rubric": [
+                "Soon after the event (same or next day), not saved up for a review",
+                "Ask for their view first, so they own what they noticed or you learn their starting point",
+                "Skip the sandwich because praise gets discounted; keep praise separate and specific"
+              ],
+              "from": "prequestion",
+              "case": "feedback-talk",
+              "failed": [
+                "one_target",
+                "attribution"
+              ],
+              "why": "one_target: joins timing with two separate ordering ideas (ask first, skip the sandwich); attribution: dropping the feedback sandwich is the speaker's contested opinion (\"I'd skip it\") but is stated as fact."
+            },
+            {
+              "n": 4,
+              "kind": "prompt",
+              "question": "Your report, a junior writer, handed in a script draft that buries the main point until page three, and you want them to fix it by Friday. How would you open the feedback conversation and then give it so they use it rather than get defensive?",
+              "answer": "First ask for their view (\"how do you think the draft reads?\") before giving yours, so they may name the problem themselves and own it. Then, if needed, give situation, behaviour, impact: in this draft, the main point only appears on page three, so a reader skims past before reaching it. Keep it about the draft, not their ability, and give it soon, not saved up.",
+              "rubric": [
+                "Asks for the writer's view before giving yours",
+                "States situation, behaviour and impact for this draft, not a character judgment",
+                "Ties it to a soon, concrete change they can make before Friday"
+              ],
+              "from": "try",
+              "case": "feedback-talk",
+              "failed": [
+                "rubric_fits"
+              ],
+              "why": "rubric_fits: the third point asks for a concrete change before Friday, which the model answer never gives, and it lumps in timing, which is a separate idea."
+            },
+            {
+              "n": 5,
+              "kind": "prompt",
+              "question": "You've just given a report feedback in a one-on-one and have ten things you could mention. How should you close the conversation, and what do you do afterwards?",
+              "answer": "End with one concrete next step you agree on together, not a list of ten things: one change they can try in the next week. Then follow up and notice when they do it.",
+              "rubric": [
+                "One concrete step, agreed together rather than imposed",
+                "Small enough to try within the next week, not a long list",
+                "Follows up and notices when they do it"
+              ],
+              "from": "highlights",
+              "case": "feedback-talk",
+              "failed": [],
+              "why": ""
+            }
+          ],
+          "plan_failed": [],
+          "ms": 66517,
+          "usage": {
+            "input_tokens": 135599,
+            "output_tokens": 5994,
+            "cost_usd": 0.1884577
+          },
+          "judge_usage": {
+            "input_tokens": 33616,
+            "output_tokens": 1447,
+            "cost_usd": 0.07308719999999999
+          },
+          "prompt_version": "enrich@16",
+          "model": "claude-sonnet-5-5"
+        },
+        {
+          "id": "spaced-repetition-wiki",
+          "questions": [
+            {
+              "n": 1,
+              "kind": "prequestion",
+              "question": "Why might reviewing material at gradually growing gaps help you remember it longer than reviewing it the same number of times back to back?",
+              "case": "spaced-repetition-wiki",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prequestion",
+              "question": "How should a review schedule treat items you answer correctly versus items you get wrong, and why?",
+              "case": "spaced-repetition-wiki",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prequestion",
+              "question": "Is it better to space out reviews with steadily expanding intervals than with evenly spaced ones? What would you expect, and why?",
+              "case": "spaced-repetition-wiki",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 4,
+              "kind": "prequestion",
+              "question": "What kinds of learning beyond memorizing facts do you think spaced practice could help with, and why?",
+              "case": "spaced-repetition-wiki",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 1,
+              "kind": "prompt",
+              "question": "In designing a review schedule for a course, why might gaps that grow after each successful recall be expected to strengthen long-term memory more than the same number of reviews packed together?",
+              "answer": "Massed review doesn't require much retrieval effort. With expanding gaps, more time has passed at each test, so retrieving gets harder, which is believed to force deeper processing in long-term memory each time. The first test also comes early, right after learning, so it is likely to succeed, and people tend to remember that success on later tests. The effort explanation in particular has little evidence behind it.",
+              "rubric": [
+                "Says longer gaps make each retrieval harder, which is believed to produce deeper processing",
+                "Notes the first test comes early, so it is likely to succeed, and that success carries into later tests",
+                "Keeps the hedge: these are believed mechanisms, and the effort claim has little supporting evidence"
+              ],
+              "from": "prequestion",
+              "case": "spaced-repetition-wiki",
+              "failed": [
+                "faithful"
+              ],
+              "why": "faithful: the source never says massed review takes little retrieval effort, and it gives these mechanisms for expanding intervals in general, not as a contrast with packed reviews (an early first test happens in massed review too)."
+            },
+            {
+              "n": 2,
+              "kind": "prompt",
+              "question": "In a flashcard-style review system, how should the schedule treat items you recall correctly versus items you miss, and what should happen after a miss?",
+              "answer": "Correct items move to longer intervals and appear less often; missed and harder items come back sooner and more often (in the Leitner system, back to the first box). After a miss, the correct answer should be shown, since people who got feedback tended to get the item right on later tests.",
+              "rubric": [
+                "Correct or easy items are shown less frequently, with longer gaps",
+                "Missed or difficult items return sooner and more often, e.g. back to the first Leitner box",
+                "Shows the correct answer after a miss, because feedback makes later success likely"
+              ],
+              "from": "prequestion",
+              "case": "spaced-repetition-wiki",
+              "failed": [
+                "one_target"
+              ],
+              "why": "one_target: it joins two separate questions, how scheduling treats correct versus missed items and the separate feedback finding about what to do after a miss."
+            },
+            {
+              "n": 3,
+              "kind": "prompt",
+              "question": "You're choosing between expanding and evenly spaced review intervals for students. What does the evidence say about which is better, and how settled is it?",
+              "answer": "Expanding intervals perform as well as or better than uniform spacing in some papers, but meta-analyses tend to find both yield similar results. The effort-ramp explanation has little evidence; benefits seen may come from the early first retrieval, the number of repetitions or the total spacing. It has also been proposed that the best schedule depends on the learner, so general recommendations may not apply.",
+              "rubric": [
+                "Expanding is at least as good as uniform in some studies, while meta-analyses tend to find similar results",
+                "Apparent benefits may be due to other factors such as timing of the first retrieval, repetition count or overall spacing",
+                "Best schedule may be learner-dependent, so spacing at all is what is well supported"
+              ],
+              "from": "prequestion",
+              "case": "spaced-repetition-wiki",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 4,
+              "kind": "prompt",
+              "question": "You teach a course on editing video, where students must apply techniques, not just recall terms. Does spaced practice have a basis for helping with that, and how would you use it?",
+              "answer": "Spaced practice has mostly been studied with facts, but it has also helped with math, where a spaced group scored higher on a final test of a simple principle, and with procedural skills, e.g. a pilot study of neurosurgery simulation training. So spread repeated practice of the techniques over time, with feedback on errors, instead of cramming it in one block.",
+              "rubric": [
+                "Notes it was traditionally studied for facts but has shown benefit for math problems and procedural skills",
+                "Cites evidence such as the math principle study or surgical simulation pilot",
+                "Applies it to the course: spread repeated practice of techniques over time, with feedback after errors"
+              ],
+              "from": "prequestion",
+              "case": "spaced-repetition-wiki",
+              "failed": [],
+              "why": ""
+            }
+          ],
+          "plan_failed": [],
+          "ms": 57870,
+          "usage": {
+            "input_tokens": 122851,
+            "output_tokens": 3130,
+            "cost_usd": 0.20826219999999998
+          },
+          "judge_usage": {
+            "input_tokens": 89021,
+            "output_tokens": 2765,
+            "cost_usd": 0.266142
+          },
+          "prompt_version": "enrich@16",
+          "model": "claude-sonnet-5-5"
+        },
+        {
+          "id": "python-classes",
+          "questions": [
+            {
+              "n": 1,
+              "kind": "prequestion",
+              "question": "Why can a list stored on a class, rather than set up inside each instance, cause surprising bugs when you create several objects from that class?",
+              "case": "python-classes",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prequestion",
+              "question": "When you call a method on an object, how does the function know which object it is working on?",
+              "case": "python-classes",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prequestion",
+              "question": "When code refers to a bare name inside a nested function, how should a language decide which variable that name means?",
+              "case": "python-classes",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 4,
+              "kind": "prequestion",
+              "question": "Why might a language let you write a loop over your own custom object, and what would that object have to provide?",
+              "case": "python-classes",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 1,
+              "kind": "prompt",
+              "question": "You're writing a Python class for a chat session that keeps a list of messages, and you create one session per user. Why would defining that list at class level, instead of in the setup method, cause trouble?",
+              "answer": "A variable defined on the class is shared by all instances, so only one list exists. Appending to it through one session changes what every other session sees. Instance variables hold data unique to each instance, so the list should be created in __init__ (self.messages = []), giving each session its own list.",
+              "rubric": [
+                "Says a class-level variable is shared by all instances, so there is just one list",
+                "Says appending via one instance shows up in every other instance",
+                "Says the fix is to create the list in __init__ as an instance variable, so each object gets its own",
+                "Ties it to the chat setting: one user's messages would leak into another user's session"
+              ],
+              "from": "prequestion",
+              "case": "python-classes",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prompt",
+              "question": "In Python, a method is defined with a parameter like `def speak(self)`, yet you call it as `dog.speak()` with no argument. How does this work?",
+              "answer": "Calling a method on an instance passes the instance itself as the first argument of the underlying function. Looking up dog.speak finds the function on the class and packs the instance and the function into a method object; calling it builds a new argument list with the instance first. So dog.speak() is equivalent to Dog.speak(dog).",
+              "rubric": [
+                "Says the instance is automatically passed as the function's first argument",
+                "Says dog.speak() is equivalent to Dog.speak(dog)",
+                "Mentions that the attribute lookup yields a method object bundling the instance and the function"
+              ],
+              "from": "prequestion",
+              "case": "python-classes",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prompt",
+              "question": "In Python, a function nested inside another function uses the bare name `count`. In what order does Python look for it, and what happens if the nested function assigns to `count`?",
+              "answer": "Python searches the innermost local scope first, then enclosing functions' scopes (nearest first), then the module's global names, then the built-in names. An assignment inside the nested function creates a new local variable and leaves the outer one unchanged, unless the name is declared nonlocal (enclosing function) or global (module level).",
+              "rubric": [
+                "Gives the order: local, enclosing functions, module globals, built-ins",
+                "Says plain assignment creates a new local variable and leaves the outer one unchanged",
+                "Says nonlocal or global is needed to rebind a variable in an enclosing or module scope"
+              ],
+              "from": "prequestion",
+              "case": "python-classes",
+              "failed": [
+                "one_target"
+              ],
+              "why": "one_target: joins two separate questions, the lookup order and what assignment does."
+            },
+            {
+              "n": 4,
+              "kind": "prompt",
+              "question": "You want to loop over a custom Python object, such as a collection of lesson cards, with a for statement. What must the object provide, and how does the loop use it?",
+              "answer": "The class defines an __iter__() method that returns an iterator object, which has a __next__() method. The for loop calls iter() on the object, then calls __next__() repeatedly to get elements one at a time. When no elements remain, __next__() raises StopIteration, which ends the loop. If the class defines __next__() itself, __iter__() can just return self.",
+              "rubric": [
+                "Names __iter__() returning an object with a __next__() method",
+                "Says the loop calls __next__() repeatedly to get one element at a time",
+                "Says StopIteration signals the end and terminates the loop",
+                "Applies it to the cards collection: __next__ hands back the next card"
+              ],
+              "from": "prequestion",
+              "case": "python-classes",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 5,
+              "kind": "prompt",
+              "question": "In Python, a base class's __init__ calls a helper method, and a subclass later overrides that helper with a different signature. How can the base class protect its own call from breaking?",
+              "answer": "Give the helper a private copy under a double-underscore name (e.g. __update = update). Python textually renames it to _ClassName__update inside each class, so a subclass that overrides update or defines its own __update gets a different mangled name and the base class's internal call still reaches its original method. Mangling is designed mostly to avoid accidents, not to enforce privacy.",
+              "rubric": [
+                "Says to use a double-underscore (name-mangled) name for the internal copy",
+                "Says it is renamed to _classname__name, so the subclass's version doesn't collide",
+                "Says the base class's internal call therefore keeps reaching the original method",
+                "Notes it prevents accidents rather than truly hiding the name"
+              ],
+              "from": "highlights",
+              "case": "python-classes",
+              "failed": [
+                "rubric_fits"
+              ],
+              "why": "rubric_fits: the 'prevents accidents rather than hiding' point is not something the question asks for."
+            }
+          ],
+          "plan_failed": [],
+          "ms": 45757,
+          "usage": {
+            "input_tokens": 114847,
+            "output_tokens": 3543,
+            "cost_usd": 0.1827572
+          },
+          "judge_usage": {
+            "input_tokens": 47333,
+            "output_tokens": 1348,
+            "cost_usd": 0.1800126
+          },
+          "prompt_version": "enrich@16",
+          "model": "claude-sonnet-5-5"
+        },
+        {
+          "id": "git-undo",
+          "questions": [
+            {
+              "n": 1,
+              "kind": "prequestion",
+              "question": "Why might undoing a mistake in Git be safe to do on your own machine but cause trouble once teammates have your commits?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 2,
+              "kind": "prequestion",
+              "question": "When you want to take back a commit, what decides whether the changes from it should end up staged, unstaged, or gone?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prequestion",
+              "question": "If you commit work and then lose track of it after a reset or amend, why might you still be able to get it back?",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 1,
+              "kind": "prompt",
+              "question": "In a team repo, why is rewinding a branch with reset fine on a private branch but risky once colleagues have pulled it, and what do you use instead?",
+              "answer": "A reset moves the branch itself, so anyone who already has the old commits holds a history that disagrees with yours, and their next push or pull has to reconcile the two. On shared branches use git revert, which adds a new commit with the opposite changes, so history only grows and nobody's copy is contradicted.",
+              "rubric": [
+                "Says reset moves the branch, leaving others with a history that disagrees with yours",
+                "Notes the teammates' next push or pull must reconcile the difference",
+                "Names revert as the shared-branch alternative, adding an opposite commit so history only grows"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [
+                "one_target"
+              ],
+              "why": "one_target: joins why reset is risky on shared branches with a separate question about what to use instead (revert)."
+            },
+            {
+              "n": 2,
+              "kind": "prompt",
+              "question": "You made a commit that was premature. How does the choice between the three reset modes decide where its changes end up, and which fits when you want to keep the work and recommit?",
+              "answer": "The modes differ only in what happens to the changes from the commits you step over. --soft leaves them in the index, staged. --mixed (the default) leaves them in the working tree, unstaged. --hard removes them from both. To take back a commit and keep the work, git reset --soft HEAD~1 is the usual choice.",
+              "rubric": [
+                "Soft keeps changes staged in the index",
+                "Mixed (default) keeps them in the working tree, unstaged",
+                "Hard removes them from index and working tree",
+                "Picks soft (or mixed) to keep the work"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 3,
+              "kind": "prompt",
+              "question": "A teammate ran a hard reset on their laptop and thinks their last commits are gone. Why may they still recover them, and what limits that?",
+              "answer": "Git writes a reflog entry every time HEAD moves, so commits no branch points to can still be reached through git reflog, e.g. git reset --hard HEAD@{1}. Limits: entries last 90 days by default (30 for unreachable commits), after which garbage collection may delete them, and the reflog is local, never pushed.",
+              "rubric": [
+                "Reflog records every HEAD movement, so orphaned commits are reachable by entry",
+                "Recovery by finding the entry and resetting to it",
+                "Limited by expiry (90 days default, 30 for unreachable commits)",
+                "Local only, so it can't help if the machine is gone"
+              ],
+              "from": "prequestion",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 4,
+              "kind": "card",
+              "question": "In Git, what state is a repository in when HEAD points straight at a commit rather than at a branch?",
+              "answer": "A detached HEAD.",
+              "rubric": [],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            },
+            {
+              "n": 5,
+              "kind": "prompt",
+              "question": "You staged a config file by mistake before committing, but want to keep your edits to it. What do you run, and why does it lose nothing?",
+              "answer": "Run git restore --staged <file>. It takes the file out of the index, but the edits stay in the working tree; they just won't be in the next commit.",
+              "rubric": [
+                "Uses git restore --staged <file>",
+                "Explains the change stays in the working tree, only removed from the index"
+              ],
+              "from": "highlights",
+              "case": "git-undo",
+              "failed": [],
+              "why": ""
+            }
+          ],
+          "plan_failed": [],
+          "ms": 37897,
+          "usage": {
+            "input_tokens": 112450,
+            "output_tokens": 2706,
+            "cost_usd": 0.07669419999999999
+          },
+          "judge_usage": {
+            "input_tokens": 33312,
+            "output_tokens": 1482,
+            "cost_usd": 0.0731024
+          },
+          "prompt_version": "enrich@16",
+          "model": "claude-sonnet-5-5"
+        }
+      ]
+    }
+  ]
+}

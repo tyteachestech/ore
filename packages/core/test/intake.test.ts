@@ -3,13 +3,16 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, tr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
-import { addSource, addTab, addText, audioOf, reimportSource } from "../src/ingest/index.ts";
+import { addPageText, addSource, addTab, addText, audioOf, hasPageText, redoPageText, reimportSource, undoPageText } from "../src/ingest/index.ts";
+import { addHighlight, readAnnotations } from "../src/annotations.ts";
+import { cutText } from "../src/cut.ts";
+import { findItem } from "../src/items.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
 import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { xlsxToDoc } from "../src/ingest/sheets.ts";
-import { transcribe, transcribeFile } from "../src/ingest/audio.ts";
+import { pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
 import { chapterLines } from "../src/ai/recall.ts";
@@ -1117,6 +1120,223 @@ describe("import coverage: audio and podcasts", () => {
     const item = await addSource(await tempLibrary(), url);
     expect(item.meta.title).toBe("Episode 12: Memory");
     expect(item.meta.author).toBe("Learning Show");
+  });
+
+  test("a player's page whose audio has its type mid-path still plays it", async () => {
+    const url = "https://pca.st/episode/abc";
+    serve({
+      [url]: { body: `<html><head><meta property="og:title" content="Episode 13"></head><body><audio src="https://cdn.pca.test/ep13.mp3/stream"></audio></body></html>`, type: HTML },
+      "https://cdn.pca.test/ep13.mp3/stream": { body: new Uint8Array(4096), type: "audio/mpeg" },
+    });
+    expect((await addSource(await tempLibrary(), url)).meta.title).toBe("Episode 13");
+  });
+
+  // D122, D167, D215: a publisher's own episode page (Scientific American's, words rewritten) plays
+  // its episode in a Megaphone player. It comes in as the Apple link does (the audio kept to play, the
+  // heard transcript as the text), the page kept beside it as page.html; one click adds the page's own
+  // text below the transcript, and Undo takes it out again.
+  const EPISODE = "https://www.scientificamerican.com/podcast/episode/how-the-tiny-soybean-took-over-the-american-diet/";
+  const episodePage = readFileSync(join(FIX, "audio", "episode-page.html"), "utf8");
+  const MEGAPHONE = "https://traffic.megaphone.fm/SAM9228418236.mp3";
+  const heard = "[00:00] Welcome back to the show. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n";
+  const asEpisode = (item: Awaited<ReturnType<typeof addSource>>) => {
+    expect(item.meta).toMatchObject({ type: "article", title: "Soybeans: The crop that quietly took over America", author: "Rachel Feltman, Alli Rodgers, Sushmita Pathak, Alex Sugiura", published: "2026-11-04T06:00:00-05:00", url: EPISODE });
+    expect(item.body).toBe(heard);
+    expect(readFileSync(join(item.dir, "source.mp3")).length).toBe(4096);
+    expect(readFileSync(join(item.dir, "page.html"), "utf8")).toBe(episodePage);
+    expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.mp3") });
+    expect(hasPageText(item)).toBe(true);
+  };
+  test("a publisher's episode page: its player's audio kept and heard, the page kept beside it", async () => {
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    asEpisode(await addSource(await tempLibrary(), EPISODE));
+  });
+
+  test("an episode page added from the browser tab comes in as its episode too", async () => {
+    serve({ [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    asEpisode(await addTab(await tempLibrary(), { tab: { browser: "Safari", url: EPISODE, title: "x", html: episodePage } }));
+  });
+
+  test("an episode's page text is added below its transcript in one step, highlights kept, and undone", async () => {
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    const lib = await tempLibrary();
+    const item = await addSource(lib, EPISODE);
+    const spoken = addHighlight(item, { exact: "Today we talk about spaced repetition", intent: "keep" });
+    const added = await addPageText(lib, item.meta.id);
+    let now = findItem(lib, item.meta.id);
+    expect(now.body.startsWith(`${heard}\n## From the page\n\n**Rachel Feltman:** For *Scientific American*`)).toBe(true);
+    expect(now.body.trimEnd().endsWith("this is Rachel Feltman. Fact you plan sense!")).toBe(true);
+    expect(hasPageText(now)).toBe(false);
+    await expect(addPageText(lib, item.meta.id)).rejects.toThrow(/already/);
+    // The transcript's highlight stays where it was; one in the page's text goes with it on Undo, and comes back on Redo.
+    expect(readAnnotations(now).find((a) => a.id === spoken.id)).toMatchObject({ start: spoken.start, end: spoken.end });
+    const inPage = addHighlight(now, { exact: "For *Scientific American*", intent: "keep" });
+    await undoPageText(lib, item.meta.id, added.id);
+    now = findItem(lib, item.meta.id);
+    expect(now.body).toBe(heard);
+    expect(hasPageText(now)).toBe(true);
+    expect(readAnnotations(now).map((a) => a.id)).toEqual([spoken.id]);
+    await redoPageText(lib, item.meta.id, added.id);
+    now = findItem(lib, item.meta.id);
+    expect(hasPageText(now)).toBe(false);
+    expect(readAnnotations(now).map((a) => a.id).sort()).toEqual([spoken.id, inPage.id].sort());
+    // A source with no page kept has nothing to add.
+    const lecture = await addSource(lib, mp3());
+    expect(hasPageText(lecture)).toBe(false);
+    await expect(addPageText(lib, lecture.meta.id)).rejects.toThrow(/no page/);
+  });
+
+  test("an episode's page text: two clicks at once add it once, and cutting its heading doesn't offer it again", async () => {
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    const lib = await tempLibrary();
+    const { meta } = await addSource(lib, EPISODE);
+    const both = await Promise.allSettled([addPageText(lib, meta.id), addPageText(lib, meta.id)]);
+    expect(both.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+    let now = findItem(lib, meta.id);
+    expect(now.body.split("## From the page").length).toBe(2);
+    // Cutting only its heading leaves the text in: nothing to offer again.
+    const at = now.body.indexOf("## From the page");
+    await cutText(lib, meta.id, at, at + 3);
+    now = findItem(lib, meta.id);
+    expect(now.body).not.toContain("## From the page");
+    expect(hasPageText(now)).toBe(false);
+    await expect(addPageText(lib, meta.id)).rejects.toThrow(/already/);
+  });
+
+  test("Undo of an episode's page text works after a cut above it", async () => {
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    const lib = await tempLibrary();
+    const { meta } = await addSource(lib, EPISODE);
+    const added = await addPageText(lib, meta.id);
+    await cutText(lib, meta.id, 0, 5); // "[00:00] Welcome back…", the transcript's first paragraph
+    await undoPageText(lib, meta.id, added.id);
+    let now = findItem(lib, meta.id);
+    expect(now.body).toBe("[01:00] Thanks for listening.\n");
+    expect(hasPageText(now)).toBe(true);
+    await redoPageText(lib, meta.id, added.id);
+    now = findItem(lib, meta.id);
+    expect(now.body.startsWith("[01:00] Thanks for listening.\n\n## From the page\n")).toBe(true);
+  });
+
+  test("Reimport keeps a source's shape: an article stays the article, an episode keeps the page text he added", async () => {
+    const lib = await tempLibrary();
+    // Saved as an article (before D215, or its audio wouldn't come then): Reimport reads it as the article again.
+    serve({ [EPISODE]: { body: episodePage, type: HTML } });
+    const article = await addSource(lib, EPISODE);
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    expect((await reimportSource(lib, article.meta.id)).changed).toBe(false);
+    expect(existsSync(join(article.dir, "source.mp3"))).toBe(false);
+    expect(findItem(lib, article.meta.id).body).toBe(article.body);
+    // An episode with its page text: heard again, the page text after it, its highlight kept.
+    const lib2 = await tempLibrary();
+    const ep = await addSource(lib2, EPISODE);
+    await addPageText(lib2, ep.meta.id);
+    const inPage = addHighlight(findItem(lib2, ep.meta.id), { exact: "For *Scientific American*", intent: "keep" });
+    const vtt2 = join(mkdtempSync(join(tmpdir(), "ore-vtt-")), "out.vtt");
+    writeFileSync(vtt2, VTT.replace("Welcome back to the show.", "Welcome back."));
+    process.env.ORE_TRANSCRIBE = stand(`cat '${vtt2}'`);
+    try {
+      const r = await reimportSource(lib2, ep.meta.id);
+      expect(r.changed).toBe(true);
+      expect(r.removed).toEqual([]);
+      const now = findItem(lib2, ep.meta.id);
+      expect(now.body.startsWith("[00:00] Welcome back. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n\n## From the page\n\n**Rachel Feltman:**")).toBe(true);
+      expect(readAnnotations(now).find((a) => a.id === inPage.id)?.exact).toBe("For *Scientific American*");
+      expect(hasPageText(now)).toBe(false);
+      // Its Undo still takes the page text out.
+      await undoPageText(lib2, ep.meta.id, now.meta.page_added!);
+      expect(findItem(lib2, ep.meta.id).body).toBe("[00:00] Welcome back. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n");
+    } finally {
+      process.env.ORE_TRANSCRIBE = stand(`cat '${vttFile}'`);
+    }
+  });
+
+  test("an episode page whose audio won't come still comes in as the article", async () => {
+    serve({ [EPISODE]: { body: episodePage, type: HTML } }); // the audio 404s
+    const item = await addSource(await tempLibrary(), EPISODE);
+    expect(item.body.startsWith("**Rachel Feltman:**")).toBe(true);
+    expect(existsSync(join(item.dir, "source.html"))).toBe(true);
+    expect(audioOf(item)).toBeNull();
+    // A machine that can't hear speech at all doesn't download the audio for nothing.
+    const fetched: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const u = String(input instanceof Request ? input.url : input);
+      fetched.push(u);
+      return u === EPISODE ? new Response(episodePage, { headers: { "content-type": HTML } }) : new Response(new Uint8Array(4096), { headers: { "content-type": "audio/mpeg" } });
+    }) as unknown as typeof fetch;
+    process.env.ORE_TRANSCRIBE = "";
+    try {
+      expect(audioOf(await addSource(await tempLibrary(), EPISODE))).toBeNull();
+      expect(fetched.filter((u) => u.includes("megaphone"))).toEqual([]);
+    } finally {
+      process.env.ORE_TRANSCRIBE = stand(`cat '${vttFile}'`);
+    }
+    // Nor when the Mac can't hear it (an older macOS).
+    process.env.ORE_TRANSCRIBE = stand("exit 3");
+    serve({ [EPISODE]: { body: episodePage, type: HTML }, [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+    try {
+      expect(audioOf(await addSource(await tempLibrary(), EPISODE))).toBeNull();
+    } finally {
+      process.env.ORE_TRANSCRIBE = stand(`cat '${vttFile}'`);
+    }
+  });
+
+  // The rule (pageAudio): a page is an episode when its page-level JSON-LD is a PodcastEpisode (or
+  // og:type says episode) with audio, or it plays exactly one audio at an address naming one episode.
+  const prose = "<p>" + "Forecasters expect a wetter season along the coast, and towns are planning for it. ".repeat(12) + "</p>";
+  const page = (head: string, body = "") => `<html><head><title>Storm season</title>${head}</head><body><article><h1>Storm season</h1>${prose}${body}${prose}</article></body></html>`;
+  const ld = (o: object) => `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", ...o })}</script>`;
+  test("a page that names its episode's audio is the episode; a news story with a clip stays the article", async () => {
+    const fetched: string[] = [];
+    const pages: Record<string, string> = {
+      // Episodes.
+      "https://radio.test/shows/17": page(ld({ "@type": "PodcastEpisode", name: "Episode 17", associatedMedia: { "@type": "MediaObject", contentUrl: "https://cdn.radio.test/17.m4a" } })),
+      "https://show.test/sleep": page(`<meta property="og:type" content="music.podcast_episode"><meta property="og:audio" content="https://cdn.show.test/sleep.mp3">`),
+      // Two formats of one player, and the same file under another tracking query: one audio.
+      "https://show.test/episodes/18": page("", `<audio controls><source src="https://cdn.show.test/18.m4a"><source src="https://cdn.show.test/18.mp3"></audio><p><a href="#">Play</a></p><audio src="https://cdn.show.test/18.m4a?src=share"></audio>`),
+      // Articles: a bare og:audio, an AudioObject beside the Article in its @graph (a read-aloud), a
+      // clip at an ordinary address, a show's index with one featured player, a Megaphone playlist,
+      // and a video podcast's episode.
+      "https://news.test/2026/11/read-aloud": page(`<meta property="og:type" content="article"><meta property="og:audio" content="https://news.test/read-aloud.mp3">`),
+      "https://news.test/2026/11/graph": page(ld({ "@graph": [{ "@type": "NewsArticle", headline: "Storm season" }, { "@type": "AudioObject", contentUrl: "https://news.test/graph.mp3" }] })),
+      "https://news.test/2026/11/storm-season": page(ld({ "@type": "NewsArticle", audio: { "@type": "AudioObject", contentUrl: "https://news.test/nested.mp3" } }), `<audio controls src="/clips/mayor.mp3"></audio>`),
+      "https://show.test/podcasts/": page("", `<audio src="https://cdn.show.test/latest.mp3"></audio>`),
+      "https://show.test/podcast/playlist": page("", `<iframe src="https://player.megaphone.fm/playlist/ABC1234567"></iframe>`),
+      "https://show.test/episodes/video-19": page(ld({ "@type": "PodcastEpisode", associatedMedia: { "@type": "MediaObject", contentUrl: "https://cdn.show.test/19.mp4" } })),
+    };
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const u = String(input instanceof Request ? input.url : input);
+      fetched.push(u);
+      if (pages[u]) return new Response(pages[u], { headers: { "content-type": HTML } });
+      if (/\.(mp3|m4a|mp4)(?:\?|$)/.test(u)) return new Response(new Uint8Array(4096), { headers: { "content-type": u.includes(".mp3") ? "audio/mpeg" : "audio/mp4" } });
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
+    const lib = await tempLibrary();
+    for (const u of ["https://radio.test/shows/17", "https://show.test/sleep", "https://show.test/episodes/18"]) {
+      const item = await addSource(lib, u);
+      expect([u, audioOf(item)?.words[0], existsSync(join(item.dir, "page.html"))]).toEqual([u, [0, "Welcome"], true]);
+    }
+    expect(fetched.filter((u) => u.startsWith("https://cdn.show.test/18"))).toEqual(["https://cdn.show.test/18.m4a"]);
+    for (const u of Object.keys(pages).slice(3)) {
+      const item = await addSource(lib, u);
+      expect([u, audioOf(item), existsSync(join(item.dir, "source.html"))]).toEqual([u, null, true]);
+    }
+    expect(fetched.filter((u) => /\.(mp3|m4a|mp4)(?:\?|$)/.test(u) && !/cdn\.(radio|show)\.test\/(17|sleep|18)/.test(u))).toEqual([]);
+  });
+
+  test("one episode under two addresses is one audio; a show's og:type is not an episode's; player pages hear any audio type and a Megaphone player", async () => {
+    // A redirector (Podtrac) in front of the Megaphone file the player plays; og:audio beside a player of two formats.
+    expect(pageAudio(`<audio src="https://dts.podtrac.com/redirect.mp3/traffic.megaphone.fm/ABC1234567.mp3"></audio><iframe src="https://playlist.megaphone.fm/?e=ABC1234567"></iframe>`, "https://show.test/podcast/episode/21")).toBe("https://dts.podtrac.com/redirect.mp3/traffic.megaphone.fm/ABC1234567.mp3");
+    expect(pageAudio(`<meta property="og:audio" content="https://cdn.show.test/20.mp3"><audio><source src="https://cdn.show.test/20.m4a"><source src="https://cdn.show.test/20.mp3"></audio>`, "https://show.test/episodes/20")).toBe("https://cdn.show.test/20.mp3");
+    // A show's page names its latest episode's audio: only an episode's type counts, else the address rule.
+    const latest = `<meta property="og:audio" content="https://cdn.show.test/latest.mp3">`;
+    expect(pageAudio(`<meta property="og:type" content="music.podcast">${latest}`, "https://show.test/")).toBeUndefined();
+    expect(pageAudio(`<meta property="og:type" content="podcast">${latest}`, "https://show.test/")).toBeUndefined();
+    expect(pageAudio(`<meta property="og:type" content="podcast:episode">${latest}`, "https://show.test/")).toBe("https://cdn.show.test/latest.mp3");
+    // A player's own page: any audio the Mac hears, a Megaphone player, a file whose type is mid-path.
+    expect(pageAudio(`<audio src="/ep.aac"></audio>`, "https://overcast.fm/+x", true)).toBe("https://overcast.fm/ep.aac");
+    expect(pageAudio(`<iframe src="https://player.megaphone.fm/SAM9228418236"></iframe>`, "https://overcast.fm/+x", true)).toBe("https://traffic.megaphone.fm/SAM9228418236.mp3");
+    expect(pageAudio(`<audio src="https://cdn.pca.test/ep13.mp3/stream"></audio>`, "https://pca.st/episode/abc", true)).toBe("https://cdn.pca.test/ep13.mp3/stream");
   });
 
   // D122: a Spotify link is heard from the same episode in the show's public feed.

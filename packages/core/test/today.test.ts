@@ -10,6 +10,7 @@ import { endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
 import { readReviews, type Review } from "../src/reviews.ts";
 import { calibration, raterStats } from "../src/stats.ts";
 import { loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
+import { NO_SKILL } from "../src/no-skill.ts";
 import { dueQueue, recordReview } from "../src/study.ts";
 import { level, nextLevelAt, reminderNote, skillGrowth, skillStrength, SOLID_DAYS, today } from "../src/today.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -149,6 +150,7 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     const day1 = T();
     for (const c of cards.slice(0, 6)) await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: day1 });
     const later = new Date(day1.getTime() + 90 * 864e5);
+    later.setHours(12, 0, 0, 0); // midday, so the minute after it is still the same day on any clock
     await recordReview(lib, cards[0]!.meta.id, { rating: 1, confidence: 3, now: later }); // a miss today owes one pass
     const q = dueQueue(lib, new Date(later.getTime() + 60_000));
     expect(q.map((e) => (e.relearn ? "R" : e.due === null ? "N" : "D")).join("")).toBe("DDDDNDNNNNNR");
@@ -184,6 +186,22 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(picked.flatMap((e, i) => (e.due === null ? [i] : []))).toEqual([4, 9]);
     expect(picked.filter((e) => e.due === null).map((e) => e.id)).toEqual([fromB.meta.id, fromC.meta.id]);
     expect(dueQueue(lib, later, { skills: ["habits"] }).map((e) => e.id)).toEqual([habit.meta.id]);
+  });
+
+  test("exercises filed under no skill: Today counts them apart, and a pick takes them only with NO_SKILL (D204)", async () => {
+    const { lib, item } = await library(0);
+    const draft = (skills: string[], q: string) => writeNewCard(lib, { kind: "card", item: item.meta.id, skills, topics: [], content_type: "fact", question: q, answer: "A", rubric: [] });
+    const filed = draft(["learning"], "Filed?");
+    const none = draft([], "Unfiled?");
+    const ghost = draft(["no-such-skill"], "Under a skill that is gone?");
+    const t = today(lib, T());
+    // The picker's rows add up to the session with every row ticked: the skills' rows plus the no-skill row.
+    expect(t.due).toBe(3);
+    expect(t.skills.find((s) => s.skill === "learning")?.due).toBe(1);
+    expect(t.no_skill_due).toBe(2);
+    expect(dueQueue(lib, T(), { skills: ["learning"] }).map((e) => e.id)).toEqual([filed.meta.id]);
+    expect(dueQueue(lib, T(), { skills: [NO_SKILL] }).map((e) => e.id).sort()).toEqual([none.meta.id, ghost.meta.id].sort());
+    expect(dueQueue(lib, T(), { skills: ["learning", NO_SKILL] })).toHaveLength(3);
   });
 
   test("new cards from his own work come before the AI's: his notes, then his highlights, then the rest (D176)", async () => {

@@ -383,7 +383,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
           setText(e.target.value);
           setError(null);
         }}
-        onBlur={() => !busy && onDone(false)}
+        onBlur={() => !busy && document.hasFocus() && (text.trim() ? void add() : onDone(false))}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.nativeEvent.isComposing || e.keyCode === 229) return;

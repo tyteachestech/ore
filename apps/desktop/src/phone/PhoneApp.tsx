@@ -20,7 +20,7 @@ import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
-import { errorText, type Notify } from "../util";
+import { errorText, useKeptScroll, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
@@ -146,7 +146,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
 type TabId = "today" | "sources" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
-type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; review: { pick: string[] | null } | null };
+type Place = { tab: TabId; skill: string | null; skillNote?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null } | null };
 const PLACE = "ore-phone-place";
 function loadPlace(): Place {
   try {
@@ -277,7 +277,7 @@ export function PhoneApp() {
   const [openId, setOpenId] = useState<string | null>(start.openId);
   const [noting, setNoting] = useState(!!start.noting);
   /** What the page beside the source shows: the note, or what he collected (a tap on the collected count). */
-  const [side, setSide] = useState<SideTab>("note");
+  const [side, setSide] = useState<SideTab>(start.side ?? "note");
   // Once that page has slid away it is the note again, so the edge swipe always brings the note.
   useEffect(() => {
     if (noting) return;
@@ -285,7 +285,10 @@ export function PhoneApp() {
     return () => clearTimeout(t);
   }, [noting]);
   const [jumpTo, setJumpTo] = useState<string | undefined>();
-  const [finishing, setFinishing] = useState(false);
+  const [finishing, setFinishing] = useState(!!start.finishing);
+  /** Finish has recorded the source Done: a relaunch from here on never opens Finish again (its closing moment shows). */
+  const [recorded, setRecorded] = useState(false);
+  useEffect(() => void (finishing || setRecorded(false)), [finishing]);
   const [reviewing, setReviewing] = useState<{ pick: string[] | null; run: number } | null>(start.review && { pick: start.review.pick, run: 0 });
   const [tick, setTick] = useState(0);
   const { notify, view: toast } = useToast();
@@ -299,13 +302,15 @@ export function PhoneApp() {
   const cue = useRef<HTMLDivElement>(null);
   // Rendered inside the touch's own handler, so iOS lets the field take focus and bring up the keyboard.
   usePullToSearch(main, cue, () => flushSync(() => setSearching(true)));
+  // The lists share this one scroller: each keeps its own place, as Mail's tabs do (and across a relaunch).
+  useKeptScroll(main, `phone:${tab}`);
   const go = (t: TabId) => (setTab(t), setDrawer(false));
 
   useEffect(() => {
     try {
-      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, review: reviewing && { pick: reviewing.pick } } satisfies Place));
+      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, openId, noting, side, finishing: finishing && !recorded, review: reviewing && { pick: reviewing.pick } } satisfies Place));
     } catch {}
-  }, [tab, skill, skillNote, openId, noting, reviewing]);
+  }, [tab, skill, skillNote, openId, noting, side, finishing, recorded, reviewing]);
   const tabNow = useRef(tab);
   tabNow.current = tab;
   const refresh = useCallback(async () => {
@@ -470,6 +475,7 @@ export function PhoneApp() {
             skills={skills}
             finishing={finishing}
             setFinishing={setFinishing}
+            onFinishRecorded={setRecorded}
             notesOpen={noting}
             sideTab={side}
             onShowSide={(t) => (setSide(t), setNoting(true))}

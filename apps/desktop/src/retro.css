@@ -84,7 +84,7 @@
 .outline-lines span.past { background: var(--faint); }
 .outline-lines span.on { background: var(--paper); }
 .outline-cursor { position: absolute; top: 0; left: -6px; fill: var(--paper); pointer-events: none; }
-.outline:hover .outline-cursor, .outline:focus-within .outline-cursor { visibility: hidden !important; }
+.outline.open .outline-cursor, .outline:focus-within .outline-cursor { visibility: hidden !important; }
 
 /* One level of boxes at most (Tyler, 2026-10-30): page sections are a label over a hairline rule, never framed;
    what sits inside a section is never boxed either. Home's cards stay hairline frames: nothing inside them is. */

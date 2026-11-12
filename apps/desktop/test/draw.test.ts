@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
+import { STROKES,
   addChild, addMap, addMatrix, align, bounds, centre, DEFAULT_STYLE, distribute, duplicate, edgePoint, fitLink, flowDir, fromScene, growMatrix, labelOf,
-  layoutMatrix, minLabelWidth, nearestIn, nextCell, parseMap, remove, reorder, resize, rotate, route, byId, setLabel, shape, snapBox, toScene, topAt, move, type El, type Scene,
+  layoutMatrix, minLabelWidth, syncAll, tidy, absPoints as absPointsOf, nearestIn, nextCell, parseMap, remove, reorder, resize, rotate, route, byId, setLabel, shape, snapBox, toScene, topAt, move, type El, type Scene,
 } from "../src/draw/model";
 import { dark } from "../src/draw/render";
 
@@ -49,10 +49,65 @@ describe("diagram files (Excalidraw's format)", () => {
     expect(dark("#1e1e1e")).toBe("#f2f1ec");
     expect(dark("transparent")).toBe("transparent");
     expect(dark("#a5d8ff")).toMatch(/^#[0-9a-f]{6}$/);
+    // The presets are the note's text colours, read from styles.css so the two never drift apart.
+    // retro.css loads after styles.css and sets the palette the app shows, so its value is the one that counts.
+    const css = ["styles.css", "retro.css"].map((f) => readFileSync(join(import.meta.dir, "../src", f), "utf8")).join("\n");
+    const c = (n: string) => [...css.matchAll(new RegExp(`--c-${n}:\\s*(#[0-9a-f]{6})`, "g"))].at(-1)![1];
+    expect([STROKES[1], STROKES[2], STROKES[3], STROKES[4]].map((x) => dark(x!))).toEqual([c("red"), c("green"), c("blue"), c("orange")]);
+  });
+});
+
+describe("saved and opened again (Codex sweep 4)", () => {
+  test("a dragged elbow middle, a matrix cell and a box label at the top survive the file", () => {
+    const s = box(0, 0), t = box(400, 200);
+    const arrow = { ...shape("rectangle", { x: 0, y: 0, w: 1, h: 1 }, DEFAULT_STYLE), type: "arrow", elbowed: true, points: [[0, 0], [1, 1]], startBinding: { elementId: s.id, focus: 0, gap: 6 }, endBinding: { elementId: t.id, focus: 0, gap: 6 }, customData: { oreElbow: { mid: 320 } } } as El;
+    let els: El[] = [s, t, route(arrow, byId([s, t, arrow]))];
+    els = setLabel(els, s.id, "Section", DEFAULT_STYLE);
+    els = syncAll(els.map((e) => (e.containerId === s.id ? { ...e, verticalAlign: "top" as const } : e)));
+    els = [...els, ...addMatrix([], [0, 600], 2, 2, DEFAULT_STYLE).els];
+    const back = fromScene(JSON.parse(JSON.stringify(toScene(els, null))));
+    const a = back.find((e) => e.type === "arrow")!;
+    expect(absPointsOf(route(a, byId(back)))[1]![0]).toBe(320);
+    expect(back.find((e) => e.containerId === s.id)?.verticalAlign).toBe("top");
+    expect(back.filter((e) => e.customData?.oreCell)).toHaveLength(4);
+    // A label written without its originalText (left out when it equals text) opens with its words (sweep 5).
+    expect(back.find((e) => e.containerId === s.id)?.originalText).toBe("Section");
+  });
+});
+
+describe("labels", () => {
+  test("a box's label set to the top sits under its top edge, and stays there as the box grows (a section's title)", () => {
+    const a = box(0, 0, 400, 300);
+    let els = setLabel([a], a.id, "Practice section", DEFAULT_STYLE);
+    const mid = els.find((e) => e.containerId === a.id)!;
+    expect(mid.y + mid.height / 2).toBeCloseTo(150, 0);
+    els = syncAll(els.map((e) => (e.containerId === a.id ? { ...e, verticalAlign: "top" as const } : e)));
+    expect(els.find((e) => e.containerId === a.id)!.y).toBe(10);
+    els = syncAll(els.map((e) => (e.id === a.id ? { ...e, y: 50, height: 500 } : e)));
+    expect(els.find((e) => e.containerId === a.id)!.y).toBe(60);
+    els = syncAll(els.map((e) => (e.containerId === a.id ? { ...e, textAlign: "left" as const } : e)));
+    expect(els.find((e) => e.containerId === a.id)!.x).toBe(10);
+    els = syncAll(els.map((e) => (e.containerId === a.id ? { ...e, textAlign: "right" as const } : e)));
+    const r = els.find((e) => e.containerId === a.id)!;
+    expect(r.x + r.width).toBeCloseTo(390, 0);
   });
 });
 
 describe("arrows", () => {
+  test("an elbow arrow keeps its middle segment where it was dragged, as its ends move (Codex sweep 2)", () => {
+    const els = [box(0, 0), box(400, 200)];
+    const [s, t] = els as [El, El];
+    const arrow = { ...shape("rectangle", { x: 0, y: 0, w: 1, h: 1 }, DEFAULT_STYLE), type: "arrow", elbowed: true, points: [[0, 0], [1, 1]], startBinding: { elementId: s.id, focus: 0, gap: 6 }, endBinding: { elementId: t.id, focus: 0, gap: 6 } } as El;
+    const map = byId([...els, arrow]);
+    const mid = (e: El) => absPointsOf(e)[1]![0];
+    expect(mid(route(arrow, map))).toBeCloseTo(250, 0);
+    const dragged = route({ ...arrow, customData: { oreElbow: { mid: 320 } } }, map);
+    expect(mid(dragged)).toBe(320);
+    expect(absPointsOf(dragged)[2]![0]).toBe(320);
+    const moved = route(dragged, byId([s, { ...t, y: 260 }, dragged]));
+    expect(mid(moved)).toBe(320);
+  });
+
   test("a bound arrow's ends sit on each shape's edge, a gap away, and follow a move", () => {
     const a = box(0, 0);
     const b = box(300, 0);
@@ -173,6 +228,36 @@ describe("keyboard maps (Tab, ⌘+arrow, ⌥+arrow)", () => {
     expect(flowDir(els, last)).toBe("down");
     const round = fromScene(toScene(els, { type: "excalidraw", elements: [] } as never) as never);
     expect(round.find((e) => e.id === a.id)?.startBinding?.fixedPoint).toEqual([0.5, 1]);
+  });
+
+  test("no link runs through a node it doesn't join, as typed and after Tidy (Codex sweep 2)", () => {
+    const src = "Retrieval -strengthens-> Memory\nRereading -feels like-> Fluency\nFluency -not lasting-> Memory\nDelay -reveals gap-> Memory\nPractice tests -retrieves-> Memory\nA -> B -> C\nA -> C";
+    const crossings = (els: El[]) => {
+      const nodes = els.filter((e) => e.type === "rectangle");
+      const out: string[] = [];
+      for (const a of els.filter((e) => e.type === "arrow")) {
+        const pts = absPointsOf(a);
+        for (const n of nodes) {
+          if (n.id === a.startBinding?.elementId || n.id === a.endBinding?.elementId) continue;
+          const b = { x: n.x - 4, y: n.y - 4, w: n.width + 8, h: n.height + 8 };
+          for (let i = 1; i < pts.length; i++) {
+            for (let t = 0; t <= 1; t += 0.02) {
+              const x = pts[i - 1]![0] + (pts[i]![0] - pts[i - 1]![0]) * t, y = pts[i - 1]![1] + (pts[i]![1] - pts[i - 1]![1]) * t;
+              if (x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h) { out.push(`${labelOf(els, a.id)?.text ?? "→"} crosses ${labelOf(els, n.id)?.text}`); t = 2; i = pts.length; }
+            }
+          }
+        }
+      }
+      return out;
+    };
+    const r = addMap([], src, DEFAULT_STYLE, [0, 0]);
+    expect(crossings(r.els)).toEqual([]);
+    expect(crossings(tidy(r.els))).toEqual([]);
+    // With cycles and fan-in (Codex sweep 3).
+    const loop = "Question -prompts-> Recall\nRecall -checks-> Feedback\nFeedback -corrects-> Restudy\nRestudy -retries-> Recall\nFeedback -schedules-> Delay\nDelay -retests-> Question\nRecall -strengthens-> Memory\nSleep -consolidates-> Memory\nPractice -strengthens-> Memory\nMemory -supports-> Transfer\nExamples -support-> Transfer\nTransfer -raises-> Question\nConfidence -predicts-> Feedback\nFluency -inflates-> Confidence\nRestudy -creates-> Fluency";
+    const big = addMap([], loop, DEFAULT_STYLE, [0, 0]);
+    expect(crossings(big.els)).toEqual([]);
+    expect(crossings(tidy(big.els))).toEqual([]);
   });
 
   test("a typed map reuses nodes already drawn with the same label", () => {

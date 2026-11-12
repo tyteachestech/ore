@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { lessonsOf, nextLesson, titleMatches, type Item } from "../src/ore";
+import { lessonsOf, nextLesson, searchFields, type Item } from "../src/ore";
+import { rankScore } from "../src/match";
 
 const lesson = (id: string, part: number, status: Item["status"], course = "c1"): Item => ({
   id, type: "youtube", title: id, dir: "", captured_at: "2026-10-28T00:00:00Z", status, skills: ["ai"], course: { id: course, title: "AI Fluency", part },
@@ -15,8 +16,15 @@ describe("courses in lists (D79)", () => {
   });
 
   test("filtering the list by a course's title finds its lessons (⌘F), as ⌘K does", () => {
-    expect(titleMatches(lesson("Lesson 3: Prompts", 3, "inbox"), "ai fluency")).toBe(true);
-    expect(titleMatches(lesson("Lesson 3: Prompts", 3, "inbox"), "prompts")).toBe(true);
-    expect(titleMatches(source("Other", "inbox"), "ai fluency")).toBe(false);
+    const finds = (i: Item, q: string) => rankScore(searchFields(i), q) > 0;
+    expect(finds(lesson("Lesson 3: Prompts", 3, "inbox"), "ai fluency")).toBe(true);
+    expect(finds(lesson("Lesson 3: Prompts", 3, "inbox"), "prompts")).toBe(true);
+    expect(finds(source("Other", "inbox"), "ai fluency")).toBe(false);
+  });
+
+  test("a site is searched by its name, not its .com, which every web page shares", () => {
+    const page = source("Other", "inbox");
+    expect(rankScore(searchFields(page, "nytimes.com"), "nytimes")).toBeGreaterThan(0);
+    expect(rankScore(searchFields(page, "nytimes.com"), "com")).toBe(0);
   });
 });

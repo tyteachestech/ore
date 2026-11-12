@@ -175,7 +175,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     arrange(layoutOf(groups.map((x) => (x === g ? { ...x, collection: v } : x))), `Renamed collection “${g.collection}” to “${v}”`, { from: g.collection, to: v });
   };
   // Finder's New Folder: the name field opens where collections end, Enter makes it and names its
-  // first skill (a collection is the skills in it), Esc or clicking away drops it.
+  // first skill (a collection is the skills in it), Esc or clicking away drops it (a click away can't
+  // go on to name the skill without taking focus back from where he clicked).
   const nameCollection = (name: string) => {
     setNaming(false);
     const v = tidyCollection(name);
@@ -219,7 +220,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const namingField = (
     <div className="side-section" key="naming">
       <div className="side-head">
-        <RenameField value="" label="New collection name" placeholder="Collection name" onSave={nameCollection} onCancel={() => setNaming(false)} />
+        <RenameField value="" label="New collection name" placeholder="Collection name" blurSaves={false} onSave={nameCollection} onCancel={() => setNaming(false)} />
       </div>
     </div>
   );
@@ -405,10 +406,10 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, taken, 
   );
 }
 
-/** A collection's name, edited in place like a Finder folder: Enter saves, Esc or clicking away keeps the old one. */
+/** A collection's name, edited in place like a Finder folder: Enter or clicking away saves, Esc keeps the old one. */
 /** A collection's name field. A name another collection has is refused in place, as Finder refuses
  *  a folder name that is taken: the field stays open and says so (Tyler, 2026-11-07). */
-function RenameField({ value, label = "Collection name", placeholder, taken, onSave, onCancel }: { value: string; label?: string; placeholder?: string; taken?: (v: string) => boolean; onSave: (v: string) => void; onCancel: () => void }) {
+function RenameField({ value, label = "Collection name", placeholder, taken, blurSaves = true, onSave, onCancel }: { value: string; label?: string; placeholder?: string; taken?: (v: string) => boolean; blurSaves?: boolean; onSave: (v: string) => void; onCancel: () => void }) {
   const [v, setV] = useState(value);
   const [refused, setRefused] = useState<string | null>(null);
   return (
@@ -423,7 +424,14 @@ function RenameField({ value, label = "Collection name", placeholder, taken, onS
       onFocus={(e) => e.currentTarget.select()}
       aria-invalid={refused ? true : undefined}
       onChange={(e) => (setV(e.target.value), setRefused(null))}
-      onBlur={onCancel}
+      // Clicking away saves it (Finder); empty or unchanged keeps the old, a taken name stays open and says so.
+      onBlur={() => {
+        if (!document.hasFocus()) return;
+        const name = v.trim().replace(/\s+/g, " ");
+        if (!name || name === value || !blurSaves) onCancel();
+        else if (taken?.(name)) setRefused(name);
+        else onSave(v);
+      }}
       data-no-drag
       onKeyDown={(e) => {
         e.stopPropagation();
@@ -584,7 +592,7 @@ function ArchivedRow({ s, on, drop, marked, onOpen, menu }: { s: Skill; on: bool
 }
 
 /** Names a new skill in place, like a new page in Notion's sidebar: Enter creates it through
- *  `ore skills add`, Esc or clicking away drops the name (never saved on blur). */
+ *  `ore skills add`, as clicking away with a name does (D211); Esc or an empty name drops it. */
 function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; collection: string; marked: boolean; onDone: (s: Skill | null) => void }) {
   // What opened it, read before its field takes focus: Esc gives focus back there.
   const [opener] = useState(() => document.activeElement as HTMLElement | null);
@@ -628,7 +636,7 @@ function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; col
               setName(e.target.value);
               setError(null);
             }}
-            onBlur={() => !busy && onDone(null)}
+            onBlur={() => !busy && document.hasFocus() && (name.trim() ? void create() : onDone(null))}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

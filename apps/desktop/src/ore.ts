@@ -96,6 +96,8 @@ export type Item = {
   tables?: "reading" | "read";
   tables_error?: string;
   tables_reader?: boolean;
+  /** An episode whose own page is kept and whose text isn't in it yet (D215): one click adds it. */
+  page_text?: boolean;
   skills: string[];
   suggested_skill?: { name: string; hook?: string };
   prequestions?: Prequestion[];
@@ -123,7 +125,6 @@ export function courseThumb(lessons: Item[]): Pick<Item, "type" | "thumbnail"> |
   const own = lessons.find((l) => l.course_cover)?.course_cover;
   return own ? { type: "article", thumbnail: own } : lessons.find((l) => l.thumbnail);
 }
-/** Whether a filter (⌘F on a list) finds the source: by its title, or a lesson by its course's title. */
 /** A pin time that lists a source between two pinned ones (they list by `pinned_at`): halfway
  *  between them, or a second past the end it goes to. */
 export function pinBetween(before?: string, after?: string): string {
@@ -133,10 +134,11 @@ export function pinBetween(before?: string, after?: string): string {
   return new Date(t).toISOString();
 }
 
-export const titleMatches = (i: Item, q: string): boolean => {
-  const t = q.toLowerCase();
-  return i.title.toLowerCase().includes(t) || !!i.course?.title.toLowerCase().includes(t);
-};
+/** What a list's search knows a source by (`ranked`): its title first, then its course, author, site, skills and type. */
+export const searchFields = (i: Item, site?: string, skills: string[] = []): (string | undefined)[] => [i.title, i.course?.title, i.author, siteName(site), ...skills, i.type];
+/** A site as searched: its name without the ending ("nytimes" for nytimes.com, "bbc.co" for bbc.co.uk), or
+ *  "com" would find nearly every web page as one types "Complete" (bench "filter sources"). */
+const siteName = (site?: string) => site?.replace(/\.[^.]+$/, "");
 /** The lesson to open next: the first one not done (null when all are). */
 export const nextLesson = (lessons: Item[]): Item | null => lessons.find((l) => l.status !== "done") ?? null;
 /** EPUB chapter recall (D18); `n` is the number in the body's `<!-- chapter N -->` marker. */
@@ -240,6 +242,8 @@ export type Today = {
   due: number;
   new_today: number;
   new_waiting: number;
+  /** Of `due`, the exercises filed under no skill: What to review's "No skill" row (D204). */
+  no_skill_due: number;
   estimate_ms: number;
   /** Today's slice: the most urgent cards that fit what is left of the goal (D65). */
   slice_ms: number;

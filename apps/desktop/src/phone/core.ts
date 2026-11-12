@@ -72,6 +72,9 @@ function boot() {
 export async function run<T>(args: string[], input: string | null): Promise<T> {
   const { commands, errorLine } = await boot();
   const [name, ...rest] = args;
+  // The journeys' failure path, as on the Mac's mock (scripts/mock/tauri.js): `window.__ORE_FAIL = { notes: "why" }`.
+  const fail = import.meta.env.DEV && (globalThis as { __ORE_FAIL?: Record<string, string> }).__ORE_FAIL?.[name ?? ""];
+  if (fail) throw new Error(fail);
   const cmd = commands[name ?? ""];
   if (!cmd) throw new Error(`unknown command "${name}"`);
   if (needsAi(name!, rest)) throw new Error("AI runs on your Mac for now.");

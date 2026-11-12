@@ -6,7 +6,7 @@ import { stringifyFrontmatter } from "./frontmatter.ts";
 import { latestRevs, sha256, writeAtomic } from "./fsutil.ts";
 import { ulid } from "./ids.ts";
 import { VIDEO_END } from "./ingest/page.ts";
-import { findItem, readItemDir, type Item } from "./items.ts";
+import { findItem, readItemDir, type Item, type ItemMeta } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 
@@ -139,6 +139,78 @@ async function apply(lib: Library, item: Item, c: Omit<Cut, "removed">): Promise
     writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify(cut));
   });
   return cut;
+}
+
+/** A section at the end of a source's body (an episode's page text, D215), added, taken out and put
+ *  back under the library lock, each time from the source as it is then, so two at once or a cut
+ *  landing meanwhile is never overwritten. It is recorded as a cut, found again as the body's end
+ *  (a cut above it moves it), and `mark` keeps the frontmatter in step: the record's id while the
+ *  text is in, undefined once it is out. */
+type Mark = (meta: ItemMeta, id: string | undefined) => ItemMeta;
+
+/** Adds `make(item)` (which may refuse, seeing the source as it is under the lock) at the body's end. */
+export async function appendText(lib: Library, ref: string, make: (item: Item) => string, mark: Mark): Promise<Cut> {
+  const dir = findItem(lib, ref).dir;
+  return withLock(paths.lock(lib), () => {
+    const item = readItemDir(dir);
+    const text = make(item);
+    const cut: Cut = { id: ulid(), item: item.meta.id, at: item.body.length, text, section: false, removed: [] };
+    write(lib, item, cut, item.body + text, mark(item.meta, cut.id));
+    return cut;
+  });
+}
+
+/** Takes an added end section out again (Undo): its highlights go with it, kept for `putEnd`. */
+export async function takeEnd(lib: Library, ref: string, id: string, mark: Mark): Promise<Cut> {
+  const dir = findItem(lib, ref).dir;
+  return withLock(paths.lock(lib), () => {
+    const item = readItemDir(dir);
+    const was = readCut(lib, item, id);
+    if (!item.body.endsWith(was.text)) throw new Error("That text changed since, so it can’t be taken out in one step.");
+    const cut: Cut = { ...was, at: item.body.length - was.text.length, removed: [] };
+    const next = item.body.slice(0, cut.at);
+    for (const a of readAnnotations(item))
+      if (a.end > cut.at && a.intent !== "question") {
+        cut.removed.push(a);
+        reviseAnnotation(item, a, { status: "deleted" });
+      }
+    write(lib, item, cut, next, mark(item.meta, undefined));
+    return cut;
+  });
+}
+
+/** Puts an end section back at the body's end (Redo), its highlights with it. */
+export async function putEnd(lib: Library, ref: string, id: string, mark: Mark): Promise<Item> {
+  const dir = findItem(lib, ref).dir;
+  return withLock(paths.lock(lib), () => {
+    const item = readItemDir(dir);
+    const was = readCut(lib, item, id);
+    if (item.body.endsWith(was.text)) throw new Error("That text is already back.");
+    const shift = item.body.length - was.at;
+    const next = item.body + was.text;
+    const now = new Map(latestRevs(annotationRevs(item.dir)).map((a) => [a.id, a]));
+    for (const r of was.removed) {
+      const c = now.get(r.id);
+      if (c?.status === "deleted") reviseAnnotation(item, c, { status: r.status, ...quoteSelector(next, r.start + shift, r.end + shift) });
+    }
+    write(lib, item, { ...was, at: item.body.length, removed: [] }, next, mark(item.meta, was.id));
+    return readItemDir(dir);
+  });
+}
+
+/** Records text already at the body's end (a Reimport adding the page text again) for `takeEnd`; its id. */
+export function recordEnd(lib: Library, item: string, at: number, text: string): string {
+  const cut: Cut = { id: ulid(), item, at, text, section: false, removed: [] };
+  mkdirSync(stashDir(lib, item), { recursive: true });
+  writeAtomic(join(stashDir(lib, item), `${cut.id}.json`), JSON.stringify(cut));
+  return cut.id;
+}
+
+/** Writes the body and its record; called under the lock. */
+function write(lib: Library, item: Item, cut: Cut, next: string, meta: ItemMeta) {
+  writeAtomic(item.docPath, stringifyFrontmatter({ ...meta, text_sha256: sha256(next) }, next));
+  mkdirSync(stashDir(lib, item.meta.id), { recursive: true });
+  writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify(cut));
 }
 
 const readCut = (lib: Library, item: Item, id: string): Cut => {

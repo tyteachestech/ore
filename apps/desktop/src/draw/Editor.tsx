@@ -38,12 +38,13 @@ type Gesture =
   | { kind: "rotate"; before: El[]; starts: El[]; about: Pt; a0: number }
   | { kind: "create"; before: El[]; id: string; start: Pt; type: Shape }
   | { kind: "line"; before: El[]; id: string; start: Pt; startOn: string | null }
-  | { kind: "point"; before: El[]; id: string; index: number }
+  | { kind: "point"; before: El[]; id: string; index: number; mid?: Pt }
+  | { kind: "elbow"; before: El[]; id: string; axis: 0 | 1 }
   | { kind: "draw"; before: El[]; id: string; pts: Pt[] }
   | { kind: "erase"; ids: Set<string> }
   | { kind: "pan"; start: [number, number]; view: View };
 
-const LOCK = "ore.diagram.lock";
+const LOCK = "ore.diagram.keep-tool";
 const TOOLS: { tool: Tool; key: KeyId; label: string; icon: ReactNode }[] = [
   { tool: "select", key: "d-select", label: "Select", icon: <CursorClick size={16} /> },
   { tool: "hand", key: "d-hand", label: "Hand", icon: <Hand size={16} /> },
@@ -71,6 +72,36 @@ setMeasure((line, size, family) => {
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+/** The + on each side of one selected node: a click makes the next linked node that way (FigJam's quick
+ *  create, Tyler 2026-11-11). Further out above, past the rotate handle. */
+function plusesOf(sel: El[], zoom: number, els: readonly El[]): { dir: Dir; p: Pt }[] {
+  const e = sel.length === 1 ? sel[0]! : null;
+  if (!e || !isShape(e) || e.type === "image" || e.locked || cellOf(e) || e.angle) return [];
+  const b = bounds(e);
+  const d = 26 / zoom;
+  // A side a link already leaves or arrives on keeps its arrow clear of a +.
+  const taken = new Set<Dir>();
+  for (const a of els) {
+    if (a.type !== "arrow") continue;
+    const pts = absPoints(a);
+    const end = a.startBinding?.elementId === e.id ? pts[0] : a.endBinding?.elementId === e.id ? pts[pts.length - 1] : null;
+    if (!end) continue;
+    const m = 8;
+    taken.add(end[0] >= b.x + b.w - m ? "right" : end[0] <= b.x + m ? "left" : end[1] <= b.y + m ? "up" : "down");
+  }
+  return ([
+    { dir: "right", p: [b.x + b.w + d, b.y + b.h / 2] },
+    { dir: "down", p: [b.x + b.w / 2, b.y + b.h + d] },
+    { dir: "left", p: [b.x - d, b.y + b.h / 2] },
+    { dir: "up", p: [b.x + b.w / 2, b.y - d - 22 / zoom] },
+  ] as { dir: Dir; p: Pt }[]).filter((x) => {
+    if (taken.has(x.dir)) return false;
+    // A + over another shape would take the click meant for it.
+    const r = 10 / zoom;
+    return !els.some((o) => o.id !== e.id && isShape(o) && !isLabel(o) && (() => { const f = bounds(o); return x.p[0] + r > f.x && x.p[0] - r < f.x + f.w && x.p[1] + r > f.y && x.p[1] - r < f.y + f.h; })());
+  });
+}
 
 /** Handles for the selection: one rotated frame for a single shape, the union box for several. */
 function handlesOf(sel: El[], zoom: number): { box: Box; angle: number; at: { h: Handle | "rotate"; p: Pt }[] } | null {
@@ -112,8 +143,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const [files, setFiles] = useState<Files>(initialFiles);
   const [sel, setSelState] = useState<string[]>([]);
   const [tool, setTool] = useState<Tool>("select");
-  // On unless he turned it off: a tool he picked stays until he picks another (V or Esc for Select).
-  const [toolLock, setToolLockState] = useState(() => load(LOCK) !== "0");
+  // Off unless he turned it on (Q): a drawn shape goes back to Select, as in Excalidraw (Tyler, 2026-11-11). The pen keeps its tool.
+  const [toolLock, setToolLockState] = useState(() => load(LOCK) === "1");
   const setToolLock = (f: (x: boolean) => boolean) => setToolLockState((x) => {
     const to = f(x);
     save(LOCK, to ? "1" : "0");
@@ -124,6 +155,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const [editing, setEditing] = useState<Editing | null>(null);
   const [draft, setDraft] = useState("");
   const [guides, setGuides] = useState<Guide[]>([]);
+  // The line a drawn or rotated thing has landed on at a multiple of 45°, drawn through it while the drag lasts.
+  const [angleGuide, setAngleGuide] = useState<[Pt, Pt] | null>(null);
   const [hot, setHot] = useState<string | null>(null); // the shape an arrow end would bind to
   const [entered, setEntered] = useState<string | null>(null); // the group double-click went into
   const [multi, setMulti] = useState<string | null>(null); // a line being drawn point by point
@@ -532,6 +565,34 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       () => notify("Couldn't reach the clipboard. Try again.", "error"),
     );
 
+  // The menu's Cut, Copy and Paste, which ⌘X ⌘C ⌘V do through the copy and paste events (Excalidraw's menu has them).
+  const clip = (cut: boolean) => {
+    const ids = [...live.current.sel];
+    void navigator.clipboard.writeText(copyData()).then(
+      () => cut && apply(remove(live.current.els, new Set(ids)), []),
+      () => notify("Couldn't reach the clipboard. Try again.", "error"),
+    );
+  };
+  const pasteFromMenu = async () => {
+    // One read: an image, else the text it holds (WebKit refuses a second read straight after, Codex sweep 4);
+    // readText only when that read is refused.
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (type) return pasteImage(new File([await item.getType(type)], "pasted", { type }));
+        if (item.types.includes("text/plain")) return pasteData(await (await item.getType("text/plain")).text());
+      }
+      return;
+    } catch {
+      /* readText below */
+    }
+    try {
+      pasteData(await navigator.clipboard.readText());
+    } catch {
+      notify("Couldn't reach the clipboard. Try ⌘V.", "error");
+    }
+  };
+
   type Cmd = { id: string; label: string; key?: KeyId; run: () => void; when?: () => boolean; group: string };
   const cmds: Cmd[] = [
     { id: "map", label: "Type a map", key: "d-map", group: "Learn", run: () => setPanel("map") },
@@ -545,6 +606,9 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     { id: "url", label: "Add or edit link…", key: "d-url", group: "Edit", when: () => selected.length === 1, run: () => setPanel("url") },
     { id: "shape", label: "Change shape (box, ellipse, diamond)", key: "d-shape", group: "Edit", when: () => selected.some((e) => e.type === "rectangle" || e.type === "ellipse" || e.type === "diamond"), run: () => cycleShape() },
     { id: "tidy", label: "Tidy up the map", key: "d-tidy", group: "Arrange", when: () => live.current.els.some((e) => e.type === "arrow" && e.startBinding && e.endBinding), run: () => { apply(tidy(live.current.els, live.current.sel.length > 1 ? selIds() : new Set())); } },
+    { id: "cut", label: "Cut", group: "Edit", when: nonEmpty, run: () => clip(true) },
+    { id: "copy", label: "Copy", group: "Edit", when: nonEmpty, run: () => clip(false) },
+    { id: "paste", label: "Paste", group: "Edit", run: () => void pasteFromMenu() },
     { id: "duplicate", label: "Duplicate", key: "d-duplicate", group: "Edit", when: nonEmpty, run: () => { const d = duplicate(live.current.els, selIds()); apply(d.els, d.ids); } },
     { id: "copy-style", label: "Copy style", key: "d-copy-style", group: "Edit", when: () => selected.length === 1, run: copyStyle },
     { id: "paste-style", label: "Paste style", key: "d-paste-style", group: "Edit", when: () => nonEmpty() && !!styleClip.current, run: pasteStyle },
@@ -851,9 +915,20 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     if (!e || !isLinear(e) || e.locked) return null;
     const pts = absPoints(e);
     const r = 7 / live.current.view.zoom;
-    for (let i = 0; i < pts.length; i++) if (dist(pts[i]!, p) <= r) return { index: i, mid: false };
+    // An elbow arrow's corners follow its ends; only its ends and its middle segment (elbowAt) are handles.
+    for (let i = 0; i < pts.length; i++) if ((!e.elbowed || i === 0 || i === pts.length - 1) && dist(pts[i]!, p) <= r) return { index: i, mid: false };
     if (!e.elbowed) for (let i = 1; i < pts.length; i++) if (dist(midOf(pts[i - 1]!, pts[i]!), p) <= r) return { index: i, mid: true };
     return null;
+  };
+
+  /** The handle on a selected elbow arrow's middle segment: dragged, it moves that segment (FigJam, tldraw). */
+  const elbowAt = (p: Pt): 0 | 1 | null => {
+    const e = selected.length === 1 ? selected[0]! : null;
+    if (!e || e.type !== "arrow" || !e.elbowed || e.locked) return null;
+    const pts = absPoints(e);
+    if (pts.length !== 4) return null;
+    if (dist(midOf(pts[1]!, pts[2]!), p) > 7 / live.current.view.zoom) return null;
+    return pts[1]![0] === pts[2]![0] ? 0 : 1;
   };
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
@@ -928,18 +1003,18 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       return toolDone();
     }
     // select
+    const plus = (handlesOf(selected.filter((x) => !isLabel(x)), live.current.view.zoom) ? plusesOf(selected.filter((x) => !isLabel(x)), live.current.view.zoom, live.current.els) : []).find((x) => Math.abs(x.p[0] - p[0]) <= 9 / live.current.view.zoom && Math.abs(x.p[1] - p[1]) <= 9 / live.current.view.zoom);
+    if (plus && tool === "select") return child(plus.dir);
+    const axis = elbowAt(p);
+    if (axis !== null) {
+      g.current = { kind: "elbow", before: els, id: selected[0]!.id, axis };
+      return;
+    }
     const pt = pointAt(p);
     if (pt) {
       const line = selected[0]!;
-      let next = line;
-      let index = pt.index;
-      if (pt.mid) {
-        const pts = absPoints(line);
-        pts.splice(pt.index, 0, midOf(pts[pt.index - 1]!, pts[pt.index]!));
-        next = withPoints(line, pts);
-        setEls(els.map((x) => (x.id === line.id ? next : x)));
-      }
-      g.current = { kind: "point", before: els, id: line.id, index };
+      // A midpoint becomes a bend only once it is dragged, so a double-click there labels the arrow (Excalidraw).
+      g.current = { kind: "point", before: els, id: line.id, index: pt.index, mid: pt.mid ? p : undefined };
       return;
     }
     const h = handleAt(p);
@@ -1058,11 +1133,21 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     }
     if (cur.kind === "rotate") {
       let da = Math.atan2(p[1] - cur.about[1], p[0] - cur.about[0]) - cur.a0;
+      const base = cur.starts.length === 1 ? cur.starts[0]!.angle : 0;
+      let guide: [Pt, Pt] | null = null;
       if (e.shiftKey) {
-        const base = cur.starts.length === 1 ? cur.starts[0]!.angle : 0;
         const step = Math.PI / 12;
         da = Math.round((base + da) / step) * step - base;
+      } else if (!off) {
+        const r = softAngle(base + da);
+        if (r !== null) {
+          da = r - base;
+          const b = boundsOf(cur.starts)!;
+          const half = Math.hypot(b.w, b.h) / 2 + 24 / live.current.view.zoom;
+          guide = [[cur.about[0] - half * Math.cos(r), cur.about[1] - half * Math.sin(r)], [cur.about[0] + half * Math.cos(r), cur.about[1] + half * Math.sin(r)]];
+        }
       }
+      setAngleGuide(guide);
       const next = rotate(cur.starts, cur.about, da);
       const nm = new Map(next.map((x) => [x.id, x]));
       return setEls(syncAll(reroute(cur.before.map((x) => nm.get(x.id) ?? x), new Set(nm.keys()))));
@@ -1088,21 +1173,40 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       const target = els.find((x) => x.id === cur.id)?.type === "arrow" ? bindTarget(els, p, 8 / live.current.view.zoom, new Set([cur.id, ...(cur.startOn ? [cur.startOn] : [])])) : null;
       setHot(target?.id ?? null);
       let end = target ? p : snapP(p, new Set([cur.id]), off).p;
+      const soft = !target && !e.shiftKey && !off ? softSnap(cur.start, end) : null;
       if (e.shiftKey && !target) end = angleSnap(cur.start, end);
+      if (soft) end = soft;
+      setAngleGuide(soft ? [cur.start, soft] : null);
       return setEls(syncAll(els.map((x) => {
         if (x.id !== cur.id) return x;
         const line = withPoints(x, [cur.start, end]);
         return route({ ...line, endBinding: target ? { elementId: target.id, focus: 0, gap: GAP } : null }, byId(els));
       })));
     }
+    if (cur.kind === "elbow") {
+      const a = els.find((x) => x.id === cur.id);
+      if (!a) return;
+      const next = route({ ...a, customData: { ...a.customData, oreElbow: { mid: Math.round(p[cur.axis]) } } }, byId(els));
+      return setEls(syncAll(els.map((x) => (x.id === a.id ? next : x))));
+    }
     if (cur.kind === "point") {
       const line = els.find((x) => x.id === cur.id);
       if (!line) return;
       const pts = absPoints(line);
+      if (cur.mid) {
+        if (dist(cur.mid, p) * live.current.view.zoom < 3) return;
+        pts.splice(cur.index, 0, midOf(pts[cur.index - 1]!, pts[cur.index]!));
+        cur.mid = undefined;
+      }
       const ends = cur.index === 0 || cur.index === pts.length - 1;
       const target = ends && line.type === "arrow" ? bindTarget(els, p, 8 / live.current.view.zoom, new Set([line.id])) : null;
       setHot(target?.id ?? null);
       pts[cur.index] = target ? p : snapP(p, new Set([line.id]), off).p;
+      const nb = pts[cur.index - 1] ?? pts[cur.index + 1];
+      if (e.shiftKey && !target && nb) pts[cur.index] = angleSnap(nb, pts[cur.index]!);
+      const soft = !target && !off && !e.shiftKey && nb ? softSnap(nb, pts[cur.index]!) : null;
+      if (soft) pts[cur.index] = soft;
+      setAngleGuide(soft && nb ? [nb, soft] : null);
       let next = withPoints(line, pts);
       if (ends && line.type === "arrow") next = { ...next, [cur.index === 0 ? "startBinding" : "endBinding"]: target ? { elementId: target.id, focus: 0, gap: GAP } : null };
       return setEls(syncAll(els.map((x) => (x.id === line.id ? route(next, byId(els)) : x))));
@@ -1122,6 +1226,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     const cur = g.current;
     g.current = null;
     setGuides([]);
+    setAngleGuide(null);
     setHot(null);
     if (!cur) return;
     const els = live.current.els;
@@ -1186,6 +1291,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     const cur = g.current;
     g.current = null;
     setGuides([]);
+    setAngleGuide(null);
     setHot(null);
     if (cur && "before" in cur) setEls(cur.before);
     force((n) => n + 1);
@@ -1255,6 +1361,23 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
 
   // ---------- style ----------
   const kinds = new Set(selected.map((e) => e.type));
+  /** A box's label in the middle or under its top edge, where a section's title goes (Excalidraw's vertical align). */
+  const alignLabels = (v: "middle" | "top") => {
+    const boxes = new Set(selected.filter((e) => e.type === "rectangle").map((e) => e.id));
+    apply(syncAll(live.current.els.map((e) => (e.type === "text" && e.containerId && boxes.has(e.containerId) ? { ...e, verticalAlign: v } : e))));
+  };
+  /** Left, centre or right: free text, and a box's label (Excalidraw's text align). */
+  const alignOf = () => {
+    const e = selected[0];
+    if (!e) return value("textAlign");
+    return (e.type === "text" ? e : labelOf(els, e.id))?.textAlign;
+  };
+  const setAlign = (a: "left" | "center" | "right") => {
+    setStyle((s) => ({ ...s, textAlign: a }));
+    if (!selected.length) return;
+    const ids = new Set(selected.map((e) => e.id));
+    apply(syncAll(live.current.els.map((e) => (e.type === "text" && (ids.has(e.id) || (e.containerId && ids.has(e.containerId) && live.current.els.find((c) => c.id === e.containerId)?.type === "rectangle")) ? { ...e, textAlign: a } : e))));
+  };
   const showStyle = selected.length > 0 || (tool !== "select" && tool !== "hand" && tool !== "eraser");
   const current = selected[0];
   const value = <K extends keyof Style>(k: K): Style[K] => (current && k in current ? (current[k as keyof El] as Style[K]) : style[k]);
@@ -1277,6 +1400,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       return { ...e, ...p };
     });
     next = next.map((e) => (e.type === "text" && !e.containerId && ids.has(e.id) ? { ...e, ...measureText(e.text ?? "", e.fontSize ?? 20, e.fontFamily ?? SANS, lineHeightOf(e)) } : e));
+    // Straight or elbow re-routes the arrows picked, not only those joined to a shape that moved.
+    if ("elbowed" in patch) { const m = byId(next); next = next.map((e) => (e.type === "arrow" && ids.has(e.id) ? route(e, m) : e)); }
     const out = syncAll(reroute(next, ids));
     if (step) apply(out);
     else setEls(out);
@@ -1438,6 +1563,21 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
                 </Seg>
               ))}
             </Row>
+            {(kinds.has("text") || tool === "text" || selected.some((e) => e.type === "rectangle" && labelOf(els, e.id))) && (
+              <Row label="Align">
+                {(["left", "center", "right"] as const).map((a) => (
+                  <Seg key={a} on={(alignOf() ?? "left") === a} onPick={() => setAlign(a)} label={{ left: "Left", center: "Centre", right: "Right" }[a]}>
+                    <span className="mono">{{ left: "L", center: "C", right: "R" }[a]}</span>
+                  </Seg>
+                ))}
+              </Row>
+            )}
+            {selected.some((e) => e.type === "rectangle" && labelOf(els, e.id)) && (
+              <Row label="Place">
+                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle" && labelOf(els, e.id))?.id ?? "")?.verticalAlign !== "top"} onPick={() => alignLabels("middle")} label="Middle"><span className="mono">M</span></Seg>
+                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle" && labelOf(els, e.id))?.id ?? "")?.verticalAlign === "top"} onPick={() => alignLabels("top")} label="Top"><span className="mono">T</span></Seg>
+              </Row>
+            )}
             <Row label="Font">
               <Seg on={(lbl("font") ?? value("fontFamily")) !== MONO} onPick={() => setProp({ fontFamily: SANS })} label="Sans">Aa</Seg>
               <Seg on={(lbl("font") ?? value("fontFamily")) === MONO} onPick={() => setProp({ fontFamily: MONO })} label="Mono"><span className="mono">Aa</span></Seg>
@@ -1476,6 +1616,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const erasing = cur?.kind === "erase" ? withLabels(els, cur.ids) : null;
   const editingLabel = editing?.kind === "label" ? labelOf(els, editing.id)?.id : editing?.id;
   const handles = !editing && !multi && (!cur || cur.kind === "marquee") ? handlesOf(selected.filter((e) => !isLabel(e)), view.zoom) : null;
+  const pluses = handles && tool === "select" ? plusesOf(selected.filter((e) => !isLabel(e)), view.zoom, els) : [];
   const z = view.zoom;
   const containers = byId(shown);
 
@@ -1493,8 +1634,9 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       const wrapped = wrap(draft || " ", w, fs, fam);
       const lines = wrapped.split("\n").length;
       const c = isLinear(e) ? midOfPts(absPoints(e)) : centre(e);
+      if (e.type === "rectangle" && lbl?.verticalAlign === "top") c[1] = lbl.y + (lines * lh) / 2;
       const width = isLinear(e) ? Math.max(60, measureText(wrapped, fs, fam).width + 12) : w;
-      return { left: (c[0] - width / 2 - view.x) * z, top: (c[1] - (lines * lh) / 2 - view.y) * z, width: width * z, height: lines * lh * z, font: fs * z, fam, align: "center" as const, angle: isLinear(e) ? 0 : e.angle, colour: dark(e.strokeColor), wrap: true };
+      return { left: (c[0] - width / 2 - view.x) * z, top: (c[1] - (lines * lh) / 2 - view.y) * z, width: width * z, height: lines * lh * z, font: fs * z, fam, align: (e.type === "rectangle" ? lbl?.textAlign ?? "center" : "center") as "left" | "center" | "right", angle: isLinear(e) ? 0 : e.angle, colour: dark(e.strokeColor), wrap: true };
     }
     const m = measureText(draft || " ", fs, fam);
     return { left: (e.x - view.x) * z, top: (e.y - view.y) * z, width: (m.width + fs) * z, height: m.height * z, font: fs * z, fam, align: (e.textAlign ?? "left") as "left" | "center" | "right", angle: e.angle, colour: dark(e.strokeColor), wrap: false };
@@ -1533,6 +1675,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     // In a box or on an arrow, Enter finishes (⇧↵ for a new line); free text takes Enter as a new line.
     if (e.key === "Enter" && !e.shiftKey && ed.kind === "label") {
       e.preventDefault();
+      // A shape just drawn already takes its label: Enter there (Excalidraw's key to start one) waits for the words.
+      if (ed.fresh && !ed.then && !ed.from && !draft && live.current.els.find((x) => x.id === ed.id)?.type !== "arrow") return;
       return endEdit("done");
     }
   };
@@ -1542,10 +1686,11 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const menu = (): MenuAction[] => {
     const pick = (ids: string[]) => cmds.filter((c) => ids.includes(c.id) && (!c.when || c.when()));
     const rows = live.current.sel.length
-      ? pick(["edit", "child", "sibling", "link", "url", "shape", "duplicate", "copy-style", "paste-style", "add-row", "add-col", "tidy", "group", "ungroup", "forward", "backward", "front", "back", "align-left", "align-hcenter", "align-right", "align-top", "align-vcenter", "align-bottom", "dist-h", "dist-v", "flip-h", "flip-v", "lock", "style", "fit-sel", "png", "svg", "txt", "delete"])
-      : pick(["map", "matrix", "all", "lock", "tidy", "fit", "grid", "snap", "png", "svg", "txt"]);
+      ? pick(["cut", "copy", "paste", "edit", "child", "sibling", "link", "url", "shape", "duplicate", "copy-style", "paste-style", "add-row", "add-col", "tidy", "group", "ungroup", "forward", "backward", "front", "back", "align-left", "align-hcenter", "align-right", "align-top", "align-vcenter", "align-bottom", "dist-h", "dist-v", "flip-h", "flip-v", "lock", "style", "fit-sel", "png", "svg", "txt", "delete"])
+      : pick(["paste", "map", "matrix", "all", "lock", "tidy", "fit", "grid", "snap", "png", "svg", "txt"]);
     const groupOf = (c: Cmd) => c.group;
-    return rows.map((c, i) => ({ id: c.id, label: c.label, hint: c.key ? hintKeys(c.key) : undefined, danger: c.id === "delete", divider: i > 0 && groupOf(rows[i - 1]!) !== groupOf(c), run: c.run }));
+    const sys: Record<string, string> = { cut: "⌘X", copy: "⌘C", paste: "⌘V" };
+    return rows.map((c, i) => ({ id: c.id, label: c.label, hint: c.key ? hintKeys(c.key) : sys[c.id], danger: c.id === "delete", divider: i > 0 && groupOf(rows[i - 1]!) !== groupOf(c), run: c.run }));
   };
 
   const arrowHeads = ["arrow", "triangle", "dot", "bar", null] as const;
@@ -1595,9 +1740,11 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
           <Overlay
               selected={moving ? [] : selected.filter((e) => !isLabel(e))}
               handles={handles}
+              pluses={pluses}
               z={z}
               hot={hot ? map.get(hot) : undefined}
               guides={guides}
+              angleGuide={angleGuide}
               marquee={cur?.kind === "marquee" ? rectOf(cur.start, cur.end) : null}
               moveBox={moving ? { ...moving.box, x: moving.box.x + moving.dx, y: moving.box.y + moving.dy } : null}
               showPoints={!multi && !editing && selected.length === 1 && isLinear(selected[0]!) && !selected[0]!.locked}
@@ -1799,6 +1946,17 @@ const midOfPts = (pts: Pt[]) => {
 };
 const rectOf = (a: Pt, b: Pt): Box => ({ x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) });
 const containsBox = (o: Box, b: Box) => b.x >= o.x && b.y >= o.y && b.x + b.w <= o.x + o.w && b.y + b.h <= o.y + o.h;
+/** Within 4° of a multiple of 45°, an angle lands on it, so straight and diagonal take no Shift (Tyler, 2026-11-11). */
+const SOFT = (4 * Math.PI) / 180;
+const softAngle = (a: number): number | null => {
+  const r = Math.round(a / (Math.PI / 4)) * (Math.PI / 4);
+  return Math.abs(a - r) < SOFT ? r : null;
+};
+const softSnap = (s: Pt, p: Pt): Pt | null => {
+  const d = dist(s, p);
+  const r = d > 0 ? softAngle(Math.atan2(p[1] - s[1], p[0] - s[0])) : null;
+  return r === null ? null : [s[0] + d * Math.cos(r), s[1] + d * Math.sin(r)];
+};
 const angleSnap = (s: Pt, p: Pt): Pt => {
   const a = Math.round(Math.atan2(p[1] - s[1], p[0] - s[0]) / (Math.PI / 12)) * (Math.PI / 12);
   const d = dist(s, p);
@@ -1808,8 +1966,8 @@ const angleSnap = (s: Pt, p: Pt): Pt => {
 const ORDER: Handle[] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
 const rotHandle = (h: Handle, angle: number): Handle => ORDER[(ORDER.indexOf(h) + Math.round(angle / (Math.PI / 4)) + 8) % 8]!;
 
-function Overlay({ selected, handles, z, hot, guides, marquee, moveBox, showPoints }: {
-  selected: El[]; handles: ReturnType<typeof handlesOf>; z: number; hot?: El; guides: Guide[]; marquee: Box | null; moveBox: Box | null; showPoints: boolean;
+function Overlay({ selected, handles, pluses, z, hot, guides, angleGuide, marquee, moveBox, showPoints }: {
+  selected: El[]; handles: ReturnType<typeof handlesOf>; pluses: { dir: Dir; p: Pt }[]; z: number; hot?: El; guides: Guide[]; angleGuide: [Pt, Pt] | null; marquee: Box | null; moveBox: Box | null; showPoints: boolean;
 }) {
   const sw = 1 / z;
   const hs = 8 / z;
@@ -1847,7 +2005,11 @@ function Overlay({ selected, handles, z, hot, guides, marquee, moveBox, showPoin
               const m = midOf(pts[i]!, p);
               return <rect key={`m${i}`} x={m[0] - hs / 3} y={m[1] - hs / 3} width={(hs * 2) / 3} height={(hs * 2) / 3} fill="var(--paper)" opacity={0.45} />;
             })}
-            {pts.map((p, i) => <rect key={i} x={p[0] - hs / 2} y={p[1] - hs / 2} width={hs} height={hs} fill="var(--bg)" stroke="var(--paper)" strokeWidth={sw * 1.5} />)}
+            {selected[0].elbowed && pts.length === 4 && (() => {
+              const m = midOf(pts[1]!, pts[2]!);
+              return <rect className="draw-elbow-handle" x={m[0] - hs / 2} y={m[1] - hs / 2} width={hs} height={hs} fill="var(--paper)" />;
+            })()}
+            {pts.map((p, i) => (selected[0]!.elbowed && i > 0 && i < pts.length - 1 ? null : <rect key={i} x={p[0] - hs / 2} y={p[1] - hs / 2} width={hs} height={hs} fill="var(--bg)" stroke="var(--paper)" strokeWidth={sw * 1.5} />))}
           </>
         );
       })()}
@@ -1861,6 +2023,22 @@ function Overlay({ selected, handles, z, hot, guides, marquee, moveBox, showPoin
         }
         return gd.axis === "x" ? <line key={i} x1={gd.at} x2={gd.at} y1={gd.from - 8 / z} y2={gd.to + 8 / z} stroke="var(--accent)" strokeWidth={sw} /> : <line key={i} y1={gd.at} y2={gd.at} x1={gd.from - 8 / z} x2={gd.to + 8 / z} stroke="var(--accent)" strokeWidth={sw} />;
       })}
+      {pluses.map(({ dir, p }) => {
+        const r = 7 / z, t = 3.5 / z;
+        return (
+          <g key={dir} className="draw-plus" data-dir={dir}>
+            <rect x={p[0] - r} y={p[1] - r} width={r * 2} height={r * 2} fill="var(--bg)" stroke="var(--paper)" strokeWidth={sw} />
+            <path d={`M${p[0] - t} ${p[1]} H${p[0] + t} M${p[0]} ${p[1] - t} V${p[1] + t}`} stroke="var(--paper)" strokeWidth={sw * 1.5} />
+          </g>
+        );
+      })}
+      {angleGuide && (() => {
+        // Runs past both ends, so a line on 0°, 45° or 90° shows it is exactly there.
+        const [a, b] = angleGuide;
+        const len = dist(a, b) || 1;
+        const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, t = 24 / z;
+        return <line className="draw-angle-guide" x1={a[0] - ux * t} y1={a[1] - uy * t} x2={b[0] + ux * t} y2={b[1] + uy * t} stroke="var(--accent)" strokeWidth={sw} strokeDasharray={`${4 / z} ${3 / z}`} />;
+      })()}
       {marquee && <rect x={marquee.x} y={marquee.y} width={marquee.w} height={marquee.h} fill="rgba(242, 241, 236, 0.06)" stroke="var(--paper)" strokeWidth={sw} strokeDasharray={`${4 / z} ${3 / z}`} />}
     </g>
   );

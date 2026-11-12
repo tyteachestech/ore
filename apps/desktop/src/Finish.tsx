@@ -7,7 +7,7 @@ import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
 import { stampBefore } from "./transcript";
-import { errorText, focusPicked, stepLabel, type Notify } from "./util";
+import { errorText, focusPicked, kept, stepLabel, type Notify } from "./util";
 import { Matrix, useLate, Working } from "./Working";
 import { PixelBurst } from "./Burst";
 
@@ -29,6 +29,9 @@ type Props = NotesSync & {
   keyPoint?: { on: boolean; toggle: () => void };
   onCancel: () => void;
   onDone: () => void;
+  /** Finish has saved all it has (true), or a save after Done failed and it stays open with his work (false): the
+   *  phone keeps Finish open for a relaunch only while something is left to save. */
+  onMarked?: (saved: boolean) => void;
   /** The library's skills, for the colour of the finished burst (D153). */
   skills?: Skill[];
   /** In a course (D79): the lesson to read next, which the closing card can open instead of going back. */
@@ -43,6 +46,21 @@ const SURE = ["Guess", "Think so", "Sure"] as const;
 // Typed text survives closing the panel (Esc) and reopening it while the reader stays open (D52).
 type Draft = { step: number; recall: string; answers: string[]; conf: (number | undefined)[]; use: string; leave: string; qs: Prequestion[] };
 const drafts = new Map<string, Draft>();
+/** It survives quitting the app too (for a day, `kept`), once he has typed something: kept without the questions
+ *  (they are read from the source again) but with what they were and when it was written, so a draft for questions
+ *  since rewritten, or older than a recall recorded since, goes instead of answering something else. */
+type KeptDraft = Omit<Draft, "qs"> & { asked: string };
+const keptDrafts = kept<KeptDraft>("ore.finish-drafts");
+const askedIn = (qs: Prequestion[]) => JSON.stringify(qs.map((q) => q.q));
+function keptDraft(doc: Doc): Draft | undefined {
+  const k = keptDrafts.get(doc.id);
+  if (!k) return undefined;
+  const qs = doc.prequestions ?? [];
+  if (k.asked !== askedIn(qs) || (doc.recall && Date.parse(doc.recall.at) > (keptDrafts.at(doc.id) ?? 0))) return void keptDrafts.delete(doc.id);
+  const { asked: _asked, ...d } = k;
+  return { ...d, qs };
+}
+const dropDraft = (id: string) => (drafts.delete(id), keptDrafts.delete(id));
 
 /** Sources whose cards failed to draft, each with its retry: one toast says them all (the latest reason),
  *  and its Try again drafts them all, so a second failure never hides the first one's way back. */
@@ -62,10 +80,10 @@ function sayUndrafted(notify: Notify, why: string) {
 /** The finish step as a quiz panel beside the blurred source (D52 to D56): free recall first, then
  *  each prequestion is answered, rated for confidence and checked against its key points, with the
  *  source shown only after the attempt. */
-export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, nextLesson, notify, flushNotes, onNotes, skills, highlightsSaved }: Props) {
+export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, onMarked, nextLesson, notify, flushNotes, onNotes, skills, highlightsSaved }: Props) {
   // The finished badge bursts in the colour of the source's first coloured skill (D153).
   const burstColor = doc.skills.map((id) => skills?.find((s) => s.id === id)?.color).find(Boolean);
-  const draft = drafts.get(doc.id);
+  const draft = drafts.get(doc.id) ?? keptDraft(doc);
   const [qs, setQs] = useState<Prequestion[]>(draft?.qs ?? doc.prequestions ?? []);
   /** "Leave anything out?" (D100): his words, sent to the AI with the recall. */
   const [leave, setLeave] = useState(draft?.leave ?? doc.leave_out?.text ?? "");
@@ -77,6 +95,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const [answers, setAnswers] = useState(() => draft?.answers ?? qs.map((q) => q.after ?? ""));
   const [conf, setConf] = useState<(number | undefined)[]>(() => draft?.conf ?? qs.map((q) => q.confidence));
   const [use, setUse] = useState(draft?.use ?? "");
+  /** Marked done by "Just mark done"; otherwise the closing card asks, Done or Keep reading (2026-10-31). */
+  const [marked, setMarked] = useState(false);
   const [checked, setChecked] = useState<boolean[]>(() => qs.map(() => false));
   const [busy, setBusy] = useState(false);
   const [pointsError, setPointsError] = useState<string | null>(null);
@@ -97,7 +117,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
 
   useEffect(() => {
     drafts.set(doc.id, { step, recall, answers, conf, use, leave, qs });
-  }, [doc.id, step, recall, answers, conf, use, leave, qs]);
+    // Once the source is Done only the closing card's line is his unsaved work.
+    const typed = marked ? !!use.trim() : recall !== (doc.recall?.text ?? "") || answers.some((a, i) => a !== (qs[i]?.after ?? "")) || !!use.trim() || leave !== (doc.leave_out?.text ?? "");
+    if (typed) keptDrafts.set(doc.id, marked ? { step, recall: "", answers: [], conf: [], use, leave: "", asked: askedIn(qs) } : { step, recall, answers, conf, use, leave, asked: askedIn(qs) });
+    else keptDrafts.delete(doc.id);
+  }, [doc.id, step, recall, answers, conf, use, leave, qs, marked]);
 
   // D56: key points for every prequestion, written while he does the free recall.
   const pointsRun = useRef<Promise<unknown> | null>(null);
@@ -187,12 +211,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   /** Saving the recall failed: offer a way out that doesn't need it. */
   const [recallFailed, setRecallFailed] = useState(false);
 
-  /** Marked done by "Just mark done"; otherwise the closing card asks, Done or Keep reading (2026-10-31). */
-  const [marked, setMarked] = useState(false);
   const [moment, setMoment] = useState(false);
   async function markDone() {
     await ore("status", doc.id, "done");
     setMarked(true);
+    // The recall and answers he didn't save are left behind with the source Done; only the closing card's line remains.
+    dropDraft(doc.id);
   }
 
   /** D100: before the questions, leave out the ones past where he stopped or that his note rules out
@@ -268,10 +292,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       if (use.trim()) onNotes((await ore<Notes>("notes", doc.id, opt("append", use.trim()), opt("heading", "Use and connections"))).text);
     } catch (e) {
       notify(errorText(e), "error");
+      onMarked?.(false);
       setBusy(false);
       return;
     }
-    drafts.delete(doc.id);
+    onMarked?.(true);
+    dropDraft(doc.id);
     // Drafting starts at once, so a window closed during the moment still drafts the cards.
     let gone = () => {};
     enrich(new Promise<void>((ok) => (gone = ok)));
@@ -295,7 +321,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       setBusy(false);
       return;
     }
-    drafts.delete(doc.id);
+    dropDraft(doc.id);
     onCancel();
   }
 
@@ -306,6 +332,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       const left = await applyScope();
       if (left === null) return;
       await markDone();
+      onMarked?.(true);
       setStep(left + 1);
     } catch (e) {
       notify(errorText(e), "error");

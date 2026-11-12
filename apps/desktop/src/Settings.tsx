@@ -1,4 +1,4 @@
-import { CaretUpDown, Check, GearSix, Keyboard, Minus, Plus, Target, X } from "./icons";
+import { CaretUpDown, GearSix, Tick, Keyboard, Minus, Plus, Target, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { invoke } from "@tauri-apps/api/core";
 import * as Switch from "@radix-ui/react-switch";
@@ -456,10 +456,12 @@ function Row({ title, text, htmlFor, children }: { title: string; text: string; 
   );
 }
 
-/** "After ___, I review." Enter saves, Esc or clicking away keeps what was there (as the skill hook, D63). */
+/** "After ___, I review." Enter or clicking away saves, Esc keeps what was there (D211). */
 function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) => void }) {
   const [text, setText] = useState(plan);
   useEffect(() => setText(plan), [plan]);
+  /** Enter or Esc already settled it: the blur their focus move causes saves nothing more. */
+  const settled = useRef(false);
   // Leaving the field hands focus to the sheet, not the page under it, so the next Esc closes Settings.
   const done = (field: HTMLElement) => field.closest<HTMLElement>(".settings-sheet")?.focus();
   return (
@@ -472,18 +474,28 @@ function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) => void
         maxLength={80}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        onBlur={() => setText(plan)}
+        // Clicking away saves it, as Enter does (D211).
+        onFocus={() => (settled.current = false)}
+        onBlur={() => {
+          if (settled.current) return;
+          if (!document.hasFocus()) return;
+          const v = text.trim().replace(/[.,;]+$/, "");
+          setText(v);
+          if (v !== plan) onSave(v);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
             const v = text.trim().replace(/[.,;]+$/, "");
             setText(v);
             if (v !== plan) onSave(v);
+            settled.current = true;
             done(e.currentTarget);
           } else if (e.key === "Escape") {
             e.preventDefault();
             e.stopPropagation();
             setText(plan);
+            settled.current = true;
             done(e.currentTarget);
           }
         }}
@@ -536,7 +548,7 @@ function SelectMenu({ label, value, options, disabled, onChange }: { label: stri
                 <DropdownMenu.RadioItem key={o.id || "default"} value={o.id} className="menu-item check">
                   <span className="menu-tick">
                     <DropdownMenu.ItemIndicator>
-                      <Check size={12} weight="bold" />
+                      <Tick />
                     </DropdownMenu.ItemIndicator>
                   </span>
                   <span className="menu-label">{o.label}</span>

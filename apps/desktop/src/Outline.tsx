@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { Arrow, ARROW_H, playHop, still } from "./SideCursor";
 import { PHONE } from "./ore";
 import { Trap } from "./Trap";
-import { useSwipeDown } from "./phone/sheet";
+import { sheetLayer, useSwipeDown } from "./phone/sheet";
 
 /** Most lines the collapsed outline shows; deeper levels drop out until it fits. */
 const MAX_LINES = 40;
@@ -72,6 +72,9 @@ function jumpTo(scroll: RefObject<HTMLDivElement | null>, h: Heading, onJump?: (
 
 /** Position bar and floating outline (D45): how far down the source he is, and a Notion-style
  *  table of contents at the right edge. No percent, no time left (D27). */
+/** How long the pointer rests on the outline before it opens. */
+const HOVER_OPEN_MS = 300;
+
 /** `onJump`: called before a jump, so ⌘[ can come back to where he was. */
 export function Position(place: Place) {
   const { scroll, onJump } = place;
@@ -109,6 +112,17 @@ export function Position(place: Place) {
 
   const jump = (h: Heading) => jumpTo(scroll, h, onJump);
 
+  // Hover opens it after a short wait, so a mouse passing to the scrollbar doesn't flash it (Home's skill card waits the same);
+  // Tab opens it at once (:focus-within).
+  const [hovered, setHovered] = useState(false);
+  const intent = useRef(0);
+  useEffect(() => () => clearTimeout(intent.current), []);
+  const enter = () => {
+    clearTimeout(intent.current);
+    intent.current = window.setTimeout(() => (setHovered(true), reveal()), HOVER_OPEN_MS);
+  };
+  const leave = () => (clearTimeout(intent.current), setHovered(false));
+
   // The Tab stop follows the arrows while he is in the outline; a jump or scroll hands it back to the heading he is in.
   const [stop, setStop] = useState<number | null>(null);
   useEffect(() => setStop(null), [current]);
@@ -134,7 +148,7 @@ export function Position(place: Place) {
         </div>
       )}
       {headings.length > 1 && (
-        <nav className="outline" aria-label="Outline" onMouseEnter={reveal} onFocus={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && reveal()}>
+        <nav className={hovered ? "outline open" : "outline"} aria-label="Outline" onMouseEnter={enter} onMouseLeave={leave} onFocus={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && reveal()}>
           <div className="outline-lines" ref={lines} aria-hidden="true" style={{ "--n": headings.length } as CSSProperties}>
             {headings.map((h, i) => (
               <span key={i} className={i === current ? "on" : i < current ? "past" : undefined} style={{ width: 16 - (h.level - top) * 4 }} />
@@ -182,7 +196,7 @@ export function ReadingPill(place: Place) {
         </svg>
         {name && <span key={current} className="read-pill-name">{name}</span>}
       </button>
-      {open && (
+      {open && sheetLayer(
         <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
           <Trap>
             <div ref={box} className="panel sheet sections-sheet" role="dialog" aria-modal="true" aria-label="Sections" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } }}>

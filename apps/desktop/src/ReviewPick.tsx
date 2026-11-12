@@ -4,8 +4,9 @@ import { SkillIcon } from "./IconPicker";
 import { is } from "./keys";
 import { Trap } from "./Trap";
 import { PHONE, type Skill, type Today } from "./ore";
-import { useSwipeDown } from "./phone/sheet";
+import { sheetLayer, useSwipeDown } from "./phone/sheet";
 import { load, save } from "./util";
+import { NO_SKILL } from "../../../packages/core/src/no-skill";
 
 const PICK = "ore.review-pick";
 const day = () => new Date().toLocaleDateString("sv-SE");
@@ -26,13 +27,16 @@ let seen: Today | null = null;
 export const rememberToday = (t: Today) => void (seen = t);
 export const lastToday = () => seen;
 
-/** Skills with cards due, Focus first, then most due first: the ones a session would help most. */
-export const dueSkills = (today: Today, skills: Skill[]) =>
-  today.skills
+/** Skills with cards due, Focus first, then most due first: the ones a session would help most. Last, "No skill"
+ *  for the exercises filed under none, so every row ticked is the whole session and unticking it is his call (D80, D204). */
+export const dueSkills = (today: Today, skills: Skill[]) => [
+  ...today.skills
     .filter((x) => x.due > 0)
     .flatMap((x) => skills.filter((s) => s.id === x.skill && !s.archived).map((s) => ({ skill: s, due: x.due })))
     // Focus first, then Normal, then Light (D173), most due first within each.
-    .sort((a, b) => (a.skill.priority ?? "P2").localeCompare(b.skill.priority ?? "P2") || b.due - a.due);
+    .sort((a, b) => (a.skill.priority ?? "P2").localeCompare(b.skill.priority ?? "P2") || b.due - a.due),
+  ...(today.no_skill_due > 0 ? [{ skill: { id: NO_SKILL, name: "No skill", color: "gray" } as Skill, due: today.no_skill_due }] : []),
+];
 
 /** Whether the skill list names every skill with cards due. Today's numbers can land before the
  *  skills do; until then there is no telling whether to ask what to review. */
@@ -100,7 +104,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
     }
   };
 
-  return (
+  return sheetLayer(
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Trap>
       <div ref={box} className="panel review-pick" role="dialog" aria-modal="true" aria-label="What to review" tabIndex={-1} onKeyDown={onKey}>

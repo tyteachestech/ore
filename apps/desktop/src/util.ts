@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type RefObject } from "react";
 
 /** A toast; `undo` adds an Undo button and puts the step on the app's history (⌘Z), and `redo`,
@@ -42,6 +43,91 @@ export function save(key: string, value: string): void {
   }
 }
 
+/** A draft lasts a day: today's session is the slice it was typed in (D65); tomorrow it is asked anew. */
+export const DRAFT_MS = 24 * 3600_000;
+
+/** What he typed and hasn't sent, by id, kept in localStorage under `key`: an app quit, or iOS ending a web view left
+ *  in the background, never loses it (daily-session.md: nothing is lost when a session is cut short; Notes). Each
+ *  lasts DRAFT_MS from its last change (`at`). Written a moment after the last change, and at once (flushKept) as
+ *  the page is hidden or goes, or the app quits (the shell's "quitting" event: ⌘Q sends the page neither). Each write
+ *  puts only its own changes over what is stored, so another window (the quick quiz) keeps its own. */
+export type Kept<V> = { get(id: string): V | undefined; at(id: string): number | undefined; set(id: string, v: V): void; delete(id: string): void };
+type Stamped<V> = { v: V; at: number };
+const flushers = new Set<() => void>();
+/** Writes every kept draft now. */
+export const flushKept = () => flushers.forEach((f) => f());
+if (typeof window !== "undefined") {
+  addEventListener("pagehide", flushKept);
+  addEventListener("beforeunload", flushKept);
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flushKept());
+  if ("__TAURI_INTERNALS__" in window) void listen("quitting", flushKept).catch(() => {});
+}
+export function kept<V>(key: string): Kept<V> {
+  const fresh = (e: Stamped<V>) => Date.now() - e.at <= DRAFT_MS;
+  const read = (): Map<string, Stamped<V>> => {
+    try {
+      const rows = JSON.parse(load(key) ?? "[]") as [string, Record<string, unknown>][];
+      const out = new Map<string, Stamped<V>>();
+      for (const [id, e] of rows) {
+        if (!e || typeof e.at !== "number") continue;
+        if ("v" in e) out.set(id, e as unknown as Stamped<V>);
+        else {
+          // Written before rows were stamped: the draft with its own `at` beside its fields.
+          const { at, ...v } = e;
+          out.set(id, { v: v as V, at: at as number });
+        }
+      }
+      return out;
+    } catch {
+      return new Map();
+    }
+  };
+  let m = read();
+  const mine = new Set<string>();
+  let later = 0;
+  const flush = () => {
+    clearTimeout(later);
+    if (!mine.size) return;
+    const now = read();
+    for (const id of mine) {
+      const e = m.get(id);
+      if (e) now.set(id, e);
+      else now.delete(id);
+    }
+    mine.clear();
+    for (const [id, e] of now) if (!fresh(e)) now.delete(id);
+    save(key, JSON.stringify([...now]));
+    m = now;
+  };
+  flushers.add(flush);
+  const changed = (id: string) => {
+    mine.add(id);
+    clearTimeout(later);
+    later = window.setTimeout(flush, 300);
+  };
+  // Another window wrote: take its drafts, keeping ours not yet written.
+  addEventListener("storage", (e: StorageEvent) => {
+    if (e.key !== key) return;
+    const now = read();
+    for (const id of mine) {
+      const own = m.get(id);
+      if (own) now.set(id, own);
+      else now.delete(id);
+    }
+    m = now;
+  });
+  const live = (id: string) => {
+    const e = m.get(id);
+    return e && fresh(e) ? e : undefined;
+  };
+  return {
+    get: (id) => live(id)?.v,
+    at: (id) => live(id)?.at,
+    set: (id, v) => (m.set(id, { v, at: Date.now() }), changed(id)),
+    delete: (id) => void (m.delete(id) && changed(id)),
+  };
+}
+
 /** How far each list was scrolled, by tab, skill page or "home": one map in localStorage for the app, as every
  *  remembered view is (the app opens one library; another is a developer's ORE_LIBRARY). */
 export function keptScrolls(): Record<string, number> {
@@ -80,6 +166,8 @@ export function useKeptScroll(ref: RefObject<HTMLElement | null>, key: string): 
       grows.disconnect();
       sized.disconnect();
     };
+    // No place kept: the top, not where the scroller was for another key (the phone's lists share one).
+    if (!pending) el.scrollTop = 0;
     put();
     if (pending) (grows.observe(el, { childList: true, subtree: true }), watch());
     const giveUp = window.setTimeout(stop, 3000);

@@ -19,6 +19,7 @@ import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
+import { HideDots } from "./HideDots";
 import { Hint } from "./Hint";
 import { Thumb } from "./Thumb";
 import { SkillIcon } from "./IconPicker";
@@ -41,11 +42,12 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
-import { errorText, inOrder, load, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
+import { errorText, focusQuietly, inOrder, kept, load, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
 import { mergeAnns } from "./anns";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
+import { paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
@@ -452,17 +454,24 @@ function ColumnHead({ children, style }: { children?: ReactNode; style?: CSSProp
  *  the row that opens it is outside the index. It folds again the next time the source is opened. */
 function Output({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  // The row goes when it opens: if it had focus (Enter on it), the output it showed takes it, so the keys
+  // don't fall to nothing. A click in the Mac's webview focuses no button, and then nothing moves.
+  const out = useRef<HTMLPreElement>(null);
+  const hadFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (open && hadFocus.current && out.current) focusQuietly(out.current);
+  }, [open]);
   return (
     <>
       {!open && (
         <Hint text="Guess it first, then show">
-          <button className="output-fold" data-noindex="" onClick={() => setOpen(true)}>
+          <button className="output-fold" data-noindex="" onClick={(e) => { hadFocus.current = document.activeElement === e.currentTarget; setOpen(true); }}>
             <CaretRight size={12} />
             Output
           </button>
         </Hint>
       )}
-      <pre className="output" hidden={!open}>{children}</pre>
+      <pre ref={out} tabIndex={-1} className="output" hidden={!open}>{children}</pre>
     </>
   );
 }
@@ -559,6 +568,8 @@ type Props = {
   skills: Skill[];
   finishing: boolean;
   setFinishing: (on: boolean) => void;
+  /** Finish has saved all it has (the phone forgets that Finish was open), or a save after Done failed (it keeps it). */
+  onFinishRecorded?: (saved: boolean) => void;
   /** The side panel is open (D44), on `sideTab` (D75). */
   notesOpen: boolean;
   sideTab: SideTab;
@@ -604,6 +615,10 @@ type Props = {
   notify: Notify;
 };
 
+/** A key point being typed ("Card here"), by source: its line, its anchor and the text at it (NEAR characters). */
+const keyDrafts = kept<{ text: string; at: number; near: string }>("ore.keypoint-drafts");
+const NEAR = 64;
+
 /** A reimport (or its undo) replaces the text under every highlight range and mark, so the reader
  *  starts over on the new text rather than patching what it drew. */
 export function Reader(p: Props) {
@@ -633,6 +648,28 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [adding, setAdding] = useState<string | null>(null);
   /** Where Card here was opened: the source offset his line is anchored at. */
   const hereAt = useRef<number | null>(null);
+  // The line he was typing comes back after a relaunch (for a day, `kept`), anchored where it was, into the place he
+  // left it: the Collected field, when Collected opens (or Card here does) or is open as the source opens; never over a line in
+  // progress, and not when the source's text there has changed since (a reimport, the Mac's edit through sync).
+  const keptLine = (): string | null => {
+    const d = keyDrafts.get(p.id);
+    if (!d || !doc) return null;
+    if (doc.body.slice(d.at, d.at + NEAR) !== d.near) return void keyDrafts.delete(p.id), null;
+    hereAt.current = d.at;
+    return d.text;
+  };
+  const collectedOpen = p.notesOpen && p.sideTab === "questions";
+  useEffect(() => {
+    if (!doc || adding !== null || !collectedOpen) return;
+    const line = keptLine();
+    if (line !== null) setAdding(line);
+  }, [doc, p.id, collectedOpen]);
+  useEffect(() => {
+    const at = hereAt.current;
+    if (adding === null || !doc) return;
+    if (adding.trim() && at !== null) keyDrafts.set(p.id, { text: adding, at, near: doc.body.slice(at, at + NEAR) });
+    else keyDrafts.delete(p.id);
+  }, [adding, doc, p.id]);
   /** He asked for the key point field (+, Card here, a failed save): it takes focus once, not on every remount. */
   const focusAdd = useRef(false);
   const [addAsk, setAddAsk] = useState(0);
@@ -869,12 +906,12 @@ function ReaderView(p: Props & { reload: () => void }) {
     const changed = i !== currentWord.current;
     if (changed) {
       currentWord.current = i;
-      if (i < 0) CSS.highlights.delete("hl-spoken");
+      if (i < 0) unpaint("hl-spoken");
       else {
         // A new range each time: WebKit repaints only the new extent when one is moved in place,
         // so text behind a rewind stayed lit until something else repainted it.
         spoken.current = skeletonRange(index, words.pos[0]!, words.end[i]!);
-        CSS.highlights.set("hl-spoken", new Highlight(spoken.current));
+        paint("hl-spoken", [spoken.current]);
       }
     }
     // A folded transcript keeps its place; the card's box scrolls, not the page.
@@ -962,7 +999,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     speaker.current = new Speaker(list, rate, {
       sentence: (i) => {
         sentence.current = list[i]!;
-        CSS.highlights.set("hl-listen", new Highlight(list[i]!));
+        paint("hl-listen", [list[i]!]);
         showSentence();
       },
       end: stopListening,
@@ -981,7 +1018,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     speaker.current?.pause();
     speaker.current = null;
     sentence.current = null;
-    CSS.highlights.delete("hl-listen");
+    unpaint("hl-listen");
     setListen(null);
     setAway(null);
   }
@@ -1140,13 +1177,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     setPainted((cur) => (cur.length === next.length && cur.every((x, i) => x.a === next[i]!.a && x.r === next[i]!.r) ? cur : next));
     // Hidden behind the quiz, highlight colors would show where the answers are (D52).
     for (const i of INTENTS) {
-      const h = new Highlight(...(hidden ? [] : by[i]));
-      h.priority = 1; // above hl-spoken, so a highlight in a playing transcript keeps its own text colour
-      CSS.highlights.set(`hl-${i}`, h);
+      // Above hl-spoken, so a highlight in a playing transcript keeps its own text colour.
+      paint(`hl-${i}`, hidden ? [] : by[i], 1);
     }
     const active = popup && map.get(popup.id);
-    if (active) CSS.highlights.set("hl-active", new Highlight(active));
-    else CSS.highlights.delete("hl-active");
+    paint("hl-active", active ? [active] : []);
     // `q:start:end` is a quote a card points to (D99), not a highlight.
     const q = p.jumpTo?.match(/^q:(\d+):(\d+)$/);
     const jump = jumped.current ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }) : p.jumpTo && map.get(p.jumpTo);
@@ -1154,10 +1189,10 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (jump && el) {
       jumped.current = true;
       toThird(jump);
-      CSS.highlights.set("hl-active", new Highlight(jump));
+      paint("hl-active", [jump]);
     }
   }, [ready, anns, body, popup?.id, hidden, repaint]);
-  useEffect(() => () => CSS.highlights.clear(), []);
+  useEffect(() => () => unpaintAll(), []);
   // A ⌘K match in a highlight or its note: land on it with its popup open, once its range is painted.
   const landed = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -1196,16 +1231,16 @@ function ReaderView(p: Props & { reload: () => void }) {
   useEffect(() => {
     const index = idx.current;
     const el = scrollRef.current;
-    CSS.highlights.delete("hl-evidence");
-    CSS.highlights.delete("hl-evidence-on");
+    unpaint("hl-evidence");
+    unpaint("hl-evidence-on");
     setEvidence([]);
     if (!reveal || !ready || !index || !el || body === undefined || !src) return;
     const rs = reveal.quotes.map((q) => rangeFor(index, src, body, q));
     setEvidence(rs);
     const cur = rs[reveal.at];
-    CSS.highlights.set("hl-evidence", new Highlight(...rs.filter((r, i): r is Range => !!r && i !== reveal.at)));
+    paint("hl-evidence", rs.filter((r, i): r is Range => !!r && i !== reveal.at));
     if (cur) {
-      CSS.highlights.set("hl-evidence-on", new Highlight(cur));
+      paint("hl-evidence-on", [cur]);
       toThird(cur, "smooth");
     }
   }, [reveal, ready, body]);
@@ -1512,8 +1547,8 @@ function ReaderView(p: Props & { reload: () => void }) {
     const r = rangeFor(index, src, body, { exact: m.quote, prefix: "", suffix: "", start: m.start ?? 0 });
     if (!r) return p.notify("Couldn’t find that passage in the text any more.", "error");
     toThird(r, "smooth");
-    CSS.highlights.set("hl-evidence-on", new Highlight(r));
-    window.setTimeout(() => CSS.highlights.delete("hl-evidence-on"), 2400);
+    paint("hl-evidence-on", [r]);
+    window.setTimeout(() => unpaint("hl-evidence-on"), 2400);
   }
 
   /** From the Collected tab (D64): scroll the passage a third of the way down the text in view (below a
@@ -1581,10 +1616,11 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** A key point of his own ("Card here", Tyler, 2026-10-29; D118): a line he types, anchored where he is now, drafted from the whole source. */
   function cardHere() {
     if (popup) closePopup();
-    // A draft he kept stays anchored where he started it.
-    if (adding === null) hereAt.current = here();
+    // A draft he kept stays anchored where he started it, one kept across a relaunch too.
+    const restored = adding === null ? keptLine() : null;
+    if (adding === null && restored === null) hereAt.current = here();
     focusAdd.current = true;
-    setAdding((cur) => cur ?? "");
+    setAdding((cur) => cur ?? restored ?? "");
     setAddAsk((n) => n + 1);
     p.onShowSide("questions", true);
   }
@@ -2022,13 +2058,13 @@ function ReaderView(p: Props & { reload: () => void }) {
     // Where it sits in the body: the AI reads its paragraph, and the rest of the source is searched for it.
     const q = src && doc && idx.current ? sourceQuote(src, doc.body, idx.current, range) : null;
     const again = q && doc ? againIn(doc.body, q.start + q.exact.length, word) : { sections: [], later: false };
-    CSS.highlights.set("hl-lookup", new Highlight(range));
+    paint("hl-lookup", [range]);
     setLookup({ word, range, ann, ...at, start: q?.start, again });
     void define(word).then((text) => setLookup((cur) => (cur?.range === range ? { ...cur, text } : cur)));
   }
 
   function closeLookUp() {
-    CSS.highlights.delete("hl-lookup");
+    unpaint("hl-lookup");
     setLookup(null);
     scrollRef.current?.focus({ preventScroll: true });
   }
@@ -2410,7 +2446,8 @@ function ReaderView(p: Props & { reload: () => void }) {
         markPlace();
         return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
       }
-      return p.notify(`That part of the page wasn’t saved with it.${doc?.url && doc.type !== "snippet" ? " Reimport the source from its ⋯ menu to fetch it again." : ""}`, "error");
+      // The phone can't reimport (D78): the step is the Mac's.
+      return p.notify(`That part of the page wasn’t saved with it.${doc?.url && doc.type !== "snippet" ? (PHONE ? " Reimport the source on your Mac to fetch it again." : " Reimport the source from its ⋯ menu to fetch it again.") : ""}`, "error");
     }
     if (/^(?:https?|mailto):/i.test(href)) return void openUrl(href).catch((e) => p.notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
     p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. Add it with ${label(keys.file)} to read it here.`, "error");
@@ -2651,6 +2688,27 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   };
 
+  /** An episode's own page text, added below its transcript in one step (D215), with Undo and Redo as a
+   *  cut's. Snipd's episode screen: the show notes are one tap from the player, never in its way. */
+  const [addingPage, setAddingPage] = useState(false);
+  const addPageText = async () => {
+    if (!doc || addingPage) return;
+    const d = doc;
+    setAddingPage(true);
+    try {
+      const c = await ore<{ id: string; words: number }>("page-text", d.id);
+      p.reload();
+      p.onChanged();
+      const step = (flag: string) => () => ore("page-text", d.id, flag, c.id).then(() => (p.reload(), p.onChanged()));
+      p.notify(`Added the page’s text, ${c.words} ${c.words === 1 ? "word" : "words"}`, "info", step("--undo"), step("--redo"));
+      // Still adding until the reload replaces this view with the source as it is now (page_text gone),
+      // so the button never shows again in between to be clicked twice.
+    } catch (e) {
+      setAddingPage(false);
+      p.notify(errorText(e), "error");
+    }
+  };
+
   /** Files the source under exactly `skills` (its cards follow), with Undo naming the one that changed. */
   /** The skills as last saved from here: the Questions list reads again once a filing has landed. */
   const [filed, setFiled] = useState("");
@@ -2707,7 +2765,9 @@ function ReaderView(p: Props & { reload: () => void }) {
         { id: "rename", label: "Rename…", hint: label(keys.rename), divider: true, run: () => setRenaming(true) },
         { id: "author", label: doc.author ? "Edit author…" : "Add author…", run: () => setAuthoring(true) },
         // A PDF or EPUB file is read again from the copy kept with it, so a better reader reaches it.
-        ...((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub" ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
+        // Not on the phone: it can't fetch a page (its CSP) or reread an original (not in its library), D78; like Listen.
+        ...(!PHONE && ((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub") ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
+        ...(doc.page_text && !PHONE ? [{ id: "page-text", label: "Add the page’s text", run: () => void addPageText() }] : []),
         ...(PHONE ? [] : [{ id: "find", label: "Find in source…", hint: label(keys.filter), paletteOnly: true, run: openFind }]),
         ...(p.skills.length
           ? [{
@@ -2977,6 +3037,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           })}
         </div>
       )}
+      <HideDots hidden={hidden} box={scrollRef} page={pageRef} />
       <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
@@ -2984,14 +3045,6 @@ function ReaderView(p: Props & { reload: () => void }) {
                 og:image or site logo only repeats what the title says, and a video's picture is its player. */}
             {doc.thumbnail && (doc.type === "pdf" || doc.type === "epub") && <Thumb item={doc} className="doc-thumb" />}
             {doc.course && p.lessons && p.lessons.length > 1 && <CourseLine id={doc.id} course={doc.course} lessons={p.lessons} onOpen={p.onOpenLesson} />}
-            {/* Where it's from, above the title (Reeder, Matter): one click opens the original. */}
-            {source && (
-              <Hint text={doc.url ? "Open the original page" : "Open the original file"} keys="original">
-                <button className={`source${doc.url ? " site" : ""}`} onClick={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}>
-                  {source} ↗
-                </button>
-              </Hint>
-            )}
             {renaming ? (
               <TitleField className="title-edit" value={doc.title} onSave={(t) => retitle(doc.id, doc.title, t.trim())} onClose={() => setRenaming(false)} />
             ) : (
@@ -3003,12 +3056,12 @@ function ReaderView(p: Props & { reload: () => void }) {
                 </h1>
               </WithMenu>
             )}
-            {(doc.author || authoring || published || doc.skills.length > 0 || suggested || !PHONE) && (
+            {(doc.author || authoring || published || doc.skills.length > 0 || suggested || source || !PHONE) && (
               <div className="chips">
                 {authoring ? (
                   <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
                 ) : (
-                  doc.author &&
+                  doc.author ?
                   (PHONE ? (
                     <span className="by">{doc.author}</span>
                   ) : (
@@ -3017,7 +3070,16 @@ function ReaderView(p: Props & { reload: () => void }) {
                         {doc.author}
                       </button>
                     </Hint>
-                  ))
+                  )) : (
+                    // None found on import (D210): a faint empty field where the name goes, one click fills it (Notion's empty property).
+                    !PHONE && (
+                      <Hint text="Add author">
+                        <button className="by-add" ref={authorRef} onClick={() => setAuthoring(true)}>
+                          Author
+                        </button>
+                      </Hint>
+                    )
+                  )
                 )}
                 {published && <span className="when">{published}</span>}
                 {PHONE ? (
@@ -3040,6 +3102,14 @@ function ReaderView(p: Props & { reload: () => void }) {
                     </Hint>
                   </span>
                 )}
+                {/* Where it's from, last on the byline (D210): one click opens the original. */}
+                {source && (
+                  <Hint text={doc.url ? "Open the original page" : "Open the original file"} keys="original">
+                    <button className="source" onClick={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}>
+                      {source} ↗
+                    </button>
+                  </Hint>
+                )}
               </div>
             )}
           </header>
@@ -3059,6 +3129,19 @@ function ReaderView(p: Props & { reload: () => void }) {
           {/* The phone can't write prequestions (AI runs on the Mac): it shows the ones the Mac wrote. */}
           {/* No text, nothing to ask before reading it. */}
           {!doc.preview && <TablesLine key={doc.id} doc={doc} onRead={tablesRead} />}
+          {doc.page_text && !PHONE && (
+            <div className="page-text">
+              {addingPage ? (
+                <Working label="Adding the page’s text…" />
+              ) : (
+                <Hint text="Adds the episode page’s own text below the transcript">
+                  <button className="page-text-btn" onClick={() => void addPageText()}>
+                    Add the page’s text
+                  </button>
+                </Hint>
+              )}
+            </div>
+          )}
           {!doc.preview && (!PHONE || !!doc.prequestions?.length) && (!!doc.body.trim() || !!doc.prequestions?.length) && <Prequestions key={doc.prequestions?.length ?? 0} doc={doc} waiting={waiting || retrying} onRetry={gaveUp && !retrying ? () => void retryEnrich() : undefined} notify={p.notify} ask={preqAsk} onKept={(i, text) => setDoc((cur) => cur && { ...cur, prequestions: cur.prequestions?.map((q, j) => (j === i ? { ...q, before: text || undefined } : q)) })} />}
           {away === "up" && !video && (
             <div className="follow-up">
@@ -3309,7 +3392,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               anns={anns}
               timeOf={timeOf}
               adding={adding}
-              onAdding={(on) => (on ? cardHere() : setAdding(null))}
+              onAdding={(on) => (on ? cardHere() : (setAdding(null), keyDrafts.delete(p.id)))}
               onEdit={setAdding}
               addAsk={addAsk}
               takeAddFocus={() => {
@@ -3351,6 +3434,7 @@ function ReaderView(p: Props & { reload: () => void }) {
             scrollRef.current?.focus({ preventScroll: true });
           }}
           onDone={p.onDone}
+          onMarked={p.onFinishRecorded}
           nextLesson={nextUp && { title: nextUp.title, open: () => (p.onChanged(), p.onOpenLesson(nextUp.id)) }}
           notify={p.notify}
           flushNotes={notes.flush}
@@ -3401,9 +3485,9 @@ function ReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>; onOp
   );
 }
 
-/** Prequestion guesses typed but not yet stored, by source and question: leaving the source keeps them for when
- *  he comes back (Enter still stores one). */
-const preqDrafts = new Map<string, string>();
+/** Prequestion guesses typed but not yet stored, by source and question (a rewritten question is another key):
+ *  leaving the source or quitting the app keeps them for when he comes back (for a day, `kept`); Enter stores one. */
+const preqDrafts = kept<string>("ore.preq-drafts");
 
 /** "What do you already know?" — short attempts before reading, stored and never scored (D18). Question rows; the one
  *  you are on opens an answer line, Enter stores it and opens the next unanswered one. */
@@ -3431,8 +3515,8 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
   // One answer line open at a time (Perplexity "Related"): the rest stay visible as things to read for.
   // Coming back with a guess he hadn't stored opens its line again.
   const [at, setAt] = useState(() => {
-    const kept = qs.findIndex((_, i) => preqDrafts.has(draftKey(i)));
-    return kept >= 0 ? kept : qs.findIndex((q) => !q.before);
+    const left = qs.findIndex((_, i) => preqDrafts.get(draftKey(i)) !== undefined);
+    return left >= 0 ? left : qs.findIndex((q) => !q.before);
   });
   const edit = (i: number, text: string) => {
     setVals((v) => v.map((x, j) => (j === i ? text : x)));
@@ -3445,7 +3529,7 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
   const focusLine = useRef(false);
   // Open while they can still do their work: before he starts reading. Once he has highlighted or is reading,
   // the block folds to its one line so the text comes first; one click opens it again.
-  const [open, setOpen] = useState(() => qs.some((_, i) => preqDrafts.has(draftKey(i))) || (qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length));
+  const [open, setOpen] = useState(() => qs.some((_, i) => preqDrafts.get(draftKey(i)) !== undefined) || (qs.some((q) => !q.before) && doc.status !== "reading" && !doc.annotations?.length));
   // The row he just answered plays a short check-in, so the move from typing to answered reads as done.
   const [just, setJust] = useState(-1);
   if (!qs.length && !waiting && !onRetry) return null;

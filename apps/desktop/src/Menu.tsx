@@ -1,4 +1,4 @@
-import { CaretLeft, CaretRight, Check, DotsThree } from "./icons";
+import { CaretLeft, CaretRight, DotsThree, Tick } from "./icons";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
@@ -6,7 +6,7 @@ import { Hint } from "./Hint";
 import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
-import { useSwipeDown } from "./phone/sheet";
+import { sheetLayer, useSwipeDown } from "./phone/sheet";
 import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
 
@@ -100,7 +100,7 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
                         <ContextMenu.CheckboxItem key={b.id} className="menu-item check" checked={b.checked} onSelect={pick(b)}>
                           <span className="menu-tick">
                             <ContextMenu.ItemIndicator>
-                              <Check size={12} weight="bold" />
+                              <Tick />
                             </ContextMenu.ItemIndicator>
                           </span>
                           {b.icon}
@@ -196,7 +196,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
                         <DropdownMenu.CheckboxItem key={b.id} className="menu-item check" checked={b.checked} onSelect={pick(b)}>
                           <span className="menu-tick">
                             <DropdownMenu.ItemIndicator>
-                              <Check size={12} weight="bold" />
+                              <Tick />
                             </DropdownMenu.ItemIndicator>
                           </span>
                           {b.icon}
@@ -211,7 +211,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
               <DropdownMenu.CheckboxItem className="menu-item check" checked={a.checked} onSelect={pick(a)}>
                 <span className="menu-tick">
                   <DropdownMenu.ItemIndicator>
-                    <Check size={12} weight="bold" />
+                    <Tick />
                   </DropdownMenu.ItemIndicator>
                 </span>
                 {a.icon}
@@ -240,6 +240,8 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   const open = controlled ?? own;
   // The press that opens it keeps focus where it is (a note's text under the keyboard bar), as Radix's
   // trigger does; an owner that preventDefault()s the press keeps it from opening (the drag handle).
+  // Kept on the mouse-down, never the pointer-down: WebKit sends no click after a touch whose pointer-down
+  // was prevented, so on the phone the tap did nothing.
   const held = useRef(false);
   const [stepId, setStepId] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -275,10 +277,10 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   };
   return (
     <>
-      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} data-no-drag onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; e.preventDefault(); }}>
+      <button className={className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} data-no-drag onClick={(e) => (e.stopPropagation(), held.current || show(true))} onPointerDown={(e) => { onPointerDown?.(e); held.current = e.defaultPrevented; }} onMouseDown={(e) => e.preventDefault()}>
         {icon ?? <DotsThree size={16} aria-hidden="true" />}
       </button>
-      {open && (
+      {open && sheetLayer(
         <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
           <Trap>
             <div ref={box} className="panel sheet action-sheet" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); step ? setStepId(null) : close(); } }}>
@@ -294,7 +296,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
                     <Fragment key={a.id}>
                       {a.divider && !step && <div className="sheet-sep" role="separator" />}
                       <button className={`pick-row${a.danger ? " danger" : ""}`} role={a.checked === undefined ? undefined : "checkbox"} aria-checked={a.checked} onClick={() => pick(a)}>
-                        {step && <span className="menu-tick">{a.checked && <Check size={12} weight="bold" />}</span>}
+                        {step && <span className="menu-tick">{a.checked && <Tick />}</span>}
                         {a.icon}
                         <span className="name">{a.label}</span>
                         {a.sub && <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />}

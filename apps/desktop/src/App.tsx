@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
+import { ranked } from "./match";
+import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
 import { DotBar } from "./Ring";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
@@ -13,7 +14,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, titleMatches, pinBetween, oreJob, opt, PHONE, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, searchFields, pinBetween, oreJob, opt, PHONE, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -89,7 +90,6 @@ const added = (iso: string) => {
 };
 
 function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; archived: boolean; go: (s: Tab) => void; details: Detail[]; toggle: (d: Detail) => void }) {
-  const keys = useKeymap();
   const views = [...TABS, ...(archived || status === "archived" ? [{ id: "archived" as Tab, label: "Archived", key: undefined }] : [])];
   return (
     <DropdownMenu.Root modal={false}>
@@ -108,11 +108,10 @@ function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; arch
               <DropdownMenu.RadioItem key={v.id} value={v.id} className="menu-item check">
                 <span className="menu-tick">
                   <DropdownMenu.ItemIndicator>
-                    <Check size={12} weight="bold" />
+                    <Tick />
                   </DropdownMenu.ItemIndicator>
                 </span>
                 <span className="menu-label">{v.label}</span>
-                {v.key && <kbd>{label(keys[v.key])}</kbd>}
               </DropdownMenu.RadioItem>
             ))}
           </DropdownMenu.RadioGroup>
@@ -128,7 +127,7 @@ function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; arch
             >
               <span className="menu-tick">
                 <DropdownMenu.ItemIndicator>
-                  <Check size={12} weight="bold" />
+                  <Tick />
                 </DropdownMenu.ItemIndicator>
               </span>
               <span className="menu-label">{c.label}</span>
@@ -1055,11 +1054,13 @@ export function App() {
             .sort((a, b) => Number(!a.pinned_at) - Number(!b.pinned_at) || (a.pinned_at ?? "").localeCompare(b.pinned_at ?? "") || touched(b).localeCompare(touched(a))),
     [inSkill, archivedInSkill, status],
   );
-  /** All sources' filter (⌘F): titles that contain it first, then sources whose text, highlights or
-   *  note match (`ore search`), each with its matching line. A skill page shows To read only. */
+  /** A list's search (⌘F on All sources, the magnifying glass on a skill page, D203): sources known by
+   *  the words first, best match first (title, then course, author, site, skill, type; a typo still
+   *  finds it), then sources whose text, highlights or note match (`ore search`), each with its line. */
   const [query, setQuery] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
-  const q = onSkillPage ? "" : query.trim();
+  const q = query.trim();
+  useEffect(() => setQuery(""), [skill]);
   /** `error`: why searching the text failed, so it never reads as "nothing matches". */
   const [hits, setHits] = useState<{ q: string; snip: Map<string, string>; error?: string }>({ q: "", snip: new Map() });
   useEffect(() => {
@@ -1080,7 +1081,13 @@ export function App() {
       clearTimeout(t);
     };
   }, [q]);
-  const byTitle = useMemo(() => (q ? tabRows.filter((r) => titleMatches(r, q)) : tabRows), [tabRows, q]);
+  /** What each row is searched by, worked out once per list and not on every key: a site is a parsed URL
+   *  and a skill a lookup, which on a big library was most of a key's time (bench "filter sources"). */
+  const fieldsOf = useMemo(() => {
+    const names = new Map(skills.map((s) => [s.id, s.name]));
+    return new Map(tabRows.map((r) => [r, searchFields(r, siteOf(r.url), r.skills.map((id) => names.get(id) ?? id))]));
+  }, [tabRows, skills]);
+  const byTitle = useMemo(() => (q ? ranked(tabRows, q, (r) => fieldsOf.get(r)!) : tabRows), [tabRows, q, fieldsOf]);
   const byText = useMemo(
     () => (q && hits.q === q ? tabRows.filter((r) => hits.snip.has(r.id) && !byTitle.includes(r)) : []),
     [tabRows, byTitle, hits, q],
@@ -2061,7 +2068,7 @@ export function App() {
       )}
       {!listError && items && !q && rows.length === 0 && <div className="empty-state">{empty(status, keys)}</div>}
       {q && hits.q === q && hits.error && <div className="empty-state err" role="alert">Couldn’t search the text: {hits.error} Titles still filter.</div>}
-      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">No {(TABS.find((s) => s.id === status)?.label ?? "archived").toLowerCase()} sources match “{q}”.</div>}
+      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches “{q}”.</div>}
       {/* A grid, not a listbox: a row holds its own controls (chips, ⋯), which an option may not (ARIA's layout grid). */}
       {rows.length > 0 && <div role="grid" aria-multiselectable="true" aria-label="Sources">
       <DndContext
@@ -2113,7 +2120,7 @@ export function App() {
         )}
       </DndContext>
       </div>}
-      {onSkillPage && groups.length > SKILL_CAP && (
+      {onSkillPage && !q && groups.length > SKILL_CAP && (
         <button className="show-all" onClick={() => setShowAll(!showAll)}>
           {showAll ? "Show fewer" : `Show all ${groups.length}`}
         </button>
@@ -2121,6 +2128,15 @@ export function App() {
     </div>
     </WithMenu>
   );
+  /** From a search field: ↓ moves into the rows it found, ↵ opens the first (Linear, Raindrop). */
+  const searchKeys = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown" && rows.length) {
+      e.preventDefault();
+      setKeyed(true);
+      setCursor(rows[0]!.id);
+      listRef.current?.focus({ preventScroll: true });
+    } else if (e.key === "Enter" && rows[0]) openSource(rows[0].id);
+  };
   const sources = (
     <>
       <div className="list-bar">
@@ -2143,12 +2159,7 @@ export function App() {
                   e.preventDefault();
                   if (query) setQuery("");
                   else listRef.current?.focus({ preventScroll: true });
-                } else if (e.key === "ArrowDown" && rows.length) {
-                  e.preventDefault();
-                  setKeyed(true);
-                  setCursor(rows[0]!.id);
-                  listRef.current?.focus({ preventScroll: true });
-                } else if (e.key === "Enter" && rows[0]) openSource(rows[0].id);
+                } else searchKeys(e);
               }}
             />
             {!query && <kbd>{label(keys.filter)}</kbd>}
@@ -2303,6 +2314,7 @@ export function App() {
             key={skill}
             skill={skillOf(skill)}
             view={view}
+            search={{ value: query, set: (v) => (setQuery(v), setCursor(null)), keys: searchKeys }}
             targets={targets}
             blocked={overlay}
             onOpen={openLink}

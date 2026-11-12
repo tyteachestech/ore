@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { release, tmpdir } from "node:os";
 import { join } from "node:path";
 import { madeThisRun } from "../cancel.ts";
 import { run, swiftHelper } from "./swift.ts";
@@ -26,6 +26,15 @@ export async function transcribe(data: Uint8Array, ext: string, onProgress?: Pro
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** Whether this machine can hear speech at all, before anything downloads: the stand-in transcriber
+ *  (ORE_TRANSCRIBE; set empty, none), else macOS 26 or later (Darwin 25), where Apple's SpeechAnalyzer
+ *  is. Whether it has a model for the speech's language is only known by trying. */
+export function canTranscribe(): boolean {
+  const stand = process.env.ORE_TRANSCRIBE;
+  if (stand !== undefined) return stand !== "";
+  return process.platform === "darwin" && Number(release().split(".")[0]) >= 25;
 }
 
 /** A sound or video file on disk as WebVTT, without reading it into memory (a lecture video can be
@@ -109,13 +118,107 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   }
   const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
   const html = res?.ok ? await res.text() : "";
-  // Either attribute order: pages write `content` before `property` as often as after it.
+  const meta = metaOf(html);
+  const audio = pageAudio(html, url, true);
+  if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
+  return { audio, title: meta("og:title"), show: meta("og:site_name") };
+}
+
+/** A page's `<meta>` values by property or name, in either attribute order: pages write `content`
+ *  before `property` as often as after it. */
+function metaOf(html: string): (p: string) => string | undefined {
   const tags = html.match(/<meta\b[^>]*>/gi) ?? [];
   const attr = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
-  const meta = (p: string) => tags.map((t) => ((attr(t, "property") ?? attr(t, "name"))?.toLowerCase() === p ? attr(t, "content") : undefined)).find(Boolean);
-  const audio = meta("og:audio") ?? meta("og:audio:url") ?? html.match(/<(?:audio|source)[^>]+src=["']([^"']+\.(?:mp3|m4a)[^"']*)["']/i)?.[1];
-  if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
-  return { audio: new URL(audio.replace(/&amp;/g, "&"), url).href, title: meta("og:title"), show: meta("og:site_name") };
+  return (p) => tags.map((t) => ((attr(t, "property") ?? attr(t, "name"))?.toLowerCase() === p ? attr(t, "content") : undefined)).find(Boolean);
+}
+
+/** An audio file by its address: the types the Mac hears (AUDIO_TYPES), never a video. A player's own
+ *  page (Overcast, Pocket Casts) may name the type mid-path (`/ep13.mp3/stream`). */
+const AUDIO_FILE = new RegExp(`\\.(?:${AUDIO_TYPES.join("|")})(?:[?#]|$)`, "i");
+const AUDIO_ANYWHERE = new RegExp(`\\.(?:${AUDIO_TYPES.join("|")})(?:[/?#]|$)`, "i");
+/** An address with a part after `/podcast/`, `/podcasts/`, `/episode/` or `/episodes/`: one episode's
+ *  page, not the show's index (`/podcasts/`). */
+const EPISODE_PATH = /\/(?:podcasts?|episodes?)\/[^/]+/i;
+/** A Megaphone episode id (SAM9228418236): letters, then digits. A playlist or show path is not one. */
+const MEGAPHONE_ID = /^[A-Z]{2,}\d{6,}$/;
+
+/** The audio a web page is the episode of, or undefined when the page is only an article (D92,
+ *  D122, D167). The page is an episode when its JSON-LD's page-level node (or one in its @graph) is a
+ *  PodcastEpisode or RadioEpisode whose media is audio, or its `og:type` says episode and `og:audio`
+ *  names the file; otherwise only when it plays exactly one audio (its `og:audio`, an `<audio>` file,
+ *  or a Megaphone episode player, whose enclosure is its id's MP3) and its address names one episode.
+ *  So a news story that plays a clip, or offers a read-aloud of itself (a bare `og:audio`, an
+ *  AudioObject beside its Article), stays the article, as does a show's index with a featured player.
+ *  One file counts once (see `add`). `player` is an episode link's own page (Overcast, Pocket Casts):
+ *  any audio it plays is the episode, at any address, its first one if it plays several. */
+export function pageAudio(html: string, url: string, player = false): string | undefined {
+  const abs = (u: string | undefined) => {
+    try {
+      return u ? new URL(u.replace(/&amp;/g, "&"), url).href : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const meta = metaOf(html);
+  const og = abs(meta("og:audio") ?? meta("og:audio:url") ?? meta("og:audio:secure_url"));
+  const declared = ldEpisodeAudio(html) ?? (og && /episode/i.test(meta("og:type") ?? "") && AUDIO_FILE.test(og) ? og : undefined);
+  if (declared) return abs(declared);
+  // A player's own og:audio is its episode, whatever its address looks like (as before D215).
+  if (player && og) return og;
+  if (!player && !EPISODE_PATH.test(new URL(url).pathname)) return undefined;
+  const isAudio = (u: string) => (player ? AUDIO_ANYWHERE : AUDIO_FILE).test(new URL(u).pathname);
+  // One episode under two addresses counts once: the same file in another format or under another
+  // query string, or behind a redirector (`…/redirect.mp3/traffic.megaphone.fm/ID.mp3`), is known by
+  // its own name, the last part of its address without the type.
+  const found = new Map<string, string>();
+  const add = (u: string | undefined) => {
+    if (!u || !isAudio(u)) return;
+    const key = (new URL(u).pathname.split("/").filter(Boolean).pop() ?? u).replace(/\.\w+$/, "").toLowerCase();
+    if (!found.has(key)) found.set(key, u);
+  };
+  add(og);
+  const src = (tag: string) => tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
+  for (const m of html.matchAll(/<audio\b([^>]*)>([\s\S]*?)<\/audio>/gi)) {
+    // One player: its own file, else the first of its sources the Mac hears.
+    const own = abs(src(m[1]!));
+    add(own && isAudio(own) ? own : (m[2]!.match(/<source\b[^>]*>/gi) ?? []).map((t) => abs(src(t))).find((u) => u && isAudio(u)));
+  }
+  // A player's page may hold its file in a bare <source>, outside an <audio>.
+  if (player) for (const m of html.matchAll(/<source\b[^>]*>/gi)) add(abs(src(m[0])));
+  for (const m of html.matchAll(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)) {
+    const u = abs(m[1]!);
+    if (!u || !/^(?:playlist|player)\.megaphone\.fm$/.test(new URL(u).host)) continue;
+    const id = new URL(u).searchParams.get("e") ?? new URL(u).pathname.split("/").filter(Boolean).join("/");
+    if (MEGAPHONE_ID.test(id)) add(`https://traffic.megaphone.fm/${id}.mp3`);
+  }
+  if (player) return [...found.values()][0];
+  return found.size === 1 ? [...found.values()][0] : undefined;
+}
+
+/** The audio a page's JSON-LD names as the page's own: a page-level (or @graph) PodcastEpisode's or
+ *  RadioEpisode's `associatedMedia` or `audio`, when it is audio by its address or `encodingFormat`. */
+function ldEpisodeAudio(html: string): string | undefined {
+  const media = (v: unknown): string | undefined =>
+    [v].flat().flatMap((m) => {
+      const o = m && typeof m === "object" ? (m as Record<string, unknown>) : {};
+      const u = typeof o.contentUrl === "string" ? o.contentUrl : undefined;
+      return u && (AUDIO_FILE.test(u) || /^audio\//i.test(String(o.encodingFormat ?? ""))) ? [u] : [];
+    })[0];
+  for (const m of html.matchAll(/<script\b[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    let data: unknown;
+    try {
+      data = JSON.parse(m[1]!);
+    } catch {
+      continue;
+    }
+    const nodes = [data].flat().flatMap((n) => (n && typeof n === "object" ? [n, ...[(n as Record<string, unknown>)["@graph"] ?? []].flat()] : [])) as Record<string, unknown>[];
+    for (const n of nodes) {
+      if (!n || typeof n !== "object" || ![n["@type"]].flat().some((t) => /^(?:PodcastEpisode|RadioEpisode)$/.test(String(t)))) continue;
+      const u = media(n.associatedMedia) ?? media(n.audio);
+      if (u) return u;
+    }
+  }
+  return undefined;
 }
 
 /** Titles compared as words: case, punctuation and "&" vs "and" aside. */
