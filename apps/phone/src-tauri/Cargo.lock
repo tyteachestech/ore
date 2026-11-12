@@ -2437,6 +2437,7 @@ name = "ore-phone"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "objc2",
  "objc2-foundation",
  "serde",
  "tauri",

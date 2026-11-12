@@ -2604,9 +2604,12 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .doc-head :is(.title-edit, .author-edit), .phone .cp-input, .phone .preq-input, .phone .quiz-leave { min-height: 44px; }
 /* Renaming from ⋯ keeps the title's own size (it is over 16px, so iOS doesn't zoom): the accent rule says it is being edited. */
 .phone .doc-head .title-edit { font-size: 26px !important; line-height: 1.25; outline: none; }
-/* The note's keyboard bar: nine 44pt buttons are wider than a 390pt iPhone; it scrolls the last few points sideways. */
-.phone .kb-bar { overflow-x: auto; scrollbar-width: none; }
+/* The note's keyboard bar: in a list its 44pt buttons are wider than an iPhone; they scroll under a fade, Hide stays at the right. */
 .phone .kb-btn { flex: 1 0 44px; }
+.kb-scroll { flex: 1; min-width: 0; display: flex; overflow-x: auto; scrollbar-width: none; }
+.kb-scroll::-webkit-scrollbar { display: none; }
+.kb-scroll[data-more] { mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+.phone .kb-hide { flex: none; width: 44px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
@@ -2750,7 +2753,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44px); }
 /* On the phone the / [[ @ and emoji menus are a sheet docked above the keyboard bar (Notion's iOS app), never under a finger or off screen. */
 /* Fixed inside the note page, which slides in by a transform and ends at the bar: its bottom is the bar's top. */
-.phone .note-menu { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; max-width: none; max-height: 40vh; overflow-y: auto; z-index: 41; }
+/* Never taller than the room under the source's 44pt header (iOS's keyboard can leave less than 40vh). */
+.phone .note-menu { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; max-width: none; max-height: min(40vh, calc(100% - 60px)); overflow-y: auto; z-index: 41; }
 .phone .note-menu-row { height: 44px; font-size: 17px; }
 .phone .mynotes-text { scroll-padding-bottom: 52px; }
 /* The skill's note on the phone: a row at the top of its page (Apple Notes' folder rows), and the note's own screen. */

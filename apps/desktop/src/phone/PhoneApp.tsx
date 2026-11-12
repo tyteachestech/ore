@@ -569,8 +569,10 @@ export function PhoneApp() {
       document.documentElement.style.setProperty("--keyboard", `${kb}px`);
       if (!kb) return;
       document.querySelector(".phone-full .review-foot")?.scrollIntoView({ block: "end" });
-      // A field in the reader (a prequestion, a highlight's note) stays in sight above the keyboard.
       const field = document.activeElement;
+      // ...but never past the field he is typing in: Edit exercise's question sat above the foot, under the head.
+      if (field instanceof HTMLElement && field.closest(".phone-full .review-body")) return field.scrollIntoView({ block: "nearest" });
+      // A field in the reader (a prequestion, a highlight's note) stays in sight above the keyboard.
       if (!(field instanceof HTMLElement) || !field.closest(".phone-reader")) return;
       if (!field.isContentEditable) return field.scrollIntoView({ block: "nearest" });
       // The source note is one tall editor: bring the caret, not the editor, into view, once the screen has shrunk.

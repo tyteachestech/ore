@@ -46,3 +46,8 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F20 | 2026-11-12 | Buttons | The small button (D196) drew three different focus rings: inside its edge on Start, 1px outside on the note toggle, a shadow ring on Settings | fixed #319 | `every small button takes its focus ring from one shared rule` |
 | F21 | 2026-11-12 | Source rows, Reader | A 20px icon sat in a smaller button and hung off its centre: a row's add-skill + (18px circle) and a highlight's margin mark (16px, plus the button's default padding) | fixed #319 | `or bigger than the button it sits in, so it sits off the button's centre` |
 | F22 | 2026-11-12 | Lists, Home | ⌘Z right after dragging a row onto a skill (or pinning it) did nothing: the step went on the history only once the write had landed | fixed #321 | `⌘Z takes the drop back` |
+| F23 | 2026-11-12 | iPhone notes | The note's keyboard bar sat on top of iOS's own Previous / Next / Done bar, two bars over the keyboard | open | — |
+| F24 | 2026-11-12 | iPhone notes | The keyboard bar's ten 44pt buttons ran past a 402pt screen: Hide the keyboard started off the edge, and nothing showed the bar scrolls | open | — |
+| F25 | 2026-11-12 | iPhone notes | With the keyboard up, the + menu's top row was cut off under the source's header | open | — |
+| F26 | 2026-11-12 | iPhone Review | Review's ⋯ was three faint specks beside a bold × | open | — |
+| F27 | 2026-11-12 | iPhone Review | In Edit exercise, the question went up under the head when the keyboard came up | open | — |
