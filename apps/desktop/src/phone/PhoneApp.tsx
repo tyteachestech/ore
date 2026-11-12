@@ -17,7 +17,7 @@ import { planReminders } from "./reminder";
 import { SkillIcon } from "../IconPicker";
 import { NoteBody, useNotes, type SideTab } from "../Notes";
 import { PixelBook, PixelNote } from "../PixelIcon";
-import type { NoteEditorHandle } from "../editor/NoteEditor";
+import type { LinkTarget, NoteEditorHandle } from "../editor/NoteEditor";
 import { holdMenu, WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
 import { SkillEditor, skillGroups } from "../Skills";
@@ -318,13 +318,13 @@ function SourceList({ title, items, onOpen, row, head, flat, empty = "Nothing he
 
 /** A skill's note on its own screen (Tyler 2026-11-06, B): the whole page to write in, as in Apple
  *  Notes, with the keyboard bar under it; Back or the edge swipe returns to the skill. */
-function SkillNote({ skill, notify }: { skill: string; notify: Notify }) {
+function SkillNote({ skill, notify, targets, onOpen }: { skill: string; notify: Notify; targets: LinkTarget[]; onOpen: (t: Omit<LinkTarget, "title">) => void }) {
   const ref = useMemo(() => ({ skill }), [skill]);
   const notes = useNotes(ref, notify);
   const editor = useRef<NoteEditorHandle>(null);
   return (
     <div className="phone-page phone-note">
-      <NoteBody notes={notes} editorRef={editor} targets={[]} onOpen={() => {}} label="Skill note" placeholder="What you know so far. Type / for blocks." />
+      <NoteBody notes={notes} editorRef={editor} targets={targets} onOpen={onOpen} label="Skill note" placeholder="What you know so far. Type / for blocks." />
     </div>
   );
 }
@@ -622,6 +622,21 @@ export function PhoneApp() {
     setNoting(false);
     setOpenId(id);
   };
+  // What a note's [[ link and the keyboard bar's link button pick from, and where a tapped link goes (as on the Mac).
+  const targets: LinkTarget[] = useMemo(
+    () => [
+      ...skills.map((s) => ({ kind: "skill" as const, id: s.id, title: s.name })),
+      ...[...(items ?? [])].sort((a, b) => b.captured_at.localeCompare(a.captured_at)).map((i) => ({ kind: "item" as const, id: i.id, title: i.title })),
+    ],
+    [skills, items],
+  );
+  // The note it was tapped in closes (a skill's note sits over everything), so what it names is what shows.
+  const openLink = (t: { kind: "item" | "skill"; id: string }) => {
+    setSkillNote(false);
+    setNoting(false);
+    if (t.kind === "item") open(t.id);
+    else (setOpenId(null), setSkill(t.id));
+  };
   // What the share card's Open asked for, as soon as it is in the list; given up after half a minute (it
   // couldn't be read here, or another device took it), so it never pulls him out of something later.
   useEffect(() => {
@@ -823,8 +838,8 @@ export function PhoneApp() {
             onMove={() => void refresh()}
             jumpTo={jumpTo}
             blocked={false}
-            targets={[]}
-            onOpenLink={() => {}}
+            targets={targets}
+            onOpenLink={openLink}
             onBack={() => setOpenId(null)}
             onChanged={() => void refresh()}
             onSkillsChanged={() => void refresh()}
@@ -968,7 +983,7 @@ export function PhoneApp() {
               skill={skillOf}
               view={<HeadTabs label="Sources shown" tabs={SKILL_TABS} value={skillTab} onChange={(v) => (setSkillTab(v), setSkillAll(false))} />}
               search={{ value: skillQuery, set: setSkillQuery, keys: () => {} }}
-              targets={[]}
+              targets={targets}
               blocked={false}
               onOpen={() => {}}
               onQuestion={(q) => open(q.item, q.id)}
@@ -1016,7 +1031,7 @@ export function PhoneApp() {
       {skillOf && skillNote && (
         <Screen className="phone-full phone-reader" onBack={() => setSkillNote(false)}>
           <Back label={skillName ?? "Back"} onClick={() => setSkillNote(false)} />
-          <SkillNote skill={skillOf.id} notify={notify} />
+          <SkillNote skill={skillOf.id} notify={notify} targets={targets} onOpen={openLink} />
         </Screen>
       )}
       {/* A course's lessons in order, pushed over the list its row was in; a lesson opens over it. */}
