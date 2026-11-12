@@ -66,10 +66,29 @@ describe("labels", () => {
     expect(els.find((e) => e.containerId === a.id)!.y).toBe(10);
     els = syncAll(els.map((e) => (e.id === a.id ? { ...e, y: 50, height: 500 } : e)));
     expect(els.find((e) => e.containerId === a.id)!.y).toBe(60);
+    els = syncAll(els.map((e) => (e.containerId === a.id ? { ...e, textAlign: "left" as const } : e)));
+    expect(els.find((e) => e.containerId === a.id)!.x).toBe(10);
+    els = syncAll(els.map((e) => (e.containerId === a.id ? { ...e, textAlign: "right" as const } : e)));
+    const r = els.find((e) => e.containerId === a.id)!;
+    expect(r.x + r.width).toBeCloseTo(390, 0);
   });
 });
 
 describe("arrows", () => {
+  test("an elbow arrow keeps its middle segment where it was dragged, as its ends move (Codex sweep 2)", () => {
+    const els = [box(0, 0), box(400, 200)];
+    const [s, t] = els as [El, El];
+    const arrow = { ...shape("rectangle", { x: 0, y: 0, w: 1, h: 1 }, DEFAULT_STYLE), type: "arrow", elbowed: true, points: [[0, 0], [1, 1]], startBinding: { elementId: s.id, focus: 0, gap: 6 }, endBinding: { elementId: t.id, focus: 0, gap: 6 } } as El;
+    const map = byId([...els, arrow]);
+    const mid = (e: El) => absPointsOf(e)[1]![0];
+    expect(mid(route(arrow, map))).toBeCloseTo(250, 0);
+    const dragged = route({ ...arrow, customData: { oreElbow: { mid: 320 } } }, map);
+    expect(mid(dragged)).toBe(320);
+    expect(absPointsOf(dragged)[2]![0]).toBe(320);
+    const moved = route(dragged, byId([s, { ...t, y: 260 }, dragged]));
+    expect(mid(moved)).toBe(320);
+  });
+
   test("a bound arrow's ends sit on each shape's edge, a gap away, and follow a move", () => {
     const a = box(0, 0);
     const b = box(300, 0);

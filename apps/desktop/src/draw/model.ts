@@ -405,7 +405,10 @@ export function syncAll(els: Els): El[] {
     const [cx, cy] = isLinear(container) ? midpoint(absPoints(container)) : centre(container);
     // A box's label set to the top (a section's title, Excalidraw's vertical align) sits under its top edge.
     const top = container.type === "rectangle" && t.verticalAlign === "top" ? container.y + PAD * 2 : null;
-    out[i] = { ...t, text, x: cx - m.width / 2, y: top ?? cy - m.height / 2, width: m.width, height: m.height, angle: isLinear(container) ? 0 : container.angle };
+    // Left or right in a box (Excalidraw's text align); arrows and the round shapes keep it centred.
+    const side = container.type === "rectangle" ? t.textAlign : "center";
+    const x = side === "left" ? container.x + PAD * 2 : side === "right" ? container.x + container.width - PAD * 2 - m.width : cx - m.width / 2;
+    out[i] = { ...t, text, x, y: top ?? cy - m.height / 2, width: m.width, height: m.height, angle: isLinear(container) ? 0 : container.angle };
   }
   return out;
 }
@@ -434,7 +437,7 @@ export function route(a: El, map: Map<string, El>): El {
   if (a.elbowed) {
     const from = s ? centre(s) : pts[0]!;
     const to = t ? centre(t) : pts[pts.length - 1]!;
-    next = elbow(from, to, s ? bounds(s) : null, t ? bounds(t) : null);
+    next = elbow(from, to, s ? bounds(s) : null, t ? bounds(t) : null, elbowMid(a));
   } else {
     next = pts.map((p) => [...p] as Pt);
     const n = next.length;
@@ -462,18 +465,24 @@ export function route(a: El, map: Map<string, El>): El {
   return withPoints(a, next);
 }
 
-function elbow(from: Pt, to: Pt, sb: Box | null, tb: Box | null): Pt[] {
+/** Where he dragged an elbow arrow's middle segment to (its x when the arrow runs across, y when down). */
+export const elbowMid = (a: El): number | undefined => {
+  const m = (a.customData?.oreElbow as { mid?: unknown } | undefined)?.mid;
+  return typeof m === "number" ? m : undefined;
+};
+
+function elbow(from: Pt, to: Pt, sb: Box | null, tb: Box | null, mid?: number): Pt[] {
   const dx = to[0] - from[0];
   const dy = to[1] - from[1];
   if (Math.abs(dx) >= Math.abs(dy)) {
     const sx = sb ? (dx > 0 ? sb.x + sb.w : sb.x) + Math.sign(dx) * GAP : from[0];
     const tx = tb ? (dx > 0 ? tb.x : tb.x + tb.w) - Math.sign(dx) * GAP : to[0];
-    const mx = (sx + tx) / 2;
+    const mx = mid ?? (sx + tx) / 2;
     return [[sx, from[1]], [mx, from[1]], [mx, to[1]], [tx, to[1]]];
   }
   const sy = sb ? (dy > 0 ? sb.y + sb.h : sb.y) + Math.sign(dy) * GAP : from[1];
   const ty = tb ? (dy > 0 ? tb.y : tb.y + tb.h) - Math.sign(dy) * GAP : to[1];
-  const my = (sy + ty) / 2;
+  const my = mid ?? (sy + ty) / 2;
   return [[from[0], sy], [from[0], my], [to[0], my], [to[0], ty]];
 }
 

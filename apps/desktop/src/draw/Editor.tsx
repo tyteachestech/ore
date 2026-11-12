@@ -39,6 +39,7 @@ type Gesture =
   | { kind: "create"; before: El[]; id: string; start: Pt; type: Shape }
   | { kind: "line"; before: El[]; id: string; start: Pt; startOn: string | null }
   | { kind: "point"; before: El[]; id: string; index: number; mid?: Pt }
+  | { kind: "elbow"; before: El[]; id: string; axis: 0 | 1 }
   | { kind: "draw"; before: El[]; id: string; pts: Pt[] }
   | { kind: "erase"; ids: Set<string> }
   | { kind: "pan"; start: [number, number]; view: View };
@@ -876,9 +877,20 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     if (!e || !isLinear(e) || e.locked) return null;
     const pts = absPoints(e);
     const r = 7 / live.current.view.zoom;
-    for (let i = 0; i < pts.length; i++) if (dist(pts[i]!, p) <= r) return { index: i, mid: false };
+    // An elbow arrow's corners follow its ends; only its ends and its middle segment (elbowAt) are handles.
+    for (let i = 0; i < pts.length; i++) if ((!e.elbowed || i === 0 || i === pts.length - 1) && dist(pts[i]!, p) <= r) return { index: i, mid: false };
     if (!e.elbowed) for (let i = 1; i < pts.length; i++) if (dist(midOf(pts[i - 1]!, pts[i]!), p) <= r) return { index: i, mid: true };
     return null;
+  };
+
+  /** The handle on a selected elbow arrow's middle segment: dragged, it moves that segment (FigJam, tldraw). */
+  const elbowAt = (p: Pt): 0 | 1 | null => {
+    const e = selected.length === 1 ? selected[0]! : null;
+    if (!e || e.type !== "arrow" || !e.elbowed || e.locked) return null;
+    const pts = absPoints(e);
+    if (pts.length !== 4) return null;
+    if (dist(midOf(pts[1]!, pts[2]!), p) > 7 / live.current.view.zoom) return null;
+    return pts[1]![0] === pts[2]![0] ? 0 : 1;
   };
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
@@ -953,6 +965,11 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       return toolDone();
     }
     // select
+    const axis = elbowAt(p);
+    if (axis !== null) {
+      g.current = { kind: "elbow", before: els, id: selected[0]!.id, axis };
+      return;
+    }
     const pt = pointAt(p);
     if (pt) {
       const line = selected[0]!;
@@ -1125,6 +1142,12 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
         const line = withPoints(x, [cur.start, end]);
         return route({ ...line, endBinding: target ? { elementId: target.id, focus: 0, gap: GAP } : null }, byId(els));
       })));
+    }
+    if (cur.kind === "elbow") {
+      const a = els.find((x) => x.id === cur.id);
+      if (!a) return;
+      const next = route({ ...a, customData: { ...a.customData, oreElbow: { mid: Math.round(p[cur.axis]) } } }, byId(els));
+      return setEls(syncAll(els.map((x) => (x.id === a.id ? next : x))));
     }
     if (cur.kind === "point") {
       const line = els.find((x) => x.id === cur.id);
@@ -1302,6 +1325,18 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
     const boxes = new Set(selected.filter((e) => e.type === "rectangle").map((e) => e.id));
     apply(syncAll(live.current.els.map((e) => (e.type === "text" && e.containerId && boxes.has(e.containerId) ? { ...e, verticalAlign: v } : e))));
   };
+  /** Left, centre or right: free text, and a box's label (Excalidraw's text align). */
+  const alignOf = () => {
+    const e = selected[0];
+    if (!e) return value("textAlign");
+    return (e.type === "text" ? e : labelOf(els, e.id))?.textAlign;
+  };
+  const setAlign = (a: "left" | "center" | "right") => {
+    setStyle((s) => ({ ...s, textAlign: a }));
+    if (!selected.length) return;
+    const ids = new Set(selected.map((e) => e.id));
+    apply(syncAll(live.current.els.map((e) => (e.type === "text" && (ids.has(e.id) || (e.containerId && ids.has(e.containerId) && live.current.els.find((c) => c.id === e.containerId)?.type === "rectangle")) ? { ...e, textAlign: a } : e))));
+  };
   const showStyle = selected.length > 0 || (tool !== "select" && tool !== "hand" && tool !== "eraser");
   const current = selected[0];
   const value = <K extends keyof Style>(k: K): Style[K] => (current && k in current ? (current[k as keyof El] as Style[K]) : style[k]);
@@ -1324,6 +1359,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       return { ...e, ...p };
     });
     next = next.map((e) => (e.type === "text" && !e.containerId && ids.has(e.id) ? { ...e, ...measureText(e.text ?? "", e.fontSize ?? 20, e.fontFamily ?? SANS, lineHeightOf(e)) } : e));
+    // Straight or elbow re-routes the arrows picked, not only those joined to a shape that moved.
+    if ("elbowed" in patch) { const m = byId(next); next = next.map((e) => (e.type === "arrow" && ids.has(e.id) ? route(e, m) : e)); }
     const out = syncAll(reroute(next, ids));
     if (step) apply(out);
     else setEls(out);
@@ -1485,10 +1522,19 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
                 </Seg>
               ))}
             </Row>
+            {(kinds.has("text") || tool === "text" || selected.some((e) => e.type === "rectangle" && labelOf(els, e.id))) && (
+              <Row label="Align">
+                {(["left", "center", "right"] as const).map((a) => (
+                  <Seg key={a} on={(alignOf() ?? "left") === a} onPick={() => setAlign(a)} label={{ left: "Left", center: "Centre", right: "Right" }[a]}>
+                    <span className="mono">{{ left: "L", center: "C", right: "R" }[a]}</span>
+                  </Seg>
+                ))}
+              </Row>
+            )}
             {selected.some((e) => e.type === "rectangle" && labelOf(els, e.id)) && (
-              <Row label="Label">
-                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle")?.id ?? "")?.verticalAlign !== "top"} onPick={() => alignLabels("middle")} label="Middle">Mid</Seg>
-                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle")?.id ?? "")?.verticalAlign === "top"} onPick={() => alignLabels("top")} label="Top">Top</Seg>
+              <Row label="Place">
+                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle")?.id ?? "")?.verticalAlign !== "top"} onPick={() => alignLabels("middle")} label="Middle"><span className="mono">M</span></Seg>
+                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle")?.id ?? "")?.verticalAlign === "top"} onPick={() => alignLabels("top")} label="Top"><span className="mono">T</span></Seg>
               </Row>
             )}
             <Row label="Font">
@@ -1548,7 +1594,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       const c = isLinear(e) ? midOfPts(absPoints(e)) : centre(e);
       if (e.type === "rectangle" && lbl?.verticalAlign === "top") c[1] = lbl.y + (lines * lh) / 2;
       const width = isLinear(e) ? Math.max(60, measureText(wrapped, fs, fam).width + 12) : w;
-      return { left: (c[0] - width / 2 - view.x) * z, top: (c[1] - (lines * lh) / 2 - view.y) * z, width: width * z, height: lines * lh * z, font: fs * z, fam, align: "center" as const, angle: isLinear(e) ? 0 : e.angle, colour: dark(e.strokeColor), wrap: true };
+      return { left: (c[0] - width / 2 - view.x) * z, top: (c[1] - (lines * lh) / 2 - view.y) * z, width: width * z, height: lines * lh * z, font: fs * z, fam, align: (e.type === "rectangle" ? lbl?.textAlign ?? "center" : "center") as "left" | "center" | "right", angle: isLinear(e) ? 0 : e.angle, colour: dark(e.strokeColor), wrap: true };
     }
     const m = measureText(draft || " ", fs, fam);
     return { left: (e.x - view.x) * z, top: (e.y - view.y) * z, width: (m.width + fs) * z, height: m.height * z, font: fs * z, fam, align: (e.textAlign ?? "left") as "left" | "center" | "right", angle: e.angle, colour: dark(e.strokeColor), wrap: false };
@@ -1916,7 +1962,11 @@ function Overlay({ selected, handles, z, hot, guides, angleGuide, marquee, moveB
               const m = midOf(pts[i]!, p);
               return <rect key={`m${i}`} x={m[0] - hs / 3} y={m[1] - hs / 3} width={(hs * 2) / 3} height={(hs * 2) / 3} fill="var(--paper)" opacity={0.45} />;
             })}
-            {pts.map((p, i) => <rect key={i} x={p[0] - hs / 2} y={p[1] - hs / 2} width={hs} height={hs} fill="var(--bg)" stroke="var(--paper)" strokeWidth={sw * 1.5} />)}
+            {selected[0].elbowed && pts.length === 4 && (() => {
+              const m = midOf(pts[1]!, pts[2]!);
+              return <rect className="draw-elbow-handle" x={m[0] - hs / 2} y={m[1] - hs / 2} width={hs} height={hs} fill="var(--paper)" />;
+            })()}
+            {pts.map((p, i) => (selected[0]!.elbowed && i > 0 && i < pts.length - 1 ? null : <rect key={i} x={p[0] - hs / 2} y={p[1] - hs / 2} width={hs} height={hs} fill="var(--bg)" stroke="var(--paper)" strokeWidth={sw * 1.5} />))}
           </>
         );
       })()}
