@@ -4413,13 +4413,13 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   await tabs.getByRole("tab", { name: "To read" }).click();
   await page.keyboard.press("ArrowRight");
   await until("→ opens Done", async () => (await on("Done")) === "true");
-  await page.waitForTimeout(100);
+  // A frame later is when the list used to take focus from the tab.
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.keyboard.press("ArrowLeft");
   await until("a second arrow goes back to To read", async () => (await on("To read")) === "true");
-  // ⌘1, with no tab focused, still hands the keys to the list (Linear).
-  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  // ⌘2, even from a focused tab, hands the keys to the list (Linear).
   await page.keyboard.press("Meta+2");
-  await until("⌘2 focuses the list", () => page.evaluate(() => !document.activeElement?.closest("[role=tablist]") && document.activeElement !== document.body));
+  await until("⌘2 focuses the list", () => page.evaluate(() => document.activeElement?.matches(".list") ?? false));
 });
 
 journey("reader questions: ask one, ⌘Z takes it back; its ⋯ menu marks it answered and deletes it, ⌘Z each", async (page) => {
@@ -9627,26 +9627,8 @@ journey("phone: a long press on a Today source opens its menu", async (page) => 
   await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
 }, "phone");
 
-journey("phone: a held row in a skill's list opens its own menu only; Rename… is on Today's rows too, and its Return opens nothing (F35–F37)", async (page) => {
-  // Today's rows rename in place, as the Sources list's do (D225).
-  await press(page, page.locator(".home-read").first());
-  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
-  const today = page.locator(".home-read input");
-  await today.fill("Renamed on Today");
-  await today.press("Enter");
-  await page.locator(".home-read", { hasText: "Renamed on Today" }).waitFor();
-  // The Sources list's Return saves and stays on the list.
-  await page.evaluate(() => localStorage.setItem("ore-phone-place", JSON.stringify({ tab: "sources", skill: null, openId: null, review: null })));
-  await page.reload();
-  await press(page, page.locator(".phone-sources li button").first());
-  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
-  const field = page.locator(".phone-row-rename input");
-  await field.fill("Renamed in Sources");
-  await field.press("Enter");
-  await page.locator(".phone-sources li button", { hasText: "Renamed in Sources" }).waitFor();
-  await Bun.sleep(400);
-  if (await page.locator(".phone-reader").count()) throw new Error("Return in the rename field opened the source");
-  // On a skill's page a held row is under the section's own menu: a finger's pointer still opens only the row's.
+journey("phone: a held row in a skill's list opens its own menu only; Return in Rename opens nothing; Rename… is on Today's rows too (F35–F37)", async (page) => {
+  // On a skill's page a held row is under the section's own menu: a finger's pointer opens only the row's (F35).
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
   const row = page.locator(".phone-skill .phone-sources li button").first();
@@ -9657,6 +9639,29 @@ journey("phone: a held row in a skill's list opens its own menu only; Rename… 
   await page.getByRole("menuitem", { name: "Review this source" }).waitFor();
   await Bun.sleep(200);
   if (await page.getByRole("menuitem", { name: "Search sources" }).count()) throw new Error("the section's menu opened over the row's");
+  // The Sources list's Return saves and stays on the list (F36).
+  const place = (tab: string) => page.evaluate((tab) => localStorage.setItem("ore-phone-place", JSON.stringify({ tab, skill: null, openId: null, review: null })), tab);
+  await place("sources");
+  await page.reload();
+  await press(page, page.locator(".phone-sources li button").first());
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const field = page.locator(".phone-row-rename input");
+  await field.fill("Renamed in Sources");
+  await field.press("Enter");
+  await page.locator(".phone-sources li button", { hasText: "Renamed in Sources" }).waitFor();
+  await Bun.sleep(400);
+  if (await page.locator(".phone-reader").count()) throw new Error("Return in the rename field opened the source");
+  // Today's rows rename in place, as the Sources list's do (F37, D225).
+  await place("today");
+  await page.reload();
+  await press(page, page.locator(".home-read").first());
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const today = page.locator(".home-read input");
+  await today.fill("Renamed on Today");
+  await today.press("Enter");
+  await page.locator(".home-read", { hasText: "Renamed on Today" }).waitFor();
+  await Bun.sleep(400);
+  if (await page.locator(".phone-reader").count()) throw new Error("Return in Today's rename field opened the source");
 }, "phone");
 
 journey("phone: a long press on a skill, on Today or in the drawer, opens the skill's menu, and Review this skill reviews it", async (page) => {

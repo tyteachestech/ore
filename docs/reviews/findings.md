@@ -58,7 +58,7 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F32 | 2026-11-12 | iPhone | A link the phone couldn't read told him to use the Mac's Browser tab, `ore add --tab` or paste its text, none of which the phone has | fixed #324 | `a refused link's reason leaves out the Mac's next steps` |
 | F33 | 2026-11-12 | Skill page, All sources | The source folder tabs took one arrow and stopped: changing the tab handed focus to the list, so the next → did nothing (D226) | fixed #326 | `a second arrow goes back to To read` |
 | F34 | 2026-11-12 | Home | After a ⌘-click picked a Continue reading row, the first ⇧↓ didn't grow the pick: WebKit leaves a clicked button unfocused (F27 again) | fixed #326 | `after a ⌘-click picks a row, the first ⇧↓ grows the pick` |
-| F35 | 2026-11-12 | iPhone, Skill page | Holding a source in a skill's list opened two menus, the row's and the section's (Search sources, Add source) over it | fixed #326 | `a held row in a skill's list opens its own menu only` |
+| F35 | 2026-11-12 | iPhone, Skill page | Holding a source in a skill's list opened two menus, the row's and the section's (Search sources, Add source) over it | fixed #326 | `the section's menu opened over the row's` |
 | F36 | 2026-11-12 | iPhone | Return in a Sources row's Rename field saved it and then opened the source | fixed #326 | `Return in the rename field opened the source` |
-| F37 | 2026-11-12 | iPhone, Today | Today's hold menu for a source had no Rename…, though Sources and a skill's list do (D225) | fixed #326 | `Rename… is on Today's rows too` |
+| F37 | 2026-11-12 | iPhone, Today | Today's hold menu for a source had no Rename…, though Sources and a skill's list do (D225) | fixed #326 | `Return in Today's rename field opened the source` |
 | F38 | 2026-11-12 | iPhone | Once, the search field sat under the keyboard's accessory bar; not seen again on the repeat | open | — |

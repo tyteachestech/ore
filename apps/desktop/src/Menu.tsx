@@ -98,7 +98,11 @@ function useHold(on: boolean | undefined) {
     if (!on || !el) return;
     const stop = trackDrag(el, () => ({
       // Text in a field or the reader keeps iOS's own press (select, Look Up).
-      accept: (t) => !nativeMenu(document.elementFromPoint(t.clientX, t.clientY), getSelection()),
+      // So does a row inside with a menu of its own, which opens alone (F35).
+      accept: (t) => {
+        const at = document.elementFromPoint(t.clientX, t.clientY);
+        return !nativeMenu(at, getSelection()) && (!at || at.closest("[data-menu-row]") === el);
+      },
       begin: () => false, // A slide is a scroll or a swipe, never this.
       move: () => {},
       end: () => {},
@@ -129,7 +133,7 @@ export function WithMenu({ actions, children, keepFocus, hold, plain }: { action
       <ContextMenu.Trigger asChild ref={held} disabled={native} data-menu-row="" onPointerDownCapture={(e) => ((row.current = e.currentTarget as HTMLElement), setNative(nativeMenu(e.target, getSelection())))} onPointerDown={(e) => {
         // A finger held on a row with its own menu opens that one: Radix's touch timer on a menu around it
         // (a skill page's section) would open a second over it (F35). Handled defaults skip Radix's own handler.
-        if (e.pointerType !== "mouse" && (e.target as Element).closest?.("[data-menu-row]") !== e.currentTarget && !nativeMenu(e.target, getSelection())) e.preventDefault();
+        if (PHONE && e.pointerType !== "mouse" && (e.target as Element).closest?.("[data-menu-row]") !== e.currentTarget && !nativeMenu(e.target, getSelection())) e.preventDefault();
       }}>
         {children}
       </ContextMenu.Trigger>

@@ -225,13 +225,7 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
         {renaming && (
           <div className="phone-row-rename">
             <Thumb item={item} className="thumb phone-thumb" />
-            <TitleField value={item.title} onSave={(t) => row.retitle(item, t)} onClose={() => {
-              // The Return that saved it can still click the row it hands focus back to (F36): that is not a tap.
-              swiped.current = true;
-              setTimeout(() => (swiped.current = false), 350);
-              flushSync(() => setRenaming(false));
-              ref.current?.focus({ preventScroll: true });
-            }} />
+            <TitleField value={item.title} onSave={(t) => row.retitle(item, t)} onClose={() => (flushSync(() => setRenaming(false)), ref.current?.focus({ preventScroll: true }))} />
           </div>
         )}
         {/* Hidden, not gone, while renaming: its swipes and hold are on this element. */}
