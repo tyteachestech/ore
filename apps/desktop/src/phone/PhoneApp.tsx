@@ -945,7 +945,7 @@ export function PhoneApp() {
         </Screen>
       )}
       {/* A course's lessons in order, pushed over the list its row was in; a lesson opens over it. */}
-      {course && courseOf && (
+      {courseOf.length > 0 && (
         <Screen className="phone-full" onBack={() => setCourse(null)}>
           <Back label={skillOf?.name ?? (tab === "today" ? "Today" : "Sources")} onClick={() => setCourse(null)} />
           <div className="phone-page">

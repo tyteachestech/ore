@@ -9222,6 +9222,9 @@ journey("phone: a skill's page is the Mac's in one column, and a course is one r
       await lessons.waitFor();
       const titles = await lessons.locator("li .phone-title").allInnerTexts();
       if (!titles[0]?.startsWith("Lecture 4") || !titles[1]?.startsWith("The Testing Effect")) throw new Error(`the lessons aren't in course order: ${titles.join(" | ")}`);
+      // A relaunch comes back to the course's lessons, as to any screen he was on.
+      await page.reload();
+      await lessons.waitFor();
       await tap(page, lessons.locator("li button").first());
       await page.locator(".phone-reader .doc").first().waitFor();
     }),
