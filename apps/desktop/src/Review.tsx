@@ -1407,14 +1407,15 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   // cart: rolling and pouring · poured: the ring is full · leaving: the mole comes up · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
-  const [mood, setMood] = useState<"peek" | "cheer">(pour ? "peek" : "cheer");
+  // It always comes up out of the ground first, with or without a cart before it (under Reduce Motion it is just there, pleased).
+  const [mood, setMood] = useState<"peek" | "cheer">(() => (still() ? "cheer" : "peek"));
   // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that.
   const up = stage === "leaving" || stage === "done";
   useEffect(() => {
-    if (!pour || !up) return;
+    if (!up) return;
     const id = setTimeout(() => setMood("cheer"), 560);
     return () => clearTimeout(id);
-  }, [pour, up]);
+  }, [up]);
   const full = stage !== "cart";
   // D197: a cut gem that was won back carries its gold seam; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;

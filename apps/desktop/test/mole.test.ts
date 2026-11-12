@@ -91,3 +91,27 @@ test("each mood's still pose (reduced motion, hidden window) shows the whole mol
     expect(cells(d, "eye").length).toBeGreaterThan(0);
   }
 });
+
+test("a move is big enough to see at button size: a squat, then a hop of a row and a half; a tap as high", () => {
+  // A dot is 1.6 to 1.8px in the chat and the button, so less than a row and a half of travel is lost.
+  for (const name of ["happy", "cheer"] as const) {
+    const frames = play(name, MOVES[name].end!), pose = { ...REST, ...MOVES[name].still }.top;
+    const low = frames.findIndex((f) => f.top > REST.top + 1), high = frames.findIndex((f) => f.top < pose - 1.5);
+    expect(low).toBeGreaterThanOrEqual(0);
+    expect(high).toBeGreaterThan(low);
+    // Both paws go up with it, and never past the room above the grid.
+    expect(Math.max(...frames.map((f) => Math.min(f.pawL, f.pawR)))).toBeGreaterThan(1.5);
+    expect(Math.min(...frames.map((f) => f.top))).toBeGreaterThan(-HEAD);
+  }
+  expect(Math.min(...play("surprised", 400).map((f) => f.top))).toBeLessThan(REST.top - 1);
+  const think = play("thinking", 4000);
+  expect(Math.max(...think.map((f) => f.pawR))).toBeGreaterThan(1.4);
+  expect(Math.max(...think.map((f) => f.pawL))).toBeGreaterThan(1.4);
+});
+
+test("stretched tall the head is narrower than at rest, squashed it is wider", () => {
+  // How much of row 9 the head covers: the sum of its dots' sizes.
+  const width = (s: Partial<State>) => at(s).reduce((n, [, r, rad, t]) => (r === 9 && t !== "paw" ? n + rad : n), 0);
+  expect(width({ top: -2 })).toBeLessThan(width({}));
+  expect(width({ top: 1.7, rx: 9 })).toBeGreaterThan(width({ rx: 9 }));
+});
