@@ -182,7 +182,7 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
         <div className="skill-col" ref={noteCol} onMouseDown={clickBelow(editor)} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
           <section className="skill-card skill-note" data-tone="note" onMouseDown={clickBelow(editor)}>
             <div className="card-head">
-              <span className="card-title"><PixelNote className="card-icon" size={12} aria-hidden="true" /><h2>Your note</h2></span>
+              <span className="card-title"><PixelNote className="card-icon" size={16} aria-hidden="true" /><h2>Your note</h2></span>
               <Hint text={wide ? "Back beside sources and questions" : "Widen the note, for wide tables"}>
                 <button className="icon-btn note-widen" aria-label={wide ? "Narrow your note" : "Widen your note"} aria-pressed={wide} onClick={() => setWide((w) => !w)}>
                   {wide ? <Collapse size={14} aria-hidden="true" /> : <Expand size={14} aria-hidden="true" />}
@@ -318,10 +318,10 @@ function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, 
       <div className="card-head">
         <button className={`fold-head${menu ? " caret-only" : ""}`} aria-expanded={open} aria-label={menu ? `${open ? "Fold" : "Unfold"} ${title}` : undefined} onClick={toggle}>
           <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
-          {!menu && <span className="card-title"><I className="card-icon" size={12} aria-hidden="true" /><h2>{title}</h2></span>}
+          {!menu && <span className="card-title"><I className="card-icon" size={16} aria-hidden="true" /><h2>{title}</h2></span>}
           {summary && !(summaryFolded && open) && <span className="fold-sum">{summary}</span>}
         </button>
-        {menu && <span className="card-title"><I className="card-icon" size={12} aria-hidden="true" />{menu}</span>}
+        {menu && <span className="card-title"><I className="card-icon" size={16} aria-hidden="true" />{menu}</span>}
         {menu && <span className="fold-fill" />}
         {/* Its + adds into the body, so a folded card opens first, or the new row would be hidden. */}
         {action && <span className="fold-action" onClickCapture={() => !open && toggle()}>{action}</span>}

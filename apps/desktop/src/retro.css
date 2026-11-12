@@ -106,6 +106,8 @@
 
 /* Labels: section and card titles, sidebar groups, metadata. */
 .card-title h2, .home-h, .home-cont .home-h, .side-label { font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+/* A page's section names are bigger and brighter than the sidebar's group labels (Tyler, 2026-11-12). */
+.skill-card .card-title h2, .home-h, .home-cont .home-h { font-size: 20px; letter-spacing: 0.02em; line-height: 30px; color: var(--text); }
 .card-title .card-icon { margin-right: 2px; }
 .skill-page .row .kind, .row .kind-line, .row .count, .side-item .count, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
 
