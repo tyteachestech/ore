@@ -16,7 +16,7 @@ const highlight = sprites("PixelIcon.tsx");
 const edge = (rows: string[]) => rows.map((r) => (r.includes("#") ? [r.indexOf("#"), r.lastIndexOf("#")] : null));
 
 test.each([
-  ["icons.tsx", ["Question", "Minus", "PlayCircle", "CircleHalf", "Compass", "Target"]],
+  ["icons.tsx", ["Question", "Minus", "PlayCircle", "CircleHalf", "Compass", "Target", "Globe"]],
   ["PixelIcon.tsx", ["PixelQuestion"]],
 ] as const)("round icons in %s share Circle's outline", (file, names) => {
   const circle = edge(ui.get("Circle")!);
