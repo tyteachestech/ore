@@ -326,6 +326,18 @@ export function PhoneApp() {
     }
   }, []);
   useEffect(() => void (tab === "archive" && refresh()), [tab, refresh]);
+  // A place saved for a source that has since left the library (deleted on the Mac, or a new build) opens on
+  // where he was before it, not on an error with the source's id.
+  const loaded = items !== null;
+  useEffect(() => {
+    const id = start.openId;
+    if (!loaded || !id || items!.some((i) => i.id === id)) return;
+    void ore<Item[]>("ls", "--archived")
+      .then((archived) => archived.some((i) => i.id === id) || (setOpenId((now) => (now === id ? null : now)), setNoting(false)))
+      .catch(() => {});
+    // Once, on the first list: later a missing source is one he just archived from inside it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
   useEffect(() => void refresh(), [refresh]);
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
@@ -347,21 +359,30 @@ export function PhoneApp() {
       if (!(field instanceof HTMLElement) || !field.closest(".phone-reader")) return;
       if (!field.isContentEditable) return field.scrollIntoView({ block: "nearest" });
       // The source note is one tall editor: bring the caret, not the editor, into view, once the screen has shrunk.
-      requestAnimationFrame(() => {
-        const sel = getSelection();
-        const caret = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
-        let box: HTMLElement | null = field;
-        while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
-        if (!caret || !box) return;
-        const below = caret.bottom + 24 - box.getBoundingClientRect().bottom;
-        if (below > 0) box.scrollTop += below;
-      });
+      requestAnimationFrame(keepCaret);
     };
+    // iOS reveals the caret just above its own keyboard, which leaves it under the note's keyboard bar: as he
+    // types past it, scroll the note so the line he is writing stays above the bar (Notes keeps it in sight).
+    const keepCaret = () => {
+      const field = document.activeElement;
+      if (!(field instanceof HTMLElement) || !field.isContentEditable || !field.closest(".phone-reader")) return;
+      const sel = getSelection();
+      const caret = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+      let box: HTMLElement | null = field;
+      while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
+      if (!caret || !caret.height || !box) return;
+      const bar = document.querySelector(".kb-bar")?.getBoundingClientRect().top ?? Infinity;
+      const below = caret.bottom + 24 - Math.min(box.getBoundingClientRect().bottom, bar, vv.offsetTop + vv.height);
+      if (below > 0) box.scrollTop += below;
+    };
+    const typed = () => requestAnimationFrame(keepCaret);
     vv.addEventListener("resize", fit);
     vv.addEventListener("scroll", fit);
+    document.addEventListener("selectionchange", typed);
     return () => {
       vv.removeEventListener("resize", fit);
       vv.removeEventListener("scroll", fit);
+      document.removeEventListener("selectionchange", typed);
     };
   }, []);
 

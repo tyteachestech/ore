@@ -2998,7 +2998,11 @@ function ReaderView(p: Props & { reload: () => void }) {
               <WithMenu actions={PHONE ? [] : shownActions}>
                 {/* One click renames it in place, as the skill page's name does (Notion's page title);
                     a drag across it still selects the words to copy. */}
-                <h1 className={PHONE ? undefined : "renamable"} onClick={() => !PHONE && getSelection()?.isCollapsed !== false && setRenaming(true)}>
+                <h1
+                  className={PHONE ? undefined : "renamable"}
+                  // On the phone a long title stops at four lines; a tap shows the rest, and another folds it.
+                  onClick={(e) => (PHONE ? e.currentTarget.classList.toggle("whole") : getSelection()?.isCollapsed !== false && setRenaming(true))}
+                >
                   {doc.title}
                 </h1>
               </WithMenu>

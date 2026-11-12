@@ -20,7 +20,10 @@ Copy what Apple's own apps do (Books, Notes, Mail) and check against Apple's Hum
 ## Run it
 
 1. **Where:** the iOS simulator (iPhone 18 Pro, a regular iPhone; never the foldable) for the real
-   web view, keyboard and gestures (`idb ui tap/swipe/text`, `xcrun simctl io booted screenshot`).
+   web view, keyboard and gestures. `bun apps/phone/scripts/sim.ts start --lib <scratch copy>` builds and
+   installs it, then `sim.ts tap/swipe/drag/longpress/type/tree/shot` plays real touches through XCUITest
+   and saves a screenshot after each (`apps/phone/sim-driver`; no idb needed). For an outside tester,
+   hand Codex `docs/reviews/2026-11-12-codex-phone/prompt.md` (`codex exec - < prompt.md`).
    For quick loops, Chromium at 390×844 with `hasTouch` and the mock (`apps/phone/README.md`).
    Build from a copy of the library, never `~/Ore`. Don't install on Tyler's phone mid-audit.
 2. **Data:** real-length and junk: an empty library, a 200-character title, a source with no
