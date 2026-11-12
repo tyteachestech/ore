@@ -148,14 +148,19 @@ interface Info {
   automatic_captions?: Record<string, Track[]>;
 }
 
-/** The captions to read: English first, then the video's own language (a Spanish lecture's Spanish),
- *  as written by people before YouTube's automatic ones. */
-function pickTrack(info: Info): Track | undefined {
+/** The captions to read: English written by people first, then the video's own language (a Spanish
+ *  lecture's Spanish), people's before YouTube's automatic ones, then English translated by YouTube. A human track may carry more than its language
+ *  ("en-GB", or "en-qlPKC2UN_YU" as MIT OpenCourseWare names its own). When yt-dlp names no language, the
+ *  video's own is the one its automatic captions were made in ("es-orig"), else its only human track's. */
+export function pickTrack(info: Pick<Info, "language" | "subtitles" | "automatic_captions">): Track | undefined {
   const manual = info.subtitles ?? {};
   const auto = info.automatic_captions ?? {};
-  const own = info.language?.split("-")[0];
-  const of = (lang: string) => Object.keys(manual).filter((k) => k === lang || new RegExp(`^${lang}-[A-Za-z]{2,4}$`).test(k)).map((k) => manual[k]);
-  const keys = [...of("en"), auto["en-orig"], auto["en"], ...(own && own !== "en" ? [...of(own), auto[`${own}-orig`], auto[own]] : [])];
+  const langs = Object.keys(manual).filter((k) => k !== "live_chat");
+  const own = (info.language ?? Object.keys(auto).find((k) => k.endsWith("-orig"))?.slice(0, -5) ?? (langs.length === 1 ? langs[0] : undefined))?.split("-")[0];
+  const of = (lang: string) => [...langs.filter((k) => k === lang), ...langs.filter((k) => k.startsWith(lang + "-"))].map((k) => manual[k]);
+  // For a video in another language, YouTube's automatic "en" is a machine translation: last, after its own captions.
+  const other = own && own !== "en" ? [...of(own), auto[`${own}-orig`], auto[own]] : [];
+  const keys = [...of("en"), auto["en-orig"], ...other, auto["en"]];
   for (const tracks of keys) {
     const vtt = tracks?.find((t) => t.ext === "vtt");
     if (vtt) return vtt;
