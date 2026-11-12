@@ -4,6 +4,10 @@ import { invoke } from "@tauri-apps/api/core";
 export const PHONE = import.meta.env.VITE_PHONE === "1";
 
 /** On iPhone, reads in what the Mac changed (through iCloud) since; true if anything did. Never on the Mac. */
+/** The share card's skill chips (phone/core.ts `shareSkills`); nothing on the Mac. */
+export const shareSkills = async (skills: { id: string; name: string }[]): Promise<void> => {
+  if (PHONE) (await import("./phone/core")).shareSkills(skills);
+};
 export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import("./phone/core")).pull() : false);
 
 // Every library read and write goes through the `ore` CLI (D30). Errors are the CLI's one-line message.

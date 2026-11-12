@@ -208,6 +208,13 @@ async fn share_inbox(root: String) -> usize {
     entries.flatten().filter(|e| e.file_name().to_string_lossy().ends_with(".link.json")).filter(|e| fs::rename(e.path(), to.join(e.file_name())).is_ok()).count()
 }
 
+/// His skills, as JSON, for the share card's chips: the extension can't read the library itself.
+#[tauri::command]
+async fn share_skills(json: String) -> bool {
+    let Some(dir) = group() else { return false };
+    fs::create_dir_all(&dir).is_ok() && fs::write(dir.join("skills.json"), json).is_ok()
+}
+
 #[cfg(target_os = "ios")]
 #[allow(unused_unsafe)]
 fn group() -> Option<PathBuf> {
@@ -284,7 +291,7 @@ pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch, share_inbox, player_port])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch, share_inbox, share_skills, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }

@@ -18,7 +18,7 @@ import { Palette } from "../Palette";
 import { SkillEditor, skillGroups } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { lessonsOf, opt, ore, pullFromMac, type Item, type Skill, touched } from "../ore";
+import { lessonsOf, opt, ore, pullFromMac, shareSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -336,6 +336,7 @@ export function PhoneApp() {
       const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
       setItems(all);
       setSkills(sk);
+      void shareSkills(sk.filter((k) => !k.archived));
       setWaiting(w);
       setError(null);
       // The Archive list, only while it shows: listed twice on every change otherwise.
