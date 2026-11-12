@@ -2760,6 +2760,9 @@ journey("highlight note: a note whose save fails is kept, and saves when the hig
   await away();
   await until("the failed save says so", async () => (await page.locator(".toast").allInnerTexts()).some((t) => t.includes("The library is busy.")));
   await fail(false);
+  // Leaving the source and coming back keeps them too.
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await openSource(page, AGENTS);
   await open();
   await until("the words he typed are still there", async () => (await note.inputValue()) === "first thought and two");
   await away();
@@ -3499,6 +3502,10 @@ journey("Feed: ⇧↓ grows the pick, ⇧⌘U marks the whole pick read, a click
     await page.keyboard.press("Shift+Meta+KeyU");
     await until("⇧⌘U marks both picked posts read", async () => (await isRead("Keys alpha")) && (await isRead("Keys beta")));
     if (await isRead("Keys gamma")) throw new Error("⇧⌘U marked a post outside the pick");
+    await post("Keys gamma").click({ modifiers: ["Meta"] });
+    await page.locator(".feed-list").focus();
+    await page.keyboard.press("Shift+ArrowDown");
+    await until("⇧↓ after a ⌘-click grows that pick", async () => (await sel()) === 2);
   } finally {
     await ore("feed", "unfollow", feed).catch(() => {});
     server.stop(true);
@@ -3533,6 +3540,11 @@ journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space
   await field.waitFor();
   if ((await field.inputValue()) !== first) throw new Error(`⌥⌘R opened “${await field.inputValue()}”`);
   await page.keyboard.press("Escape");
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.press("Shift+Meta+KeyA");
+  await until("⇧⌘A archives the row and focus goes to the next", async () => (await page.locator(".home-read .title", { hasText: first }).count()) === 0 && (await page.evaluate(() => !!document.activeElement?.closest(".home-read, .home-skill"))));
+  await page.keyboard.press("Meta+z");
+  await page.locator(".home-read .title", { hasText: first }).waitFor();
   await rows.nth(0).locator(".home-open").click({ button: "right" });
   const shown = (await page.getByRole("menuitem", { name: /Rename/ }).innerText()).replace(/\s+/g, "");
   await page.keyboard.press("Escape");

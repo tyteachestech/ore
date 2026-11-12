@@ -19,7 +19,8 @@ import { focusQuietly } from "./focus-near";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
 import { TitleField } from "./TitleField";
-import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
+import { pickRun, typeSelect } from "./typeahead";
+import { keepFocusNear } from "./focus-near";
 
 const day = () => new Date().toLocaleDateString("sv-SE");
 
@@ -50,6 +51,9 @@ let openedByKeys: string | null = null;
 let backHome = false;
 /** Back (⌘[, the back arrow) is landing on Home. */
 export const comingBackHome = () => void (backHome = true);
+
+/** What a press on Home is not on, for it to be a click on empty space. */
+const BLANK_NOT = ".home-read, .home-skill, button, a, input, [role=menu], [role=dialog]";
 
 export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource: openSource, onOpenSkill: openSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, onCopy, skillMenu, onRetry, notify, manyMenu, onDragSkill, onDropOnSkill}: {
   items: Item[];
@@ -140,7 +144,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
       const all = [...document.querySelectorAll<HTMLElement>(".home .home-skill, .home .home-read")];
       if (!all.length) return;
       const tile = t.closest<HTMLElement>(".home-skill, .home-read");
-      if (e.shiftKey && tile?.classList.contains("home-read")) return; // ⇧↑↓ grow the pick (below)
+      if (e.shiftKey && tile?.classList.contains("home-read") && (e.key === "ArrowDown" || e.key === "ArrowUp")) return; // ⇧↑↓ grow the pick (below)
+      if (!e.shiftKey) setPicked([]); // a plain arrow moves on alone, as in the lists
       const at = tile && t.classList.contains("home-open") ? all.indexOf(tile) : -1;
       if (at < 0 && t !== document.body) return;
       e.preventDefault();
@@ -176,6 +181,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   // Continue reading rows pick as a source list's do (F9, Finder): ⌘-click adds or drops one, ⇧-click
   // picks the run from the last one clicked, Esc clears; a plain click opens and clears.
   const [picked, setPicked] = useState<string[]>([]);
+  const pressedBlank = useRef(false);
   const anchor = useRef<string | null>(null);
   const pick = reading.filter((i) => picked.includes(i.id));
   const clickRow = (e: ReactMouseEvent, i: Item) => {
@@ -224,7 +230,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   // The source lists' keys on Continue reading (D232, D234): ⇧↑↓ grow the pick from where it started,
   // the first letters of a title select its tile or row (Finder), and Rename, Pin, Archive, Open original,
   // Reveal and Copy path act on the focused row, or on the pick it is in, as its menu does.
-  const typed = useRef({ text: "", at: 0 });
+  const typed = useRef(typeSelect());
   const live = useRef({ reading, picked, actionsFor });
   live.current = { reading, picked, actionsFor };
   useEffect(() => {
@@ -233,21 +239,20 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
       const t = e.target as HTMLElement;
       if (t.closest?.("[role='dialog'], [role='menu']")) return;
       const { reading, picked, actionsFor } = live.current;
-      const now = Date.now();
-      const begun = now - typed.current.at < TYPE_GAP && typed.current.text !== "";
-      if (!typesTitle(e, begun)) typed.current.text = "";
-      const onRow = t.classList?.contains("home-open") ? t.closest<HTMLElement>(".home .home-read")?.dataset.id : undefined;
-      const row = reading.find((i) => i.id === onRow);
-      const focusRow = (id: string) => root.current?.querySelector<HTMLElement>(`.home-read[data-id="${CSS.escape(id)}"] .home-open`)?.focus();
+      const rowEl = t.classList?.contains("home-open") ? t.closest<HTMLElement>(".home .home-read") : null;
+      const row = reading.find((i) => i.id === rowEl?.dataset.id);
+      const tiles = [...(root.current?.querySelectorAll<HTMLElement>(".home-skill, .home-read") ?? [])];
+      const onTile = (!!rowEl || !!t.closest?.(".home .home-skill") || t === document.body) && tiles.length > 0;
+      const from = tiles.findIndex((el) => el.contains(t) && t !== document.body);
+      const jump = onTile ? typed.current(e, tiles.map((el) => el.querySelector(".home-open")?.textContent ?? ""), from) : null;
       if (row && e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
         e.preventDefault();
         const ids = reading.map((i) => i.id);
         const at = ids.indexOf(row.id);
         const to = ids[Math.max(0, Math.min(ids.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)))]!;
         if (!picked.length || !anchor.current || !ids.includes(anchor.current)) anchor.current = row.id;
-        const a = ids.indexOf(anchor.current), b = ids.indexOf(to);
-        setPicked(ids.slice(Math.min(a, b), Math.max(a, b) + 1));
-        focusRow(to);
+        setPicked(pickRun(ids, anchor.current, to));
+        root.current?.querySelector<HTMLElement>(`.home-read[data-id="${CSS.escape(to)}"] .home-open`)?.focus();
         return;
       }
       const key = (["rename", "pin", "archive", "original", "reveal", "path"] as const).find((k) => is(e, k));
@@ -256,21 +261,17 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
         const act = on && actionsFor(on).find((a) => a.id === key);
         if (!act) return;
         e.preventDefault();
+        // Focus stays with the row, or goes to the next one when it leaves, as after the same pick from its menu.
+        if (rowEl) keepFocusNear(rowEl);
         act.run();
         return;
       }
-      if ((onRow || t.closest?.(".home .home-skill") || t === document.body) && typesTitle(e, begun)) {
-        const tiles = [...(root.current?.querySelectorAll<HTMLElement>(".home-skill, .home-read") ?? [])];
-        if (!tiles.length) return;
+      if (jump !== null) {
         e.preventDefault();
-        const text = (begun ? typed.current.text : "") + e.key;
-        typed.current = { text, at: now };
-        const from = tiles.findIndex((el) => el.contains(t) && t !== document.body);
-        const i = typeJump(tiles.map((el) => el.querySelector(".home-open")?.textContent ?? ""), text, from);
-        if (i < 0) return;
+        if (jump < 0) return;
         setPicked([]);
-        tiles[i]!.querySelector<HTMLElement>(".home-open")?.focus();
-        tiles[i]!.scrollIntoView({ block: "nearest" });
+        tiles[jump]!.querySelector<HTMLElement>(".home-open")?.focus();
+        tiles[jump]!.scrollIntoView({ block: "nearest" });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -320,8 +321,13 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   const split = useSplit("ore.home-split", 1 / 3);
   const two = reading.length > 0 && shown.length > 0 && !!today;
   return (
-    // A click on empty space drops the pick (Finder).
-    <div className="home" ref={root} onClick={(e) => picked.length && !(e.target as Element).closest(".home-read, button, a, input, [role=menu], [role=dialog]") && setPicked([])}>
+    // A click on empty space drops the pick (Finder); not the end of a drag that began on a row.
+    <div
+      className="home"
+      ref={root}
+      onPointerDown={(e) => (pressedBlank.current = !(e.target as Element).closest(BLANK_NOT))}
+      onClick={(e) => picked.length && pressedBlank.current && !(e.target as Element).closest(BLANK_NOT) && setPicked([])}
+    >
       <section className="home-today" aria-label="Today">
         {error && (
           <div role="alert">

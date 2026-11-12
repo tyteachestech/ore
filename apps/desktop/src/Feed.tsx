@@ -6,7 +6,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
+import { pickRun, typeSelect } from "./typeahead";
 import { Article, CaretDown, Plus, Tick, YoutubeLogo } from "./icons";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap } from "./keys";
@@ -222,6 +222,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const [picked, setPicked] = useState<string[]>([]);
   const anchor = useRef<string | null>(null);
   const pick = order.filter((p) => picked.includes(p.url));
+  const pressedBlank = useRef(false);
   useEffect(() => {
     if (!picked.length) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && !blocked && !inTextField(e) && setPicked([]);
@@ -234,10 +235,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       anchor.current = p.url;
     } else if (e.shiftKey) {
       // From the last post clicked, or this one when that has left the list.
-      const b = order.indexOf(p);
-      const from = order.findIndex((x) => x.url === (anchor.current ?? current?.url));
-      const a = from < 0 ? b : from;
-      setPicked(order.slice(Math.min(a, b), Math.max(a, b) + 1).map((x) => x.url));
+      setPicked(pickRun(order.map((x) => x.url), anchor.current ?? current?.url ?? null, p.url));
     } else {
       setPicked([]);
       anchor.current = p.url;
@@ -248,7 +246,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const manyActions = (ps: FeedPost[]): MenuAction[] => {
     const unread = ps.some((p) => !p.read);
     return [
-      { id: "read", label: unread ? `Mark ${ps.length} read` : `Mark ${ps.length} unread`, run: () => (setPicked([]), unread && show === "unread" && moveOn(ps[0]!, (x) => ps.includes(x)), setRead(ps, unread)) },
+      { id: "read", label: unread ? `Mark ${ps.length} read` : `Mark ${ps.length} unread`, hint: label(keys["mark-read"]), run: () => (setPicked([]), unread && show === "unread" && moveOn(ps[0]!, (x) => ps.includes(x)), setRead(ps, unread)) },
       { id: "copy", label: `Copy ${ps.length} as Markdown`, hint: label(keys.copy), run: () => copyPost(ps) },
     ];
   };
@@ -274,23 +272,27 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     ];
   };
 
-  /** What he has typed of a title, and when the last letter came (Finder's type-select, D232). */
-  const typed = useRef({ text: "", at: 0 });
+  /** Finder's type-select on the posts' titles (D232). */
+  const typed = useMemo(typeSelect, []);
   const onKey = (e: React.KeyboardEvent) => {
     if (blocked || renaming) return;
     const at = order.findIndex((p) => p.url === cursor);
-    const now = Date.now();
-    const begun = now - typed.current.at < TYPE_GAP && typed.current.text !== "";
-    if (!typesTitle(e, begun)) typed.current.text = "";
+    const jump = inTextField(e.nativeEvent) ? null : typed(e, order.map((x) => x.title), keyed ? at : -1);
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (!order.length) return;
       const next = !keyed || at < 0 ? (e.key === "ArrowDown" ? 0 : order.length - 1) : Math.max(0, Math.min(order.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)));
-      if (e.shiftKey && keyed && at >= 0) {
-        // Finder: ⇧↑↓ grow or shrink the pick from where it started.
-        if (!picked.length || !anchor.current) anchor.current = order[at]!.url;
-        const a = order.findIndex((x) => x.url === anchor.current);
-        setPicked(order.slice(Math.min(a, next), Math.max(a, next) + 1).map((x) => x.url));
+      if (e.shiftKey && at >= 0) {
+        // Finder: ⇧↑↓ grow or shrink the pick from where it started, after a ⌘-click too.
+        const ids = order.map((x) => x.url);
+        if (!picked.length || !anchor.current || !ids.includes(anchor.current)) anchor.current = order[at]!.url;
+        // From the post the cursor is on, after a ⌘-click too (the mouse leaves the cursor un-keyed).
+        const to = Math.max(0, Math.min(order.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)));
+        setPicked(pickRun(ids, anchor.current, ids[to]!));
+        setKeyed(true);
+        setCursor(ids[to]!);
+        document.getElementById(`post-${ids[to]!}`)?.scrollIntoView({ block: "nearest" });
+        return;
       } else {
         setPicked([]);
         anchor.current = order[next]!.url;
@@ -317,13 +319,11 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       const next = show === "unread" && !current.read ? (order[at + 1] ?? order[at - 1]) : undefined;
       setRead(current, !current.read);
       if (next) setCursor(next.url);
-    } else if (!inTextField(e.nativeEvent) && typesTitle(e, begun)) {
+    } else if (jump !== null) {
       // The first letters of a title select its post (D232), never a plain-letter action.
       e.preventDefault();
       e.stopPropagation();
-      const text = (begun ? typed.current.text : "") + e.key;
-      typed.current = { text, at: now };
-      const i = typeJump(order.map((x) => x.title), text, keyed ? at : -1);
+      const i = jump;
       if (i < 0) return;
       setPicked([]);
       anchor.current = order[i]!.url;
@@ -468,8 +468,9 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
           aria-activedescendant={current ? `post-${current.url}` : undefined}
           onKeyDown={onKey}
           onPointerMove={() => keyed && setKeyed(false)}
-          // A click on empty space drops the pick (Finder).
-          onClick={(e) => picked.length && !(e.target as Element).closest(".row, button, [role=menu]") && setPicked([])}
+          // A click on empty space drops the pick (Finder); not the end of a drag that began on a row.
+          onPointerDown={(e) => (pressedBlank.current = !(e.target as Element).closest(".row, button, [role=menu]"))}
+          onClick={(e) => picked.length && pressedBlank.current && !(e.target as Element).closest(".row, button, [role=menu]") && setPicked([])}
         >
           {body}
         </div>
