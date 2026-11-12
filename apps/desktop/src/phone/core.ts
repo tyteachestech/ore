@@ -75,7 +75,9 @@ if (isTauri()) {
     const bin = atob(r.body);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const res = new Response([101, 204, 205, 304].includes(r.status) ? null : bytes, { status: r.status, headers: r.headers });
+    // A status the web's Response can't hold (LinkedIn's 999) is a refusal: 520, so the importer says so itself.
+    const status = r.status >= 200 && r.status <= 599 ? r.status : 520;
+    const res = new Response([204, 205, 304].includes(status) ? null : bytes, { status, headers: r.headers });
     Object.defineProperty(res, "url", { value: r.url });
     Object.defineProperty(res, "redirected", { value: r.url !== url });
     return res;
@@ -143,7 +145,7 @@ async function loadShared() {
     if (!n.endsWith(".file.json")) continue;
     try {
       const q = JSON.parse(readFileSync(`${dir}/${n}`, "utf8")) as { file?: unknown; device?: unknown };
-      if (q.device === "iphone" && typeof q.file === "string" && !q.file.includes("..")) await load(`${dir}/${q.file}`);
+      if (q.device === "iphone" && typeof q.file === "string" && !q.file.split("/").some((part) => !part || part === "." || part === "..")) await load(`${dir}/${q.file}`);
     } catch {}
   }
 }

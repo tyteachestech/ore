@@ -92,4 +92,10 @@ test("a file waits beside its item, is handed to the import by its path, and lea
   const late = queueFile(lib, src);
   unlinkSync(join(paths.inbox(lib), late.file!));
   expect(queuedLinks(lib)).toEqual([]);
+  removeQueuedLink(lib, late.id);
+  // A name with two dots in a row is a name, not a way out of the inbox; a path that leaves it is never listed.
+  const dotted = queueFile(lib, src, [], "report..final.md");
+  expect(queuedLinks(lib).map((l) => l.url)).toEqual(["report..final.md"]);
+  writeFileSync(join(paths.inbox(lib), `${dotted.id}.file.json`), JSON.stringify({ ...dotted, file: "../skills.yaml" }));
+  expect(queuedLinks(lib)).toEqual([]);
 });

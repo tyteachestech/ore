@@ -151,6 +151,12 @@ test("a file the share sheet saved to the inbox is loaded when asked for, read a
   fs.copyFileSync(`${P}/inbox/01X/paper.pdf`, `${P}/items/d-04/source.pdf`);
   await flush();
   expect(sent).toEqual([["items/d-04/source.pdf", Buffer.from(pdf).toString("base64"), true]]);
+  // A shared text file reads as its text too.
+  other = ["inbox/01X/paper.pdf", "inbox/01Z/notes.txt"];
+  shared.set("inbox/01Z/notes.txt", Buffer.from("Spacing works.").toString("base64"));
+  await rescan();
+  await load(`${P}/inbox/01Z/notes.txt`);
+  expect(fs.readFileSync(`${P}/inbox/01Z/notes.txt`, "utf8")).toBe("Spacing works.");
   // One that isn't in the folder (not downloaded yet) says so.
   expect(await load(`${P}/inbox/01Y/gone.pdf`)).toBe(false);
   // Imported and removed: it leaves the listing.

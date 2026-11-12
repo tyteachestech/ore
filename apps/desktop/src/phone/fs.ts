@@ -244,6 +244,7 @@ export async function load(p: string): Promise<boolean> {
   const b64 = await disk.invoke<string | null>("library_bytes", { root: disk.root, path: rel(p) });
   if (b64 == null) return false;
   e.bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  e.text = new TextDecoder().decode(e.bytes); // as a written file has both: a shared .txt or .csv is read as text
   return true;
 }
 
