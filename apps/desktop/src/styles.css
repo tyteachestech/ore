@@ -1476,7 +1476,8 @@ button.skill-badge:hover { filter: brightness(1.2); }
 .fold-head .caret { flex: none; color: var(--faint); transform: rotate(90deg); transition: transform var(--t-1) ease; }
 .fold-head[aria-expanded="false"] .caret { transform: none; }
 /* The caret sits on the rule's start and the icon after it, as in a fold whose whole head is the button. */
-.fold-head.caret-only { flex: none; width: auto; margin-right: -4px; }
+.fold-head.caret-only { flex: none; width: 30px; justify-content: center; margin: 0 -6px 0 0; padding: 0; }
+.fold-head.caret-only .caret { margin-top: 2px; }
 .fold-fill { flex: 1; }
 .fold-sum { margin-left: auto; display: flex; gap: 10px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fold-body { margin: 0 -6px; }
