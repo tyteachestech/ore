@@ -46,8 +46,14 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F20 | 2026-11-12 | Buttons | The small button (D196) drew three different focus rings: inside its edge on Start, 1px outside on the note toggle, a shadow ring on Settings | fixed #319 | `every small button takes its focus ring from one shared rule` |
 | F21 | 2026-11-12 | Source rows, Reader | A 20px icon sat in a smaller button and hung off its centre: a row's add-skill + (18px circle) and a highlight's margin mark (16px, plus the button's default padding) | fixed #319 | `or bigger than the button it sits in, so it sits off the button's centre` |
 | F22 | 2026-11-12 | Lists, Home | ⌘Z right after dragging a row onto a skill (or pinning it) did nothing: the step went on the history only once the write had landed | fixed #321 | `⌘Z takes the drop back` |
-| F23 | 2026-11-12 | iPhone notes | The note's keyboard bar sat on top of iOS's own Previous / Next / Done bar, two bars over the keyboard | fixed #323 | no test: WKContentView's accessory bar is native iOS, outside the web view; the phone thread checks it in the Simulator |
-| F24 | 2026-11-12 | iPhone notes | The keyboard bar's ten 44pt buttons ran past a 402pt screen: Hide the keyboard started off the edge, and nothing showed the bar scrolls | fixed #323 | `the note's keyboard bar fits the screen` |
-| F25 | 2026-11-12 | iPhone notes | With the keyboard up, the + menu's top row was cut off under the source's header | fixed #323 | `the + menu starts below the header` |
-| F26 | 2026-11-12 | iPhone Review | Review's ⋯ was three faint specks beside a bold × | fixed #323 | `Review's ⋯ is as strong as ×` |
-| F27 | 2026-11-12 | iPhone Review | In Edit exercise, the question went up under the head when the keyboard came up | fixed #323 | `the question stays below the head` |
+| F23 | 2026-11-12 | Reader | A highlight note whose save failed closed and lost the words just typed | fixed #322 | `a note whose save fails is kept, and saves when the highlight next closes` |
+| F24 | 2026-11-12 | Feed | ⇧⌘U marked only the post under the cursor, not the pick (D234) | fixed #322 | `⇧⌘U marks both picked posts read` |
+| F25 | 2026-11-12 | Home, Feed | F8 on Home and the Feed: no type-select there, and Home's rows took none of the lists' ⌘ keys (Rename, Pin, Archive, Open original), so its menus hid them | fixed #322 | `⌥⌘R renames the focused row` |
+| F26 | 2026-11-12 | Home, Feed | A click on empty space left the pick in place | fixed #322 | `a click on empty space drops the pick` |
+| F27 | 2026-11-12 | Home, Feed | ⇧↑↓ moved the cursor without growing the pick | fixed #322 | `⇧↓ grows the pick` |
+| F28 | 2026-11-12 | Reader | Esc keeps an edit to a highlight's note (read as against D211) | not a bug: D211 is for fields edited in place (titles, names); a highlight's note is writing, kept however the popup closes, as journey "highlight note: what he types is kept when he clicks away or presses Esc" says | — |
+| F29 | 2026-11-12 | iPhone notes | The note's keyboard bar sat on top of iOS's own Previous / Next / Done bar, two bars over the keyboard | fixed #323 | no test: WKContentView's accessory bar is native iOS, outside the web view; the phone thread checks it in the Simulator |
+| F30 | 2026-11-12 | iPhone notes | The keyboard bar's ten 44pt buttons ran past a 402pt screen: Hide the keyboard started off the edge, and nothing showed the bar scrolls | fixed #323 | `the note's keyboard bar fits the screen` |
+| F31 | 2026-11-12 | iPhone notes | With the keyboard up, the + menu's top row was cut off under the source's header | fixed #323 | `the + menu starts below the header` |
+| F32 | 2026-11-12 | iPhone Review | Review's ⋯ was three faint specks beside a bold × | fixed #323 | `Review's ⋯ is as strong as ×` |
+| F33 | 2026-11-12 | iPhone Review | In Edit exercise, the question went up under the head when the keyboard came up | fixed #323 | `the question stays below the head` |

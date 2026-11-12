@@ -624,6 +624,10 @@ type Props = {
 };
 
 /** A key point being typed ("Card here"), by source: its line, its anchor and the text at it (NEAR characters). */
+/** A highlight note whose save failed, by highlight id, with the note it was to replace: the popup opens on it
+ *  while that note is unchanged, so his words survive leaving the source or a relaunch, and the next close saves
+ *  them again (F22). */
+const unsavedNotes = kept<{ note: string; was: string }>("ore.highlight-note-unsaved");
 const keyDrafts = kept<{ text: string; at: number; near: string }>("ore.keypoint-drafts");
 const NEAR = 64;
 
@@ -1443,6 +1447,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     if (!pop || !ann) return;
     const note = pop.note.trim();
     if (note !== (ann.note ?? "")) void setNoteOf(pop.id, note);
+    else unsavedNotes.delete(pop.id); // he took the unsaved words back out
   }
 
   useEffect(() => () => keepNote(), [p.id]);
@@ -1540,7 +1545,9 @@ function ReaderView(p: Props & { reload: () => void }) {
     aimRef.current = aim;
     const at = popupAt(range, aim);
     if (!at) return;
-    setPopup({ id, ...at, note });
+    const d = unsavedNotes.get(id);
+    if (d && d.was !== note) unsavedNotes.delete(id); // the note changed since: his draft no longer fits it
+    setPopup({ id, ...at, note: d && d.was === note ? d.note : note });
     setTip(null);
   }
 
@@ -1975,15 +1982,18 @@ function ReaderView(p: Props & { reload: () => void }) {
     const wake = wakeOnLanding();
     const was = annOf(id)?.note ?? "";
     setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note } : a)));
+    let rid = id;
     try {
-      const rid = await realId(id);
+      rid = await realId(id);
       await annotateWaking(wake, rid, opt("note", note));
+      unsavedNotes.delete(rid);
       if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {
       setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note: was } : a)));
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
-      p.notify(errorText(e), "error");
+      unsavedNotes.set(rid, { note, was });
+      p.notify(`${errorText(e)} Your note is kept: open the highlight to save it again.`, "error");
     }
   }
 
