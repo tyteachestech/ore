@@ -173,7 +173,7 @@ export const DESCRIPTION_HEADING = "## From the description";
 
 /** A caption track's WebVTT. Some sites (TED) serve it as an HLS playlist of short VTT segments,
  *  fetched and joined in order; a cue a segment repeats is dropped as the rolling-caption repeat. */
-async function captions(text: string, url: string): Promise<string> {
+export async function captions(text: string, url: string): Promise<string> {
   if (!text.startsWith("#EXTM3U")) return text;
   const parts = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
   const segs = await Promise.all(parts.map(async (p) => {

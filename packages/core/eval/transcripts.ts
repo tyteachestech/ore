@@ -15,7 +15,7 @@ import { extname, join } from "node:path";
 import { z } from "zod";
 import { transcribeFile } from "../src/ingest/audio.ts";
 import { htmlToDoc } from "../src/ingest/web.ts";
-import { srtToVtt, vttWords, youtubeId, ytDlp } from "../src/ingest/youtube.ts";
+import { captions, srtToVtt, vttWords, youtubeId, ytDlp } from "../src/ingest/youtube.ts";
 
 const METHODS = ["auto", "page", "heard"] as const;
 type Method = (typeof METHODS)[number];
@@ -128,10 +128,12 @@ async function ytdlp(args: string[]): Promise<string> {
 }
 
 const vttOf = (tracks: Track[] | undefined) => tracks?.find((t) => t.ext === "vtt");
-/** The human captions in `lang` ("en", "en-US", "en-GB"…), then the automatic ones. */
+/** The human captions in `lang` ("en", "en-GB", "es-419", "en-qlPKC2UN_YU"…), then the automatic ones. */
 export function pickTracks(info: Pick<Info, "subtitles" | "automatic_captions">, lang: string): { human?: Track; auto?: Track } {
   const manual = info.subtitles ?? {}, auto = info.automatic_captions ?? {};
-  const key = Object.keys(manual).find((k) => k === lang) ?? Object.keys(manual).find((k) => new RegExp(`^${lang}-[A-Za-z]{2,4}$`).test(k));
+  const keys = Object.keys(manual);
+  // Exact, then a region ("en-GB"), then a track named by its uploader's id ("en-qlPKC2UN_YU").
+  const key = keys.find((k) => k === lang) ?? keys.find((k) => new RegExp(`^${lang}-[A-Za-z0-9]{2,4}$`).test(k)) ?? keys.find((k) => k.startsWith(lang + "-"));
   return { human: key ? vttOf(manual[key]) : undefined, auto: vttOf(auto[`${lang}-orig`]) ?? vttOf(auto[lang]) };
 }
 
@@ -141,6 +143,8 @@ const text = async (url: string) => {
   return r.text();
 };
 const vttText = (vtt: string) => vttWords(vtt).map((w) => w.w).join(" ");
+/** A caption track's words: a VTT file, or an HLS playlist of VTT pieces (some automatic tracks). */
+const trackText = async (url: string) => vttText(await captions(await text(url), url));
 
 /** The caption tracks a video's own page lists, read with one plain request and no yt-dlp. */
 export function pageTracks(html: string): { url: string; lang: string; auto: boolean }[] {
@@ -170,8 +174,14 @@ async function pageCaptions(url: string, lang: string): Promise<{ text: string; 
   const fits = (t: { lang: string }) => t.lang === lang || t.lang.startsWith(lang + "-");
   const t = tracks.find((t) => fits(t) && !t.auto) ?? tracks.find((t) => fits(t));
   if (!t) throw new Error(`no ${lang} captions on the page (it has ${tracks.map((t) => t.lang).join(", ")})`);
-  const vtt = await text(t.url + (t.url.includes("fmt=") ? "" : "&fmt=vtt"));
-  if (!/-->/.test(vtt)) throw new Error("the captions link answered with nothing in it");
+  const res = await fetch(t.url + (t.url.includes("fmt=") ? "" : "&fmt=vtt"), { signal: AbortSignal.timeout(60000) });
+  const vtt = await res.text();
+  if (!/-->/.test(vtt)) {
+    // YouTube marks a link it won't serve without a proof-of-origin token (`pot`, made by its player's
+    // script) with exp=xpe, and answers it with an empty page.
+    const xpe = new URL(t.url).searchParams.get("exp") === "xpe";
+    throw new Error(`the captions link answered HTTP ${res.status} with ${vtt.length ? `no captions (${vtt.length} bytes)` : "an empty body"}${xpe ? "; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player" : ""}`);
+  }
   return { text: vttText(vtt), track: t.auto ? "auto" : "human" };
 }
 
@@ -217,11 +227,11 @@ async function runCase(c: Case, methods: Method[], keep: string | undefined, dir
       const info = JSON.parse(await ytdlp(["-J", "--skip-download", c.url!])) as Info;
       const { human, auto } = pickTracks(info, c.lang);
       if (!human) throw new Error(`no human ${c.lang} captions, so nothing to score against: replace this case`);
-      const key = words(vttText(await text(human.url)));
+      const key = words(await trackText(human.url));
       save("key", key);
       if (methods.includes("auto")) await score("auto", key, async () => {
         if (!auto) throw new Error("no automatic captions");
-        return { text: vttText(await text(auto.url)) };
+        return { text: await trackText(auto.url) };
       });
       if (methods.includes("page")) await score("page", key, async () => {
         const got = await pageCaptions(c.url!, c.lang);

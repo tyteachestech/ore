@@ -25,6 +25,10 @@ test("pickTracks takes the human captions in the language, a regional one too, a
   const vtt = (url: string) => [{ ext: "json3", url: "x" }, { ext: "vtt", url }];
   expect(pickTracks({ subtitles: { "en-GB": vtt("human"), fr: vtt("fr") }, automatic_captions: { en: vtt("auto"), "en-orig": vtt("orig") } }, "en")).toEqual({ human: { ext: "vtt", url: "human" }, auto: { ext: "vtt", url: "orig" } });
   expect(pickTracks({ automatic_captions: { en: vtt("auto") } }, "en")).toEqual({ human: undefined, auto: { ext: "vtt", url: "auto" } });
+  // A track YouTube names by its uploader's id (MIT OpenCourseWare, Talks at Google) is human captions too.
+  expect(pickTracks({ subtitles: { "en-qlPKC2UN_YU": vtt("named"), "es-419": vtt("es") } }, "en").human).toEqual({ ext: "vtt", url: "named" });
+  expect(pickTracks({ subtitles: { "en-qlPKC2UN_YU": vtt("named"), "en-US": vtt("us") } }, "en").human).toEqual({ ext: "vtt", url: "us" });
+  expect(pickTracks({ subtitles: { english: vtt("no") } }, "en").human).toBeUndefined();
 });
 
 test("pageTracks reads the caption list out of a video page", () => {

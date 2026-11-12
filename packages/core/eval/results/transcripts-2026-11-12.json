@@ -1,0 +1,471 @@
+{
+  "ran": "2026-11-12T05:53:35.049Z",
+  "methods": [
+    "auto",
+    "page",
+    "heard"
+  ],
+  "rows": [
+    {
+      "id": "yt-ted-urban",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 2248,
+      "sub": 42,
+      "del": 36,
+      "ins": 52,
+      "wer": 0.05782918149466192,
+      "seconds": 0.10067912500000012
+    },
+    {
+      "id": "yt-ted-urban",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-ted-urban",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 2248,
+      "sub": 41,
+      "del": 16,
+      "ins": 32,
+      "wer": 0.03959074733096085,
+      "seconds": 27.004198458999998,
+      "note": "speech took 9 s for 14 min"
+    },
+    {
+      "id": "yt-3b1b-neural",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 3363,
+      "sub": 43,
+      "del": 4,
+      "ins": 10,
+      "wer": 0.01694915254237288,
+      "seconds": 0.09216979199999333
+    },
+    {
+      "id": "yt-3b1b-neural",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-3b1b-neural",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 3363,
+      "sub": 42,
+      "del": 7,
+      "ins": 12,
+      "wer": 0.018138566755872734,
+      "seconds": 23.711482458,
+      "note": "speech took 15 s for 19 min"
+    },
+    {
+      "id": "yt-mit-linalg",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 4905,
+      "sub": 298,
+      "del": 41,
+      "ins": 285,
+      "wer": 0.12721712538226299,
+      "seconds": 0.13154995800000324
+    },
+    {
+      "id": "yt-mit-linalg",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-mit-linalg",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 4905,
+      "sub": 1868,
+      "del": 632,
+      "ins": 223,
+      "wer": 0.5551478083588175,
+      "seconds": 26.382745291999992,
+      "note": "speech took 20 s for 40 min"
+    },
+    {
+      "id": "yt-kurzgesagt-egg",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 907,
+      "sub": 13,
+      "del": 6,
+      "ins": 4,
+      "wer": 0.025358324145534728,
+      "seconds": 0.07998033299999951
+    },
+    {
+      "id": "yt-kurzgesagt-egg",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body"
+    },
+    {
+      "id": "yt-kurzgesagt-egg",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 907,
+      "sub": 17,
+      "del": 8,
+      "ins": 2,
+      "wer": 0.029768467475192944,
+      "seconds": 10.807479584000001,
+      "note": "speech took 3 s for 8 min"
+    },
+    {
+      "id": "yt-cs229-ng",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 12802,
+      "sub": 671,
+      "del": 325,
+      "ins": 382,
+      "wer": 0.1076394313388533,
+      "seconds": 0.21739033300000302
+    },
+    {
+      "id": "yt-cs229-ng",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-cs229-ng",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 12802,
+      "sub": 1095,
+      "del": 993,
+      "ins": 213,
+      "wer": 0.17973754100921732,
+      "seconds": 65.29699420799999,
+      "note": "speech took 53 s for 75 min"
+    },
+    {
+      "id": "yt-crashcourse-agri",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 2253,
+      "sub": 63,
+      "del": 19,
+      "ins": 16,
+      "wer": 0.04349755881047492,
+      "seconds": 0.2238444169999857
+    },
+    {
+      "id": "yt-crashcourse-agri",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-crashcourse-agri",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 2253,
+      "sub": 68,
+      "del": 23,
+      "ins": 12,
+      "wer": 0.04571682201509099,
+      "seconds": 13.897613458000007,
+      "note": "speech took 10 s for 11 min"
+    },
+    {
+      "id": "yt-computerphile-qa",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 2971,
+      "sub": 132,
+      "del": 46,
+      "ins": 130,
+      "wer": 0.10366879838438237,
+      "seconds": 0.1509908750000177
+    },
+    {
+      "id": "yt-computerphile-qa",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body"
+    },
+    {
+      "id": "yt-computerphile-qa",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 2971,
+      "sub": 143,
+      "del": 65,
+      "ins": 102,
+      "wer": 0.10434197239986537,
+      "seconds": 23.421747999999994,
+      "note": "speech took 13 s for 19 min"
+    },
+    {
+      "id": "yt-kernighan-brailsford",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 4950,
+      "sub": 173,
+      "del": 51,
+      "ins": 270,
+      "wer": 0.0997979797979798,
+      "seconds": 0.15431520799998544
+    },
+    {
+      "id": "yt-kernighan-brailsford",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-kernighan-brailsford",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 4950,
+      "sub": 189,
+      "del": 67,
+      "ins": 172,
+      "wer": 0.08646464646464647,
+      "seconds": 34.644685375,
+      "note": "speech took 22 s for 28 min"
+    },
+    {
+      "id": "yt-hamming-research",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 7659,
+      "sub": 375,
+      "del": 111,
+      "ins": 135,
+      "wer": 0.08108108108108109,
+      "seconds": 0.235426833000005
+    },
+    {
+      "id": "yt-hamming-research",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-hamming-research",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 7659,
+      "sub": 433,
+      "del": 169,
+      "ins": 101,
+      "wer": 0.09178743961352658,
+      "seconds": 31.42043295800005,
+      "note": "speech took 26 s for 44 min"
+    },
+    {
+      "id": "yt-tomscott-stonehenge",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 4590,
+      "sub": 95,
+      "del": 53,
+      "ins": 186,
+      "wer": 0.07276688453159041,
+      "seconds": 0.2731669579999871
+    },
+    {
+      "id": "yt-tomscott-stonehenge",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-tomscott-stonehenge",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 4590,
+      "sub": 124,
+      "del": 63,
+      "ins": 66,
+      "wer": 0.055119825708061,
+      "seconds": 26.772367541000015,
+      "note": "speech took 18 s for 26 min"
+    },
+    {
+      "id": "yt-tedx-es-cerebro",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 2012,
+      "sub": 0,
+      "del": 0,
+      "ins": 8,
+      "wer": 0.003976143141153081,
+      "seconds": 0.5782988340000156
+    },
+    {
+      "id": "yt-tedx-es-cerebro",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-tedx-es-cerebro",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 2012,
+      "sub": 99,
+      "del": 23,
+      "ins": 58,
+      "wer": 0.08946322067594434,
+      "seconds": 28.139953749999986,
+      "note": "speech took 9 s for 16 min"
+    },
+    {
+      "id": "yt-tomscott-elia",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 422,
+      "sub": 20,
+      "del": 2,
+      "ins": 3,
+      "wer": 0.05924170616113744,
+      "seconds": 0.06197170799999731
+    },
+    {
+      "id": "yt-tomscott-elia",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-tomscott-elia",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 422,
+      "sub": 12,
+      "del": 2,
+      "ins": 1,
+      "wer": 0.035545023696682464,
+      "seconds": 9.106085542000015,
+      "note": "speech took 2 s for 3 min"
+    },
+    {
+      "id": "yt-cs50-scratch",
+      "kind": "youtube",
+      "method": "auto",
+      "n": 23525,
+      "sub": 631,
+      "del": 800,
+      "ins": 442,
+      "wer": 0.07961742826780022,
+      "seconds": 0.25921608300000665
+    },
+    {
+      "id": "yt-cs50-scratch",
+      "kind": "youtube",
+      "method": "page",
+      "error": "the captions link answered HTTP 200 with an empty body; the link is marked exp=xpe: YouTube wants a proof-of-origin token from its player"
+    },
+    {
+      "id": "yt-cs50-scratch",
+      "kind": "youtube",
+      "method": "heard",
+      "n": 23525,
+      "sub": 809,
+      "del": 786,
+      "ins": 385,
+      "wer": 0.08416578108395324,
+      "seconds": 120.09983075,
+      "note": "speech took 101 s for 125 min; on a second run, the first audio download got HTTP 403 from YouTube"
+    },
+    {
+      "id": "pod-80k-china",
+      "kind": "podcast",
+      "method": "heard",
+      "n": 3804,
+      "sub": 129,
+      "del": 37,
+      "ins": 71,
+      "wer": 0.062302839116719244,
+      "seconds": 17.510077540999976,
+      "note": "speech took 16 s"
+    },
+    {
+      "id": "pod-cwt-tao",
+      "kind": "podcast",
+      "method": "heard",
+      "n": 8940,
+      "sub": 423,
+      "del": 150,
+      "ins": 746,
+      "wer": 0.14753914988814318,
+      "seconds": 40.730056250000025,
+      "note": "speech took 38 s"
+    },
+    {
+      "id": "pod-99pi-squat",
+      "kind": "podcast",
+      "method": "heard",
+      "n": 5864,
+      "sub": 145,
+      "del": 148,
+      "ins": 1197,
+      "wer": 0.25409276944065484,
+      "seconds": 33.52483612500003,
+      "note": "speech took 27 s"
+    },
+    {
+      "id": "pod-tal-blue",
+      "kind": "podcast",
+      "method": "heard",
+      "n": 8830,
+      "sub": 366,
+      "del": 84,
+      "ins": 892,
+      "wer": 0.1519818799546999,
+      "seconds": 40.88219391700002,
+      "note": "speech took 36 s"
+    },
+    {
+      "id": "pod-freakonomics-694",
+      "kind": "podcast",
+      "method": "heard",
+      "n": 10751,
+      "sub": 316,
+      "del": 116,
+      "ins": 1462,
+      "wer": 0.1761696586364059,
+      "seconds": 53.90551808300003,
+      "note": "speech took 49 s"
+    },
+    {
+      "id": "pod-changelog-660",
+      "kind": "podcast",
+      "method": "heard",
+      "n": 18255,
+      "sub": 628,
+      "del": 198,
+      "ins": 2923,
+      "wer": 0.20536839222130923,
+      "seconds": 98.88509729100006,
+      "note": "speech took 90 s"
+    },
+    {
+      "id": "pod-lex-math",
+      "kind": "podcast",
+      "method": "heard",
+      "n": 37677,
+      "sub": 1037,
+      "del": 352,
+      "ins": 2008,
+      "wer": 0.09016110624518937,
+      "seconds": 176.625108334,
+      "note": "speech took 169 s"
+    }
+  ]
+}
