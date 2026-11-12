@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { listBreak } from "../src/list-keys";
+import { fromBullets, listBreak, showBullets } from "../src/list-keys";
 
 /** The value after the edit, with | for the caret. */
 function press(withCaret: string) {
@@ -17,6 +17,15 @@ describe("a list typed in a highlight's note", () => {
     expect(press("- one|")).toBe("- one\n- |");
     expect(press("* one|")).toBe("* one\n* |");
     expect(press("intro\n- one|")).toBe("intro\n- one\n- |");
+  });
+  test("a shown bullet carries on as a bullet", () => {
+    expect(press("• one|")).toBe("• one\n• |");
+    expect(press("• one\n• |")).toBe("• one\n|");
+  });
+  test("the field shows bullets where the note saves Markdown dashes, and back", () => {
+    expect(showBullets("intro\n- a\n  * b\n-not\n1. c")).toBe("intro\n• a\n  • b\n-not\n1. c");
+    expect(fromBullets("intro\n• a\n  • b")).toBe("intro\n- a\n  - b");
+    expect(fromBullets(showBullets("- a\n- b"))).toBe("- a\n- b");
   });
   test("a number counts up and keeps its punctuation and indent", () => {
     expect(press("1. one|")).toBe("1. one\n2. |");

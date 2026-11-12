@@ -21,7 +21,7 @@ import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
-import { breakList } from "./list-keys";
+import { breakList, bulletOnSpace, fromBullets, showBullets } from "./list-keys";
 import { HideDots } from "./HideDots";
 import { Hint } from "./Hint";
 import { Thumb } from "./Thumb";
@@ -3359,15 +3359,16 @@ function ReaderView(p: Props & { reload: () => void }) {
                 ref={noteRef}
                 className="field"
                 aria-label="Note"
-                value={popup.note}
+                value={showBullets(popup.note)}
                 // From the popup as it is now: a keystroke as the highlight's save lands must not put back its draft id.
                 onChange={(e) => {
-                  const note = e.target.value;
+                  const note = fromBullets(e.target.value);
                   setPopup((cur) => cur && { ...cur, note });
                 }}
-                // ⇧↵ on a "- ", "* " or "1. " line starts the next item, as in Claude's and ChatGPT's chat boxes; ↵ still closes.
+                // "- " or "* " shows as a bullet (saved as "- "); ⇧↵ on a bullet or "1. " line starts the next item, as in Claude's and ChatGPT's chat boxes; ↵ still closes.
                 onKeyDown={(e) => {
                   if (numbered(e.nativeEvent, e.currentTarget)) e.preventDefault();
+                  else if (e.key === " " && !e.metaKey && !e.altKey && !e.ctrlKey && !e.nativeEvent.isComposing && bulletOnSpace(e.currentTarget)) e.preventDefault();
                   else if (e.key === "Enter" && e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey && !e.nativeEvent.isComposing && breakList(e.currentTarget)) e.preventDefault();
                 }}
                 placeholder={PLACEHOLDER[intent]}

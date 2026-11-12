@@ -808,7 +808,7 @@ journey("highlight note: ⇧↵ carries a list on, an empty item ends it, a long
   await page.keyboard.press("Shift+Enter");
   await page.keyboard.type("b");
   const typed = await note.inputValue();
-  if (typed !== "1. cue\n2. quiz\n- a\n- b") throw new Error(`the note says ${JSON.stringify(typed)}`);
+  if (typed !== "1. cue\n2. quiz\n• a\n• b") throw new Error(`the note shows ${JSON.stringify(typed)}`);
   if (!(await popup.isVisible())) throw new Error("⇧↵ closed the popup");
   await page.keyboard.type(" and a longer thought that runs on for a while about how the cue works".repeat(2));
   await until("a note past four lines widens the popup", async () => (await popup.boundingBox())!.width > width + 40);
@@ -817,6 +817,10 @@ journey("highlight note: ⇧↵ carries a list on, an empty item ends it, a long
   if (Math.abs((await offset()) - top) > 1) throw new Error("the tools moved down the popup as the note grew");
   await page.keyboard.press("Enter");
   await popup.waitFor({ state: "hidden" });
+  // Saved as Markdown: the bullets are "- " in the file, and come back as bullets.
+  await select(page, "Each successful retrieval changes the memory itself");
+  await popup.waitFor();
+  await until("the note comes back with its bullets", async () => (await note.inputValue()).startsWith("1. cue\n2. quiz\n• a\n• b"));
 });
 
 journey("highlight note: \"2.\" in an empty note starts a numbered list, and leaves the type as it was (D133's 2 is Key point)", async (page) => {
