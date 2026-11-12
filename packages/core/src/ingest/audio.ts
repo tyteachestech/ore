@@ -14,9 +14,23 @@ export const VIDEO_TYPES = ["mp4", "mov", "m4v"];
 
 type Progress = (done: number, label?: string) => void;
 
+type Hear = (data: Uint8Array, ext: string, onProgress?: Progress, language?: string) => Promise<string>;
+let device: Hear | null = null;
+/** A device that hears through its own shell instead of the Mac's helper: the iPhone app, whose shell
+ *  runs Apple's on-device speech (apps/desktop/src/phone/core.ts). It gives WebVTT, or throws why not
+ *  in its own words. */
+export function setTranscriber(hear: Hear | null): void {
+  device = hear;
+}
+
 /** The audio as WebVTT. `onProgress` gets 0..1 as it goes, and a line to show while the speech model
  *  downloads the first time. */
 export async function transcribe(data: Uint8Array, ext: string, onProgress?: Progress, language?: string): Promise<string> {
+  if (device) {
+    const vtt = await device(data, ext, onProgress, language);
+    if (!/-->/.test(vtt)) throw new Error("Heard no speech in that audio. If it has a transcript, copy it and paste it here instead.");
+    return vtt;
+  }
   const dir = mkdtempSync(join(tmpdir(), "ore-audio-"));
   madeThisRun(dir);
   try {
@@ -29,9 +43,10 @@ export async function transcribe(data: Uint8Array, ext: string, onProgress?: Pro
 }
 
 /** Whether this machine can hear speech at all, before anything downloads: the stand-in transcriber
- *  (ORE_TRANSCRIBE; set empty, none), else macOS 26 or later (Darwin 25), where Apple's SpeechAnalyzer
+ *  (ORE_TRANSCRIBE; set empty, none), a device's own shell (`setTranscriber`), else macOS 26 or later (Darwin 25), where Apple's SpeechAnalyzer
  *  is. Whether it has a model for the speech's language is only known by trying. */
 export function canTranscribe(): boolean {
+  if (device) return true;
   const stand = process.env.ORE_TRANSCRIBE;
   if (stand !== undefined) return stand !== "";
   return process.platform === "darwin" && Number(release().split(".")[0]) >= 25;
