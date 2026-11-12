@@ -3,6 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 /** The iPhone build (`ORE_PHONE=1 vite build`, apps/phone). */
 export const PHONE = import.meta.env.VITE_PHONE === "1";
 
+/** On iPhone, reads in what the Mac changed (through iCloud) since; true if anything did. Never on the Mac. */
+export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import("./phone/core")).pull() : false);
+
 // Every library read and write goes through the `ore` CLI (D30). Errors are the CLI's one-line message.
 
 /** Runs `ore <args> --json` and returns the parsed output. */

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Keyboard
 import { Hint } from "./Hint";
 import { Shuffle } from "./icons";
 import { SKILL_COLORS, type SkillColor } from "./ore";
-import { SKILL_ICON_SET } from "./skill-icon-set";
+import { findSkillIcons } from "./skill-icon-set";
 import { load, save } from "./util";
 
 // A skill icon is "mc:<name>", one of the set in skill-icon-set.ts (D157): a MingCute fill glyph redrawn on the
@@ -88,9 +88,6 @@ export function IconPicker({ value, color, onPick, onColor, onRemove }: {
   );
 }
 
-/** `words`: the name as words plus the words that find it ("book 2 read"), lowercased, for search. */
-type McIcon = { name: string; words: string };
-const ICONS: McIcon[] = SKILL_ICON_SET.map(([name, words = ""]) => ({ name, words: `${name.replaceAll("_", " ")} ${words}`.toLowerCase() }));
 
 const COLS = 12;
 const label = (icon: string) => icon.slice(3).replaceAll(/[-_]/g, " ");
@@ -99,17 +96,7 @@ function IconsTab({ recent, color, onPick }: { recent: string[]; color: SkillCol
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
 
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return ICONS;
-    // Exact name, then names starting with the query, then a word starting with it, then names containing it.
-    const name = (i: McIcon) => i.name.replaceAll("_", " ");
-    const rank = (i: McIcon) => (name(i) === q ? 0 : name(i).startsWith(q) ? 1 : i.words.includes(` ${q}`) ? 2 : i.words.includes(q) ? 3 : 4);
-    return ICONS.map((i) => ({ i, r: rank(i) }))
-      .filter((x) => x.r < 4)
-      .sort((a, b) => a.r - b.r)
-      .map((x) => x.i);
-  }, [query]);
+  const shown = useMemo(() => findSkillIcons(query), [query]);
   useEffect(() => setActive(0), [query]);
   // The arrows move the active cell; keep it in view as they leave the visible rows (not on hover).
   const scroll = useRef<HTMLDivElement>(null);

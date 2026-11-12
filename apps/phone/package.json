@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "tauri": "../desktop/node_modules/.bin/tauri",
-    "ios:init": "bun run tauri ios init",
+    "ios:init": "bun run tauri ios init && cp src-tauri/Entitlements.ios.plist src-tauri/gen/apple/ore-phone_iOS/ore-phone_iOS.entitlements",
     "ios:build": "bun run tauri ios build --debug",
     "ios:run": "bun run tauri ios run --release"
   }
