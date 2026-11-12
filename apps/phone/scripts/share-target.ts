@@ -41,6 +41,8 @@ if (!p.includes("OreShare:")) {
             NSExtensionActivationRule:
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
               NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsFileWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 1
     entitlements:
       path: OreShare/OreShare.entitlements
 ${ent("      ")}

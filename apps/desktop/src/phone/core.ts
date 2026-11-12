@@ -9,7 +9,7 @@ import * as YAML from "yaml";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setLibraryRoot } from "./tauri-core";
-import { existsSync, mkdirSync, mount, mountDisk, readFileSync, rescan, rmSync, writeFileSync } from "./fs";
+import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, writeFileSync } from "./fs";
 import { ready } from "./sqlite";
 
 export const ROOT = "/lib";
@@ -134,9 +134,24 @@ export const pull = () =>
         .catch(() => false)
     : Promise.resolve(false);
 
+/** A file the share sheet saved to the inbox is listed, not loaded (fs.ts): this phone's own come in as bytes
+ *  before an import reads them. Another device's is left for that device, or the Mac. */
+async function loadShared() {
+  const dir = `${ROOT}/inbox`;
+  if (!existsSync(dir)) return;
+  for (const n of readdirSync(dir)) {
+    if (!n.endsWith(".file.json")) continue;
+    try {
+      const q = JSON.parse(readFileSync(`${dir}/${n}`, "utf8")) as { file?: unknown; device?: unknown };
+      if (q.device === "iphone" && typeof q.file === "string" && !q.file.includes("..")) await load(`${dir}/${q.file}`);
+    } catch {}
+  }
+}
+
 /** `ore <args> --json` in-process: the command's JSON output, or its one-line error. */
 export async function run<T>(args: string[], input: string | null): Promise<T> {
   const lib = await boot();
+  if (args[0] === "inbox" && args.includes("--import")) await loadShared();
   return exclusive(() => command<T>(lib, args, input));
 }
 

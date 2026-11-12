@@ -227,6 +227,19 @@ function listOthers(other: string[] = []) {
   }
 }
 
+/** Loads one listed file's bytes from the folder, so the core can read it: a file the share sheet saved to
+ *  the inbox. False when it isn't there to load. */
+export async function load(p: string): Promise<boolean> {
+  const e = files.get(p);
+  if (!e) return false;
+  if (!e.unread || e.bytes) return true;
+  if (!disk) return false;
+  const b64 = await disk.invoke<string | null>("library_bytes", { root: disk.root, path: rel(p) });
+  if (b64 == null) return false;
+  e.bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return true;
+}
+
 function setDownloading(waiting: string[]) {
   downloading.clear();
   for (const r of waiting) downloading.add(r);
@@ -290,7 +303,7 @@ class Bytes extends Uint8Array {
 export function readFileSync(p: string, enc?: unknown): string {
   const e = files.get(p);
   if (!e) throw err("ENOENT", p);
-  if (e.unread) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
+  if (e.unread && !e.bytes) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
   if (enc === undefined && e.bytes) return Bytes.from(e.bytes) as unknown as string;
   return e.text;
 }

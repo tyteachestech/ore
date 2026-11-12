@@ -1,6 +1,7 @@
 // Ore's Share Extension: a link or page shared from Safari or any app becomes one inbox item,
 // `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in Ore's iCloud folder, or in the App
-// Group the app reads when it opens. The link is saved the moment the card appears; the card then offers his skills to file it under,
+// Group the app reads when it opens. A file (a PDF from Files, a photo) is copied to `inbox/<ulid>/<name>`
+// with `inbox/<ulid>.file.json` written after it. It is saved the moment the card appears; the card then offers his skills to file it under,
 // one tap each, and closes by itself if he leaves it alone (Raindrop's share card).
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
 import UIKit
@@ -98,8 +99,13 @@ class ShareViewController: UIViewController {
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     Task { @MainActor in
-      guard let url = await link() else { return fail("Ore adds links. This isn’t one.") }
-      guard save(url) else { return fail("Open Ore once first, then share again.") }
+      if let url = await link() {
+        guard save(url) else { return fail("Open Ore once first, then share again.") }
+      } else if let p = fileProvider() {
+        guard await save(file: p) else { return fail("Couldn’t save that file. Open Ore once first, then share again.") }
+      } else {
+        return fail("Ore adds links and files. This isn’t one.")
+      }
       titleLabel.text = "Added to Ore"
       layoutChips(skills())
       // Left alone, the card goes by itself; a touch on it keeps it until Done.
@@ -121,22 +127,69 @@ class ShareViewController: UIViewController {
     return nil
   }
 
-  /// Ore's iCloud folder first, so the Mac sees the link without the app opening; the App Group when iCloud
+  /// The first thing shared that is a file and not a web link (a file's own URL is a file URL).
+  private func fileProvider() -> NSItemProvider? {
+    let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
+    return providers.first { $0.hasItemConformingToTypeIdentifier(UTType.data.identifier) }
+  }
+
+  /// Ore's iCloud folder first, so the Mac sees it without the app opening; the App Group when iCloud
   /// Drive is off or the folder isn't there yet (the app moves it in when it opens, lib.rs `share_inbox`).
-  private func save(_ url: String) -> Bool {
-    let id = ulid()
-    let stamp = ISO8601DateFormatter()
-    stamp.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    item = ["id": id, "url": url, "skills": [String](), "added": stamp.string(from: Date()), "device": "iphone"]
+  private func inboxes() -> [URL] {
     var roots: [URL] = []
     if let cloud = FileManager.default.url(forUbiquityContainerIdentifier: cloudId) { roots.append(cloud.appendingPathComponent("Documents", isDirectory: true)) }
     if let g = groupDir() { roots.append(g) }
-    for root in roots {
-      let dir = root.appendingPathComponent("inbox", isDirectory: true)
+    return roots.map { $0.appendingPathComponent("inbox", isDirectory: true) }
+  }
+
+  private func stamp() -> String {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f.string(from: Date())
+  }
+
+  private func save(_ url: String) -> Bool {
+    let id = ulid()
+    item = ["id": id, "url": url, "skills": [String](), "added": stamp(), "device": "iphone"]
+    for dir in inboxes() {
       try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
       file = dir.appendingPathComponent("\(id).link.json")
       if write() { return true }
     }
+    file = nil
+    return false
+  }
+
+  /// The file under the name it had, then its item, so no device sees the item before the file (inbox.ts `queueFile`).
+  /// Copied, never read into memory: an extension has little.
+  private func save(file p: NSItemProvider) async -> Bool {
+    let id = ulid()
+    let dirs = inboxes()
+    let saved: (dir: URL, name: String)? = await withCheckedContinuation { done in
+      // The file Apple hands over is gone when this block returns, so the copy is made inside it.
+      _ = p.loadFileRepresentation(forTypeIdentifier: UTType.data.identifier) { tmp, _ in
+        guard let tmp else { return done.resume(returning: nil) }
+        var name = tmp.lastPathComponent.replacingOccurrences(of: #"[/\\:]"#, with: "-", options: .regularExpression)
+        while name.hasPrefix(".") { name.removeFirst() }
+        if name.isEmpty { name = "file" }
+        for dir in dirs {
+          let into = dir.appendingPathComponent(id, isDirectory: true)
+          do {
+            try FileManager.default.createDirectory(at: into, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: tmp, to: into.appendingPathComponent(name))
+            return done.resume(returning: (dir, name))
+          } catch {
+            try? FileManager.default.removeItem(at: into)
+          }
+        }
+        done.resume(returning: nil)
+      }
+    }
+    guard let saved else { return false }
+    item = ["id": id, "url": saved.name, "file": "\(id)/\(saved.name)", "skills": [String](), "added": stamp(), "device": "iphone"]
+    file = saved.dir.appendingPathComponent("\(id).file.json")
+    if write() { return true }
+    try? FileManager.default.removeItem(at: saved.dir.appendingPathComponent(id, isDirectory: true))
     file = nil
     return false
   }
