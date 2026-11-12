@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Merged into the app's Info.plist by Tauri: portrait only (Tyler, 2026-10-27). -->
+<!-- Merged into the app's Info.plist by Tauri: portrait only (Tyler, 2026-10-27), and Ore's iCloud Drive
+     folder, shown as "Ore" in Files and in the Mac's iCloud Drive (D222). -->
 <plist version="1.0">
 <dict>
   <key>UISupportedInterfaceOrientations</key>
@@ -11,5 +12,17 @@
   <array>
     <string>UIInterfaceOrientationPortrait</string>
   </array>
+  <key>NSUbiquitousContainers</key>
+  <dict>
+    <key>iCloud.com.tylerpoelking.ore</key>
+    <dict>
+      <key>NSUbiquitousContainerIsDocumentScopePublic</key>
+      <true/>
+      <key>NSUbiquitousContainerName</key>
+      <string>Ore</string>
+      <key>NSUbiquitousContainerSupportedFolderLevels</key>
+      <string>Any</string>
+    </dict>
+  </dict>
 </dict>
 </plist>

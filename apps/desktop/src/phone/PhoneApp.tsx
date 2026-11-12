@@ -15,7 +15,7 @@ import type { NoteEditorHandle } from "../editor/NoteEditor";
 import { WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
 import { skillGroups } from "../Skills";
-import { lessonsOf, opt, ore, type Item, type Skill, touched } from "../ore";
+import { lessonsOf, opt, ore, pullFromMac, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -327,6 +327,21 @@ export function PhoneApp() {
   }, []);
   useEffect(() => void (tab === "archive" && refresh()), [tab, refresh]);
   useEffect(() => void refresh(), [refresh]);
+  // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
+  useEffect(() => {
+    const check = () =>
+      void pullFromMac().then((changed) => {
+        if (!changed) return;
+        setTick((t) => t + 1);
+        void refresh();
+      });
+    const back = () => !document.hidden && check();
+    const every = setInterval(back, 30_000);
+    const failed = (e: Event) => notify(`Couldn’t save to iCloud: ${(e as CustomEvent<string>).detail}`, "error");
+    addEventListener("visibilitychange", back);
+    addEventListener("ore:save-failed", failed);
+    return () => (clearInterval(every), removeEventListener("visibilitychange", back), removeEventListener("ore:save-failed", failed));
+  }, [refresh, notify]);
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
   // height, and keep the answer's buttons in sight when it opens.
