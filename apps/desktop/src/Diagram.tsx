@@ -258,3 +258,130 @@ export default function DiagramEditor({ args, name, loaded, notify, onClose, onF
     document.body,
   );
 }
+
+/** The phone's diagram (Tyler 2026-11-12: view on the phone, draw on the Mac): the whole drawing on its own
+ *  screen, as Photos shows a picture. Pinch zooms, a finger pans once zoomed in, a double tap zooms in on
+ *  that spot or back out to fit; Done closes it. Nothing on it edits the file. */
+export function DiagramView({ args, name, loaded, onClose }: { args: string[]; name: string; loaded?: Diagram; onClose: () => void }) {
+  const [svg, setSvg] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const art = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // The tap that opened it focused the note: the keyboard and its bar go away while it shows.
+    (document.activeElement as HTMLElement | null)?.blur();
+    let live = true;
+    (loaded ? Promise.resolve(loaded) : ore<Diagram>("diagram", ...args, name)).then(
+      (d) => live && setSvg(d.scene && d.scene.elements.length ? preview(d.scene) : ""),
+      (e) => live && setFailed(errorText(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [args.join(" "), name]);
+
+  useEffect(() => {
+    const el = stage.current;
+    const a = art.current;
+    if (!el || !a || !svg) return;
+    let k = 1, x = 0, y = 0;
+    const show = () => (a.style.transform = `translate(${x}px, ${y}px) scale(${k})`);
+    // Zoomed out it fits the screen; it never goes past 6 times or smaller than that fit.
+    const clamp = () => {
+      k = Math.min(6, Math.max(1, k));
+      const r = el.getBoundingClientRect();
+      const mx = (r.width * (k - 1)) / 2, my = (r.height * (k - 1)) / 2;
+      x = Math.min(mx, Math.max(-mx, x));
+      y = Math.min(my, Math.max(-my, y));
+    };
+    /** Zoom to `to` about a point on screen, keeping that point under the finger. */
+    const zoomAt = (to: number, cx: number, cy: number) => {
+      const r = el.getBoundingClientRect();
+      const px = cx - r.left - r.width / 2, py = cy - r.top - r.height / 2;
+      x = px - ((px - x) * to) / k;
+      y = py - ((py - y) * to) / k;
+      k = to;
+      clamp();
+    };
+    const pts = new Map<number, { x: number; y: number }>();
+    let last: { d: number; cx: number; cy: number } | null = null;
+    let tapAt = 0;
+    const down = (e: PointerEvent) => {
+      el.setPointerCapture(e.pointerId);
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      last = null;
+      a.style.transition = "none";
+    };
+    const move = (e: PointerEvent) => {
+      const p = pts.get(e.pointerId);
+      if (!p) return;
+      const was = { ...p };
+      p.x = e.clientX;
+      p.y = e.clientY;
+      if (pts.size === 2) {
+        const [m, n] = [...pts.values()] as [{ x: number; y: number }, { x: number; y: number }];
+        const now = { d: Math.hypot(m.x - n.x, m.y - n.y), cx: (m.x + n.x) / 2, cy: (m.y + n.y) / 2 };
+        if (last) {
+          x += now.cx - last.cx;
+          y += now.cy - last.cy;
+          zoomAt((k * now.d) / last.d, now.cx, now.cy);
+        }
+        last = now;
+      } else if (k > 1) {
+        x += p.x - was.x;
+        y += p.y - was.y;
+        clamp();
+      }
+      show();
+    };
+    const up = (e: PointerEvent) => {
+      const p = pts.get(e.pointerId);
+      pts.delete(e.pointerId);
+      last = null;
+      if (!p || pts.size) return;
+      // A double tap: in to 2.5 times on that spot, or back out to fit (Photos).
+      const now = e.timeStamp;
+      if (now - tapAt < 300) {
+        a.style.transition = "transform var(--t-3) var(--ease-out)";
+        if (k > 1) [k, x, y] = [1, 0, 0];
+        else zoomAt(2.5, e.clientX, e.clientY);
+        show();
+        tapAt = 0;
+      } else tapAt = now;
+    };
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+    };
+  }, [svg]);
+
+  return createPortal(
+    <Trap>
+    <div className="diagram-view" role="dialog" aria-modal="true" aria-label="Diagram">
+      <div className="diagram-head">
+        <span className="diagram-name">{name}</span>
+        <button className="diagram-done" onClick={onClose}>
+          Done
+        </button>
+      </div>
+      <div ref={stage} className="diagram-stage">
+        {failed ? (
+          <p className="diagram-empty">Diagram {name}: {failed}</p>
+        ) : svg === "" ? (
+          <p className="diagram-empty">Empty diagram. Draw in it on your Mac.</p>
+        ) : (
+          // Markup the editor drew from the file, text escaped by React (the note's preview does the same).
+          svg && <div ref={art} className="diagram-art" dangerouslySetInnerHTML={{ __html: svg }} />
+        )}
+      </div>
+    </div>
+    </Trap>,
+    document.body,
+  );
+}

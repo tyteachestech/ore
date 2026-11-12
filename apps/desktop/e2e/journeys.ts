@@ -12,7 +12,7 @@
 import { chromium, devices, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { $ } from "bun";
 
 const MOCK = join(import.meta.dir, "../scripts/mock");
@@ -9545,6 +9545,80 @@ const itemFile = (lib: string, slug: string, name: string) => {
   return join(lib, "items", year, readdirSync(join(lib, "items", year)).find((d) => d.startsWith(slug))!, name);
 };
 const cardFile = (lib: string, text: string) => join(lib, "cards", readdirSync(join(lib, "cards")).find((f) => f.endsWith(".md") && readFileSync(join(lib, "cards", f), "utf8").includes(text))!);
+
+journey("phone: Review's ⋯ puts an exercise off with Later before its answer, and edits it after (D227)", async (page) => {
+  // The phone's Review had no Later (D192 kept it on the Mac) and Edit only in a toolbar beside Ask, which needs the Mac.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const q = page.locator(".review-q");
+  await q.waitFor();
+  const first = await q.innerText();
+  const more = page.getByRole("button", { name: "Exercise actions" });
+  await tap(page, more);
+  if (await page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }).count()) throw new Error("Edit shows before the answer, which would give it away");
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+  await until("Later moves on", async () => (await q.innerText()) !== first);
+  if (await page.getByRole("button", { name: "Ask about this" }).count()) throw new Error("Ask is on the phone, which can't run the AI");
+  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await tap(page, more);
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
+  await page.getByRole("button", { name: "Save" }).waitFor();
+}, "phone");
+
+journey("phone: the note's keyboard bar moves a block, edits a table and adds a picture; a diagram opens to view (D227)", async (page) => {
+  const notes = (lib: string) => itemFile(lib, "the-testing-effect", "notes.md");
+  const diagram = join(dirname(itemFile(PHONE_LIB, "the-testing-effect", "notes.md")), "diagrams", "loop.excalidraw");
+  mkdirSync(dirname(diagram), { recursive: true });
+  writeFileSync(diagram, JSON.stringify({ type: "excalidraw", version: 2, elements: [{ id: "a", type: "rectangle", x: 0, y: 0, width: 160, height: 70, angle: 0, strokeColor: "#1e1e1e", backgroundColor: "transparent", fillStyle: "solid", strokeWidth: 2, roughness: 0, opacity: 100, seed: 1, version: 1, isDeleted: false, boundElements: [], groupIds: [], roundness: null }], appState: {}, files: {} }));
+  const extra = "\n\n![Diagram](diagrams/loop.excalidraw)\n\n| Term | Meaning |\n| --- | --- |\n| Spacing | Gaps between reviews |\n\nfirst line\n\nsecond line\n\nthird line";
+  try {
+    await macChanges(notes, "= hypercorrection", `= hypercorrection${extra}`, async () => {
+      await page.reload();
+      await page.locator(".phone-app").waitFor();
+      await phoneSource(page, TESTING);
+      await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+      const note = page.locator(".phone-reader [contenteditable=true]").first();
+      const bar = page.locator(".kb-bar");
+      // Move: ⋮⋮ ▸ Move picks the block up, ↑ carries it, Done puts the caret back in it.
+      await tap(page, note.locator("p").filter({ hasText: "third line" }));
+      await tap(page, bar.getByRole("button", { name: "Block actions" }));
+      await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Move", exact: true }));
+      await tap(page, bar.getByRole("button", { name: "Move up" }));
+      await tap(page, bar.getByRole("button", { name: "Move up" }));
+      await tap(page, bar.getByRole("button", { name: "Done moving" }));
+      await until("third line moved above first line", async () => {
+        const t = await note.innerText();
+        return t.indexOf("third line") < t.indexOf("first line");
+      });
+      // A table cell swaps the block kinds for the table's edits.
+      await tap(page, note.locator("td").filter({ hasText: "Gaps" }));
+      await bar.getByRole("button", { name: "Table actions" }).waitFor();
+      if (await bar.getByRole("button", { name: "To-do" }).count()) throw new Error("the bar offers To-do inside a table cell");
+      const rows = await note.locator("tr").count();
+      await tap(page, bar.getByRole("button", { name: "Table actions" }));
+      await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Insert row below", exact: true }));
+      await until("a row was added", async () => (await note.locator("tr").count()) === rows + 1);
+      // A picture: iOS's own sheet answers the file field.
+      await tap(page, note.locator("p").filter({ hasText: "second line" }));
+      const chooser = page.waitForEvent("filechooser");
+      await tap(page, bar.getByRole("button", { name: "Add a picture" }));
+      await (await chooser).setFiles({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
+      await until("the picture is in the note", async () => (await note.locator("img").count()) === 1);
+      // A diagram opens to view, with no way to draw on it.
+      await tap(page, note.locator(".note-diagram").first());
+      const view = page.locator(".diagram-view");
+      await view.locator(".diagram-art svg").waitFor();
+      if (await page.locator(".kb-bar").count()) throw new Error("the keyboard bar stayed over the diagram");
+      if (await view.locator(".draw, [role=toolbar]").count()) throw new Error("the phone's diagram has drawing tools");
+      await tap(page, view.getByRole("button", { name: "Done" }));
+      await view.waitFor({ state: "detached" });
+    });
+  } finally {
+    rmSync(dirname(diagram), { recursive: true, force: true });
+  }
+}, "phone");
 
 journey("phone: a kept draft goes when the Mac changes what it answered, and nothing is kept before he types", async (page) => {
   // Kept drafts outlived their questions: Finish kept one (with a copy of the questions) the moment it opened, and

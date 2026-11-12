@@ -25,6 +25,10 @@ g.process = {
     throw new Error("no processes on iPhone");
   },
 };
+// The CLI reads pasted bytes (a picture for a note, a file for the tutor) as `Buffer.from(base64, "base64")`.
+g.Buffer ??= {
+  from: (s: string, enc?: string) => (enc === "base64" ? Uint8Array.from(atob(s), (c) => c.charCodeAt(0)) : new TextEncoder().encode(s)),
+};
 g.require = (m: string) => {
   if (m === "yaml") return YAML;
   throw new Error(`require(${m}) on iPhone`);
