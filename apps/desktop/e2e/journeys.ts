@@ -3381,6 +3381,38 @@ journey("Home: ⌘-click and ⇧-click pick Continue reading rows, ⋯ acts on t
   await page.mouse.up();
   await page.getByText(`Filed “${title}” under ${names[k]}`).first().waitFor();
   if (await page.locator(".doc-head").count()) throw new Error("the drop opened the source");
+  // ⌘Z takes it back off the skill.
+  const id = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === title)!.id;
+  await page.keyboard.press("Meta+KeyZ");
+  await until("⌘Z takes the drop back", async () => !((await ore("show", id)) as { skills: string[] }).skills.includes(ids[k]!));
+});
+
+journey("All sources: a row dragged onto a sidebar skill is filed there, and ⌘Z takes it back off (F20)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row", { hasText: TESTING }).first();
+  await row.waitFor();
+  const under = ((await ore("ls")) as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!;
+  const targets = page.locator(".sidebar .side-item[data-drop-skill]:not([data-drop-skill=''])");
+  const ids = await targets.evaluateAll((els) => els.map((el) => el.getAttribute("data-drop-skill")!));
+  const k = ids.findIndex((id) => !under.skills.includes(id));
+  const name = (await targets.nth(k).innerText()).trim();
+  const from = (await row.boundingBox())!;
+  const to = (await targets.nth(k).boundingBox())!;
+  await page.mouse.move(from.x + 60, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 100, from.y + from.height / 2, { steps: 4 });
+  await page.locator(".row-ghost").waitFor();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  // A real write takes a moment: ⌘Z pressed at once, before it lands, still takes the drop back.
+  await page.evaluate(() => ((window as { __ORE_SLOW?: Record<string, number> }).__ORE_SLOW = { edit: 600 }));
+  await page.mouse.up();
+  await page.keyboard.press("Meta+KeyZ");
+  await page.evaluate(() => delete (window as { __ORE_SLOW?: unknown }).__ORE_SLOW);
+  const on = async () => ((await ore("show", under.id)) as { skills: string[] }).skills.includes(ids[k]!);
+  await page.getByText(`Undone: Filed “${TESTING}” under ${name}`).first().waitFor();
+  await until("⌘Z takes the drop back", async () => !(await on()));
+  await page.waitForTimeout(800);
+  if (await on()) throw new Error("the drop's write landed after its undo");
 });
 
 journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at once, ⇧⌘U marks the selected one, Esc clears (F9)", async (page) => {
@@ -3394,7 +3426,7 @@ journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at on
     const post = (n: number) => page.locator(".row.post", { hasText: `Pick post ${n}` });
     await post(3).waitFor();
     // In Unread a read post leaves the list; in All it stays, dimmed.
-    const isRead = async (n: number) => !(await post(n).count()) || (await post(n).getAttribute("class"))!.includes("read");
+    const isRead = (n: number) => post(n).evaluateAll((els) => !els.length || els[0]!.classList.contains("read"));
     await post(1).click({ modifiers: ["Meta"] });
     await post(3).click({ modifiers: ["Shift"] });
     await until("⌘-click then ⇧-click pick three posts", async () => (await page.locator(".row.post.sel").count()) === 3);
@@ -3408,6 +3440,13 @@ journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at on
     await page.getByRole("menuitem", { name: "Mark 2 read" }).click();
     await until("both are read", async () => (await isRead(1)) && (await isRead(2)));
     await page.getByText("Marked 2 posts read").first().waitFor();
+    await page.keyboard.press("Meta+KeyZ");
+    await until("⌘Z marks both unread again", async () => !(await isRead(1)) && !(await isRead(2)));
+    await post(2).click({ modifiers: ["Meta"] });
+    await post(1).click({ modifiers: ["Meta"] });
+    await post(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Mark 2 read" }).click();
+    await until("both are read again", async () => (await isRead(1)) && (await isRead(2)));
     await until("the pick is cleared", async () => (await page.locator(".row.post.sel").count()) === 0);
     await page.locator(".feed-list").focus();
     for (let n = 0; n < 20 && !(await page.locator(".row.post.on", { hasText: "Pick post 3" }).count()); n++) await page.keyboard.press("ArrowDown");
