@@ -9019,6 +9019,64 @@ async function phoneSource(page: Page, title: string) {
   await page.locator(".phone-reader .doc").first().waitFor();
 }
 
+journey("phone: reopening on a source that left the library lands on Today, not an error with its id", async (page) => {
+  // Found in the Simulator: a place saved before the source was deleted (on the Mac, or by a new build) showed
+  // `no item matches "01M4…"` and a lowercase "back to sources" instead of the app.
+  await page.evaluate(() => localStorage.setItem("ore-phone-place", JSON.stringify({ tab: "today", skill: null, openId: "01M4J53NB45RYFGW1DQNGWYGWD", review: null })));
+  await page.reload();
+  await page.getByRole("button", { name: "Start review" }).waitFor();
+  if (await page.getByText(/no item matches/).count()) throw new Error("the missing source's error is on screen");
+}, "phone");
+
+journey("phone: a tap on a source's cut-off title shows all of it", async (page) => {
+  // Found in the Simulator: the title stopped at four lines and nothing showed the rest (the Sources row cuts it too).
+  await phoneSource(page, "A very long title about the neuroscience");
+  const h1 = page.locator(".phone-reader .doc-head h1");
+  const cut = () => h1.evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+  if (!(await cut())) throw new Error("the long title isn't cut at first: the journey checks nothing");
+  await tap(page, h1);
+  await until("the whole title shows", async () => !(await cut()));
+}, "phone");
+
+journey("phone: typing a long note keeps the line being typed above the keyboard bar", async (page) => {
+  // Found in the Simulator: iOS reveals the caret just above its own keyboard, under the note's bar, so as a
+  // note grew its last line and the caret went under the bar and he typed blind.
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  await tap(page, note);
+  // A browser has no on-screen keyboard: stand one in, as the app's own measure of it sets.
+  await page.evaluate(() => document.documentElement.style.setProperty("--keyboard", "300px"));
+  await page.keyboard.press("Meta+ArrowDown");
+  for (let i = 0; i < 14; i++) await page.keyboard.type(` line ${i} of a note that keeps growing past the bottom of the screen while he types it.`);
+  // Where the caret is: its own box, or on a new empty line (which gives none) its line's.
+  const CARET = `(() => { const sel = getSelection(); const r = sel.getRangeAt(0).getBoundingClientRect(); if (r.height) return r; const n = sel.focusNode; return (n instanceof Element ? n : n.parentElement).getBoundingClientRect(); })()`;
+  // Leave the caret where iOS does, under the bar, and move it as a keystroke does (a browser's own reveal
+  // would lift it: iOS's doesn't know the bar).
+  const underBar = () =>
+    page.evaluate((CARET) => {
+      const sel = getSelection()!;
+      const caret = eval(CARET) as DOMRect;
+      const bar = document.querySelector(".kb-bar")!.getBoundingClientRect();
+      let box = document.activeElement as HTMLElement | null;
+      while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
+      box!.scrollTop -= bar.bottom - 4 - caret.bottom;
+      sel.collapse(sel.focusNode, sel.focusOffset);
+    }, CARET);
+  const above = () =>
+    page.evaluate((CARET) => {
+      const caret = eval(CARET) as DOMRect;
+      const bar = document.querySelector(".kb-bar")!.getBoundingClientRect();
+      return caret.bottom > 0 && caret.bottom <= bar.top;
+    }, CARET);
+  await underBar();
+  await until("the caret sits above the keyboard bar", above);
+  // Return at the end starts an empty line, whose caret has no box of its own.
+  await page.keyboard.press("Enter");
+  await underBar();
+  await until("a new empty line sits above the keyboard bar", above);
+}, "phone");
+
 journey("phone: a tap opens Source actions and works the note's keyboard bar", async (page) => {
   // WebKit sends no click after a touch whose pointer-down was prevented: the ⋯ and the bar's buttons did nothing.
   await phoneSource(page, TESTING);

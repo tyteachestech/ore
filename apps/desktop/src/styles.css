@@ -2594,8 +2594,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* A key point ticks from anywhere on its row, as a Reminders row does, not only from its 28pt circle. */
 .phone .quiz-points li { position: relative; min-height: 44px; align-items: center; }
 .phone .quiz-points .quiz-mark::before { content: ""; position: absolute; inset: 0; }
-/* A long title stops at four lines, as Books does; the full title is in the Sources list. */
+/* A long title stops at four lines, as Books does; a tap on it shows the rest (the Sources row cuts it too). */
 .phone .doc-head h1 { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 26px; }
+.phone .doc-head h1.whole { -webkit-line-clamp: unset; }
 /* A tap leaves :hover on the element under the finger: on touch, hover looks like rest. */
 @media (hover: none) {
   .phone :is(.home-skill, .home-read, .pick-row, .phone-sources li button):hover:not(:active) { background: transparent; }
