@@ -1,5 +1,5 @@
 import { GearSix } from "./icons";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from "react";
 import { gemHint, GemRing, NearGoal } from "./Gem";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap } from "./keys";
@@ -16,6 +16,8 @@ import { Thumb } from "./Thumb";
 import { Roll } from "./Roll";
 import { errorText, load, typedLast, useKeptScroll, useLibraryChanges, type Notify } from "./util";
 import { focusQuietly } from "./focus-near";
+import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
+import { RowSensor } from "./drag";
 import { TitleField } from "./TitleField";
 
 const day = () => new Date().toLocaleDateString("sv-SE");
@@ -48,7 +50,7 @@ let backHome = false;
 /** Back (⌘[, the back arrow) is landing on Home. */
 export const comingBackHome = () => void (backHome = true);
 
-export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource: openSource, onOpenSkill: openSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, onCopy, skillMenu, onRetry, notify }: {
+export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource: openSource, onOpenSkill: openSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, onCopy, skillMenu, onRetry, notify, manyMenu, onDragSkill, onDropOnSkill}: {
   items: Item[];
   /** The library has no sources yet (loaded, not loading): Home says how to add the first. */
   empty?: boolean;
@@ -74,6 +76,11 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   /** ⌘C on a focused Continue reading row: copies it as Markdown with its link, as the source lists do. */
   onCopy?: (item: Item) => void;
   skillMenu?: (skill: Skill) => MenuAction[];
+  /** The picked rows' actions (⌘- or ⇧-click), as a source list's for its pick (F9). */
+  manyMenu?: (items: Item[]) => MenuAction[];
+  /** A row dragged from Home: the sidebar skill under the pointer, to light it, and the drop that files it (F10). */
+  onDragSkill?: (skill: string | null) => void;
+  onDropOnSkill?: (items: Item[], skill: string) => void;
   /** Try again also reloads what failed with today's numbers: the sources and the skills. */
   onRetry?: () => void;
   notify: Notify;
@@ -163,6 +170,48 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
 
   // An archived skill's sources wait off Home too (D173).
   const reading = continueReading(items, recent).filter((i) => !archivedOnly(i.skills, skills)).slice(0, 5);
+
+  // Continue reading rows pick as a source list's do (F9, Finder): ⌘-click adds or drops one, ⇧-click
+  // picks the run from the last one clicked, Esc clears; a plain click opens and clears.
+  const [picked, setPicked] = useState<string[]>([]);
+  const anchor = useRef<string | null>(null);
+  const pick = reading.filter((i) => picked.includes(i.id));
+  const clickRow = (e: ReactMouseEvent, i: Item) => {
+    if (e.metaKey || (e.shiftKey && anchor.current)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.metaKey) setPicked((p) => (p.includes(i.id) ? p.filter((x) => x !== i.id) : [...p, i.id]));
+      else {
+        const ids = reading.map((r) => r.id);
+        const [a, b] = [ids.indexOf(anchor.current!), ids.indexOf(i.id)].sort((x, y) => x - y);
+        setPicked(ids.slice(Math.max(0, a!), b! + 1));
+      }
+      if (e.metaKey || !anchor.current) anchor.current = i.id;
+      return;
+    }
+    setPicked([]);
+    anchor.current = null;
+    onOpenSource(i.id);
+  };
+  useEffect(() => {
+    if (!picked.length) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || inTextField(e)) return;
+      setPicked([]);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [picked.length]);
+  // The rows a menu acts on: the pick, when the row is in it.
+  const actionsFor = (i: Item) => (manyMenu && pick.length > 1 && picked.includes(i.id) ? manyMenu(pick) : sourceMenu ? withRename(sourceMenu(i), i) : []);
+  // A row drags onto a sidebar skill to file it there, the whole pick when it is in one (F10, as in the lists).
+  const sensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }));
+  const [drag, setDrag] = useState<{ items: Item[]; at: { x: number; y: number } } | null>(null);
+  const under = (e: DragMoveEvent) => {
+    const start = e.activatorEvent as PointerEvent;
+    const at = { x: start.clientX + e.delta.x, y: start.clientY + e.delta.y };
+    return { at, skill: document.elementFromPoint(at.x, at.y)?.closest<HTMLElement>("[data-drop-skill]")?.dataset.dropSkill || null };
+  };
 
   // ⌘C on the focused Continue reading row copies it, as on a list's selected row; never selected text or a field's.
   useEffect(() => {
@@ -282,20 +331,41 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
       {reading.length > 0 && (
         <section className="home-cont" aria-label="Continue reading">
           <h2 className="home-h">Continue reading</h2>
+          <DndContext
+            sensors={sensors}
+            accessibility={{ container: document.body }}
+            onDragStart={(e) => {
+              const i = reading.find((r) => r.id === e.active.id);
+              const p = e.activatorEvent as PointerEvent;
+              if (i) setDrag({ items: pick.length > 1 && picked.includes(i.id) ? pick : [i], at: { x: p.clientX, y: p.clientY } });
+            }}
+            onDragMove={(e) => {
+              const u = under(e);
+              setDrag((d) => d && { ...d, at: u.at });
+              onDragSkill?.(u.skill);
+            }}
+            onDragEnd={(e) => {
+              const { skill } = under(e);
+              if (drag && skill) onDropOnSkill?.(drag.items, skill);
+              setDrag(null);
+              onDragSkill?.(null);
+            }}
+            onDragCancel={() => (setDrag(null), onDragSkill?.(null))}
+          >
           <div className="home-reading">
             {reading.map((i) => {
               const at = Number(load(`ore.pos.${i.id}`) ?? 0) || 0;
               return (
                 // The title is the row's one control (a button inside a button reads as one to a screen reader);
                 // the skill chips and ⋯ sit beside it. A click anywhere else on the row still opens it.
-                <WithMenu key={i.id} actions={sourceMenu ? () => withRename(sourceMenu(i), i) : []} hold>
-                <div className="home-read" data-id={i.id} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpenSource(i.id)}>
+                <WithMenu key={i.id} actions={sourceMenu ? () => actionsFor(i) : []} hold>
+                <HomeRow id={i.id} drags={!!onDropOnSkill && renaming !== i.id} className={`home-read${picked.includes(i.id) ? " sel" : ""}`} aria-selected={picked.length ? picked.includes(i.id) : undefined} onClick={(e) => (!(e.target as Element).closest("button, a, input") || e.metaKey || e.shiftKey) && !(e.target as Element).closest(".chips, .more, input") && clickRow(e, i)}>
                   <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
                     // Focus goes back to the row once it closes, as after any pick from its menu (keepFocusNear).
                     <TitleField value={i.title} onSave={(t) => onRename!(i, t)} onClose={() => setRenaming(null)} />
                   ) : (
-                    <button className="title home-open" onClick={() => onOpenSource(i.id)}>{i.title}</button>
+                    <button className="title home-open" onClick={(e) => clickRow(e, i)}>{i.title}</button>
                   )}
                   {i.course && <span className="course-of">{i.course.title}</span>}
                   {onRefile && onCreateSkill && (
@@ -308,12 +378,19 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                     <span className="home-meter small"><DotBar className="" share={at} n={10} /></span>
                   </Hint>
                   {/* On hover the ⋯ takes the meter's place, as on every other row (Linear). */}
-                  {sourceMenu && <MoreButton label="Source actions" actions={() => withRename(sourceMenu(i), i)} hoverOnly />}
-                </div>
+                  {sourceMenu && <MoreButton label="Source actions" actions={() => actionsFor(i)} hoverOnly />}
+                </HomeRow>
                 </WithMenu>
               );
             })}
           </div>
+          {drag && (
+            // Follows the pointer, beside it, so the skill under it stays visible (as the lists' ghost does).
+            <div className="row-ghost" style={{ left: drag.at.x + 14, top: drag.at.y + 10 }}>
+              {drag.items.length > 1 ? `${drag.items.length} sources` : drag.items[0]!.title}
+            </div>
+          )}
+          </DndContext>
         </section>
       )}
 
@@ -449,6 +526,30 @@ function Week({ week }: { week: Today["week"] }) {
           </span>
         </Hint>
       ))}
+    </div>
+  );
+}
+
+/** A Continue reading row that drags onto a sidebar skill (F10); a click still opens it, as the drag starts
+ *  only after the pointer moves 6px. The menu's trigger passes its ref and pointer-down too; both run. */
+function HomeRow({ id, drags, children, ref, ...props }: { id: string; drags: boolean; children: ReactNode; ref?: Ref<HTMLDivElement> } & Omit<HTMLAttributes<HTMLDivElement>, "id">) {
+  const { setNodeRef, listeners } = useDraggable({ id, disabled: !drags });
+  const setRef = (el: HTMLDivElement | null) => {
+    setNodeRef(el);
+    if (typeof ref === "function") ref(el);
+    else if (ref) ref.current = el;
+  };
+  return (
+    <div
+      ref={setRef}
+      data-id={id}
+      {...props}
+      onPointerDown={(e) => {
+        props.onPointerDown?.(e);
+        listeners?.onPointerDown?.(e);
+      }}
+    >
+      {children}
     </div>
   );
 }

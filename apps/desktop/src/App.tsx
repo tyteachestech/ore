@@ -293,6 +293,8 @@ export function App() {
   const [rowDrag, setRowDrag] = useState<{ item: Item; course?: Extract<Line, { kind: "course" }>; many?: Item[]; skill: string | null; at: { x: number; y: number } } | null>(null);
   /** Where a dragged pinned row would land among the pinned (Raycast's pinned reorder). */
   const [pinDrop, setPinDrop] = useState<PinGap | null>(null);
+  /** The sidebar skill under a Continue reading row dragged from Home (F10), lit as the lists light theirs. */
+  const [homeDrop, setHomeDrop] = useState<string | null>(null);
   const rowSensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }));
   const { notify, progress, clear: clearToast, view: toast } = useToast();
   const tutor = useTutorChat(notify);
@@ -1653,11 +1655,11 @@ export function App() {
   const copyPaths = (list: Item[]) =>
     void navigator.clipboard.writeText(list.map(pathOf).join("\n")).then(() => notify(list.length > 1 ? `Copied ${list.length} paths` : "Path copied"), (e) => notify(errorText(e), "error"));
   const sourcesN = (n: number) => `${n} source${n === 1 ? "" : "s"}`;
-  const archiveMany = () => batch(`Archived ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null);
-  const restoreMany = () => batch(`Restored ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])));
-  const moveMany = (to: Item["status"]) =>
-    batch(`Moved ${sourcesN(many.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }));
-  const fileMany = (k: Skill, on: boolean) => fileItems(many, sourcesN(many.length), k, on);
+  const archiveMany = (sel = many) => batch(`Archived ${sourcesN(sel.length)}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, sel);
+  const restoreMany = (sel = many) => batch(`Restored ${sourcesN(sel.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])), undefined, undefined, sel);
+  const moveMany = (to: Item["status"], sel = many) =>
+    batch(`Moved ${sourcesN(sel.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }), undefined, sel);
+  const fileMany = (k: Skill, on: boolean, sel = many) => fileItems(sel, sourcesN(sel.length), k, on);
   /** Puts `k` on each of these sources, or takes it off, each keeping its other skills. */
   const fileItems = (sel: Item[], what: string, k: Skill, on: boolean) => {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
@@ -1670,28 +1672,28 @@ export function App() {
     );
   };
   /** The picked sources' actions: the same as one row's that make sense for many, named for the count. */
-  const manyActions = (): MenuAction[] => {
-    const what = sourcesN(many.length);
-    if (many.every((i) => i.archived_at)) return [{ id: "restore", label: `Restore ${what}`, run: restoreMany }];
+  const manyActions = (sel = many): MenuAction[] => {
+    const what = sourcesN(sel.length);
+    if (sel.every((i) => i.archived_at)) return [{ id: "restore", label: `Restore ${what}`, run: () => restoreMany(sel) }];
     return [
-      many.every((i) => i.status === "done")
-        ? { id: "toread", label: `Move ${what} to To read`, run: () => moveMany("reading") }
-        : { id: "done", label: `Move ${what} to Done`, run: () => moveMany("done") },
+      sel.every((i) => i.status === "done")
+        ? { id: "toread", label: `Move ${what} to To read`, run: () => moveMany("reading", sel) }
+        : { id: "done", label: `Move ${what} to Done`, run: () => moveMany("done", sel) },
       ...(skills.length
         ? [{
             id: "skills",
             label: "Skills",
             run: () => {},
             sub: skills.map((k) => {
-              const all = many.every((i) => i.skills.includes(k.id));
-              return { id: k.id, label: k.name, icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: all, run: () => fileMany(k, !all) };
+              const all = sel.every((i) => i.skills.includes(k.id));
+              return { id: k.id, label: k.name, icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: all, run: () => fileMany(k, !all, sel) };
             }),
           }]
         : []),
-      { id: "copy", label: `Copy ${what} as Markdown`, hint: label(keys.copy), divider: true, run: () => copySources(many) },
-      { id: "path", label: "Copy paths", hint: label(keys.path), run: () => copyPaths(many) },
+      { id: "copy", label: `Copy ${what} as Markdown`, hint: label(keys.copy), divider: true, run: () => copySources(sel) },
+      { id: "path", label: "Copy paths", hint: label(keys.path), run: () => copyPaths(sel) },
       showMenu,
-      { id: "archive", label: `Archive ${what}`, hint: label(keys.archive), danger: true, divider: true, run: archiveMany },
+      { id: "archive", label: `Archive ${what}`, hint: label(keys.archive), danger: true, divider: true, run: () => archiveMany(sel) },
     ];
   };
 
@@ -2272,7 +2274,7 @@ export function App() {
         hidden={collapsed && !peek}
         peek={collapsed && peek}
         onPointer={(over) => (over ? clearTimeout(peekTimer.current) : peekOut())}
-        drop={dropping ? (dropping.skill ?? "") : (rowDrag?.skill ?? undefined)}
+        drop={dropping ? (dropping.skill ?? "") : (rowDrag?.skill ?? homeDrop ?? undefined)}
         onOpen={openSkill}
         menu={skillMenu}
         onCreated={(s) => {
@@ -2406,6 +2408,14 @@ export function App() {
             // Home shows none but ⌘C, which copies the focused row (onCopy).
             sourceMenu={(i) => rowActions(i).map((a) => (a.id === "copy" ? a : { ...a, hint: undefined }))}
             onCopy={(i) => copySources([i])}
+            manyMenu={(sel) => manyActions(sel).filter((a) => a.id !== "show").map((a) => (a.id === "copy" ? a : { ...a, hint: undefined }))}
+            onDragSkill={setHomeDrop}
+            onDropOnSkill={(sel, id) => {
+              const k = skills.find((x) => x.id === id);
+              if (!k || sel.every((i) => i.skills.includes(k.id))) return;
+              if (sel.length > 1) fileMany(k, true, sel);
+              else void fileSource(sel[0]!, k);
+            }}
             onRename={(i, t) => retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
             onRetry={reload}

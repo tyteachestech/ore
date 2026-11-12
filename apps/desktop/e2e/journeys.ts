@@ -3297,6 +3297,79 @@ journey("Add: Esc puts focus back on the + Add or Add a source that opened it, o
   await roundTrip("a skill page", page.getByRole("button", { name: /Add a source/ }).first());
 });
 
+journey("Home: ⌘-click and ⇧-click pick Continue reading rows, ⋯ acts on them all, Esc clears; a row dragged onto a sidebar skill is filed there, as in the source lists (F9, F10)", async (page) => {
+  await openSource(page, AGENTS);
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const rows = page.locator(".home-read");
+  await rows.nth(1).waitFor();
+  const picked = () => page.locator(".home-read.sel").count();
+  await rows.nth(0).click({ modifiers: ["Meta"] });
+  await rows.nth(1).click({ modifiers: ["Shift"] });
+  await until("⌘-click then ⇧-click pick two rows", async () => (await picked()) === 2);
+  if (await page.locator(".doc-head").count()) throw new Error("a ⌘-click opened the source");
+  await rows.nth(1).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Archive 2 sources" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await until("Esc clears the pick", async () => (await picked()) === 0);
+  // Dragged onto a skill it isn't under, a row is filed there.
+  const title = (await rows.nth(0).locator(".title").innerText()).trim();
+  const under = ((await ore("ls")) as { title: string; skills: string[] }[]).find((i) => i.title === title)!.skills;
+  const targets = page.locator(".sidebar .side-item[data-drop-skill]:not([data-drop-skill=''])");
+  const names = (await targets.allInnerTexts()).map((t) => t.trim());
+  const ids = await targets.evaluateAll((els) => els.map((el) => el.getAttribute("data-drop-skill")!));
+  const k = ids.findIndex((id) => !under.includes(id));
+  if (k < 0) throw new Error(`no skill “${title}” isn't under`);
+  const from = (await rows.nth(0).locator(".thumb, .title").first().boundingBox())!;
+  const to = (await targets.nth(k).boundingBox())!;
+  await page.mouse.move(from.x + 4, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 40, from.y + from.height / 2, { steps: 4 });
+  await page.locator(".row-ghost").waitFor();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  await until("the skill under the pointer is lit", async () => (await targets.nth(k).getAttribute("class"))?.includes("drop-on") ?? false);
+  await page.mouse.up();
+  await page.getByText(`Filed “${title}” under ${names[k]}`).first().waitFor();
+  if (await page.locator(".doc-head").count()) throw new Error("the drop opened the source");
+});
+
+journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at once, ⇧⌘U marks the selected one, Esc clears (F9)", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const item = (n: number) => `<item><title>Pick post ${n}</title><link>http://localhost/pick-${n}.html</link><pubDate>${day}</pubDate></item>`;
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Pick Notes</title><link>http://localhost/</link>${[1, 2, 3].map(item).join("")}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", feed);
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const post = (n: number) => page.locator(".row.post", { hasText: `Pick post ${n}` });
+    await post(3).waitFor();
+    // In Unread a read post leaves the list; in All it stays, dimmed.
+    const isRead = async (n: number) => !(await post(n).count()) || (await post(n).getAttribute("class"))!.includes("read");
+    await post(1).click({ modifiers: ["Meta"] });
+    await post(3).click({ modifiers: ["Shift"] });
+    await until("⌘-click then ⇧-click pick three posts", async () => (await page.locator(".row.post.sel").count()) === 3);
+    if (await page.locator(".post-view, .doc-head").count()) throw new Error("a ⌘-click opened the post");
+    await page.keyboard.press("Escape");
+    await until("Esc clears the pick", async () => (await page.locator(".row.post.sel").count()) === 0);
+    await post(1).click({ modifiers: ["Meta"] });
+    await post(2).click({ modifiers: ["Meta"] });
+    await until("⌘-click picks two posts", async () => (await page.locator(".row.post.sel").count()) === 2);
+    await post(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Mark 2 read" }).click();
+    await until("both are read", async () => (await isRead(1)) && (await isRead(2)));
+    await page.getByText("Marked 2 posts read").first().waitFor();
+    await until("the pick is cleared", async () => (await page.locator(".row.post.sel").count()) === 0);
+    await page.locator(".feed-list").focus();
+    for (let n = 0; n < 20 && !(await page.locator(".row.post.on", { hasText: "Pick post 3" }).count()); n++) await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Shift+Meta+KeyU");
+    await until("⇧⌘U marks the selected post read", async () => isRead(3));
+  } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
 journey("Home and Feed: ⌘C on the focused row copies it as Markdown with its link, as a list's selected row does", async (page) => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   const clip = () => page.evaluate(() => navigator.clipboard.readText());

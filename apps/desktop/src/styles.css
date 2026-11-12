@@ -270,7 +270,7 @@ kbd {
 img.thumb[data-kind="pdf"], img.thumb[data-kind="epub"] { object-position: top; }
 /* No white glare on dark; full strength on hover and selection. */
 img.thumb { filter: brightness(0.86); }
-.row:hover .thumb, .row.on .thumb, .row.sel .thumb, .home-read:hover .thumb, [cmdk-item][data-selected="true"] .thumb { opacity: 1; filter: none; }
+.row:hover .thumb, .row.on .thumb, .row.sel .thumb, .home-read:hover .thumb, .home-read.sel .thumb, [cmdk-item][data-selected="true"] .thumb { opacity: 1; filter: none; }
 .thumb-at { position: relative; flex: none; display: flex; }
 .thumb-bar { position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; border-radius: 1px; background: var(--bg-active); overflow: hidden; }
 .row .col { flex: none; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1968,6 +1968,7 @@ button.home-plan:hover { color: var(--text); }
 .home-reading { display: flex; flex-direction: column; }
 .home-read { display: flex; align-items: center; gap: 12px; height: var(--row); padding: 0 12px; border-radius: var(--radius); text-align: left; color: var(--text); min-width: 0; }
 .home-read:hover { background: var(--bg-hover); }
+.home-read.sel { background: var(--bg-active); }
 /* A row's or tile's ⋯ shows on hover (Linear); on a row it takes the meter's place. */
 .home-read { position: relative; }
 .home-read .more { position: absolute; width: 24px; height: 24px; border-radius: 6px; display: none; place-items: center; color: var(--faint); }
