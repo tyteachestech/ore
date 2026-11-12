@@ -6,7 +6,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
+import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
