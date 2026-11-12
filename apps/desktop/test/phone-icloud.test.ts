@@ -103,3 +103,12 @@ test("the phone reads the folder, writes back to it, and reads in the Mac's edit
   expect(() => fs.appendFileSync(`${P}/reviews/2026-10.iphone.jsonl`, "{}\n")).toThrow(/still downloading/);
   waiting = [];
 });
+
+test("a picture saved with an atomic write reaches the folder byte for byte", async () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xd8, 0x00, 0x80]);
+  sent.length = 0;
+  fs.writeFileSync(`${P}/items/c-03/assets/.x.png.tmp`, png);
+  fs.renameSync(`${P}/items/c-03/assets/.x.png.tmp`, `${P}/items/c-03/assets/x.png`);
+  await flush();
+  expect(sent).toEqual([["items/c-03/assets/x.png", Buffer.from(png).toString("base64"), true]]);
+});
