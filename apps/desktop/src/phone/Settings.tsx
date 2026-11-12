@@ -5,7 +5,7 @@ import * as Switch from "@radix-ui/react-switch";
 import { useEffect, useRef, useState } from "react";
 import { GOALS, Group, NEW, PlanField, Row, Seg } from "../Settings";
 import { ore, opt, pullFromMac } from "../ore";
-import { errorText, useLibraryChanges, type Notify } from "../util";
+import { errorText, type Notify } from "../util";
 import { syncState } from "./fs";
 import { allowReminders, planReminders } from "./reminder";
 
@@ -16,13 +16,13 @@ const NAME: Record<Key, string> = { goal_minutes: "Minutes a day", weekdays_only
 /** A reminder turned on starts here; the wheel changes it. */
 const FIRST_TIME = "09:00";
 
-export function PhoneSettings({ notify }: { notify: Notify }) {
+/** `reload`: the Mac's changes came in, read again; `onPulled`: Check now brought some. */
+export function PhoneSettings({ reload, onPulled, notify }: { reload: number; onPulled: () => void; notify: Notify }) {
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const changes = useLibraryChanges();
   useEffect(() => {
     ore<{ review: Review }>("settings").then((d) => setReview(d.review), (e) => setError(errorText(e)));
-  }, [changes]);
+  }, [reload]);
   const now = useRef(review);
   now.current = review;
 
@@ -81,7 +81,7 @@ export function PhoneSettings({ notify }: { notify: Notify }) {
         </>
       )}
       <Group title="iCloud">
-        <Sync />
+        <Sync onPulled={onPulled} />
       </Group>
     </div>
   );
@@ -100,7 +100,7 @@ function ReminderTime({ value, onSave }: { value: string; onSave: (t: string) =>
 }
 
 /** Whether the library on this phone is the one in iCloud: what is still on its way, or why it isn't. */
-function Sync() {
+function Sync({ onPulled }: { onPulled: () => void }) {
   const [s, setS] = useState(syncState);
   const [checking, setChecking] = useState(false);
   useEffect(() => {
@@ -109,7 +109,7 @@ function Sync() {
   }, []);
   const check = async () => {
     setChecking(true);
-    await pullFromMac().catch(() => false);
+    if (await pullFromMac().catch(() => false)) onPulled();
     setS(syncState());
     setChecking(false);
   };

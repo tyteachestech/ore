@@ -7406,7 +7406,7 @@ journey("undo that fails: the toast says why, and ⌘Z tries the same step again
 journey("settings: a Review setting goes on the history; ⌘Z takes it back, ⇧⌘Z gives it again", async (page) => {
   await page.keyboard.press("Meta+Comma");
   await page.getByRole("tab", { name: "Review" }).click();
-  const minutes = page.getByRole("radiogroup", { name: "Minutes a day" }).or(page.getByRole("radiogroup", { name: "Minutes a day" }));
+  const minutes = page.getByRole("group", { name: "Minutes a day" }).or(page.getByRole("radiogroup", { name: "Minutes a day" }));
   const on = async () => (await minutes.locator("[data-state=on]").innerText()).trim();
   const was = await on();
   const other = was === "30" ? "5" : "30";
@@ -8846,7 +8846,7 @@ journey("settings: ⌘Z after closing and reopening Settings shows the goal it p
     await page.keyboard.press("Meta+Comma");
     await page.getByRole("tab", { name: "Review" }).click();
   };
-  const minutes = page.getByRole("radiogroup", { name: "Minutes a day" }).or(page.getByRole("radiogroup", { name: "Minutes a day" }));
+  const minutes = page.getByRole("group", { name: "Minutes a day" }).or(page.getByRole("radiogroup", { name: "Minutes a day" }));
   const on = async () => (await minutes.locator("[data-state=on]").innerText()).trim();
   await open();
   const was = await on();

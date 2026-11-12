@@ -47,15 +47,18 @@ const home = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 
 const AGENT_AT = "ore.reminder-agent";
 /** The reminder's time is in skills.yaml, which the iPhone's Settings can change through iCloud (D228): the Mac's
- *  LaunchAgent follows it whenever the library changes. Only the installed app, so a dev build never takes it over. */
+ *  LaunchAgent follows it when Ore opens or comes to the front. Only the installed app, so a dev build never takes it over. */
 export function useReminderAgent() {
-  const changes = useLibraryChanges();
   useEffect(() => {
     if (PHONE || import.meta.env.DEV) return;
-    ore<Data>("settings")
-      .then(({ review: { reminder: t } }) => (load(AGENT_AT) === t ? undefined : invoke("set_reminder", { time: t || null }).then(() => save(AGENT_AT, t))))
-      .catch(() => {});
-  }, [changes]);
+    const follow = () =>
+      void ore<Data>("settings")
+        .then(({ review: { reminder: t } }) => (load(AGENT_AT) === t ? undefined : invoke("set_reminder", { time: t || null }).then(() => save(AGENT_AT, t))))
+        .catch(() => {});
+    follow();
+    addEventListener("focus", follow);
+    return () => removeEventListener("focus", follow);
+  }, []);
 }
 
 /** ⌘, (Codex, Linear): sections on the left, each a page of grouped rows with a title, one line on

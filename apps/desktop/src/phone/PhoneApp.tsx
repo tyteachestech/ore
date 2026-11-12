@@ -242,12 +242,14 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
 type Line = { kind: "item"; item: Item } | { kind: "course"; id: string; title: string; url?: string; lessons: Item[]; next: Item | null };
 const toReadOrder = (a: Item, b: Item) => Number(!a.pinned_at) - Number(!b.pinned_at) || (a.pinned_at ?? "").localeCompare(b.pinned_at ?? "") || touched(b).localeCompare(touched(a));
 
-/** `list` as lines, each course once (in To read while any lesson is left, in Done once all are, as on the Mac). */
+/** The tab's rows of `list` as lines, each course once where its first lesson in the tab sorts, in To read while
+ *  any lesson is left and in Done once all are (App.tsx `groups`). */
 function linesOf(list: Item[], status: "toread" | "done"): Line[] {
   const seen = new Set<string>();
   return list.flatMap((item): Line[] => {
+    if ((item.status === "done") !== (status === "done")) return [];
     const c = item.course;
-    if (!c) return (item.status === "done") === (status === "done") ? [{ kind: "item", item }] : [];
+    if (!c) return [{ kind: "item", item }];
     if (seen.has(c.id)) return [];
     seen.add(c.id);
     const lessons = lessonsOf(list, c.id);
@@ -448,6 +450,12 @@ export function PhoneApp() {
   }, [tab, skill, skillNote, course, settings, openId, noting, side, finishing, recorded, reviewing]);
   const tabNow = useRef(tab);
   tabNow.current = tab;
+  /** The Mac's changes have come in: every screen reads again, and the reminders follow a goal met there. */
+  const pulled = () => {
+    setTick((t) => t + 1);
+    void refresh();
+    void planReminders();
+  };
   const refresh = useCallback(async () => {
     try {
       const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
@@ -489,20 +497,16 @@ export function PhoneApp() {
   useEffect(() => void (refresh(), planReminders()), [refresh]);
   // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
   useEffect(() => {
-    const check = () =>
-      void pullFromMac().then((changed) => {
-        if (!changed) return;
-        setTick((t) => t + 1);
-        void refresh();
-      });
-    // Leaving the screen (or coming back) plans the reminders again: today's goes once the goal is met.
-    const back = () => (void planReminders(), !document.hidden && check());
+    const check = () => void pullFromMac().then((changed) => changed && pulled());
+    const back = () => !document.hidden && check();
+    // Leaving the screen plans the reminders again: today's goes once the goal is met (the Mac's changes, in `pulled`).
+    const seen = () => (document.hidden ? void planReminders() : check());
     const every = setInterval(back, 30_000);
     const failed = (e: Event) => notify(`Couldn’t save to iCloud: ${(e as CustomEvent<string>).detail}`, "error");
-    addEventListener("visibilitychange", back);
+    addEventListener("visibilitychange", seen);
     addEventListener("ore:save-failed", failed);
-    return () => (clearInterval(every), removeEventListener("visibilitychange", back), removeEventListener("ore:save-failed", failed));
-  }, [refresh, notify]);
+    return () => (clearInterval(every), removeEventListener("visibilitychange", seen), removeEventListener("ore:save-failed", failed));
+  }, [refresh, notify]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
   // height, and keep the answer's buttons in sight when it opens.
@@ -770,6 +774,9 @@ export function PhoneApp() {
   const skillOf = skills.find((s) => s.id === skill);
   const skillName = skillOf?.name;
   const courseOf = course ? lessonsOf(items ?? [], course) : [];
+  // A skill gone from the library (deleted on the Mac) closes its page and note, as a gone source does.
+  const skillGone = loaded && !!skill && !skillOf;
+  useEffect(() => void (skillGone && (setSkill(null), setSkillNote(false))), [skillGone]);
   // A course archived or gone (on the Mac) closes its screen.
   const courseGone = loaded && !!course && !courseOf.length;
   useEffect(() => void (courseGone && setCourse(null)), [courseGone]);
@@ -938,10 +945,10 @@ export function PhoneApp() {
           </div>
         </Screen>
       )}
-      {skill && skillNote && (
+      {skillOf && skillNote && (
         <Screen className="phone-full phone-reader" onBack={() => setSkillNote(false)}>
           <Back label={skillName ?? "Back"} onClick={() => setSkillNote(false)} />
-          <SkillNote skill={skill} notify={notify} />
+          <SkillNote skill={skillOf.id} notify={notify} />
         </Screen>
       )}
       {/* A course's lessons in order, pushed over the list its row was in; a lesson opens over it. */}
@@ -956,7 +963,7 @@ export function PhoneApp() {
       {settings && (
         <Screen className="phone-full" onBack={() => setSettings(false)}>
           <Back label={tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} onClick={() => setSettings(false)} />
-          <PhoneSettings notify={notify} />
+          <PhoneSettings reload={tick} onPulled={pulled} notify={notify} />
         </Screen>
       )}
       {over}
