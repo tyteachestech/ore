@@ -1,10 +1,11 @@
 // A video added on a device with no yt-dlp (the iPhone) is in the library at once, its transcript owed;
 // a device that has yt-dlp fills it as a reimport (D227).
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addSource, fillOwed, findItem, reimportSource, transcriptOf } from "../src/index.ts";
+import { paths } from "../src/library.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const realFetch = globalThis.fetch;
@@ -42,6 +43,8 @@ test("with no yt-dlp the video comes in at once with its transcript owed, and a 
   expect(added.body).toBe("");
   // It plays: the reader finds the video, with no words yet.
   expect(transcriptOf(added)).toEqual({ video: "abcdefghijk", words: [] });
+  // What is owed is noted in the inbox, so a pass with nothing owed never reads the sources.
+  expect(readdirSync(paths.inbox(lib))).toEqual([`${added.meta.id}.owed.json`]);
   // The phone itself fills nothing, and says where the transcript comes from when asked to read it again.
   expect(await fillOwed(lib)).toEqual([]);
   expect(reimportSource(lib, added.meta.id)).rejects.toThrow(/through your Mac/);
@@ -57,6 +60,7 @@ test("with no yt-dlp the video comes in at once with its transcript owed, and a 
   expect(now.meta.published).toBe("2026-01-02");
   expect(readFileSync(now.docPath, "utf8")).not.toContain("owed");
   expect(transcriptOf(now)!.words.length).toBeGreaterThan(3);
+  expect(readdirSync(paths.inbox(lib))).toEqual([]);
   expect(await fillOwed(lib)).toEqual([]);
 });
 

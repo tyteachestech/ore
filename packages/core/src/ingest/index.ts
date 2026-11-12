@@ -476,6 +476,10 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   const same = !isUrl && sameText(lib, ready.body);
   const item = same ? await keep(lib, same, opts) : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview });
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
+  if (!same && ready.owed?.length) {
+    mkdirSync(paths.inbox(lib), { recursive: true });
+    writeAtomic(owedNote(lib, item.meta.id), JSON.stringify({ id: item.meta.id, owed: ready.owed }) + "\n");
+  }
   if (!same) await makeThumbnail(item);
   if (!opts.preview) await unarchive(lib, opts.skills); // a Feed post read as a preview isn't filed
   return item;
@@ -742,19 +746,33 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone };
 }
 
+/** Where a source with a part owed is noted, beside the links waiting in inbox/: a pass that finds none
+ *  reads one folder, not every source. */
+const owedNote = (lib: Library, id: string) => join(paths.inbox(lib), `${id}.owed.json`);
+
 /** Fills what a device with no tools left owed (D227): each such source is read again here, as a reimport,
  *  when this device has the tools. One that fails keeps its reason and waits for a Reimport by hand, so a
  *  video that is gone isn't asked for on every pass. */
 export async function fillOwed(lib: Library): Promise<Item[]> {
-  if (!ytDlp()) return [];
+  if (!existsSync(paths.inbox(lib))) return [];
+  const ids = readdirSync(paths.inbox(lib)).filter((n) => n.endsWith(".owed.json") && !n.startsWith(".")).map((n) => n.replace(/\.owed\.json$/, ""));
+  if (!ids.length || !ytDlp()) return [];
   const filled: Item[] = [];
-  for (const i of allItems(lib)) {
-    if (!i.meta.owed?.length || i.meta.owed_error) continue;
+  for (const id of ids) {
+    let item: Item;
     try {
-      filled.push((await reimportSource(lib, i.meta.id)).item);
-    } catch (e) {
-      await updateItemMeta(lib, i.meta.id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) }));
+      item = findItem(lib, id);
+    } catch {
+      continue; // its source hasn't arrived yet (iCloud), or a synced copy of the note
     }
+    if (item.meta.owed?.length && !item.meta.owed_error) {
+      try {
+        filled.push((await reimportSource(lib, id)).item);
+      } catch (e) {
+        await updateItemMeta(lib, id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) }));
+      }
+    }
+    rmSync(owedNote(lib, id), { force: true });
   }
   return filled;
 }
