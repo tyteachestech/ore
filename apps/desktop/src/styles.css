@@ -2612,6 +2612,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .kb-btn { flex: 1 0 44px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
+.phone .review-moment { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
 .phone .menu-item { height: 44px; }
 /* A submenu (a source's Skills) has no room beside its menu at phone width: it rises as a sheet across the bottom.
