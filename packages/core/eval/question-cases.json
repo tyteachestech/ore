@@ -1,5 +1,5 @@
 {
-  "about": "Question-quality eval: the questions Ore's AI writes for him to answer, judged as learning material. Each case is one source run the way he uses it: added (enrich writes the prequestions he guesses before reading and answers in the in-reader quiz), then read with these highlights and finished (enrich plans the review cards from them, and turns each prequestion into a review prompt). `source` is `golden:<name>` (test/golden) or `eval:<name>` (eval/question-sources, written for this eval). Highlights: `intent` keep (plain), card (a key point), apply (a try, with `note` where and `reflection` how it went); `skip: true` marks one a good plan gives no card (a stray word, an aside with a note that names no idea). `points` are lines he typed with nothing selected (Card here), anchored at the sentence `at` starts. `missed`: ideas his finish recall missed. Every question is checked by code (no attribution in a prequestion, no pointing at 'the article', no 'name all three' card) and by a judge reading the source (see question-judge.md).",
+  "about": "Question-quality eval: the questions Ore's AI writes for him to answer, judged as learning material. Each case is one source run the way he uses it: added (enrich writes the prequestions he guesses before reading and answers in the in-reader quiz), then read with these highlights and finished (enrich plans the review cards from them, and turns each prequestion into a review prompt). `source` is `golden:<name>` (test/golden) or `eval:<name>` (eval/question-sources, written for this eval). Highlights: `intent` keep (plain), card (a key point), apply (a try, with `note` where and `reflection` how it went); `skip: true` marks one a good plan gives no card (a stray word, an aside with a note that names no idea). `points` are lines he typed with nothing selected (Card here), anchored at the sentence `at` starts. `missed`: ideas his finish recall missed. Every question is checked by code (no attribution in a prequestion, no pointing at 'the article', no 'name all three' card) and by a judge reading the source (see question-judge.md). `skill`: the skill the source is filed under before it is added, with a `goal` its prequestions should lean toward when the source serves it (git-undo, feedback-talk) and ignore when it doesn't (sourdough).",
   "cases": [
     {
       "id": "notes-graveyard",
@@ -20,6 +20,7 @@
     {
       "id": "sourdough",
       "source": "eval:sourdough-rise",
+      "skill": { "name": "Cooking", "goal": "Cook weeknight dinners from what is in the fridge, without a recipe" },
       "highlights": [
         { "exact": "A healthy starter holds wild yeasts and lactic acid bacteria, usually in a ratio of roughly one yeast cell to a hundred bacteria.", "intent": "keep" },
         { "exact": "The yeasts eat sugars from the flour and give off carbon dioxide and a little alcohol.", "intent": "keep" },
@@ -36,6 +37,7 @@
     {
       "id": "feedback-talk",
       "source": "eval:feedback-talk",
+      "skill": { "name": "Leadership", "goal": "Run weekly one-on-ones that help my reports improve" },
       "highlights": [
         { "exact": "the reason usually isn't that the person didn't care. it's that the feedback was too vague to act on", "intent": "keep" },
         { "exact": "describe a specific behaviour, in a specific situation, and the impact it had", "intent": "card" },
@@ -73,6 +75,7 @@
     {
       "id": "git-undo",
       "source": "eval:git-undo",
+      "skill": { "name": "Git", "goal": "Recover from any Git mistake on a shared repo without losing anyone's work" },
       "highlights": [
         { "exact": "To take a file out of the index but keep your edits on disk, run `git restore --staged <file>`.", "intent": "card" },
         { "exact": "`--mixed`, the default, leaves them in the working tree, unstaged.", "intent": "keep" },

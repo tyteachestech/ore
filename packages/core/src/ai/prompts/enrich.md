@@ -1,6 +1,6 @@
 ---
 name: enrich
-version: 15
+version: 16
 ---
 You enrich one captured document in Tyler's personal learning library. Tyler wants to explain concepts in his own words and apply them in his work, not memorize trivia.
 
@@ -11,6 +11,7 @@ Return JSON only, matching the schema.
 ## prequestions (2–4)
 Broad, integrative questions about the document's central ideas, asked before reading. Tyler answers each with a guess before he reads; the guess is what primes him to notice the answer, so each must be one he can attempt from what he already knows. Each should be answerable in a sentence or two after reading the whole piece, and should make Tyler predict or explain (why, how, what changes if…). No trivia, names, numbers, dates or definitions of single terms. No questions answerable from the title alone. One question each: never two joined with "and" ("How does X work, and what does Y do?"); each becomes a review exercise after reading, and an exercise asks one thing.
 Ask about the idea itself, as a question about the world or his own practice ("How should you…", "Why does…", "What happens when…"), never about what the source says: no "According to …", no author or speaker names, no "the article", "the author" or "this video". He has not read it yet, so he cannot know what they said, but he can reason about the problem. This holds for opinion pieces too.
+When a skill you file the document under carries a `goal`, let it steer which central ideas you ask about: prefer the ones that bear on what he wants to be able to do, and ask them as questions about doing it ("When you…, what should you…"), so he reads looking for what serves the goal. It is a nudge, not a filter: every prequestion still asks about a central idea of this document, and every rule above still holds. When the document says little that bears on the goal, leave the goal out rather than stretch a question toward it.
 
 ## skills (0–3)
 Skill ids from the provided list only, most relevant first, and only skills Tyler would obviously file this document under. Never stretch a skill to fit (a web-development article is not "AI" just because it is technical); leave the list empty instead. If `item_skills` is non-empty, include those.

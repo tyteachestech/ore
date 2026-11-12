@@ -18,7 +18,7 @@ import { initLibrary } from "../src/init.ts";
 import { createItem, findItem, ItemType, setItemStatus, updateItemMeta, type Item } from "../src/items.ts";
 import type { Library } from "../src/library.ts";
 import { sharedRun } from "../src/remix.ts";
-import { loadSkills } from "../src/skills.ts";
+import { addSkill, loadSkills, setItemSkills, setSkillLook } from "../src/skills.ts";
 import { GOLDEN } from "./ask.ts";
 import { columns, costText, pct, pool, range, resultPath, setId, wilson, withVendor } from "./grade.ts";
 
@@ -32,6 +32,8 @@ const QuestionCase = z.strictObject({
   highlights: z.array(Highlight).min(1),
   points: z.array(z.strictObject({ at: z.string().min(1), note: z.string().min(1) })).optional(),
   missed: z.array(z.string()).optional(),
+  /** The skill it is filed under before it is added, with the goal its prequestions should lean toward (or, for a goal the source doesn't serve, ignore). */
+  skill: z.strictObject({ name: z.string().min(1), goal: z.string().min(1) }).optional(),
 });
 export type QuestionCase = z.infer<typeof QuestionCase>;
 
@@ -163,6 +165,11 @@ export async function runCase(root: string, c: QuestionCase, judgeModel: string)
   try {
     await initLibrary(lib.root);
     const item = await addSource(lib, c.source);
+    if (c.skill) {
+      const s = await addSkill(lib, c.skill.name);
+      await setSkillLook(lib, s.id, { goal: c.skill.goal });
+      await setItemSkills(lib, item.meta.id, [s.id]);
+    }
     const added = await enrichItem(lib, item.meta.id);
     add(added.usage);
     const skip = await readAndFinish(lib, findItem(lib, item.meta.id), c);
@@ -179,7 +186,7 @@ export async function runCase(root: string, c: QuestionCase, judgeModel: string)
     const { meta, body } = findItem(lib, item.meta.id);
     const j = await judge(lib.root, item.docPath, {
       source: { title: meta.title, author: meta.author ?? null, type: meta.type },
-      skills: loadSkills(lib).skills.filter((s) => meta.skills.includes(s.id)).map((s) => ({ name: s.name, hook: s.hook })),
+      skills: loadSkills(lib).skills.filter((s) => meta.skills.includes(s.id)).map((s) => ({ name: s.name, hook: s.hook, goal: s.goal ?? null })),
       prequestions: pre.map(({ n, question }) => ({ n, question })),
       cards: qs.map(({ n, kind, question, answer, rubric, from }) => ({ n, kind, question, answer, rubric, from })),
     }, judgeModel);
