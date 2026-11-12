@@ -206,6 +206,8 @@ class ShareViewController: UIViewController {
     pageTitle.text = given ?? host
     site.text = given == nil ? nil : host
     site.isHidden = given == nil
+    // The picture's slot shows from the start, so the title doesn't slide over when the picture comes.
+    thumb.isHidden = false
     preview.isHidden = false
     let provider = LPMetadataProvider()
     provider.timeout = 10
@@ -219,17 +221,19 @@ class ShareViewController: UIViewController {
         self.site.text = host
         self.site.isHidden = false
       }
-      self?.picture(from: got.imageProvider)
+      // A page with no picture of its own shows its site's icon in the slot instead.
+      self?.picture(from: got.imageProvider ?? got.iconProvider, icon: got.imageProvider == nil)
     }
   }
 
-  private func picture(from provider: NSItemProvider?) {
+  private func picture(from provider: NSItemProvider?, icon: Bool = false) {
     guard let provider, provider.canLoadObject(ofClass: UIImage.self) else { return }
     _ = provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
       // Drawn small before it is kept: a page's picture can be thousands of pixels wide, and an extension has little memory.
       guard let small = (image as? UIImage)?.preparingThumbnail(of: CGSize(width: 192, height: 192)) else { return }
       DispatchQueue.main.async {
-        self?.thumb.image = small
+        self?.thumb.contentMode = icon ? .center : .scaleAspectFill
+        self?.thumb.image = icon ? small.preparingThumbnail(of: CGSize(width: 32, height: 32)) : small
         self?.thumb.isHidden = false
       }
     }
