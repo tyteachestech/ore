@@ -160,7 +160,11 @@ async fn library_apply(root: String, ops: Vec<(String, Option<String>, bool)>) -
 #[allow(unused_unsafe)]
 fn container() -> Option<PathBuf> {
     use objc2_foundation::NSFileManager;
-    let url = unsafe { NSFileManager::defaultManager().URLForUbiquityContainerIdentifier(None) }?;
+    let Some(url) = (unsafe { NSFileManager::defaultManager().URLForUbiquityContainerIdentifier(None) }) else {
+        // The Simulator has no iCloud: its library is the app's own Documents, which
+        // `apps/phone/scripts/sim.ts` fills with a scratch library for testing.
+        return if cfg!(target_abi = "sim") { std::env::var_os("HOME").map(PathBuf::from) } else { None };
+    };
     Some(PathBuf::from(unsafe { url.path() }?.to_string()))
 }
 #[cfg(target_os = "ios")]
