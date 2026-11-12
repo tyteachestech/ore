@@ -789,6 +789,55 @@ journey("highlight popup open: typing writes the note, and no letter runs a shor
   if (after !== words + "2") throw new Error(`a 2 typed after the note became “${after}”`);
 });
 
+journey("highlight note: ⇧↵ carries a list on, an empty item ends it, a long note widens the popup, and its tools stay at the top", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "Each successful retrieval changes the memory itself");
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  const note = popup.getByLabel("Note");
+  const tools = popup.locator(".popup-tools");
+  const offset = async () => (await tools.boundingBox())!.y - (await popup.boundingBox())!.y;
+  const top = await offset();
+  const width = (await popup.boundingBox())!.width;
+  await page.keyboard.type("1. cue");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("quiz");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("- a");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("b");
+  const typed = await note.inputValue();
+  if (typed !== "1. cue\n2. quiz\n• a\n• b") throw new Error(`the note shows ${JSON.stringify(typed)}`);
+  if (!(await popup.isVisible())) throw new Error("⇧↵ closed the popup");
+  await page.keyboard.type(" and a longer thought that runs on for a while about how the cue works".repeat(2));
+  await until("a note past four lines widens the popup", async () => (await popup.boundingBox())!.width > width + 40);
+  const box = (await popup.boundingBox())!;
+  if (box.x < 0 || box.x + box.width > page.viewportSize()!.width) throw new Error("the wide popup runs off the window");
+  if (Math.abs((await offset()) - top) > 1) throw new Error("the tools moved down the popup as the note grew");
+  await page.keyboard.press("Enter");
+  await popup.waitFor({ state: "hidden" });
+  // Saved as Markdown: the bullets are "- " in the file, and come back as bullets.
+  await select(page, "Each successful retrieval changes the memory itself");
+  await popup.waitFor();
+  await until("the note comes back with its bullets", async () => (await note.inputValue()).startsWith("1. cue\n2. quiz\n• a\n• b"));
+});
+
+journey("highlight note: \"2.\" in an empty note starts a numbered list, and leaves the type as it was (D133's 2 is Key point)", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "Space the tests out");
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  await page.keyboard.type("2. second");
+  const typed = await popup.getByLabel("Note").inputValue();
+  if (typed !== "2. second") throw new Error(`the note says ${JSON.stringify(typed)}`);
+  await page.waitForTimeout(300);
+  if ((await popup.locator(".intent.card").getAttribute("aria-pressed")) === "true") throw new Error("the 2 left it a Key point");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("x");
+  if ((await popup.getByLabel("Note").inputValue()) !== "2. second\n3. x") throw new Error("⇧↵ didn't count on to 3.");
+});
+
 journey("tutor mole: it sits at the bottom right on every screen, pages keep room to scroll clear of it, and a quiz panel hides it (D160, D168)", async (page) => {
   const button = page.getByRole("button", { name: "Open the tutor" });
   const vp = page.viewportSize()!;
