@@ -9,7 +9,7 @@ import * as YAML from "yaml";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setLibraryRoot } from "./tauri-core";
-import { existsSync, flush, mount, mountDisk, readFileSync, rescan, writeFileSync } from "./fs";
+import { existsSync, mount, mountDisk, readFileSync, rescan } from "./fs";
 import { ready } from "./sqlite";
 
 export const ROOT = "/lib";
@@ -87,22 +87,16 @@ function boot() {
       const root = await invoke<string | null>("library_dir");
       if (!root) throw new Error("Turn on iCloud Drive for Ore: Settings › your name › iCloud › Drive.");
       await invoke<number>("share_inbox", { root }).catch(() => 0);
-      mark("dir");
       await mountDisk(ROOT, root, invoke);
-      mark("mounted");
       // A source's own files (its images) load from the folder itself: /lib/... is the folder on disk.
       setLibraryRoot(ROOT, root);
-      debugAdd();
     } else {
       const text = await (await fetch("/library.json")).text();
       const snap = JSON.parse(text) as Record<string, string>;
       await mount(Object.fromEntries(Object.entries(snap).map(([p, t]) => [`${ROOT}/${p}`, t])), bytesToHex(sha256(new TextEncoder().encode(text))));
     }
     await ready(wasmUrl);
-    mark("sqlite");
-    const m = await import("ore-commands");
-    mark("commands");
-    return m;
+    return await import("ore-commands");
   })();
   // A failed start (iCloud Drive off) tries again on the next command, once he has turned it on.
   booted.catch(() => (booted = null));
@@ -122,23 +116,8 @@ export const pull = () => (booted ? booted.then(() => exclusive(rescan)).catch((
 
 /** `ore <args> --json` in-process: the command's JSON output, or its one-line error. */
 export async function run<T>(args: string[], input: string | null): Promise<T> {
-  const lib = await boot().catch((e) => {
-    throw e instanceof TypeError || e instanceof SyntaxError ? new Error(`Couldn't start: ${e.message}`) : e;
-  });
-  const t0 = performance.now();
-  return exclusive(() => command<T>(lib, args, input)).finally(() => mark(`${args.slice(0, 2).join(" ")} (${Math.round(performance.now() - t0)} ms)`));
-}
-
-/** SPIKE (launch timing): each boot phase and the first commands, as ms since the page started and as
- *  wall-clock time, in `debug-launch.json`, rewritten at each. */
-const marks: [string, number, number][] = [];
-function mark(what: string) {
-  if (marks.length > 20 || !isTauri()) return;
-  marks.push([what, Math.round(performance.now()), Date.now()]);
-  if (existsSync(`${ROOT}/skills.yaml`)) {
-    writeFileSync(`${ROOT}/debug-launch.json`, JSON.stringify({ timeOrigin: Math.round(performance.timeOrigin), marks }, null, 1));
-    void flush();
-  }
+  const lib = await boot();
+  return exclusive(() => command<T>(lib, args, input));
 }
 
 async function command<T>({ commands, errorLine }: typeof import("ore-commands"), args: string[], input: string | null): Promise<T> {
@@ -178,24 +157,3 @@ function picture(path: string): string | undefined {
 const AI = new Set(["grade", "ask", "enrich", "key-points", "research", "remix", "catch-up"]);
 const needsAi = (name: string, args: string[]) =>
   AI.has(name) || (name === "inbox" && args.includes("--import")) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));
-
-/** SPIKE (phone import): `debug-add.json` in the library, a list of links, is imported at launch with
- *  `ore add`; each one's seconds and result go to `debug-add.out.json`. */
-function debugAdd() {
-  if (!existsSync(`${ROOT}/debug-add.json`)) return;
-  const urls = JSON.parse(readFileSync(`${ROOT}/debug-add.json`)) as string[];
-  setTimeout(async () => {
-    const out: unknown[] = [];
-    for (const url of urls) {
-      const t0 = performance.now();
-      try {
-        const r = await run<{ id: string; dir?: string }>(["add", url, "--json"], null);
-        out.push({ url, secs: (performance.now() - t0) / 1000, id: r?.id, dir: r?.dir });
-      } catch (e) {
-        out.push({ url, secs: (performance.now() - t0) / 1000, error: String(e) });
-      }
-      writeFileSync(`${ROOT}/debug-add.out.json`, JSON.stringify(out, null, 1));
-      await flush();
-    }
-  }, 500);
-}

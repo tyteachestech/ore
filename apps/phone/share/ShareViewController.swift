@@ -1,4 +1,4 @@
-// Ore's Share Extension (spike): a link or page shared from Safari or any app becomes one inbox item,
+// Ore's Share Extension: a link or page shared from Safari or any app becomes one inbox item,
 // `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223), in the App Group the app reads at launch.
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
 import UIKit

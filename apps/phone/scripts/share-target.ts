@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// SPIKE: adds the Share Extension (apps/phone/share) to the Xcode project Tauri writes, and the App Group to
+// Adds the Share Extension (apps/phone/share) to the Xcode project Tauri writes, and the App Group to
 // the app's entitlements. Run after `tauri ios init`, which rewrites gen/apple (as ios:init copies entitlements).
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";

@@ -55,9 +55,12 @@ struct Scan {
 
 /// Ore's folder in iCloud Drive, or None when iCloud Drive is off for Ore.
 #[tauri::command]
-async fn library_dir() -> Option<String> {
+async fn library_dir(app: tauri::AppHandle) -> Option<String> {
+    use tauri::Manager;
     let dir = container()?.join("Documents");
     fs::create_dir_all(&dir).ok()?;
+    // A source's saved images, audio and PDF load from the folder through the asset protocol: only this folder.
+    let _ = app.asset_protocol_scope().allow_directory(&dir, true);
     Some(dir.to_string_lossy().into_owned())
 }
 
@@ -194,7 +197,7 @@ async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, S
     .map_err(|e| e.to_string())?
 }
 
-/// SPIKE: links the Share Extension (apps/phone/share) left in the App Group move into the library's inbox
+/// Links the Share Extension (apps/phone/share) left in the App Group move into the library's inbox
 /// (D223), where the app shows them. Returns how many came in.
 #[tauri::command]
 async fn share_inbox(root: String) -> usize {
