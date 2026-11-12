@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type KeyboardE
 import { Grow } from "./Grow";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
-import { is, label, useKeymap } from "./keys";
+import { is, label, useKeymap, keepKeysIn } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
 import { rankScore } from "./match";
 import { errorText, focusQuietly, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
@@ -128,7 +128,7 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
     // Keys typed here never reach the reader (finish, Esc back to sources) or the page.
-    e.stopPropagation();
+    keepKeysIn(e); // ⌘Z still reaches the app history
     // Enter that picks a word from an input method (Japanese, Chinese) is still typing; WKWebView
     // sends that Enter as keyCode 229 with isComposing false.
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
@@ -234,7 +234,7 @@ function Piece({ text, from, onSave, onEditing }: {
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -386,7 +386,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
         }}
         onBlur={() => !busy && document.hasFocus() && (text.trim() ? void add() : onDone(false))}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           if (e.key === "Enter") {
             e.preventDefault();

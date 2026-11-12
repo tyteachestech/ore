@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { ownsUndo } from "./history";
 import { BINDINGS, comboOf, IN_REVIEW, type Combo, type CommandEvent, type KeyId } from "./keys";
 
 // The Mac menu bar (Apple's apps, Things): every command with its shortcut, built from the keymap
@@ -115,15 +116,13 @@ if (typeof window !== "undefined") {
   );
 }
 
-/** A plain text field undoes its own typing: Edit ▸ Undo is ours (so a click reaches the app history,
- *  D82), and macOS's own item, which a field's typing undo hangs on, is gone from the menu. */
-const textField = (el: Element | null): el is HTMLInputElement | HTMLTextAreaElement =>
-  !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA") && !el.hasAttribute("data-app-undo");
+/* A plain text field undoes its own typing (`ownsUndo`): Edit ▸ Undo is ours (so a click reaches the
+ * app history, D82), and macOS's own item, which a field's typing undo hangs on, is gone from the menu. */
 
 /** Runs a menu click as its shortcut, unless the same key press already reached the page. */
 export function runMenu(id: KeyId, keymap: Record<KeyId, Combo>, now = performance.now()) {
   // ⌘Z in a field reaches the menu too (the page left it alone), so it is never dropped as a repeat.
-  if ((id === "undo" || id === "redo") && textField(document.activeElement)) {
+  if ((id === "undo" || id === "redo") && ownsUndo(document.activeElement)) {
     document.execCommand(id);
     return;
   }

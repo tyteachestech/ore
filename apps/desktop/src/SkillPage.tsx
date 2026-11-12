@@ -10,7 +10,7 @@ import { useSplit } from "./split";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import * as Popover from "@radix-ui/react-popover";
 import { focusFilter, IconPicker, SkillIcon } from "./IconPicker";
-import { is, isNotes, label, useKeymap } from "./keys";
+import { is, isNotes, label, useKeymap, keepKeysIn } from "./keys";
 import { clickBelow, LinkedFrom, NoteBody, useNotes } from "./Notes";
 import { FindBar, onceFound } from "./Find";
 import { Hint } from "./Hint";
@@ -391,7 +391,7 @@ function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; last
         // Clicking away saves (D211); an emptied field keeps the goal, only Enter clears it.
         onBlur={() => document.hasFocus() && ((draft ?? "").trim() ? void save() : setDraft(null))}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.key === "Enter") void save();
           if (e.key === "Escape") setDraft(null);
         }}
@@ -823,7 +823,7 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
   useEffect(() => void (row.current = field.current?.closest<HTMLElement>(".try") ?? null), []);
   useFocusWhileMounted(field, () => (row.current?.isConnected ? row.current.querySelector<HTMLElement>(".try-check, .try-quote") : null));
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    e.stopPropagation();
+    keepKeysIn(e); // ⌘Z still reaches the app history
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSave(v.trim(), next.trim());
