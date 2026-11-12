@@ -2,9 +2,11 @@
 // `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in Ore's iCloud folder, or in the App
 // Group the app reads when it opens. A file (a PDF from Files, a photo) is copied to `inbox/<ulid>/<name>`
 // with `inbox/<ulid>.file.json` written after it. It is saved the moment the card appears; the card then offers his skills to file it under,
-// one tap each, and stays until Done, a tap above it or a swipe down (closing by itself after 3 s read as a glitch, Tyler 2026-11-12).
+// one tap each, under a preview of what was shared (its picture, title and site in one row, Raindrop's confirmation: the title Safari
+// hands over at once, the picture when Apple's LinkPresentation has fetched it), from the top of the sheet iOS gives it, and stays until Done, a tap above it or a swipe down (closing by itself after 3 s read as a glitch, Tyler 2026-11-12).
 // With no skills to offer it goes by itself.
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
+import LinkPresentation
 import UIKit
 import UniformTypeIdentifiers
 
@@ -67,6 +69,11 @@ class ShareViewController: UIViewController {
   private var closing: DispatchWorkItem?
   private let card = UIView()
   private let titleLabel = UILabel()
+  private let preview = UIStackView()
+  private let thumb = UIImageView()
+  private let pageTitle = UILabel()
+  private let site = UILabel()
+  private var fetching: LPMetadataProvider?
   private let chips = UIStackView()
 
   private let paper = UIColor(white: 0.93, alpha: 1)
@@ -84,8 +91,6 @@ class ShareViewController: UIViewController {
     view.addGestureRecognizer(down)
 
     card.backgroundColor = UIColor(white: 0.11, alpha: 1)
-    card.layer.cornerRadius = 16
-    card.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
     card.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(card)
 
@@ -113,7 +118,37 @@ class ShareViewController: UIViewController {
     chips.spacing = 8
     chips.alignment = .leading
 
-    let stack = UIStackView(arrangedSubviews: [head, chips])
+    // What was shared, so he sees it took the right thing. Hidden until there is something to show.
+    // One row of a fixed height, drawn here on the card's dark (Apple's own preview view tints itself from the
+    // site's icon and waits seconds for its title): the picture arrives later without moving the chips under his thumb.
+    preview.isHidden = true
+    preview.axis = .horizontal
+    preview.spacing = 12
+    preview.alignment = .center
+    thumb.isHidden = true
+    thumb.contentMode = .scaleAspectFill
+    thumb.clipsToBounds = true
+    thumb.layer.cornerRadius = 8
+    thumb.backgroundColor = line
+    pageTitle.font = .preferredFont(forTextStyle: .subheadline)
+    pageTitle.adjustsFontForContentSizeCategory = true
+    pageTitle.textColor = paper
+    pageTitle.numberOfLines = 2
+    site.font = .preferredFont(forTextStyle: .footnote)
+    site.adjustsFontForContentSizeCategory = true
+    site.textColor = muted
+    let words = UIStackView(arrangedSubviews: [pageTitle, site])
+    words.axis = .vertical
+    words.spacing = 2
+    preview.addArrangedSubview(thumb)
+    preview.addArrangedSubview(words)
+    NSLayoutConstraint.activate([
+      thumb.widthAnchor.constraint(equalToConstant: 64),
+      thumb.heightAnchor.constraint(equalToConstant: 64),
+      preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
+    ])
+
+    let stack = UIStackView(arrangedSubviews: [head, preview, chips])
     stack.axis = .vertical
     stack.spacing = 14
     stack.translatesAutoresizingMaskIntoConstraints = false
@@ -122,11 +157,13 @@ class ShareViewController: UIViewController {
     NSLayoutConstraint.activate([
       card.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       card.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      card.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-      stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+      // From the sheet's top, as any sheet's content: iOS sizes the sheet, so content at its foot left it mostly empty above.
+      card.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+      card.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor),
+      stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
       stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),
       stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
-      stack.bottomAnchor.constraint(equalTo: card.safeAreaLayoutGuide.bottomAnchor, constant: -18),
+      stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18),
       head.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
     ])
   }
@@ -142,8 +179,10 @@ class ShareViewController: UIViewController {
     Task { @MainActor in
       if let url = await link() {
         guard save(url) else { return fail("Open Ore once first, then share again.") }
+        show(link: url)
       } else if let p = fileProvider() {
         guard await save(file: p) else { return fail("Couldn’t save that file. Open Ore once first, then share again.") }
+        showFile()
       } else {
         return fail("Ore adds links and files. This isn’t one.")
       }
@@ -155,6 +194,70 @@ class ShareViewController: UIViewController {
       closing = work
       DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
     }
+  }
+
+  /// The title Safari hands over with the share, and the site, at once; the page's picture, and its title if
+  /// Safari gave none, when Apple's fetch has them (no page is loaded here).
+  private func show(link: String) {
+    guard let url = URL(string: link) else { return }
+    let given = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).compactMap { $0.attributedTitle?.string ?? $0.attributedContentText?.string }
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty && !$0.hasPrefix("http") }
+    let host = (url.host ?? link).replacingOccurrences(of: #"^www\."#, with: "", options: .regularExpression)
+    pageTitle.text = given ?? host
+    site.text = given == nil ? nil : host
+    site.isHidden = given == nil
+    // The picture's slot shows from the start, so the title doesn't slide over when the picture comes.
+    thumb.isHidden = false
+    preview.isHidden = false
+    let provider = LPMetadataProvider()
+    provider.timeout = 10
+    fetching = provider
+    provider.startFetchingMetadata(for: url) { [weak self] got, _ in
+      guard let got else { self?.noPicture(); return }
+      let title = got.title
+      DispatchQueue.main.async {
+        guard let self, given == nil, let title, !title.isEmpty else { return }
+        self.pageTitle.text = title
+        self.site.text = host
+        self.site.isHidden = false
+      }
+      // A page with no picture of its own shows its site's icon in the slot instead.
+      self?.picture(from: got.imageProvider ?? got.iconProvider, icon: got.imageProvider == nil)
+    }
+  }
+
+  private func picture(from provider: NSItemProvider?, icon: Bool = false) {
+    guard let provider, provider.canLoadObject(ofClass: UIImage.self) else { return noPicture() }
+    _ = provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
+      // Drawn small before it is kept: a page's picture can be thousands of pixels wide, and an extension has little memory.
+      // In its own shape (its short side 192 px), so the slot crops it and never squashes it.
+      guard let full = image as? UIImage, full.size.width > 0, full.size.height > 0 else { self?.noPicture(); return }
+      let k = 192 / min(full.size.width, full.size.height)
+      guard let small = full.preparingThumbnail(of: CGSize(width: full.size.width * k, height: full.size.height * k)) else { self?.noPicture(); return }
+      DispatchQueue.main.async {
+        self?.thumb.contentMode = icon ? .center : .scaleAspectFill
+        self?.thumb.image = icon ? small.preparingThumbnail(of: CGSize(width: 32, height: 32)) : small
+        self?.thumb.isHidden = false
+      }
+    }
+  }
+
+  /// Offline, or a page with neither picture nor icon: the empty slot goes, and the words take its place.
+  private func noPicture() {
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.thumb.image == nil else { return }
+      self.thumb.isHidden = true
+    }
+  }
+
+  /// A shared file under its name, with the picture itself when it is one.
+  private func showFile() {
+    guard let file, let rel = item["file"] as? String else { return }
+    let at = file.deletingLastPathComponent().appendingPathComponent(rel)
+    pageTitle.text = at.lastPathComponent
+    site.isHidden = true
+    preview.isHidden = false
+    if UTType(filenameExtension: at.pathExtension)?.conforms(to: .image) == true { picture(from: NSItemProvider(contentsOf: at)) }
   }
 
   private func link() async -> String? {
@@ -326,6 +429,7 @@ class ShareViewController: UIViewController {
 
   @objc private func finish() {
     closing?.cancel()
+    fetching?.cancel()
     extensionContext?.completeRequest(returningItems: nil)
   }
 }
