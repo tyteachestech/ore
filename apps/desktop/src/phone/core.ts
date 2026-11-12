@@ -204,7 +204,7 @@ const AI = new Set(["grade", "ask", "enrich", "key-points", "research", "remix",
 const needsAi = (name: string, args: string[]) =>
   AI.has(name) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));
 
-/** A file picked on the phone (a PDF, a book, a photo) is saved to the inbox, as a link is (D227): its bytes
+/** A file picked on the phone (a PDF, a book, a photo) is saved to the inbox, as a link is (D235): its bytes
  *  pass through a scratch path the folder never sees. */
 let picks = 0;
 export async function queuePicked(name: string, bytes: Uint8Array, skill?: string): Promise<void> {

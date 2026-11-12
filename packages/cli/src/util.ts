@@ -34,3 +34,6 @@ export { errorLine } from "@ore/core";
 export function progress(done: number, of: number, label: string, line: string): void {
   process.stderr.write(process.argv.includes("--json") ? JSON.stringify({ progress: { done, of, label } }) + "\n" : line + "\n");
 }
+
+/** Pasted bytes sent as base64 on stdin. Not Buffer: the iPhone runs these commands in its web view, which has none. */
+export const fromBase64 = (s: string): Uint8Array => Uint8Array.from(atob(s.trim()), (c) => c.charCodeAt(0));

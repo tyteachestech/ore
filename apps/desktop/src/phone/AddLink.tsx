@@ -1,4 +1,4 @@
-// Adding a source on the iPhone (D227): the link is saved to the library's inbox at once, then the phone
+// Adding a source on the iPhone (D235): the link is saved to the library's inbox at once, then the phone
 // imports it itself with the Mac's importer; what it can't read (a video's transcript) the Mac brings in.
 // The sheet is one field, as Raindrop's add-a-link is; a link already on the clipboard is offered by the
 // field's own Paste (iOS), never read without his tap.

@@ -104,3 +104,19 @@ describe("note tables", () => {
     expect((await run(T, move("row", 2, 2))).got).toBe(null);
   });
 });
+
+describe("the caret's cell (the phone's keyboard bar)", () => {
+  test("names the table, row and column the caret is in, and nothing outside a table", async () => {
+    const at = (find: string) => (v: View, t: number) => {
+      let pos = -1;
+      v.state.doc.descendants((n, p) => void (pos < 0 && n.isText && n.text?.includes(find) && (pos = p + 1)));
+      v.dispatch(v.state.tr.setSelection(pm.TextSelection.create(v.state.doc, pos)));
+      return { cell: tables.caretCell(v.state), t };
+    };
+    const high = (await run(T, at("High"))).got as { cell: unknown; t: number };
+    expect(high.cell).toEqual({ table: high.t, row: 2, col: 1 });
+    const head = (await run(T, at("Technique"))).got as { cell: unknown; t: number };
+    expect(head.cell).toEqual({ table: head.t, row: 0, col: 0 });
+    expect(((await run(T, at("Top"))).got as { cell: unknown }).cell).toBe(null);
+  });
+});

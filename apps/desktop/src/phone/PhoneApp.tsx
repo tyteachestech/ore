@@ -496,10 +496,10 @@ export function PhoneApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
   // Links waiting in the inbox (added with +, or shared from another app) are imported here, by the Mac's
-  // own importer (D227). One this phone can't read keeps its reason, and the Mac tries it.
+  // own importer (D235). One this phone can't read keeps its reason, and the Mac tries it.
   const [reading, setReading] = useState(false);
   const readingNow = useRef(false);
-  // The share card's Open (D227): the app comes forward and shows what that shared item became, once it is in.
+  // The share card's Open (D235): the app comes forward and shows what that shared item became, once it is in.
   const came = useRef(new Map<string, string>());
   const [wanted, setWanted] = useState<string | null>(null);
   const jumping = useRef<() => Promise<void>>(async () => {});

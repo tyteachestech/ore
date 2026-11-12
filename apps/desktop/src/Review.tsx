@@ -10,6 +10,7 @@ import { CartTip, oreFor } from "./CartTip";
 import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
+import { MoreButton } from "./Menu";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
@@ -915,7 +916,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       void retire();
       return;
     }
-    if (is(e, "later") && !PHONE) {
+    if (is(e, "later")) {
       e.preventDefault();
       // A held ⌘L puts off the one on screen, never the ones after it.
       if (!e.repeat) later();
@@ -948,7 +949,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     } else if (is(e, "edit-card")) {
       e.preventDefault();
       edit();
-    } else if (is(e, "ask")) {
+    } else if (is(e, "ask") && !PHONE) {
       e.preventDefault();
       setAsking(true);
     } else if (is(e, "bad-version") && card.variant) {
@@ -1003,6 +1004,23 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
               <ArrowCounterClockwise size={16} weight="bold" aria-hidden="true" />
             </button>
           </Hint>
+        )}
+        {/* The phone's exercise actions, one ⋯ as Mail's and Notes' (D235): Later before or after the answer, Edit
+            once the answer is out (before, it would show it), and Retire. The Mac's toolbar under the answer
+            holds them there, with Ask, which needs the Mac's AI (D7). */}
+        {PHONE && card && entry && !end && phase !== "edit" && (
+          <MoreButton
+            className="quiz-close"
+            label="Exercise actions"
+            actions={() => [
+              { id: "later", label: "Later", run: () => void later() },
+              ...(phase !== "answer" ? [{ id: "edit", label: "Edit exercise", run: edit }] : []),
+              ...(phase !== "answer" && card.variant ? [{ id: "bad-version", label: "Bad version: show the original", run: () => void badVersion() }] : []),
+              entry.state === "draft"
+                ? { id: "retire", label: "Delete exercise", danger: true, divider: true, run: () => void retire() }
+                : { id: "retire", label: "Retire exercise", danger: true, divider: true, run: () => void retire() },
+            ]}
+          />
         )}
         <Hint text={<>Leave review <kbd>Esc</kbd></>}>
           <button className="quiz-close" aria-label="Leave review" onClick={() => (end ? onClose() : void finish(!quick))}>
@@ -1229,7 +1247,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                     </Hint>
                   ))}
                 </div>
-                <div className="review-tools">
+                {!PHONE && <div className="review-tools">
                   <Hint text="Ask about this" keys="ask" side="top">
                     <button aria-label="Ask about this" aria-pressed={asking} onClick={() => setAsking((v) => !v)}>
                       <ChatCircleDots size={14} aria-hidden="true" />
@@ -1247,14 +1265,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                       </button>
                     </Hint>
                   )}
-                  {/* The Mac only for now (D192): the phone's toolbar stays as it was. */}
-                  {!PHONE && (
-                    <Hint text="Later: at the end of this session" keys="later" side="top">
-                      <button aria-label="Later" disabled={busy} onClick={() => later()}>
-                        <Clock size={14} aria-hidden="true" />
-                      </button>
-                    </Hint>
-                  )}
+                  <Hint text="Later: at the end of this session" keys="later" side="top">
+                    <button aria-label="Later" disabled={busy} onClick={() => later()}>
+                      <Clock size={14} aria-hidden="true" />
+                    </button>
+                  </Hint>
                   {entry.state === "draft" ? (
                     <Hint text="Delete exercise" keys="retire-card" side="top">
                       <button aria-label="Delete exercise" onClick={() => void retire()}>
@@ -1268,7 +1283,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                       </button>
                     </Hint>
                   )}
-                </div>
+                </div>}
                 {asking && (
                   <Ask
                     card={card}
