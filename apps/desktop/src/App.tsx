@@ -23,7 +23,7 @@ import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Reader, type PracticeRef } from "./Reader";
 import { setSidebarShown, useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
-import { Settings, type SettingsSection } from "./Settings";
+import { Settings, useReminderAgent, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
@@ -160,6 +160,7 @@ function lastView(): { status: Tab; skill: string | null } {
 
 
 export function App() {
+  useReminderAgent();
   const [items, setItems] = useState<Item[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
