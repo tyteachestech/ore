@@ -5761,9 +5761,10 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   // ⌘Z: the rating and its moment are both taken back.
   await page.keyboard.press("Meta+z");
   await moment.waitFor({ state: "detached" });
-  await until("the exercise is back", async () => (await q.innerText()) === was);
-  await page.keyboard.press("Escape");
-  await page.locator(".review").waitFor({ state: "detached" });
+  // A miss comes back in the session, so the same exercise shows either way: the rating is gone once Undo is.
+  await page.getByRole("button", { name: "Undo last rating" }).waitFor({ state: "detached" });
+  if ((await q.innerText()) !== was) throw new Error("⌘Z did not leave the exercise showing");
+  await until("Esc leaves", async () => (await page.keyboard.press("Escape"), (await page.locator(".review").count()) === 0));
 });
 
 journey("review: with no AI marks (the check failed), the screen reader counts the ones he sets", async (page) => {
