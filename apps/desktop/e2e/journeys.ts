@@ -3332,8 +3332,12 @@ journey("sidebar: ⌘Z while a collection's rename still saves puts the old name
   await page.getByLabel("Collection name").fill("Craft slowly");
   await page.keyboard.press("Enter");
   await label(/^Craft slowly$/i).waitFor();
+  // As in Finder, the renamed folder keeps focus: the header drawn in the field's place takes it, even when the
+  // next key comes before it is placed (⌘Z pressed at once once left focus on <body>, 3 runs in 4).
+  const focusOn = (name: string) => page.evaluate((n) => !!document.activeElement?.matches("button.side-label") && document.activeElement.textContent?.trim().toLowerCase() === n, name.toLowerCase());
   await page.keyboard.press("Meta+z");
   await label(/^Craft$/i).waitFor();
+  await until("focus is on the collection again, under its old name", () => focusOn("Craft"));
   const shown: string[] = [];
   for (const end = Date.now() + 2000; Date.now() < end; await page.waitForTimeout(25)) {
     const names = (await page.locator(".side-head .side-label-text").allInnerTexts()).map((t) => t.trim()).join(", ");

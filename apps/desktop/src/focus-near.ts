@@ -133,7 +133,13 @@ export function keepFocusNear(row: HTMLElement): void {
     if (!queued) (queued = true), requestAnimationFrame(() => setTimeout(check, 0));
   };
   const press = (e: Event) => void (inside(e.target as Element | null) || done());
-  const key = () => void (inside(document.activeElement) || done());
+  // A key pressed while focus is nowhere (the field just closed, its frames not yet run) is no move elsewhere: focus
+  // goes where it belongs now, before the key acts (⌘Z at once after a rename's Enter left it on <body>).
+  const key = () => {
+    const a = document.activeElement;
+    if (!a || a === document.body) check();
+    else if (!inside(a)) done();
+  };
   const seen = new MutationObserver(() => queue());
   const layers = new MutationObserver(() => queue());
   watching = done;
