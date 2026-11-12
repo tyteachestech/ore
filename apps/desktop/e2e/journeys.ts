@@ -1942,6 +1942,29 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await page.keyboard.press("Escape");
 });
 
+journey("highlight: a double click keeps its sentence in one step, ⌥ double click just the word (D224)", async (page) => {
+  await openSource(page, TESTING);
+  const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300);
+  const writes: string[] = [];
+  page.on("request", (r) => void (/"(?:highlight|annotate)"/.test(r.postData() ?? "") && writes.push(r.postData()!)));
+  const word = await pointAt(page, "strengthens");
+  await page.mouse.dblclick(word.x, word.y);
+  await popup.waitFor();
+  await until("the sentence is the highlight", async () => (await active()) === "It strengthens the route back to the information and adds new cues, so the next retrieval is easier.");
+  if (writes.length !== 1) throw new Error(`a double click wrote ${writes.length} times`);
+  await page.keyboard.press("Escape"); // drops the fresh one
+  await popup.waitFor({ state: "hidden" });
+  const other = await pointAt(page, "Effortful");
+  await page.keyboard.down("Alt");
+  await page.mouse.dblclick(other.x, other.y);
+  await page.keyboard.up("Alt");
+  await popup.waitFor();
+  await until("⌥ keeps just the word", async () => (await active()) === "Effortful");
+  await page.keyboard.press("Escape");
+});
+
 journey("highlight: a triple click keeps the paragraph as one step, so one ⌘Z takes it all back", async (page) => {
   await openSource(page, TESTING);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
@@ -2417,9 +2440,9 @@ journey("highlight: one the core can't place says what to do, not “text not fo
 });
 
 /** The middle of a phrase in the reader, scrolled into view. */
-async function pointAt(page: Page, phrase: string) {
-  return (await page.evaluate((phrase) => {
-    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+async function pointAt(page: Page, phrase: string, root = ".doc") {
+  return (await page.evaluate(({ phrase, root }) => {
+    const walk = document.createTreeWalker(document.querySelector(root)!, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
       const i = n.data.indexOf(phrase);
       if (i < 0) continue;
@@ -2430,10 +2453,10 @@ async function pointAt(page: Page, phrase: string) {
       const b = r.getBoundingClientRect();
       return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
     }
-  }, phrase))!;
+  }, { phrase, root }))!;
 }
 
-journey("highlight: a drag that starts right after a double click keeps both, the word without a popup", async (page) => {
+journey("highlight: a drag that starts right after a double click keeps both, the double click's sentence without a popup", async (page) => {
   await openSource(page, TESTING);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
@@ -2443,17 +2466,17 @@ journey("highlight: a drag that starts right after a double click keeps both, th
   await select(page, "Free recall, short-answer questions"); // within the double-click time
   await page.getByRole("dialog", { name: "Highlight" }).waitFor();
   await until("the drag's passage is highlighted, its popup open", async () => (await active()).startsWith("Free recall, short-answer questions"));
-  await until("the word is kept too", async () => (await kept()).includes("laboratory"));
+  await until("the double click's sentence is kept too", async () => (await kept()).some((t) => t.startsWith("Decades of laboratory") && t.endsWith("no feedback is given.")));
 });
 
-journey("highlight: a triple click whose selection runs past the text keeps the double click's word", async (page) => {
+journey("highlight: a triple click whose selection runs past the text keeps the double click's sentence", async (page) => {
   await openSource(page, TESTING);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
   await page.waitForTimeout(300);
   const word = await pointAt(page, "Decades");
   await page.mouse.dblclick(word.x, word.y);
   // WebKit's triple click on the last paragraph selects past the end of the text: the reader can't
-  // highlight that, so the word he double-clicked stays his.
+  // highlight that, so the sentence he double-clicked stays his.
   await page.evaluate(({ x, y }) => {
     const p = document.elementFromPoint(x, y)!.closest("p")!;
     const r = document.createRange();
@@ -2466,7 +2489,7 @@ journey("highlight: a triple click whose selection runs past the text keeps the 
       p.dispatchEvent(new MouseEvent(type, { bubbles: true, detail: 3, button: 0, clientX: x, clientY: y }));
     }
   }, word);
-  await until("the word is highlighted", async () => (await kept()).includes("Decades"));
+  await until("the sentence is highlighted", async () => (await kept()).some((t) => t.startsWith("Decades of laboratory") && t.endsWith("no feedback is given.")));
 });
 
 journey("highlight: an edge move that fails to save leaves it untouched, so Esc still drops it", async (page) => {
@@ -9148,6 +9171,33 @@ journey("phone: a link added waits for the Mac on Sources, and Remove takes it o
   await row.waitFor({ state: "detached" });
 }, "phone");
 
+journey("phone: a double tap highlights the paragraph and opens it, a heading and a highlight keep their taps (D224)", async (page) => {
+  await phoneSource(page, TESTING);
+  await page.waitForTimeout(400);
+  const kept = () => page.evaluate(() => ["hl-keep", "hl-active"].flatMap((k) => [...(CSS.highlights.get(k) ?? [])].map((r) => r.toString())));
+  const at = (phrase: string) => pointAt(page, phrase, ".phone-reader .doc");
+  const twice = async (p: { x: number; y: number }) => {
+    await page.touchscreen.tap(p.x, p.y);
+    await page.touchscreen.tap(p.x, p.y);
+  };
+  const before = (await kept()).length;
+  const heading = await at("Why it works");
+  await page.waitForTimeout(300); // the scroll settles: a tap that stops one is no tap
+  await twice(heading);
+  await page.waitForTimeout(600);
+  if ((await kept()).length !== before) throw new Error(`a double tap on a heading highlighted ${JSON.stringify(await kept())}`);
+  const p = await at("familiarity is easily");
+  await page.waitForTimeout(300);
+  await twice(p);
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await until("the paragraph is highlighted", async () => (await kept()).some((t) => t.startsWith("Rereading, by contrast") && t.endsWith("weaker results.")));
+  const count = (await kept()).length;
+  await page.waitForTimeout(400);
+  await twice(p);
+  await page.waitForTimeout(600);
+  if ((await kept()).length !== count) throw new Error("a double tap on a highlight stacked a second one");
+}, "phone");
+
 journey("phone: a tap on a source's cut-off title shows all of it", async (page) => {
   // Found in the Simulator: the title stopped at four lines and nothing showed the rest (the Sources row cuts it too).
   await phoneSource(page, "A very long title about the neuroscience");
@@ -9171,17 +9221,17 @@ journey("phone: typing a long note keeps the line being typed above the keyboard
   for (let i = 0; i < 14; i++) await page.keyboard.type(` line ${i} of a note that keeps growing past the bottom of the screen while he types it.`);
   // Where the caret is: its own box, or on a new empty line (which gives none) its line's.
   const CARET = `(() => { const sel = getSelection(); const r = sel.getRangeAt(0).getBoundingClientRect(); if (r.height) return r; const n = sel.focusNode; return (n instanceof Element ? n : n.parentElement).getBoundingClientRect(); })()`;
-  // Leave the caret where iOS does, under the bar, and move it as a keystroke does (a browser's own reveal
-  // would lift it: iOS's doesn't know the bar).
+  // Leave the caret where iOS does, under the bar, and tell the page it moved, as a keystroke does (a
+  // browser's own reveal would lift it: iOS's doesn't know the bar).
   const underBar = () =>
     page.evaluate((CARET) => {
-      const sel = getSelection()!;
       const caret = eval(CARET) as DOMRect;
       const bar = document.querySelector(".kb-bar")!.getBoundingClientRect();
       let box = document.activeElement as HTMLElement | null;
       while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
       box!.scrollTop -= bar.bottom - 4 - caret.bottom;
-      sel.collapse(sel.focusNode, sel.focusOffset);
+      // The caret moving on, as each keystroke moves it on iOS (a collapse to where it already is fires nothing).
+      document.dispatchEvent(new Event("selectionchange"));
     }, CARET);
   const above = () =>
     page.evaluate((CARET) => {
