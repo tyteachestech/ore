@@ -2700,6 +2700,12 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-note-row:active { background: var(--bg-hover); }
 .phone .phone-note { padding: 8px 20px 40px; }
 .phone .phone-note .note-editor { --note-size: 17px; min-height: 60vh; }
+/* A to-do's box answers a touch 44pt tall around its centre (0.775em + 1.5px down, 0.875em - 1.5px left of the
+   text), from 22pt left of it to where the text starts, so a tap on the text still places the caret (Notes). One
+   under another starts halfway between the two boxes (rows are 1.8em apart), so each row keeps its own taps. A
+   selected row's ::after is its tint. */
+.phone .note-editor li[data-item-type="task"]:not(.block-sel)::after { content: ""; position: absolute; left: calc(-0.875em - 20.5px); right: 100%; top: calc(0.775em - 20.5px); height: 44px; }
+.phone .note-editor li[data-item-type="task"] + li[data-item-type="task"]:not(.block-sel)::after { top: calc(1.5px - 0.125em); height: calc(0.9em + 22px); }
 .kb-bar .sel-bar.docked { position: static; flex: 1; height: 44px; border: 0; box-shadow: none; background: none; overflow-x: auto; justify-content: space-between; animation: none; }
 .kb-bar .sel-bar.docked button { min-width: 40px; height: 40px; }
 
