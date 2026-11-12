@@ -6462,6 +6462,9 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   await page.keyboard.type("Quiz myself before each edit session");
   await page.keyboard.press("Enter");
   await page.locator(".collected-chip.apply").waitFor();
+  // The plan's save lands before he leaves: a skill page that opens while it is on its way loads the try
+  // without it (it waits for no save it didn't make), and a slow runner got there first.
+  await until("the plan is saved", async () => JSON.stringify(await ore("tries")).includes("Quiz myself before each edit session"));
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const row = page.locator(".try").filter({ hasText: "Quiz myself before each edit session" });
   await row.getByRole("checkbox", { name: "Mark tried" }).click();
