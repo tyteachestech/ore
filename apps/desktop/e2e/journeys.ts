@@ -4001,9 +4001,32 @@ journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page)
   await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Mark answered" }).click();
   await until("it leaves the open questions", async () => (await open()) === 0);
+  // The header's Answered tab (D226) shows it; the Questions tab goes back to the open ones.
+  const tabs = page.getByRole("tablist", { name: "Questions shown" });
+  await tabs.getByRole("tab", { name: "Answered" }).click();
+  await until("the Answered tab lists it", async () => (await open()) > 0);
+  if ((await tabs.getByRole("tab", { name: "Answered" }).getAttribute("aria-selected")) !== "true") throw new Error("the Answered tab is not the open one");
+  await page.keyboard.press("ArrowLeft");
+  await until("← moves back to the open questions", async () => (await tabs.getByRole("tab", { name: "Questions" }).getAttribute("aria-selected")) === "true" && (await open()) === 0);
   await page.waitForTimeout(300);
   await page.keyboard.press("Meta+z");
   await until("⌘Z reopens it", async () => (await open()) > 0);
+});
+
+journey("skill page: the sources' folder tabs show To read, Done and the row details menu", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const tabs = page.getByRole("tablist", { name: "Sources shown" });
+  const on = (name: string) => tabs.getByRole("tab", { name }).getAttribute("aria-selected");
+  await until("To read is the open tab", async () => (await on("To read")) === "true");
+  await tabs.getByRole("tab", { name: "Done" }).hover();
+  await page.getByRole("tooltip").filter({ hasText: "Done" }).waitFor();
+  await tabs.getByRole("tab", { name: "Done" }).click();
+  await until("a click opens Done", async () => (await on("Done")) === "true" && (await on("To read")) === "false");
+  await page.getByRole("button", { name: "Row details" }).click();
+  await page.getByRole("menuitemcheckbox").first().waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+1");
+  await until("⌘1 goes back to To read", async () => (await on("To read")) === "true");
 });
 
 journey("reader questions: ask one, ⌘Z takes it back; its ⋯ menu marks it answered and deletes it, ⌘Z each", async (page) => {
@@ -4716,8 +4739,7 @@ journey("diagram: opens in a sheet centred over the window, ⇧⌘↵ gives it t
 /** Opens a source he has finished, from All sources' Done view. */
 async function openDone(page: Page, title: string) {
   await page.getByRole("button", { name: /^All sources/ }).click();
-  await page.locator(".view-menu").click();
-  await page.getByRole("menuitemradio", { name: /^Done/ }).click();
+  await page.getByRole("tab", { name: "Done" }).click();
   await page.locator(".row").filter({ hasText: title }).first().click();
   await page.locator(".doc-head").filter({ hasText: title }).waitFor();
 }
