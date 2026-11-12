@@ -50,7 +50,8 @@ class ShareViewController: UIViewController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    view.backgroundColor = UIColor(white: 0, alpha: 0.35)
+    // iOS shows a share extension in its own sheet, so a see-through view left the sheet's grey above the card
+    view.backgroundColor = UIColor(white: 0.11, alpha: 1)
     view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(outside(_:))))
 
     card.backgroundColor = UIColor(white: 0.11, alpha: 1)
