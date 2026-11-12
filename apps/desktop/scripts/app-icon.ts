@@ -104,14 +104,30 @@ if (import.meta.main) {
     await page.setContent(`<body style="margin:0;background:${clear ? "transparent" : "#1b1b1b"}">${svg.replace("<svg ", `<svg width="${size}" height="${size}" style="display:block" `)}</body>`);
     return page.screenshot({ omitBackground: clear });
   };
+  // Tauri refuses an icon PNG with no alpha channel, and a screenshot of an opaque page has none (it stopped every
+  // iPhone build once). A canvas always writes RGBA, so Tauri's files come from one.
+  const rgba = async (svg: string, size: number) => {
+    const url = await page.evaluate(async ([svg, size]) => {
+      const img = new Image();
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      c.getContext("2d")!.drawImage(img, 0, 0, size, size);
+      return c.toDataURL("image/png");
+    }, [svg, size] as const);
+    const png = Buffer.from(url.split(",")[1]!, "base64");
+    if (png[25] !== 6) throw new Error(`icon at ${size}px is not RGBA`);
+    return png;
+  };
   if (preview) {
     mkdirSync(preview, { recursive: true });
     writeFileSync(join(preview, "mac.png"), await shoot(macSvg(), 1024, true));
     writeFileSync(join(preview, "phone.png"), await shoot(phoneSvg(), 1024, false));
   } else {
-    for (const [app, svg, clear] of [["desktop", macSvg(), true], ["phone", phoneSvg(), false]] as const) {
+    for (const [app, svg] of [["desktop", macSvg()], ["phone", phoneSvg()]] as const) {
       const dir = join(import.meta.dir, "../..", app, "src-tauri/icons"), png = new Map<number, Buffer>();
-      for (const size of [16, 32, 64, 128, 256, 512, 1024]) png.set(size, await shoot(svg, size, clear));
+      for (const size of [16, 32, 64, 128, 256, 512, 1024]) png.set(size, await rgba(svg, size));
       for (const [name, size] of [["32x32", 32], ["128x128", 128], ["128x128@2x", 256], ["icon", 512]] as const) writeFileSync(join(dir, `${name}.png`), png.get(size)!);
       writeFileSync(join(dir, "icon.icns"), icns(png));
     }

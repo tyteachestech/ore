@@ -7,11 +7,11 @@
 //   bun apps/phone/scripts/sim.ts swipe X Y X2 Y2 [SECS]    a flick; drag X Y X2 Y2 holds first (moves things)
 //   bun apps/phone/scripts/sim.ts type "text" | key return|delete|tab
 //   bun apps/phone/scripts/sim.ts shot | tree | launch | home | activate | wait SECS | rotate portrait|landscape
-//   bun apps/phone/scripts/sim.ts reset    delete the app and its data, install it again (a first launch)
+//   bun apps/phone/scripts/sim.ts reset    delete the app and its data, install it again with the --lib copy (a first launch)
 //   bun apps/phone/scripts/sim.ts stop
 // X and Y are iPhone points from the top left (the screenshot is 3x on iPhone 18 Pro: its pixels / 3;
 // `tree` gives exact frames). Each command prints JSON: {"ok", "shot": png path, "error"}.
-// The library is a copy built into the app (D78): --lib is a scratch library, never ~/Ore.
+// The library is a copy of --lib in the app's Documents (the Simulator has no iCloud): a scratch library, never ~/Ore.
 import { spawnSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -50,10 +50,16 @@ function savedDevice() {
   return existsSync(f) ? readFileSync(f, "utf8").trim() : device();
 }
 
+/** A fresh install with the scratch library in the app's Documents, which is its library in the Simulator
+ *  (no iCloud there, D222). */
 function install(udid: string) {
   spawnSync("xcrun", ["simctl", "terminate", udid, bundle]);
   spawnSync("xcrun", ["simctl", "uninstall", udid, bundle]);
   sh("xcrun", ["simctl", "install", udid, appPath]);
+  const lib = readFileSync(join(dir, "lib"), "utf8").trim();
+  const docs = join(sh("xcrun", ["simctl", "get_app_container", udid, bundle, "data"]).trim(), "Documents");
+  mkdirSync(docs, { recursive: true });
+  sh("rsync", ["-a", "--exclude", ".index", "--exclude", ".ore", "--exclude", ".git", `${lib}/`, `${docs}/`]);
 }
 
 async function send(cmd: Record<string, unknown>, timeoutMs = 60_000) {
@@ -86,10 +92,11 @@ async function start() {
     const abs = realpathSync(resolve(lib));
     const live = [resolve(homedir(), "Ore"), resolve(homedir(), "Library/Mobile Documents")].map((p) => (existsSync(p) ? realpathSync(p) : p));
     if (live.some((p) => abs === p || abs.startsWith(p + "/"))) throw new Error("use a scratch library, never ~/Ore or iCloud");
-    console.error("building the app for the Simulator with", abs, "(a few minutes)");
-    sh("bun", ["run", "tauri", "ios", "build", "--debug", "--target", "aarch64-sim"], { cwd: phone, env: { ORE_PHONE_LIBRARY: abs } });
+    writeFileSync(join(dir, "lib"), abs);
+    console.error("building the app for the Simulator (a few minutes); its library will be", abs);
+    sh("bun", ["run", "tauri", "ios", "build", "--debug", "--target", "aarch64-sim"], { cwd: phone });
   }
-  if (!existsSync(appPath)) throw new Error("no Simulator build yet: pass --lib DIR");
+  if (!existsSync(appPath) || !existsSync(join(dir, "lib"))) throw new Error("no Simulator build yet: pass --lib DIR");
   if (lib || args.includes("--fresh")) install(udid);
   spawnSync("xcrun", ["simctl", "terminate", udid, bundle]);
   // One driver at a time: two test runners on one Simulator fight over it.
