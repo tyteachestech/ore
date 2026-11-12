@@ -1889,6 +1889,41 @@ journey("Collected: questions that fail to load say why, and Try again shows the
   if (await alert.count()) throw new Error("the error stayed after the list loaded");
 });
 
+journey("search while reading (D219): ⌘F names what it finds in; Collected has its own filter, which hides groups with no match", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.keyboard.press("Meta+f");
+  const find = page.locator(".find-bar input");
+  await until("with Collected open, ⌘F finds in the source alone", async () => (await find.getAttribute("placeholder")) === "Find in source");
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await page.keyboard.press("Meta+f");
+  await until("with the note open, it says so", async () => (await find.getAttribute("placeholder")) === "Find in source and note");
+  await find.fill("just a measurement");
+  const count = page.locator(".find-count");
+  await until("words only in the note are found", async () => (await count.innerText()) === "1/1");
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await until("switching to Collected, the bar counts again without the note", async () => /not found/i.test(await count.innerText()));
+  if ((await find.getAttribute("placeholder")) !== "Find in source") throw new Error("the field still names the note");
+  await find.fill("");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Filter collected" }).click();
+  const field = page.getByRole("textbox", { name: "Filter collected" });
+  await until("the glass opens a field with the caret", () => field.evaluate((el) => el === document.activeElement));
+  await field.fill("tested group");
+  await page.locator(".cp-row", { hasText: "the tested group remembered" }).waitFor();
+  if (await page.locator(".cp-head.keep").isVisible()) throw new Error("Highlights, with no match, still shows");
+  await field.press("ArrowDown");
+  await until("↓ moves into the rows", () => page.evaluate(() => !!document.activeElement?.closest(".cp-row")));
+  await field.fill("zzqxv");
+  await page.getByText("Nothing collected here matches “zzqxv”.").waitFor();
+  await field.press("Escape");
+  await until("Esc clears it", async () => (await field.inputValue()) === "");
+  await page.locator(".cp-head.keep").waitFor();
+  await field.press("Escape");
+  await until("a second Esc closes the row, focus back on the glass", async () => (await field.count()) === 0 && (await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "Filter collected");
+});
+
 journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {
   await openSource(page, TESTING);
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
@@ -2236,7 +2271,7 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
-journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D215)", async (page) => {
+journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D219)", async (page) => {
   const lecture = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title.startsWith("Lecture 4"))!;
   const dir = ((await ore("show", lecture.id)) as { dir: string }).dir;
   const button = page.getByRole("button", { name: "Add the page’s text" });
@@ -2299,7 +2334,7 @@ journey("a playing source takes YouTube's K J L beside Space and the arrows: K p
   if (!(await paused())) throw new Error("J or L started it playing");
   // Typed into find, they are letters.
   await page.keyboard.press("Meta+f");
-  const find = page.getByPlaceholder("Find", { exact: true });
+  const find = page.locator(".find-bar input");
   await find.waitFor();
   await page.keyboard.type("kjl");
   await page.waitForTimeout(300);
@@ -4103,7 +4138,7 @@ async function searchPick(page: Page, query: string, row: string) {
 
 /** The find bar holds `words` and its current match is on screen, inside `within`. */
 async function foundOnScreen(page: Page, words: string, within: string) {
-  const bar = page.getByLabel("Find in source");
+  const bar = page.locator(".find-bar input");
   await until("the find bar holds the words", async () => (await bar.count()) === 1 && (await bar.inputValue()) === words);
   await until(`the match is on screen, in ${within}`, () =>
     page.evaluate((within) => {
@@ -6878,7 +6913,7 @@ journey("add box: a feed's own link followed by ↵ at once follows it, without 
   }
 });
 
-journey("questions on a source: filing it under a skill lists that skill's questions at once; one whose link to the source fails to save is taken back", async (page) => {
+journey("questions on a source: Collected lists only this source's questions, not its skill's others (D219); one whose link to the source fails to save is taken back", async (page) => {
   const k = (await ore("skills", "add", "Glassblowing")) as { id: string };
   const q = (await ore("snippet", "--text=How hot is the glory hole?", "--intent=question", `--skill=${k.id}`)) as { annotation: { id: string } };
   const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# A page in no skill\n\nGather, blow, shape, anneal." }) }).then((r) => r.json())) as { id: string };
@@ -6899,13 +6934,17 @@ journey("questions on a source: filing it under a skill lists that skill's quest
     await failNext(page, "match", null);
     await until("the half-saved question is taken back", async () => (await count()) === before);
     await page.keyboard.press("Escape");
-    // Filing the source under a skill brings that skill's questions.
+    // Filed under a skill, it still lists only its own: the skill's question asked elsewhere stays on the skill's page.
     await page.getByRole("button", { name: "Skills for A page in no skill" }).click();
     await page.locator(".skill-picker [cmdk-item]", { hasText: "Glassblowing" }).click();
     await page.keyboard.press("Escape");
-    await page.locator(".qp-line", { hasText: "How hot is the glory hole?" }).waitFor({ timeout: 3000 }).catch(() => {
-      throw new Error("the skill's question is missing until the tab is reopened");
-    });
+    await page.getByText("No open questions from this source.").waitFor();
+    if (await page.locator(".qp-line", { hasText: "How hot is the glory hole?" }).count()) throw new Error("a question asked in another source shows in this one's Collected");
+    // One he asks here stays, though the source is under a skill now.
+    await head.getByRole("button", { name: "Ask a question" }).click();
+    await page.getByLabel("New question").fill("Which gather comes first?");
+    await page.keyboard.press("Enter");
+    await page.locator(".qp-line", { hasText: "Which gather comes first?" }).waitFor();
   } finally {
     await ore("annotate", q.annotation.id, "--status", "deleted").catch(() => {});
     await ore("archive", made.id).catch(() => {});
@@ -9028,6 +9067,23 @@ journey("phone: reopening on a source that left the library lands on Today, not 
   if (await page.getByText(/no item matches/).count()) throw new Error("the missing source's error is on screen");
 }, "phone");
 
+journey("phone: a link added waits for the Mac on Sources, and Remove takes it off", async (page) => {
+  // D223: the phone queues the link in the inbox; the Mac imports it.
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input").fill("not a link");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link .phone-error").filter({ hasText: "isn’t a link" }).waitFor();
+  await page.locator(".add-link input").fill("https://example.com/articles/interleaving");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/interleaving" });
+  await row.waitFor();
+  await tap(page, row.getByRole("button", { name: "Remove" }));
+  await row.waitFor({ state: "detached" });
+}, "phone");
+
 journey("phone: a tap on a source's cut-off title shows all of it", async (page) => {
   // Found in the Simulator: the title stopped at four lines and nothing showed the rest (the Sources row cuts it too).
   await phoneSource(page, "A very long title about the neuroscience");
@@ -9051,8 +9107,8 @@ journey("phone: typing a long note keeps the line being typed above the keyboard
   for (let i = 0; i < 14; i++) await page.keyboard.type(` line ${i} of a note that keeps growing past the bottom of the screen while he types it.`);
   // Where the caret is: its own box, or on a new empty line (which gives none) its line's.
   const CARET = `(() => { const sel = getSelection(); const r = sel.getRangeAt(0).getBoundingClientRect(); if (r.height) return r; const n = sel.focusNode; return (n instanceof Element ? n : n.parentElement).getBoundingClientRect(); })()`;
-  // Leave the caret where iOS does, under the bar, and move it as a keystroke does (a browser's own reveal
-  // would lift it: iOS's doesn't know the bar).
+  // Leave the caret where iOS does, under the bar, and tell the page it moved, as a keystroke does (a
+  // browser's own reveal would lift it: iOS's doesn't know the bar).
   const underBar = () =>
     page.evaluate((CARET) => {
       const sel = getSelection()!;
@@ -9061,7 +9117,8 @@ journey("phone: typing a long note keeps the line being typed above the keyboard
       let box = document.activeElement as HTMLElement | null;
       while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
       box!.scrollTop -= bar.bottom - 4 - caret.bottom;
-      sel.collapse(sel.focusNode, sel.focusOffset);
+      // The caret moving on, as each keystroke moves it on iOS (a collapse to where it already is fires nothing).
+      document.dispatchEvent(new Event("selectionchange"));
     }, CARET);
   const above = () =>
     page.evaluate((CARET) => {

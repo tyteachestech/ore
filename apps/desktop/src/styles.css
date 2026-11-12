@@ -3051,3 +3051,24 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* Three tabs in a panel at its narrowest: the names stay, the icons go. */
 .mynotes-head { container-type: inline-size; }
 @container (max-width: 330px) { .side-tabs:has(> :nth-child(3)) .card-icon { display: none; } }
+
+/* Collected's filter (D219): the glass at the right of the side panel's tabs opens a full-width row under them;
+   while it holds words, groups with no match go. */
+.mynotes-head > .icon-btn { margin-left: auto; }
+.side-filter { flex: none; width: auto; height: 30px; margin: 0 12px 4px; padding: 0 10px; gap: 8px; }
+.cp-none { display: none; margin: 4px 0 0; }
+.cp.filtering:not(:has(.cp-row:not(.cp-add), .qp-row)) .cp-none { display: block; }
+.cp.filtering section.none,
+.cp.filtering .cp-questions:not(:has(.qp-row, input, textarea, [role=alert])) { display: none; }
+.mynotes-head > .icon-btn[aria-pressed="true"] { color: var(--text); }
+/* Adding a link on the iPhone (D223): one field and Add. */
+.add-link { display: flex; flex-direction: column; gap: 12px; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+.add-link .field { font-size: 17px; min-height: 44px; }
+.add-link .phone-error { padding: 0; }
+.add-link .pill-btn { justify-content: center; text-align: center; min-height: 44px; }
+/* Above the keyboard, which the field brings up at once. */
+.phone .overlay:has(.add-link) { padding-bottom: var(--keyboard, 0px); }
+.phone-bar .phone-add { margin-left: auto; }
+.phone-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+.phone-waiting .phone-error { flex-basis: 100%; order: 3; padding: 0 0 6px; }
+.phone-sources .phone-waiting button { width: auto; min-height: 44px; border: 0; padding: 0 0 0 8px; background: none; color: var(--accent); font: 500 15px var(--font); }
