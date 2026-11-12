@@ -26,7 +26,7 @@ const DEFAULTS = [
   { id: "reveal", label: "Reveal in Finder", group: "General", combo: "Shift+Meta+KeyR", global: true },
   { id: "home", label: "Go to Home", group: "General", combo: "Meta+Digit0", global: true },
   { id: "go-feed", label: "Go to Feed", group: "General", combo: "Meta+Digit3", global: true },
-  { id: "mark-read", label: "Mark post read or unread", group: "Feed", combo: "KeyU" },
+  { id: "mark-read", label: "Mark post read or unread", group: "Feed", combo: "Shift+Meta+KeyU" },
   { id: "tutor", label: "Tutor chat", group: "General", combo: "Meta+KeyJ", global: true },
   { id: "tutor-stop", label: "Stop the tutor's reply", group: "General", combo: "Meta+Period", global: true },
   { id: "review", label: "Start review", group: "General", combo: "Meta+KeyR", global: true },
