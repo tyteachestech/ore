@@ -504,7 +504,8 @@ export function PhoneApp() {
   const [wanted, setWanted] = useState<string | null>(null);
   const jumping = useRef<() => Promise<void>>(async () => {});
   const jump = useCallback(async () => {
-    const want = await shareOpen();
+    // A relaunch can cut the module's load short (WebKit rejects the import): nothing was asked for then.
+    const want = await shareOpen().catch(() => null);
     if (!want) return;
     setWanted(want);
     await pullFromMac();
