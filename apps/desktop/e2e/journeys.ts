@@ -8294,7 +8294,7 @@ journey("review: changing an Explain card's key points after it was checked keep
   const save = async (text: string, shows: string) => {
     if (!(await field.isVisible())) await page.getByRole("button", { name: "Edit exercise" }).click();
     await field.fill(text);
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await points.locator("li").first().filter({ hasText: shows }).waitFor();
   };
   // Only reordered: both marks stay, but they were the AI's, so nothing is suggested until he marks.
