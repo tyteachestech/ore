@@ -5,6 +5,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
+import { rankScore } from "./match";
 import { errorText, focusQuietly, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { passageText } from "./text";
 
@@ -321,8 +322,8 @@ export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | nul
 
 /** Types a question in place, like a new skill in the sidebar: Enter saves it as a question snippet
  *  filed under these skills (as Raycast's Capture Question does), Esc or clicking away drops it. */
-/** `item`: the source he is asking from. A question lives under skills (D75); from a source in none, it is
- *  marked as one this source may answer, or the source that took it could never show it. */
+/** `item`: the source he is asking from. A question lives under skills (D75), and is marked as one this source
+ *  may answer: Collected lists only this source's questions (D219), so it would vanish as he asked it. */
 export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]; item?: string; onDone: (added: boolean) => void; notify: Notify }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -354,7 +355,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
     try {
       const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
       // Two writes: if the second fails, the first is taken back, so a retry never leaves a question nobody can see.
-      if (item && !skills.length)
+      if (item)
         await ore("match", item, r.annotation.id).catch(async (e) => {
           await ore("annotate", r.annotation.id, "--status", "deleted").catch(() => {});
           throw e;
@@ -408,7 +409,7 @@ const CAP = 6;
 /** The reader's Questions tab (D75): the open questions of this source's skills, the ones it may
  *  answer first. Click one (or ↑ ↓ ↵) to write toward its answer; a selection made before Q comes in
  *  as the quote. */
-export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote, onJumpHighlight, notify, ask, marked }: {
+export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote, onJumpHighlight, notify, ask, marked, filter }: {
   item: string;
   /** The source's skills: their names head the list, and a question typed here is filed under them. */
   skills: { id: string; name: string }[];
@@ -422,6 +423,8 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   /** What decides which questions are this source's, as saved (D75): its question highlights and its skills.
    *  The list reads again when it changes. */
   marked?: string;
+  /** Collected's filter (D219): only the questions whose words (or his answer's) match. */
+  filter?: string;
 }) {
   const grouped = ask !== undefined;
   const [qs, setQs] = useState<Question[] | null>(null);
@@ -462,9 +465,13 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
     }
   };
 
-  const here = (qs ?? []).filter((q) => q.here === "match");
-  const rest = (qs ?? []).filter((q) => q.here !== "match");
-  const shown = all ? rest : rest.slice(0, CAP);
+  const find = filter?.trim();
+  const listed = (qs ?? []).filter((q) => !find || rankScore([questionText(q), ...q.answers.map((a) => a.text)], find) > 0);
+  const here = listed.filter((q) => q.here === "match");
+  // In Collected only those asked in this source (D219): the skill's others are on its page, and here, under
+  // "Key points" and "Highlights" from this source, they read as this source's.
+  const rest = listed.filter((q) => q.here !== "match" && (!grouped || q.here === "from"));
+  const shown = all || find ? rest : rest.slice(0, CAP);
   const order = [...here, ...shown];
 
   // ↑ ↓ move between questions, as in any list here; Enter or a click opens one.
@@ -595,16 +602,16 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
             </button>
           </div>
         )}
-        {qs && !order.length && !asking && (
+        {qs && !order.length && !asking && !find && (
           <p className="quiet qp-empty">
-            No open questions{skills.length ? ` for ${skills.map((s) => s.name).join(" or ")}` : ""}.{" "}
+            {grouped ? "No open questions from this source." : `No open questions${skills.length ? ` for ${skills.map((s) => s.name).join(" or ")}` : ""}.`}{" "}
             <button className="qp-link" onClick={() => setAsking(true)}>
               Ask one
             </button>
           </p>
         )}
         {shown.map(row)}
-        {rest.length > CAP && (
+        {rest.length > CAP && !find && (
           <button className="answered-toggle" aria-expanded={all} onClick={() => setAll(!all)}>
             {all ? "Show fewer" : `Show all ${rest.length}`}
           </button>

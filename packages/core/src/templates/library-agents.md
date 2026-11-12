@@ -36,7 +36,7 @@ cards/<id>.variants.jsonl      remixed versions of that card, append-only; write
 reviews/<yyyy>-<mm>[.<device>].jsonl   append-only review log, one file per device; the source of truth for scheduling
 sessions/<yyyy>-<mm>[.<device>].jsonl  review session start/end receipts
 chats/<id>.json                his tutor chats as the app shows them (title, @ context, turns); written only through `ore chat`
-inbox/                         unused (no watcher); add files with `ore add`
+inbox/                         links added on the iPhone (`<id>.link.json`), waiting for the Mac to import them (`ore inbox --import`)
 .index/library.sqlite          search index and cached card states (gitignored)
 .ore/                          lock, open-session marker, background logs (gitignored)
 ```

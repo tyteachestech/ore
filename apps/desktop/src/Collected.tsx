@@ -6,6 +6,7 @@ import { still } from "./SideCursor";
 import { PixelKeep, PixelQuestion, PixelStar, PixelTry } from "./PixelIcon";
 import { INTENTS, PHONE, type Annotation, type Intent } from "./ore";
 import { passageText } from "./text";
+import { rankScore } from "./match";
 import { load, save } from "./util";
 
 // D118: one highlight; a key point (`card` in the files) is a highlight he marked to come back, and the AI
@@ -147,7 +148,7 @@ export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
 /** The side panel's Collected tab (Tyler, 2026-10-29): his cards, then his questions, then his keeps, each
  *  a collapsible group in reading order. A row opens its passage; + on Cards adds one where he is ("Card
  *  here"): a line he types, drafted from the whole source. */
-export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk, takeAddFocus, onAdd, onJump, onAsk, questions, actions }: {
+export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk, takeAddFocus, onAdd, onJump, onAsk, questions, actions, filter }: {
   anns: Annotation[];
   /** A video source: the time each highlight is spoken, for the row's right edge. */
   timeOf?: (a: Annotation) => string | null;
@@ -166,6 +167,9 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
   questions: ReactNode;
   /** A row's ⋯ and right-click menu: the popup's actions, without opening the passage. */
   actions?: (a: Annotation) => MenuAction[];
+  /** What the tab's filter holds (D219): only the rows whose passage, note or key point match, every group
+   *  open, a group with none hidden. */
+  filter?: string;
 }) {
   // A row's passage as the page shows it, worked out once per passage, not on every render.
   const shownText = useRef(new Map<string, string>());
@@ -182,7 +186,12 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
       save("ore.collected.shut", [...next].join(","));
       return next;
     });
-  const sorted = [...anns].sort((a, b) => (a.anchor?.start ?? a.start) - (b.anchor?.start ?? b.start));
+  const find = filter?.trim() ?? "";
+  // Filtered, rows keep reading order: a passage has no title to rank by.
+  const sorted = [...anns]
+    .filter((a) => !find || rankScore([a.note, passage(a.exact)], find) > 0)
+    .sort((a, b) => (a.anchor?.start ?? a.start) - (b.anchor?.start ?? b.start));
+  const isShut = (g: string) => !find && shut.has(g);
   const of = (i: Intent) => sorted.filter((a) => a.intent === i);
   const cards = of("card");
   const keeps = of("keep");
@@ -212,7 +221,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
 
   const head = (g: string, label: string, Glyph: typeof PixelKeep, extra?: ReactNode) => (
     <h3 className={`cp-head ${g}`}>
-      <button className="cp-toggle" aria-expanded={!shut.has(g)} onClick={() => toggle(g)}>
+      <button className="cp-toggle" aria-expanded={!isShut(g)} onClick={() => toggle(g)}>
         <CaretRight className="cp-caret" size={10} weight="bold" aria-hidden="true" />
         <Glyph size={13} weight="fill" aria-hidden="true" />
         {label}
@@ -236,8 +245,9 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
   };
 
   return (
-    <div className="cp" ref={box} onKeyDown={onKey}>
-      <section>
+    <div className={`cp${find ? " filtering" : ""}`} ref={box} onKeyDown={onKey}>
+      {find && <p className="quiet cp-none">Nothing collected here matches “{find}”.</p>}
+      <section className={find && !cards.length && adding === null ? "none" : undefined}>
         {head(
           "card",
           "Key points",
@@ -248,11 +258,11 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
             </button>
           </Hint>,
         )}
-        {!shut.has("card") && (
+        {!isShut("card") && (
           <>
             {adding !== null && <AddLine value={adding} ask={addAsk} takeFocus={takeAddFocus} onChange={onEdit} onDone={addDone} />}
             {cards.map(row)}
-            {!cards.length && adding === null && (
+            {!cards.length && adding === null && !find && (
               <button className="cp-empty" onClick={() => onAdding(true)}>
                 Add a key point…
               </button>
@@ -260,7 +270,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
           </>
         )}
       </section>
-      <section>
+      <section className="cp-questions">
         {head(
           "question",
           "Questions",
@@ -271,18 +281,18 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
             </button>
           </Hint>,
         )}
-        {!shut.has("question") && questions}
+        {!isShut("question") && questions}
       </section>
       {tries.length > 0 && (
         <section>
           {head("apply", "To try", PixelTry)}
-          {!shut.has("apply") && tries.map(row)}
+          {!isShut("apply") && tries.map(row)}
         </section>
       )}
       {keeps.length > 0 && (
         <section>
-          {head("keep", "Highlights", PixelKeep, shut.has("keep") ? <span className="cp-count">{keeps.length}</span> : null)}
-          {!shut.has("keep") && keeps.map(row)}
+          {head("keep", "Highlights", PixelKeep, isShut("keep") ? <span className="cp-count">{keeps.length}</span> : null)}
+          {!isShut("keep") && keeps.map(row)}
         </section>
       )}
     </div>

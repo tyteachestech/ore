@@ -130,4 +130,4 @@ function picture(path: string): string | undefined {
  *  failing on a missing prompt file. Storing a recall or his own key-point marks needs no AI. */
 const AI = new Set(["grade", "ask", "enrich", "key-points", "research", "remix", "catch-up"]);
 const needsAi = (name: string, args: string[]) =>
-  AI.has(name) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));
+  AI.has(name) || (name === "inbox" && args.includes("--import")) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));

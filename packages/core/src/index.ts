@@ -54,3 +54,4 @@ export { doclingHome, doclingPath } from "./ingest/docling-path.ts";
 type Docling = typeof import("./ingest/docling.ts");
 export const installDocling = async (...a: Parameters<Docling["installDocling"]>) => (await import("./ingest/docling.ts")).installDocling(...a);
 export const removeDocling = async () => (await import("./ingest/docling.ts")).removeDocling();
+export * from "./inbox.ts";
