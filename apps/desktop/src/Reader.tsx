@@ -13,6 +13,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
+import { HeadSearch } from "./HeadSearch";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
 import { snapRange } from "./snap";
 import { Grab } from "./Grab";
@@ -1364,6 +1365,13 @@ function ReaderView(p: Props & { reload: () => void }) {
   }
   /** The passage selected when he pressed Q: it goes with what he writes toward an answer (D75). */
   const [sideQuote, setSideQuote] = useState<string | null>(null);
+  /** Collected's filter (D219), cleared for each source. */
+  const [sideFilter, setSideFilter] = useState("");
+  const [sideFiltering, setSideFiltering] = useState(false);
+  useEffect(() => {
+    setSideFilter("");
+    setSideFiltering(false);
+  }, [p.id]);
   const firstNotes = useRef(true);
   useEffect(() => {
     if (firstNotes.current) return void (firstNotes.current = false);
@@ -2635,7 +2643,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   };
 
-  /** An episode's own page text, added below its transcript in one step (D215), with Undo and Redo as a
+  /** An episode's own page text, added below its transcript in one step (D219), with Undo and Redo as a
    *  cut's. Snipd's episode screen: the show notes are one tap from the player, never in its way. */
   const [addingPage, setAddingPage] = useState(false);
   const addPageText = async () => {
@@ -2958,7 +2966,10 @@ function ReaderView(p: Props & { reload: () => void }) {
       )}
       {find.open && !closedBook && (
         <FindBar
-          roots={() => [...(find.note ? [] : [pageRef.current]), readerRef.current?.querySelector<HTMLElement>(".mynotes-text")]}
+          // Text read in order: the source and, when it is open, the note. Collected has its own filter, and the
+          // Original tab is a picture of the page (D219).
+          roots={() => [...(find.note ? [] : [pageRef.current]), notesShown ? readerRef.current?.querySelector<HTMLElement>(".mynotes-text") : null]}
+          scope={find.note ? "note" : notesShown ? "source and note" : "source"}
           within={readerRef.current}
           query={find.query}
           onQuery={(query) => setFind((f) => ({ ...f, query }))}
@@ -3281,7 +3292,28 @@ function ReaderView(p: Props & { reload: () => void }) {
       )}
       {/* On the phone the note stays beside the source, a swipe away, so each keeps its place. */}
       {(panelShown || (PHONE && !closedBook)) && (
-        <SidePanel tab={sideTab} onTab={(t) => p.onShowSide(t, true)} original={!!pdf} bodyRef={sideBody} onBodyMouseDown={sideTab === "note" ? clickBelow(notesField) : undefined}>
+        <SidePanel
+          tab={sideTab}
+          onTab={(t) => p.onShowSide(t, true)}
+          original={!!pdf}
+          tool={
+            questionsShown && !PHONE && (
+              <HeadSearch
+                label="Filter collected"
+                value={sideFilter}
+                onChange={setSideFilter}
+                open={sideFiltering}
+                setOpen={setSideFiltering}
+                onKeys={(e) => {
+                  // ↓ or ↵ moves into the rows, as a skill page's search does (D203).
+                  if (e.key !== "ArrowDown" && e.key !== "Enter") return;
+                  e.preventDefault();
+                  sideBody.current?.querySelector<HTMLElement>(".cp-row:not(.cp-add), .qp-row")?.focus();
+                }}
+              />
+            )
+          }
+          bodyRef={sideBody} onBodyMouseDown={sideTab === "note" ? clickBelow(notesField) : undefined}>
           {originalShown && pdf ? (
             <Suspense fallback={null}>
               <Original file={pdf} page={page} />
@@ -3351,6 +3383,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               onJump={(id) => onSource(() => jumpToHighlight(id))}
               onAsk={() => setAsk((n) => n + 1)}
               actions={highlightActions}
+              filter={sideFilter}
               questions={
                 <QuestionsPanel
                   item={doc.id}
@@ -3362,6 +3395,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                   notify={p.notify}
                   ask={ask}
                   marked={`${filed}|${annWrites}|${anns.filter((a) => a.intent === "question").map((a) => a.id).join()}`}
+                  filter={sideFilter}
                 />
               }
             />

@@ -5,6 +5,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap } from "./keys";
 import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
+import { rankScore } from "./match";
 import { errorText, focusQuietly, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { passageText } from "./text";
 
@@ -408,7 +409,7 @@ const CAP = 6;
 /** The reader's Questions tab (D75): the open questions of this source's skills, the ones it may
  *  answer first. Click one (or ↑ ↓ ↵) to write toward its answer; a selection made before Q comes in
  *  as the quote. */
-export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote, onJumpHighlight, notify, ask, marked }: {
+export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote, onJumpHighlight, notify, ask, marked, filter }: {
   item: string;
   /** The source's skills: their names head the list, and a question typed here is filed under them. */
   skills: { id: string; name: string }[];
@@ -422,6 +423,8 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
   /** What decides which questions are this source's, as saved (D75): its question highlights and its skills.
    *  The list reads again when it changes. */
   marked?: string;
+  /** Collected's filter (D219): only the questions whose words (or his answer's) match. */
+  filter?: string;
 }) {
   const grouped = ask !== undefined;
   const [qs, setQs] = useState<Question[] | null>(null);
@@ -462,9 +465,11 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
     }
   };
 
-  const here = (qs ?? []).filter((q) => q.here === "match");
-  const rest = (qs ?? []).filter((q) => q.here !== "match");
-  const shown = all ? rest : rest.slice(0, CAP);
+  const find = filter?.trim();
+  const listed = (qs ?? []).filter((q) => !find || rankScore([questionText(q), ...q.answers.map((a) => a.text)], find) > 0);
+  const here = listed.filter((q) => q.here === "match");
+  const rest = listed.filter((q) => q.here !== "match");
+  const shown = all || find ? rest : rest.slice(0, CAP);
   const order = [...here, ...shown];
 
   // ↑ ↓ move between questions, as in any list here; Enter or a click opens one.
@@ -595,7 +600,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
             </button>
           </div>
         )}
-        {qs && !order.length && !asking && (
+        {qs && !order.length && !asking && !find && (
           <p className="quiet qp-empty">
             No open questions{skills.length ? ` for ${skills.map((s) => s.name).join(" or ")}` : ""}.{" "}
             <button className="qp-link" onClick={() => setAsking(true)}>
@@ -604,7 +609,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
           </p>
         )}
         {shown.map(row)}
-        {rest.length > CAP && (
+        {rest.length > CAP && !find && (
           <button className="answered-toggle" aria-expanded={all} onClick={() => setAll(!all)}>
             {all ? "Show fewer" : `Show all ${rest.length}`}
           </button>

@@ -366,7 +366,7 @@ export type SideTab = "note" | "questions" | "original";
 /** The reader's right panel: one panel, two tabs (D75), like Notion's side peek. N opens the source
  *  note, C what he collected (Q too, at his questions); the same key again closes the panel. The toggle at the
  *  window's top right (⌥⌘S) shows or hides it. Resizable, width remembered. */
-export function SidePanel({ tab, onTab, original, bodyRef, onBodyMouseDown, children }: { tab: SideTab; onTab: (t: SideTab) => void; /** The source is a PDF: its own pages get a tab (D202). */ original?: boolean; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
+export function SidePanel({ tab, onTab, original, tool, bodyRef, onBodyMouseDown, children }: { tab: SideTab; onTab: (t: SideTab) => void; /** The source is a PDF: its own pages get a tab (D202). */ original?: boolean; /** At the right of the tabs: the open tab's own control (Collected's filter, D219). */ tool?: ReactNode; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
   const { width, dragging, divider } = useSideWidth("ore.notewidth", NOTE_WIDTH);
   return (
     <aside className={`mynotes${dragging ? " dragging" : ""}`} aria-label={tab === "note" ? "Source note" : tab === "original" ? "Original" : "Collected"} style={{ width }}>
@@ -394,6 +394,7 @@ export function SidePanel({ tab, onTab, original, bodyRef, onBodyMouseDown, chil
               </Hint>
             )}
           </Tabs.List>
+          {tool}
         </div>
         <Tabs.Content ref={bodyRef} value={tab} className="mynotes-text" tabIndex={-1} onMouseDown={onBodyMouseDown}>
           {children}

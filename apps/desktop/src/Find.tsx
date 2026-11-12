@@ -135,8 +135,10 @@ function show(all: Range[], on: Range | undefined) {
 
 /** The find bar at the top right of the source. `roots` lists what it searches, left to right;
  *  `within` is watched so typing in the note or the source finishing loading updates the count. */
-export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump }: {
+export function FindBar({ roots, scope, within, query, onQuery, focus, onClose, onJump }: {
   roots: () => (HTMLElement | null | undefined)[];
+  /** What `roots` covers, named in the field (D219): "source", "source and note" or "note". */
+  scope: string;
   within: HTMLElement | null;
   query: string;
   onQuery: (q: string) => void;
@@ -193,7 +195,18 @@ export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump 
       mo.disconnect();
       clearTimeout(t);
     };
-  }, [within, query]);
+    // `scope`: a tab opened or closed changes what `roots` returns.
+  }, [within, query, scope]);
+
+  // The note opened or closed beside it: count again over what is searched now.
+  const scoped = useRef(scope);
+  useEffect(() => {
+    if (scoped.current === scope) return;
+    scoped.current = scope;
+    const rs = search(roots().filter((r): r is HTMLElement => !!r), query);
+    setFound(rs);
+    setAt((i) => Math.min(i, Math.max(0, rs.length - 1)));
+  }, [scope]);
 
   useEffect(() => show(found, found[at]), [found, at]);
   useEffect(() => () => {
@@ -224,8 +237,8 @@ export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump 
     <div className="find-bar" role="search">
       <input
         ref={input}
-        aria-label="Find in source"
-        placeholder="Find"
+        aria-label={`Find in ${scope}`}
+        placeholder={`Find in ${scope}`}
         spellCheck={false}
         value={query}
         onChange={(e) => onQuery(e.target.value)}

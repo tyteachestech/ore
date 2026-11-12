@@ -1864,6 +1864,35 @@ journey("Collected: questions that fail to load say why, and Try again shows the
   if (await alert.count()) throw new Error("the error stayed after the list loaded");
 });
 
+journey("search while reading (D219): ⌘F names what it finds in; Collected has its own filter, which hides groups with no match", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.keyboard.press("Meta+f");
+  const find = page.locator(".find-bar input");
+  await until("with Collected open, ⌘F finds in the source alone", async () => (await find.getAttribute("placeholder")) === "Find in source");
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await page.keyboard.press("Meta+f");
+  await until("with the note open, it says so", async () => (await find.getAttribute("placeholder")) === "Find in source and note");
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.getByRole("button", { name: "Filter collected" }).click();
+  const field = page.getByRole("textbox", { name: "Filter collected" });
+  await until("the glass opens a field with the caret", () => field.evaluate((el) => el === document.activeElement));
+  await field.fill("tested group");
+  await page.locator(".cp-row", { hasText: "the tested group remembered" }).waitFor();
+  if (await page.locator(".cp-head.keep").isVisible()) throw new Error("Highlights, with no match, still shows");
+  await field.press("ArrowDown");
+  await until("↓ moves into the rows", () => page.evaluate(() => !!document.activeElement?.closest(".cp-row")));
+  await field.fill("zzqxv");
+  await page.getByText("Nothing collected here matches “zzqxv”.").waitFor();
+  await field.press("Escape");
+  await until("Esc clears it", async () => (await field.inputValue()) === "");
+  await page.locator(".cp-head.keep").waitFor();
+  await field.press("Escape");
+  await page.getByRole("button", { name: "Filter collected" }).waitFor();
+});
+
 journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {
   await openSource(page, TESTING);
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
@@ -2211,7 +2240,7 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
-journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D215)", async (page) => {
+journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D219)", async (page) => {
   const lecture = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title.startsWith("Lecture 4"))!;
   const dir = ((await ore("show", lecture.id)) as { dir: string }).dir;
   const button = page.getByRole("button", { name: "Add the page’s text" });
@@ -2274,7 +2303,7 @@ journey("a playing source takes YouTube's K J L beside Space and the arrows: K p
   if (!(await paused())) throw new Error("J or L started it playing");
   // Typed into find, they are letters.
   await page.keyboard.press("Meta+f");
-  const find = page.getByPlaceholder("Find", { exact: true });
+  const find = page.locator(".find-bar input");
   await find.waitFor();
   await page.keyboard.type("kjl");
   await page.waitForTimeout(300);
@@ -4078,7 +4107,7 @@ async function searchPick(page: Page, query: string, row: string) {
 
 /** The find bar holds `words` and its current match is on screen, inside `within`. */
 async function foundOnScreen(page: Page, words: string, within: string) {
-  const bar = page.getByLabel("Find in source");
+  const bar = page.locator(".find-bar input");
   await until("the find bar holds the words", async () => (await bar.count()) === 1 && (await bar.inputValue()) === words);
   await until(`the match is on screen, in ${within}`, () =>
     page.evaluate((within) => {
