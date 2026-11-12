@@ -13,11 +13,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
 tauri-plugin-notification = "2.8.0"
 serde = { version = "1", features = ["derive"] }
 base64 = "0.22"
+# The phone's fetch of other sites (a web view can't: CORS and the CSP). MIT/Apache, rustls.
+ureq = "2"
 
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString", "NSError"] }

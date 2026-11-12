@@ -189,6 +189,18 @@ export async function captions(text: string, url: string): Promise<string> {
   return "WEBVTT\n\n" + segs.join("\n\n");
 }
 
+/** A YouTube video on a device that can't run yt-dlp (the iPhone, `ORE_NO_TOOLS`): its title and channel
+ *  from YouTube's public oEmbed, so it is in the library and plays at once; its transcript is owed, and a
+ *  device with yt-dlp fills it (D227, `fillOwed`). A video oEmbed won't describe waits for that device whole. */
+export async function owedVideo(url: string): Promise<Pick<YoutubeDoc, "title" | "author" | "url">> {
+  const link = `https://www.youtube.com/watch?v=${youtubeId(url)}`;
+  const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(link)}`);
+  if (!res.ok) throw new Error("Videos need yt-dlp, which only runs on the Mac.");
+  const o = (await res.json()) as { title?: string; author_name?: string };
+  if (!o.title) throw new Error("Videos need yt-dlp, which only runs on the Mac.");
+  return { title: o.title, author: o.author_name, url: link };
+}
+
 export interface VideoOptions {
   /** Hear a video with no captions: download its sound and transcribe it on the Mac (D122). */
   listen?: boolean;

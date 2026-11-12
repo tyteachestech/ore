@@ -53,7 +53,7 @@ export function notebookToDoc(json: string): NotebookDoc {
       const [type, ext] = PLOTS.find(([t]) => o.data?.[t]) ?? [];
       if (!type || !ext) continue;
       const raw = joined(o.data![type]);
-      const data = ext === "svg" ? new TextEncoder().encode(raw) : Uint8Array.from(Buffer.from(raw.replace(/\s+/g, ""), "base64"));
+      const data = ext === "svg" ? new TextEncoder().encode(raw) : Uint8Array.from(atob(raw.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
       const name = assetName(data, ext);
       assets.set(name, { name, data });
       parts.push(`![](assets/${name})`);

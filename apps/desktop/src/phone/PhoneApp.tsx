@@ -6,7 +6,7 @@ import { Archive, BookOpen, CaretLeft, CaretRight, Check, GearSix, GraduationCap
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
-import { AddLink, WaitingLinks, type Waiting } from "./AddLink";
+import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
 import { Home } from "../Home";
 import { HeadTabs, type HeadTab as HeadTabT } from "../HeadTabs";
@@ -23,7 +23,7 @@ import { Palette } from "../Palette";
 import { SkillEditor, skillGroups } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { courseThumb, lessonsOf, nextLesson, opt, ore, pullFromMac, type Item, type Skill, touched } from "../ore";
+import { courseThumb, lessonsOf, nextLesson, opt, ore, pullFromMac, shareSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -461,6 +461,7 @@ export function PhoneApp() {
       const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
       setItems(all);
       setSkills(sk);
+      void shareSkills(sk.filter((k) => !k.archived));
       setWaiting(w);
       setError(null);
       // The Archive list, only while it shows: listed twice on every change otherwise.
@@ -494,10 +495,34 @@ export function PhoneApp() {
     // Once, on the first list: later a missing source is one he just archived from inside it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
-  useEffect(() => void (refresh(), planReminders()), [refresh]);
+  // Links waiting in the inbox (added with +, or shared from another app) are imported here, by the Mac's
+  // own importer (D227). One this phone can't read keeps its reason, and the Mac tries it.
+  const [reading, setReading] = useState(false);
+  const readingNow = useRef(false);
+  const bringIn = useCallback(async () => {
+    if (readingNow.current) return;
+    readingNow.current = true;
+    try {
+      if (!(await ore<Waiting[]>("inbox")).length) return;
+      setReading(true);
+      const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+      for (const a of r.added) notify(a.kept ? `Already here: “${a.title}”` : `Added “${a.title}”`, "info");
+      for (const f of r.failed) {
+        const mac = macOnly(f.error);
+        notify(mac ?? `Couldn’t read ${f.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]} here. Your Mac will try it.`, mac ? "info" : "error");
+      }
+    } catch {
+      // The list says what is still waiting.
+    } finally {
+      readingNow.current = false;
+      setReading(false);
+      void refresh();
+    }
+  }, [refresh, notify]);
+  useEffect(() => void (refresh().then(bringIn), planReminders()), [refresh, bringIn]);
   // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
   useEffect(() => {
-    const check = () => void pullFromMac().then((changed) => changed && pulled());
+    const check = () => void pullFromMac().then((changed) => changed && (pulled(), void bringIn()));
     const back = () => !document.hidden && check();
     // Leaving the screen plans the reminders again: today's goes once the goal is met (the Mac's changes, in `pulled`).
     const seen = () => (document.hidden ? void planReminders() : check());
@@ -506,7 +531,7 @@ export function PhoneApp() {
     addEventListener("visibilitychange", seen);
     addEventListener("ore:save-failed", failed);
     return () => (clearInterval(every), removeEventListener("visibilitychange", seen), removeEventListener("ore:save-failed", failed));
-  }, [refresh, notify]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refresh, notify, bringIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
   // height, and keep the answer's buttons in sight when it opens.
@@ -831,7 +856,7 @@ export function PhoneApp() {
                 onOpen={open}
                 row={row}
                 flat={tab === "archive"}
-                head={tab === "sources" && <WaitingLinks links={waiting} onRemove={removeWaiting} />}
+                head={tab === "sources" && <WaitingLinks links={waiting} reading={reading} onRemove={removeWaiting} />}
                 empty={tab === "archive" ? "Nothing archived. Swipe a source left to archive it." : waiting.length ? "" : undefined}
               />
             )}
@@ -985,7 +1010,7 @@ export function PhoneApp() {
           onClose={() => setSearching(false)}
         />
       )}
-      {adding && <AddLink skill={addTo} onClose={() => (setAdding(false), setAddTo(undefined))} onAdded={() => void refresh()} notify={notify} />}
+      {adding && <AddLink skill={addTo} onClose={() => (setAdding(false), setAddTo(undefined))} onAdded={() => void refresh().then(bringIn)} />}
       {editingSkill && skills.some((s) => s.id === editingSkill) && (
         <SkillEditor
           skill={skills.find((s) => s.id === editingSkill)!}

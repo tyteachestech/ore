@@ -104,7 +104,13 @@ async function measure(page: Page, act: () => Promise<unknown>, load = false): P
 
 const BOOK = "The Complete Book of Learning";
 const steps: [string, (page: Page) => Promise<Result>][] = [
-  ["startup → Home", async (page) => measure(page, async () => { await page.goto(url); await page.locator(".side-item").first().waitFor(); }, true)],
+  ["startup → Home", async (page) => {
+    const res = await measure(page, async () => { await page.goto(url); await page.locator(".side-item").first().waitFor(); }, true);
+    // What the app does a moment after launch (the iPhone inbox pass at 1.5 s, the reminder check at 3 s) is over
+    // before the next step is timed.
+    await page.waitForTimeout(3500);
+    return res;
+  }],
   ["skill page", async (page) => measure(page, () => page.locator(".side-item").filter({ hasText: "Learning" }).first().click())],
   ["All sources", async (page) => measure(page, () => page.getByRole("button", { name: /^All sources/ }).click())],
   ["↓ ×20 in All sources", async (page) => {

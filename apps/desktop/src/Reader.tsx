@@ -3237,7 +3237,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
-              {video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
+              {doc.owed?.length ? (doc.owed_error ? `Couldn’t get the transcript: ${doc.owed_error} Reimport tries again.` : "The transcript comes in when Ore is open on your Mac. Watch it above meanwhile.") : video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
             </p>
           )}
           {PHONE && ready && canFinish && !closedBook && (

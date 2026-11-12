@@ -9247,19 +9247,70 @@ journey("phone: reopening on a source that left the library lands on Today, not 
   if (await page.getByText(/no item matches/).count()) throw new Error("the missing source's error is on screen");
 }, "phone");
 
-journey("phone: a link added waits for the Mac on Sources, and Remove takes it off", async (page) => {
-  // D223: the phone queues the link in the inbox; the Mac imports it.
+journey("phone: a link added is read on the phone itself; one it can't read waits for the Mac, and Remove takes it off", async (page) => {
+  // D227: the link is saved to the inbox, then the phone imports it with the Mac's own importer.
+  const para = "Mixing kinds of problems in one sitting makes each one harder to start and easier to keep. ";
+  const article = `<html><head><title>Interleaving in practice</title></head><body><article><h1>Interleaving in practice</h1>${`<p>${para.repeat(5)}</p>`.repeat(4)}</article></body></html>`;
+  await page.route("https://example.com/articles/interleaving", (r) => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", headers: { "access-control-allow-origin": "*" }, body: article }));
+  await page.route("https://example.com/articles/offline", (r) => r.abort());
   await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input").fill("not a link");
+  await page.locator(".add-link input.field").fill("not a link");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link .phone-error").filter({ hasText: "isn’t a link" }).waitFor();
-  await page.locator(".add-link input").fill("https://example.com/articles/interleaving");
+  await page.locator(".add-link input.field").fill("https://example.com/articles/interleaving");
   await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “Interleaving in practice”").waitFor();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await page.locator(".phone-sources").getByText("Interleaving in practice").first().waitFor();
+  if (await page.locator(".phone-waiting").count()) throw new Error("the link it read is still listed as coming in");
+  // One the phone can't reach keeps its reason, and the Mac tries it.
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://example.com/articles/offline");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/offline" });
+  await row.getByText("Your Mac will try it.").waitFor();
+  await tap(page, row.getByRole("button", { name: "Remove" }));
+  await row.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: a YouTube link is in the library at once and says its transcript comes from the Mac", async (page) => {
+  // D227: no yt-dlp on a phone, so the video comes in with its title and plays; the Mac fills the transcript.
+  await page.route("https://www.youtube.com/oembed?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ title: "How spacing works", author_name: "Learning Lab" }) }));
+  await page.route(/ytimg\.com|youtube(-nocookie)?\.com\/(embed|iframe_api)/, (r) => r.abort());
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://youtu.be/abcdefghijk");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “How spacing works”").waitFor();
+  // Not phoneSource: it waits for the text, and this source has none yet.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await tap(page, page.locator(".phone-sources button").filter({ hasText: "How spacing works" }));
+  await page.locator(".doc-empty").filter({ hasText: "The transcript comes in when Ore is open on your Mac." }).waitFor();
+}, "phone");
+
+journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
+  // D227: the file is saved to the inbox beside its item, then imported here like a link.
+  const files = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
+  const pick = async (name: string) => {
+    await tap(page, page.getByRole("button", { name: "Add a link" }));
+    const chooser = page.waitForEvent("filechooser");
+    await tap(page, page.getByRole("button", { name: "Choose a file or photo" }));
+    await (await chooser).setFiles(join(files, name));
+  };
+  await pick("notes.docx");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText(/^Added “/).waitFor();
+  await pick("screenshot.png");
   await page.locator(".add-link").waitFor({ state: "detached" });
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
-  const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/interleaving" });
-  await row.waitFor();
+  const row = page.locator(".phone-waiting").filter({ hasText: "screenshot.png" });
+  await row.getByText("Your Mac reads the text in a picture or a scan.").waitFor();
+  if (await page.locator(".phone-waiting").count() !== 1) throw new Error("the Word file it read is still listed as coming in");
   await tap(page, row.getByRole("button", { name: "Remove" }));
   await row.waitFor({ state: "detached" });
 }, "phone");

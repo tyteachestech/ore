@@ -4,7 +4,8 @@
 // to the folder, and the Mac's changes read in again when the app comes back (`mountDisk`). In a browser
 // (the e2e journeys, `vite` at phone size) they come from a snapshot, kept in IndexedDB (`mount`).
 
-type Entry = { text: string; mtime: number };
+/** `bytes`: a binary file (an image, a PDF) as written, so a rename or copy moves it whole. */
+type Entry = { text: string; mtime: number; bytes?: Uint8Array; unread?: true };
 const files = new Map<string, Entry>();
 /** The snapshot's paths: only these need a tombstone when deleted. */
 const shipped = new Set<string>();
@@ -110,7 +111,7 @@ const SNAPSHOT = "#snapshot";
 
 function put(p: string, text: string, mtime = Date.now(), bytes?: Uint8Array) {
   if (disk && downloading.has(rel(p))) throw Object.assign(new Error("This file is still downloading from iCloud: try again in a moment"), { code: "EBUSY" });
-  const e = { text, mtime };
+  const e: Entry = bytes ? { text, mtime, bytes } : { text, mtime };
   files.set(p, e);
   addDirs(p);
   if (SCRATCH.test(p)) return;
@@ -137,7 +138,7 @@ function drop(p: string) {
 
 type Invoke = <T>(cmd: string, args: Record<string, unknown>) => Promise<T>;
 type Stamped = [rel: string, mtime: number, stamp: string];
-type Scan = { files: Stamped[]; waiting: string[] };
+type Scan = { files: Stamped[]; waiting: string[]; other?: string[] };
 let disk: { root: string; prefix: string; invoke: Invoke } | null = null;
 /** Each file's stamp (mtime and size) as last read or written, to tell what the Mac changed since. */
 const known = new Map<string, string>();
@@ -166,7 +167,7 @@ function queue(p: string, op: Op) {
 
 /** The files the folder's listing reports (apps/phone/src-tauri/src/lib.rs `wanted`); only these are
  *  watched for the Mac's changes. */
-const LISTED = /(\.(md|ya?ml|jsonl?|excalidraw)|\/(thumbnail|course-cover)\.(jpe?g|png|webp|gif))$/i;
+const LISTED = /(\.(md|ya?ml|jsonl?|excalidraw|vtt)|\/(thumbnail|course-cover)\.(jpe?g|png|webp|gif))$/i;
 
 /** Sends the writes made so far to the folder; resolves once they are on disk. */
 export function flush(): Promise<void> {
@@ -198,19 +199,53 @@ export function flush(): Promise<void> {
 }
 
 /** Loads the library from the folder. On a first launch iCloud may still be downloading it: waits for
- *  that, up to a minute; what still hasn't come keeps the phone from writing over it (`downloading`). */
+ *  that (transcripts aside), up to a minute; what still hasn't come keeps the phone from writing over it (`downloading`). */
 export async function mountDisk(prefix: string, root: string, invoke: Invoke) {
   disk = { root, prefix, invoke };
   let scan = await invoke<Scan>("library_scan", { root });
-  for (let i = 0; scan.waiting.length && i < 60; i++) {
+  // Only for what the lists need: a transcript still on its way (they are large, and many) comes in with a
+  // later look at the folder, and never holds up the launch (it once did, for 72 s).
+  const held = () => scan.waiting.some((r) => !/\.vtt$/i.test(r));
+  for (let i = 0; held() && i < 60; i++) {
     await new Promise((r) => setTimeout(r, 1000));
     scan = await invoke<Scan>("library_scan", { root });
   }
   setDownloading(scan.waiting);
   await read(scan.files);
+  listOthers(scan.other);
   lastSync = Date.now();
   // iOS may suspend the app soon after it leaves the screen: what it wrote goes now.
   addEventListener("visibilitychange", () => document.hidden && void flush());
+}
+
+/** Files the phone doesn't load (a source's audio or PDF) still show in the folder's listing, so the core
+ *  finds them (`sourceFile`); the screens open them from disk (convertFileSrc). */
+function listOthers(other: string[] = []) {
+  // One the Mac deleted since leaves the listing too.
+  const now = new Set(other.map((r) => `${disk!.prefix}/${r}`));
+  let gone = false;
+  for (const [p, e] of files) if (e.unread && !now.has(p)) gone = files.delete(p);
+  if (gone) pruneDirs();
+  for (const r of other) {
+    const p = `${disk!.prefix}/${r}`;
+    if (files.has(p)) continue;
+    files.set(p, { text: "", mtime: 0, unread: true });
+    addDirs(p);
+  }
+}
+
+/** Loads one listed file's bytes from the folder, so the core can read it: a file the share sheet saved to
+ *  the inbox. False when it isn't there to load. */
+export async function load(p: string): Promise<boolean> {
+  const e = files.get(p);
+  if (!e) return false;
+  if (!e.unread || e.bytes) return true;
+  if (!disk) return false;
+  const b64 = await disk.invoke<string | null>("library_bytes", { root: disk.root, path: rel(p) });
+  if (b64 == null) return false;
+  e.bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  e.text = new TextDecoder().decode(e.bytes); // as a written file has both: a shared .txt or .csv is read as text
+  return true;
 }
 
 function setDownloading(waiting: string[]) {
@@ -251,6 +286,7 @@ export async function rescan(): Promise<boolean> {
   }
   if (gone.length) pruneDirs();
   await read(changed);
+  listOthers(scan.other);
   lastSync = Date.now();
   return changed.length + gone.length > 0;
 }
@@ -265,9 +301,19 @@ function pruneDirs() {
 // ---- the node:fs functions the core uses.
 
 export const existsSync = (p: string) => files.has(p) || dirs.has(p);
-export function readFileSync(p: string, _enc?: unknown): string {
+/** A binary file read with no encoding, as Node's Buffer is: its bytes, and its text if printed. */
+class Bytes extends Uint8Array {
+  toString() {
+    return new TextDecoder().decode(this);
+  }
+}
+/** With an encoding, the text. With none, a file saved as bytes (a picked PDF, a picture) comes back as its
+ *  bytes, as Node gives a Buffer; a text file still comes back as text, which every caller here expects. */
+export function readFileSync(p: string, enc?: unknown): string {
   const e = files.get(p);
   if (!e) throw err("ENOENT", p);
+  if (e.unread && !e.bytes) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
+  if (enc === undefined && e.bytes) return Bytes.from(e.bytes) as unknown as string;
   return e.text;
 }
 export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, new TextDecoder().decode(s), Date.now(), s));
@@ -290,10 +336,14 @@ export function rmSync(p: string, _o?: unknown) {
   for (const d of [...dirs]) if (d === p || d.startsWith(p + "/")) dirs.delete(d);
 }
 export function renameSync(a: string, b: string) {
-  put(b, readFileSync(a));
+  copyFileSync(a, b);
   drop(a);
 }
-export const copyFileSync = (a: string, b: string) => put(b, readFileSync(a));
+export const copyFileSync = (a: string, b: string) => {
+  readFileSync(a); // throws for a missing file, and for one the phone lists but hasn't loaded
+  const e = files.get(a)!;
+  put(b, e.text, Date.now(), e.bytes);
+};
 export const mkdtempSync = (prefix: string) => {
   const d = `${prefix}${Math.random().toString(36).slice(2, 8)}`;
   mkdirSync(d);
@@ -319,7 +369,7 @@ export function statSync(p: string) {
   if (!existsSync(p)) throw err("ENOENT", p);
   const e = files.get(p);
   const m = e?.mtime ?? 1;
-  return { mtimeMs: m, mtime: new Date(m), size: e?.text.length ?? 0, isDirectory: () => !e, isFile: () => !!e };
+  return { mtimeMs: m, mtime: new Date(m), size: e?.bytes?.length ?? e?.text.length ?? 0, isDirectory: () => !e, isFile: () => !!e };
 }
 export const lstatSync = statSync;
 export const realpathSync = (p: string) => p;

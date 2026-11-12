@@ -41,7 +41,9 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
     assets.set(name, { name, data: bytes });
     return { src: `assets/${name}` };
   });
-  const { value } = await mammoth.convertToHtml({ buffer: Buffer.from(data) }, { convertImage });
+  // Node's build of mammoth takes a Buffer; its browser build (the iPhone app) takes the bytes themselves.
+  const input = (typeof Buffer !== "undefined" ? { buffer: Buffer.from(data) } : { arrayBuffer: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) }) as { buffer: Buffer };
+  const { value } = await mammoth.convertToHtml(input, { convertImage });
   const { document } = parseHTML(`<html><body>${value}</body></html>`);
   const body = td.turndown(document.body as unknown as HTMLElement).trim();
   if (!body) throw new Error("This Word file has no text to read.");

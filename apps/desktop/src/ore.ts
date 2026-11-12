@@ -4,6 +4,14 @@ import { invoke } from "@tauri-apps/api/core";
 export const PHONE = import.meta.env.VITE_PHONE === "1";
 
 /** On iPhone, reads in what the Mac changed (through iCloud) since; true if anything did. Never on the Mac. */
+/** The share card's skill chips (phone/core.ts `shareSkills`); nothing on the Mac. */
+export const shareSkills = async (skills: { id: string; name: string }[]): Promise<void> => {
+  if (PHONE) (await import("./phone/core")).shareSkills(skills);
+};
+/** A file picked on the phone goes to the inbox to be imported (phone/core.ts `queuePicked`). */
+export const queuePicked = async (name: string, bytes: Uint8Array, skill?: string): Promise<void> => {
+  if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes, skill);
+};
 export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import("./phone/core")).pull() : false);
 
 // Every library read and write goes through the `ore` CLI (D30). Errors are the CLI's one-line message.
@@ -95,6 +103,9 @@ export type Item = {
   finished_at?: string;
   /** A PDF's tables or formulas that read as plain text until the optional reader reads them (D125). */
   structure?: ("tables" | "formulas")[];
+  /** What the device that added it couldn't bring in (a video's transcript on the iPhone, D227). */
+  owed?: "transcript"[];
+  owed_error?: string;
   /** `ore show`: being read now, or read; why the last reading failed; whether the reader is installed. */
   tables?: "reading" | "read";
   tables_error?: string;
