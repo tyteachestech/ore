@@ -190,6 +190,34 @@ async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, S
     .map_err(|e| e.to_string())?
 }
 
+/// SPIKE: links the Share Extension (apps/phone/share) left in the App Group move into the library's inbox
+/// (D223), where the app shows them. Returns how many came in.
+#[tauri::command]
+async fn share_inbox(root: String) -> usize {
+    let Some(from) = group().map(|g| g.join("inbox")) else { return 0 };
+    let to = Path::new(&root).join("inbox");
+    let Ok(entries) = fs::read_dir(&from) else { return 0 };
+    let _ = fs::create_dir_all(&to);
+    entries.flatten().filter(|e| e.file_name().to_string_lossy().ends_with(".link.json")).filter(|e| fs::rename(e.path(), to.join(e.file_name())).is_ok()).count()
+}
+
+#[cfg(target_os = "ios")]
+#[allow(unused_unsafe)]
+fn group() -> Option<PathBuf> {
+    use objc2_foundation::{NSFileManager, NSString};
+    const GROUP: &str = "group.com.tylerpoelking.ore";
+    match unsafe { NSFileManager::defaultManager().containerURLForSecurityApplicationGroupIdentifier(&NSString::from_str(GROUP)) } {
+        Some(url) => Some(PathBuf::from(unsafe { url.path() }?.to_string())),
+        // The Simulator's build drops the App Group entitlement: the Share Extension writes beside the containers.
+        None if cfg!(target_abi = "sim") => Some(PathBuf::from(std::env::var_os("HOME")?).parent()?.parent()?.join("Shared/AppGroup").join(GROUP)),
+        None => None,
+    }
+}
+#[cfg(not(target_os = "ios"))]
+fn group() -> Option<PathBuf> {
+    None
+}
+
 #[cfg(target_os = "ios")]
 #[allow(unused_unsafe)]
 fn container() -> Option<PathBuf> {
@@ -221,7 +249,7 @@ pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch, share_inbox])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }
