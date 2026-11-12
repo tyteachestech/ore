@@ -987,10 +987,13 @@ function ReaderView(p: Props & { reload: () => void }) {
     };
     const onDown = (e: globalThis.MouseEvent) => e.target === el && e.offsetX >= el.clientWidth && off();
     el.addEventListener("wheel", onWheel, { passive: true });
+    // A finger's scroll on the iPhone (and a trackpad's on a touch screen) is his too.
+    el.addEventListener("touchmove", off, { passive: true });
     el.addEventListener("keydown", onKey);
     el.addEventListener("mousedown", onDown);
     return () => {
       el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchmove", off);
       el.removeEventListener("keydown", onKey);
       el.removeEventListener("mousedown", onDown);
     };

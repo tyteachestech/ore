@@ -2388,6 +2388,32 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
+journey("a recording: a finger's scroll away from the spoken line stops following it, as the wheel does, and Back to current shows (D49)", async (page) => {
+  await page.setViewportSize({ width: 1000, height: 320 });
+  await openSource(page, "Lecture 4");
+  for (let i = 0; i < 5; i++) await page.keyboard.press("Meta+Equal"); // the short transcript runs past the window
+  const player = page.locator(".player.audio");
+  await player.waitFor();
+  await page.locator(".doc .ts").filter({ hasText: "00:30" }).click();
+  await until("it plays from the stamp", async () => (await player.getByRole("button", { name: "Pause" }).count()) === 1);
+  const box = page.locator(".reader-scroll");
+  await until("it follows the spoken line", async () => (await box.evaluate((el) => el.scrollTop)) > 40);
+  // A finger drags the text back to the top, as on the iPhone: touch events, then the scroll they make.
+  await box.evaluate((el) => {
+    const t = (y: number) => new Touch({ identifier: 1, target: el, clientX: 300, clientY: y });
+    el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [t(200)] }));
+    el.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [t(400)] }));
+    el.scrollTop = 0;
+    el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, touches: [] }));
+  });
+  await page.waitForTimeout(800);
+  const top = await box.evaluate((el) => el.scrollTop);
+  if (top > 5) throw new Error(`the playing recording pulled the text back to its line (scrollTop ${top})`);
+  await page.locator(".back-current").waitFor();
+  await page.keyboard.press("Space");
+  for (let i = 0; i < 5; i++) await page.keyboard.press("Meta+Minus");
+});
+
 journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D219)", async (page) => {
   const lecture = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title.startsWith("Lecture 4"))!;
   const dir = ((await ore("show", lecture.id)) as { dir: string }).dir;
@@ -9712,6 +9738,46 @@ journey("phone: New skill in the drawer names one in place and opens its page; a
   await tap(page, page.locator(".phone-back").filter({ hasText: "Today" }));
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await page.locator(".phone-drawer section button").filter({ hasText: "Juggling" }).waitFor();
+}, "phone");
+
+journey("phone: New skill's field and its refusal stay above the keyboard", async (page) => {
+  await page.evaluate(() => document.documentElement.style.setProperty("--keyboard", "336px")); // iOS's keyboard, as the shell measures it
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "New skill" }));
+  const field = page.getByRole("textbox", { name: "New skill name" });
+  await field.fill("learning");
+  await field.press("Enter");
+  const error = page.locator(".phone-new-error");
+  await error.waitFor();
+  await until("the field and the refusal sit above the keyboard", async () => {
+    const f = (await field.boundingBox())!, e = (await error.boundingBox())!;
+    return f.y + f.height <= 844 - 336 && e.y + e.height <= 844 - 336;
+  });
+  await field.press("Escape");
+  await page.evaluate(() => document.documentElement.style.removeProperty("--keyboard"));
+}, "phone");
+
+journey("phone: a double tap on an open picture zooms it, and keeps it open (Photos)", async (page) => {
+  await phoneSource(page, AGENTS);
+  const img = page.locator(".phone-reader .doc img").first();
+  await until("the saved picture loads from the library", () => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0));
+  await tap(page, img);
+  const view = page.locator(".figure-view");
+  await view.locator("img").waitFor();
+  await page.waitForTimeout(400); // grown in
+  const scale = () => view.evaluate((v) => Math.max(...[...v.querySelectorAll<HTMLElement>("*")].map((el) => new DOMMatrix(getComputedStyle(el).transform === "none" ? undefined : getComputedStyle(el).transform).a)));
+  await page.touchscreen.tap(195, 422);
+  await page.waitForTimeout(80);
+  await page.touchscreen.tap(195, 422);
+  await page.waitForTimeout(700);
+  if (!(await view.count())) throw new Error("a double tap closed the picture");
+  await until("a double tap zooms in", async () => (await scale()) > 1.5);
+  await page.touchscreen.tap(195, 422);
+  await page.waitForTimeout(80);
+  await page.touchscreen.tap(195, 422);
+  await until("a second double tap zooms back out", async () => (await scale()) < 1.05);
+  await page.touchscreen.tap(195, 422);
+  await view.waitFor({ state: "detached" });
 }, "phone");
 
 journey("phone: Settings in the drawer changes the daily goal and the reminder, and they stay (D228)", async (page) => {
