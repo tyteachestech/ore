@@ -2816,9 +2816,13 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.keyboard.press("Escape");
   await page.keyboard.press("Backspace");
   await page.keyboard.type("Read the guide", { delay: 10 });
-  await page.keyboard.press("Shift+Home");
-  await page.waitForTimeout(150); // the editor takes the selection a moment after the page shows it
-  await page.keyboard.press("Meta+k"); // the palette's key, in the note with words selected
+  // The words selected to the line's start and ⌘K in the same moment, as a quick hand does: ⌘K reads the
+  // selection the note has when the key lands, never one a frame behind.
+  await page.evaluate(() => {
+    const t = document.querySelector(".note-editor .ProseMirror p")!.firstChild!;
+    getSelection()!.setBaseAndExtent(t, t.textContent!.length, t, 0);
+    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", metaKey: true, bubbles: true, cancelable: true }));
+  });
   await page.getByPlaceholder("Paste a link").waitFor();
   // Esc closes it with focus back on the words (Notion), so ⌘K asks again at once.
   await page.keyboard.press("Escape");
@@ -2832,10 +2836,12 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.waitForTimeout(200);
   if (await page.evaluate(() => !!document.activeElement?.closest(".note-editor"))) throw new Error("a press outside the link field put focus back in the note");
   await pm.getByText("Read the guide").click();
-  await page.keyboard.press("End");
-  await page.keyboard.press("Shift+Home");
-  await page.waitForTimeout(150);
-  await page.keyboard.press("Meta+k");
+  // The line's end, then select to its start, by this Mac's keys or Linux's (on the Mac, Home and End scroll).
+  const mac = process.platform === "darwin";
+  await page.keyboard.press(mac ? "Meta+ArrowRight" : "End");
+  await page.keyboard.press(mac ? "Meta+Shift+ArrowLeft" : "Shift+Home");
+  if ((await page.evaluate(() => String(getSelection()))) !== "Read the guide") throw new Error("the words aren't selected");
+  await page.keyboard.press("Meta+k"); // at once: ⌘K reads the selection the note has as the key lands
   await page.getByPlaceholder("Paste a link").waitFor();
   await page.keyboard.type("example.com/guide");
   await page.keyboard.press("Enter");
