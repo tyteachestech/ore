@@ -31,9 +31,9 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F5 | 2026-11-08 | Import | Reimport after the kept original was deleted gives the wrong reason ("only a source added from a link or a file") | open | — |
 | F6 | 2026-11-08 | Reader | The reader's shown-text map (`apps/desktop/src/text.ts`) and core anchoring are two maps of one text | open | — |
 | F7 | 2026-11-09 | Undo | `batch` has no rollback when a write fails midway | known limit: accepted in the 2026-11-09 code reviews | — |
-| F8 | 2026-11-10 | Lists | Typing a title's first letters in a list doesn't jump to that row (Finder) | Tyler: add type-to-select in lists? | — |
-| F9 | 2026-11-10 | Home, Feed | No multi-selection on Home or the Feed | Tyler: recommended no | — |
-| F10 | 2026-11-10 | Home | A Home source can't be dragged onto a skill | Tyler: recommended no | — |
+| F8 | 2026-11-10 | Lists | Typing a title's first letters in a list doesn't jump to that row (Finder); Tyler: yes, D232 | fixed #311 | `list type-select: typing a title's first letters selects its row` |
+| F9 | 2026-11-10 | Home, Feed | No multi-selection on Home or the Feed; Tyler: yes, 2026-11-12 | open | — |
+| F10 | 2026-11-10 | Home | A Home source can't be dragged onto a skill; Tyler: yes, 2026-11-12 | open | — |
 | F11 | 2026-11-10 | Notes, lists | A slow first read shows a blank list or editor | not a bug: local reads take milliseconds; the delay was added by hand (twice) | — |
 | F12 | 2026-11-11 | Review | A skill row's count is taken after the day's new-exercise cap over the whole queue, so a row picked alone can serve more new exercises than it showed | known limit: D204 | — |
 | F13 | 2026-11-11 | iPhone | YouTube and audio sources show the transcript as plain text: the snapshot leaves out `.vtt` and audio, and there is no player relay page | open | — |

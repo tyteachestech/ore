@@ -37,6 +37,7 @@ import { dueSkills, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { Review } from "./Review";
 import { useToast } from "./Toast";
 import { lineAfter, lineKey, type Line } from "./lines";
+import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { readGuard } from "./reads";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
@@ -1261,7 +1262,7 @@ export function App() {
   useEffect(() => {
     if (openId || overlay || onHome || !current) return;
     const onKey = (e: KeyboardEvent) => {
-      // O is a plain letter: in a field (the skill note, a new question) it is typing.
+      // In a field (the filter, the skill note, a new question) these act on the text, not a row.
       if ((is(e, "original") || is(e, "archive")) && inTextField(e)) return;
       if (is(e, "copy") && !window.getSelection()?.toString() && (many.length > 1 || keyed)) {
         // ⌘C on the picked rows, or the selected one, copies them as linked titles; a course as its page.
@@ -1351,6 +1352,10 @@ export function App() {
 
   const onListKey = (e: ReactKeyboardEvent) => {
     if (!lines.length || !currentLine) return;
+    const now = Date.now();
+    const begun = now - typed.current.at < TYPE_GAP && typed.current.text !== "";
+    // Any key but a letter of a title ends the title being typed (an arrow, Esc, a shortcut).
+    if (!typesTitle(e, begun)) typed.current.text = "";
     const at = lines.indexOf(currentLine);
     if (e.key === "Escape" && picked.length) {
       e.preventDefault();
@@ -1391,8 +1396,25 @@ export function App() {
     } else if (is(e.nativeEvent, "rename") && keyed) {
       e.preventDefault();
       setRenamingRow(lineKey(currentLine));
+    } else if (is(e.nativeEvent, "pin") && keyed && many.length < 2 && currentLine.kind === "item" && !currentLine.item.archived_at) {
+      e.preventDefault();
+      void pinSource(currentLine.item);
+    } else if (!inTextField(e.nativeEvent) && typesTitle(e, begun)) {
+      // Finder's type-select (F8): the first letters of a title select its row. Stopped here, so a plain
+      // letter bound elsewhere (N opens a skill's note) never also acts while he types a title.
+      e.preventDefault();
+      e.stopPropagation();
+      const text = (begun ? typed.current.text : "") + e.key;
+      typed.current = { text, at: now };
+      const i = typeJump(lines.map((l) => (l.kind === "item" ? l.item.title : l.title)), text, keyed ? at : -1);
+      if (i < 0) return;
+      unpick();
+      setKeyed(true);
+      setCursor(lineKey(lines[i]!));
     }
   };
+  /** What he has typed of a title, and when the last letter came (Finder's type-select). */
+  const typed = useRef({ text: "", at: 0 });
 
   /** A source row's title edited in place (Finder's Rename): optimistic, put back if the write fails. */
   const [renamingRow, setRenamingRow] = useState<string | null>(null);
@@ -1791,7 +1813,7 @@ export function App() {
     { id: "open", label: "Open", hint: "↵", run: () => openSource(r.id) },
     { id: "review-source", label: "Review this source", run: () => startReview(null, r.id) },
     { id: "rename", divider: true, label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(r.id) },
-    ...(r.archived_at ? [] : [{ id: "pin", label: r.pinned_at ? "Unpin" : "Pin to top", run: () => void pinSource(r) }]),
+    ...(r.archived_at ? [] : [{ id: "pin", label: r.pinned_at ? "Unpin" : "Pin to top", hint: label(keys.pin), run: () => void pinSource(r) }]),
     ...pinMoves(r),
     ...(r.archived_at
       ? [{ id: "restore", label: "Restore", run: () => void restoreSource(r) }]
