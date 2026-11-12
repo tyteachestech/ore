@@ -4,8 +4,9 @@ import { deviceName, writeAtomic } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 
-// A link added on the iPhone waits in inbox/ as `<id>.link.json` until the Mac imports it (D223): the
-// phone can't run the whole import (D96) or the AI (D78.3), and iCloud brings the file to the Mac.
+// A link added on a device waits in inbox/ as `<id>.link.json` until a device imports it (D223, D227).
+// The device that captured it goes first: another one leaves it alone for a few minutes, so the two don't
+// both import it while iCloud is still carrying the news, and takes it at once when the first one couldn't.
 
 export interface QueuedLink {
   id: string;
@@ -13,7 +14,7 @@ export interface QueuedLink {
   skills: string[];
   added: string;
   device: string;
-  /** Why the Mac couldn't import it last time; it is tried again on the next import. */
+  /** Why the last device to try couldn't import it; it is tried again on the next import. */
   error?: string;
 }
 
@@ -51,13 +52,25 @@ export function removeQueuedLink(lib: Library, id: string): void {
   unlinkSync(file(lib, id));
 }
 
-/** Imports each waiting link with `add` (the Mac's whole import). A link that fails keeps its reason for the phone
+/** How long another device's link is left for that device to import itself. */
+export const THEIRS_FIRST_MS = 5 * 60_000;
+
+/** Whether this device imports the link now: its own always; another device's once that one has failed,
+ *  or has had its few minutes (its app may never have opened: a link shared from Safari). */
+export function mine(l: QueuedLink, now = Date.now(), device = deviceName()): boolean {
+  if (l.device === device || l.error) return true;
+  const at = Date.parse(l.added);
+  return Number.isNaN(at) || now - at >= THEIRS_FIRST_MS;
+}
+
+/** Imports each waiting link that is this device's to import (`mine`) with `add`, the whole import. A link that fails keeps its reason for the phone
  *  to show and is tried again next time (the Mac may just have been offline); `failed` lists only new reasons, so
  *  the same failure isn't announced on every import. */
-export async function importQueued<T extends { id: string; title: string }>(lib: Library, add: (url: string, skills: string[]) => Promise<T>): Promise<{ added: (T & { url: string })[]; failed: QueuedLink[] }> {
+export async function importQueued<T extends { id: string; title: string }>(lib: Library, add: (url: string, skills: string[]) => Promise<T>, now = Date.now()): Promise<{ added: (T & { url: string })[]; failed: QueuedLink[] }> {
   const added: (T & { url: string })[] = [];
   const failed: QueuedLink[] = [];
   for (const l of queuedLinks(lib)) {
+    if (!mine(l, now)) continue;
     let item: T;
     try {
       item = await add(l.url, l.skills);

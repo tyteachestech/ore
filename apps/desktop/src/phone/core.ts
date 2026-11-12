@@ -82,6 +82,10 @@ if (isTauri()) {
   }) as typeof fetch;
 }
 
+/** Links the Share Extension saved since (apps/phone/share) come into the library's inbox. */
+let libraryDir: string | null = null;
+const shared = () => (libraryDir ? invoke<number>("share_inbox", { root: libraryDir }).catch(() => 0) : Promise.resolve(0));
+
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
 function boot() {
@@ -89,7 +93,8 @@ function boot() {
     if (isTauri()) {
       const root = await invoke<string | null>("library_dir");
       if (!root) throw new Error("Turn on iCloud Drive for Ore: Settings › your name › iCloud › Drive.");
-      await invoke<number>("share_inbox", { root }).catch(() => 0);
+      libraryDir = root;
+      await shared();
       await mountDisk(ROOT, root, invoke);
       // A source's own files (its images) load from the folder itself: /lib/... is the folder on disk.
       setLibraryRoot(ROOT, root);
@@ -115,7 +120,15 @@ function exclusive<T>(f: () => Promise<T>): Promise<T> {
 }
 
 /** Reads in what changed on the Mac (through iCloud) since; true if anything did. */
-export const pull = () => (booted ? booted.then(() => exclusive(rescan)).catch(() => false) : Promise.resolve(false));
+export const pull = () =>
+  booted
+    ? booted
+        .then(async () => {
+          const came = await shared();
+          return (await exclusive(rescan)) || came > 0;
+        })
+        .catch(() => false)
+    : Promise.resolve(false);
 
 /** `ore <args> --json` in-process: the command's JSON output, or its one-line error. */
 export async function run<T>(args: string[], input: string | null): Promise<T> {
@@ -159,4 +172,4 @@ function picture(path: string): string | undefined {
  *  failing on a missing prompt file. Storing a recall or his own key-point marks needs no AI. */
 const AI = new Set(["grade", "ask", "enrich", "key-points", "research", "remix", "catch-up"]);
 const needsAi = (name: string, args: string[]) =>
-  AI.has(name) || (name === "inbox" && args.includes("--import")) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));
+  AI.has(name) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));

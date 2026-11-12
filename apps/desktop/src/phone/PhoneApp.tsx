@@ -369,14 +369,35 @@ export function PhoneApp() {
     // Once, on the first list: later a missing source is one he just archived from inside it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
-  useEffect(() => void refresh(), [refresh]);
+  // Links waiting in the inbox (added with +, or shared from another app) are imported here, by the Mac's
+  // own importer (D227). One this phone can't read keeps its reason, and the Mac tries it.
+  const [reading, setReading] = useState(false);
+  const readingNow = useRef(false);
+  const bringIn = useCallback(async () => {
+    if (readingNow.current) return;
+    readingNow.current = true;
+    try {
+      if (!(await ore<Waiting[]>("inbox")).length) return;
+      setReading(true);
+      const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+      for (const a of r.added) notify(a.kept ? `Already here: “${a.title}”` : `Added “${a.title}”`, "info");
+      for (const f of r.failed) notify(`Couldn’t read ${f.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]} here. Your Mac will try it.`, "error");
+    } catch {
+      // The list says what is still waiting.
+    } finally {
+      readingNow.current = false;
+      setReading(false);
+      void refresh();
+    }
+  }, [refresh, notify]);
+  useEffect(() => void refresh().then(bringIn), [refresh, bringIn]);
   // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
   useEffect(() => {
     const check = () =>
       void pullFromMac().then((changed) => {
         if (!changed) return;
         setTick((t) => t + 1);
-        void refresh();
+        void refresh().then(bringIn);
       });
     const back = () => !document.hidden && check();
     const every = setInterval(back, 30_000);
@@ -384,7 +405,7 @@ export function PhoneApp() {
     addEventListener("visibilitychange", back);
     addEventListener("ore:save-failed", failed);
     return () => (clearInterval(every), removeEventListener("visibilitychange", back), removeEventListener("ore:save-failed", failed));
-  }, [refresh, notify]);
+  }, [refresh, notify, bringIn]);
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
   // height, and keep the answer's buttons in sight when it opens.
@@ -684,7 +705,7 @@ export function PhoneApp() {
                 items={tab === "archive" ? archived : items}
                 onOpen={open}
                 row={row}
-                head={tab === "sources" && <WaitingLinks links={waiting} onRemove={removeWaiting} />}
+                head={tab === "sources" && <WaitingLinks links={waiting} reading={reading} onRemove={removeWaiting} />}
                 empty={tab === "archive" ? "Nothing archived. Swipe a source left to archive it." : waiting.length ? "" : undefined}
               />
             )}
@@ -765,7 +786,7 @@ export function PhoneApp() {
           onClose={() => setSearching(false)}
         />
       )}
-      {adding && <AddLink onClose={() => setAdding(false)} onAdded={() => void refresh()} notify={notify} />}
+      {adding && <AddLink onClose={() => setAdding(false)} onAdded={() => void refresh().then(bringIn)} />}
       {editingSkill && skills.some((s) => s.id === editingSkill) && (
         <SkillEditor
           skill={skills.find((s) => s.id === editingSkill)!}

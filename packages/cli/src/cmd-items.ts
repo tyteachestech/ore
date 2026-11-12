@@ -104,13 +104,13 @@ export const itemCommands: Record<string, Command> = {
   },
 
   inbox: {
-    usage: "[--add <url> [--skill s]] [--remove <id>] [--import]   links added on the iPhone, waiting for the Mac to import them (D223): --add queues one (the phone), --import adds each with the whole import and enrichment (the Mac), --remove drops one; with none, lists them",
+    usage: "[--add <url> [--skill s]] [--remove <id>] [--import]   links saved on a device, waiting to be imported (D223, D227): --add saves one, --import adds each that is this device's to import (its own; another device's after five minutes, or at once when that one couldn't) with the whole import, --remove drops one; with none, lists them",
     options: { add: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
       if (f.add !== undefined) {
         const l = queueLink(lib, str(f.add) ?? "", strs(f.skill));
-        return { data: l, text: `Waiting for your Mac: ${l.url}` };
+        return { data: l, text: `Coming in: ${l.url}` };
       }
       if (f.remove !== undefined) {
         removeQueuedLink(lib, need(str(f.remove), "<id>"));

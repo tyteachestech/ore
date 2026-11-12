@@ -3083,4 +3083,5 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone-bar .phone-add { margin-left: auto; }
 .phone-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
 .phone-waiting .phone-error { flex-basis: 100%; order: 3; padding: 0 0 6px; }
+.phone-waiting-note { color: var(--faint, var(--muted)); font-size: 13px; }
 .phone-sources .phone-waiting button { width: auto; min-height: 44px; border: 0; padding: 0 0 0 8px; background: none; color: var(--accent); font: 500 15px var(--font); }

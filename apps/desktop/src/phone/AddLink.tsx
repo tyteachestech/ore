@@ -1,15 +1,16 @@
-// Adding a source on the iPhone (D223): a link waits in the library's inbox until the Mac imports it with the
-// whole import and the AI (D96, D78.3). The sheet is one field, as Raindrop's add-a-link is; a link already on
-// the clipboard is offered by the field's own Paste (iOS), never read without his tap.
+// Adding a source on the iPhone (D227): the link is saved to the library's inbox at once, then the phone
+// imports it itself with the Mac's importer; what it can't read (a video's transcript) the Mac brings in.
+// The sheet is one field, as Raindrop's add-a-link is; a link already on the clipboard is offered by the
+// field's own Paste (iOS), never read without his tap.
 import { useEffect, useRef, useState } from "react";
 import { Trap } from "../Trap";
 import { ore } from "../ore";
-import { errorText, type Notify } from "../util";
+import { errorText } from "../util";
 import { sheetLayer, useSwipeDown } from "./sheet";
 
 export type Waiting = { id: string; url: string; skills: string[]; error?: string };
 
-export function AddLink({ onClose, onAdded, notify }: { onClose: () => void; onAdded: () => void; notify: Notify }) {
+export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,6 @@ export function AddLink({ onClose, onAdded, notify }: { onClose: () => void; onA
     setBusy(true);
     try {
       await ore("inbox", "--add", url.trim());
-      notify("Added. Your Mac brings it in next time Ore is open there.", "info");
       onAdded();
       onClose();
     } catch (e) {
@@ -58,17 +58,18 @@ export function AddLink({ onClose, onAdded, notify }: { onClose: () => void; onA
   );
 }
 
-/** Links added here that the Mac hasn't brought in yet: each says so, or why the Mac couldn't. */
-export function WaitingLinks({ links, onRemove }: { links: Waiting[]; onRemove: (l: Waiting) => void }) {
+/** Links on their way in: one this phone is reading says so, and one it couldn't read says why and that
+ *  the Mac tries it. */
+export function WaitingLinks({ links, reading, onRemove }: { links: Waiting[]; reading: boolean; onRemove: (l: Waiting) => void }) {
   if (!links.length) return null;
   return (
     <section>
-      <h2>Waiting for your Mac</h2>
+      <h2>Coming in</h2>
       <ul>
         {links.map((l) => (
           <li key={l.id} className="phone-waiting">
             <span className="phone-title">{l.url.replace(/^https?:\/\/(www\.)?/, "")}</span>
-            {l.error && <span className="phone-error">{l.error}</span>}
+            {l.error ? <span className="phone-error">{l.error} Your Mac will try it.</span> : reading && <span className="phone-waiting-note">Reading…</span>}
             <button className="phone-back" onClick={() => onRemove(l)}>
               Remove
             </button>
