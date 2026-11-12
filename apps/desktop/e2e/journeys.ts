@@ -617,6 +617,26 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("highlight popup: a click in the margin beside the text closes it and the highlight stays", async (page) => {
+  await openSource(page, TESTING);
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  await select(page, "The advantage only appears after a delay"); // a passage no other journey highlights
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  await until("the highlight is made", async () => Number(await keeps.innerText()) === before + 1);
+  // Beside the column, level with the text: in the reader's scroll area but off the page.
+  const box = (await page.locator(".reader-scroll").boundingBox())!;
+  const col = (await page.locator(".page").boundingBox())!;
+  if (col.x - box.x < 20) throw new Error("no margin beside the page to click in");
+  await page.mouse.click(box.x + (col.x - box.x) / 2, col.y + 80);
+  await popup.waitFor({ state: "detached" });
+  await page.waitForTimeout(300);
+  if (Number(await keeps.innerText()) !== before + 1) throw new Error("the click away dropped the highlight");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => Number(await keeps.innerText()) === before);
+});
+
 journey("skill page: To read's and Questions' heads line up, caret over caret and icon over icon", async (page) => {
   await page.getByRole("button", { name: /^Learning/ }).first().click();
   await page.locator(".skill-col.side .card-head .card-icon").nth(1).waitFor();
