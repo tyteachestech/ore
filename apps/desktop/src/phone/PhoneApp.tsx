@@ -12,7 +12,7 @@ import { SkillIcon } from "../IconPicker";
 import { NoteBody, useNotes, type SideTab } from "../Notes";
 import { PixelNote } from "../PixelIcon";
 import type { NoteEditorHandle } from "../editor/NoteEditor";
-import { WithMenu, type MenuAction } from "../Menu";
+import { holdMenu, WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
 import { skillGroups } from "../Skills";
 import { lessonsOf, opt, ore, pullFromMac, type Item, type Skill, touched } from "../ore";
@@ -171,9 +171,9 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   useHorizontalDrag(ref, {
     accept: (t) => ((swiped.current = false), t.clientX > 24),
     // iOS's half second, not the menu library's 700 ms (D145.4): Radix's trigger opens on contextmenu, and clears its own timer.
-    hold: (clientX, clientY) => {
+    hold: (_, y) => {
       swiped.current = true; // Letting go after the menu opened is not a tap on the row.
-      ref.current!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX, clientY }));
+      holdMenu(ref.current!, y);
     },
     begin: (dx) => {
       if (item.archived_at && dx > 0) return false; // Archived: only Restore, to the left.
@@ -590,6 +590,7 @@ export function PhoneApp() {
                 onReview={(pick) => setReviewing({ pick, run: 0 })}
                 onOpenSource={(id) => open(id)}
                 onOpenSkill={setSkill}
+                sourceMenu={row.menu}
                 notify={notify}
               />
             ) : (

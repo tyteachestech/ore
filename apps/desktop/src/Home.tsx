@@ -288,7 +288,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
               return (
                 // The title is the row's one control (a button inside a button reads as one to a screen reader);
                 // the skill chips and ⋯ sit beside it. A click anywhere else on the row still opens it.
-                <WithMenu key={i.id} actions={sourceMenu ? () => withRename(sourceMenu(i), i) : []}>
+                <WithMenu key={i.id} actions={sourceMenu ? () => withRename(sourceMenu(i), i) : []} hold>
                 <div className="home-read" data-id={i.id} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpenSource(i.id)}>
                   <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
@@ -329,7 +329,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
               <h2 className="home-h">{g.name}</h2>
               <div className="home-skills">
                 {g.skills.map((s) => (
-                  <WithMenu key={s.id} actions={skillMenu ? () => skillMenu(s) : []}>
+                  <WithMenu key={s.id} actions={skillMenu ? () => skillMenu(s) : []} hold>
                     <SkillTile skill={s} strength={today.skills.find((x) => x.skill === s.id)} onOpen={() => onOpenSkill(s.id)} onStart={() => onReview([s.id])} more={skillMenu && <MoreButton label="Skill actions" actions={() => skillMenu(s)} hoverOnly />} />
                   </WithMenu>
                 ))}

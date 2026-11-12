@@ -1,11 +1,12 @@
 import { CaretLeft, CaretRight, DotsThree, Tick } from "./icons";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
 import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
+import { trackDrag } from "./phone/drag";
 import { sheetLayer, useSwipeDown } from "./phone/sheet";
 import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
@@ -58,9 +59,46 @@ const listOf = (a: Actions) => (typeof a === "function" ? a() : a);
 /** Renders its children only when it renders: inside a closed menu, never. */
 const Later = ({ children }: { children: () => ReactNode }) => <>{children()}</>;
 
+/** Opens a row's menu as a right-click under the finger would, but from the row's left edge, as iOS lines its
+ *  menu up with what was pressed: at the finger's x the menu ran off a 390 pt screen. */
+export function holdMenu(el: HTMLElement, y: number) {
+  const x = Math.min(el.getBoundingClientRect().left + 16, innerWidth / 2);
+  el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+}
+
+/** iOS's long-press menu on a WebKit row. WebKit on iOS sends no contextmenu for a press, and Radix's own touch
+ *  timer (700 ms) gives up at the first pointermove, which a real finger always makes: so the phone decides the hold
+ *  itself, once (`trackDrag`: still within 10 pt for 500 ms), and opens the menu as a right-click would. The click
+ *  iOS may send as the finger lifts is the press, not a tap on the row. */
+function useHold(on: boolean | undefined) {
+  const off = useRef<(() => void) | null>(null);
+  return useCallback((el: HTMLElement | null) => {
+    off.current?.();
+    off.current = null;
+    if (!on || !el) return;
+    let pressed = false;
+    const swallow = (e: Event) => pressed && (e.preventDefault(), e.stopPropagation(), (pressed = false));
+    const reset = () => void (pressed = false);
+    el.addEventListener("click", swallow, true);
+    el.addEventListener("touchstart", reset, { passive: true });
+    const stop = trackDrag(el, () => ({
+      // Text in a field or the reader keeps iOS's own press (select, Look Up).
+      accept: (t) => !nativeMenu(document.elementFromPoint(t.clientX, t.clientY), getSelection()),
+      begin: () => false, // A slide is a scroll or a swipe, never this.
+      move: () => {},
+      end: () => {},
+      hold: (_, y) => {
+        pressed = true;
+        holdMenu(el, y);
+      },
+    }));
+    off.current = () => (stop(), el.removeEventListener("click", swallow, true), el.removeEventListener("touchstart", reset));
+  }, [on]);
+}
+
 /** An object's actions, the same list on right-click and on its ⋯ button, as in Linear and Finder
  *  (AGENTS.md interaction checklist). Radix menus: arrows, type-ahead, Enter, Esc. */
-export function WithMenu({ actions, children, keepFocus }: { actions: Actions; children: ReactNode; /** Focus stays where the action put it (the note's text), not back on the trigger. */ keepFocus?: boolean }) {
+export function WithMenu({ actions, children, keepFocus, hold }: { actions: Actions; children: ReactNode; /** Focus stays where the action put it (the note's text), not back on the trigger. */ keepFocus?: boolean; /** On the iPhone, a still half-second press opens it (Photos, Files): a row that has no swipes of its own. */ hold?: boolean }) {
   // macOS opens the menu on mouse down, under the pointer, so the same click's mouse up lands on the
   // first item and Radix would pick it. A release right after opening is that click, not a choice;
   // pressing, moving to an item and releasing still picks it, as in a native menu.
@@ -71,11 +109,12 @@ export function WithMenu({ actions, children, keepFocus }: { actions: Actions; c
   const [native, setNative] = useState(false);
   const { later, pick, closed } = useLater();
   const row = useRef<HTMLElement | null>(null);
+  const held = useHold(PHONE && hold);
   // A row not on screen yet can't be right-clicked; its menu comes with it when it scrolls in.
   if (useLite() || (Array.isArray(actions) && !actions.length)) return children; // or no menu to open (the phone's title)
   return (
     <ContextMenu.Root onOpenChange={(open) => open && (opened.current = performance.now())}>
-      <ContextMenu.Trigger asChild disabled={native} data-menu-row="" onPointerDownCapture={(e) => ((row.current = e.currentTarget as HTMLElement), setNative(nativeMenu(e.target, getSelection())))}>
+      <ContextMenu.Trigger asChild ref={held} disabled={native} data-menu-row="" onPointerDownCapture={(e) => ((row.current = e.currentTarget as HTMLElement), setNative(nativeMenu(e.target, getSelection())))}>
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
