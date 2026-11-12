@@ -111,7 +111,7 @@ test("gem grades on the end screen (D197): a won-back gem carries its gold seam,
   reduce = false;
   const gems = [...s.body.querySelectorAll(".review-cut > span")];
   expect(gems).toHaveLength(3);
-  const seams = gems.map((g) => g.querySelectorAll('circle[fill="var(--seam)"]').length);
+  const seams = gems.map((g) => g.querySelectorAll('rect[fill="var(--seam)"]').length);
   expect(seams[0]).toBeGreaterThan(0);
   expect(seams.slice(1)).toEqual([0, 0]);
   expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");
