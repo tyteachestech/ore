@@ -7,7 +7,7 @@ import { ore } from "../ore";
 import { errorText, type Notify } from "../util";
 import { sheetLayer, useSwipeDown } from "./sheet";
 
-export type Waiting = { id: string; url: string; error?: string };
+export type Waiting = { id: string; url: string; skills: string[]; error?: string };
 
 export function AddLink({ onClose, onAdded, notify }: { onClose: () => void; onAdded: () => void; notify: Notify }) {
   const [url, setUrl] = useState("");

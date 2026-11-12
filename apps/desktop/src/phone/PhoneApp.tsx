@@ -571,7 +571,7 @@ export function PhoneApp() {
     try {
       await ore("inbox", "--remove", l.id);
       void refresh();
-      notify("Removed the link", "info", () => ore("inbox", "--add", l.url).then(refresh));
+      notify("Removed the link", "info", () => ore("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s])).then(refresh));
     } catch (e) {
       notify(errorText(e), "error");
     }

@@ -25,9 +25,16 @@ test("a queued link waits, the Mac imports it, and a failure keeps its reason", 
   expect(r.added).toEqual([{ id: "01X", title: "A", url: "https://example.com/a" }]);
   expect(queuedLinks(lib).map((l) => [l.id, l.error])).toEqual([[b.id, "Couldn’t open that page (HTTP 404 from example.com)."]]);
 
-  // A failed one isn't tried again on every import; he removes it.
-  expect((await importQueued(lib, async () => ({ id: "x", title: "x" }))).added).toEqual([]);
+  // A failed one is tried again (the Mac may have been offline), and the same failure isn't reported twice.
+  const again = await importQueued(lib, async () => {
+    throw new Error("Couldn’t open that page (HTTP 404 from example.com).");
+  });
+  expect([again.added, again.failed]).toEqual([[], []]);
+  expect(queuedLinks(lib)).toHaveLength(1);
   removeQueuedLink(lib, b.id);
+  // A link pasted without its scheme gets https://.
+  expect(queueLink(lib, "example.com/c").url).toBe("https://example.com/c");
+  removeQueuedLink(lib, queuedLinks(lib)[0]!.id);
   expect(queuedLinks(lib)).toEqual([]);
   expect(existsSync(paths.inbox(lib)) ? readdirSync(paths.inbox(lib)) : []).toEqual([]);
   expect(a.device.length).toBeGreaterThan(0);

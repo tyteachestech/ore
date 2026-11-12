@@ -22,6 +22,16 @@ import {
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
+
+/** What follows an add, from `ore add` or a link the iPhone queued: enrichment in the background (also for a Feed
+ *  post now kept, which wasn't yet), and a PDF's tables and formulas once the optional reader is installed (D125). */
+function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noEnrich: boolean): string {
+  const kept = !!item.kept;
+  const enrich = noEnrich || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
+  if (noEnrich && !kept) markEnrichSkipped(lib, item.meta.id);
+  if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
+  return enrich;
+}
 import { int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
 import { importQueued, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
@@ -84,10 +94,7 @@ export const itemCommands: Record<string, Command> = {
           : await addSource(lib, need(input, "<url|path>"), { type: oneOf(f.type, ItemType.options, "type"), skills: strs(f.skill), onProgress });
       if (f.for) await matchQuestion(lib, item.meta.id, str(f.for)!);
       const kept = !!item.kept;
-      const enrich = f["no-enrich"] || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
-      if (f["no-enrich"] && !kept) markEnrichSkipped(lib, item.meta.id);
-      // A PDF's tables and formulas are read after it is added, once the optional reader is installed (D125).
-      if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
+      const enrich = afterAdd(lib, item, !!f["no-enrich"]);
       const path = relative(lib.root, item.docPath);
       return {
         data: { id: item.meta.id, title: item.meta.title, type: item.meta.type, path, enrich, ...(kept ? { kept, filed: item.filed, restored: item.restored, status: item.meta.status, skills: item.meta.skills } : {}) },
@@ -112,8 +119,8 @@ export const itemCommands: Record<string, Command> = {
       if (f.import) {
         const r = await importQueued(lib, async (url, skills) => {
           const item = await addSource(lib, url, { skills });
-          if (!item.kept) startEnrich(lib, item.meta.id);
-          return { id: item.meta.id, title: item.meta.title };
+          afterAdd(lib, item, false);
+          return { id: item.meta.id, title: item.meta.title, kept: !!item.kept };
         });
         return { data: r, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`)].join("\n") };
       }

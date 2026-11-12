@@ -364,14 +364,14 @@ export function App() {
       if (busy) return;
       busy = true;
       try {
-        const waiting = await ore<{ error?: string }[]>("inbox");
-        if (!waiting.some((l) => !l.error)) return;
-        const r = await ore<{ added: { title: string }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
-        if (r.added.length) notify(r.added.length === 1 ? `Added “${r.added[0]!.title}” from your iPhone` : `Added ${r.added.length} sources from your iPhone`, "info");
+        const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+        const fresh = r.added.filter((a) => !a.kept);
+        if (fresh.length) notify(fresh.length === 1 ? `Added “${fresh[0]!.title}” from your iPhone` : `Added ${fresh.length} sources from your iPhone`, "info");
+        for (const a of r.added.filter((a) => a.kept)) notify(`Already here: “${a.title}”, from your iPhone`, "info");
         for (const f of r.failed) notify(`Couldn’t add ${f.url} from your iPhone: ${f.error}`, "error");
-        reload();
-      } catch {
-        // An older library or a missing inbox: nothing to bring in.
+        if (r.added.length) reload();
+      } catch (e) {
+        notify(`Couldn’t bring in links from your iPhone: ${errorText(e)}`, "error");
       } finally {
         busy = false;
       }
@@ -379,9 +379,11 @@ export function App() {
     void fromPhone();
     // Only after a real absence (10 s away): a click on a menu or a dialog closing doesn't reload the lists.
     let left = 0;
-    const away = () => (left = Date.now());
+    // Focus moving into the video player (an iframe) blurs the window too: that isn't away.
+    const away = () => setTimeout(() => document.activeElement?.tagName !== "IFRAME" && (left = Date.now()));
     const back = () => {
       if (!left || Date.now() - left < 10_000) return;
+      left = 0;
       void refresh();
       void fromPhone();
     };
