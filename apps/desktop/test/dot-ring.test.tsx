@@ -37,17 +37,21 @@ test("a gem is loose dots until it is cut, then solid pixels, and no state glows
       expect(count(draw(kind), "circle")).toBeGreaterThan(0);
       expect(draw(kind)).not.toContain("<rect");
     }
-    // Nearly cut: every cell a swollen dot, a rounded square that has not yet filled its cell.
-    expect(draw("ready")).not.toContain("<circle");
-    expect(draw("ready")).toMatch(/<rect[^>]* rx="0\.[0-9]+/);
     // Cut: every cell a full square.
     expect(draw("cut")).not.toContain("<circle");
     expect(draw("cut")).not.toMatch(/rx="0\.[0-9]/);
-    expect(count(draw("ready"), "rect")).toBe(count(draw("cut"), "rect"));
-    // A crack is a line of missing cells; mended, gold fills it; polished adds the sparkle and no white block.
-    expect(count(draw("dull"), "rect")).toBeLessThan(count(draw("cut"), "rect"));
+    // Nearly cut: still the rock, its dots swollen, with one face already cut solid.
+    expect(count(draw("ready"), "rect")).toBe(count(draw("rough"), "circle"));
+    expect(draw("ready")).toMatch(/<rect[^>]* rx="0\.[0-9]+/);
+    expect(draw("ready")).toMatch(/<rect[^>]* rx="0"/);
+    // Missed: the gem's outline in its own colour, every cell loose again. No crack: no cell is missing.
+    expect(count(draw("dull"), "rect")).toBe(count(draw("cut"), "rect"));
+    expect(draw("dull")).not.toMatch(/<rect[^>]* rx="0"/);
+    // Won back: the rim gold, and it keeps the gold if it is missed again.
     expect(count(draw("cut", { seam: true }), "rect")).toBe(count(draw("cut"), "rect"));
     expect(draw("cut", { seam: true })).toContain("var(--seam)");
+    expect(draw("dull", { seam: true })).toContain("var(--seam)");
+    expect(draw("cut")).not.toContain("var(--seam)");
     expect(draw("cut", { polished: true })).toContain("gem-sparkle");
     expect(draw("cut")).not.toContain("gem-sparkle");
     expect(count(draw("empty"), "circle")).toBeLessThan(count(draw("cut"), "rect"));

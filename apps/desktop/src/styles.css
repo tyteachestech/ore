@@ -49,7 +49,7 @@
   --c-red: #ff7b72;
   --c-orange: #ffa657;
   --c-yellow: #e8c24a;
-  --seam: #ffb000; /* the gold of a mended gem (D197), the one colour a gem carries beside its skill's */
+  --seam: #ffb000; /* the gold rim of a won-back gem (D197, D236), the one colour a gem carries beside its skill's */
   --ore-rich: color-mix(in oklab, var(--c-green), white 45%);
   --c-green: #5fcf8a;
   --c-teal: #4fd1c5;
@@ -246,6 +246,8 @@ kbd {
 [data-color="blue"] { --skill: var(--c-blue); }
 [data-color="purple"] { --skill: var(--c-purple); }
 [data-color="pink"] { --skill: var(--c-pink); }
+/* A won-back gem's gold rim would vanish on a skill that is gold itself: there it is white gold. */
+[data-color="yellow"], [data-color="orange"] { --seam: #fff3cf; }
 .main { position: relative; min-width: 0; height: 100%; display: flex; flex-direction: column; padding-top: var(--titlebar); }
 
 /* Sources list: its title is the view menu (To read, Done, Archived), then the filter (⌘F). */
@@ -1505,8 +1507,6 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 /* Gems (D90, Gem.tsx): one slot per memory to the next level. */
 .gem-row { display: flex; align-items: center; width: 100%; min-width: 0; }
 .gem { flex: none; display: block; }
-/* Cracked: a dark slate gem with a crack, darker than any skill colour (grey skills included). */
-.gem[data-kind="dull"] { --skill: color-mix(in oklab, var(--c-gray), black 45%); }
 .gem[data-kind="empty"] { opacity: 0.35; }
 /* Nearly cut and due today (D236): the swollen dots swell and settle slowly; prefers-reduced-motion stops it globally. No glow. */
 .gem[data-breathe] { animation: gem-swell 2.4s ease-in-out infinite; transform-origin: center; }

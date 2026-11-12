@@ -1439,7 +1439,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     return () => clearTimeout(id);
   }, [up]);
   const full = stage !== "cart";
-  // D197: a cut gem that was won back carries its gold seam; a gem passed on a new case this session shows polished.
+  // D197: a cut gem that was won back has a gold rim; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
   const mendedN = (s.grades ?? []).filter((g) => g === "mended").length;
   const polishedN = (s.polished?.length ?? 0) + (s.grades ?? []).filter((g) => g === "polished").length;
@@ -1464,7 +1464,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
             const sk = skills.find((x) => x.id === g.skill);
             return (
               // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then. A gem cut before today and polished now shows once the cart has poured.
-              <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: you passed it as a remix" : g.seam ? "Mended: you missed it once and won it back" : "Cut: you'd still recall it three weeks from now"}`}>
+              <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: you passed it as a remix" : g.seam ? "Won back: you missed it once and cut it again" : "Cut: you'd still recall it three weeks from now"}`}>
                 <span data-color={sk?.color} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
                   <Gem kind="cut" size={36} seam={g.seam} polished={g.polished} />
                   {sk && <span className="review-cut-skill"><SkillIcon icon={sk.icon} color={sk.color} dot /></span>}
