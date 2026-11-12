@@ -11,7 +11,11 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setLibraryRoot } from "./tauri-core";
 import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, writeFileSync } from "./fs";
 import { ready } from "./sqlite";
+import { iterableStreams } from "./streams";
 import { shareList } from "./share-skills";
+
+// Before any import runs: iOS 26 can't iterate a stream with `for await`, and pdf.js reads a PDF's text that way.
+iterableStreams();
 
 export const ROOT = "/lib";
 
@@ -69,13 +73,16 @@ if (isTauri()) {
     // The shell's fetch only reads: nothing the importers do sends a body.
     if (init?.body != null || (method !== "GET" && method !== "HEAD")) throw new TypeError(`fetch failed: the iPhone app only reads other sites (${method} ${url})`);
     const headers = [...new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)).entries()];
-    type Fetched = { status: number; url: string; headers: [string, string][]; body: string };
-    const r = await invoke<Fetched>("http_fetch", { url, method, headers }).catch((e) => {
-      throw new TypeError(`fetch failed: ${e}`);
-    });
-    const bin = atob(r.body);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    // Raw bytes, never base64 text (an hour's podcast as text cost eleven times its size): four bytes of
+    // length, that much JSON, then the body.
+    const got = new Uint8Array(
+      await invoke<ArrayBuffer>("http_fetch", { url, method, headers }).catch((e) => {
+        throw new TypeError(`fetch failed: ${e}`);
+      }),
+    );
+    const head = 4 + new DataView(got.buffer, got.byteOffset).getUint32(0);
+    const r = JSON.parse(new TextDecoder().decode(got.subarray(4, head))) as { status: number; url: string; headers: [string, string][] };
+    const bytes = got.subarray(head);
     // A status the web's Response can't hold (LinkedIn's 999) is a refusal: 520, so the importer says so itself.
     const status = r.status >= 200 && r.status <= 599 ? r.status : 520;
     const res = new Response([204, 205, 304].includes(status) ? null : bytes, { status, headers: r.headers });
@@ -96,6 +103,13 @@ export const shareSkills = (skills: { id: string; name: string; icon?: string; c
 /** The inbox item the share card's Open asked to see (lib.rs `share_open`), once. */
 export const shareOpen = () => (isTauri() ? invoke<string | null>("share_open").catch(() => null) : Promise.resolve(null));
 
+/** Speech to a timed transcript in the shell (lib.rs `transcribe`): the audio goes over as raw bytes, its
+ *  WebVTT comes back, or why not in the phone's own words. It works only while Ore is on screen. */
+const hear = (data: Uint8Array, ext: string, _progress?: unknown, language?: string) =>
+  invoke<string>("transcribe", data, { headers: { "x-ext": ext, ...(language ? { "x-language": language } : {}) } }).catch((e) => {
+    throw new Error(String(e));
+  });
+
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
 function boot() {
@@ -108,6 +122,8 @@ function boot() {
       await mountDisk(ROOT, root, invoke);
       // A source's own files (its images) load from the folder itself: /lib/... is the folder on disk.
       setLibraryRoot(ROOT, root);
+      // Podcasts and audio are heard here when this iPhone can (D227): the shell runs Apple's on-device speech.
+      if (await invoke<boolean>("can_transcribe").catch(() => false)) await (await import("ore-commands")).setTranscriber(hear);
     } else {
       const text = await (await fetch("/library.json")).text();
       const snap = JSON.parse(text) as Record<string, string | null>;

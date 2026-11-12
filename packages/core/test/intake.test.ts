@@ -1098,6 +1098,32 @@ describe("import coverage: audio and podcasts", () => {
     expect(seen).toEqual([0.5, 1]);
   });
 
+  test("a device with its own speech (the iPhone's shell) hears an audio link through it, kept whole", async () => {
+    // D227: the phone imports what it captures; a podcast needed the Mac only because the helper is a Mac program.
+    const { setTranscriber, canTranscribe } = await import("../src/ingest/audio.ts");
+    const mac = process.env.ORE_TRANSCRIBE;
+    process.env.ORE_TRANSCRIBE = "";
+    const asked: [number, string, string | undefined][] = [];
+    try {
+      expect(canTranscribe()).toBe(false);
+      setTranscriber(async (data, ext, _progress, language) => (asked.push([data.length, ext, language]), VTT));
+      expect(canTranscribe()).toBe(true);
+      const audio = "https://cdn.example.com/show/ep-12.mp3";
+      serve({ [audio]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
+      const item = await addSource(await tempLibrary(), audio);
+      expect(asked).toEqual([[4096, "mp3", undefined]]);
+      expect(item.body).toContain("[01:00] Thanks for listening.");
+      expect(readFileSync(join(item.dir, "source.mp3")).length).toBe(4096);
+      expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(VTT);
+      // What the shell heard nothing in is refused, never saved empty.
+      setTranscriber(async () => "WEBVTT\n");
+      await expect(addSource(await tempLibrary(), audio)).rejects.toThrow("Heard no speech");
+    } finally {
+      setTranscriber(null);
+      process.env.ORE_TRANSCRIBE = mac;
+    }
+  });
+
   test("an Apple Podcasts episode: its audio through Apple's lookup, titled as the episode", async () => {
     const audio = "https://traffic.megaphone.fm/HSW1.mp3";
     serve({
