@@ -7,7 +7,7 @@ import fs, { flush, mountDisk, rescan } from "../src/phone/fs";
 const P = "/icloud";
 let clock = 1000;
 const folder = new Map<string, { text: string; mtime: number }>();
-const sent: [string, string | null][] = [];
+const sent: [string, string | null, boolean?][] = [];
 const stamp = (rel: string) => `${folder.get(rel)!.mtime}:${folder.get(rel)!.text.length}`;
 let waiting: string[] = [];
 
@@ -16,8 +16,8 @@ const invoke = async <T,>(cmd: string, args: Record<string, unknown>): Promise<T
   if (cmd === "library_read") return (args.paths as string[]).map((r) => folder.get(r)?.text ?? null) as T;
   if (cmd === "library_apply") {
     const out: [string, number, string][] = [];
-    for (const [rel, text] of args.ops as [string, string | null][]) {
-      sent.push([rel, text]);
+    for (const [rel, text, b64] of args.ops as [string, string | null, boolean][]) {
+      sent.push(b64 ? [rel, text, true] : [rel, text]);
       if (text === null) folder.delete(rel);
       else {
         folder.set(rel, { text, mtime: ++clock });
@@ -74,4 +74,32 @@ test("the phone reads the folder, writes back to it, and reads in the Mac's edit
   fs.unlinkSync(`${P}/scratch.md`);
   await flush();
   expect(sent).toEqual([]);
+
+  // A file deleted while its first write is still on its way is deleted from the folder too.
+  fs.writeFileSync(`${P}/new.md`, "x");
+  const first = flush();
+  fs.unlinkSync(`${P}/new.md`);
+  await first;
+  await flush();
+  expect(folder.has("new.md")).toBe(false);
+
+  // A pasted picture reaches the folder as its bytes, and isn't dropped later as gone.
+  sent.length = 0;
+  fs.writeFileSync(`${P}/items/a-01/images/p.png`, new Uint8Array([137, 80, 78, 71]));
+  await flush();
+  expect(sent).toEqual([["items/a-01/images/p.png", "iVBORw==", true]]);
+  await rescan();
+  expect(fs.existsSync(`${P}/items/a-01/images/p.png`)).toBe(true);
+
+  // A source deleted on the phone goes from the folder whole, with files the phone never loaded.
+  sent.length = 0;
+  fs.rmSync(`${P}/items/a-01`, { recursive: true });
+  await flush();
+  expect(sent[0]).toEqual(["items/a-01", null]);
+
+  // A file iCloud is still downloading can't be written over with what the phone wrongly thinks it holds.
+  waiting = ["reviews/2026-10.iphone.jsonl"];
+  await rescan();
+  expect(() => fs.appendFileSync(`${P}/reviews/2026-10.iphone.jsonl`, "{}\n")).toThrow(/still downloading/);
+  waiting = [];
 });

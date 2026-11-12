@@ -72,6 +72,8 @@ function boot() {
     await ready(wasmUrl);
     return await import("ore-commands");
   })();
+  // A failed start (iCloud Drive off) tries again on the next command, once he has turned it on.
+  booted.catch(() => (booted = null));
   return booted;
 }
 
@@ -84,7 +86,7 @@ function exclusive<T>(f: () => Promise<T>): Promise<T> {
 }
 
 /** Reads in what changed on the Mac (through iCloud) since; true if anything did. */
-export const pull = () => (booted ? booted.then(() => exclusive(rescan)) : Promise.resolve(false));
+export const pull = () => (booted ? booted.then(() => exclusive(rescan)).catch(() => false) : Promise.resolve(false));
 
 /** `ore <args> --json` in-process: the command's JSON output, or its one-line error. */
 export async function run<T>(args: string[], input: string | null): Promise<T> {

@@ -114,24 +114,34 @@ async fn library_read(root: String, paths: Vec<String>) -> Vec<Option<String>> {
         .collect()
 }
 
-/// Writes (text) and deletes (None) in order; returns each written file's new stamp.
+/// Writes (text, or base64 for a picture) and deletes (None; a folder goes whole) in order; returns
+/// each written file's new stamp. A write lands whole: written beside the app, then moved in.
 #[tauri::command]
-async fn library_apply(root: String, ops: Vec<(String, Option<String>)>) -> Result<Vec<(String, f64, String)>, String> {
+async fn library_apply(root: String, ops: Vec<(String, Option<String>, bool)>) -> Result<Vec<(String, f64, String)>, String> {
     let mut stamps = vec![];
-    for (rel, text) in ops {
+    for (rel, text, b64) in ops {
         let p = inside(&root, &rel)?;
+        let fail = |e: std::io::Error| format!("{rel}: {e}");
         match text {
             Some(t) => {
+                let bytes = if b64 { base64::engine::general_purpose::STANDARD.decode(t).map_err(|e| format!("{rel}: {e}"))? } else { t.into_bytes() };
                 if let Some(d) = p.parent() {
-                    fs::create_dir_all(d).map_err(|e| format!("{rel}: {e}"))?;
+                    fs::create_dir_all(d).map_err(fail)?;
                 }
-                fs::write(&p, t).map_err(|e| format!("{rel}: {e}"))?;
+                let tmp = std::env::temp_dir().join(format!("ore-{}", std::process::id()));
+                if fs::write(&tmp, &bytes).and_then(|_| fs::rename(&tmp, &p)).is_err() {
+                    fs::write(&p, &bytes).map_err(fail)?;
+                }
                 if let Some((ms, s)) = stamp(&p) {
                     stamps.push((rel, ms, s));
                 }
             }
             None => {
-                let _ = fs::remove_file(&p);
+                let gone = if p.is_dir() { fs::remove_dir_all(&p) } else { fs::remove_file(&p) };
+                match gone {
+                    Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(fail(e)),
+                    _ => {}
+                }
                 // A folder emptied by the delete goes too (a source's folder), as on the Mac.
                 let mut d = p.parent();
                 while let Some(dir) = d {
