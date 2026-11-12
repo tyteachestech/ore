@@ -6,6 +6,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { Article, CaretDown, Plus, Tick, YoutubeLogo } from "./icons";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap } from "./keys";
@@ -273,13 +274,27 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     ];
   };
 
+  /** What he has typed of a title, and when the last letter came (Finder's type-select, D232). */
+  const typed = useRef({ text: "", at: 0 });
   const onKey = (e: React.KeyboardEvent) => {
     if (blocked || renaming) return;
     const at = order.findIndex((p) => p.url === cursor);
+    const now = Date.now();
+    const begun = now - typed.current.at < TYPE_GAP && typed.current.text !== "";
+    if (!typesTitle(e, begun)) typed.current.text = "";
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (!order.length) return;
       const next = !keyed || at < 0 ? (e.key === "ArrowDown" ? 0 : order.length - 1) : Math.max(0, Math.min(order.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)));
+      if (e.shiftKey && keyed && at >= 0) {
+        // Finder: ⇧↑↓ grow or shrink the pick from where it started.
+        if (!picked.length || !anchor.current) anchor.current = order[at]!.url;
+        const a = order.findIndex((x) => x.url === anchor.current);
+        setPicked(order.slice(Math.min(a, next), Math.max(a, next) + 1).map((x) => x.url));
+      } else {
+        setPicked([]);
+        anchor.current = order[next]!.url;
+      }
       setKeyed(true);
       setCursor(order[next]!.url);
       document.getElementById(`post-${order[next]!.url}`)?.scrollIntoView({ block: "nearest" });
@@ -292,12 +307,29 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     } else if (current && is(e.nativeEvent, "copy") && !getSelection()?.toString()) {
       e.preventDefault();
       copyPost(current);
+    } else if (pick.length > 1 && is(e.nativeEvent, "mark-read")) {
+      // The key acts on the pick, as its menu's Mark N read does (D234).
+      e.preventDefault();
+      manyActions(pick).find((a) => a.id === "read")!.run();
     } else if (current && is(e.nativeEvent, "mark-read")) {
       e.preventDefault();
       // The selection moves on, as Mail's does, so a run of posts is marked one key at a time.
       const next = show === "unread" && !current.read ? (order[at + 1] ?? order[at - 1]) : undefined;
       setRead(current, !current.read);
       if (next) setCursor(next.url);
+    } else if (!inTextField(e.nativeEvent) && typesTitle(e, begun)) {
+      // The first letters of a title select its post (D232), never a plain-letter action.
+      e.preventDefault();
+      e.stopPropagation();
+      const text = (begun ? typed.current.text : "") + e.key;
+      typed.current = { text, at: now };
+      const i = typeJump(order.map((x) => x.title), text, keyed ? at : -1);
+      if (i < 0) return;
+      setPicked([]);
+      anchor.current = order[i]!.url;
+      setKeyed(true);
+      setCursor(order[i]!.url);
+      document.getElementById(`post-${order[i]!.url}`)?.scrollIntoView({ block: "nearest" });
     }
   };
 
@@ -436,6 +468,8 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
           aria-activedescendant={current ? `post-${current.url}` : undefined}
           onKeyDown={onKey}
           onPointerMove={() => keyed && setKeyed(false)}
+          // A click on empty space drops the pick (Finder).
+          onClick={(e) => picked.length && !(e.target as Element).closest(".row, button, [role=menu]") && setPicked([])}
         >
           {body}
         </div>

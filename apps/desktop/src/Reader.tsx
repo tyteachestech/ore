@@ -1535,12 +1535,16 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** Where the pointer was when the popup opened, kept so a reflow moves it the same way. */
   const aimRef = useRef<Aim>({});
 
+  /** A note whose save failed, by highlight: the popup opens on it, so his words are never lost and the
+   *  next close saves them again (F22). */
+  const unsaved = useRef(new Map<string, string>());
+
   function openPopup(id: string, range: Range, note: string, aim: Aim = {}) {
     if (popup && popup.id !== id) keepNote();
     aimRef.current = aim;
     const at = popupAt(range, aim);
     if (!at) return;
-    setPopup({ id, ...at, note });
+    setPopup({ id, ...at, note: unsaved.current.get(id) ?? note });
     setTip(null);
   }
 
@@ -1975,15 +1979,18 @@ function ReaderView(p: Props & { reload: () => void }) {
     const wake = wakeOnLanding();
     const was = annOf(id)?.note ?? "";
     setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note } : a)));
+    let rid = id;
     try {
-      const rid = await realId(id);
+      rid = await realId(id);
       await annotateWaking(wake, rid, opt("note", note));
+      unsaved.current.delete(rid);
       if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {
       setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note: was } : a)));
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
-      p.notify(errorText(e), "error");
+      unsaved.current.set(rid, note);
+      p.notify(`${errorText(e)} Your note is kept: open the highlight to save it again.`, "error");
     }
   }
 
