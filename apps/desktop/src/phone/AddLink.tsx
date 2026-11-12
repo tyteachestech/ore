@@ -9,7 +9,8 @@ import { sheetLayer, useSwipeDown } from "./sheet";
 
 export type Waiting = { id: string; url: string; skills: string[]; error?: string };
 
-export function AddLink({ onClose, onAdded, notify }: { onClose: () => void; onAdded: () => void; notify: Notify }) {
+/** `skill`: added from a skill's page, it is filed there when the Mac brings it in. */
+export function AddLink({ skill, onClose, onAdded, notify }: { skill?: string; onClose: () => void; onAdded: () => void; notify: Notify }) {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export function AddLink({ onClose, onAdded, notify }: { onClose: () => void; onA
     if (!url.trim() || busy) return;
     setBusy(true);
     try {
-      await ore("inbox", "--add", url.trim());
+      await ore("inbox", "--add", url.trim(), ...(skill ? ["--skill", skill] : []));
       notify("Added. Your Mac brings it in next time Ore is open there.", "info");
       onAdded();
       onClose();

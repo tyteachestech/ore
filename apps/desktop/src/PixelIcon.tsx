@@ -44,7 +44,7 @@ export const PixelKeep = sprite([
   "................",
 ]);
 
-/** Key point (D118, D227): a cut gem, the ore worth keeping, which review cuts into one of his gems. A star read as jank in dots. */
+/** Key point (D118, D229): a cut gem, the ore worth keeping, which review cuts into one of his gems. A star read as jank in dots. */
 export const PixelGem = sprite([
   "................",
   "................",
@@ -164,7 +164,7 @@ export const PixelStack = sprite([
   "................",
 ]);
 
-/** Question (D227): a bare bold question mark, three dots thick. Cut from a coin it turned to mush at 20px. */
+/** Question (D229): a bare bold question mark, three dots thick. Cut from a coin it turned to mush at 20px. */
 export const PixelQuestion = sprite([
   "................",
   ".....######.....",

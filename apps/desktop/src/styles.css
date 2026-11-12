@@ -2719,6 +2719,57 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-note-row:active { background: var(--bg-hover); }
 .phone .phone-note { padding: 8px 20px 40px; }
 .phone .phone-note .note-editor { --note-size: 17px; min-height: 60vh; }
+/* A skill's page on the phone (D228): the Mac's page in one column, its note a row that opens the note's screen. */
+.phone .phone-skill { padding: 8px 20px 40px; }
+.phone .phone-skill .skill-page { display: block; overflow: visible; }
+.phone .phone-skill .skill-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0 20px; }
+.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -4px 0 0 -12px; }
+.phone .phone-skill .skill-goal span { white-space: normal; }
+.phone .phone-skill .skill-col { padding-inline: 0; margin-inline: 0; }
+.phone .phone-skill .skill-cols.one { display: flex; flex-direction: column; gap: 24px; padding: 0; }
+.phone .phone-skill .skill-cols.one .phone-note-row { margin: 0; }
+.phone .phone-skill .phone-sources { padding: 0 6px; }
+.phone .phone-skill .phone-sources > .quiet { margin: 4px 2px; color: var(--faint); }
+.phone .phone-skill .answered-toggle { min-height: 44px; }
+/* No folding on the phone: one scrolling page, as Notes' folder is. */
+.phone .phone-skill .fold-head.caret-only { display: none; }
+.phone .phone-skill .card-head .icon-btn { width: 44px; height: 44px; margin: -9px -9px -9px 0; }
+.phone .phone-skill :is(.q-check, .try-check) { position: relative; }
+/* A question's and a try's actions are their long press on the phone (Mail's rows): the hover buttons never show. */
+.phone .phone-skill :is(.question, .try) .question-actions { display: none; }
+.phone .phone-skill :is(.question, .try) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.phone .phone-skill :is(.q-check, .try-check)::before { content: ""; position: absolute; inset: -14px; }
+/* A course as one row: its title, and under it the lesson a tap goes on with. */
+.phone-sources .phone-course .phone-two { display: flex; flex-direction: column; gap: 2px; }
+.phone-two > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-two small { font-size: 13px; color: var(--muted); }
+.phone-sources .phone-course > svg:last-child { flex: none; color: var(--faint); }
+/* The drawer's last rows: a new skill named in place, then Settings. */
+.phone-drawer .phone-drawer-quiet { color: var(--muted); }
+.phone-drawer .phone-drawer-foot { margin-top: 20px; }
+.phone-new-skill { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; }
+.phone-new-skill input { flex: 1; min-width: 0; height: 32px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: 16px var(--font); color: var(--text); }
+.phone-new-error { flex-basis: 100%; margin: 0 0 6px 26px; font-size: 13px; color: var(--c-red); }
+/* Settings on the phone (iOS Settings): grouped rows; a segmented choice goes under its name, full width. */
+.phone .phone-settings { padding: 8px 16px 40px; }
+.phone .phone-settings h1 { font-size: 30px; margin: 8px 0 20px; }
+.phone .phone-settings .settings-row { gap: 10px 16px; padding: 12px 14px; }
+.phone .phone-settings .settings-row-text > :is(span, label) { font-size: 16px; }
+.phone .phone-settings .settings-row-text p { font-size: 13px; }
+.phone .phone-settings .settings-row:has(.seg) { flex-direction: column; align-items: stretch; }
+.phone .phone-settings .settings-row:has(.seg) .settings-row-control { max-width: none; }
+.phone .phone-settings .seg { flex: 1; display: flex; }
+.phone .phone-settings .seg-item { flex: 1; height: 44px; font-size: 15px; }
+.phone .phone-settings .settings-plan { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.phone .phone-settings .settings-row:has(.settings-plan) { flex-direction: column; align-items: stretch; }
+.phone .phone-settings .settings-row:has(.settings-plan) .settings-row-control { max-width: none; }
+.phone .phone-settings .settings-plan .field { flex: 1; min-width: 140px; height: 44px; }
+.phone .phone-settings .settings-btn { height: 44px; padding: 0 14px; font-size: 15px; }
+.phone .phone-settings .phone-time { height: 44px; padding: 0 10px; color: var(--text); }
+/* iOS's switch size. */
+.phone .switch { width: 51px; height: 31px; }
+.phone .switch-thumb { width: 27px; height: 27px; }
+.phone .switch-thumb[data-state="checked"] { transform: translateX(22px); }
 /* A to-do's box answers a touch 44pt tall around its centre (0.775em + 1.5px down, 0.875em - 1.5px left of the
    text), from 22pt left of it to where the text starts, so a tap on the text still places the caret (Notes). One
    under another starts halfway between the two boxes (rows are 1.8em apart), so each row keeps its own taps. A

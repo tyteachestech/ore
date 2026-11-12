@@ -1,4 +1,5 @@
 import { CaretRight, Plus } from "./icons";
+import { keepKeysIn } from "./keys";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
@@ -321,7 +322,7 @@ function AddLine({ value: v, ask, takeFocus, onChange, onDone }: { value: string
         aria-label="Key point"
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.key === "Enter" && !e.nativeEvent.isComposing) {
             e.preventDefault();
             finish(v);

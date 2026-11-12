@@ -617,6 +617,26 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("highlight popup: a click in the margin beside the text closes it and the highlight stays", async (page) => {
+  await openSource(page, TESTING);
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  await select(page, "The advantage only appears after a delay"); // a passage no other journey highlights
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  await until("the highlight is made", async () => Number(await keeps.innerText()) === before + 1);
+  // Beside the column, level with the text: in the reader's scroll area but off the page.
+  const box = (await page.locator(".reader-scroll").boundingBox())!;
+  const col = (await page.locator(".page").boundingBox())!;
+  if (col.x - box.x < 20) throw new Error("no margin beside the page to click in");
+  await page.mouse.click(box.x + (col.x - box.x) / 2, col.y + 80);
+  await popup.waitFor({ state: "detached" });
+  await page.waitForTimeout(300);
+  if (Number(await keeps.innerText()) !== before + 1) throw new Error("the click away dropped the highlight");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => Number(await keeps.innerText()) === before);
+});
+
 journey("skill page: To read's and Questions' heads line up, caret over caret and icon over icon", async (page) => {
   await page.getByRole("button", { name: /^Learning/ }).first().click();
   await page.locator(".skill-col.side .card-head .card-icon").nth(1).waitFor();
@@ -8348,6 +8368,54 @@ journey("a popover closes on any click outside it, even after a press inside it 
   await page.keyboard.press("Escape");
 });
 
+journey("skill picker: two skills added in a source, then ⌘Z twice takes both off, picker open or closed", async (page) => {
+  const item = () => ore("ls").then((ls) => (ls as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!);
+  const start = (await item()).skills;
+  const others = ((await ore("skills")) as { id: string; name: string }[]).filter((k) => !start.includes(k.id)).slice(0, 2);
+  await openSource(page, TESTING);
+  for (const closeFirst of [true, false]) {
+    await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
+    const picker = page.locator(".skill-picker");
+    for (const k of others) {
+      await picker.getByRole("option").filter({ has: page.locator(".menu-label", { hasText: k.name }) }).click();
+      await until(`filed under ${k.name}`, async () => (await item()).skills.includes(k.id));
+      await page.getByText(`Filed under ${k.name}`, { exact: true }).last().waitFor(); // the tick is on the history
+    }
+    if (closeFirst) {
+      await page.keyboard.press("Escape");
+      await picker.waitFor({ state: "detached" });
+    }
+    await page.keyboard.press("Meta+z");
+    await until("the first ⌘Z takes the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
+    await page.keyboard.press("Meta+z");
+    await until("the second ⌘Z takes the first off", async () => (await item()).skills.join() === start.join());
+    if (!closeFirst) await page.keyboard.press("Escape");
+  }
+  // By keys: he types to filter and ticks with ↵, so focus stays in the filter field, which has
+  // nothing typed since the tick: ⌘Z is the app's (macOS keeps one undo run per window).
+  await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
+  for (const k of others) {
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(k.name);
+    await page.keyboard.press("Enter");
+    await until(`filed under ${k.name} by keys`, async () => (await item()).skills.includes(k.id));
+    await page.getByText(`Filed under ${k.name}`, { exact: true }).last().waitFor();
+  }
+  // Typing after the tick is the field's to undo first; once it is undone, ⌘Z goes back to the app.
+  await page.getByText(`Filed under ${others[1]!.name}`, { exact: true }).last().waitFor(); // the tick is on the history
+  await page.keyboard.type("x");
+  await page.keyboard.press("Meta+z"); // the field's: the app leaves it alone
+  if (!(await item()).skills.includes(others[1]!.id)) throw new Error("⌘Z with fresh typing in the filter took a skill off");
+  // Chromium on Linux undoes typing on ⌃Z only; the Mac's ⌘Z runs this (menubar.ts).
+  await page.evaluate(() => document.execCommand("undo"));
+  await page.keyboard.press("Meta+z");
+  await until("the typing undone, then the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z in the filter takes both off", async () => (await item()).skills.join() === start.join());
+  await page.keyboard.press("Escape");
+});
+
 journey("skill picker: a skill with a long name still shows its tick", async (page) => {
   const long = "Quantum error correction for people who never took physics and want to read the papers anyway, slowly";
   const k = (await ore("skills", "add", long)) as { id: string };
@@ -9191,6 +9259,78 @@ journey("phone: a link added waits for the Mac on Sources, and Remove takes it o
   await row.waitFor();
   await tap(page, row.getByRole("button", { name: "Remove" }));
   await row.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: a skill's page is the Mac's in one column, and a course is one row that opens its lessons (D228)", async (page) => {
+  // Tyler 2026-11-12, iPhone parity phase 4: the phone's skill page listed only sources and a note row.
+  const lesson = (part: number) => `topics: []\ncourse:\n  id: memory-101\n  title: Memory 101\n  part: ${part}\n`;
+  await macChanges((lib) => itemFile(lib, "lecture-4-the-testing-effect", "doc.md"), "topics: []\n", lesson(1), () =>
+    macChanges((lib) => itemFile(lib, "the-testing-effect", "doc.md"), "topics: []\n", lesson(2), async () => {
+      await page.reload();
+      await tap(page, page.getByRole("button", { name: "Open menu" }));
+      await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
+      const sk = page.locator(".phone-skill");
+      await sk.locator(".skill-goal").waitFor();
+      await sk.locator(".hero-strength").waitFor();
+      await sk.getByText("Does this hold for kids?").waitFor();
+      const wide = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".phone-skill *")].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).map((e) => e.className).slice(0, 3));
+      if (wide.length) throw new Error(`wider than the screen: ${wide.join(", ")}`);
+      // A question's actions are its long press, as a row's are (its hover buttons never show on a phone).
+      await press(page, sk.locator(".question").first());
+      await page.getByRole("menuitem", { name: "Answer…" }).waitFor();
+      await page.keyboard.press("Escape");
+      const course = sk.locator(".phone-course").filter({ hasText: "Memory 101" });
+      await course.waitFor();
+      await press(page, course);
+      await page.getByRole("menuitem", { name: "Archive course" }).waitFor();
+      await page.keyboard.press("Escape");
+      if (await sk.locator("li button:not(.phone-course)").filter({ hasText: "Lecture 4 the testing effect" }).count()) throw new Error("a lesson is listed on its own beside its course");
+      await tap(page, course);
+      const lessons = page.locator(".phone-sources").filter({ has: page.locator("h1", { hasText: "Memory 101" }) });
+      await lessons.waitFor();
+      const titles = await lessons.locator("li .phone-title").allInnerTexts();
+      if (!titles[0]?.startsWith("Lecture 4") || !titles[1]?.startsWith("The Testing Effect")) throw new Error(`the lessons aren't in course order: ${titles.join(" | ")}`);
+      // A relaunch comes back to the course's lessons, as to any screen he was on.
+      await page.reload();
+      await lessons.waitFor();
+      await tap(page, lessons.locator("li button").first());
+      await page.locator(".phone-reader .doc").first().waitFor();
+    }),
+  );
+}, "phone");
+
+journey("phone: New skill in the drawer names one in place and opens its page; a name he has is refused there", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "New skill" }));
+  const field = page.getByRole("textbox", { name: "New skill name" });
+  await field.fill("learning");
+  await field.press("Enter");
+  await page.locator(".phone-new-error").filter({ hasText: "is taken" }).waitFor();
+  await field.fill("Juggling");
+  await field.press("Enter");
+  await page.locator(".phone-skill h1").filter({ hasText: "Juggling" }).waitFor();
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Today" }));
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await page.locator(".phone-drawer section button").filter({ hasText: "Juggling" }).waitFor();
+}, "phone");
+
+journey("phone: Settings in the drawer changes the daily goal and the reminder, and they stay (D228)", async (page) => {
+  const settings = async () => {
+    await tap(page, page.getByRole("button", { name: "Open menu" }));
+    await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+    await page.locator(".phone-settings h1").waitFor();
+  };
+  await settings();
+  await tap(page, page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }));
+  await tap(page, page.getByRole("switch", { name: "Reminder" }));
+  await page.locator(".phone-time").waitFor();
+  await page.locator(".phone-settings").getByText("isn’t in iCloud").waitFor();
+  await page.reload();
+  await page.locator(".phone-settings h1").waitFor();
+  await until("the goal stayed 20", async () => (await page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }).getAttribute("aria-checked")) === "true");
+  if ((await page.locator(".phone-time").inputValue()) !== "09:00") throw new Error("the reminder didn't stay on at 9:00");
+  await tap(page, page.locator(".phone-back"));
+  await page.locator(".phone-settings").waitFor({ state: "detached" });
 }, "phone");
 
 journey("phone: a double tap highlights the paragraph and opens it, a heading and a highlight keep their taps (D224)", async (page) => {
