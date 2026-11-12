@@ -32,7 +32,7 @@ function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noE
   if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
   return enrich;
 }
-import { int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
+import { fromBase64, int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
 import { importQueued, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
 
@@ -379,7 +379,7 @@ export const itemCommands: Record<string, Command> = {
       if (f.base !== undefined && f.set === undefined) throw new Error("--base goes with --set");
       if (f.attach !== undefined) {
         const path = need(str(f.attach), "--attach");
-        const r = await attachToNote(lib, note, path === "-" ? { ext: need(str(f.ext), "--ext"), data: Buffer.from(await readStdin(), "base64") } : path);
+        const r = await attachToNote(lib, note, path === "-" ? { ext: need(str(f.ext), "--ext"), data: fromBase64(await readStdin()) } : path);
         return { data: r, text: `Copied to ${r.attached} (beside ${r.path})` };
       }
       const r0 =

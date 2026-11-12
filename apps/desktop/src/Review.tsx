@@ -948,7 +948,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     } else if (is(e, "edit-card")) {
       e.preventDefault();
       edit();
-    } else if (is(e, "ask")) {
+    } else if (is(e, "ask") && !PHONE) {
       e.preventDefault();
       setAsking(true);
     } else if (is(e, "bad-version") && card.variant) {

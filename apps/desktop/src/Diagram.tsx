@@ -296,6 +296,7 @@ export function DiagramView({ args, name, loaded, onClose }: { args: string[]; n
     };
     /** Zoom to `to` about a point on screen, keeping that point under the finger. */
     const zoomAt = (to: number, cx: number, cy: number) => {
+      to = Math.min(6, Math.max(1, to)); // clamped first, so the point under the fingers stays under them at the limits
       const r = el.getBoundingClientRect();
       const px = cx - r.left - r.width / 2, py = cy - r.top - r.height / 2;
       x = px - ((px - x) * to) / k;
@@ -306,9 +307,12 @@ export function DiagramView({ args, name, loaded, onClose }: { args: string[]; n
     const pts = new Map<number, { x: number; y: number }>();
     let last: { d: number; cx: number; cy: number } | null = null;
     let tapAt = 0;
+    /** This touch is still a tap: one finger, short, and hardly moved. A pan or a pinch never arms a double tap. */
+    let tap: { x: number; y: number; t: number } | null = null;
     const down = (e: PointerEvent) => {
       el.setPointerCapture(e.pointerId);
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      tap = pts.size === 1 ? { x: e.clientX, y: e.clientY, t: e.timeStamp } : null;
       last = null;
       a.style.transition = "none";
     };
@@ -318,6 +322,7 @@ export function DiagramView({ args, name, loaded, onClose }: { args: string[]; n
       const was = { ...p };
       p.x = e.clientX;
       p.y = e.clientY;
+      if (tap && Math.hypot(p.x - tap.x, p.y - tap.y) > 10) tap = null;
       if (pts.size === 2) {
         const [m, n] = [...pts.values()] as [{ x: number; y: number }, { x: number; y: number }];
         const now = { d: Math.hypot(m.x - n.x, m.y - n.y), cx: (m.x + n.x) / 2, cy: (m.y + n.y) / 2 };
@@ -339,8 +344,11 @@ export function DiagramView({ args, name, loaded, onClose }: { args: string[]; n
       pts.delete(e.pointerId);
       last = null;
       if (!p || pts.size) return;
-      // A double tap: in to 2.5 times on that spot, or back out to fit (Photos).
       const now = e.timeStamp;
+      const tapped = tap && now - tap.t < 250;
+      tap = null;
+      if (!tapped) return void (tapAt = 0);
+      // A double tap: in to 2.5 times on that spot, or back out to fit (Photos).
       if (now - tapAt < 300) {
         a.style.transition = "transform var(--t-3) var(--ease-out)";
         if (k > 1) [k, x, y] = [1, 0, 0];

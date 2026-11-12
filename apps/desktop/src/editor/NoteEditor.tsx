@@ -789,8 +789,15 @@ function pickPictures(): Promise<File[]> {
     input.type = "file";
     input.accept = "image/*";
     input.multiple = true;
-    input.addEventListener("change", () => ok([...(input.files ?? [])]));
-    input.addEventListener("cancel", () => ok([]));
+    // In the page while iOS's sheet is up, so nothing collects it; gone once he has picked or cancelled.
+    input.hidden = true;
+    document.body.append(input);
+    const done = (files: File[]) => {
+      input.remove();
+      ok(files);
+    };
+    input.addEventListener("change", () => done([...(input.files ?? [])]));
+    input.addEventListener("cancel", () => done([]));
     input.click();
   });
 }

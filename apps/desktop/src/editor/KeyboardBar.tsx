@@ -1,10 +1,10 @@
-import { Selection, TextSelection } from "@milkdown/kit/prose/state";
+import { NodeSelection, Selection } from "@milkdown/kit/prose/state";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { useEffect, useReducer, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Circle, DotsSix, Image, Keyboard, LinkSimple, Plus, Square, Table, TextT } from "../icons";
 import { MoreButton, type MenuAction } from "../Menu";
-import { duplicate, moveBy, remove, selectBlocks, selectedBlock, type Block } from "./blockops";
+import { BlockSelection, duplicate, moveBy, remove, selectBlocks, selectedBlock, type Block } from "./blockops";
 import { canEdit, caretCell, editTable, sizeOf, type TableEdit } from "./tables";
 import { barAction, barState, type BarAction } from "./kbbar";
 import type { LinkTarget } from "./NoteEditor";
@@ -55,8 +55,11 @@ export function KeyboardBar({ view, targets, onPicture }: { view: () => EditorVi
     };
   }, [view]);
   const v = view();
-  if ((!on && !menu && !moving) || !v) return null;
-  if (moving) {
+  // A tap into the text, or leaving the note, puts the block down: ↑ ↓ never carry another one.
+  const carrying = moving && !!v && v.hasFocus() && v.state.selection instanceof BlockSelection;
+  if (moving && !carrying) queueMicrotask(() => setMoving(false));
+  if ((!on && !menu) || !v) return null;
+  if (carrying) {
     const step = (dir: -1 | 1) => {
       const b = selectedBlock(v.state);
       const tr = b && moveBy(v.state, b, dir);
@@ -88,7 +91,8 @@ export function KeyboardBar({ view, targets, onPicture }: { view: () => EditorVi
   }
   // Selected text gets the Mac's format bar here instead, one tap per mark or colour (Notion's iOS app).
   const { from, to, empty } = v.state.selection;
-  if (!empty && v.state.selection instanceof TextSelection)
+  // A tapped diagram or picture (a NodeSelection) is no text to format; picked-up blocks get the block bar.
+  if (!empty && !(v.state.selection instanceof BlockSelection) && !(v.state.selection instanceof NodeSelection))
     return createPortal(
       <div className="kb-bar" onMouseDown={(e) => e.preventDefault()}>
         <SelectionBar key={`${from}-${to}`} view={view} sel={{ from, to, x: 0, y: 0 }} targets={targets} onDone={redraw} docked />
