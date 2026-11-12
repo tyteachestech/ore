@@ -690,6 +690,22 @@ journey("What to review by keyboard: it opens on its first row, Space unticks it
   await page.locator(".review-card").waitFor();
 });
 
+journey("What to review: Deselect all and Select all flip every row in one click, ⌥-click solos one", async (page) => {
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  await pick.waitFor();
+  const ticks = () => pick.locator(".pick-row").evaluateAll((rows) => rows.map((r) => r.getAttribute("aria-checked")));
+  await pick.getByRole("button", { name: "Deselect all" }).click();
+  await until("every row unticked", async () => (await ticks()).every((t) => t === "false"));
+  await pick.getByRole("button", { name: "Select all" }).click();
+  await until("every row ticked", async () => (await ticks()).every((t) => t === "true"));
+  await pick.locator(".pick-row").nth(1).click({ modifiers: ["Alt"] });
+  await until("only the second row ticked", async () => (await ticks()).every((t, i) => t === String(i === 1)));
+  await pick.locator(".pick-row").nth(1).click({ modifiers: ["Alt"] });
+  await until("⌥-click again ticks every row", async () => (await ticks()).every((t) => t === "true"));
+  await page.keyboard.press("Escape");
+});
+
 journey("⌘K ↵ on Home starts review, never flips a display setting", async (page) => {
   await page.keyboard.press("Meta+k");
   await page.locator("[cmdk-item]").first().waitFor();

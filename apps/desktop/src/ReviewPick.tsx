@@ -44,7 +44,8 @@ export const knowsDue = (today: Today, skills: Skill[]) => today.skills.every((x
 
 /** What to review this session (D80), opened by Start review, ↵ on Home and ⌘R. Preselected with his
  *  pick from earlier today, else every skill with cards due; ↵ (or ⌘R again) starts at once, so the
- *  common case costs one extra key. Rows toggle on one click or Space, Duolingo's raised checkbox. */
+ *  common case costs one extra key. Rows toggle on one click or Space, Duolingo's raised checkbox;
+ *  Select all / Deselect all flips every row at once (D218). */
 export function ReviewPick({ today, skills, onStart, onClose }: {
   today: Today;
   skills: Skill[];
@@ -66,8 +67,12 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
     return () => to?.focus?.();
   }, []);
 
-  const toggle = (id: string) =>
+  const ids = rows.map((r) => r.skill.id);
+  const all = ids.every((id) => on.has(id));
+  // ⌥-click solos a row, and ⌥-click on the only one ticked brings every row back (D58's chips, Final Cut and Logic).
+  const toggle = (id: string, solo = false) =>
     setOn((cur) => {
+      if (solo) return cur.size === 1 && cur.has(id) ? new Set(ids) : new Set([id]);
       const next = new Set(cur);
       if (!next.delete(id)) next.add(id);
       return next;
@@ -108,10 +113,17 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Trap>
       <div ref={box} className="panel review-pick" role="dialog" aria-modal="true" aria-label="What to review" tabIndex={-1} onKeyDown={onKey}>
-        <h2>What to review</h2>
+        <div className="review-pick-head">
+          <h2>What to review</h2>
+          {rows.length > 1 && (
+            <button className="pick-all" onClick={() => setOn(all ? new Set() : new Set(ids))}>
+              {all ? "Deselect all" : "Select all"}
+            </button>
+          )}
+        </div>
         <div className="pick-list">
           {rows.map(({ skill: s, due }) => (
-            <button key={s.id} className="pick-row" role="checkbox" aria-checked={on.has(s.id)} onClick={() => toggle(s.id)}>
+            <button key={s.id} className="pick-row" role="checkbox" aria-checked={on.has(s.id)} onClick={(e) => toggle(s.id, e.altKey)}>
               <span className="pick-box" aria-hidden="true">
                 {on.has(s.id) && <Check size={14} weight="bold" />}
               </span>
