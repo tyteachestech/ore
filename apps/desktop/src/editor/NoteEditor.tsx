@@ -782,23 +782,30 @@ const bytes = (f: File) =>
   });
 
 /** The phone's picker for pictures: a file field iOS answers with its own sheet (Photo Library, Take Photo,
- *  Choose File), as Notes and Mail do. Opened in the tap itself, which iOS requires. Empty when he cancels. */
+ *  Choose File), as Notes and Mail do. Opened in the tap itself, which iOS requires. */
+let picker: { input: HTMLInputElement; ok: (files: File[]) => void } | null = null;
 function pickPictures(): Promise<File[]> {
-  return new Promise((ok) => {
+  // One field, kept in the page, so nothing collects it while the sheet is up. A cancel leaves the last ask
+  // waiting, harmlessly: the next pick takes its place (WebKit's 'cancel' can't be trusted to come, or not to).
+  if (!picker) {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
     input.multiple = true;
-    // In the page while iOS's sheet is up, so nothing collects it; gone once he has picked or cancelled.
     input.hidden = true;
     document.body.append(input);
-    const done = (files: File[]) => {
-      input.remove();
-      ok(files);
-    };
-    input.addEventListener("change", () => done([...(input.files ?? [])]));
-    input.addEventListener("cancel", () => done([]));
-    input.click();
+    const p = { input, ok: (_: File[]) => {} };
+    input.addEventListener("change", () => {
+      const files = [...(input.files ?? [])];
+      input.value = "";
+      if (files.length) p.ok(files);
+    });
+    picker = p;
+  }
+  const p = picker;
+  return new Promise((ok) => {
+    p.ok = ok;
+    p.input.click();
   });
 }
 
