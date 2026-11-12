@@ -14,7 +14,7 @@ import { NO_SKILL } from "./no-skill.ts";
 import { openSessionId, readSessions } from "./sessions.ts";
 import { archivedOnly, cardPriority, unfiled, desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
 import { retentionMetric } from "./stats.ts";
-import { passedVariant, SOLID_DAYS } from "./today.ts";
+import { gemPast, SOLID_DAYS } from "./today.ts";
 
 export interface ReviewInput {
   rating: 1 | 2 | 3 | 4;
@@ -292,34 +292,29 @@ export function cardHistory(lib: Library, cardRef: string, now = new Date()): { 
   const after = (rating: Rating) => nextState(before, at, rating, retention, w);
   const solid = (stability: number) => stability >= SOLID_DAYS;
   const was = prior.length ? before.stability : 0;
-  // Its past, by the receipt's rule (`gemGrade`): cut once, fallen from cut, passed on a new case.
-  let cutOnce = false;
-  let fell = false;
-  let wonBack = false;
-  let last = false;
-  for (const r of prior) {
-    const s = solid(r.state_after.stability);
-    if (last && !s) fell = true;
-    if (s && fell) wonBack = true;
-    if (s) cutOnce = true;
-    last = s;
-  }
-  const polished = prior.some(passedVariant) || undefined;
-  const near = (state: FsrsState) => solid(nextState(state, new Date(state.due), 3, retention, w).stability);
+  // Its past by the one rule (`gemPast`), read from the log; where it stands now is the schedule's own state.
+  // The two can differ after the schedule is re-fitted, so "missed since" needs both to say it isn't solid.
+  const past = gemPast(prior);
+  const polished = past.applied || undefined;
+  const near = (state: FsrsState, when: Date) => solid(nextState(state, when, 3, retention, w).stability);
   // The rim is gold once it has fallen and been cut again; a first miss has none yet.
-  const gem = (state: FsrsState | null): CardGem => {
-    if (!state) return { kind: "empty" };
-    if (solid(state.stability)) return { kind: "cut", ...(fell ? { seam: true } : {}), ...(polished ? { polished } : {}) };
-    if (cutOnce) return { kind: "dull", ...(wonBack ? { seam: true } : {}) };
-    return { kind: near(state) ? "ready" : "rough" };
+  const today = (): CardGem => {
+    if (!prior.length) return { kind: "empty" };
+    if (solid(was)) return { kind: "cut", ...(past.fell ? { seam: true } : {}), ...(polished ? { polished } : {}) };
+    if (past.cutOnce && !past.solid) return { kind: "dull", ...(past.wonBack ? { seam: true } : {}) };
+    // Nearly cut means what the Good on offer says: one given now, not on the day it falls due.
+    return { kind: near(before, at) ? "ready" : "rough" };
   };
   const then = (rating: Rating) => {
     const a = after(rating);
-    return { ...gem(a), days: Math.max(0, Math.round(a.stability - was)) };
+    const days = Math.max(0, Math.round(a.stability - was));
+    if (solid(a.stability)) return { kind: "cut" as const, ...(past.fell ? { seam: true } : {}), ...(polished ? { polished } : {}), days };
+    if (past.cutOnce || solid(was)) return { kind: "dull" as const, ...(past.wonBack ? { seam: true } : {}), days };
+    return { kind: near(a, new Date(a.due)) ? ("ready" as const) : ("rough" as const), days };
   };
   return {
     reviews: prior.map((r) => ({ ts: r.ts, rating: r.rating as Rating })),
     next: { 1: after(1).due, 2: after(2).due, 3: after(3).due, 4: after(4).due },
-    gem: { ...gem(prior.length ? before : null), after: { 1: then(1), 2: then(2), 3: then(3), 4: then(4) } },
+    gem: { ...today(), after: { 1: then(1), 2: then(2), 3: then(3), 4: then(4) } },
   };
 }

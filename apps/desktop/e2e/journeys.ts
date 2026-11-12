@@ -5751,6 +5751,17 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   if (!(await guard.innerText()).includes("2 of 2 key points are marked missed. Press Good again to keep it.")) throw new Error(`the guard says: ${await guard.innerText()}`);
   if ((await q.innerText()) !== was) throw new Error("one press of Good over a miss moved on");
   if (await page.locator(".review-moment").count()) throw new Error("a rating that only waits showed a moment");
+  // A double click is one decision, not two: Good pressed again at once still waits.
+  await page.getByRole("button", { name: "Easy", exact: true }).dblclick();
+  await page.waitForTimeout(300);
+  if ((await q.innerText()) !== was || !(await guard.innerText()).includes("Press Easy again")) throw new Error("a double click on Easy over a miss recorded it");
+  // Marking both points as got means Good no longer goes over the marks: the wait and its reason go.
+  const got = page.getByRole("button", { name: /Mark as got$/ });
+  const missed = page.getByRole("button", { name: /Mark as missed$/ });
+  while (await got.count()) await got.first().click();
+  await guard.waitFor({ state: "detached" });
+  while (await missed.count()) await missed.first().click();
+  await page.locator(".review-rate .rate-1.suggested").waitFor();
   // Again, what the marks say, goes in at one press: the gem comes loose and the line is true to his Sure.
   await page.keyboard.press("1");
   const moment = page.locator('.review-moment[data-tone="miss"]');
@@ -6356,7 +6367,10 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
       await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click().catch(() => {});
       await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
       // Good over No idea waits for a second press (D237).
-      if (await page.locator(".review-guard").isVisible()) await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
+      if (await page.locator(".review-guard").isVisible()) {
+        await page.waitForTimeout(550);
+        await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
+      }
       await page.waitForTimeout(300);
     }
     await doneButton.waitFor();
@@ -6543,6 +6557,7 @@ async function armGood(page: Page, noIdea: boolean) {
   if (!noIdea) return;
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await page.locator(".review-guard").waitFor();
+  await page.waitForTimeout(550); // a second press inside a double click doesn't count
 }
 
 

@@ -24,7 +24,7 @@ export function momentFor(history: CardHistory | undefined, rating: 1 | 2 | 3 | 
   const to: CardGem = { ...after, ...(polished ? { polished: true } : {}) };
   const seen = ago(history.reviews.at(-1)?.ts, o.now ?? Date.now());
   if (gem.kind === "cut" && to.kind === "dull")
-    return { from, to, days: 0, tone: "miss", line: `${o.sure ? "You were sure, and a miss you were sure of is the one a correction fixes best." : "Loose, not lost: it was cut once, so it comes back faster."} It returns this session.` };
+    return { from, to, days: 0, tone: "miss", line: o.sure ? "You were sure, and a miss you were sure of is the one a correction fixes best." : "Loose, not lost: it was cut once, so it comes back faster." };
   if (gem.kind !== "cut" && to.kind === "cut")
     return { from, to, days, tone: "cut", line: gem.kind === "dull" ? "Won back. It keeps a gold rim." : [seen, "Cut: you'd still recall this three weeks from now."].filter(Boolean).join(" ") };
   if (to.kind === "cut" && polished && !gem.polished) return { from, to, days, tone: "cut", line: "Polished: you recalled it on a new case." };

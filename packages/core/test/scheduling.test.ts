@@ -113,7 +113,8 @@ describe("card history (D149)", async () => {
       at = Date.parse(cardHistory(lib, c.meta.id, new Date(at)).next[3]) - 1;
       // What it said a Good would give is what the Good gave.
       expect({ kind: gem(at).kind, seam: gem(at).seam }).toEqual({ kind: said.kind, seam: said.seam });
-      if (said.kind === "cut") expect(g.kind).toBe("ready");
+      // Nearly cut and "a Good now cuts it" are the same claim, both ways.
+      expect(g.kind === "ready").toBe(said.kind === "cut");
       expect(said.days).toBeGreaterThan(0);
       kinds.push(gem(at).kind);
     }

@@ -23,7 +23,7 @@ test("the moment after a rating (D237): only a gem that is cut, comes loose, is 
   // Missed a cut gem: it comes loose, no days, and the line is true to whether he was sure.
   const miss = momentFor(h({ kind: "cut" }, { 1: { kind: "dull", days: 0 } }), 1, { now: NOW, sure: true })!;
   expect(miss).toMatchObject({ tone: "miss", days: 0, to: { kind: "dull" } });
-  expect(miss.line).toContain("You were sure");
+  expect(miss.line).toBe("You were sure, and a miss you were sure of is the one a correction fixes best.");
   expect(momentFor(h({ kind: "cut" }, { 1: { kind: "dull", days: 0 } }), 1, { now: NOW })!.line).toStartWith("Loose, not lost");
   // A miss on a rock that was never cut loses nothing he had: no moment.
   expect(momentFor(h({ kind: "rough" }, {}), 1, { now: NOW, sure: true })).toBeNull();

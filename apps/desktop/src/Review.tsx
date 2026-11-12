@@ -32,6 +32,8 @@ import { Occluded } from "./Occluded";
 const SURE = ["Guess", "Think so", "Sure"] as const;
 const KEY_POINTS_CHANGED = "The key points changed.";
 const RATINGS = ["Again", "Hard", "Good", "Easy"] as const;
+/** How long after the first press of a guarded rating the second one starts to count: past a double click. */
+const GUARD_MS = 500;
 /** The exercise's gem in words, for its hover. */
 const GEM_SAYS: Record<CardGem["kind"], string> = {
   empty: "Not reviewed yet",
@@ -164,6 +166,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const [preview, setPreview] = useState<number | undefined>();
   /** A rating two steps over what the marks say waits for a second press (D237); this is the one waiting. */
   const [guard, setGuard] = useState<number | undefined>();
+  const guardAt = useRef(0);
   /** The moment after a rating that changed the exercise's gem (D237). It sits over the next card and never holds it back. */
   const [moment, setMoment] = useState<(Moment & { n: number; color?: string }) | null>(null);
   useEffect(() => {
@@ -568,13 +571,21 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     return got === marks.length ? Math.max(3, grade.rating) : got ? 2 : 1;
   })();
 
+  // A rating waits only for what the marks say now: when they change, it stops waiting.
+  useEffect(() => setGuard(undefined), [suggested]);
+
   const advance = (again: boolean) => setQueue((q) => q && afterAnswer(q, again));
 
   const rate = async (rating: number) => {
     if (!card || phase !== "checked" || busyNow.current) return;
     // D237: his rating is the one recorded (D21), but Good or Easy over a miss, by his own marks, takes a second
     // press, so a slip of the finger can't turn a gem that should come loose into a cut one.
-    if (card.kind !== "card" && suggested !== undefined && rating >= suggested + 2 && guard !== rating) return void setGuard(rating);
+    // The second press is a decision, so one that lands within the first's double click doesn't count. With nothing
+    // to go by yet (the check still running, or no mark of his own), there is no guard: that rating is his alone.
+    if (card.kind !== "card" && suggested !== undefined && rating >= suggested + 2 && (guard !== rating || Date.now() - guardAt.current < GUARD_MS)) {
+      if (guard !== rating) guardAt.current = Date.now();
+      return void setGuard(rating);
+    }
     const after = momentFor(card.history, rating as 1 | 2 | 3 | 4, { sure: conf === 3, remix: !!card.variant });
     const color = entry ? skillOf(entry.skills[0] ?? "").color : undefined;
     setBusy(true);
@@ -594,7 +605,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         ...(session.current ? [opt("session", session.current.id)] : []),
       ];
       await submit(args, rating, elapsed);
-      setMoment(after && { ...after, n: Date.now(), color });
+      // An everyday rating leaves a moment still showing to run its time.
+      if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
       // The session is today's slice (D65): it ends when the goal closes, and Keep going goes on.
       const b = before.current;

@@ -27,16 +27,23 @@ export type GemGrade = "cut" | "mended" | "polished";
 /** The grade of one card's gem from its reviews in time order (D197), null while it isn't solid: polished once
  *  a remix was passed, else mended if it fell from solid and came back. The session receipt's rule; `strength` counts by the same one. */
 export function gemGrade(reviews: Pick<Review, "variant" | "rating" | "state_after">[]): GemGrade | null {
-  let solid = false;
-  let fell = false;
-  let applied = false;
+  const { solid, fell, applied } = gemPast(reviews);
+  return !solid ? null : applied ? "polished" : fell ? "mended" : "cut";
+}
+/** One card's gem history from its reviews in time order, the one rule every screen reads: `solid` after the
+ *  last review, `cutOnce` ever solid, `fell` from solid at least once, `wonBack` solid again after a fall,
+ *  `applied` a remix passed. */
+export function gemPast(reviews: Pick<Review, "variant" | "rating" | "state_after">[]): { solid: boolean; cutOnce: boolean; fell: boolean; wonBack: boolean; applied: boolean } {
+  const p = { solid: false, cutOnce: false, fell: false, wonBack: false, applied: false };
   for (const r of reviews) {
     const after = r.state_after.stability >= SOLID_DAYS;
-    if (solid && !after) fell = true;
-    solid = after;
-    if (passedVariant(r)) applied = true;
+    if (p.solid && !after) p.fell = true;
+    if (after && p.fell) p.wonBack = true;
+    if (after) p.cutOnce = true;
+    p.solid = after;
+    if (passedVariant(r)) p.applied = true;
   }
-  return !solid ? null : applied ? "polished" : fell ? "mended" : "cut";
+  return p;
 }
 
 /** A skill's strength (D62, D63). `solid`: live cards with stability of 21 days or more. `growing`:
