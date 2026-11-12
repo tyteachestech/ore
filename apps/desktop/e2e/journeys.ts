@@ -6,6 +6,9 @@
 //   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 //   ORE_E2E_SHARD=2/4                the second of four runs of the journeys in order, each on its own fresh library (CI runs them side by side)
+//   ORE_E2E_REPEAT=30                each picked journey that many times in a row, to catch a flaky one
+//   ORE_E2E_CPU=6                    Chromium's CPU slowed that many times, as a busy CI runner is
+//   ORE_E2E_SLOW='{"ls":800}'        those `ore` commands answer that many ms late (window.__ORE_SLOW), to widen a race
 import { chromium, devices, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -108,10 +111,14 @@ async function open(url: string, engine: Engine): Promise<Page> {
   if (engine === "phone") return openPhone();
   const page = await (engine === "webkit" ? await safariBrowser() : browser).newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(8000);
-  page.on("pageerror", (e) => errors.push(e.message));
+  // Named for the journey that opened the page, also when it comes as the page closes (a request still in flight).
+  const of = running;
+  page.on("pageerror", (e) => errors.push(`${of}: ${e.message}`));
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
   await page.addInitScript(HYGIENE);
+  if (process.env.ORE_E2E_SLOW) await page.addInitScript(`window.__ORE_SLOW = ${process.env.ORE_E2E_SLOW}`);
+  if (process.env.ORE_E2E_CPU && engine === "chromium") await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.ORE_E2E_CPU) });
   await page.goto(url);
   await page.locator(".side-item").first().waitFor();
   return page;
@@ -269,6 +276,8 @@ const HYGIENE = `(() => {
 })()`;
 
 const errors: string[] = [];
+/** The journey running now, which names the page errors of the pages it opens. */
+let running = "";
 const { url, stop } = await start();
 const browser = await chromium.launch();
 /** The Mac app runs in WebKit (WKWebView), not Chromium: a journey about what only WebKit does (its native
@@ -4232,16 +4241,8 @@ journey("note drag to select: a drag down the gutter boxes the blocks it passes,
 const pickedRows = (page: Page) => page.locator(".list .row.sel .title").allInnerTexts();
 /** The titles of the list's rows at these places. */
 const rowTitles = (page: Page, ...at: number[]) => Promise.all(at.map((i) => page.locator(".list .row").nth(i).locator(".title").innerText()));
-/** Presses at (x, y), drags to (x2, y2) and, unless told not to, lets go. */
-async function boxDrag(page: Page, x: number, y: number, x2: number, y2: number, release = true) {
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x2, y2, { steps: 8 });
-  if (release) await page.mouse.up();
-}
-
-/** Waits until every \`ore\` call the page made has answered and what came back is drawn, three frames running
- *  with none outstanding (the mock counts them in \`window.__ORE_PENDING\`). A skill page draws its sources before
+/** Waits until every `ore` call the page made has answered and what came back is drawn, three frames running
+ *  with none outstanding (the mock counts them in `window.__ORE_PENDING`). A skill page draws its sources before
  *  its stats and note arrive, which then push them down: a press measured before that lands above the list. */
 async function loaded(page: Page) {
   await until("the page has loaded what it asked for", () => page.evaluate(() => new Promise<boolean>((done) => {
@@ -4254,6 +4255,14 @@ async function loaded(page: Page) {
     look();
   })));
 }
+/** Presses at (x, y), drags to (x2, y2) and, unless told not to, lets go. */
+async function boxDrag(page: Page, x: number, y: number, x2: number, y2: number, release = true) {
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x2, y2, { steps: 8 });
+  if (release) await page.mouse.up();
+}
+
 
 journey("list drag to select: a drag from beside the rows boxes the ones it crosses, back up lets them go, ⇧ adds, Esc mid-drag puts the selection back, ⋯ acts on them all, a click on blank space clears; a drag from a row still carries the row (D194)", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
@@ -4341,6 +4350,44 @@ journey("list drag to select: a drag from beside the rows boxes the ones it cros
   if ((await page.locator(".marquee").count()) || (await pickedRows(page)).length) throw new Error("a drag from a row drew the box");
   await page.mouse.up();
   await until("dropped on no skill, nothing is picked", async () => !(await page.locator(".row-ghost").count()) && !(await pickedRows(page)).length);
+});
+
+journey("list drag to select survives a refresh of the same list landing mid-drag: the box goes on and picks the rows it reaches (D194)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const rows = page.locator(".list .row");
+  await rows.nth(2).waitFor();
+  await loaded(page);
+  const at = async (i: number) => (await rows.nth(i).boundingBox())!;
+  const mid = async (i: number) => (await at(i)).y + (await at(i)).height / 2;
+  const edge = (await page.locator(".side-divider").boundingBox())!;
+  const x = (edge.x + edge.width + (await at(0)).x) / 2;
+  // Pinning a row reads the list again after it writes (`ls` and `ls --archived`); those reads are held until the
+  // box is being dragged, then let go, so they land mid-drag.
+  await hold(page, "ls", 2);
+  const pinned = (await rowTitles(page, 2))[0]!;
+  try {
+    await rows.nth(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Pin to top" }).click();
+    await until("pinned on screen at once", async () => (await rowTitles(page, 0))[0] === pinned);
+    await boxDrag(page, x, (await at(0)).y + 10, x + 240, await mid(1), false);
+    await until("two picked", async () => (await pickedRows(page)).length === 2);
+    await until("the list's read again is waiting", () => isHeld(page, "ls"));
+    const landed = answered(page, "ls");
+    await release(page, "ls");
+    await landed;
+    await loaded(page); // and drawn
+    await page.mouse.move(x + 240, await mid(2), { steps: 4 });
+    await until("the box goes on to the third row", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0, 1, 2)).join());
+    if ((await page.locator(".marquee").count()) !== 1) throw new Error("the box went with the refresh");
+    await page.mouse.up();
+    await until("released, the three stay", async () => (await pickedRows(page)).length === 3 && !(await page.locator(".marquee").count()));
+  } finally {
+    // Unpinned for the journeys after this one, whatever happened above.
+    await page.mouse.up().catch(() => {});
+    await release(page, "ls").catch(() => {});
+    const row = ((await ore("ls")) as { id: string; title: string; pinned_at?: string }[]).find((i) => i.title === pinned);
+    if (row?.pinned_at) await ore("pin", row.id, "--undo");
+  }
 });
 
 journey("list drag to select on a skill page: a drag from the column beside its sources selects the ones it crosses; a click there clears (D194)", async (page) => {
@@ -6003,7 +6050,8 @@ function oreCalls(page: Page) {
 async function openQuiz(): Promise<Page> {
   const quiz = await browser.newPage({ viewport: { width: 680, height: 520 } });
   quiz.setDefaultTimeout(8000);
-  quiz.on("pageerror", (e) => errors.push(e.message));
+  const of = running;
+  quiz.on("pageerror", (e) => errors.push(`${of}: ${e.message}`));
   await quiz.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}; window.__ORE_LABEL = "quiz"`);
   await quiz.addInitScript({ path: join(MOCK, "tauri.js") });
   await quiz.goto(url);
@@ -6313,28 +6361,25 @@ journey("review: a card whose source was deleted says so where the passage would
 
 journey("review picker: fresh numbers that drop the only ticked skill leave nothing to start", async (page) => {
   await page.getByRole("button", { name: "Start review" }).waitFor(); // Home has read today's numbers
-  let release!: () => void;
-  const held = new Promise<void>((ok) => (release = ok));
-  let drop = "";
-  await page.route(/\/ore$/, async (route) => {
-    if (!(route.request().postData() ?? "").includes('"today"')) return route.fallback();
-    const res = await route.fetch();
-    const t = (await res.json()) as { skills: { skill: string; due: number }[] };
-    await held;
-    await route.fulfill({ response: res, json: { ...t, skills: t.skills.filter((x) => x.skill !== drop) } });
-  });
+  // The picker's fresh read waits, in the page, until the test lets it go with one skill taken out. (A Playwright
+  // route once missed this read, sent the instant after ⌘R, and the numbers came back unchanged: 1 run in 30.)
+  await hold(page, "today");
   await page.keyboard.press("Meta+r");
   const pick = page.getByRole("dialog", { name: "What to review" });
   const rows = pick.getByRole("checkbox");
   await until("two skills or more are due", async () => (await rows.count()) > 1);
+  await until("the fresh numbers are being read", () => isHeld(page, "today"));
   const first = await rows.first().locator(".name").innerText();
-  drop = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.name === first)!.id;
+  const drop = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.name === first)!.id;
+  await page.evaluate((id) => {
+    type T = { skills: { skill: string }[] };
+    (window as unknown as { __ORE_EDIT: Record<string, (t: T) => T> }).__ORE_EDIT = { today: (t) => ({ ...t, skills: t.skills.filter((x) => x.skill !== id) }) };
+  }, drop);
   for (const row of (await rows.all()).slice(1)) if ((await row.getAttribute("aria-checked")) === "true") await row.click();
-  release();
+  await release(page, "today");
   await until("the fresh numbers land", async () => !(await pick.getByRole("checkbox", { name: new RegExp(first) }).count()));
   await pick.getByRole("button", { name: "Pick a skill" }).waitFor();
   if (await pick.getByRole("button", { name: "Pick a skill" }).isEnabled()) throw new Error("Start is on with no shown skill ticked");
-  await page.unroute(/\/ore$/);
   await page.keyboard.press("Escape");
 });
 
@@ -6532,6 +6577,133 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   const back = (await ore("tries")) as { note?: string; status: string; uses?: unknown[] }[];
   const mine = back.find((t) => t.note === "Quiz myself before each edit session");
   if (!mine || mine.status !== "done" || mine.uses?.length) throw new Error(`the library kept the re-plan: ${JSON.stringify(mine)}`);
+});
+
+/** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
+const hold = (page: Page, key: string, calls = 1) => page.evaluate(([k, n]) => {
+  const w = window as unknown as { __ORE_HOLD?: Record<string, unknown[]> };
+  (w.__ORE_HOLD ??= {})[k] = Array(n).fill("manual");
+}, [key, calls] as const);
+const release = (page: Page, key: string) => page.evaluate((k) => (window as unknown as { __ORE_RELEASE: (k: string) => void }).__ORE_RELEASE(k), key);
+/** Whether an `ore <key>` is waiting on its hold right now. */
+const isHeld = (page: Page, key: string) => page.evaluate((k) => (window as unknown as { __ORE_HELD: string[] }).__ORE_HELD.includes(k), key);
+/** Resolves once the page's next `ore <cmd>` has answered. */
+const answered = (page: Page, cmd: string) => page.waitForResponse((r) => r.url().endsWith("/ore") && (JSON.parse(r.request().postData() ?? "{}") as { args?: string[] }).args?.[0] === cmd);
+/** The tries on the skill page whose text has `text`. */
+const tryRows = (page: Page, text: string) => page.locator(".try").filter({ hasText: text });
+
+journey("try it: a plan written just before the skill page opens shows there once it saves, though the page read its tries first", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "explaining an idea aloud all count"); // a passage no other journey highlights
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.press("4");
+  await until("the plan field has the caret", async () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Note"));
+  await page.keyboard.type("Explain it aloud on the walk home");
+  await loaded(page); // Try it has saved; only the plan's write is left
+  // The plan's write waits until the skill page has read its tries, as on a busy Mac.
+  await hold(page, "annotate");
+  await page.keyboard.press("Enter");
+  const read = answered(page, "tries");
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await read;
+  if (!(await isHeld(page, "annotate")) || (await tryRows(page, "Explain it aloud on the walk home").count())) throw new Error("the skill page did not read its tries before the plan saved");
+  await release(page, "annotate");
+  await until("the try shows its plan once it saves", async () => (await tryRows(page, "Explain it aloud on the walk home").count()) === 1);
+});
+
+journey("try it: a plan written while its highlight is still being made shows on a skill page opened meanwhile, once both save", async (page) => {
+  await searchPick(page, "spaced repetition scheduling", "Notes on spaced repetition scheduling (FSRS)"); // in Done, so ⌘K finds it
+  await page.locator(".doc-head").filter({ hasText: "Notes on spaced repetition scheduling (FSRS)" }).waitFor();
+  await hold(page, "highlight"); // the highlight itself is still being made when he goes
+  await select(page, "FSRS models stability and difficulty");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.press("4");
+  await until("the plan field has the caret", async () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Note"));
+  await page.keyboard.type("Check stability before each exam");
+  await page.keyboard.press("Enter");
+  const read = answered(page, "tries");
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await read;
+  if (!(await isHeld(page, "highlight")) || (await tryRows(page, "Check stability before each exam").count())) throw new Error("the skill page did not read its tries before the highlight was made");
+  await release(page, "highlight");
+  await until("the try shows with its plan once both save", async () => (await tryRows(page, "Check stability before each exam").count()) === 1);
+});
+
+journey("try it: a plan typed and left unsent (he clicks away) shows on the skill page he went to, once it saves", async (page) => {
+  await searchPick(page, "Story Spine", "The Story Spine"); // in Done, so ⌘K finds it
+  await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
+  await select(page, "The spine forces cause and effect");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.press("4");
+  await until("the plan field has the caret", async () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Note"));
+  await page.keyboard.type("Outline the next talk as a spine");
+  await loaded(page); // the try is made; the plan is saved only as the source closes
+  await hold(page, "annotate");
+  const read = answered(page, "tries");
+  await page.locator(".sidebar .side-item", { hasText: "Storytelling" }).first().click(); // no Enter
+  await read;
+  if (!(await isHeld(page, "annotate")) || (await tryRows(page, "Outline the next talk as a spine").count())) throw new Error("the plan saved before the skill page read its tries");
+  await release(page, "annotate");
+  await until("the try shows its plan once it saves", async () => (await tryRows(page, "Outline the next talk as a spine").count()) === 1);
+});
+
+journey("try it: 4 on the reading focus makes a try that shows on a skill page opened while it saves", async (page) => {
+  await openSource(page, "A very long title about the neuroscience of habit formation");
+  await page.locator(".doc").getByText("Habits form when a cue").waitFor();
+  await loaded(page);
+  await hold(page, "highlight");
+  await page.keyboard.press("ArrowDown"); // the reading focus, on the source's first line
+  await page.keyboard.press("4"); // a try of it, in one `ore highlight --intent apply`
+  await until("the try is being made", () => isHeld(page, "highlight"));
+  await page.keyboard.press("Escape");
+  const read = answered(page, "tries");
+  await page.locator(".sidebar .side-item", { hasText: /^Habits$/ }).first().click();
+  const shown = (await (await read).json()) as unknown[];
+  if (shown.length) throw new Error("the skill page read a try before the one being made");
+  await release(page, "highlight");
+  await until("the try shows once it is made", async () => (await page.locator(".try").count()) === 1);
+});
+
+journey("highlight note: a click on the highlight in the instant its save lands opens it with the note he wrote, and closing it keeps the note", async (page) => {
+  await openSource(page, TESTING);
+  await hold(page, "highlight");
+  await select(page, "Confidence matters as much as accuracy");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await page.keyboard.type("Ask how sure before checking"); // typing with the popup open writes its note
+  await page.keyboard.press("Enter");
+  await until("the popup closed", async () => !(await page.getByRole("dialog", { name: "Highlight" }).count()));
+  // A click on the passage as the save's answer comes in, before the page has drawn it.
+  const at = await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("Confidence matters");
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i + 3);
+      r.setEnd(n, i + 4);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    }
+    return null;
+  });
+  if (!at) throw new Error("the passage is not on the page");
+  await page.evaluate((at) => {
+    (window as unknown as { __ORE_AFTER: Record<string, () => void> }).__ORE_AFTER = {
+      highlight: () => {
+        getSelection()?.removeAllRanges();
+        document.elementFromPoint(at.x, at.y)!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: at.x, clientY: at.y, button: 0, detail: 1 }));
+      },
+    };
+  }, at);
+  await release(page, "highlight");
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  await until("the popup opens with his note", async () => (await popup.getByLabel("Note").inputValue()) === "Ask how sure before checking");
+  await page.keyboard.press("Escape");
+  await loaded(page);
+  const doc = (await ore("show", (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === TESTING)!.id, "--annotations")) as { annotations: { exact: string; note?: string }[] };
+  const mine = doc.annotations.find((a) => a.exact.startsWith("Confidence matters"));
+  if (mine?.note !== "Ask how sure before checking") throw new Error(`the note was lost: ${JSON.stringify(mine)}`);
 });
 
 journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D148)", async (page) => {
@@ -7034,11 +7206,17 @@ journey("finish: a question on a source with no skill is pointed to Collected, n
   await page.keyboard.press("Enter");
   await page.locator(".doc").getByText("A first source, filed under no skill").waitFor();
   await select(page, "one passage worth asking about");
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await loaded(page); // the highlight is saved
+  // Marking it a question saves after the closing card opens, as on a slow Mac (CI, 2026-11-11: "1 highlight").
+  await hold(page, "annotate");
   await page.getByRole("dialog", { name: "Highlight" }).locator(".intent.question").click();
   await page.locator(".mark-icon.question").first().waitFor();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Finish", exact: true }).click();
   await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await until("the question is still saving", () => isHeld(page, "annotate"));
+  await release(page, "annotate");
   const made = page.locator(".quiz-made-list").filter({ hasText: "1 question" });
   await made.waitFor();
   if ((await made.innerText()).includes("skill page")) throw new Error(`“${await made.innerText()}”: this source has no skill page`);
@@ -7234,6 +7412,33 @@ journey("settle: closing a typed highlight lifts the popup away, pops its mark a
 });
 
 // Last: they add headings and a diagram to AGENTS' note, which earlier journeys lay out.
+/** Clicks just inside the end of an element's last line of text, where a click puts the caret after its last letter. */
+async function clickAtEnd(page: Page, el: Locator) {
+  const at = await el.evaluate((e) => {
+    const walk = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
+    let last: Text | null = null;
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) if (n.data.length) last = n;
+    if (!last) return null;
+    const r = document.createRange();
+    r.setStart(last, last.data.length - 1);
+    r.setEnd(last, last.data.length);
+    const b = r.getBoundingClientRect();
+    return { x: b.right - 1, y: b.top + b.height / 2 };
+  });
+  if (!at) throw new Error("no text to click the end of");
+  await page.mouse.click(at.x, at.y);
+}
+/** Whether the caret sits after the last letter of `el`. */
+const caretAtEndOf = (el: Locator) =>
+  el.evaluate((e) => {
+    const s = getSelection();
+    if (!s?.isCollapsed || !s.anchorNode || !e.contains(s.anchorNode)) return false;
+    const r = document.createRange();
+    r.selectNodeContents(e);
+    r.setStart(s.anchorNode, s.anchorOffset);
+    return r.toString() === "";
+  });
+
 journey("tutor Practice: an answer under a renamed heading, and a diagram-only answer, both reach the tutor; an empty one is refused in place", async (page) => {
   await openSource(page, AGENTS);
   const exercise = (heading: string) => ({ heading, prompts: ["Your answer"] });
@@ -7258,11 +7463,16 @@ journey("tutor Practice: an answer under a renamed heading, and a diagram-only a
   await tutor.getByRole("button", { name: "Practice", exact: true }).click();
   // A written answer under a heading he renamed.
   await tutor.getByRole("button", { name: "Write it in your note" }).click();
-  await page.locator(".note-editor h2", { hasText: "What loop does an agent run?" }).waitFor();
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowRight" : "End");
+  const head = page.locator(".note-editor h2", { hasText: "What loop does an agent run?" });
+  await head.waitFor();
+  // The caret goes where he would click, checked each time: line-end keys differ by platform, and on CI's
+  // Linux an End once left it at the heading's start, so the rename and the answer both went into the heading.
+  await clickAtEnd(page, head);
+  await until("the caret is at the heading's end", () => caretAtEndOf(head));
   await page.keyboard.type(" (my words)");
-  await page.keyboard.press("ArrowDown");
+  const answer = page.locator(".note-editor .ghost").first();
+  await answer.click();
+  await until("the caret is in the answer line", () => answer.evaluate((el) => !!getSelection()?.anchorNode && el.contains(getSelection()!.anchorNode)));
   await page.keyboard.type("It acts, observes the result and decides again.");
   await page.keyboard.press("Meta+Enter");
   await tutor.getByText("Good. Now draw it.").waitFor();
@@ -8264,6 +8474,8 @@ journey("list: an archive whose save hangs never freezes the list; a read starte
     if (await row.isVisible()) throw new Error("the archived row came back while its save hung");
   } finally {
     await page.evaluate(() => void ((window as unknown as W).__ORE_SLOW = {}));
+    await release(page, "archive"); // its answer comes in now, and the list reads it before the page closes
+    await loaded(page);
     await ore("archive", made.id);
     await ore("archive", ((await ore("ls", "--archived")) as { id: string; title: string }[]).find((i) => i.title === AGENTS)!.id, "--undo");
   }
@@ -9346,14 +9558,20 @@ journey("phone: a half-typed answer to What do you already know? survives a rela
 // —— run ——
 
 let failed = 0;
-const picked = journeys.filter(([name]) => !only || name.includes(only));
+const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
   let page: Page | undefined;
+  running = name;
   const t0 = Date.now();
   try {
     page = await open(url, engine);
     await run(page);
+    // Nothing of the journey's still in flight as its page closes: a save cut off there is lost to the next
+    // journey's library, and WebKit reports the cut request as a page error. A call held and never let go fails here.
+    await until("its ore calls have answered", () => page!.evaluate(() => !(window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING)).catch(async () => {
+      throw new Error(`the journey ended with ore calls in flight: ${JSON.stringify(await page!.evaluate(() => (window as unknown as { __ORE_INFLIGHT?: string[] }).__ORE_INFLIGHT))}`);
+    });
     const broke = await page.evaluate(async () => {
       const w = window as unknown as { __hygiene?: Set<string>; __hygieneCheck?: () => Promise<void> };
       await w.__hygieneCheck?.();
@@ -9365,7 +9583,10 @@ for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) 
     failed++;
     const shot = join(tmpdir(), `ore-e2e-${name.replace(/\W+/g, "-")}.png`);
     await page?.screenshot({ path: shot }).catch(() => {});
-    const why = (e as Error).message.split("\n").filter((l) => l.trim() && !/^\s*Call log/.test(l)).slice(0, 2).join("\n      ");
+    // The error's first two lines, then the end of Playwright's call log: what was in the way of a click that timed out.
+    const lines = (e as Error).message.split("\n").filter((l) => l.trim());
+    const log = lines.findIndex((l) => /^\s*Call log/.test(l));
+    const why = [...(log < 0 ? lines : lines.slice(0, log)).slice(0, 2), ...(log < 0 ? [] : lines.slice(log + 1).slice(-4))].join("\n      ");
     console.log(`FAIL  ${name}\n      ${why}${page ? `\n      screenshot: ${shot}` : ""}`);
   }
   await page?.close();

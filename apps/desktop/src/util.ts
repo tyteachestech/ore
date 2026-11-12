@@ -325,6 +325,21 @@ export const stepLanded = (step: object) => {
   const at = made.get(step) ?? 0;
   for (const [wake, since] of screens) if (since > at) wake();
 };
+/** A write he starts now that lands later (a highlight, its type or note): call it at his action, before any wait,
+ *  and pass it the write; screens opened from that moment read again once it lands, as after a step. */
+export function wakeOnLanding(): (write: Promise<unknown>) => void {
+  const token = {};
+  stepMade(token);
+  return (write) => void write.then(() => stepLanded(token), () => {});
+}
+
+/** `run` once at a time: a call while one is still going gets that one's promise and starts nothing, so a screen
+ *  read again mid-way (a wake) never starts a second slow job (a feed refresh). */
+export function singleFlight<T>(run: () => Promise<T>): () => Promise<T> {
+  let going: Promise<T> | null = null;
+  return () => (going ??= run().finally(() => (going = null)));
+}
+
 /** Changes when a step made before this screen opened lands: a dependency of the effect that loads its data. */
 export function useLibraryChanges(): number {
   const [n, setN] = useState(0);
