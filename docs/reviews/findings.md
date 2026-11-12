@@ -42,4 +42,4 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F16 | 2026-11-12 | iPhone | Archive's Undo toast: a late tap didn't restore the row; inconclusive, the toast may have expired during screenshots | open | — |
 | F17 | 2026-11-11 | Release build | The KaTeX font was refused by the release CSP | fixed #256 | `release build under the release app's CSP` |
 | F18 | 2026-11-11 | Diagrams | Elbow middles, matrix cells and top labels were lost on reopening a diagram | fixed #280 | `a dragged elbow middle, a matrix cell and a box label at the top survive the file` |
-| F19 | 2026-11-12 | Skill icons | The Learning brain read as two pills, not a brain, at 20px and on the 40px tile | fixed #PR | no test: whether a drawing reads as its subject is judged by eye, shot at 4× in the PR |
+| F19 | 2026-11-12 | Skill icons | The Learning brain read as two pills, not a brain, at 20px and on the 40px tile | fixed #317 | no test: whether a drawing reads as its subject is judged by eye, shot at 4× in the PR |
