@@ -3045,12 +3045,12 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .mynotes-head { container-type: inline-size; }
 @container (max-width: 330px) { .side-tabs:has(> :nth-child(3)) .card-icon { display: none; } }
 
-/* Collected's filter (D219): at the right of the side panel's tabs; while it holds words, groups with no match go. */
-.mynotes-head > .icon-btn, .mynotes-head > .head-search { margin-left: auto; }
+/* Collected's filter (D219): the glass at the right of the side panel's tabs opens a full-width row under them;
+   while it holds words, groups with no match go. */
+.mynotes-head > .icon-btn { margin-left: auto; }
+.side-filter { flex: none; width: auto; height: 30px; margin: 0 12px 4px; padding: 0 10px; gap: 8px; }
 .cp-none { display: none; margin: 4px 0 0; }
 .cp.filtering:not(:has(.cp-row:not(.cp-add), .qp-row)) .cp-none { display: block; }
 .cp.filtering section.none,
 .cp.filtering .cp-questions:not(:has(.qp-row, input, textarea, [role=alert])) { display: none; }
-/* The open field takes what room the tabs leave, so the tabs never wrap. */
-.mynotes-head > .side-tabs { flex: none; white-space: nowrap; }
-.mynotes-head > .head-search { flex: 1 1 auto; width: auto; min-width: 80px; max-width: 200px; }
+.mynotes-head > .icon-btn[aria-pressed="true"] { color: var(--text); }

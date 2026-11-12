@@ -1896,7 +1896,7 @@ journey("search while reading (D219): ⌘F names what it finds in; Collected has
   await until("Esc clears it", async () => (await field.inputValue()) === "");
   await page.locator(".cp-head.keep").waitFor();
   await field.press("Escape");
-  await page.getByRole("button", { name: "Filter collected" }).waitFor();
+  await until("a second Esc closes the row, focus back on the glass", async () => (await field.count()) === 0 && (await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "Filter collected");
 });
 
 journey("highlight: a selection snaps to whole words and the full stop, ⌥ keeps it exact", async (page) => {

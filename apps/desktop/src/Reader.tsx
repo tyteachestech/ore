@@ -13,7 +13,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
-import { HeadSearch } from "./HeadSearch";
+import { SearchButton, SearchField } from "./HeadSearch";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
 import { snapRange } from "./snap";
 import { Grab } from "./Grab";
@@ -1368,6 +1368,9 @@ function ReaderView(p: Props & { reload: () => void }) {
   /** Collected's filter (D219), cleared for each source. */
   const [sideFilter, setSideFilter] = useState("");
   const [sideFiltering, setSideFiltering] = useState(false);
+  const sideFilterShown = sideFiltering || !!sideFilter;
+  const sideFilterButton = useRef<HTMLButtonElement>(null);
+  useFocusBack(sideFilterShown, sideFilterButton);
   useEffect(() => {
     setSideFilter("");
     setSideFiltering(false);
@@ -3296,9 +3299,11 @@ function ReaderView(p: Props & { reload: () => void }) {
           tab={sideTab}
           onTab={(t) => p.onShowSide(t, true)}
           original={!!pdf}
-          tool={
-            questionsShown && !PHONE && (
-              <HeadSearch
+          tool={questionsShown && !PHONE && <SearchButton label="Filter collected" button={sideFilterButton} pressed={sideFilterShown} onClick={() => (sideFilterShown ? (setSideFilter(""), setSideFiltering(false)) : setSideFiltering(true))} />}
+          bar={
+            questionsShown && !PHONE && sideFilterShown && (
+              <SearchField
+                className="side-filter"
                 label="Filter collected"
                 value={sideFilter}
                 onChange={setSideFilter}
