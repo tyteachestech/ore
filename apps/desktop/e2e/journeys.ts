@@ -4387,7 +4387,7 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   const tabs = page.getByRole("tablist", { name: "Sources shown" });
   const on = (name: string) => tabs.getByRole("tab", { name }).getAttribute("aria-selected");
   await until("To read is the open tab", async () => (await on("To read")) === "true");
-  // F35: the header's gems load after the page; the tabs under it stay where they were when they land.
+  // F36: the header's gems load after the page; the tabs under it stay where they were when they land.
   const tabY = async () => (await tabs.getByRole("tab", { name: "To read" }).boundingBox())!.y;
   const y0 = await tabY();
   await page.locator(".hero-strength").waitFor();
@@ -10082,6 +10082,20 @@ journey("phone: the small controls of a source answer a 44pt touch", async (page
   const fits = (sel: string, what: string) => fits44(page, sel, what);
   await phoneSource(page, AGENTS);
   await fits(".doc-head .source", "the original-site link");
+  // Its 44pt reach takes no room: the link sits on the byline's line beside the date (it sat 4pt low), or, when the
+  // byline fills the line, starts the next one flush with it (it was indented 14pt).
+  const byline = async (width: number) => {
+    await page.locator(".doc-head .chips").evaluate((el, w) => ((el as HTMLElement).style.width = w), width ? `${width}px` : "");
+    return page.evaluate(() => {
+      const box = (sel: string) => document.querySelector(`.doc-head ${sel}`)!.getBoundingClientRect();
+      const [when, source, name] = [box(".when"), box(".source"), box(".by")];
+      return { off: source.y + source.height / 2 - (when.y + when.height / 2), indent: source.x + 4 - name.x };
+    });
+  };
+  const wide = await byline(1000);
+  if (Math.abs(wide.off) > 1) throw new Error(`the original-site link sits ${wide.off.toFixed(1)}pt off the byline's line`);
+  const narrow = await byline(0);
+  if (narrow.off < 10 || Math.abs(narrow.indent) > 1) throw new Error(`the wrapped original-site link sits ${narrow.indent.toFixed(1)}pt from the byline's start`);
   await fits(".read-pill", "the reading pill");
   await tap(page, page.getByRole("button", { name: "Back" }));
   await phoneSource(page, TESTING);
