@@ -356,6 +356,41 @@ export function App() {
     reloadSkills();
   }, [refresh, reloadSkills]);
   useEffect(reload, [reload]);
+  // Links added on the iPhone wait in the library's inbox (D223): the Mac imports them when it opens or comes
+  // back to the front, and the lists read in whatever else the phone changed meanwhile.
+  useEffect(() => {
+    let busy = false;
+    const fromPhone = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+        const fresh = r.added.filter((a) => !a.kept);
+        if (fresh.length) notify(fresh.length === 1 ? `Added “${fresh[0]!.title}” from your iPhone` : `Added ${fresh.length} sources from your iPhone`, "info");
+        for (const a of r.added.filter((a) => a.kept)) notify(`Already here: “${a.title}”, from your iPhone`, "info");
+        for (const f of r.failed) notify(`Couldn’t add ${f.url} from your iPhone: ${f.error}`, "error");
+        if (r.added.length) reload();
+      } catch (e) {
+        notify(`Couldn’t bring in links from your iPhone: ${errorText(e)}`, "error");
+      } finally {
+        busy = false;
+      }
+    };
+    void fromPhone();
+    // Only after a real absence (10 s away): a click on a menu or a dialog closing doesn't reload the lists.
+    let left = 0;
+    // Focus moving into the video player (an iframe) blurs the window too: that isn't away.
+    const away = () => setTimeout(() => document.activeElement?.tagName !== "IFRAME" && (left = Date.now()));
+    const back = () => {
+      if (!left || Date.now() - left < 10_000) return;
+      left = 0;
+      void refresh();
+      void fromPhone();
+    };
+    addEventListener("blur", away);
+    addEventListener("focus", back);
+    return () => (removeEventListener("blur", away), removeEventListener("focus", back));
+  }, [notify, refresh, reload]);
 
   useEffect(() => save("ore.view", JSON.stringify({ status, skill })), [status, skill]);
 

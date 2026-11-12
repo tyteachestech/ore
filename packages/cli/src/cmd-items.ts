@@ -22,8 +22,19 @@ import {
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
+
+/** What follows an add, from `ore add` or a link the iPhone queued: enrichment in the background (also for a Feed
+ *  post now kept, which wasn't yet), and a PDF's tables and formulas once the optional reader is installed (D125). */
+function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noEnrich: boolean): string {
+  const kept = !!item.kept;
+  const enrich = noEnrich || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
+  if (noEnrich && !kept) markEnrichSkipped(lib, item.meta.id);
+  if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
+  return enrich;
+}
 import { int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
+import { importQueued, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
 
 const INTENTS = Intent.options;
 
@@ -83,15 +94,38 @@ export const itemCommands: Record<string, Command> = {
           : await addSource(lib, need(input, "<url|path>"), { type: oneOf(f.type, ItemType.options, "type"), skills: strs(f.skill), onProgress });
       if (f.for) await matchQuestion(lib, item.meta.id, str(f.for)!);
       const kept = !!item.kept;
-      const enrich = f["no-enrich"] || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
-      if (f["no-enrich"] && !kept) markEnrichSkipped(lib, item.meta.id);
-      // A PDF's tables and formulas are read after it is added, once the optional reader is installed (D125).
-      if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
+      const enrich = afterAdd(lib, item, !!f["no-enrich"]);
       const path = relative(lib.root, item.docPath);
       return {
         data: { id: item.meta.id, title: item.meta.title, type: item.meta.type, path, enrich, ...(kept ? { kept, filed: item.filed, restored: item.restored, status: item.meta.status, skills: item.meta.skills } : {}) },
         text: kept ? `Already here: ${item.meta.title} (${item.meta.id})\n  skills ${item.meta.skills.join(", ") || "none"}` : `Added: ${item.meta.title} (${item.meta.id})\n  ${item.meta.type} → ${path}\n  enrichment ${enrich}`,
       };
+    },
+  },
+
+  inbox: {
+    usage: "[--add <url> [--skill s]] [--remove <id>] [--import]   links added on the iPhone, waiting for the Mac to import them (D223): --add queues one (the phone), --import adds each with the whole import and enrichment (the Mac), --remove drops one; with none, lists them",
+    options: { add: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" } },
+    async run(_, f) {
+      const lib = openLibrary();
+      if (f.add !== undefined) {
+        const l = queueLink(lib, str(f.add) ?? "", strs(f.skill));
+        return { data: l, text: `Waiting for your Mac: ${l.url}` };
+      }
+      if (f.remove !== undefined) {
+        removeQueuedLink(lib, need(str(f.remove), "<id>"));
+        return { data: queuedLinks(lib), text: "Removed" };
+      }
+      if (f.import) {
+        const r = await importQueued(lib, async (url, skills) => {
+          const item = await addSource(lib, url, { skills });
+          afterAdd(lib, item, false);
+          return { id: item.meta.id, title: item.meta.title, kept: !!item.kept };
+        });
+        return { data: r, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`)].join("\n") };
+      }
+      const all = queuedLinks(lib);
+      return { data: all, text: all.length ? table(all.map((l) => [l.id, l.url, l.error ?? "waiting"])) : "Nothing waiting" };
     },
   },
 
