@@ -9,15 +9,17 @@
 # Log: ~/Library/Caches/ore/app-install.log
 [ "$(git rev-parse --abbrev-ref HEAD)" = master ] || exit 0
 id=com.tylerpoelking.ore
+# lsappinfo, not AppleScript: right after the swap AppleScript can fail to find the bundle id (-1728).
+running() { [ -n "$(lsappinfo find bundleid="$id")" ]; }
 relaunch() {
-  [ "$(osascript -e "application id \"$id\" is running")" = true ] || return 0
+  running || return 0
   if lsappinfo info -only bundleID "$(lsappinfo front)" | grep -q "\"$id\""; then
     echo "$(date): Ore is in front, not relaunched"; return 0
   fi
   osascript -e "tell application id \"$id\" to quit" || { echo "$(date): quit refused, not relaunched"; return 0; }
   # Open the new copy by path: the old one is in the Trash with the same bundle id.
   for _ in 1 2 3 4 5 6 7 8 9 10; do
-    [ "$(osascript -e "application id \"$id\" is running")" = true ] || { open -g /Applications/Ore.app && echo "$(date): relaunched"; return 0; }
+    running || { open -g /Applications/Ore.app && echo "$(date): relaunched"; return 0; }
     sleep 1
   done
   echo "$(date): Ore did not quit, not relaunched"
