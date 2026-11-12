@@ -10,6 +10,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
@@ -165,6 +166,8 @@ function zoomable(t: EventTarget | null, doc: HTMLElement | null): Zoomed | null
   const img = (t as Element | null)?.closest?.("img");
   if (!(img instanceof HTMLImageElement) || !doc?.contains(img) || img.closest("a[href]") || !img.naturalWidth) return null;
   const from = img.getBoundingClientRect();
+  // On the phone any picture opens, to pinch in on (Books): the screen is as wide as the column.
+  if (PHONE) return { img, from };
   return Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height) > 1.1 ? { img, from } : null;
 }
 
@@ -1276,7 +1279,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   // Opening the source note puts the caret in it; closing writes what is pending.
   /** A PDF's own file, for the Original tab (D202); any other source has only the two tabs. */
-  const pdf = !PHONE && doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
+  const pdf = doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
   const sideTab: SideTab = p.sideTab === "original" && !pdf ? "note" : p.sideTab;
   const notesShown = p.notesOpen && !closedBook && sideTab === "note";
   const questionsShown = p.notesOpen && !closedBook && sideTab === "questions";
@@ -2893,7 +2896,8 @@ function ReaderView(p: Props & { reload: () => void }) {
           : []),
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
-        ...(pdf ? [{ id: "original-page", label: originalShown ? "Close original page" : "Original page beside the text", paletteOnly: true, run: () => p.onShowSide("original") }] : []),
+        // On the phone the PDF's own page is a page of its own, beside the source as the note is (Back returns).
+        ...(pdf ? [{ id: "original-page", label: PHONE ? "Original page" : originalShown ? "Close original page" : "Original page beside the text", paletteOnly: !PHONE, run: () => p.onShowSide("original") }] : []),
         ...(readingFor ? [{ id: "reading-for", label: "Show prequestions", paletteOnly: true, run: () => setPreqAsk((n) => n + 1) }] : []),
         { id: "archive", label: doc.archived_at ? "Restore" : "Archive", hint: label(keys.archive), danger: !doc.archived_at, divider: true, run: () => p.onArchive(doc) },
       ];
@@ -2902,7 +2906,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   const menuActions = actions.filter((a) => !a.paletteOnly);
   const canFinish = !!doc && doc.status !== "done" && !doc.preview;
   // On the phone Finish lives here and at the end of the source; the top bar stays Back and ⋯ (D156).
-  const phoneActions = menuActions.filter((a) => !["reveal", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url));
+  const phoneActions = menuActions.filter((a) => !["reveal", "path", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url));
   const shownActions = PHONE
     ? [...phoneActions.filter((a) => a.id === "finish").map((a) => ({ ...a, label: "Finish", hint: undefined })), ...phoneActions.filter((a) => a.id !== "finish")].map((a, i) => (i ? a : { ...a, divider: false }))
     : menuActions;
@@ -3023,7 +3027,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     : undefined;
 
   return (
-    <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
+    <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && panelShown ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
       <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
@@ -3557,7 +3561,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           highlightsSaved={highlightsSaved}
         />
       ) : null}
-      {zoom && <FigureZoom fig={zoom} item={doc?.id ?? ""} notify={p.notify} onClose={() => setZoom(null)} />}
+      {zoom && (PHONE ? <FigureView img={zoom.img} from={zoom.from} onClose={() => setZoom(null)} /> : <FigureZoom fig={zoom} item={doc?.id ?? ""} notify={p.notify} onClose={() => setZoom(null)} />)}
     </div>
   );
 }

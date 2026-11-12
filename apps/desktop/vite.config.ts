@@ -1,6 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -55,31 +55,44 @@ const phoneAliases = [
 ];
 
 // The phone's library in a browser (the e2e journeys, `vite` at phone size): the text files of ORE_PHONE_LIBRARY
-// (a demo library, or a copy of his), served as /library.json. Binaries (PDFs, the index, git) stay behind;
-// thumbnails go as data URLs. The iPhone app reads Ore's iCloud Drive folder instead (src/phone/fs.ts), so its
+// (a demo library, or a copy of his), served as /library.json. Binaries (PDFs, audio, the index, git) stay behind,
+// named with null as the phone's folder listing names them (`unread`); thumbnails go as data URLs. The iPhone app reads Ore's iCloud Drive folder instead (src/phone/fs.ts), so its
 // build ships no library unless ORE_PHONE_LIBRARY is set.
 const phoneLibrary: Plugin = {
   name: "phone-library",
   configureServer(server) {
     server.middlewares.use("/library.json", (_req, res) => res.end(JSON.stringify(snapshot())));
+    // A source's own files (its images, audio, PDF) for a browser standing in for the phone, as the shell's asset
+    // protocol serves them from the folder: the e2e journeys point convertFileSrc here.
+    server.middlewares.use("/library-file", (req, res) => {
+      const rel = decodeURIComponent((req.url ?? "").split("?")[0]!).replace(/^\/lib\//, "");
+      const root = process.env.ORE_PHONE_LIBRARY!;
+      const file = join(root, rel);
+      if (rel.split("/").includes("..") || !existsSync(file)) return void ((res.statusCode = 404), res.end());
+      const type: Record<string, string> = { svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", pdf: "application/pdf", wav: "audio/wav", m4a: "audio/mp4", mp3: "audio/mpeg" };
+      const ext = file.split(".").pop()!.toLowerCase();
+      if (type[ext]) res.setHeader("content-type", type[ext]);
+      res.end(readFileSync(file));
+    });
   },
   generateBundle() {
     if (process.env.ORE_PHONE_LIBRARY) this.emitFile({ type: "asset", fileName: "library.json", source: JSON.stringify(snapshot()) });
   },
 };
-function snapshot(): Record<string, string> {
+function snapshot(): Record<string, string | null> {
   const root = process.env.ORE_PHONE_LIBRARY;
   if (!root) throw new Error("ORE_PHONE_LIBRARY: the library folder to put on the phone");
-  const out: Record<string, string> = {};
+  const out: Record<string, string | null> = {};
   const walk = (dir: string) => {
     for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
       const rel = dir ? `${dir}/${e.name}` : e.name;
       if (e.isDirectory()) {
         if (!e.name.startsWith(".")) walk(rel);
-      } else if (/\.(md|ya?ml|jsonl?|excalidraw)$/.test(e.name)) out[rel] = readFileSync(join(root, rel), "utf8");
+      } else if (/\.(md|ya?ml|jsonl?|excalidraw|vtt)$/.test(e.name)) out[rel] = readFileSync(join(root, rel), "utf8");
       // A source's picture (D77), small by design (480px): it goes along as a data URL so lists show it.
       else if (/^(thumbnail|course-cover)\.(jpe?g|png|webp|gif)$/.test(e.name))
         out[rel] = `data:image/${e.name.split(".")[1]!.replace("jpg", "jpeg")};base64,${readFileSync(join(root, rel)).toString("base64")}`;
+      else if (!e.name.startsWith(".")) out[rel] = null;
     }
   };
   walk("");

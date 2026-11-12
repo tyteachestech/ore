@@ -106,7 +106,7 @@ function boot() {
       setLibraryRoot(ROOT, root);
     } else {
       const text = await (await fetch("/library.json")).text();
-      const snap = JSON.parse(text) as Record<string, string>;
+      const snap = JSON.parse(text) as Record<string, string | null>;
       await mount(Object.fromEntries(Object.entries(snap).map(([p, t]) => [`${ROOT}/${p}`, t])), bytesToHex(sha256(new TextEncoder().encode(text))));
     }
     await ready(wasmUrl);
