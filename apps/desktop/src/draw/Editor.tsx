@@ -1711,7 +1711,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       onDrop={onDrop}
       style={{ "--draw-ground": "var(--bg)" } as CSSProperties}
     >
-      <WithMenu actions={menu}>
+      <WithMenu actions={menu} plain>
         <svg
           ref={svg}
           className="draw-canvas"

@@ -11,6 +11,14 @@ import { trackDrag } from "./phone/drag";
 import { sheetLayer, useSwipeDown } from "./phone/sheet";
 import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
+import { menuIcon } from "./menu-icons";
+
+/** The item's icon at its left (menu-icons.ts), or an empty slot so the labels line up. */
+const Glyph = ({ a, plain }: { a: MenuAction; plain?: boolean }) => {
+  if (plain) return null;
+  const I = menuIcon(a);
+  return <span className="menu-icon" aria-hidden="true">{I && <I />}</span>;
+};
 
 /** A picked action runs once the menu has closed and handed focus back (its onCloseAutoFocus), so a
  *  field or dialog the action opens keeps the caret: run on a timer, it raced Radix's own focus return,
@@ -51,6 +59,12 @@ export type MenuAction = {
   /** Listed in ⌘K but not in the ⋯ and right-click menus: the action has its own control on screen
    *  (the skill picker, + Note), or is a keyboard convention (⌘F). Its shortcut still works. */
   paletteOnly?: boolean;
+};
+
+/** A group of actions with a line above it: on its first item the menu shows, whichever items are there. */
+export const group = (list: MenuAction[]): MenuAction[] => {
+  const first = list.findIndex((a) => !a.paletteOnly);
+  return list.map((a, i) => (i === first ? { ...a, divider: true } : a));
 };
 
 /** A list of actions, or a function that makes it as the menu opens: a long list's rows then build
@@ -96,7 +110,7 @@ function useHold(on: boolean | undefined) {
 
 /** An object's actions, the same list on right-click and on its ⋯ button, as in Linear and Finder
  *  (AGENTS.md interaction checklist). Radix menus: arrows, type-ahead, Enter, Esc. */
-export function WithMenu({ actions, children, keepFocus, hold }: { actions: Actions; children: ReactNode; /** Focus stays where the action put it (the note's text), not back on the trigger. */ keepFocus?: boolean; /** On the iPhone, a still half-second press opens it (Photos, Files): a row that has no swipes of its own. */ hold?: boolean }) {
+export function WithMenu({ actions, children, keepFocus, hold, plain }: { actions: Actions; children: ReactNode; /** No icons: a long command list (the diagram canvas). */ plain?: boolean; /** Focus stays where the action put it (the note's text), not back on the trigger. */ keepFocus?: boolean; /** On the iPhone, a still half-second press opens it (Photos, Files): a row that has no swipes of its own. */ hold?: boolean }) {
   // macOS opens the menu on mouse down, under the pointer, so the same click's mouse up lands on the
   // first item and Radix would pick it. A release right after opening is that click, not a choice;
   // pressing, moving to an item and releasing still picks it, as in a native menu.
@@ -117,12 +131,13 @@ export function WithMenu({ actions, children, keepFocus, hold }: { actions: Acti
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus, row.current)} onKeyDown={keepKeysIn}>
-          <Later>{() => listOf(actions).map((a) => (
+          <Later>{() => listOf(actions).map((a, i) => (
             <Fragment key={a.id}>
-            {a.divider && <ContextMenu.Separator className="menu-sep" />}
+            {a.divider && i > 0 && <ContextMenu.Separator className="menu-sep" />}
             {a.sub ? (
               <ContextMenu.Sub>
                 <ContextMenu.SubTrigger className="menu-item">
+                  <Glyph a={a} plain={plain} />
                   {a.label}
                   <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />
                 </ContextMenu.SubTrigger>
@@ -150,6 +165,7 @@ export function WithMenu({ actions, children, keepFocus, hold }: { actions: Acti
               </ContextMenu.Sub>
             ) : (
               <ContextMenu.Item className={`menu-item${a.danger ? " danger" : ""}`} onPointerUp={early} onSelect={later(a.run)}>
+                <Glyph a={a} plain={plain} />
                 {a.label}
                 {a.hint && <kbd>{a.hint}</kbd>}
               </ContextMenu.Item>
@@ -213,12 +229,13 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
       </Hint>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (hoverOnly && !keepFocus && focusRow(e, self.current), closed(e, keepFocus, self.current?.closest<HTMLElement>("[data-menu-row]")))} onClick={(e) => e.stopPropagation()} onKeyDown={keepKeysIn}>
-          <Later>{() => listOf(actions).map((a) => (
+          <Later>{() => listOf(actions).map((a, i) => (
             <Fragment key={a.id}>
-            {a.divider && <DropdownMenu.Separator className="menu-sep" />}
+            {a.divider && i > 0 && <DropdownMenu.Separator className="menu-sep" />}
             {a.sub ? (
               <DropdownMenu.Sub>
                 <DropdownMenu.SubTrigger className="menu-item">
+                  <Glyph a={a} />
                   {a.label}
                   <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />
                 </DropdownMenu.SubTrigger>
@@ -256,6 +273,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
               </DropdownMenu.CheckboxItem>
             ) : (
               <DropdownMenu.Item className={`menu-item${a.danger ? " danger" : ""}`} onSelect={later(a.run)}>
+                <Glyph a={a} />
                 {a.label}
                 {a.hint && <kbd>{a.hint}</kbd>}
               </DropdownMenu.Item>
