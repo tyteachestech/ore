@@ -8,7 +8,7 @@ import { parseArgs } from "@pkgjs/parseargs";
 import * as YAML from "yaml";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { mount, mountDisk, readFileSync, rescan } from "./fs";
+import { existsSync, mount, mountDisk, readFileSync, rescan } from "./fs";
 import { ready } from "./sqlite";
 
 export const ROOT = "/lib";
@@ -97,6 +97,8 @@ async function command<T>({ commands, errorLine }: typeof import("ore-commands")
   // The journeys' failure path, as on the Mac's mock (scripts/mock/tauri.js): `window.__ORE_FAIL = { notes: "why" }`.
   const fail = import.meta.env.DEV && (globalThis as { __ORE_FAIL?: Record<string, string> }).__ORE_FAIL?.[name ?? ""];
   if (fail) throw new Error(fail);
+  // Before iCloud has brought the library down, say so, never "run ore init" (the Mac's library is the one).
+  if (isTauri() && !existsSync(`${ROOT}/skills.yaml`)) throw new Error("Your library is on its way from iCloud. It shows here once your Mac has uploaded it.");
   const cmd = commands[name ?? ""];
   if (!cmd) throw new Error(`unknown command "${name}"`);
   if (needsAi(name!, rest)) throw new Error("AI runs on your Mac for now.");

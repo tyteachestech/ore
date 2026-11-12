@@ -62,6 +62,8 @@ async fn library_dir() -> Option<String> {
 #[tauri::command]
 async fn library_scan(root: String) -> Scan {
     let mut out = Scan { files: vec![], waiting: vec![] };
+    // Asks iCloud for the folder itself too, so new files the Mac added come down.
+    download(Path::new(&root));
     walk(Path::new(&root), "", &mut out);
     out
 }
