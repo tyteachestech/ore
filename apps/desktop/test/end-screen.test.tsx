@@ -74,12 +74,15 @@ test("nothing to tip, or Reduce Motion: no cart, and the mole, the ring and the 
   const none = await mount(end([], today(true, 600_000)));
   expect(none.q(".cart-tip")).toBe(0);
   expect(none.q(".review-mole .mole")).toBe(1);
+  // With no cart before it, it still comes up out of the ground first, as it does after the cart.
+  expect(none.body.querySelector(".review-mole .mole")?.getAttribute("data-mood")).toBe("peek");
   await none.done();
   reduce = true;
   const still = await mount(end(["ai"]));
   reduce = false;
   expect(still.q(".cart-tip")).toBe(0);
   expect(still.q(".review-mole .mole")).toBe(1);
+  expect(cheering(still.body)).toBe(true);
   expect(still.q(".review-cut > span[data-wait]")).toBe(0);
   await still.done();
 });

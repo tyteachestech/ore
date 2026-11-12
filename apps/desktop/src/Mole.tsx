@@ -55,6 +55,8 @@ export type Dot = [c: number, r: number, radius: number, tone: Tone];
 export function moleDots(s: State): Dot[] {
   const out: Dot[] = [], bottom = ROWS - 1.5, ry = Math.max(4, bottom - s.top);
   const fx = s.hx * 0.8 + s.lx * 0.35, fy = s.y + s.ly * 0.25;
+  // Squash and stretch: stretched tall the head narrows, squashed it spreads, so it keeps its mass through a hop.
+  const rx = s.rx * clamp((bottom - REST.top) / ry, 0.86, 1.06);
   // Each paw a rounded box, and a box one dot wider that keeps the head apart from it.
   const paws = [0, 1].map((side) => {
     const w = s.pw, top = ROWS - 4 - (side ? s.pawR : s.pawL) + s.y;
@@ -69,10 +71,10 @@ export function moleDots(s: State): Dot[] {
   const marks = face(s, fx, fy);
   for (let r = -HEAD; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) {
     const up = clamp((bottom - (r - s.y + 0.5)) / ry);
-    const dx = (c - MID - s.hx * up) / s.rx, dy = (r - s.y + 0.5 - bottom) / ry;
+    const dx = (c - MID - s.hx * up) / rx, dy = (r - s.y + 0.5 - bottom) / ry;
     // Squarer at the cheeks, round at the crown.
     const e = lerp(s.ex, 2, clamp((-dy - 0.45) / 0.55)), f = (Math.abs(dx) ** e + Math.abs(dy) ** e) ** (1 / e);
-    let head = dy > 0.3 ? 0 : clamp(((1 - f) * Math.min(s.rx, ry)) / 0.5 + 0.6);
+    let head = dy > 0.3 ? 0 : clamp(((1 - f) * Math.min(rx, ry)) / 0.5 + 0.6);
     const [pl, gl] = paw(0, c, r), [pr, gr] = paw(1, c, r);
     const pawCov = clamp(-Math.min(pl, pr) * 4);
     head *= clamp(Math.min(gl, gr) * 4);
@@ -121,19 +123,26 @@ export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer
 type Beat = { to?: Partial<State>; kick?: Partial<State> };
 type Move = Beat & { from?: Partial<State>; at?: [ms: number, Beat][]; wave?: number; end?: number; loop?: number; still: Partial<State> };
 const HAPPY: Partial<State> = { arc: 1, nose: 1, pw: 6, ex: 3.6, rx: 10, top: 0.6 };
+/** Pushes, in dots a second: a paw's tap, both paws thrown up, a hop of the dome, a jolt; and the dome's top row in a squat. */
+const TAP = 45, THROW = 70, HOP = 95, JOLT = 62, SQUAT = 1.7;
 const WIDE: Partial<State> = { tall: 1, nose: 1, mouth: 1, rx: 10.4, top: 1.4 };
+const BLINK: (ms: number) => [number, Beat][] = (ms) => [[ms, { to: { open: 0 } }], [ms + 120, { to: { open: 1 } }]];
+/* Sizes here are in dots, and a dot is under 2px in the button and the chat: a move that shifts less than a row
+   and a half is not seen. Each hop is a squat first (anticipation), then the spring up, then the dirt as he lands. */
 export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // Up out of the hole with a spray of dirt, then a blink.
-  peek: { from: { y: 18 }, at: [[260, { kick: { kick: 9 } }], [1200, { to: { open: 0 } }], [1330, { to: { open: 1 } }]], end: 1500, still: {} },
-  // Looks up to one side and taps a paw twice, then the other.
+  peek: { from: { y: 18 }, at: [[260, { kick: { kick: 9 } }], ...BLINK(1200)], end: 1500, still: {} },
+  // Looks up to one side and taps a paw twice, blinks, then the other.
   thinking: { to: { lx: 1, ly: -1, hx: 0.6 }, loop: 4000, still: { lx: 1, ly: -1 },
-    at: [[400, { kick: { pawR: 16 } }], [800, { kick: { pawR: 16 } }], [2000, { to: { lx: -1, hx: -0.6 } }], [2400, { kick: { pawL: 16 } }], [2800, { kick: { pawL: 16 } }]] },
-  // Arc eyes and a hop with both paws.
-  happy: { to: HAPPY, kick: { top: -26, pawL: 14, pawR: 14, kick: 6 }, end: 1800, still: HAPPY },
-  // A jolt, wide eyes and an O.
-  surprised: { to: WIDE, kick: { top: -34, rx: -5 }, end: 1400, still: WIDE },
-  // Both paws waving, bobbing on each beat, then a last hop and it settles pleased.
-  cheer: { to: { arc: 1, nose: 1, ex: 3 }, wave: 900, at: [[900, { to: { ...HAPPY, pawL: 0, pawR: 0 }, kick: { top: -14 } }]], end: 2400, still: HAPPY },
+    at: [[400, { kick: { pawR: TAP } }], [800, { kick: { pawR: TAP } }], ...BLINK(1500), [2000, { to: { lx: -1, hx: -0.6 } }], [2400, { kick: { pawL: TAP } }], [2800, { kick: { pawL: TAP } }], ...BLINK(3500)] },
+  // A squat, then arc eyes and a hop with both paws thrown up, and the dirt as he lands.
+  happy: { to: { top: SQUAT }, end: 1700, still: HAPPY,
+    at: [[110, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [420, { kick: { kick: 7 } }]] },
+  // A jolt up with both paws, wide eyes and an O.
+  surprised: { to: WIDE, kick: { top: -JOLT, pawL: THROW, pawR: THROW, kick: 6 }, end: 1400, still: WIDE },
+  // Both paws waving, bobbing on each beat, then a squat, a last hop and it settles pleased.
+  cheer: { to: { arc: 1, nose: 1, ex: 3 }, wave: 900, end: 2400, still: HAPPY,
+    at: [[900, { to: { ...HAPPY, top: SQUAT, pawL: 0, pawR: 0 } }], [1010, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [1320, { kick: { kick: 7 } }]] },
 };
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */
