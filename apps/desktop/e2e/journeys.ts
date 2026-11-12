@@ -9261,6 +9261,78 @@ journey("phone: a link added waits for the Mac on Sources, and Remove takes it o
   await row.waitFor({ state: "detached" });
 }, "phone");
 
+journey("phone: a skill's page is the Mac's in one column, and a course is one row that opens its lessons (D228)", async (page) => {
+  // Tyler 2026-11-12, iPhone parity phase 4: the phone's skill page listed only sources and a note row.
+  const lesson = (part: number) => `topics: []\ncourse:\n  id: memory-101\n  title: Memory 101\n  part: ${part}\n`;
+  await macChanges((lib) => itemFile(lib, "lecture-4-the-testing-effect", "doc.md"), "topics: []\n", lesson(1), () =>
+    macChanges((lib) => itemFile(lib, "the-testing-effect", "doc.md"), "topics: []\n", lesson(2), async () => {
+      await page.reload();
+      await tap(page, page.getByRole("button", { name: "Open menu" }));
+      await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
+      const sk = page.locator(".phone-skill");
+      await sk.locator(".skill-goal").waitFor();
+      await sk.locator(".hero-strength").waitFor();
+      await sk.getByText("Does this hold for kids?").waitFor();
+      const wide = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".phone-skill *")].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).map((e) => e.className).slice(0, 3));
+      if (wide.length) throw new Error(`wider than the screen: ${wide.join(", ")}`);
+      // A question's actions are its long press, as a row's are (its hover buttons never show on a phone).
+      await press(page, sk.locator(".question").first());
+      await page.getByRole("menuitem", { name: "Answer…" }).waitFor();
+      await page.keyboard.press("Escape");
+      const course = sk.locator(".phone-course").filter({ hasText: "Memory 101" });
+      await course.waitFor();
+      await press(page, course);
+      await page.getByRole("menuitem", { name: "Archive course" }).waitFor();
+      await page.keyboard.press("Escape");
+      if (await sk.locator("li button:not(.phone-course)").filter({ hasText: "Lecture 4 the testing effect" }).count()) throw new Error("a lesson is listed on its own beside its course");
+      await tap(page, course);
+      const lessons = page.locator(".phone-sources").filter({ has: page.locator("h1", { hasText: "Memory 101" }) });
+      await lessons.waitFor();
+      const titles = await lessons.locator("li .phone-title").allInnerTexts();
+      if (!titles[0]?.startsWith("Lecture 4") || !titles[1]?.startsWith("The Testing Effect")) throw new Error(`the lessons aren't in course order: ${titles.join(" | ")}`);
+      // A relaunch comes back to the course's lessons, as to any screen he was on.
+      await page.reload();
+      await lessons.waitFor();
+      await tap(page, lessons.locator("li button").first());
+      await page.locator(".phone-reader .doc").first().waitFor();
+    }),
+  );
+}, "phone");
+
+journey("phone: New skill in the drawer names one in place and opens its page; a name he has is refused there", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "New skill" }));
+  const field = page.getByRole("textbox", { name: "New skill name" });
+  await field.fill("learning");
+  await field.press("Enter");
+  await page.locator(".phone-new-error").filter({ hasText: "is taken" }).waitFor();
+  await field.fill("Juggling");
+  await field.press("Enter");
+  await page.locator(".phone-skill h1").filter({ hasText: "Juggling" }).waitFor();
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Today" }));
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await page.locator(".phone-drawer section button").filter({ hasText: "Juggling" }).waitFor();
+}, "phone");
+
+journey("phone: Settings in the drawer changes the daily goal and the reminder, and they stay (D228)", async (page) => {
+  const settings = async () => {
+    await tap(page, page.getByRole("button", { name: "Open menu" }));
+    await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+    await page.locator(".phone-settings h1").waitFor();
+  };
+  await settings();
+  await tap(page, page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }));
+  await tap(page, page.getByRole("switch", { name: "Reminder" }));
+  await page.locator(".phone-time").waitFor();
+  await page.locator(".phone-settings").getByText("isn’t in iCloud").waitFor();
+  await page.reload();
+  await page.locator(".phone-settings h1").waitFor();
+  await until("the goal stayed 20", async () => (await page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }).getAttribute("aria-checked")) === "true");
+  if ((await page.locator(".phone-time").inputValue()) !== "09:00") throw new Error("the reminder didn't stay on at 9:00");
+  await tap(page, page.locator(".phone-back"));
+  await page.locator(".phone-settings").waitFor({ state: "detached" });
+}, "phone");
+
 journey("phone: a double tap highlights the paragraph and opens it, a heading and a highlight keep their taps (D224)", async (page) => {
   await phoneSource(page, TESTING);
   await page.waitForTimeout(400);

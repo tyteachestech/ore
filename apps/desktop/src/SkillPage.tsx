@@ -53,12 +53,14 @@ type Props = {
   onFound: () => void;
   /** The skill's sources, in the view the title names. */
   children: ReactNode;
+  /** The iPhone: its note is a screen of its own (Tyler 2026-11-06, B), so the page is one column with this row in the note's place. */
+  noteRow?: ReactNode;
 };
 
 
 /** A skill's page (D46): the D23 stats as chips in the header, then two equal columns that each
  *  scroll on their own, so a long note (D41) never buries his questions (D47) and sources. */
-export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children }: Props) {
+export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children, noteRow }: Props) {
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
@@ -138,6 +140,30 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
   }, [loaded, findInNote]);
   // The note across the whole page for a wide table, until he clicks again; not kept (Tyler, option C).
   const [wide, setWide] = useState(false);
+  const side = (
+    <div className="skill-col side" aria-label={`${skill.name} questions and sources`}>
+      <Fold
+        id="sources"
+        title="Sources"
+        icon={PixelBook}
+        tone="read"
+        menu={view}
+        actions={[{ id: "search", label: "Search sources", run: () => setSearching(true) }, { id: "add", label: "Add source", hint: label(keys.add), run: onAddSource }]}
+        action={<>
+          <HeadSearch label="Search sources" value={search.value} onChange={search.set} open={searching} setOpen={setSearching} onKeys={search.keys} />
+          <Hint text={`Add a source to ${skill.name}`} keys="add">
+            <button className="icon-btn" aria-label={`Add a source to ${skill.name}`} onClick={onAddSource}>
+              <Plus size={14} weight="bold" aria-hidden="true" />
+            </button>
+          </Hint>
+        </>}
+      >
+        {children}
+      </Fold>
+      <Tries skill={skill.id} onPassage={onQuestion} notify={notify} />
+      <Questions skill={skill.id} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} notify={notify} />
+    </div>
+  );
   return (
     <div className="skill-page" data-color={skill.color} ref={pageRef}>
       {find.open && (
@@ -179,6 +205,12 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
         {stats && stats.strength.solid + stats.strength.growing + stats.strength.new > 0 && <Strength s={stats} color={skill.color} />}
       </header>
 
+      {noteRow ? (
+        <div className="skill-cols one">
+          {noteRow}
+          {side}
+        </div>
+      ) : (
       <div className={`skill-cols${split.dragging ? " dragging" : ""}${wide ? " wide" : ""}`} style={{ gridTemplateColumns: wide ? "minmax(0, 1fr)" : `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` }}>
         <div className="skill-col" ref={noteCol} onMouseDown={clickBelow(editor)} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
           <section className="skill-card skill-note" data-tone="note" onMouseDown={clickBelow(editor)}>
@@ -212,29 +244,9 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
           <div className="col-divider" role="separator" aria-orientation="vertical" aria-label="Resize columns" {...split.divider} />
         </Hint>
 
-        <div className="skill-col side" aria-label={`${skill.name} questions and sources`}>
-          <Fold
-            id="sources"
-            title="Sources"
-            icon={PixelBook}
-            tone="read"
-            menu={view}
-            actions={[{ id: "search", label: "Search sources", run: () => setSearching(true) }, { id: "add", label: "Add source", hint: label(keys.add), run: onAddSource }]}
-            action={<>
-              <HeadSearch label="Search sources" value={search.value} onChange={search.set} open={searching} setOpen={setSearching} onKeys={search.keys} />
-              <Hint text={`Add a source to ${skill.name}`} keys="add">
-                <button className="icon-btn" aria-label={`Add a source to ${skill.name}`} onClick={onAddSource}>
-                  <Plus size={14} weight="bold" aria-hidden="true" />
-                </button>
-              </Hint>
-            </>}
-          >
-            {children}
-          </Fold>
-          <Tries skill={skill.id} onPassage={onQuestion} notify={notify} />
-          <Questions skill={skill.id} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} notify={notify} />
-        </div>
+        {side}
       </div>
+      )}
       {recalling && <SkillRecall skill={skill} goal={recalling === "goal" ? skill.goal : undefined} blocked={blocked} append={append} notify={notify} onClose={() => setRecalling(null)} />}
     </div>
   );
@@ -774,7 +786,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
     { id: "delete", label: "Remove", danger: true, divider: true, run: onRemove },
   ];
   return (
-    <WithMenu actions={actions}>
+    <WithMenu actions={actions} hold>
       <div className={`try${done ? " done" : ""}${history ? " history" : ""}`}>
         {!history && (
           <Hint text={done ? "Not tried yet" : "Mark tried"}>
@@ -949,7 +961,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   ];
 
   return (
-    <WithMenu actions={actions}>
+    <WithMenu actions={actions} hold>
     <div className={`question${done ? " done" : ""}`}>
       {/* D131: the question is the row; a circle at the left is Answered (Things), as a try's box is Tried. */}
       <Hint text={done ? "Reopen" : "Mark answered"}>
