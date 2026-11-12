@@ -3387,7 +3387,7 @@ journey("Home: ⌘-click and ⇧-click pick Continue reading rows, ⋯ acts on t
   await until("⌘Z takes the drop back", async () => !((await ore("show", id)) as { skills: string[] }).skills.includes(ids[k]!));
 });
 
-journey("All sources: a row dragged onto a sidebar skill is filed there, and ⌘Z takes it back off (F20)", async (page) => {
+journey("All sources: a row dragged onto a sidebar skill is filed there, and ⌘Z takes it back off (F22)", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator(".row", { hasText: TESTING }).first();
   await row.waitFor();
