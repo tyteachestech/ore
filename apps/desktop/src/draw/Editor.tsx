@@ -1560,8 +1560,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
             )}
             {selected.some((e) => e.type === "rectangle" && labelOf(els, e.id)) && (
               <Row label="Place">
-                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle")?.id ?? "")?.verticalAlign !== "top"} onPick={() => alignLabels("middle")} label="Middle"><span className="mono">M</span></Seg>
-                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle")?.id ?? "")?.verticalAlign === "top"} onPick={() => alignLabels("top")} label="Top"><span className="mono">T</span></Seg>
+                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle" && labelOf(els, e.id))?.id ?? "")?.verticalAlign !== "top"} onPick={() => alignLabels("middle")} label="Middle"><span className="mono">M</span></Seg>
+                <Seg on={labelOf(els, selected.find((e) => e.type === "rectangle" && labelOf(els, e.id))?.id ?? "")?.verticalAlign === "top"} onPick={() => alignLabels("top")} label="Top"><span className="mono">T</span></Seg>
               </Row>
             )}
             <Row label="Font">
