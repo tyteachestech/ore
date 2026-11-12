@@ -12,6 +12,18 @@
   <array>
     <string>UIInterfaceOrientationPortrait</string>
   </array>
+  <!-- The share card's Open brings the app forward with ore://open (apps/phone/share). -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.tylerpoelking.ore.phone</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>ore</string>
+      </array>
+    </dict>
+  </array>
   <key>NSUbiquitousContainers</key>
   <dict>
     <key>iCloud.com.tylerpoelking.ore</key>
