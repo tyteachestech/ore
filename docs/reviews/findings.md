@@ -45,9 +45,9 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F19 | 2026-11-12 | Skill icons | The Learning brain read as two pills, not a brain, at 20px and on the 40px tile | fixed #317 | no test: whether a drawing reads as its subject is judged by eye, shot at 4× in the PR |
 | F20 | 2026-11-12 | Buttons | The small button (D196) drew three different focus rings: inside its edge on Start, 1px outside on the note toggle, a shadow ring on Settings | fixed #319 | `every small button takes its focus ring from one shared rule` |
 | F21 | 2026-11-12 | Source rows, Reader | A 20px icon sat in a smaller button and hung off its centre: a row's add-skill + (18px circle) and a highlight's margin mark (16px, plus the button's default padding) | fixed #319 | `or bigger than the button it sits in, so it sits off the button's centre` |
-| F22 | 2026-11-12 | Reader | A highlight note whose save failed closed and lost the words just typed | fixed #PRNUM | `a note whose save fails is kept, and saves when the highlight next closes` |
-| F23 | 2026-11-12 | Feed | ⇧⌘U marked only the post under the cursor, not the pick (D234) | fixed #PRNUM | `⇧⌘U marks both picked posts read` |
-| F24 | 2026-11-12 | Home, Feed | F8 on Home and the Feed: no type-select there, and Home's rows took none of the lists' ⌘ keys (Rename, Pin, Archive, Open original), so its menus hid them | fixed #PRNUM | `⌥⌘R renames the focused row` |
-| F25 | 2026-11-12 | Home, Feed | A click on empty space left the pick in place | fixed #PRNUM | `a click on empty space drops the pick` |
-| F26 | 2026-11-12 | Home, Feed | ⇧↑↓ moved the cursor without growing the pick | fixed #PRNUM | `⇧↓ grows the pick` |
+| F22 | 2026-11-12 | Reader | A highlight note whose save failed closed and lost the words just typed | fixed #322 | `a note whose save fails is kept, and saves when the highlight next closes` |
+| F23 | 2026-11-12 | Feed | ⇧⌘U marked only the post under the cursor, not the pick (D234) | fixed #322 | `⇧⌘U marks both picked posts read` |
+| F24 | 2026-11-12 | Home, Feed | F8 on Home and the Feed: no type-select there, and Home's rows took none of the lists' ⌘ keys (Rename, Pin, Archive, Open original), so its menus hid them | fixed #322 | `⌥⌘R renames the focused row` |
+| F25 | 2026-11-12 | Home, Feed | A click on empty space left the pick in place | fixed #322 | `a click on empty space drops the pick` |
+| F26 | 2026-11-12 | Home, Feed | ⇧↑↓ moved the cursor without growing the pick | fixed #322 | `⇧↓ grows the pick` |
 | F27 | 2026-11-12 | Reader | Esc keeps an edit to a highlight's note (read as against D211) | not a bug: D211 is for fields edited in place (titles, names); a highlight's note is writing, kept however the popup closes, as journey "highlight note: what he types is kept when he clicks away or presses Esc" says | — |

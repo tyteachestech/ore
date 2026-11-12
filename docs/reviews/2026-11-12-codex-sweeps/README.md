@@ -4,7 +4,7 @@ Tyler asked to run the new sweep process (findings list, `docs/reviews/findings.
 
 | Sweep | Tested | Found | Rows | Fixed in |
 |---|---|---|---|---|
-| s1 desktop | 760bd58: menus (D231), type-select and ⌘ keys (D232), highlight note lists (D233), Home and Feed picks (D234), focus ring (#319), as five study tasks | 6, all seen twice | F22–F26; F27 not a bug | this PR |
+| s1 desktop | 760bd58: menus (D231), type-select and ⌘ keys (D232), highlight note lists (D233), Home and Feed picks (D234), focus ring (#319), as five study tasks | 6, all seen twice | F22–F26; F27 not a bug | #322 |
 | s1 iPhone | reading (D230), share card (D227), skill page and Settings (D228) | (running) | | |
 
 What s1 says about our own checks: a list rule added for All sources and a skill page (D232's type-select and ⌘ keys, the Conventions table's ⇧↑↓ and empty-space click) was never carried to Home and the Feed when D234 made them pick like lists. The Conventions table now says "Any list" means all four, and that a rule is built for all of them in the same PR.
