@@ -8,7 +8,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Article, CaretDown, Plus, Tick, YoutubeLogo } from "./icons";
 import { Hint } from "./Hint";
-import { is, label, useKeymap } from "./keys";
+import { inTextField, is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { ore, opt, type Skill } from "./ore";
 import { SkillChips, SkillPicker, unfile } from "./Skills";
@@ -136,8 +136,8 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     const put = (v: boolean) => setData((d) => d && { ...d, posts: d.posts.map((p) => (urls.has(p.url) ? { ...p, read: v } : p)) });
     put(on);
     const what = urls.size > 1 ? ` ${urls.size} posts` : "";
-    // From the history (toast false), a failure goes back to it, which says why.
-    return Promise.all([...urls].map((u) => ore("feed", on ? "read" : "unread", u))).then(
+    // From the history (toast false), a failure goes back to it, which says why. One write for the whole pick.
+    return ore("feed", on ? "read" : "unread", ...urls).then(
       () => void (toast && notify(on ? `Marked${what} read` : `Marked${what} unread`, "info", () => setRead(post, !on, false), () => setRead(post, on, false))),
       (e) => {
         put(!on);
@@ -207,7 +207,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   };
 
   /** A post as its linked title, as a source row copies (⌘C). */
-  const copyPost = (p: FeedPost) => void copyCited(citeSources([p])).then(() => notify("Copied as Markdown"), (e) => notify(errorText(e), "error"));
+  const copyPost = (p: FeedPost | FeedPost[]) => void copyCited(citeSources(Array.isArray(p) ? p : [p])).then(() => notify("Copied as Markdown"), (e) => notify(errorText(e), "error"));
   /** A post its menu takes out of view (Mark read in Unread, Unfollow): the cursor goes on to the next post that
    *  stays, else the one before, as the mark-read key moves it (Mail), and the list keeps focus, not <body>. */
   const moveOn = (from: FeedPost, gone: (x: FeedPost) => boolean) => {
@@ -223,17 +223,19 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const pick = order.filter((p) => picked.includes(p.url));
   useEffect(() => {
     if (!picked.length) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && setPicked([]);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && !blocked && !inTextField(e) && setPicked([]);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [picked.length]);
+  }, [picked.length, blocked]);
   const clickRow = (e: React.MouseEvent, p: FeedPost) => {
     if (e.metaKey) {
       setPicked((now) => (now.includes(p.url) ? now.filter((u) => u !== p.url) : [...(now.length ? now : current && current !== p ? [current.url] : []), p.url]));
       anchor.current = p.url;
     } else if (e.shiftKey) {
-      const a = order.findIndex((x) => x.url === (anchor.current ?? current?.url ?? p.url));
+      // From the last post clicked, or this one when that has left the list.
       const b = order.indexOf(p);
+      const from = order.findIndex((x) => x.url === (anchor.current ?? current?.url));
+      const a = from < 0 ? b : from;
       setPicked(order.slice(Math.min(a, b), Math.max(a, b) + 1).map((x) => x.url));
     } else {
       setPicked([]);
@@ -245,8 +247,8 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const manyActions = (ps: FeedPost[]): MenuAction[] => {
     const unread = ps.some((p) => !p.read);
     return [
-      { id: "read", label: unread ? `Mark ${ps.length} read` : `Mark ${ps.length} unread`, run: () => (setPicked([]), setRead(ps, unread)) },
-      { id: "copy", label: `Copy ${ps.length} as Markdown`, hint: label(keys.copy), run: () => void copyCited(citeSources(ps)).then(() => notify("Copied as Markdown"), (e) => notify(errorText(e), "error")) },
+      { id: "read", label: unread ? `Mark ${ps.length} read` : `Mark ${ps.length} unread`, run: () => (setPicked([]), unread && show === "unread" && moveOn(ps[0]!, (x) => ps.includes(x)), setRead(ps, unread)) },
+      { id: "copy", label: `Copy ${ps.length} as Markdown`, hint: label(keys.copy), run: () => copyPost(ps) },
     ];
   };
   const postActions = (p: FeedPost): MenuAction[] => {

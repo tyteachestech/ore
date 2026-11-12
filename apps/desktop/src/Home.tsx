@@ -177,16 +177,18 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   const anchor = useRef<string | null>(null);
   const pick = reading.filter((i) => picked.includes(i.id));
   const clickRow = (e: ReactMouseEvent, i: Item) => {
-    if (e.metaKey || (e.shiftKey && anchor.current)) {
+    e.stopPropagation();
+    if (e.metaKey || e.shiftKey) {
       e.preventDefault();
-      e.stopPropagation();
       if (e.metaKey) setPicked((p) => (p.includes(i.id) ? p.filter((x) => x !== i.id) : [...p, i.id]));
       else {
+        // From the last row clicked, or this one when that has left the list.
         const ids = reading.map((r) => r.id);
-        const [a, b] = [ids.indexOf(anchor.current!), ids.indexOf(i.id)].sort((x, y) => x - y);
-        setPicked(ids.slice(Math.max(0, a!), b! + 1));
+        const b = ids.indexOf(i.id);
+        const a = anchor.current && ids.includes(anchor.current) ? ids.indexOf(anchor.current) : b;
+        setPicked(ids.slice(Math.min(a, b), Math.max(a, b) + 1));
       }
-      if (e.metaKey || !anchor.current) anchor.current = i.id;
+      if (e.metaKey || !anchor.current || !reading.some((r) => r.id === anchor.current)) anchor.current = i.id;
       return;
     }
     setPicked([]);
@@ -203,10 +205,14 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
     return () => window.removeEventListener("keydown", onKey);
   }, [picked.length]);
   // The rows a menu acts on: the pick, when the row is in it.
-  const actionsFor = (i: Item) => (manyMenu && pick.length > 1 && picked.includes(i.id) ? manyMenu(pick) : sourceMenu ? withRename(sourceMenu(i), i) : []);
+  // An action on the pick clears it, as in the lists.
+  const actionsFor = (i: Item) =>
+    manyMenu && pick.length > 1 && picked.includes(i.id) ? manyMenu(pick).map((a) => ({ ...a, run: () => (setPicked([]), a.run()) })) : sourceMenu ? withRename(sourceMenu(i), i) : [];
   // A row drags onto a sidebar skill to file it there, the whole pick when it is in one (F10, as in the lists).
   const sensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }));
   const [drag, setDrag] = useState<{ items: Item[]; at: { x: number; y: number } } | null>(null);
+  // A skill lit by a drag goes dark if Home leaves mid-drag (dnd-kit then fires neither end nor cancel).
+  useEffect(() => () => onDragSkill?.(null), [onDragSkill]);
   const under = (e: DragMoveEvent) => {
     const start = e.activatorEvent as PointerEvent;
     const at = { x: start.clientX + e.delta.x, y: start.clientY + e.delta.y };
@@ -218,6 +224,12 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
     if (!onCopy) return;
     const onKey = (e: KeyboardEvent) => {
       if (blocked || e.defaultPrevented || !is(e, "copy") || inTextField(e) || getSelection()?.toString()) return;
+      // A pick copies whole, as its menu's Copy N says.
+      const all = pick.length > 1 && manyMenu?.(pick).find((a) => a.id === "copy");
+      if (all) {
+        e.preventDefault();
+        return all.run();
+      }
       // Only a row he can see is focused (its keyboard ring), never one focus was put on quietly after a click.
       const on = document.activeElement as HTMLElement | null;
       const id = on?.matches(":focus-visible") ? on.closest<HTMLElement>(".home .home-read")?.dataset.id : undefined;
@@ -228,7 +240,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [items, onCopy, blocked]);
+  }, [items, onCopy, blocked, pick, manyMenu]);
 
   // Back on Home he is where he was: scrolled there, and on the row or tile he opened by the keyboard, once it is drawn.
   const root = useRef<HTMLDivElement>(null);
@@ -346,7 +358,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
             }}
             onDragEnd={(e) => {
               const { skill } = under(e);
-              if (drag && skill) onDropOnSkill?.(drag.items, skill);
+              if (drag && skill) (onDropOnSkill?.(drag.items, skill), setPicked([]));
               setDrag(null);
               onDragSkill?.(null);
             }}
@@ -359,7 +371,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 // The title is the row's one control (a button inside a button reads as one to a screen reader);
                 // the skill chips and ⋯ sit beside it. A click anywhere else on the row still opens it.
                 <WithMenu key={i.id} actions={sourceMenu ? () => actionsFor(i) : []} hold>
-                <HomeRow id={i.id} drags={!!onDropOnSkill && renaming !== i.id} className={`home-read${picked.includes(i.id) ? " sel" : ""}`} aria-selected={picked.length ? picked.includes(i.id) : undefined} onClick={(e) => (!(e.target as Element).closest("button, a, input") || e.metaKey || e.shiftKey) && !(e.target as Element).closest(".chips, .more, input") && clickRow(e, i)}>
+                <HomeRow id={i.id} drags={!!onDropOnSkill && renaming !== i.id} className={`home-read${picked.includes(i.id) ? " sel" : ""}`} aria-selected={picked.length ? picked.includes(i.id) : undefined} onClick={(e) => !(e.target as Element).closest("button, a, input, .chips, .more") && clickRow(e, i)}>
                   <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
                     // Focus goes back to the row once it closes, as after any pick from its menu (keepFocusNear).
