@@ -2599,8 +2599,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .qp-sub { row-gap: 0; padding-bottom: 0; }
 .phone .qp-link { display: inline-flex; align-items: flex-start; min-height: 44px; }
 /* The original-site link at the byline's end: 44pt to the finger, its own line height to the eye, so it sits on the byline's line. */
-.phone .doc-head .source { position: relative; overflow: visible; }
-.phone .doc-head .source::before { content: ""; position: absolute; inset: -14px -6px; }
+.phone .doc-head .source { position: relative; z-index: 1; min-width: 44px; padding-block: 14px; margin-block: -14px; }
 /* The reading pill: 28pt to the eye, 44pt to the finger. */
 .phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
 /* Rename, Add author, a key point, a guess before reading and Leave anything out?: fields 44pt tall to the finger. */
