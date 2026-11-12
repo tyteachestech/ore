@@ -130,6 +130,7 @@ type Props = {
 
 // The diagram editor loads only when a diagram is shown or drawn (D40, D103).
 const DiagramEditor = lazy(() => import("../Diagram"));
+const DiagramView = lazy(() => import("../Diagram").then((m) => ({ default: m.DiagramView })));
 /** Fired after a diagram is saved, so its preview redraws; detail is `<note dir>/<name>`. */
 const SAVED = "ore:diagram-saved";
 
@@ -479,17 +480,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           void live.current.putImages([undefined]);
         },
       },
-      {
-        label: "Diagram",
-        sub: "Map, sketch, matrix",
-        run: () => {
-          const at = clear(menu)?.state.selection.from;
-          ore<Diagram>("diagram", ...p.noteArgs, "--new").then(
-            (d) => setDrawing({ name: d.name, at }),
-            (e) => p.notify(errorText(e), "error"),
-          );
-        },
-      },
+      // Diagrams are drawn on the Mac; the phone shows them (Tyler 2026-11-12).
+      ...(PHONE
+        ? []
+        : [{
+            label: "Diagram",
+            sub: "Map, sketch, matrix",
+            run: () => {
+              const at = clear(menu)?.state.selection.from;
+              ore<Diagram>("diagram", ...p.noteArgs, "--new").then(
+                (d) => setDrawing({ name: d.name, at }),
+                (e) => p.notify(errorText(e), "error"),
+              );
+            },
+          }]),
       {
         label: "Link",
         sub: "[[",
@@ -613,6 +617,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
    *  block (counted at the time, so typing during the copy never puts it inside a line). One editor
    *  step each, so ⌘Z takes it out again. */
   live.current.putImages = async (files, before) => {
+    // The phone has no file dialog: a picture to pick comes from iOS's own sheet.
+    if (PHONE && files.includes(undefined)) {
+      const picked = pickPictures();
+      try {
+        files = await Promise.all((await picked).map(bytes));
+      } catch (e) {
+        live.current.p.notify(errorText(e), "error");
+        return;
+      }
+    }
     for (const f of files) {
       const src = await live.current.p.onAttach(f);
       const v = view();
@@ -696,7 +710,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {dropLine && <div className="block-drop" style={{ left: dropLine.x, top: dropLine.y, width: dropLine.w }} />}
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
-      {PHONE && <KeyboardBar view={view} targets={p.targets} />}
+      {PHONE && <KeyboardBar view={view} targets={p.targets} onPicture={() => void live.current.putImages([undefined])} />}
       {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => showSel(null)} askLink={askLink} />}
       {menu && (menu.kind !== "date" || rows.length > 0) && (
         <div ref={menuBox} className="note-menu" role="listbox" onMouseDown={(e) => e.preventDefault()}>
@@ -713,7 +727,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         </div>
       )}
       {peek.view}
-      {drawing && (
+      {drawing && PHONE && (
+        <Suspense fallback={null}>
+          <DiagramView args={p.noteArgs} name={drawing.name} loaded={lastRead.get(`${p.dir}/${drawing.name}`)} onClose={() => setDrawing(null)} />
+        </Suspense>
+      )}
+      {drawing && !PHONE && (
         <Suspense fallback={null}>
           <DiagramEditor args={p.noteArgs} name={drawing.name} loaded={lastRead.get(`${p.dir}/${drawing.name}`)} notify={p.notify} onClose={closeDiagram} onFirstSave={linkDiagram} onRenamed={renamedDiagram} onLink={(href) => {
             const m = href.match(LINK_URL);
@@ -754,14 +773,43 @@ const ctxOf = (e: Editor) => e.ctx;
 /** A pasted screenshot or copied image goes into the note, as in Notion, not into the library as a
  *  source. A file copied in Finder pastes only its name, so its path comes from the Mac's pasteboard
  *  (another kind of file still pastes its name); copied HTML with a picture in it pastes as HTML. */
-function imagePaste(live: Live) {
-  const bytes = (f: File) =>
-    new Promise<{ ext: string; data: string }>((ok, fail) => {
-      const r = new FileReader();
-      r.onload = () => ok({ ext: imageExt(f.type), data: String(r.result).replace(/^data:[^,]*,/, "") });
-      r.onerror = () => fail(r.error);
-      r.readAsDataURL(f);
+const bytes = (f: File) =>
+  new Promise<{ ext: string; data: string }>((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok({ ext: imageExt(f.type), data: String(r.result).replace(/^data:[^,]*,/, "") });
+    r.onerror = () => fail(r.error);
+    r.readAsDataURL(f);
+  });
+
+/** The phone's picker for pictures: a file field iOS answers with its own sheet (Photo Library, Take Photo,
+ *  Choose File), as Notes and Mail do. Opened in the tap itself, which iOS requires. */
+let picker: { input: HTMLInputElement; ok: (files: File[]) => void } | null = null;
+function pickPictures(): Promise<File[]> {
+  // One field, kept in the page, so nothing collects it while the sheet is up. A cancel leaves the last ask
+  // waiting, harmlessly: the next pick takes its place (WebKit's 'cancel' can't be trusted to come, or not to).
+  if (!picker) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = true;
+    input.hidden = true;
+    document.body.append(input);
+    const p = { input, ok: (_: File[]) => {} };
+    input.addEventListener("change", () => {
+      const files = [...(input.files ?? [])];
+      input.value = "";
+      if (files.length) p.ok(files);
     });
+    picker = p;
+  }
+  const p = picker;
+  return new Promise((ok) => {
+    p.ok = ok;
+    p.input.click();
+  });
+}
+
+function imagePaste(live: Live) {
   return $prose(
     () =>
       new Plugin({
@@ -1137,7 +1185,7 @@ function diagramView(live: Live, name: string, node: PmNode, view: EditorView, g
       .then(
         (svg) => {
           if (gone) return;
-          if (!svg) return void (inner.textContent = "Empty diagram: click to draw");
+          if (!svg) return void (inner.textContent = PHONE ? "Empty diagram" : "Empty diagram: click to draw");
           // Markup the editor drew from the file, text escaped by React; inline so it uses the app's fonts.
           inner.innerHTML = svg;
         },
