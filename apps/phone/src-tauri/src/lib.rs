@@ -176,7 +176,9 @@ struct Fetched {
 #[tauri::command]
 async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, String)>) -> Result<Fetched, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(30)).build();
+        // A connect limit and a quiet-line limit, not one for the whole download: an hour's podcast is 60 to
+        // 100 MB, which a slow line takes minutes over while still moving.
+        let agent = ureq::AgentBuilder::new().timeout_connect(std::time::Duration::from_secs(20)).timeout_read(std::time::Duration::from_secs(60)).build();
         let mut req = agent.request(method.as_deref().unwrap_or("GET"), &url);
         for (k, v) in &headers {
             req = req.set(k, v);
@@ -195,6 +197,56 @@ async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, S
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Whether this iPhone hears speech itself (apps/phone/ios/Hear.swift): iOS 26 with Apple's speech model.
+#[tauri::command]
+fn can_transcribe() -> bool {
+    #[cfg(target_os = "ios")]
+    return unsafe { ore_can_transcribe() };
+    #[cfg(not(target_os = "ios"))]
+    false
+}
+
+/// Audio (the raw request body, its kind in `x-ext`, a language in `x-language`) to WebVTT with Apple's
+/// on-device speech, or why not in the phone's words. Written to a temporary file for AVAudioFile.
+#[tauri::command]
+async fn transcribe(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("No audio came with that.".into()) };
+    let header = |k: &str| request.headers().get(k).and_then(|v| v.to_str().ok()).map(str::to_string);
+    let ext = header("x-ext").filter(|e| e.chars().all(|c| c.is_ascii_alphanumeric()) && !e.is_empty()).unwrap_or_else(|| "m4a".into());
+    let language = header("x-language").unwrap_or_default();
+    let path = std::env::temp_dir().join(format!("ore-hear-{}.{ext}", std::process::id()));
+    fs::write(&path, bytes).map_err(|_| "Couldn’t save the audio to hear it.".to_string())?;
+    let run = path.clone();
+    let out = tauri::async_runtime::spawn_blocking(move || hear(&run, &language)).await.map_err(|e| e.to_string())?;
+    let _ = fs::remove_file(&path);
+    out
+}
+
+#[cfg(target_os = "ios")]
+extern "C" {
+    fn ore_can_transcribe() -> bool;
+    fn ore_transcribe(path: *const std::ffi::c_char, language: *const std::ffi::c_char, ok: *mut bool) -> *mut std::ffi::c_char;
+    fn free(p: *mut std::ffi::c_void);
+}
+
+#[cfg(target_os = "ios")]
+fn hear(path: &Path, language: &str) -> Result<String, String> {
+    let path = std::ffi::CString::new(path.to_string_lossy().as_bytes()).map_err(|e| e.to_string())?;
+    let language = std::ffi::CString::new(language).map_err(|e| e.to_string())?;
+    let mut ok = false;
+    let out = unsafe { ore_transcribe(path.as_ptr(), language.as_ptr(), &mut ok) };
+    if out.is_null() {
+        return Err("Couldn’t hear that audio.".into());
+    }
+    let text = unsafe { std::ffi::CStr::from_ptr(out) }.to_string_lossy().into_owned();
+    unsafe { free(out.cast()) };
+    if ok { Ok(text) } else { Err(text) }
+}
+#[cfg(not(target_os = "ios"))]
+fn hear(_: &Path, _: &str) -> Result<String, String> {
+    Err("Hearing speech needs an iPhone with iOS 26.".into())
 }
 
 /// Links the Share Extension (apps/phone/share) left in the App Group move into the library's inbox
@@ -323,7 +375,7 @@ pub fn run() {
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, http_fetch, share_inbox, share_skills, share_open, player_port])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, http_fetch, can_transcribe, transcribe, share_inbox, share_skills, share_open, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }
