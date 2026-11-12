@@ -4,7 +4,8 @@
 // to the folder, and the Mac's changes read in again when the app comes back (`mountDisk`). In a browser
 // (the e2e journeys, `vite` at phone size) they come from a snapshot, kept in IndexedDB (`mount`).
 
-type Entry = { text: string; mtime: number };
+/** `bytes`: a binary file (an image, a PDF) as written, so a rename or copy moves it whole. */
+type Entry = { text: string; mtime: number; bytes?: Uint8Array };
 const files = new Map<string, Entry>();
 /** The snapshot's paths: only these need a tombstone when deleted. */
 const shipped = new Set<string>();
@@ -110,7 +111,7 @@ const SNAPSHOT = "#snapshot";
 
 function put(p: string, text: string, mtime = Date.now(), bytes?: Uint8Array) {
   if (disk && downloading.has(rel(p))) throw Object.assign(new Error("This file is still downloading from iCloud: try again in a moment"), { code: "EBUSY" });
-  const e = { text, mtime };
+  const e: Entry = bytes ? { text, mtime, bytes } : { text, mtime };
   files.set(p, e);
   addDirs(p);
   if (SCRATCH.test(p)) return;
@@ -282,10 +283,14 @@ export function rmSync(p: string, _o?: unknown) {
   for (const d of [...dirs]) if (d === p || d.startsWith(p + "/")) dirs.delete(d);
 }
 export function renameSync(a: string, b: string) {
-  put(b, readFileSync(a));
+  copyFileSync(a, b);
   drop(a);
 }
-export const copyFileSync = (a: string, b: string) => put(b, readFileSync(a));
+export const copyFileSync = (a: string, b: string) => {
+  const e = files.get(a);
+  if (!e) throw err("ENOENT", a);
+  put(b, e.text, Date.now(), e.bytes);
+};
 export const mkdtempSync = (prefix: string) => {
   const d = `${prefix}${Math.random().toString(36).slice(2, 8)}`;
   mkdirSync(d);
