@@ -36,4 +36,8 @@ for d in .index .ore .git; do xattr -w 'com.apple.fileprovider.ignore#P' 1 "$D/$
 rsync -a ~/Ore/ "$D/" && mv ~/Ore ~/Ore-moved && ln -s "$D" ~/Ore
 ```
 
+On 2026-11-11 iCloud uploaded the copied folders at about one file a minute until each was renamed and renamed
+back (`mv cards cards-x && mv cards-x cards`), then took about 40 minutes for 340 files. Until it finishes the phone
+opens empty.
+
 In a browser at iPhone size: `cd apps/desktop && ORE_PHONE=1 ORE_PHONE_LIBRARY=/tmp/ore-mock bunx vite`.
