@@ -9157,17 +9157,17 @@ journey("phone: typing a long note keeps the line being typed above the keyboard
   for (let i = 0; i < 14; i++) await page.keyboard.type(` line ${i} of a note that keeps growing past the bottom of the screen while he types it.`);
   // Where the caret is: its own box, or on a new empty line (which gives none) its line's.
   const CARET = `(() => { const sel = getSelection(); const r = sel.getRangeAt(0).getBoundingClientRect(); if (r.height) return r; const n = sel.focusNode; return (n instanceof Element ? n : n.parentElement).getBoundingClientRect(); })()`;
-  // Leave the caret where iOS does, under the bar, and move it as a keystroke does (a browser's own reveal
-  // would lift it: iOS's doesn't know the bar).
+  // Leave the caret where iOS does, under the bar, and tell the page it moved, as a keystroke does (a
+  // browser's own reveal would lift it: iOS's doesn't know the bar).
   const underBar = () =>
     page.evaluate((CARET) => {
-      const sel = getSelection()!;
       const caret = eval(CARET) as DOMRect;
       const bar = document.querySelector(".kb-bar")!.getBoundingClientRect();
       let box = document.activeElement as HTMLElement | null;
       while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
       box!.scrollTop -= bar.bottom - 4 - caret.bottom;
-      sel.collapse(sel.focusNode, sel.focusOffset);
+      // The caret moving on, as each keystroke moves it on iOS (a collapse to where it already is fires nothing).
+      document.dispatchEvent(new Event("selectionchange"));
     }, CARET);
   const above = () =>
     page.evaluate((CARET) => {
