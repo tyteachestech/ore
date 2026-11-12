@@ -4387,6 +4387,11 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   const tabs = page.getByRole("tablist", { name: "Sources shown" });
   const on = (name: string) => tabs.getByRole("tab", { name }).getAttribute("aria-selected");
   await until("To read is the open tab", async () => (await on("To read")) === "true");
+  // F35: the header's gems load after the page; the tabs under it stay where they were when they land.
+  const tabY = async () => (await tabs.getByRole("tab", { name: "To read" }).boundingBox())!.y;
+  const y0 = await tabY();
+  await page.locator(".hero-strength").waitFor();
+  if ((await tabY()) !== y0) throw new Error(`the tabs moved from ${y0} to ${await tabY()} when the header's gems loaded`);
   await tabs.getByRole("tab", { name: "Done" }).hover();
   await page.getByRole("tooltip").filter({ hasText: "Done" }).waitFor();
   await tabs.getByRole("tab", { name: "Done" }).click();

@@ -1439,7 +1439,8 @@ body.resizing iframe { pointer-events: none; }
 [data-tone="question"] .card-icon { color: var(--question-solid); }
 [data-tone="apply"] .card-icon { color: var(--apply-solid); }
 .skill-note .card-head .card-title { margin-right: auto; }
-.hero-strength { margin-left: auto; flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; text-align: left; }
+/* It loads after the page: the negative margin keeps it inside the header's own height, so nothing below jumps when it lands (F35). */
+.hero-strength { margin: -9px 0 -9px auto; flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; text-align: left; }
 .hero-strength:hover, .hero-strength[aria-expanded="true"] { background: var(--bg-hover); }
 .hero-strength:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .strength-pop { width: 320px; padding: 14px; }
