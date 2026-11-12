@@ -8294,7 +8294,7 @@ journey("review: changing an Explain card's key points after it was checked keep
   const save = async (text: string, shows: string) => {
     if (!(await field.isVisible())) await page.getByRole("button", { name: "Edit exercise" }).click();
     await field.fill(text);
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await points.locator("li").first().filter({ hasText: shows }).waitFor();
   };
   // Only reordered: both marks stay, but they were the AI's, so nothing is suggested until he marks.
@@ -9899,6 +9899,16 @@ journey("phone: a tap opens Source actions and works the note's keyboard bar", a
   const block = page.locator(".kb-bar").getByRole("button", { name: "Block actions" });
   await tap(page, block);
   await until("a tap on the bar's ⋯ opens Block actions", async () => (await block.getAttribute("aria-expanded")) === "true");
+}, "phone");
+
+journey("phone: a note's [[ link finds the library's sources", async (page) => {
+  // The phone gave its notes no link targets: [[ and the keyboard bar's link button always said "No source or skill by that name".
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  await tap(page, note);
+  await page.keyboard.type("[[Testing Eff");
+  await page.locator(".note-menu-row").filter({ hasText: TESTING }).first().waitFor();
 }, "phone");
 
 journey("phone: the last rating of a review shows the end screen, not Wrapping up", async (page) => {
