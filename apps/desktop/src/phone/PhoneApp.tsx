@@ -624,7 +624,13 @@ export function PhoneApp() {
     ],
     [skills, items],
   );
-  const openLink = (t: { kind: "item" | "skill"; id: string }) => (t.kind === "item" ? open(t.id) : (setOpenId(null), setSkill(t.id)));
+  // The note it was tapped in closes (a skill's note sits over everything), so what it names is what shows.
+  const openLink = (t: { kind: "item" | "skill"; id: string }) => {
+    setSkillNote(false);
+    setNoting(false);
+    if (t.kind === "item") open(t.id);
+    else (setOpenId(null), setSkill(t.id));
+  };
   // What the share card's Open asked for, as soon as it is in the list; given up after half a minute (it
   // couldn't be read here, or another device took it), so it never pulls him out of something later.
   useEffect(() => {
