@@ -863,7 +863,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
     if (paused || under) return;
-    if (is(e, "undo") && busyNow.current && !ownsUndo(e.target)) {
+    if (is(e, "undo") && busyNow.current && !((e.target as HTMLElement).isContentEditable || ownsUndo(e.target))) {
       // The step it should take back isn't on the history yet (or is being taken back): it waits.
       e.preventDefault();
       e.stopPropagation();

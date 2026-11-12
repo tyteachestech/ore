@@ -12,10 +12,16 @@ const LIMIT = 50;
 let tick = 0;
 let stepAt = 0;
 const typedAt = new WeakMap<EventTarget, number>();
+// What the field held before that typing: once its own ⌘Z has taken the typing back to it, ⌘Z is the app's again.
+const before = new WeakMap<EventTarget, string>();
 const watched = new WeakSet<Document>();
 const watchTyping = (doc: Document) => {
   if (watched.has(doc)) return;
   watched.add(doc);
+  doc.addEventListener("beforeinput", (e) => {
+    const t = e.target as HTMLInputElement | null;
+    if (t && "value" in t && (typedAt.get(t) ?? 0) <= stepAt) before.set(t, t.value);
+  }, true);
   doc.addEventListener("input", (e) => e.target && typedAt.set(e.target, ++tick), true);
 };
 if (typeof document !== "undefined") watchTyping(document);
@@ -25,7 +31,7 @@ export function ownsUndo(el: EventTarget | null): boolean {
   const t = el as HTMLElement | null;
   if (t?.ownerDocument) watchTyping(t.ownerDocument);
   if (!t || (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA") || t.hasAttribute("data-app-undo")) return false;
-  return (typedAt.get(t) ?? 0) > stepAt;
+  return (typedAt.get(t) ?? 0) > stepAt && (t as HTMLInputElement).value !== before.get(t);
 }
 
 

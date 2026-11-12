@@ -8380,9 +8380,17 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
     await page.keyboard.press("Enter");
     await until(`filed under ${k.name} by keys`, async () => (await item()).skills.includes(k.id));
   }
+  // Typing after the tick is the field's to undo first; once it is undone, ⌘Z goes back to the app.
+  await page.getByText(`Filed under ${others[1]!.name}`).waitFor(); // the tick is on the history
+  await page.keyboard.type("x");
+  await page.keyboard.press("Meta+z"); // the field's: the app leaves it alone
+  if (!(await item()).skills.includes(others[1]!.id)) throw new Error("⌘Z with fresh typing in the filter took a skill off");
+  // Chromium on Linux undoes typing on ⌃Z only; the Mac's ⌘Z runs this (menubar.ts).
+  await page.evaluate(() => document.execCommand("undo"));
   await page.keyboard.press("Meta+z");
+  await until("the typing undone, then the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
   await page.keyboard.press("Meta+z");
-  await until("⌘Z twice in the filter takes both off", async () => (await item()).skills.join() === start.join());
+  await until("⌘Z in the filter takes both off", async () => (await item()).skills.join() === start.join());
   await page.keyboard.press("Escape");
 });
 
