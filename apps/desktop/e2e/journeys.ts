@@ -1881,6 +1881,26 @@ journey("Collected row menu: change a highlight's type and remove it without ope
   await page.waitForTimeout(500); // the write lands before the next journey reads the library
 });
 
+// ChatGPT's menus (Tyler 2026-11-12): each item has its icon at the left, and its groups are split by thin lines.
+journey("menus: every item of a source's right-click and ⋯ menu has an icon, its groups split by lines", async (page) => {
+  const check = async (what: string) => {
+    const menu = page.getByRole("menu").first();
+    await menu.waitFor();
+    const items = menu.locator(":scope > [role=menuitem], :scope > [role=menuitemcheckbox]");
+    const n = await items.count();
+    const drawn = await menu.locator(":scope > [role=menuitem] > .menu-icon > svg, :scope > [role=menuitemcheckbox] > .menu-icon > svg").count();
+    if (!n || drawn !== n) throw new Error(`${what}: ${drawn} of ${n} items have an icon`);
+    if ((await menu.locator(":scope > [role=separator]").count()) < 2) throw new Error(`${what}: its items are not grouped`);
+    await page.keyboard.press("Escape");
+  };
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".row").filter({ hasText: TESTING }).first().click({ button: "right" });
+  await check("a row's right-click");
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: "Source actions" }).first().click();
+  await check("the reader's ⋯");
+});
+
 journey("Collected: a key point he is typing survives closing its group and switching to the note and back", async (page) => {
   await openSource(page, TESTING);
   await page.getByRole("tab", { name: "Collected" }).click();

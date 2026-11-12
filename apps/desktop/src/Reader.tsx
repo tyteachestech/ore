@@ -30,7 +30,7 @@ import { bigger, keepPlace, placeOf, smaller } from "./reading";
 import { againIn, define, lookable, wordAt } from "./lookup";
 import { Explain } from "./Explain";
 import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
-import { MoreButton, WithMenu, type MenuAction } from "./Menu";
+import { group, MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { findChapterEnds, Margin, type ChapterEnd, type MarginHandle } from "./Margin";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
@@ -2836,17 +2836,38 @@ function ReaderView(p: Props & { reload: () => void }) {
   const actions: MenuAction[] = !doc
     ? []
     : [
+        { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenaming(true) },
+        { id: "author", label: doc.author ? "Edit author…" : "Add author…", run: () => setAuthoring(true) },
+        ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", run: () => {
+          setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
+          p.onPin(doc);
+        } }]),
+        ...group([
+        ...(doc.status === "done"
+          ? [{ id: "toread", label: "Move to To read", run: () => {
+              setDoc((cur) => cur && { ...cur, status: "reading" });
+              p.onMove(doc, "reading");
+            } }]
+          : doc.preview ? []
+          : [{ id: "finish", label: "Finish source", hint: label(keys["finish-source"]), run: () => p.setFinishing(true) }]),
+        ...(p.onReview ? [{ id: "review-source", label: "Review this source", run: () => p.onReview!(doc) }] : []),
+        { id: "card-here", label: "Add a key point here…", hint: label(keys.card), run: cardHere },
+        ...(video || PHONE ? [] : [{ id: "listen", label: listen ? "Stop listening" : "Listen", hint: label(keys.listen), run: () => (listen ? stopListening() : startListening()) }]),
+        { id: "collected", label: questionsShown ? "Close collected" : "Collected", hint: label(keys.collected), run: () => p.onShowSide("questions") },
+        ]),
+        ...group([
         ...(doc.url || doc.source_file ? [{ id: "original", label: "Open original", hint: label(keys.original), run: () => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error")) }] : []),
         ...(doc.url ? [{ id: "link", label: "Copy link", hint: label(keys.link), run: () => copyLink(doc) }] : []),
         { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), paletteOnly: !PHONE, run: () => void copy(citeSources([doc]), "Copied as Markdown") },
         { id: "path", label: "Copy path", hint: label(keys.path), run: () => copyPath(doc) },
         { id: "reveal", label: "Reveal in Finder", hint: label(keys.reveal), run: () => void revealInFinder(doc).catch((e) => p.notify(errorText(e), "error")) },
-        { id: "rename", label: "Rename…", hint: label(keys.rename), divider: true, run: () => setRenaming(true) },
-        { id: "author", label: doc.author ? "Edit author…" : "Add author…", run: () => setAuthoring(true) },
+        ]),
+        ...group([
         // A PDF or EPUB file is read again from the copy kept with it, so a better reader reaches it.
         // Not on the phone: it can't fetch a page (its CSP) or reread an original (not in its library), D78; like Listen.
         ...(!PHONE && ((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub") ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
         ...(doc.page_text && !PHONE ? [{ id: "page-text", label: "Add the page’s text", run: () => void addPageText() }] : []),
+        ]),
         ...(PHONE ? [] : [{ id: "find", label: "Find in source…", hint: label(keys.filter), paletteOnly: true, run: openFind }]),
         ...(p.skills.length
           ? [{
@@ -2864,17 +2885,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               })),
             }]
           : []),
-        ...(doc.status === "done"
-          ? [{ id: "toread", label: "Move to To read", divider: true, run: () => {
-              setDoc((cur) => cur && { ...cur, status: "reading" });
-              p.onMove(doc, "reading");
-            } }]
-          : doc.preview ? []
-          : [{ id: "finish", label: "Finish source", hint: label(keys["finish-source"]), divider: true, run: () => p.setFinishing(true) }]),
-        ...(video || PHONE ? [] : [{ id: "listen", label: listen ? "Stop listening" : "Listen", hint: label(keys.listen), run: () => (listen ? stopListening() : startListening()) }]),
         ...(focus ? [{ id: "highlight", label: "Highlight focused text", hint: label(keys.highlight), paletteOnly: true, run: () => highlightFocus("keep") }] : []),
-        ...(p.onReview ? [{ id: "review-source", label: "Review this source", run: () => p.onReview!(doc) }] : []),
-        { id: "card-here", label: "Add a key point here…", hint: label(keys.card), run: cardHere },
         // The open highlight's own tools, also in ⌘K (three ways to every action); its popup has the buttons.
         ...(popup && !PHONE
           ? [
@@ -2885,14 +2896,9 @@ function ReaderView(p: Props & { reload: () => void }) {
           : []),
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
-        { id: "collected", label: questionsShown ? "Close collected" : "Collected", hint: label(keys.collected), run: () => p.onShowSide("questions") },
         // On the phone the PDF's own page is a page of its own, beside the source as the note is (Back returns).
         ...(pdf ? [{ id: "original-page", label: PHONE ? "Original page" : originalShown ? "Close original page" : "Original page beside the text", paletteOnly: !PHONE, run: () => p.onShowSide("original") }] : []),
         ...(readingFor ? [{ id: "reading-for", label: "Show prequestions", paletteOnly: true, run: () => setPreqAsk((n) => n + 1) }] : []),
-        ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", run: () => {
-          setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
-          p.onPin(doc);
-        } }]),
         { id: "archive", label: doc.archived_at ? "Restore" : "Archive", hint: label(keys.archive), danger: !doc.archived_at, divider: true, run: () => p.onArchive(doc) },
       ];
   p.actionsRef.current = closedBook ? [] : actions;

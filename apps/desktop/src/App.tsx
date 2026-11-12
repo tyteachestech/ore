@@ -178,7 +178,7 @@ export function App() {
     bumpDetails();
   };
   /** The row menus' "Show" submenu: toggling keeps it open, so he sees the rows change (Linear's Display properties). */
-  const showMenu: MenuAction = { id: "show", label: "Show", run: () => {}, sub: DETAILS.map((d) => ({ id: d.id, label: d.label, checked: details.includes(d.id), keep: true, run: () => toggleDetail(d.id) })) };
+  const showMenu: MenuAction = { id: "show", label: "Show", divider: true, run: () => {}, sub: DETAILS.map((d) => ({ id: d.id, label: d.label, checked: details.includes(d.id), keep: true, run: () => toggleDetail(d.id) })) };
   const [cursor, setCursor] = useState<string | null>(null);
   /** Sources picked with ⇧ or ⌘ (Linear, Finder), by id; the row actions then act on all of them.
    *  `anchor` is where a ⇧ range starts. */
@@ -1532,7 +1532,7 @@ export function App() {
   const skillMenu = (s: Skill): MenuAction[] => [
     { id: "open", label: "Open", run: () => openSkill(s.id) },
     // One dialog holds the name, icon, color and collection, so one item opens it, name ready to type.
-    { id: "edit", label: "Edit skill…", run: () => editSkill(s.id, true) },
+    { id: "edit", label: "Edit skill…", divider: true, run: () => editSkill(s.id, true) },
     ...(collections.some((c) => c !== s.collection) || s.collection
       ? [{
           id: "move",
@@ -1545,7 +1545,7 @@ export function App() {
         }]
       : []),
     { id: "importance", label: "Importance", run: () => {}, sub: importanceActions(s, setImportance) },
-    s.archived ? { id: "unarchive", label: "Bring back", run: () => archiveSkill(s, false) } : { id: "archive", label: "Archive skill", run: () => archiveSkill(s, true) },
+    s.archived ? { id: "unarchive", label: "Bring back", divider: true, run: () => archiveSkill(s, false) } : { id: "archive", label: "Archive skill", divider: true, run: () => archiveSkill(s, true) },
     { id: "delete", label: "Delete skill…", danger: true, run: () => setDeleting(s.id) },
   ];
 
@@ -1584,7 +1584,7 @@ export function App() {
   const courseActions = (c: CourseLine): MenuAction[] => [
     { id: "open", label: c.next && c.next.status !== "inbox" ? "Continue" : "Open", hint: "↵", run: () => openSource(lessonFirst(c).id) },
     { id: "lessons", label: c.open ? "Hide lessons" : "Show lessons", hint: c.open ? "←" : "→", run: () => toggleCourse(c.id) },
-    { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(`course:${c.id}`) },
+    { id: "rename", label: "Rename…", hint: label(keys.rename), divider: true, run: () => setRenamingRow(`course:${c.id}`) },
     ...(c.url ? [{ id: "original", label: "Open course page", hint: label(keys.original), run: () => original({ ...lessonFirst(c), url: c.url }, "open") }] : []),
     ...(skills.length
       ? [{
@@ -1595,7 +1595,7 @@ export function App() {
         }]
       : []),
     showMenu,
-    { id: "archive", label: "Archive course", hint: label(keys.archive), danger: true, run: () => void archiveCourse(c) },
+    { id: "archive", label: "Archive course", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveCourse(c) },
   ];
 
   /** Writes each picked source in turn (the CLI owns the library), as one step with one Undo and
@@ -1666,10 +1666,10 @@ export function App() {
             }),
           }]
         : []),
-      { id: "copy", label: `Copy ${what} as Markdown`, hint: label(keys.copy), run: () => copySources(many) },
+      { id: "copy", label: `Copy ${what} as Markdown`, hint: label(keys.copy), divider: true, run: () => copySources(many) },
       { id: "path", label: "Copy paths", hint: label(keys.path), run: () => copyPaths(many) },
       showMenu,
-      { id: "archive", label: `Archive ${what}`, hint: label(keys.archive), danger: true, run: archiveMany },
+      { id: "archive", label: `Archive ${what}`, hint: label(keys.archive), danger: true, divider: true, run: archiveMany },
     ];
   };
 
@@ -1790,13 +1790,9 @@ export function App() {
   const rowActions = (r: Item): MenuAction[] => [
     { id: "open", label: "Open", hint: "↵", run: () => openSource(r.id) },
     { id: "review-source", label: "Review this source", run: () => startReview(null, r.id) },
-    { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(r.id) },
+    { id: "rename", divider: true, label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(r.id) },
     ...(r.archived_at ? [] : [{ id: "pin", label: r.pinned_at ? "Unpin" : "Pin to top", run: () => void pinSource(r) }]),
     ...pinMoves(r),
-    ...(r.url || r.source_file ? [{ id: "original", label: "Open original", hint: label(keys.original), run: () => original(r, "open") }] : []),
-    { id: "reveal", label: "Reveal in Finder", hint: label(keys.reveal), run: () => original(r, "reveal") },
-    { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copySources([r]) },
-    { id: "path", label: "Copy path", hint: label(keys.path), run: () => copyPaths([r]) },
     ...(r.archived_at
       ? [{ id: "restore", label: "Restore", run: () => void restoreSource(r) }]
       : [
@@ -1812,8 +1808,12 @@ export function App() {
           sub: skills.map((k) => ({ id: k.id, label: k.name, icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: r.skills.includes(k.id), run: () => fileSource(r, k) })),
         }]
       : []),
+    ...(r.url || r.source_file ? [{ id: "original", divider: true, label: "Open original", hint: label(keys.original), run: () => original(r, "open") }] : []),
+    { id: "reveal", label: "Reveal in Finder", hint: label(keys.reveal), divider: !(r.url || r.source_file), run: () => original(r, "reveal") },
+    { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copySources([r]) },
+    { id: "path", label: "Copy path", hint: label(keys.path), run: () => copyPaths([r]) },
     showMenu,
-    ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, run: () => void archiveSource(r) }]),
+    ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveSource(r) }]),
   ];
 
   /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178): a row's
@@ -2382,7 +2382,7 @@ export function App() {
             onSettings={() => setSettings({ section: "review" })}
             // Home renames its own rows (onRename); the shortcuts act on the list's selected row, so
             // Home shows none but ⌘C, which copies the focused row (onCopy).
-            sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => (a.id === "copy" ? a : { ...a, hint: undefined }))}
+            sourceMenu={(i) => rowActions(i).map((a) => (a.id === "copy" ? a : { ...a, hint: undefined }))}
             onCopy={(i) => copySources([i])}
             onRename={(i, t) => retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
