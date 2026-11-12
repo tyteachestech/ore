@@ -3,6 +3,7 @@ import { Command } from "cmdk";
 import { CaretDown, Check as CheckIcon, Plus } from "./icons";
 import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
+import { keepKeysIn } from "./keys";
 import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { Trap } from "./Trap";
@@ -143,7 +144,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
             if (!returnFocus?.current) return;
             e.preventDefault();
             returnFocus.current.focus();
-          }} onClick={stop} onKeyDown={stop} onContextMenu={stop}>
+          }} onClick={stop} onKeyDown={keepKeysIn} onContextMenu={stop}>
           <Command label="Skills" loop shouldFilter={false}>
             <Command.Input className="menu-input" placeholder="Find or create a skill…" value={query} onValueChange={setQuery} autoFocus />
             <Command.List>

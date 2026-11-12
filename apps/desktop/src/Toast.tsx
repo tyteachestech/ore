@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PHONE } from "./ore";
-import { History, type Step } from "./history";
+import { History, ownsUndo, type Step } from "./history";
 import { CHECK, CROSS, Matrix, Sprite } from "./Working";
 import { Hint } from "./Hint";
 import { is } from "./keys";
@@ -144,12 +144,12 @@ export function useToast() {
   takeBack.current = (step) => void (history.current.take(step) && undone(step));
   const redoOne = (step?: Step) => (step && history.current.again(step) ? redone(step) : redo());
 
-  // ⌘Z and ⇧⌘Z walk the history; a text field or the note editor keeps them for its own text.
-  // A field marked data-app-undo (Review's empty answer) has nothing of its own to undo.
+  // ⌘Z and ⇧⌘Z walk the history; the note editor, and a text field he has typed in since the newest
+  // step, keep them for their own text (`ownsUndo`).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if ((t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA") && !t.hasAttribute("data-app-undo")) return;
+      if (t.isContentEditable || ownsUndo(t)) return;
       if (is(e, "undo") && history.current.canUndo) {
         e.preventDefault();
         undo();

@@ -8348,6 +8348,44 @@ journey("a popover closes on any click outside it, even after a press inside it 
   await page.keyboard.press("Escape");
 });
 
+journey("skill picker: two skills added in a source, then ⌘Z twice takes both off, picker open or closed", async (page) => {
+  const item = () => ore("ls").then((ls) => (ls as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!);
+  const start = (await item()).skills;
+  const others = ((await ore("skills")) as { id: string; name: string }[]).filter((k) => !start.includes(k.id)).slice(0, 2);
+  await openSource(page, TESTING);
+  for (const closeFirst of [true, false]) {
+    await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
+    const picker = page.locator(".skill-picker");
+    for (const k of others) {
+      await picker.getByRole("option").filter({ has: page.locator(".menu-label", { hasText: k.name }) }).click();
+      await until(`filed under ${k.name}`, async () => (await item()).skills.includes(k.id));
+    }
+    if (closeFirst) {
+      await page.keyboard.press("Escape");
+      await picker.waitFor({ state: "detached" });
+    }
+    await page.keyboard.press("Meta+z");
+    await until("the first ⌘Z takes the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
+    await page.keyboard.press("Meta+z");
+    await until("the second ⌘Z takes the first off", async () => (await item()).skills.join() === start.join());
+    if (!closeFirst) await page.keyboard.press("Escape");
+  }
+  // By keys: he types to filter and ticks with ↵, so focus stays in the filter field, which has
+  // nothing typed since the tick: ⌘Z is the app's (macOS keeps one undo run per window).
+  await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
+  for (const k of others) {
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(k.name);
+    await page.keyboard.press("Enter");
+    await until(`filed under ${k.name} by keys`, async () => (await item()).skills.includes(k.id));
+  }
+  await page.keyboard.press("Meta+z");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z twice in the filter takes both off", async () => (await item()).skills.join() === start.join());
+  await page.keyboard.press("Escape");
+});
+
 journey("skill picker: a skill with a long name still shows its tick", async (page) => {
   const long = "Quantum error correction for people who never took physics and want to read the papers anyway, slowly";
   const k = (await ore("skills", "add", long)) as { id: string };
