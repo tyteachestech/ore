@@ -2,10 +2,11 @@
 // and the skills, as in Obsidian; a source and Review open full screen over it, with a way back.
 // Everything inside the screens is the Mac app's own code.
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Archive, BookOpen, CaretLeft, CaretRight, House, MagnifyingGlass, SidebarSimple } from "../icons";
+import { Archive, BookOpen, CaretLeft, CaretRight, House, MagnifyingGlass, Plus, SidebarSimple } from "../icons";
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
+import { AddLink, WaitingLinks, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
 import { Home } from "../Home";
 import { SkillIcon } from "../IconPicker";
@@ -225,7 +226,7 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
 }
 
 /** Sources by To read and Done, as one list. */
-function SourceList({ title, items, onOpen, row, head, empty = "Nothing here yet. Sources you add on the Mac come to the phone with its next install." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; empty?: string }) {
+function SourceList({ title, items, onOpen, row, head, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; empty?: string }) {
   // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.
   const toRead = (items ?? []).filter((i) => i.status !== "done").sort((a, b) => Number(!a.pinned_at) - Number(!b.pinned_at) || (a.pinned_at ?? "").localeCompare(b.pinned_at ?? "") || touched(b).localeCompare(touched(a)));
   const done = (items ?? []).filter((i) => i.status === "done");
@@ -313,6 +314,8 @@ export function PhoneApp() {
   const panel = useRef<HTMLElement>(null);
   useDrawerSwipe(shell, panel, drawer, setDrawer);
   const [searching, setSearching] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [waiting, setWaiting] = useState<Waiting[]>([]);
   const main = useRef<HTMLElement>(null);
   const cue = useRef<HTMLDivElement>(null);
   // Rendered inside the touch's own handler, so iOS lets the field take focus and bring up the keyboard.
@@ -330,9 +333,10 @@ export function PhoneApp() {
   tabNow.current = tab;
   const refresh = useCallback(async () => {
     try {
-      const [all, sk] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills")]);
+      const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
       setItems(all);
       setSkills(sk);
+      setWaiting(w);
       setError(null);
       // The Archive list, only while it shows: listed twice on every change otherwise.
       if (tabNow.current === "archive") setArchived(await ore<Item[]>("ls", "--archived"));
@@ -624,6 +628,15 @@ export function PhoneApp() {
     ) : null;
 
   const skillName = skills.find((s) => s.id === skill)?.name;
+  const removeWaiting = async (l: Waiting) => {
+    try {
+      await ore("inbox", "--remove", l.id);
+      void refresh();
+      notify("Removed the link", "info", () => ore("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s])).then(refresh));
+    } catch (e) {
+      notify(errorText(e), "error");
+    }
+  };
 
   return (
     <div className="phone-app">
@@ -632,6 +645,9 @@ export function PhoneApp() {
           <header className="phone-bar">
             <button className="phone-back phone-icon" aria-label="Open menu" aria-expanded={drawer} onClick={() => setDrawer(true)}>
               <SidebarSimple size={16} aria-hidden="true" />
+            </button>
+            <button className="phone-back phone-icon phone-add" aria-label="Add a link" onClick={() => setAdding(true)}>
+              <Plus size={16} aria-hidden="true" />
             </button>
             <button className="phone-back phone-icon" aria-label="Search" onClick={() => setSearching(true)}>
               <MagnifyingGlass size={16} aria-hidden="true" />
@@ -662,7 +678,8 @@ export function PhoneApp() {
                 items={tab === "archive" ? archived : items}
                 onOpen={open}
                 row={row}
-                empty={tab === "archive" ? "Nothing archived. Swipe a source left to archive it." : undefined}
+                head={tab === "sources" && <WaitingLinks links={waiting} onRemove={removeWaiting} />}
+                empty={tab === "archive" ? "Nothing archived. Swipe a source left to archive it." : waiting.length ? "" : undefined}
               />
             )}
           </main>
@@ -742,6 +759,7 @@ export function PhoneApp() {
           onClose={() => setSearching(false)}
         />
       )}
+      {adding && <AddLink onClose={() => setAdding(false)} onAdded={() => void refresh()} notify={notify} />}
       {editingSkill && skills.some((s) => s.id === editingSkill) && (
         <SkillEditor
           skill={skills.find((s) => s.id === editingSkill)!}

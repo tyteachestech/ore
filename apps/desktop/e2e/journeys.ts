@@ -9122,6 +9122,23 @@ journey("phone: reopening on a source that left the library lands on Today, not 
   if (await page.getByText(/no item matches/).count()) throw new Error("the missing source's error is on screen");
 }, "phone");
 
+journey("phone: a link added waits for the Mac on Sources, and Remove takes it off", async (page) => {
+  // D223: the phone queues the link in the inbox; the Mac imports it.
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input").fill("not a link");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link .phone-error").filter({ hasText: "isn’t a link" }).waitFor();
+  await page.locator(".add-link input").fill("https://example.com/articles/interleaving");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/interleaving" });
+  await row.waitFor();
+  await tap(page, row.getByRole("button", { name: "Remove" }));
+  await row.waitFor({ state: "detached" });
+}, "phone");
+
 journey("phone: a tap on a source's cut-off title shows all of it", async (page) => {
   // Found in the Simulator: the title stopped at four lines and nothing showed the rest (the Sources row cuts it too).
   await phoneSource(page, "A very long title about the neuroscience");
