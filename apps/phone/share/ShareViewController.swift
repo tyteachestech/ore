@@ -59,14 +59,19 @@ class ShareViewController: UIViewController {
     card.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(card)
 
-    titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+    titleLabel.font = .preferredFont(forTextStyle: .headline)
+    titleLabel.adjustsFontForContentSizeCategory = true
+    titleLabel.numberOfLines = 0
     titleLabel.textColor = paper
     titleLabel.text = "Adding to Ore…"
 
     let done = UIButton(type: .system)
     done.setTitle("Done", for: .normal)
-    done.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
+    done.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+    done.titleLabel?.adjustsFontForContentSizeCategory = true
     done.tintColor = paper
+    done.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    done.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     done.addTarget(self, action: #selector(finish), for: .touchUpInside)
     done.setContentHuggingPriority(.required, for: .horizontal)
 
@@ -221,21 +226,27 @@ class ShareViewController: UIViewController {
     for (i, s) in all.prefix(12).enumerated() {
       var conf = UIButton.Configuration.plain()
       conf.title = s.name
-      conf.contentInsets = NSDirectionalEdgeInsets(top: 9, leading: 14, bottom: 9, trailing: 14)
+      conf.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)
+      conf.titleLineBreakMode = .byTruncatingTail
+      let font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 15, weight: .medium))
       conf.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { a in
         var a = a
-        a.font = .systemFont(ofSize: 15, weight: .medium)
+        a.font = font
         return a
       }
       let b = UIButton(configuration: conf)
       b.tag = i
-      b.layer.cornerRadius = 18
+      b.titleLabel?.numberOfLines = 1
+      b.layer.cornerRadius = 22
       b.layer.borderWidth = 1
       b.accessibilityTraits.insert(.button)
       b.addTarget(self, action: #selector(toggle(_:)), for: .touchUpInside)
       style(b, on: false)
-      let w = b.sizeThatFits(CGSize(width: width, height: 44)).width
+      // Its own width on one line, never wider than the card; at least 44 pt each way to tap.
+      let w = min(max(b.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude, height: 44)).width, 44), width)
       if used > 0 && used + w > width { newRow() }
+      b.widthAnchor.constraint(equalToConstant: w).isActive = true
+      b.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
       row.addArrangedSubview(b)
       used += w + 8
     }
