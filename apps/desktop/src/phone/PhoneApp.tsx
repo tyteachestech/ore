@@ -6,7 +6,7 @@ import { Archive, BookOpen, CaretLeft, CaretRight, House, MagnifyingGlass, Plus,
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
-import { AddLink, WaitingLinks, type Waiting } from "./AddLink";
+import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
 import { Home } from "../Home";
 import { SkillIcon } from "../IconPicker";
@@ -382,7 +382,10 @@ export function PhoneApp() {
       setReading(true);
       const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
       for (const a of r.added) notify(a.kept ? `Already here: “${a.title}”` : `Added “${a.title}”`, "info");
-      for (const f of r.failed) notify(`Couldn’t read ${f.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]} here. Your Mac will try it.`, "error");
+      for (const f of r.failed) {
+        const mac = macOnly(f.error);
+        notify(mac ?? `Couldn’t read ${f.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]} here. Your Mac will try it.`, mac ? "info" : "error");
+      }
     } catch {
       // The list says what is still waiting.
     } finally {

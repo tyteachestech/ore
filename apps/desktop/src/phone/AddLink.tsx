@@ -58,6 +58,14 @@ export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   );
 }
 
+/** A link only the Mac can read (a video's transcript needs its tools) isn't a failure: it says where it
+ *  comes in. Anything else the phone couldn't read keeps its reason, and the Mac tries it. */
+export function macOnly(error: string): string | null {
+  if (/yt-dlp/.test(error)) return "A video comes in through your Mac.";
+  if (/only on the Mac/.test(error)) return "This one comes in through your Mac.";
+  return null;
+}
+
 /** Links on their way in: one this phone is reading says so, and one it couldn't read says why and that
  *  the Mac tries it. */
 export function WaitingLinks({ links, reading, onRemove }: { links: Waiting[]; reading: boolean; onRemove: (l: Waiting) => void }) {
@@ -69,7 +77,15 @@ export function WaitingLinks({ links, reading, onRemove }: { links: Waiting[]; r
         {links.map((l) => (
           <li key={l.id} className="phone-waiting">
             <span className="phone-title">{l.url.replace(/^https?:\/\/(www\.)?/, "")}</span>
-            {l.error ? <span className="phone-error">{l.error} Your Mac will try it.</span> : reading && <span className="phone-waiting-note">Reading…</span>}
+            {l.error ? (
+              macOnly(l.error) ? (
+                <span className="phone-waiting-note phone-waiting-why">{macOnly(l.error)}</span>
+              ) : (
+                <span className="phone-error">{l.error} Your Mac will try it.</span>
+              )
+            ) : (
+              reading && <span className="phone-waiting-note">Reading…</span>
+            )}
             <button className="phone-back" onClick={() => onRemove(l)}>
               Remove
             </button>
