@@ -443,15 +443,15 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
 // Tags a share or an ad adds to a link (utm_source=chatgpt.com, fbclid…): not part of the page, so a link is
 // kept without them, as Raindrop does, and the page added again with other tags is the source already here.
 const TRACKING = /^(utm_\w+|fbclid|gclid|dclid|gbraid|wbraid|msclkid|mc_cid|mc_eid|igshid|yclid|_hsenc|_hsmi|mkt_tok)$/i;
-export function untracked(url: string): string {
-  if (!URL.canParse(url)) return url;
-  // Every link in the URL's own form (host lowercased, default port dropped), so a link matches itself with or
-  // without tags; the other query parts are kept exactly as written.
-  const u = new URL(url);
-  const kept = u.search.slice(1).split("&").filter((p) => p && !TRACKING.test(p.split("=")[0]!));
-  u.search = kept.length ? `?${kept.join("&")}` : "";
-  return u.toString();
+function untracked(url: string): string {
+  const [, head, query, hash] = url.match(/^([^?#]*)(?:\?([^#]*))?(#.*)?$/)!;
+  if (query === undefined) return url;
+  // Only the tags go: the rest of the link is kept exactly as written.
+  const kept = query.split("&").filter((p) => p && !TRACKING.test(p.split("=")[0]!));
+  return `${head}${kept.length ? `?${kept.join("&")}` : ""}${hash ?? ""}`;
 }
+/** The same page's link, however it was written: with or without tags, the host in any case, a default port. */
+const linkKey = (url: string) => (URL.canParse(url) ? new URL(untracked(url)).href : url);
 
 // Ingest a URL or file into items/ with status inbox. Files dropped in
 // inbox/ are removed after a successful ingest (they now live as source.*).
@@ -462,7 +462,7 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   if (isUrl && !URL.canParse(input)) throw new Error("That link looks cut off. Copy it again from the address bar.");
   if (isUrl) input = untracked(input);
   if (!isUrl && /^[a-z][\w+.-]*:/i.test(input) && !existsSync(input)) throw new Error("Ore opens web links (http or https) and files. Open that one in your browser, then add the page from there.");
-  const had = isUrl ? allItems(lib, { preview: true }).find((i) => i.meta.url !== undefined && untracked(i.meta.url) === input && !i.meta.course) : undefined;
+  const had = isUrl ? allItems(lib, { preview: true }).find((i) => i.meta.url !== undefined && linkKey(i.meta.url) === linkKey(input) && !i.meta.course) : undefined;
   if (had && opts.preview) return had;
   if (had) return keep(lib, had, opts);
   const draft = isUrl ? await fromUrl(input, opts) : await fromFile(resolve(input), opts, input);
@@ -515,7 +515,7 @@ export async function addTab(lib: Library, opts: AddOptions & { tab?: Tab } = {}
   const front = opts.tab ?? (await (await import("./tab.ts")).frontTab());
   const tab = { ...front, url: untracked(front.url) };
   if (await readsByLink(tab.url)) return addSource(lib, tab.url, opts);
-  const had = listItems(lib).find((i) => i.meta.url !== undefined && untracked(i.meta.url) === tab.url && !i.meta.course);
+  const had = listItems(lib).find((i) => i.meta.url !== undefined && linkKey(i.meta.url) === linkKey(tab.url) && !i.meta.course);
   if (had) return addSource(lib, tab.url, opts);
   const host = new URL(tab.url).host;
   const draft = await tabDraft(tab, host);
