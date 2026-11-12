@@ -1,5 +1,5 @@
 // The iPhone app is a web view: the core runs inside it (apps/desktop/src/phone/core.ts). This shell
-// gives it the library's files in Ore's iCloud Drive folder, which the Mac's library is (D78.6, D219).
+// gives it the library's files in Ore's iCloud Drive folder, which the Mac's library is (D78.6, D222).
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::time::UNIX_EPOCH;

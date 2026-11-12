@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Ore's iCloud Drive folder, which holds the library on the phone and the Mac (D219). Copied into the
+<!-- Ore's iCloud Drive folder, which holds the library on the phone and the Mac (D222). Copied into the
      Xcode project by `bun run ios:init`, since Tauri writes an empty one there. Needs the paid Apple team. -->
 <plist version="1.0">
 <dict>

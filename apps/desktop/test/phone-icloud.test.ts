@@ -1,4 +1,4 @@
-// The iPhone's library is Ore's iCloud Drive folder (D219): the core's writes reach the folder, and the
+// The iPhone's library is Ore's iCloud Drive folder (D222): the core's writes reach the folder, and the
 // Mac's edits (arriving through iCloud) reach the core. The folder here is a map standing in for the
 // phone shell's file commands (apps/phone/src-tauri/src/lib.rs).
 import { expect, test } from "bun:test";

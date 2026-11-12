@@ -1,6 +1,6 @@
 // node:fs for the core on iPhone. The core reads and writes files synchronously, and a web view has no
 // synchronous file API, so the library's text files live in memory. On the phone they come from Ore's
-// iCloud Drive folder, which is the Mac's library (D78.6, D219): loaded at launch, every write sent back
+// iCloud Drive folder, which is the Mac's library (D78.6, D222): loaded at launch, every write sent back
 // to the folder, and the Mac's changes read in again when the app comes back (`mountDisk`). In a browser
 // (the e2e journeys, `vite` at phone size) they come from a snapshot, kept in IndexedDB (`mount`).
 

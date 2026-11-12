@@ -4,7 +4,7 @@ The iPhone app is the desktop app's UI (`apps/desktop/src`) built with `ORE_PHON
 is the phone layout, and `src/phone/core.ts` runs the `ore` commands inside the app, since an iPhone has no
 CLI to run (D30). This folder is only the Tauri shell around it. See D78 in `docs/DECISIONS.md`.
 
-The library is Ore's iCloud Drive folder (D219), which is the Mac's library too: `~/Ore` on the Mac links to
+The library is Ore's iCloud Drive folder (D222), which is the Mac's library too: `~/Ore` on the Mac links to
 `~/Library/Mobile Documents/iCloud~com~tylerpoelking~ore/Documents`. The phone reads its text files at launch,
 writes back as it goes, and reads the Mac's changes in when it comes back to the screen. AI (grading, exercise drafts)
 runs on the Mac (D78.3).
