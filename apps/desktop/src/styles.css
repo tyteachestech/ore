@@ -612,7 +612,9 @@ img.thumb { filter: brightness(0.86); }
 .doc-head .author-edit { font: inherit; font-size: 13px; color: var(--text); margin-right: 4px; max-width: 40ch; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -1px 0 var(--accent); outline: none; }
 .doc-thumb { display: block; height: 128px; max-width: 100%; width: auto; object-fit: cover; object-position: top; border-radius: 0; margin: 8px 0 14px; outline: 1px solid rgba(255, 255, 255, 0.08); outline-offset: -1px; }
 .doc-thumb.none { display: none; }
-.doc-head .chips { margin-bottom: 16px; align-items: center; }
+/* The byline is its own line group, then the original link 18px on (or flush left when it wraps); 28px clears it from the text. */
+.doc-head .chips { margin-bottom: 28px; align-items: center; column-gap: 18px; }
+.doc-head .byline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
 /* In the byline it takes the byline's size (Reeder's byline). */
 .doc-head .chips-button { flex-wrap: wrap; }
 .doc-head .chips-button .chip { font-size: 13px; }
@@ -633,7 +635,7 @@ img.thumb { filter: brightness(0.86); }
 .course-lessons .here { color: var(--text); font-weight: 600; }
 .course-lessons .menu-item svg { margin-left: auto; color: var(--faint); }
 /* Where it's from, last on the byline (D210): a page's site, or a file's own name. */
-.doc-head .source { flex: none; margin-left: 10px; padding: 0 4px; border-radius: 4px; font-size: 13px; color: color-mix(in srgb, var(--muted) 45%, var(--text-read)); max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-head .source { flex: none; margin-left: -4px; padding: 0 4px; border-radius: 4px; font-size: 13px; color: color-mix(in srgb, var(--muted) 45%, var(--text-read)); max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-head .source:hover { color: var(--accent); }
 .doc-head .when { color: var(--text-read); font-size: 13px; margin-right: 2px; white-space: nowrap; }
 .doc-head .by + .when::before, .doc-head .by + span .when::before, .doc-head .by-add + .when::before, .doc-head .by-add + span .when::before { content: "·"; margin-right: 6px; }
@@ -2596,8 +2598,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* The links under a question in Collected: 44pt tall, their text still just under the question, the room below it. */
 .phone .qp-sub { row-gap: 0; padding-bottom: 0; }
 .phone .qp-link { display: inline-flex; align-items: flex-start; min-height: 44px; }
-/* The original-site link over the title: 44pt tall and above the title's top, which takes no tap, in the same place. */
-.phone .doc-head .source { position: relative; z-index: 1; min-width: 44px; line-height: 44px; margin-top: -4.5px; margin-bottom: -12.5px; }
+/* The original-site link at the byline's end: 44pt to the finger, its own line height to the eye, so it sits on the byline's line. */
+.phone .doc-head .source { position: relative; overflow: visible; }
+.phone .doc-head .source::before { content: ""; position: absolute; inset: -14px -6px; }
 /* The reading pill: 28pt to the eye, 44pt to the finger. */
 .phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
 /* Rename, Add author, a key point, a guess before reading and Leave anything out?: fields 44pt tall to the finger. */

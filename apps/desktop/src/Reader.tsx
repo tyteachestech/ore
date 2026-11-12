@@ -3210,50 +3210,53 @@ function ReaderView(p: Props & { reload: () => void }) {
             )}
             {(doc.author || authoring || published || doc.skills.length > 0 || suggested || source || !PHONE) && (
               <div className="chips">
-                {authoring ? (
-                  <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
-                ) : (
-                  doc.author ?
-                  (PHONE ? (
-                    <span className="by">{doc.author}</span>
+                {/* Who, when and its skills wrap as one group, so the original link after them starts flush when it drops to a line of its own. */}
+                <span className="byline">
+                  {authoring ? (
+                    <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
                   ) : (
-                    <Hint text="Edit author">
-                      <button className="by" ref={authorRef} onClick={() => setAuthoring(true)}>
-                        {doc.author}
-                      </button>
-                    </Hint>
-                  )) : (
-                    // None found on import (D210): a faint empty field where the name goes, one click fills it (Notion's empty property).
-                    !PHONE && (
-                      <Hint text="Add author">
-                        <button className="by-add" ref={authorRef} onClick={() => setAuthoring(true)}>
-                          Author
+                    doc.author ?
+                    (PHONE ? (
+                      <span className="by">{doc.author}</span>
+                    ) : (
+                      <Hint text="Edit author">
+                        <button className="by" ref={authorRef} onClick={() => setAuthoring(true)}>
+                          {doc.author}
                         </button>
                       </Hint>
+                    )) : (
+                      // None found on import (D210): a faint empty field where the name goes, one click fills it (Notion's empty property).
+                      !PHONE && (
+                        <Hint text="Add author">
+                          <button className="by-add" ref={authorRef} onClick={() => setAuthoring(true)}>
+                            Author
+                          </button>
+                        </Hint>
+                      )
                     )
-                  )
-                )}
-                {published && <span className="when">{published}</span>}
-                {PHONE ? (
-                  doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
-                ) : (
-                  <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked}>
-                    {doc.skills.length > 0 &&
-                      doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)}
-                  </SkillPicker>
-                )}
-                {suggested && (
-                  <span className="chip suggested">
-                    <Hint text={`Suggested skill${suggested.hook ? `: ${suggested.hook}` : ""}. Click to file this source under it.`}>
-                      <button onClick={() => void suggestion("accept")}>+ {suggested.name}</button>
-                    </Hint>
-                    <Hint text="Dismiss">
-                      <button className="x" aria-label={`Dismiss suggested skill ${suggested.name}`} onClick={() => void suggestion("dismiss")}>
-                        ×
-                      </button>
-                    </Hint>
-                  </span>
-                )}
+                  )}
+                  {published && <span className="when">{published}</span>}
+                  {PHONE ? (
+                    doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
+                  ) : (
+                    <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked}>
+                      {doc.skills.length > 0 &&
+                        doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)}
+                    </SkillPicker>
+                  )}
+                  {suggested && (
+                    <span className="chip suggested">
+                      <Hint text={`Suggested skill${suggested.hook ? `: ${suggested.hook}` : ""}. Click to file this source under it.`}>
+                        <button onClick={() => void suggestion("accept")}>+ {suggested.name}</button>
+                      </Hint>
+                      <Hint text="Dismiss">
+                        <button className="x" aria-label={`Dismiss suggested skill ${suggested.name}`} onClick={() => void suggestion("dismiss")}>
+                          ×
+                        </button>
+                      </Hint>
+                    </span>
+                  )}
+                </span>
                 {/* Where it's from, last on the byline (D210): one click opens the original. */}
                 {source && (
                   <Hint text={doc.url ? "Open the original page" : "Open the original file"} keys="original">
