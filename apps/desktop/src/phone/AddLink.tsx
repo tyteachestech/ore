@@ -90,11 +90,20 @@ export function macOnly(error: string): string | null {
   return null;
 }
 
+/** How core's refusals name the Mac's way in (core's FROM_TAB starts with it; phone-waiting.test.ts checks). */
+export const MAC_WAY = "add it from the browser";
+
 /** Why the phone couldn't read a link, without the Mac's own next steps (its Browser tab, `ore add --tab`,
- *  pasting the text into the add box), which the phone doesn't have: the Mac tries the link itself (D227.3). */
+ *  pasting the text into the add box), which the phone doesn't have: the Mac tries the link itself (D227.3).
+ *  The clause naming the Mac's way in goes, with all after it; whatever came before it stays. */
 export function phoneReason(error: string): string {
-  const cut = error.search(/ Open it in your browser\b/);
-  return cut < 0 ? error : error.slice(0, cut).replace(/[,;:]?\s*$/, "").replace(/([^.])$/, "$1.");
+  const at = error.indexOf(MAC_WAY);
+  if (at < 0) return error;
+  const head = error.slice(0, at);
+  const cut = Math.max(head.lastIndexOf(". ") + 1, head.lastIndexOf("; "), head.lastIndexOf(", or "));
+  const kept = cut > 0 ? error.slice(0, cut).trim() : "";
+  if (!kept) return "Ore couldn’t read this page here.";
+  return /[.!?]$/.test(kept) ? kept : `${kept}.`;
 }
 
 /** Links on their way in: one this phone is reading says so, and one it couldn't read says why and that

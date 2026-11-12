@@ -572,12 +572,13 @@ export function PhoneApp() {
       document.documentElement.style.setProperty("--keyboard", `${kb}px`);
       if (!kb) return;
       document.querySelector(".phone-full .review-foot")?.scrollIntoView({ block: "end" });
-      // Any field stays in sight above the keyboard, wherever it is (a prequestion, a highlight's note, the
-      // drawer's New skill with its refusal under it), not only on the screens that remembered to ask.
+      // A field in the reader (a prequestion, a highlight's note) or the drawer (New skill, with its refusal
+      // under it) stays in sight above the keyboard. Sheets and Review lift themselves by --keyboard.
       const field = document.activeElement;
-      if (!(field instanceof HTMLElement) || field === document.body) return;
-      if (!field.isContentEditable) return (field.closest(".phone-drawer form") ?? field).scrollIntoView({ block: "nearest" });
+      if (!(field instanceof HTMLElement)) return;
+      if (field.closest(".phone-drawer")) return (field.closest("form") ?? field).scrollIntoView({ block: "nearest" });
       if (!field.closest(".phone-reader")) return;
+      if (!field.isContentEditable) return field.scrollIntoView({ block: "nearest" });
       // The source note is one tall editor: bring the caret, not the editor, into view, once the screen has shrunk.
       requestAnimationFrame(keepCaret);
     };

@@ -2391,7 +2391,9 @@ journey("a recording plays in place: its player over the transcript, his highlig
 journey("a recording: a finger's scroll away from the spoken line stops following it, as the wheel does, and Back to current shows (D49)", async (page) => {
   await page.setViewportSize({ width: 1000, height: 320 });
   await openSource(page, "Lecture 4");
+  const size = await page.evaluate(() => localStorage.getItem("ore.size"));
   for (let i = 0; i < 5; i++) await page.keyboard.press("Meta+Equal"); // the short transcript runs past the window
+  try {
   const player = page.locator(".player.audio");
   await player.waitFor();
   await page.locator(".doc .ts").filter({ hasText: "00:30" }).click();
@@ -2402,8 +2404,8 @@ journey("a recording: a finger's scroll away from the spoken line stops followin
   await box.evaluate((el) => {
     const t = (y: number) => new Touch({ identifier: 1, target: el, clientX: 300, clientY: y });
     el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [t(200)] }));
+    el.scrollTop = 0; // the page moves under the finger, then the move is reported
     el.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [t(400)] }));
-    el.scrollTop = 0;
     el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, touches: [] }));
   });
   await page.waitForTimeout(800);
@@ -2411,7 +2413,10 @@ journey("a recording: a finger's scroll away from the spoken line stops followin
   if (top > 5) throw new Error(`the playing recording pulled the text back to its line (scrollTop ${top})`);
   await page.locator(".back-current").waitFor();
   await page.keyboard.press("Space");
-  for (let i = 0; i < 5; i++) await page.keyboard.press("Meta+Minus");
+  } finally {
+    // The text size is kept for every later journey: put it back as it was.
+    await page.evaluate((size) => (size === null ? localStorage.removeItem("ore.size") : localStorage.setItem("ore.size", size)), size);
+  }
 });
 
 journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D219)", async (page) => {

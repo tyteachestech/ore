@@ -2472,7 +2472,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-shell:is(.open, .dragging) .phone-root { transform: translateX(calc(var(--open) * var(--drawer))); }
 .phone-scrim { position: absolute; inset: 0; z-index: 9; border: 0; padding: 0; background: #000; opacity: calc(var(--open) * .5); pointer-events: none; transition: opacity var(--t-4) var(--ease-out); }
 .phone-shell.open .phone-scrim { pointer-events: auto; }
-.phone-drawer { position: absolute; inset: 0 auto 0 0; z-index: 10; width: var(--drawer); box-sizing: border-box; padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px calc(env(safe-area-inset-bottom, 0px) + 16px + var(--keyboard, 0px)); overflow-y: auto; background: var(--bg-side); border-right: 1px solid var(--border); transform: translateX(calc((var(--open) - 1) * 100%)); transition: transform var(--t-4) var(--ease-out); }
+.phone-drawer { position: absolute; inset: 0 auto 0 0; z-index: 10; width: var(--drawer); box-sizing: border-box; padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px calc(env(safe-area-inset-bottom, 0px) + 16px + var(--keyboard, 0px)); scroll-padding-bottom: var(--keyboard, 0px); overflow-y: auto; background: var(--bg-side); border-right: 1px solid var(--border); transform: translateX(calc((var(--open) - 1) * 100%)); transition: transform var(--t-4) var(--ease-out); }
 .phone-shell.dragging :is(.phone-root, .phone-scrim, .phone-drawer) { transition: none; }
 .phone-drawer button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 8px; background: none; border: 0; border-radius: 6px; color: var(--text); font: 400 16px var(--font); text-align: left; }
 .phone-drawer button.on, .phone-drawer button:active { background: var(--bg-hover); }

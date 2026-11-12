@@ -16,7 +16,10 @@ export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from
   const zoom = useRef<ReactZoomPanPinchRef>(null);
   /** The last tap's time and place: a second one close by soon after is a double tap (Photos: zoom in there, or out). */
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  /** Where the finger went down, and whether it has since moved past a tap's jitter (10 pt, as UIKit allows). */
+  const down = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false);
+  const now = useRef<{ zoomed: boolean; back: () => void }>({ zoomed, back: () => {} });
   const swipe = useRef<{ y: number; t: number } | null>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -27,6 +30,7 @@ export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from
     if (still || zoomed) close.current(); // zoomed in, it would shrink from the wrong place: it goes at once
     else setOpen(false);
   };
+  now.current = { zoomed, back };
   useLayoutEffect(() => {
     img.style.visibility = "hidden";
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));
@@ -51,10 +55,12 @@ export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from
       style={{ background: `color-mix(in srgb, var(--bg) ${Math.round(shade * 100)}%, transparent)`, transition: swipe.current ? "none" : undefined }}
       onTouchStart={(e) => {
         moved.current = e.touches.length > 1;
+        down.current = e.touches.length === 1 ? { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY } : null;
         swipe.current = !zoomed && e.touches.length === 1 ? { y: e.touches[0]!.clientY, t: e.timeStamp } : null;
       }}
       onTouchMove={(e) => {
-        moved.current = true;
+        const t = e.touches[0];
+        if (e.touches.length > 1 || !down.current || !t || Math.hypot(t.clientX - down.current.x, t.clientY - down.current.y) > 10) moved.current = true;
         if (!swipe.current || e.touches.length !== 1) return void (swipe.current = null, setDrag(0));
         setDrag(Math.max(0, e.touches[0]!.clientY - swipe.current.y));
       }}
@@ -77,7 +83,9 @@ export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from
             if (tap.current) clearTimeout(tap.current);
             tap.current = window.setTimeout(() => {
               tap.current = null;
-              if (!zoomed) back();
+              lastTap.current = null;
+              // As things are now: a pinch begun since leaves it open.
+              if (!now.current.zoomed && !moved.current) now.current.back();
             }, 300);
           }
           return setDrag(0);
