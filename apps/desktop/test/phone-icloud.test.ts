@@ -14,7 +14,16 @@ let other: string[] = [];
 /** Files the folder holds that the phone lists but doesn't load, as base64. */
 const shared = new Map<string, string>();
 
-const invoke = async <T,>(cmd: string, args: Record<string, unknown>): Promise<T> => {
+const invoke = async <T,>(cmd: string, args: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }): Promise<T> => {
+  // A binary file goes as its raw bytes (lib.rs `library_write`); kept here as base64 to compare.
+  if (cmd === "library_write") {
+    const rel = decodeURIComponent(options!.headers["x-path"]!);
+    const text = Buffer.from(args as Uint8Array).toString("base64");
+    sent.push([rel, text, true]);
+    folder.set(rel, { text, mtime: ++clock });
+    return [rel, clock, stamp(rel)] as T;
+  }
+  args = args as Record<string, unknown>;
   if (cmd === "library_scan") return { files: [...folder.keys()].map((r) => [r, folder.get(r)!.mtime, stamp(r)]), waiting, other } as T;
   if (cmd === "library_read") return (args.paths as string[]).map((r) => folder.get(r)?.text ?? null) as T;
   if (cmd === "library_bytes") return (shared.get(args.path as string) ?? null) as T;
