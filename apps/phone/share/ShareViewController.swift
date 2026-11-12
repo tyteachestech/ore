@@ -237,8 +237,6 @@ class ShareViewController: UIViewController {
       let b = UIButton(configuration: conf)
       b.tag = i
       b.titleLabel?.numberOfLines = 1
-      b.layer.cornerRadius = 22
-      b.layer.borderWidth = 1
       b.accessibilityTraits.insert(.button)
       b.addTarget(self, action: #selector(toggle(_:)), for: .touchUpInside)
       style(b, on: false)
@@ -255,10 +253,15 @@ class ShareViewController: UIViewController {
   private var shown: [Skill] = []
 
   private func style(_ b: UIButton, on: Bool) {
-    b.backgroundColor = on ? paper : .clear
-    b.layer.borderColor = (on ? paper : line).cgColor
-    b.configuration?.baseForegroundColor = on ? UIColor(white: 0.07, alpha: 1) : muted
-    b.isSelected = on
+    // Drawn by the configuration, as a full pill: `isSelected` would tint it the system's blue.
+    var conf = b.configuration ?? .plain()
+    conf.cornerStyle = .capsule
+    conf.background.backgroundColor = on ? paper : .clear
+    conf.background.strokeColor = on ? paper : line
+    conf.background.strokeWidth = 1
+    conf.baseForegroundColor = on ? UIColor(white: 0.07, alpha: 1) : muted
+    b.configuration = conf
+    if on { b.accessibilityTraits.insert(.selected) } else { b.accessibilityTraits.remove(.selected) }
   }
 
   @objc private func toggle(_ b: UIButton) {
