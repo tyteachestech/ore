@@ -189,3 +189,19 @@ test("a file the share sheet saved to the inbox is loaded when asked for, read a
   await rescan();
   expect(fs.existsSync(`${P}/inbox/01X/paper.pdf`)).toBe(false);
 });
+
+test("a binary file is read back as one block copy, not byte by byte", async () => {
+  // TypedArray.from walks its source one element at a time: on an hour's audio (60 MB) it took the web view
+  // from 0.5 to 1.7 GB for half a second while the import renamed its temp file into place.
+  const big = new Uint8Array([1, 2, 3, 255]);
+  fs.writeFileSync(`${P}/items/c-03/source.mp3`, big);
+  const from = Uint8Array.from;
+  Uint8Array.from = (() => {
+    throw new Error("read byte by byte");
+  }) as typeof Uint8Array.from;
+  try {
+    expect([...(fs.readFileSync(`${P}/items/c-03/source.mp3`) as unknown as Uint8Array)]).toEqual([1, 2, 3, 255]);
+  } finally {
+    Uint8Array.from = from;
+  }
+});
