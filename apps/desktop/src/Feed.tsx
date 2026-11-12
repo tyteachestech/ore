@@ -12,7 +12,7 @@ import { is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { ore, opt, type Skill } from "./ore";
 import { SkillChips, SkillPicker, unfile } from "./Skills";
-import { errorText, load, save, typedLast, useLibraryChanges, type Notify } from "./util";
+import { errorText, load, save, singleFlight, typedLast, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
 import { citeSources, copyCited } from "./cite";
 import { focusQuietly } from "./focus-near";
@@ -99,16 +99,22 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       return null;
     }
   }, []);
-  const check = useCallback(async () => {
-    setChecking(true);
-    try {
-      setData(await ore<FeedData>("feed", "--refresh"));
-    } catch (e) {
-      notify(errorText(e), "error");
-    } finally {
-      setChecking(false);
-    }
-  }, [notify]);
+  // One refresh at a time: a read again while one runs (a wake, Check now) gets that one, never a second. Made
+  // once for the screen, so a new `notify` never brings a second, idle guard with it.
+  const notifyNow = useRef(notify);
+  notifyNow.current = notify;
+  const check = useRef(
+    singleFlight(async () => {
+      setChecking(true);
+      try {
+        setData(await ore<FeedData>("feed", "--refresh"));
+      } catch (e) {
+        notifyNow.current(errorText(e), "error");
+      } finally {
+        setChecking(false);
+      }
+    }),
+  ).current;
   const changes = useLibraryChanges();
   useEffect(() => {
     void read().then((d) => {

@@ -37,6 +37,8 @@ type Props = NotesSync & {
   /** In a course (D79): the lesson to read next, which the closing card can open instead of going back. */
   nextLesson?: { title: string; open: () => void };
   notify: Notify;
+  /** Resolves once the highlight writes he made in the reader have landed (a type he just picked may still be saving). */
+  highlightsSaved?: () => Promise<void>;
 };
 
 const SURE = ["Guess", "Think so", "Sure"] as const;
@@ -78,7 +80,7 @@ function sayUndrafted(notify: Notify, why: string) {
 /** The finish step as a quiz panel beside the blurred source (D52 to D56): free recall first, then
  *  each prequestion is answered, rated for confidence and checked against its key points, with the
  *  source shown only after the attempt. */
-export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, onMarked, nextLesson, notify, flushNotes, onNotes, skills }: Props) {
+export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, onDone, onMarked, nextLesson, notify, flushNotes, onNotes, skills, highlightsSaved }: Props) {
   // The finished badge bursts in the colour of the source's first coloured skill (D153).
   const burstColor = doc.skills.map((id) => skills?.find((s) => s.id === id)?.color).find(Boolean);
   const draft = drafts.get(doc.id) ?? keptDraft(doc);
@@ -344,7 +346,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const [made, setMade] = useState<{ highlights: number; questions: number } | null>(null);
   useEffect(() => {
     if (step <= n) return;
-    ore<{ annotations: Annotation[] }>("show", doc.id).then(
+    // After his last highlight writes land: a question he marked just before Finish would count as a plain highlight.
+    void (highlightsSaved?.() ?? Promise.resolve()).then(() => ore<{ annotations: Annotation[] }>("show", doc.id)).then(
       (d) => {
         const live = d.annotations.filter((a) => a.status !== "deleted");
         setMade({ highlights: live.length, questions: live.filter((a) => a.intent === "question").length });
