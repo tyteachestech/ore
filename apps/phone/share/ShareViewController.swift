@@ -1,12 +1,13 @@
 // Ore's Share Extension: a link or page shared from Safari or any app becomes one inbox item,
-// `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in the App Group the app reads when it
-// opens. The link is saved the moment the card appears; the card then offers his skills to file it under,
+// `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in Ore's iCloud folder, or in the App
+// Group the app reads when it opens. The link is saved the moment the card appears; the card then offers his skills to file it under,
 // one tap each, and closes by itself if he leaves it alone (Raindrop's share card).
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
 import UIKit
 import UniformTypeIdentifiers
 
 let group = "group.com.tylerpoelking.ore"
+let cloudId = "iCloud.com.tylerpoelking.ore"
 
 func ulid() -> String {
   let a = Array("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
@@ -120,16 +121,24 @@ class ShareViewController: UIViewController {
     return nil
   }
 
+  /// Ore's iCloud folder first, so the Mac sees the link without the app opening; the App Group when iCloud
+  /// Drive is off or the folder isn't there yet (the app moves it in when it opens, lib.rs `share_inbox`).
   private func save(_ url: String) -> Bool {
-    guard let root = groupDir() else { return false }
-    let dir = root.appendingPathComponent("inbox", isDirectory: true)
-    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     let id = ulid()
     let stamp = ISO8601DateFormatter()
     stamp.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     item = ["id": id, "url": url, "skills": [String](), "added": stamp.string(from: Date()), "device": "iphone"]
-    file = dir.appendingPathComponent("\(id).link.json")
-    return write()
+    var roots: [URL] = []
+    if let cloud = FileManager.default.url(forUbiquityContainerIdentifier: cloudId) { roots.append(cloud.appendingPathComponent("Documents", isDirectory: true)) }
+    if let g = groupDir() { roots.append(g) }
+    for root in roots {
+      let dir = root.appendingPathComponent("inbox", isDirectory: true)
+      try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+      file = dir.appendingPathComponent("\(id).link.json")
+      if write() { return true }
+    }
+    file = nil
+    return false
   }
 
   private func write() -> Bool {

@@ -127,3 +127,11 @@ test("a file the phone lists but doesn't load (audio, a PDF) is found, never cop
   await rescan();
   expect(fs.existsSync(`${P}/items/c-03/source.m4a`)).toBe(false);
 });
+
+test("a launch doesn't wait for transcripts iCloud is still bringing", async () => {
+  waiting = ["items/c-03/source.vtt"];
+  const t0 = Date.now();
+  await mountDisk(P, "/root", invoke);
+  expect(Date.now() - t0).toBeLessThan(900);
+  waiting = [];
+});

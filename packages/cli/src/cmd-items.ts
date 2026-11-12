@@ -34,7 +34,7 @@ function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noE
 }
 import { int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
-import { importQueued, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
+import { importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
 
 const INTENTS = Intent.options;
 
@@ -104,10 +104,14 @@ export const itemCommands: Record<string, Command> = {
   },
 
   inbox: {
-    usage: "[--add <url> [--skill s]] [--remove <id>] [--import]   links saved on a device, waiting to be imported (D223, D227): --add saves one, --import adds each that is this device's to import (its own; another device's after five minutes, or at once when that one couldn't) with the whole import, --remove drops one; with none, lists them",
-    options: { add: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" } },
+    usage: "[--add <url> | --add-file <path> [--name n]] [--skill s] [--remove <id>] [--import]   links and files saved on a device, waiting to be imported (D223, D227): --add saves a link, --add-file a copy of a file (under the name it should be titled by), --import adds each that is this device's to import (its own; another device's after five minutes, or at once when that one couldn't) with the whole import, --remove drops one; with none, lists them",
+    options: { add: { type: "string" }, "add-file": { type: "string" }, name: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
+      if (f["add-file"] !== undefined) {
+        const l = queueFile(lib, need(str(f["add-file"]), "<path>"), strs(f.skill), str(f.name));
+        return { data: l, text: `Coming in: ${l.url}` };
+      }
       if (f.add !== undefined) {
         const l = queueLink(lib, str(f.add) ?? "", strs(f.skill));
         return { data: l, text: `Coming in: ${l.url}` };

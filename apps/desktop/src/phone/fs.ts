@@ -193,11 +193,14 @@ export function flush(): Promise<void> {
 }
 
 /** Loads the library from the folder. On a first launch iCloud may still be downloading it: waits for
- *  that, up to a minute; what still hasn't come keeps the phone from writing over it (`downloading`). */
+ *  that (transcripts aside), up to a minute; what still hasn't come keeps the phone from writing over it (`downloading`). */
 export async function mountDisk(prefix: string, root: string, invoke: Invoke) {
   disk = { root, prefix, invoke };
   let scan = await invoke<Scan>("library_scan", { root });
-  for (let i = 0; scan.waiting.length && i < 60; i++) {
+  // Only for what the lists need: a transcript still on its way (they are large, and many) comes in with a
+  // later look at the folder, and never holds up the launch (it once did, for 72 s).
+  const held = () => scan.waiting.some((r) => !/\.vtt$/i.test(r));
+  for (let i = 0; held() && i < 60; i++) {
     await new Promise((r) => setTimeout(r, 1000));
     scan = await invoke<Scan>("library_scan", { root });
   }
@@ -276,10 +279,19 @@ function pruneDirs() {
 // ---- the node:fs functions the core uses.
 
 export const existsSync = (p: string) => files.has(p) || dirs.has(p);
-export function readFileSync(p: string, _enc?: unknown): string {
+/** A binary file read with no encoding, as Node's Buffer is: its bytes, and its text if printed. */
+class Bytes extends Uint8Array {
+  toString() {
+    return new TextDecoder().decode(this);
+  }
+}
+/** With an encoding, the text. With none, a file saved as bytes (a picked PDF, a picture) comes back as its
+ *  bytes, as Node gives a Buffer; a text file still comes back as text, which every caller here expects. */
+export function readFileSync(p: string, enc?: unknown): string {
   const e = files.get(p);
   if (!e) throw err("ENOENT", p);
   if (e.unread) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
+  if (enc === undefined && e.bytes) return Bytes.from(e.bytes) as unknown as string;
   return e.text;
 }
 export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, new TextDecoder().decode(s), Date.now(), s));
@@ -335,7 +347,7 @@ export function statSync(p: string) {
   if (!existsSync(p)) throw err("ENOENT", p);
   const e = files.get(p);
   const m = e?.mtime ?? 1;
-  return { mtimeMs: m, mtime: new Date(m), size: e?.text.length ?? 0, isDirectory: () => !e, isFile: () => !!e };
+  return { mtimeMs: m, mtime: new Date(m), size: e?.bytes?.length ?? e?.text.length ?? 0, isDirectory: () => !e, isFile: () => !!e };
 }
 export const lstatSync = statSync;
 export const realpathSync = (p: string) => p;

@@ -1,8 +1,8 @@
 // Links added on the iPhone wait in inbox/ for the Mac to import them (D223).
 import { expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { importQueued, queueLink, queuedLinks, removeQueuedLink } from "../src/inbox.ts";
+import { importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "../src/inbox.ts";
 import { paths } from "../src/library.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -64,4 +64,32 @@ test("the device that captured a link imports it first; another takes it after a
   from({ error: undefined, added: new Date(Date.now() - 6 * 60_000).toISOString() });
   await importQueued(lib, add);
   expect(tried).toHaveLength(2);
+});
+
+test("a file waits beside its item, is handed to the import by its path, and leaves nothing behind", async () => {
+  const lib = await tempLibrary();
+  const src = join(lib.root, "picked.md");
+  writeFileSync(src, "# Spacing\n\nSpace your reviews.\n");
+  const q = queueFile(lib, src, ["ai"], "Spacing notes.md");
+  expect(queuedLinks(lib).map((l) => [l.url, l.file, l.skills])).toEqual([["Spacing notes.md", `${q.id}/Spacing notes.md`, ["ai"]]]);
+  // It fails once (the phone can't read this kind): the file stays for the next device.
+  await importQueued(lib, async () => {
+    throw new Error("only on the Mac");
+  });
+  expect(readFileSync(join(paths.inbox(lib), q.file!), "utf8")).toContain("Space your reviews");
+  const seen: string[] = [];
+  const r = await importQueued(lib, async (input) => {
+    seen.push(readFileSync(input, "utf8"));
+    return { id: "01F", title: "Spacing notes" };
+  });
+  expect(seen).toEqual(["# Spacing\n\nSpace your reviews.\n"]);
+  expect(r.added).toEqual([{ id: "01F", title: "Spacing notes", url: "Spacing notes.md" }]);
+  expect(readdirSync(paths.inbox(lib))).toEqual([]);
+  // Removed before any import: the file goes too. An item whose file hasn't arrived yet isn't listed.
+  const again = queueFile(lib, src);
+  removeQueuedLink(lib, again.id);
+  expect(readdirSync(paths.inbox(lib))).toEqual([]);
+  const late = queueFile(lib, src);
+  unlinkSync(join(paths.inbox(lib), late.file!));
+  expect(queuedLinks(lib)).toEqual([]);
 });

@@ -4,9 +4,12 @@
 // field's own Paste (iOS), never read without his tap.
 import { useEffect, useRef, useState } from "react";
 import { Trap } from "../Trap";
-import { ore } from "../ore";
+import { ore, queuePicked } from "../ore";
 import { errorText } from "../util";
 import { sheetLayer, useSwipeDown } from "./sheet";
+
+/** What the importers read from a file (FILE_TYPES in the core, less video, which needs the Mac's tools to hear). */
+const PICKED = "image/*,.pdf,.epub,.md,.markdown,.txt,.html,.htm,.docx,.pptx,.rtf,.xlsx,.csv,.tsv,.ipynb,.srt,.vtt,.mp3,.m4a,.wav";
 
 export type Waiting = { id: string; url: string; skills: string[]; error?: string };
 
@@ -23,6 +26,20 @@ export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     setBusy(true);
     try {
       await ore("inbox", "--add", url.trim());
+      onAdded();
+      onClose();
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(false);
+    }
+  };
+  // A file or a photo instead: iOS's own picker (Photo Library, Take Photo, Choose Files), as Notes' attach is.
+  const picker = useRef<HTMLInputElement>(null);
+  const pick = async (list: FileList | null) => {
+    if (!list?.length || busy) return;
+    setBusy(true);
+    try {
+      for (const f of list) await queuePicked(f.name, new Uint8Array(await f.arrayBuffer()));
       onAdded();
       onClose();
     } catch (e) {
@@ -52,6 +69,10 @@ export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: ()
           <button className="pill-btn" type="submit" disabled={!url.trim() || busy}>
             Add
           </button>
+          <button className="add-link-file" type="button" disabled={busy} onClick={() => picker.current?.click()}>
+            Choose a file or photo
+          </button>
+          <input ref={picker} type="file" hidden multiple accept={PICKED} aria-label="File or photo" onChange={(e) => void pick(e.target.files)} />
         </form>
       </Trap>
     </div>,
@@ -62,7 +83,8 @@ export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: ()
  *  comes in. Anything else the phone couldn't read keeps its reason, and the Mac tries it. */
 export function macOnly(error: string): string | null {
   if (/yt-dlp/.test(error)) return "A video comes in through your Mac.";
-  if (/only on the Mac/.test(error)) return "This one comes in through your Mac.";
+  if (/scanned pages/.test(error)) return "Your Mac reads the text in a picture or a scan.";
+  if (/only on the Mac|on a Mac only/.test(error)) return "This one comes in through your Mac.";
   return null;
 }
 

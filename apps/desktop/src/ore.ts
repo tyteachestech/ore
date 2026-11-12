@@ -8,6 +8,10 @@ export const PHONE = import.meta.env.VITE_PHONE === "1";
 export const shareSkills = async (skills: { id: string; name: string }[]): Promise<void> => {
   if (PHONE) (await import("./phone/core")).shareSkills(skills);
 };
+/** A file picked on the phone goes to the inbox to be imported (phone/core.ts `queuePicked`). */
+export const queuePicked = async (name: string, bytes: Uint8Array): Promise<void> => {
+  if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes);
+};
 export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import("./phone/core")).pull() : false);
 
 // Every library read and write goes through the `ore` CLI (D30). Errors are the CLI's one-line message.

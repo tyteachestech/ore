@@ -3078,6 +3078,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .add-link .field { font-size: 17px; min-height: 44px; }
 .add-link .phone-error { padding: 0; }
 .add-link .pill-btn { justify-content: center; text-align: center; min-height: 44px; }
+.add-link-file { min-height: 44px; color: var(--muted); font: 500 15px var(--font); }
+.add-link-file:disabled { opacity: 0.45; }
 /* Above the keyboard, which the field brings up at once. */
 .phone .overlay:has(.add-link) { padding-bottom: var(--keyboard, 0px); }
 .phone-bar .phone-add { margin-left: auto; }
