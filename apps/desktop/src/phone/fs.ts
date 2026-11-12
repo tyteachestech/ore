@@ -211,6 +211,11 @@ export async function mountDisk(prefix: string, root: string, invoke: Invoke) {
 /** Files the phone doesn't load (a source's audio or PDF) still show in the folder's listing, so the core
  *  finds them (`sourceFile`); the screens open them from disk (convertFileSrc). */
 function listOthers(other: string[] = []) {
+  // One the Mac deleted since leaves the listing too.
+  const now = new Set(other.map((r) => `${disk!.prefix}/${r}`));
+  let gone = false;
+  for (const [p, e] of files) if (e.unread && !now.has(p)) gone = files.delete(p);
+  if (gone) pruneDirs();
   for (const r of other) {
     const p = `${disk!.prefix}/${r}`;
     if (files.has(p)) continue;
@@ -301,8 +306,8 @@ export function renameSync(a: string, b: string) {
   drop(a);
 }
 export const copyFileSync = (a: string, b: string) => {
-  const e = files.get(a);
-  if (!e) throw err("ENOENT", a);
+  readFileSync(a); // throws for a missing file, and for one the phone lists but hasn't loaded
+  const e = files.get(a)!;
   put(b, e.text, Date.now(), e.bytes);
 };
 export const mkdtempSync = (prefix: string) => {

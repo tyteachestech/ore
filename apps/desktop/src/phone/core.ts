@@ -64,9 +64,12 @@ if (isTauri()) {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (!/^https?:/i.test(url) || new URL(url).origin === location.origin) return own(input, init);
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    // The shell's fetch only reads: nothing the importers do sends a body.
+    if (init?.body != null || (method !== "GET" && method !== "HEAD")) throw new TypeError(`fetch failed: the iPhone app only reads other sites (${method} ${url})`);
     const headers = [...new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)).entries()];
     type Fetched = { status: number; url: string; headers: [string, string][]; body: string };
-    const r = await invoke<Fetched>("http_fetch", { url, method: init?.method ?? "GET", headers }).catch((e) => {
+    const r = await invoke<Fetched>("http_fetch", { url, method, headers }).catch((e) => {
       throw new TypeError(`fetch failed: ${e}`);
     });
     const bin = atob(r.body);

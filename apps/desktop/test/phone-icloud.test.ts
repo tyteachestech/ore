@@ -10,9 +10,10 @@ const folder = new Map<string, { text: string; mtime: number }>();
 const sent: [string, string | null, boolean?][] = [];
 const stamp = (rel: string) => `${folder.get(rel)!.mtime}:${folder.get(rel)!.text.length}`;
 let waiting: string[] = [];
+let other: string[] = [];
 
 const invoke = async <T,>(cmd: string, args: Record<string, unknown>): Promise<T> => {
-  if (cmd === "library_scan") return { files: [...folder.keys()].map((r) => [r, folder.get(r)!.mtime, stamp(r)]), waiting } as T;
+  if (cmd === "library_scan") return { files: [...folder.keys()].map((r) => [r, folder.get(r)!.mtime, stamp(r)]), waiting, other } as T;
   if (cmd === "library_read") return (args.paths as string[]).map((r) => folder.get(r)?.text ?? null) as T;
   if (cmd === "library_apply") {
     const out: [string, number, string][] = [];
@@ -111,4 +112,18 @@ test("a picture saved with an atomic write reaches the folder byte for byte", as
   fs.renameSync(`${P}/items/c-03/assets/.x.png.tmp`, `${P}/items/c-03/assets/x.png`);
   await flush();
   expect(sent).toEqual([["items/c-03/assets/x.png", Buffer.from(png).toString("base64"), true]]);
+});
+
+test("a file the phone lists but doesn't load (audio, a PDF) is found, never copied as empty, and goes when the Mac deletes it", async () => {
+  other = ["items/c-03/source.m4a"];
+  await rescan();
+  expect(fs.existsSync(`${P}/items/c-03/source.m4a`)).toBe(true);
+  expect(() => fs.readFileSync(`${P}/items/c-03/source.m4a`)).toThrow(/not loaded/);
+  sent.length = 0;
+  expect(() => fs.renameSync(`${P}/items/c-03/source.m4a`, `${P}/items/c-03/moved.m4a`)).toThrow(/not loaded/);
+  await flush();
+  expect(sent).toEqual([]);
+  other = [];
+  await rescan();
+  expect(fs.existsSync(`${P}/items/c-03/source.m4a`)).toBe(false);
 });
