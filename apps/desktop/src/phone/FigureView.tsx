@@ -4,7 +4,7 @@
 // on the phone a drag on the picture is the finger's, so that stays on the Mac.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
+import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 
 export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from: DOMRect; onClose: () => void }) {
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -13,6 +13,13 @@ export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from
   const [zoomed, setZoomed] = useState(false);
   const leaving = useRef(false);
   const tap = useRef<number | null>(null);
+  const zoom = useRef<ReactZoomPanPinchRef>(null);
+  /** The last tap's time and place: a second one close by soon after is a double tap (Photos: zoom in there, or out). */
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  /** Where the finger went down, and whether it has since moved past a tap's jitter (10 pt, as UIKit allows). */
+  const down = useRef<{ x: number; y: number } | null>(null);
+  const moved = useRef(false);
+  const now = useRef<{ zoomed: boolean; back: () => void }>({ zoomed, back: () => {} });
   const swipe = useRef<{ y: number; t: number } | null>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -23,6 +30,7 @@ export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from
     if (still || zoomed) close.current(); // zoomed in, it would shrink from the wrong place: it goes at once
     else setOpen(false);
   };
+  now.current = { zoomed, back };
   useLayoutEffect(() => {
     img.style.visibility = "hidden";
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));
@@ -46,33 +54,58 @@ export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from
       aria-label={img.alt || "Picture"}
       style={{ background: `color-mix(in srgb, var(--bg) ${Math.round(shade * 100)}%, transparent)`, transition: swipe.current ? "none" : undefined }}
       onTouchStart={(e) => {
+        moved.current = e.touches.length > 1;
+        down.current = e.touches.length === 1 ? { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY } : null;
         swipe.current = !zoomed && e.touches.length === 1 ? { y: e.touches[0]!.clientY, t: e.timeStamp } : null;
       }}
       onTouchMove={(e) => {
+        const t = e.touches[0];
+        if (e.touches.length > 1 || !down.current || !t || Math.hypot(t.clientX - down.current.x, t.clientY - down.current.y) > 10) moved.current = true;
         if (!swipe.current || e.touches.length !== 1) return void (swipe.current = null, setDrag(0));
         setDrag(Math.max(0, e.touches[0]!.clientY - swipe.current.y));
       }}
       onTouchEnd={(e) => {
         const s = swipe.current;
         swipe.current = null;
+        // Taps are counted here, not from click: iOS sends no second click once the zoom has taken the touch.
+        const p = e.changedTouches[0];
+        if (!moved.current && p && e.touches.length === 0) {
+          e.preventDefault(); // no click follows: this handler is the tap
+          const last = lastTap.current;
+          if (last && e.timeStamp - last.t < 300 && Math.hypot(p.clientX - last.x, p.clientY - last.y) < 40) {
+            lastTap.current = null;
+            if (tap.current) (clearTimeout(tap.current), (tap.current = null));
+            const z = zoom.current;
+            if (zoomed) z?.resetTransform(200);
+            else z?.setTransform(p.clientX * (1 - 2.5), p.clientY * (1 - 2.5), 2.5, 200);
+          } else {
+            lastTap.current = { t: e.timeStamp, x: p.clientX, y: p.clientY };
+            if (tap.current) clearTimeout(tap.current);
+            tap.current = window.setTimeout(() => {
+              tap.current = null;
+              lastTap.current = null;
+              // As things are now: a pinch begun since leaves it open.
+              if (!now.current.zoomed && !moved.current) now.current.back();
+            }, 300);
+          }
+          return setDrag(0);
+        }
         if (!s || drag < 6) return setDrag(0);
         if (drag > 100 || drag / Math.max(1, e.timeStamp - s.t) > 0.5) back();
         else setDrag(0);
       }}
       onClick={(e) => {
         e.stopPropagation();
-        // One tap puts it back; two zoom it (the zoom's own double tap), so the first waits for a second.
-        if (tap.current) return void (clearTimeout(tap.current), (tap.current = null));
-        tap.current = window.setTimeout(() => {
-          tap.current = null;
-          if (!zoomed) back();
-        }, 280);
+        // A finger's taps are counted in onTouchEnd; a click with no touch before it (a mouse) puts it back.
+        if (lastTap.current || tap.current || zoomed) return;
+        back();
       }}
     >
       <TransformWrapper
         minScale={1}
         maxScale={6}
-        doubleClick={{ mode: zoomed ? "reset" : "zoomIn", step: 1.2 }}
+        ref={zoom}
+        doubleClick={{ disabled: true }}
         panning={{ disabled: !zoomed, velocityDisabled: false }}
         onTransformed={(_, s) => setZoomed(s.scale > 1.01)}
       >

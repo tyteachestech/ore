@@ -987,10 +987,18 @@ function ReaderView(p: Props & { reload: () => void }) {
     };
     const onDown = (e: globalThis.MouseEvent) => e.target === el && e.offsetX >= el.clientWidth && off();
     el.addEventListener("wheel", onWheel, { passive: true });
+    // A finger's scroll on the iPhone is his too; a tap's jitter or a selection handle's drag scrolls nothing.
+    let from = 0;
+    const onTouchStart = () => void (from = el.scrollTop);
+    const onTouchMove = () => Math.abs(el.scrollTop - from) > 2 && off();
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
     el.addEventListener("keydown", onKey);
     el.addEventListener("mousedown", onDown);
     return () => {
       el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("keydown", onKey);
       el.removeEventListener("mousedown", onDown);
     };
