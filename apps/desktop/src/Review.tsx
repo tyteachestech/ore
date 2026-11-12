@@ -13,6 +13,7 @@ import { Hint } from "./Hint";
 import { MoreButton } from "./Menu";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
+import { ownsUndo } from "./history";
 import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
@@ -863,7 +864,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
     if (paused || under) return;
-    if (is(e, "undo") && busyNow.current && !(inTextField(e) && !(e.target as HTMLElement).hasAttribute("data-app-undo"))) {
+    if (is(e, "undo") && busyNow.current && !((e.target as HTMLElement).isContentEditable || ownsUndo(e.target))) {
       // The step it should take back isn't on the history yet (or is being taken back): it waits.
       e.preventDefault();
       e.stopPropagation();
@@ -1004,7 +1005,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
             </button>
           </Hint>
         )}
-        {/* The phone's exercise actions, one ⋯ as Mail's and Notes' (D227): Later before or after the answer, Edit
+        {/* The phone's exercise actions, one ⋯ as Mail's and Notes' (D235): Later before or after the answer, Edit
             once the answer is out (before, it would show it), and Retire. The Mac's toolbar under the answer
             holds them there, with Ask, which needs the Mac's AI (D7). */}
         {PHONE && card && entry && !end && phase !== "edit" && (

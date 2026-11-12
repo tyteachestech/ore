@@ -10,7 +10,7 @@ use serde::Serialize;
 /// What the phone loads: the text files, and a source's small picture as a data URL (as the snapshot did).
 fn wanted(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
-    [".md", ".yaml", ".yml", ".json", ".jsonl", ".excalidraw"].iter().any(|e| lower.ends_with(e)) || picture(&lower).is_some()
+    [".md", ".yaml", ".yml", ".json", ".jsonl", ".excalidraw", ".vtt"].iter().any(|e| lower.ends_with(e)) || picture(&lower).is_some()
 }
 fn picture(name: &str) -> Option<&'static str> {
     let (stem, ext) = name.rsplit_once('.')?;
@@ -49,19 +49,24 @@ struct Scan {
     files: Vec<(String, f64, String)>,
     /// Files iCloud hasn't downloaded yet; each has been asked for.
     waiting: Vec<String>,
+    /// Every other file (a source's audio, PDF, images): listed, so the core sees it, but not read.
+    other: Vec<String>,
 }
 
 /// Ore's folder in iCloud Drive, or None when iCloud Drive is off for Ore.
 #[tauri::command]
-async fn library_dir() -> Option<String> {
+async fn library_dir(app: tauri::AppHandle) -> Option<String> {
+    use tauri::Manager;
     let dir = container()?.join("Documents");
     fs::create_dir_all(&dir).ok()?;
+    // A source's saved images, audio and PDF load from the folder through the asset protocol: only this folder.
+    let _ = app.asset_protocol_scope().allow_directory(&dir, true);
     Some(dir.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
 async fn library_scan(root: String) -> Scan {
-    let mut out = Scan { files: vec![], waiting: vec![] };
+    let mut out = Scan { files: vec![], waiting: vec![], other: vec![] };
     // Asks iCloud for the folder itself too, so new files the Mac added come down.
     download(Path::new(&root));
     walk(Path::new(&root), "", &mut out);
@@ -94,6 +99,8 @@ fn walk(dir: &Path, rel: &str, out: &mut Scan) {
             if let Some((ms, s)) = stamp(&path) {
                 out.files.push((r, ms, s));
             }
+        } else {
+            out.other.push(r);
         }
     }
 }
@@ -156,6 +163,106 @@ async fn library_apply(root: String, ops: Vec<(String, Option<String>, bool)>) -
     Ok(stamps)
 }
 
+#[derive(Serialize)]
+struct Fetched {
+    status: u16,
+    url: String,
+    headers: Vec<(String, String)>,
+    body: String,
+}
+
+/// Fetches another site for an import, as the Mac's fetch would: redirects followed, the final URL and
+/// every status (a 404 too) handed back, the body as base64.
+#[tauri::command]
+async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, String)>) -> Result<Fetched, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(30)).build();
+        let mut req = agent.request(method.as_deref().unwrap_or("GET"), &url);
+        for (k, v) in &headers {
+            req = req.set(k, v);
+        }
+        let res = match req.call() {
+            Ok(r) => r,
+            Err(ureq::Error::Status(_, r)) => r,
+            Err(e) => return Err(e.to_string()),
+        };
+        let status = res.status();
+        let final_url = res.get_url().to_string();
+        let headers = res.headers_names().into_iter().filter_map(|n| res.header(&n).map(|v| (n.clone(), v.to_string()))).collect();
+        let mut body = vec![];
+        std::io::Read::read_to_end(&mut std::io::Read::take(res.into_reader(), 200 << 20), &mut body).map_err(|e| e.to_string())?;
+        Ok(Fetched { status, url: final_url, headers, body: base64::engine::general_purpose::STANDARD.encode(body) })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Links the Share Extension (apps/phone/share) left in the App Group move into the library's inbox
+/// (D223), where the app shows them. Returns how many came in.
+#[tauri::command]
+async fn share_inbox(root: String) -> usize {
+    let Some(from) = group().map(|g| g.join("inbox")) else { return 0 };
+    let to = Path::new(&root).join("inbox");
+    let Ok(entries) = fs::read_dir(&from) else { return 0 };
+    let _ = fs::create_dir_all(&to);
+    let entries: Vec<_> = entries.flatten().collect();
+    // A shared file's folder goes before its item, so the item never arrives without its file.
+    for e in entries.iter().filter(|e| e.path().is_dir()) {
+        let _ = fs::rename(e.path(), to.join(e.file_name()));
+    }
+    let item = |e: &&fs::DirEntry| {
+        let n = e.file_name().to_string_lossy().to_string();
+        n.ends_with(".link.json") || (n.ends_with(".file.json") && !from.join(n.trim_end_matches(".file.json")).exists())
+    };
+    entries.iter().filter(item).filter(|e| fs::rename(e.path(), to.join(e.file_name())).is_ok()).count()
+}
+
+/// One file's bytes as base64: a file the share sheet saved to the inbox, read when the phone imports it.
+#[tauri::command]
+async fn library_bytes(root: String, path: String) -> Option<String> {
+    Some(base64::engine::general_purpose::STANDARD.encode(fs::read(inside(&root, &path).ok()?).ok()?))
+}
+
+/// His skills, as JSON, for the share card's chips: the extension can't read the library itself.
+#[tauri::command]
+async fn share_skills(json: String) -> bool {
+    let Some(dir) = group() else { return false };
+    fs::create_dir_all(&dir).is_ok() && fs::write(dir.join("skills.json"), json).is_ok()
+}
+
+/// The inbox item the share card's Open asked for (apps/phone/share writes its id to `open` in the App Group
+/// before bringing the app forward): read once, then gone. One left over a minute ago is from an Open that
+/// never brought the app forward, and isn't followed on some later launch.
+#[tauri::command]
+async fn share_open() -> Option<String> {
+    let at = group()?.join("open");
+    let id = fs::read_to_string(&at).ok()?;
+    let fresh = fs::metadata(&at).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|d| d.as_secs() < 60);
+    let _ = fs::remove_file(&at);
+    if !fresh {
+        return None;
+    }
+    let id = id.trim();
+    (!id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric())).then(|| id.to_string())
+}
+
+#[cfg(target_os = "ios")]
+#[allow(unused_unsafe)]
+fn group() -> Option<PathBuf> {
+    use objc2_foundation::{NSFileManager, NSString};
+    const GROUP: &str = "group.com.tylerpoelking.ore";
+    match unsafe { NSFileManager::defaultManager().containerURLForSecurityApplicationGroupIdentifier(&NSString::from_str(GROUP)) } {
+        Some(url) => Some(PathBuf::from(unsafe { url.path() }?.to_string())),
+        // The Simulator's build drops the App Group entitlement: the Share Extension writes beside the containers.
+        None if cfg!(target_abi = "sim") => Some(PathBuf::from(std::env::var_os("HOME")?).parent()?.parent()?.join("Shared/AppGroup").join(GROUP)),
+        None => None,
+    }
+}
+#[cfg(not(target_os = "ios"))]
+fn group() -> Option<PathBuf> {
+    None
+}
+
 #[cfg(target_os = "ios")]
 #[allow(unused_unsafe)]
 fn container() -> Option<PathBuf> {
@@ -182,12 +289,41 @@ fn container() -> Option<PathBuf> {
 #[cfg(not(target_os = "ios"))]
 fn download(_: &Path) {}
 
+// The YouTube embed refuses tauri://localhost as its embedder (error 153), so it sits in a relay page served
+// on 127.0.0.1, as on the Mac (apps/desktop/src-tauri/src/main.rs, Video.tsx).
+const PLAYER_HTML: &str = include_str!("../../../desktop/src-tauri/src/player.html");
+static PLAYER_PORT: std::sync::OnceLock<Option<u16>> = std::sync::OnceLock::new();
+
+#[tauri::command]
+fn player_port() -> Option<u16> {
+    *PLAYER_PORT.get_or_init(|| {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").ok()?;
+        let port = listener.local_addr().ok()?.port();
+        std::thread::spawn(move || {
+            for mut s in listener.incoming().flatten() {
+                std::thread::spawn(move || {
+                    let _ = s.set_read_timeout(Some(std::time::Duration::from_secs(5)));
+                    let mut buf = [0u8; 4096];
+                    let n = s.read(&mut buf).unwrap_or(0);
+                    let req = String::from_utf8_lossy(&buf[..n]);
+                    let ok = req.starts_with("GET /player?") || req.starts_with("GET /player ");
+                    let (status, body) = if ok { ("200 OK", PLAYER_HTML) } else { ("404 Not Found", "") };
+                    let _ = write!(s, "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{body}", body.len());
+                });
+            }
+        });
+        Some(port)
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply])
+        .plugin(tauri_plugin_notification::init())
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, http_fetch, share_inbox, share_skills, share_open, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }

@@ -10,7 +10,7 @@ import type { Intent } from "./ore";
 
 export type Mark = { key: string; kind: Intent | "evidence"; range: Range; open: () => void };
 
-const STEP = 16; // icons that start on the same line sit side by side, leftwards
+const STEP = 20; // icons that start on the same line sit side by side, leftwards, one 20px button apart (F21)
 
 // Memo: the reader re-renders on every cursor step, and a source can carry hundreds of marks.
 export const Marks = memo(function Marks({ marks }: { marks: Mark[] }) {

@@ -123,7 +123,7 @@ describe("shortcut editor: the player's second keys (YouTube's K J L)", () => {
 
   test("they still meet every key that works on a playing source, and read-aloud's own keys meet Listen", () => {
     resetKeys();
-    expect(clash("forward-alt", "KeyA")?.id).toBe("archive");
+    expect(clash("forward-alt", "KeyN")?.id).toBe("notes");
     expect(clash("back-alt", "KeyH")?.id).toBe("highlight");
     expect(clash("play-alt", "KeyL")?.id).toBe("forward-alt");
     expect(clash("forward", "KeyJ")?.id).toBe("back-alt");

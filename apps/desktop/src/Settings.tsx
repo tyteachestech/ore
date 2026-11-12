@@ -31,8 +31,8 @@ const SECTIONS = [
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
-const GOALS = [5, 10, 15, 20, 30];
-const NEW = [0, 5, 10, 20];
+export const GOALS = [5, 10, 15, 20, 30];
+export const NEW = [0, 5, 10, 20];
 const VENDORS: { id: Vendor; label: string }[] = [
   { id: "claude", label: "Claude" },
   { id: "codex", label: "ChatGPT" },
@@ -44,6 +44,23 @@ const clock = (t: string) => new Date(`2000-01-01T${t}:00`).toLocaleTimeString(u
 
 const LAST = "ore.settings";
 const home = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
+
+const AGENT_AT = "ore.reminder-agent";
+/** The reminder's time is in skills.yaml, which the iPhone's Settings can change through iCloud (D228): the Mac's
+ *  LaunchAgent follows it when Ore opens or comes to the front. Only the installed app, so a dev build never takes it over. */
+export function useReminderAgent() {
+  useEffect(() => {
+    if (PHONE || import.meta.env.DEV) return;
+    const follow = () =>
+      void ore<Data>("settings")
+        .then(({ review: { reminder: t } }) => (load(AGENT_AT) === t ? undefined : invoke("set_reminder", { time: t || null }).then(() => save(AGENT_AT, t))))
+        .catch(() => {});
+    // Not at launch itself: every `ore` call then is a process competing with the ones that draw Home.
+    const first = setTimeout(follow, 3000);
+    addEventListener("focus", follow);
+    return () => (clearTimeout(first), removeEventListener("focus", follow));
+  }, []);
+}
 
 /** ⌘, (Codex, Linear): sections on the left, each a page of grouped rows with a title, one line on
  *  what it does and its control. Every change saves at once; Esc goes back to where he was. */
@@ -133,6 +150,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
           await ore("goal", opt("reminder", was || "off")).catch(() => {});
           throw new Error(`macOS didn’t take the reminder (${errorText(e)}). Pick the time again to retry.`);
         });
+        save(AGENT_AT, t);
       },
       record ? { message: "Changed the reminder", undo: () => setReminder(was, false), redo: () => setReminder(t, false) } : undefined,
     );
@@ -435,7 +453,7 @@ function QuizShortcut({ notify }: { notify: Notify }) {
   );
 }
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+export function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="settings-group">
       <h2>{title}</h2>
@@ -444,7 +462,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Row({ title, text, htmlFor, children }: { title: string; text: string; htmlFor?: string; children: ReactNode }) {
+export function Row({ title, text, htmlFor, children }: { title: string; text: string; htmlFor?: string; children: ReactNode }) {
   return (
     <div className="settings-row">
       <div className="settings-row-text">
@@ -457,13 +475,18 @@ function Row({ title, text, htmlFor, children }: { title: string; text: string; 
 }
 
 /** "After ___, I review." Enter or clicking away saves, Esc keeps what was there (D211). */
-function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) => void }) {
+export function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) => void }) {
   const [text, setText] = useState(plan);
   useEffect(() => setText(plan), [plan]);
   /** Enter or Esc already settled it: the blur their focus move causes saves nothing more. */
   const settled = useRef(false);
   // Leaving the field hands focus to the sheet, not the page under it, so the next Esc closes Settings.
-  const done = (field: HTMLElement) => field.closest<HTMLElement>(".settings-sheet")?.focus();
+  // On the iPhone there is no sheet: the keyboard goes, as Return does in iOS Settings.
+  const done = (field: HTMLElement) => {
+    const sheet = field.closest<HTMLElement>(".settings-sheet");
+    if (sheet) sheet.focus();
+    else field.blur();
+  };
   return (
     <span className="settings-plan">
       After
@@ -578,7 +601,7 @@ function Previews<T extends { id: string; label: string }>({ label, value, optio
   );
 }
 
-function Seg({ label, value, options, disabled, onChange }: { label: string; value: string; options: readonly { id: string; label: string }[]; disabled?: boolean; onChange: (v: string) => void }) {
+export function Seg({ label, value, options, disabled, onChange }: { label: string; value: string; options: readonly { id: string; label: string }[]; disabled?: boolean; onChange: (v: string) => void }) {
   return (
     <ToggleGroup.Root className="seg" type="single" value={value} disabled={disabled} onValueChange={(v) => v && v !== value && onChange(v)} aria-label={label}>
       {options.map((o) => (

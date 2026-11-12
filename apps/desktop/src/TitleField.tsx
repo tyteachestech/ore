@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { keepKeysIn } from "./keys";
 
 /** A title edited in place (Finder's Rename, Notion's page title), one field for every list and the reader.
  *  (The author's byline too.) Enter or clicking away saves (D211), Esc keeps the old one. The field
@@ -44,7 +45,7 @@ export function TitleField({ value, label = "Title", className = "row-rename", p
       onFocus={(e) => (busy.current ? (left.current = false) : e.currentTarget.select())}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
-        e.stopPropagation();
+        keepKeysIn(e); // ⌘Z still reaches the app history
         if (busy.current) return;
         if (e.key === "Escape") {
           settled.current = true;

@@ -8,8 +8,10 @@ import { parseArgs } from "@pkgjs/parseargs";
 import * as YAML from "yaml";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { existsSync, mount, mountDisk, readFileSync, rescan } from "./fs";
+import { setLibraryRoot } from "./tauri-core";
+import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, writeFileSync } from "./fs";
 import { ready } from "./sqlite";
+import { shareList } from "./share-skills";
 
 export const ROOT = "/lib";
 
@@ -17,7 +19,7 @@ let stdin = "";
 const g = globalThis as unknown as Record<string, unknown>;
 // What the core and CLI read from Bun and Node besides the modules above.
 g.process = {
-  env: { ...(g.process as { env?: object } | undefined)?.env, ORE_LIBRARY: ROOT, ORE_NO_ENRICH: "1", ORE_DEVICE: "iphone" },
+  env: { ...(g.process as { env?: object } | undefined)?.env, ORE_LIBRARY: ROOT, ORE_NO_ENRICH: "1", ORE_NO_TOOLS: "1", ORE_DEVICE: "iphone" },
   platform: "ios",
   pid: 1,
   cwd: () => ROOT,
@@ -56,6 +58,44 @@ g.Bun = {
   spawnSync: () => ({ exitCode: 1, stdout: new Uint8Array(), stderr: new Uint8Array() }),
 };
 
+/** Other sites go through the shell's native fetch (apps/phone/src-tauri/src/lib.rs `http_fetch`): a web view
+ *  can't read them (CORS, and the CSP's connect-src). Same-origin and data/blob URLs stay with the web view. */
+if (isTauri()) {
+  const own = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (!/^https?:/i.test(url) || new URL(url).origin === location.origin) return own(input, init);
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    // The shell's fetch only reads: nothing the importers do sends a body.
+    if (init?.body != null || (method !== "GET" && method !== "HEAD")) throw new TypeError(`fetch failed: the iPhone app only reads other sites (${method} ${url})`);
+    const headers = [...new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)).entries()];
+    type Fetched = { status: number; url: string; headers: [string, string][]; body: string };
+    const r = await invoke<Fetched>("http_fetch", { url, method, headers }).catch((e) => {
+      throw new TypeError(`fetch failed: ${e}`);
+    });
+    const bin = atob(r.body);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    // A status the web's Response can't hold (LinkedIn's 999) is a refusal: 520, so the importer says so itself.
+    const status = r.status >= 200 && r.status <= 599 ? r.status : 520;
+    const res = new Response([204, 205, 304].includes(status) ? null : bytes, { status, headers: r.headers });
+    Object.defineProperty(res, "url", { value: r.url });
+    Object.defineProperty(res, "redirected", { value: r.url !== url });
+    return res;
+  }) as typeof fetch;
+}
+
+/** Links the Share Extension saved since (apps/phone/share) come into the library's inbox. */
+let libraryDir: string | null = null;
+const shared = () => (libraryDir ? invoke<number>("share_inbox", { root: libraryDir }).catch(() => 0) : Promise.resolve(0));
+
+/** The share card files a link under a skill with one tap: it shows these, in the sidebar's order. */
+export const shareSkills = (skills: { id: string; name: string; icon?: string; color?: string }[]) =>
+  void (isTauri() && invoke("share_skills", { json: JSON.stringify(shareList(skills)) }).catch(() => false));
+
+/** The inbox item the share card's Open asked to see (lib.rs `share_open`), once. */
+export const shareOpen = () => (isTauri() ? invoke<string | null>("share_open").catch(() => null) : Promise.resolve(null));
+
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
 function boot() {
@@ -63,10 +103,14 @@ function boot() {
     if (isTauri()) {
       const root = await invoke<string | null>("library_dir");
       if (!root) throw new Error("Turn on iCloud Drive for Ore: Settings › your name › iCloud › Drive.");
+      libraryDir = root;
+      await shared();
       await mountDisk(ROOT, root, invoke);
+      // A source's own files (its images) load from the folder itself: /lib/... is the folder on disk.
+      setLibraryRoot(ROOT, root);
     } else {
       const text = await (await fetch("/library.json")).text();
-      const snap = JSON.parse(text) as Record<string, string>;
+      const snap = JSON.parse(text) as Record<string, string | null>;
       await mount(Object.fromEntries(Object.entries(snap).map(([p, t]) => [`${ROOT}/${p}`, t])), bytesToHex(sha256(new TextEncoder().encode(text))));
     }
     await ready(wasmUrl);
@@ -86,11 +130,34 @@ function exclusive<T>(f: () => Promise<T>): Promise<T> {
 }
 
 /** Reads in what changed on the Mac (through iCloud) since; true if anything did. */
-export const pull = () => (booted ? booted.then(() => exclusive(rescan)).catch(() => false) : Promise.resolve(false));
+export const pull = () =>
+  booted
+    ? booted
+        .then(async () => {
+          const came = await shared();
+          return (await exclusive(rescan)) || came > 0;
+        })
+        .catch(() => false)
+    : Promise.resolve(false);
+
+/** A file the share sheet saved to the inbox is listed, not loaded (fs.ts): this phone's own come in as bytes
+ *  before an import reads them. Another device's is left for that device, or the Mac. */
+async function loadShared() {
+  const dir = `${ROOT}/inbox`;
+  if (!existsSync(dir)) return;
+  for (const n of readdirSync(dir)) {
+    if (!n.endsWith(".file.json")) continue;
+    try {
+      const q = JSON.parse(readFileSync(`${dir}/${n}`, "utf8")) as { file?: unknown; device?: unknown };
+      if (q.device === "iphone" && typeof q.file === "string" && !q.file.split("/").some((part) => !part || part === "." || part === "..")) await load(`${dir}/${q.file}`);
+    } catch {}
+  }
+}
 
 /** `ore <args> --json` in-process: the command's JSON output, or its one-line error. */
 export async function run<T>(args: string[], input: string | null): Promise<T> {
   const lib = await boot();
+  if (args[0] === "inbox" && args.includes("--import")) await loadShared();
   return exclusive(() => command<T>(lib, args, input));
 }
 
@@ -119,8 +186,13 @@ async function command<T>({ commands, errorLine }: typeof import("ore-commands")
 
 function picture(path: string): string | undefined {
   try {
-    const text = readFileSync(path);
-    return text.startsWith("data:image/") ? text : undefined;
+    const got = readFileSync(path) as string | Uint8Array;
+    if (typeof got === "string") return got.startsWith("data:image/") ? got : undefined;
+    // One this phone just saved (an import's thumbnail) is still its bytes: the same data URL the folder's read gives.
+    const kind = ({ jpg: "jpeg", jpeg: "jpeg", png: "png", webp: "webp", gif: "gif" } as Record<string, string>)[path.split(".").pop()!.toLowerCase()];
+    let bin = "";
+    for (let i = 0; i < got.length; i += 0x8000) bin += String.fromCharCode(...got.subarray(i, i + 0x8000));
+    return kind ? `data:image/${kind};base64,${btoa(bin)}` : undefined;
   } catch {
     return undefined;
   }
@@ -130,4 +202,19 @@ function picture(path: string): string | undefined {
  *  failing on a missing prompt file. Storing a recall or his own key-point marks needs no AI. */
 const AI = new Set(["grade", "ask", "enrich", "key-points", "research", "remix", "catch-up"]);
 const needsAi = (name: string, args: string[]) =>
-  AI.has(name) || (name === "inbox" && args.includes("--import")) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));
+  AI.has(name) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));
+
+/** A file picked on the phone (a PDF, a book, a photo) is saved to the inbox, as a link is (D235): its bytes
+ *  pass through a scratch path the folder never sees. */
+let picks = 0;
+export async function queuePicked(name: string, bytes: Uint8Array, skill?: string): Promise<void> {
+  await boot();
+  const dir = `${ROOT}/.ore/pick-${++picks}`;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(`${dir}/${name}`, bytes);
+  try {
+    await run(["inbox", "--add-file", `${dir}/${name}`, "--name", name, ...(skill ? ["--skill", skill] : []), "--json"], null);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+}

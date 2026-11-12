@@ -10,6 +10,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
@@ -20,6 +21,7 @@ import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
+import { breakList, bulletOnSpace, fromBullets, showBullets } from "./list-keys";
 import { HideDots } from "./HideDots";
 import { Hint } from "./Hint";
 import { Thumb } from "./Thumb";
@@ -29,7 +31,7 @@ import { bigger, keepPlace, placeOf, smaller } from "./reading";
 import { againIn, define, lookable, wordAt } from "./lookup";
 import { Explain } from "./Explain";
 import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
-import { MoreButton, WithMenu, type MenuAction } from "./Menu";
+import { group, MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { findChapterEnds, Margin, type ChapterEnd, type MarginHandle } from "./Margin";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
@@ -165,6 +167,8 @@ function zoomable(t: EventTarget | null, doc: HTMLElement | null): Zoomed | null
   const img = (t as Element | null)?.closest?.("img");
   if (!(img instanceof HTMLImageElement) || !doc?.contains(img) || img.closest("a[href]") || !img.naturalWidth) return null;
   const from = img.getBoundingClientRect();
+  // On the phone any picture opens, to pinch in on (Books): the screen is as wide as the column.
+  if (PHONE) return { img, from };
   return Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height) > 1.1 ? { img, from } : null;
 }
 
@@ -546,7 +550,8 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, c
   );
 });
 
-type Popup = { id: string; top: number; left: number; below: boolean; note: string };
+/** `wide`: the note ran past four lines, so the popup widened for it, and stays so while it is open. */
+type Popup = { id: string; top: number; left: number; below: boolean; note: string; wide?: boolean };
 /** Where a highlight's passage sits: in the body (to save) and on the page (to paint). */
 type Span = { exact: string; start: number; range: Range };
 
@@ -1249,7 +1254,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   }, [reveal, ready, body]);
 
-  // Icons in the left margin (Marks): a star on each key point and a ? on each question (a plain highlight's
+  // Icons in the left margin (Marks): a gem on each key point and a ? on each question (a plain highlight's
   // tint says enough, D118), and one per "In the source" passage while a quiz answer is open, so the
   // passing orange tint is not mistaken for a highlight.
   const marks = useMemo<Mark[]>(() => {
@@ -1276,7 +1281,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   // Opening the source note puts the caret in it; closing writes what is pending.
   /** A PDF's own file, for the Original tab (D202); any other source has only the two tabs. */
-  const pdf = !PHONE && doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
+  const pdf = doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
   const sideTab: SideTab = p.sideTab === "original" && !pdf ? "note" : p.sideTab;
   const notesShown = p.notesOpen && !closedBook && sideTab === "note";
   const questionsShown = p.notesOpen && !closedBook && sideTab === "questions";
@@ -1510,7 +1515,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   /** The popup's centre across the page, kept inside it. */
   function leftFor(x: number, box: DOMRect) {
-    const half = video ? 230 : 190; // half the popup's width, plus room
+    const half = 230; // half the widest popup (a long note's, .popup.wide), plus room
     // iPhone: the popup spans the screen less 12pt each side (styles.css), centred like an iOS sheet.
     return PHONE ? innerWidth / 2 - box.left : Math.min(Math.max(x - box.left, half), box.width - half);
   }
@@ -1553,7 +1558,15 @@ function ReaderView(p: Props & { reload: () => void }) {
     return () => obs.disconnect();
   }, [popup?.id]);
 
-  /** A passage a question may be answered by (D75): scrolled a third of the way down and tinted for a moment. */
+  // A note past four lines widens the popup once, 360 to 440px, so a dense note wraps less; it never narrows back
+  // under him while it is open. The phone's popup already spans the screen.
+  useLayoutEffect(() => {
+    const el = noteRef.current;
+    if (!popup || popup.wide || PHONE || !el) return;
+    if (el.scrollHeight > 4 * parseFloat(getComputedStyle(el).lineHeight) + 12) setPopup((cur) => cur && { ...cur, wide: true });
+  }, [popup?.note, popup?.wide]);
+
+    /** A passage a question may be answered by (D75): scrolled a third of the way down and tinted for a moment. */
   function jumpToQuote(m: { quote: string; start?: number }) {
     const el = scrollRef.current;
     const index = idx.current;
@@ -1808,7 +1821,23 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
   const annotate = <T = unknown,>(id: string, ...args: string[]) => annotateWaking<T>(wakeOnLanding(), id, ...args);
 
-  /** The popup's marks are switches on one highlight (D118): Key point or Question, again for neither. */
+  /** A digit that just set the type from an empty note (D133), and how to take that change back. */
+  const typeKey = useRef<{ key: string; at: number; undo?: () => void } | null>(null);
+  /** "1." in an empty note starts a numbered list, not a type change then a stray "." (D133 sets the type on
+   *  1–4 while the note is empty): the "." or ")" right after the digit takes the change back and writes both. */
+  function numbered(e: KeyboardEvent, note: HTMLTextAreaElement) {
+    const key = typeKey.current;
+    typeKey.current = null;
+    if (!key || note.value || (e.key !== "." && e.key !== ")") || performance.now() - key.at > 1500) return false;
+    key.undo?.();
+    if (!document.execCommand("insertText", false, key.key + e.key)) {
+      note.setRangeText(key.key + e.key, 0, 0, "end");
+      note.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    return true;
+  }
+
+    /** The popup's marks are switches on one highlight (D118): Key point or Question, again for neither. */
   async function setIntent(want: Intent) {
     if (!popup) return;
     const now = annOf(popup.id)?.intent;
@@ -1828,6 +1857,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     // On the history at once, so a ⌘Z right after the click takes this change back, not the step before it.
     const to = (i: Intent) => () => saved.then((rid) => setIntentOf(rid, i, false));
     const forget = undoable && was && was !== intent ? p.notify(`Changed to ${LABEL[intent]}`, "quiet", to(was), to(intent)) : undefined;
+    const key = typeKey.current;
+    if (undoable && key && !key.undo) key.undo = () => {
+      forget?.();
+      if (was && was !== intent) void to(was)();
+    };
     try {
       await annotateWaking(wake, await saved, "--intent", intent);
     } catch (e) {
@@ -2153,6 +2187,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       if (!note.value && INTENTS.some((i) => is(e, i))) return;
       e.stopImmediatePropagation();
       note.focus();
+      if (numbered(e, note)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -2265,9 +2300,10 @@ function ReaderView(p: Props & { reload: () => void }) {
         else copy(citeSources([doc]), "Copied as Markdown");
         return;
       }
-      if (doc && !popup && !inField && !inNote && (is(e, "rename") || is(e, "archive"))) {
+      if (doc && !popup && !inField && !inNote && (is(e, "rename") || is(e, "archive") || (is(e, "pin") && !doc.archived_at))) {
         e.preventDefault();
         if (is(e, "rename")) setRenaming(true);
+        else if (is(e, "pin")) pinRef.current();
         else p.onArchive(doc);
         return;
       }
@@ -2346,6 +2382,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           const typed = INTENTS.find((i) => is(e, i));
           if (typed && !noteRef.current?.value) {
             e.preventDefault();
+            typeKey.current = { key: e.key, at: performance.now(), undo: undefined };
             void setIntent(typed);
           } else if (plain && !e.shiftKey && e.key === "Enter" && !e.isComposing) {
             e.preventDefault();
@@ -2362,6 +2399,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         const intent = INTENTS.find((i) => is(e, i));
         if (intent) {
           e.preventDefault();
+          if (!noteRef.current?.value) typeKey.current = { key: e.key, at: performance.now(), undo: undefined };
           void setIntent(intent);
         } else if (is(e, "note")) {
           e.preventDefault();
@@ -2419,6 +2457,21 @@ function ReaderView(p: Props & { reload: () => void }) {
       noteReached();
     }, 150);
   };
+
+  // A press anywhere off the popup closes it and keeps the highlight (Notion, Readwise Reader): in the
+  // margins beside the text and around the page too, not only on the page (whose press closes it below).
+  // A menu the popup opens in a portal is still the popup.
+  useEffect(() => {
+    if (!popup) return;
+    const down = (e: globalThis.MouseEvent) => {
+      const t = e.target as Element;
+      if (pageRef.current?.contains(t) || popupRef.current?.contains(t) || t.closest?.("[data-radix-popper-content-wrapper]")) return;
+      keepNote();
+      setPopup(null);
+    };
+    document.addEventListener("mousedown", down);
+    return () => document.removeEventListener("mousedown", down);
+  });
 
   const pressedAt = useRef({ x: 0, y: 0 });
   const onMouseDown = (e: MouseEvent) => {
@@ -2683,6 +2736,14 @@ function ReaderView(p: Props & { reload: () => void }) {
   const copyPath = (item: Item) =>
     navigator.clipboard.writeText(pathOf(item)).then(() => p.notify("Path copied"), (e) => p.notify(errorText(e), "error"));
   const copy = (c: Cited, done: string) => copyCited(c).then(() => p.notify(done), (e) => p.notify(errorText(e), "error"));
+  /** Pin or unpin the open source (⌥⌘P or its ⋯ menu), shown at once. */
+  const pin = () => {
+    if (!doc) return;
+    setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
+    p.onPin(doc);
+  };
+  const pinRef = useRef(pin);
+  pinRef.current = pin;
   /** A highlight as a quote with its source (Readwise), and his note under it. */
   const copyHighlight = (id: string, note?: string) => {
     const a = annOf(id);
@@ -2818,17 +2879,35 @@ function ReaderView(p: Props & { reload: () => void }) {
   const actions: MenuAction[] = !doc
     ? []
     : [
+        { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenaming(true) },
+        { id: "author", label: doc.author ? "Edit author…" : "Add author…", run: () => setAuthoring(true) },
+        ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", hint: label(keys.pin), run: pin }]),
+        ...group([
+        ...(doc.status === "done"
+          ? [{ id: "toread", label: "Move to To read", run: () => {
+              setDoc((cur) => cur && { ...cur, status: "reading" });
+              p.onMove(doc, "reading");
+            } }]
+          : doc.preview ? []
+          : [{ id: "finish", label: "Finish source", hint: label(keys["finish-source"]), run: () => p.setFinishing(true) }]),
+        ...(p.onReview ? [{ id: "review-source", label: "Review this source", run: () => p.onReview!(doc) }] : []),
+        { id: "card-here", label: "Add a key point here…", hint: label(keys.card), run: cardHere },
+        ...(video || PHONE ? [] : [{ id: "listen", label: listen ? "Stop listening" : "Listen", hint: label(keys.listen), run: () => (listen ? stopListening() : startListening()) }]),
+        { id: "collected", label: questionsShown ? "Close collected" : "Collected", hint: label(keys.collected), run: () => p.onShowSide("questions") },
+        ]),
+        ...group([
         ...(doc.url || doc.source_file ? [{ id: "original", label: "Open original", hint: label(keys.original), run: () => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error")) }] : []),
         ...(doc.url ? [{ id: "link", label: "Copy link", hint: label(keys.link), run: () => copyLink(doc) }] : []),
         { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), paletteOnly: !PHONE, run: () => void copy(citeSources([doc]), "Copied as Markdown") },
         { id: "path", label: "Copy path", hint: label(keys.path), run: () => copyPath(doc) },
         { id: "reveal", label: "Reveal in Finder", hint: label(keys.reveal), run: () => void revealInFinder(doc).catch((e) => p.notify(errorText(e), "error")) },
-        { id: "rename", label: "Rename…", hint: label(keys.rename), divider: true, run: () => setRenaming(true) },
-        { id: "author", label: doc.author ? "Edit author…" : "Add author…", run: () => setAuthoring(true) },
+        ]),
+        ...group([
         // A PDF or EPUB file is read again from the copy kept with it, so a better reader reaches it.
         // Not on the phone: it can't fetch a page (its CSP) or reread an original (not in its library), D78; like Listen.
         ...(!PHONE && ((doc.url && doc.type !== "snippet") || doc.type === "pdf" || doc.type === "epub") ? [{ id: "reimport", label: "Reimport", run: () => void reimport() }] : []),
         ...(doc.page_text && !PHONE ? [{ id: "page-text", label: "Add the page’s text", run: () => void addPageText() }] : []),
+        ]),
         ...(PHONE ? [] : [{ id: "find", label: "Find in source…", hint: label(keys.filter), paletteOnly: true, run: openFind }]),
         ...(p.skills.length
           ? [{
@@ -2846,17 +2925,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               })),
             }]
           : []),
-        ...(doc.status === "done"
-          ? [{ id: "toread", label: "Move to To read", divider: true, run: () => {
-              setDoc((cur) => cur && { ...cur, status: "reading" });
-              p.onMove(doc, "reading");
-            } }]
-          : doc.preview ? []
-          : [{ id: "finish", label: "Finish source", hint: label(keys["finish-source"]), divider: true, run: () => p.setFinishing(true) }]),
-        ...(video || PHONE ? [] : [{ id: "listen", label: listen ? "Stop listening" : "Listen", hint: label(keys.listen), run: () => (listen ? stopListening() : startListening()) }]),
         ...(focus ? [{ id: "highlight", label: "Highlight focused text", hint: label(keys.highlight), paletteOnly: true, run: () => highlightFocus("keep") }] : []),
-        ...(p.onReview ? [{ id: "review-source", label: "Review this source", run: () => p.onReview!(doc) }] : []),
-        { id: "card-here", label: "Add a key point here…", hint: label(keys.card), run: cardHere },
         // The open highlight's own tools, also in ⌘K (three ways to every action); its popup has the buttons.
         ...(popup && !PHONE
           ? [
@@ -2867,13 +2936,9 @@ function ReaderView(p: Props & { reload: () => void }) {
           : []),
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
-        { id: "collected", label: questionsShown ? "Close collected" : "Collected", hint: label(keys.collected), run: () => p.onShowSide("questions") },
-        ...(pdf ? [{ id: "original-page", label: originalShown ? "Close original page" : "Original page beside the text", paletteOnly: true, run: () => p.onShowSide("original") }] : []),
+        // On the phone the PDF's own page is a page of its own, beside the source as the note is (Back returns).
+        ...(pdf ? [{ id: "original-page", label: PHONE ? "Original page" : originalShown ? "Close original page" : "Original page beside the text", paletteOnly: !PHONE, run: () => p.onShowSide("original") }] : []),
         ...(readingFor ? [{ id: "reading-for", label: "Show prequestions", paletteOnly: true, run: () => setPreqAsk((n) => n + 1) }] : []),
-        ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", run: () => {
-          setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
-          p.onPin(doc);
-        } }]),
         { id: "archive", label: doc.archived_at ? "Restore" : "Archive", hint: label(keys.archive), danger: !doc.archived_at, divider: true, run: () => p.onArchive(doc) },
       ];
   p.actionsRef.current = closedBook ? [] : actions;
@@ -2881,7 +2946,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   const menuActions = actions.filter((a) => !a.paletteOnly);
   const canFinish = !!doc && doc.status !== "done" && !doc.preview;
   // On the phone Finish lives here and at the end of the source; the top bar stays Back and ⋯ (D156).
-  const phoneActions = menuActions.filter((a) => !["reveal", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url));
+  const phoneActions = menuActions.filter((a) => !["reveal", "path", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url));
   const shownActions = PHONE
     ? [...phoneActions.filter((a) => a.id === "finish").map((a) => ({ ...a, label: "Finish", hint: undefined })), ...phoneActions.filter((a) => a.id !== "finish")].map((a, i) => (i ? a : { ...a, divider: false }))
     : menuActions;
@@ -3002,7 +3067,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     : undefined;
 
   return (
-    <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && (notesShown || questionsShown) ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
+    <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && panelShown ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
       <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
@@ -3222,7 +3287,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
-              {video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
+              {doc.owed?.length ? (doc.owed_error ? `Couldn’t get the transcript: ${doc.owed_error} Reimport tries again.` : "The transcript comes in when Ore is open on your Mac. Watch it above meanwhile.") : video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
             </p>
           )}
           {PHONE && ready && canFinish && !closedBook && (
@@ -3265,7 +3330,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           )}
           {popup && (
             <div
-              className="popup"
+              className={`popup${popup.wide ? " wide" : ""}`}
               ref={popupRef}
               role="dialog"
               aria-label="Highlight"
@@ -3282,7 +3347,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                         className={`intent ${i}${intent === i ? " on" : ""}`}
                         onClick={() => void setIntent(i)}
                       >
-                        <Glyph size={14} weight={intent === i ? "fill" : "regular"} aria-hidden="true" />
+                        <Glyph size={14} aria-hidden="true" />
                         {LABEL[i]}
                       </button>
                     </Hint>
@@ -3294,11 +3359,17 @@ function ReaderView(p: Props & { reload: () => void }) {
                 ref={noteRef}
                 className="field"
                 aria-label="Note"
-                value={popup.note}
+                value={showBullets(popup.note)}
                 // From the popup as it is now: a keystroke as the highlight's save lands must not put back its draft id.
                 onChange={(e) => {
-                  const note = e.target.value;
+                  const note = fromBullets(e.target.value);
                   setPopup((cur) => cur && { ...cur, note });
+                }}
+                // "- " or "* " shows as a bullet (saved as "- "); ⇧↵ on a bullet or "1. " line starts the next item, as in Claude's and ChatGPT's chat boxes; ↵ still closes.
+                onKeyDown={(e) => {
+                  if (numbered(e.nativeEvent, e.currentTarget)) e.preventDefault();
+                  else if (e.key === " " && !e.metaKey && !e.altKey && !e.ctrlKey && !e.nativeEvent.isComposing && bulletOnSpace(e.currentTarget)) e.preventDefault();
+                  else if (e.key === "Enter" && e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey && !e.nativeEvent.isComposing && breakList(e.currentTarget)) e.preventDefault();
                 }}
                 placeholder={PLACEHOLDER[intent]}
               />
@@ -3536,7 +3607,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           highlightsSaved={highlightsSaved}
         />
       ) : null}
-      {zoom && <FigureZoom fig={zoom} item={doc?.id ?? ""} notify={p.notify} onClose={() => setZoom(null)} />}
+      {zoom && (PHONE ? <FigureView img={zoom.img} from={zoom.from} onClose={() => setZoom(null)} /> : <FigureZoom fig={zoom} item={doc?.id ?? ""} notify={p.notify} onClose={() => setZoom(null)} />)}
     </div>
   );
 }

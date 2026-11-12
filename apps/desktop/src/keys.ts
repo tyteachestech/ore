@@ -22,11 +22,11 @@ const DEFAULTS = [
   { id: "shortcuts", label: "Keyboard shortcuts", group: "General", combo: "Meta+Slash", global: true },
   { id: "go-toread", label: "Go to To read", group: "General", combo: "Meta+Digit1", global: true },
   { id: "go-done", label: "Go to Done", group: "General", combo: "Meta+Digit2", global: true },
-  { id: "original", label: "Open original", group: "General", combo: "KeyO" },
+  { id: "original", label: "Open original", group: "General", combo: "Shift+Meta+KeyO" },
   { id: "reveal", label: "Reveal in Finder", group: "General", combo: "Shift+Meta+KeyR", global: true },
   { id: "home", label: "Go to Home", group: "General", combo: "Meta+Digit0", global: true },
   { id: "go-feed", label: "Go to Feed", group: "General", combo: "Meta+Digit3", global: true },
-  { id: "mark-read", label: "Mark post read or unread", group: "Feed", combo: "KeyU" },
+  { id: "mark-read", label: "Mark post read or unread", group: "Feed", combo: "Shift+Meta+KeyU" },
   { id: "tutor", label: "Tutor chat", group: "General", combo: "Meta+KeyJ", global: true },
   { id: "tutor-stop", label: "Stop the tutor's reply", group: "General", combo: "Meta+Period", global: true },
   { id: "review", label: "Start review", group: "General", combo: "Meta+KeyR", global: true },
@@ -41,7 +41,7 @@ const DEFAULTS = [
   { id: "hide-source", label: "Hide / show the source while you write", group: "Reader", combo: "Alt+KeyH" },
   { id: "collected", label: "Collected (side panel)", group: "Reader", combo: "KeyC" },
   { id: "questions", label: "Your questions (side panel)", group: "Reader", combo: "KeyQ" },
-  { id: "rename", label: "Rename source", group: "Reader", combo: "KeyR" },
+  { id: "rename", label: "Rename source", group: "Sources", combo: "Alt+Meta+KeyR" },
   { id: "copy", label: "Copy with the source (a highlight, a source, picked sources)", group: "General", combo: "Meta+KeyC" },
   { id: "link", label: "Copy link to original", group: "Reader", combo: "Shift+Meta+KeyC", global: true },
   { id: "path", label: "Copy path (the original file, else doc.md)", group: "General", combo: "Alt+Meta+KeyC", global: true },
@@ -52,7 +52,8 @@ const DEFAULTS = [
   { id: "highlight", label: "Highlight the focused text (↑ ↓ move the focus)", group: "Reader", combo: "KeyH" },
   { id: "bigger", label: "Bigger text", group: "Reader", combo: "Meta+Equal", global: true },
   { id: "smaller", label: "Smaller text", group: "Reader", combo: "Meta+Minus", global: true },
-  { id: "archive", label: "Archive source", group: "Sources", combo: "KeyA" },
+  { id: "archive", label: "Archive source", group: "Sources", combo: "Shift+Meta+KeyA" },
+  { id: "pin", label: "Pin or unpin source", group: "Sources", combo: "Alt+Meta+KeyP" },
   { id: "filter", label: "Find: filter sources, or search the open source", group: "General", combo: "Meta+KeyF", global: true },
   { id: "passage-next", label: "Next supporting passage", group: "Quiz", combo: "ArrowDown" },
   { id: "passage-prev", label: "Previous supporting passage", group: "Quiz", combo: "ArrowUp" },
@@ -248,6 +249,12 @@ export const is = (e: KeyboardEvent, id: KeyId) => {
   const command = (e as CommandEvent).command;
   if (!keymap[id]) return command === id;
   return comboOf(e) === keymap[id] && !(command && command !== id && apart(byId(command), byId(id)));
+};
+
+/** Keeps a key press inside a popover or menu (its arrows and letters aren't for the row under it),
+ *  but lets ⌘Z and ⇧⌘Z through to the app history, so undo works wherever focus is. */
+export const keepKeysIn = (e: { stopPropagation(): void; nativeEvent: KeyboardEvent }) => {
+  if (!is(e.nativeEvent, "undo") && !is(e.nativeEvent, "redo")) e.stopPropagation();
 };
 
 /** Whether a keydown lands in a text field, where a plain letter is typing. */

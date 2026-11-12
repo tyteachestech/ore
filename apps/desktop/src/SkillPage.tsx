@@ -10,7 +10,7 @@ import { useSplit } from "./split";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import * as Popover from "@radix-ui/react-popover";
 import { focusFilter, IconPicker, SkillIcon } from "./IconPicker";
-import { is, isNotes, label, useKeymap } from "./keys";
+import { is, isNotes, label, useKeymap, keepKeysIn } from "./keys";
 import { clickBelow, LinkedFrom, NoteBody, useNotes } from "./Notes";
 import { FindBar, onceFound } from "./Find";
 import { Hint } from "./Hint";
@@ -53,12 +53,14 @@ type Props = {
   onFound: () => void;
   /** The skill's sources, in the view the title names. */
   children: ReactNode;
+  /** The iPhone: its note is a screen of its own (Tyler 2026-11-06, B), so the page is one column with this row in the note's place. */
+  noteRow?: ReactNode;
 };
 
 
 /** A skill's page (D46): the D23 stats as chips in the header, then two equal columns that each
  *  scroll on their own, so a long note (D41) never buries his questions (D47) and sources. */
-export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children }: Props) {
+export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children, noteRow }: Props) {
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
@@ -138,6 +140,30 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
   }, [loaded, findInNote]);
   // The note across the whole page for a wide table, until he clicks again; not kept (Tyler, option C).
   const [wide, setWide] = useState(false);
+  const side = (
+    <div className="skill-col side" aria-label={`${skill.name} questions and sources`}>
+      <Fold
+        id="sources"
+        title="Sources"
+        icon={PixelBook}
+        tone="read"
+        menu={view}
+        actions={[{ id: "search", label: "Search sources", run: () => setSearching(true) }, { id: "add", label: "Add source", hint: label(keys.add), run: onAddSource }]}
+        action={<>
+          <HeadSearch label="Search sources" value={search.value} onChange={search.set} open={searching} setOpen={setSearching} onKeys={search.keys} />
+          <Hint text={`Add a source to ${skill.name}`} keys="add">
+            <button className="icon-btn" aria-label={`Add a source to ${skill.name}`} onClick={onAddSource}>
+              <Plus size={14} weight="bold" aria-hidden="true" />
+            </button>
+          </Hint>
+        </>}
+      >
+        {children}
+      </Fold>
+      <Tries skill={skill.id} onPassage={onQuestion} notify={notify} />
+      <Questions skill={skill.id} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} notify={notify} />
+    </div>
+  );
   return (
     <div className="skill-page" data-color={skill.color} ref={pageRef}>
       {find.open && (
@@ -179,6 +205,12 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
         {stats && stats.strength.solid + stats.strength.growing + stats.strength.new > 0 && <Strength s={stats} color={skill.color} />}
       </header>
 
+      {noteRow ? (
+        <div className="skill-cols one">
+          {noteRow}
+          {side}
+        </div>
+      ) : (
       <div className={`skill-cols${split.dragging ? " dragging" : ""}${wide ? " wide" : ""}`} style={{ gridTemplateColumns: wide ? "minmax(0, 1fr)" : `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` }}>
         <div className="skill-col" ref={noteCol} onMouseDown={clickBelow(editor)} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
           <section className="skill-card skill-note" data-tone="note" onMouseDown={clickBelow(editor)}>
@@ -212,29 +244,9 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
           <div className="col-divider" role="separator" aria-orientation="vertical" aria-label="Resize columns" {...split.divider} />
         </Hint>
 
-        <div className="skill-col side" aria-label={`${skill.name} questions and sources`}>
-          <Fold
-            id="sources"
-            title="Sources"
-            icon={PixelBook}
-            tone="read"
-            menu={view}
-            actions={[{ id: "search", label: "Search sources", run: () => setSearching(true) }, { id: "add", label: "Add source", hint: label(keys.add), run: onAddSource }]}
-            action={<>
-              <HeadSearch label="Search sources" value={search.value} onChange={search.set} open={searching} setOpen={setSearching} onKeys={search.keys} />
-              <Hint text={`Add a source to ${skill.name}`} keys="add">
-                <button className="icon-btn" aria-label={`Add a source to ${skill.name}`} onClick={onAddSource}>
-                  <Plus size={14} weight="bold" aria-hidden="true" />
-                </button>
-              </Hint>
-            </>}
-          >
-            {children}
-          </Fold>
-          <Tries skill={skill.id} onPassage={onQuestion} notify={notify} />
-          <Questions skill={skill.id} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} notify={notify} />
-        </div>
+        {side}
       </div>
+      )}
       {recalling && <SkillRecall skill={skill} goal={recalling === "goal" ? skill.goal : undefined} blocked={blocked} append={append} notify={notify} onClose={() => setRecalling(null)} />}
     </div>
   );
@@ -300,11 +312,10 @@ function foldedIds(): string[] {
   }
 }
 
-/** A card that folds to its header, Notion toggle-heading style; the summary stays
- *  in the header so a folded section still says what is in it. Folds are remembered for every skill. */
-/** A card that folds. With `menu`, the menu is its title (the caret alone folds it), as a button
- *  can't hold another. */
-/** `actions`: the card's right-click menu (its create action), which unfolds it first, as its + does. */
+/** A section that folds to its header (Notion's toggle heading); folds are remembered for every skill. Its
+ *  title is a folder tab, or with `menu` the tabs of its views; the caret at the far right folds it. `summary`
+ *  stays in the header so a folded section still says what is in it. `actions`: its right-click menu (its
+ *  create action), which unfolds it first, as its + does. */
 function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, action, actions = [], children }: { id: string; title: string; icon: typeof PixelBook; tone: string; summary?: ReactNode; summaryFolded?: boolean; menu?: ReactNode; action?: ReactNode; actions?: MenuAction[]; children: ReactNode }) {
   const [open, setOpen] = useState(() => !foldedIds().includes(id));
   const toggle = () => {
@@ -317,16 +328,17 @@ function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, 
     <WithMenu actions={actions.map((a) => ({ ...a, run: () => (open || toggle(), a.run()) }))}>
     <section className="skill-card fold" data-tone={tone}>
       <div className="card-head">
-        <Hint text={open ? "Fold" : "Unfold"}>
-          <button className="fold-head caret-only" aria-expanded={open} aria-label={`${open ? "Fold" : "Unfold"} ${title}`} onClick={toggle}>
-            <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
-          </button>
-        </Hint>
         {/* Picking a view of a folded section opens it, or the pick would show nothing. */}
         <span className="card-title" onClickCapture={() => menu && !open && toggle()}>{menu ?? <HeadTab icon={I} tone={tone}>{title}</HeadTab>}</span>
         {summary && !(summaryFolded && open) ? <span className="fold-sum">{summary}</span> : <span className="fold-fill" />}
         {/* Its + adds into the body, so a folded card opens first, or the new row would be hidden. */}
         {action && <span className="fold-action" onClickCapture={() => !open && toggle()}>{action}</span>}
+        {/* At the far right, past the section's actions (D226, Tyler 2026-11-12): beside the tabs it read as one more view. */}
+        <Hint text={open ? "Fold" : "Unfold"}>
+          <button className="fold-head caret-only" aria-expanded={open} aria-label={`${open ? "Fold" : "Unfold"} ${title}`} onClick={toggle}>
+            <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
+          </button>
+        </Hint>
       </div>
       {open && <div className="fold-body">{children}</div>}
     </section>
@@ -391,7 +403,7 @@ function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; last
         // Clicking away saves (D211); an emptied field keeps the goal, only Enter clears it.
         onBlur={() => document.hasFocus() && ((draft ?? "").trim() ? void save() : setDraft(null))}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.key === "Enter") void save();
           if (e.key === "Escape") setDraft(null);
         }}
@@ -774,7 +786,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
     { id: "delete", label: "Remove", danger: true, divider: true, run: onRemove },
   ];
   return (
-    <WithMenu actions={actions}>
+    <WithMenu actions={actions} hold>
       <div className={`try${done ? " done" : ""}${history ? " history" : ""}`}>
         {!history && (
           <Hint text={done ? "Not tried yet" : "Mark tried"}>
@@ -823,7 +835,7 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
   useEffect(() => void (row.current = field.current?.closest<HTMLElement>(".try") ?? null), []);
   useFocusWhileMounted(field, () => (row.current?.isConnected ? row.current.querySelector<HTMLElement>(".try-check, .try-quote") : null));
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    e.stopPropagation();
+    keepKeysIn(e); // ⌘Z still reaches the app history
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSave(v.trim(), next.trim());
@@ -949,7 +961,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   ];
 
   return (
-    <WithMenu actions={actions}>
+    <WithMenu actions={actions} hold>
     <div className={`question${done ? " done" : ""}`}>
       {/* D131: the question is the row; a circle at the left is Answered (Things), as a try's box is Tried. */}
       <Hint text={done ? "Reopen" : "Mark answered"}>

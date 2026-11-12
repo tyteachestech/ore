@@ -367,6 +367,9 @@ export async function htmlToDoc(html: string, url: string, min = 200): Promise<W
     wikiMath(document as unknown as Document);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
+    // linkedom's window is the real one where there is one (the iPhone's web view), and its
+    // getComputedStyle throws on a parsed element: without a window Defuddle reads styles as it does on the Mac.
+    Object.defineProperty(document, "defaultView", { value: null });
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
     const markdown = inlineMath(htmlTables(r.content.trim()));
     if (markdown.length > min) {

@@ -30,7 +30,7 @@ const TABLE: [TableEdit, string][] = [
  *  then to-do, bullet, heading, [[ link, a picture, indent and outdent, and a key that puts the keyboard away.
  *  In a table, the table's edits take the place of the block kinds. A tap keeps the keyboard up (no blur), and
  *  acts as one editor step. Over selected text it is the format bar. Move (from ⋮⋮) picks the block up: the bar
- *  becomes ↑ ↓ Done, one step a tap (D227). */
+ *  becomes ↑ ↓ Done, one step a tap (D235). */
 export function KeyboardBar({ view, targets, onPicture }: { view: () => EditorView | undefined; targets: LinkTarget[]; onPicture: () => void }) {
   const [on, setOn] = useState(false);
   // The block menu takes focus from the note while open; the bar stays under it.

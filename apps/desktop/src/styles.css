@@ -270,7 +270,7 @@ kbd {
 img.thumb[data-kind="pdf"], img.thumb[data-kind="epub"] { object-position: top; }
 /* No white glare on dark; full strength on hover and selection. */
 img.thumb { filter: brightness(0.86); }
-.row:hover .thumb, .row.on .thumb, .row.sel .thumb, .home-read:hover .thumb, [cmdk-item][data-selected="true"] .thumb { opacity: 1; filter: none; }
+.row:hover .thumb, .row.on .thumb, .row.sel .thumb, .home-read:hover .thumb, .home-read.sel .thumb, [cmdk-item][data-selected="true"] .thumb { opacity: 1; filter: none; }
 .thumb-at { position: relative; flex: none; display: flex; }
 .thumb-bar { position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; border-radius: 1px; background: var(--bg-active); overflow: hidden; }
 .row .col { flex: none; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -367,7 +367,7 @@ img.thumb { filter: brightness(0.86); }
 /* Hover and open light the ground behind them, so it shows with the names hidden too (Icon only). */
 .chips-button:hover, .chips-button[aria-expanded="true"] { background: var(--bg-active); box-shadow: 0 0 0 3px var(--bg-active); }
 .chips-button:hover .chip, .chips-button[aria-expanded="true"] .chip { color: var(--text); }
-.chips-add { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border-radius: 9px; color: var(--faint); opacity: 0; }
+.chips-add { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-block: -1px; padding: 0; border-radius: 10px; color: var(--faint); opacity: 0; }
 .chips-add:hover, .chips-add[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 .row:hover .chips-add, .doc-head:hover .chips-add, .chips-add:focus-visible, .chips-add[aria-expanded="true"] { opacity: 1; }
 .skill-picker { width: 240px; }
@@ -736,6 +736,10 @@ img.thumb { filter: brightness(0.86); }
 .figure-zoom.open { background: var(--bg); }
 .figure-zoom img { position: fixed; max-width: none; border-radius: 6px; transform-origin: 0 0; transition: transform var(--t-4) var(--ease-in-out); }
 @media (prefers-reduced-motion: reduce) { .figure-zoom, .figure-zoom img { transition: none; } }
+/* The phone's picture view (phone/FigureView.tsx): the same grow and shrink, the whole screen, pinch to zoom. */
+.figure-view { position: fixed; inset: 0; z-index: 100; touch-action: none; transition: background-color var(--t-4) var(--ease-out); }
+.figure-view img { position: absolute; max-width: none; transform-origin: 0 0; transition: transform var(--t-4) var(--ease-in-out); }
+@media (prefers-reduced-motion: reduce) { .figure-view, .figure-view img { transition: none; } }
 /* D166: boxes over a figure, each a card; the one being drawn, and the field for what's under it. */
 .figure-zoom img.drawable { cursor: crosshair; }
 .figure-box { position: fixed; pointer-events: none; border-radius: 2px; }
@@ -834,6 +838,7 @@ img.thumb { filter: brightness(0.86); }
   box-shadow: var(--float); padding: 8px;
   user-select: none; -webkit-user-select: none; cursor: default;
 }
+.popup.wide { width: 440px; }
 .intents { grid-column: 1; margin: 0 0 8px; }
 .intent { flex: 1; height: 26px; border-radius: 6px; color: var(--muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .intent:hover { background: var(--bg-hover); }
@@ -843,10 +848,11 @@ img.thumb { filter: brightness(0.86); }
 .intent.apply { --hue: var(--apply-solid); --tint: var(--apply); }
 .intent svg { color: var(--hue, currentColor); flex: none; }
 .intent.on { color: var(--text); background: var(--tint); }
-.popup .field { grid-column: 1; min-width: 0; align-self: start; min-height: 30px; max-height: 160px; padding: 5px 10px; line-height: 1.4; }
-/* Copy, Remove text and Remove stack in one column; Play and Explain, when they show, in a second beside it. */
+.popup .field { grid-column: 1; min-width: 0; align-self: start; font-variant-numeric: tabular-nums; min-height: 30px; max-height: 160px; padding: 5px 10px; line-height: 1.4; }
+/* Copy, Remove text and Remove stack in one column; Play and Explain, when they show, in a second beside it.
+   Pinned to the top (retro.css too), so a note growing under him never moves them from where his pointer met them. */
 .popup-tools {
-  grid-column: 2; grid-row: 1 / 3; align-self: center;
+  grid-column: 2; grid-row: 1 / 3; align-self: start;
   display: grid; grid-template-rows: repeat(3, 20px); grid-auto-flow: column; gap: 1px;
   padding-left: 6px; border-left: 1px solid var(--border);
 }
@@ -860,7 +866,7 @@ img.thumb { filter: brightness(0.86); }
 }
 /* A long highlight note previews its first six lines; its popup shows it all (TIP_HEIGHT in Reader.tsx).
    A footnote's preview (.tip.note) has nothing else that shows it, so it stays whole. */
-.tip:not(.note) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
+.tip:not(.note) { white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
 /* Hover hints with the action's shortcut (Hint.tsx; Linear's tooltips). */
 .hint {
   z-index: 30; display: flex; align-items: center; gap: 6px; max-width: 280px; padding: 4px 8px;
@@ -1097,7 +1103,7 @@ body.resizing iframe { pointer-events: none; }
 .width-toggle:hover, .width-toggle[aria-expanded="true"], .width-toggle.on { background: var(--bg-hover); color: var(--text); }
 /* Top right of Home and All sources, in the title bar (App.tsx). */
 .main-tools { position: absolute; top: 7px; right: 12px; z-index: 6; display: flex; align-items: center; gap: 6px; }
-.width-toggle:focus-visible, .note-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.width-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .note-toggle {
   display: flex; align-items: center; gap: 6px;
 }
@@ -1476,7 +1482,8 @@ button.skill-badge:hover { filter: brightness(1.2); }
 .fold-head .caret { flex: none; color: var(--faint); transform: rotate(90deg); transition: transform var(--t-1) ease; }
 .fold-head[aria-expanded="false"] .caret { transform: none; }
 /* The caret sits on the rule's start and the icon after it, as in a fold whose whole head is the button. */
-.fold-head.caret-only { flex: none; width: auto; margin-right: -4px; }
+.fold-head.caret-only { flex: none; width: 30px; justify-content: center; margin: 0 -6px 0 0; padding: 0; }
+.fold-head.caret-only .caret { margin-top: 2px; }
 .fold-fill { flex: 1; }
 .fold-sum { margin-left: auto; display: flex; gap: 10px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fold-body { margin: 0 -6px; }
@@ -1963,6 +1970,7 @@ button.home-plan:hover { color: var(--text); }
 .home-reading { display: flex; flex-direction: column; }
 .home-read { display: flex; align-items: center; gap: 12px; height: var(--row); padding: 0 12px; border-radius: var(--radius); text-align: left; color: var(--text); min-width: 0; }
 .home-read:hover { background: var(--bg-hover); }
+.home-read.sel { background: var(--bg-active); }
 /* A row's or tile's ⋯ shows on hover (Linear); on a row it takes the meter's place. */
 .home-read { position: relative; }
 .home-read .more { position: absolute; width: 24px; height: 24px; border-radius: 6px; display: none; place-items: center; color: var(--faint); }
@@ -2294,6 +2302,11 @@ button.home-plan:hover { color: var(--text); }
 .menu-item[data-state="open"] { background: var(--bg-active); }
 .menu-caret { margin-left: auto; color: var(--faint); }
 .menu-item kbd { margin-left: auto; color: var(--faint); }
+/* The item's icon (menu-icons.ts, ChatGPT's menus): 20px sprite in a 20px slot, 8px to its label; the slot stays when
+   an item has none, so the labels line up. The row starts 4px nearer the edge, where the tick of a check row sits. */
+.menu-item:has(> .menu-icon) { padding-left: 6px; }
+.menu-icon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; margin-right: -8px; color: var(--muted); }
+.menu-item.danger .menu-icon { color: inherit; }
 .menu-item.check { gap: 8px; padding-left: 6px; }
 .menu-item.check > .skill-icon { flex: none; }
 /* The tick's column: 16px holds the Tick's ink (12.5px) whole; the indicator is a flex box so the sprite centres on the row, not on the text baseline. */
@@ -2406,7 +2419,7 @@ button.home-plan:hover { color: var(--text); }
    edge, no fill, the sans at 12px/500. The mono is kept for a screen's main action and the answers in Review. */
 .note-toggle, .warm-start, .settings-btn { height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text); font: 500 12px var(--font); }
 .note-toggle:hover, .warm-start:hover, .settings-btn:hover { background: var(--bg-hover); }
-.settings-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.note-toggle:focus-visible, .warm-start:focus-visible, .settings-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .settings-select { display: inline-flex; align-items: center; gap: 8px; min-width: 104px; justify-content: space-between; font-variant-numeric: tabular-nums; }
 .settings-select svg { flex: none; color: var(--faint); }
 .settings-select-label { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2421,7 +2434,7 @@ button.home-plan:hover { color: var(--text); }
 .marks { position: absolute; inset: 0; pointer-events: none; --mark-gap: 20px; }
 .page.video .marks { --mark-gap: 54px; }
 .mark-icon {
-  position: absolute; pointer-events: auto; width: 16px; height: 16px; margin-left: calc(-1 * var(--mark-gap)); transform: translate(-50%, -50%);
+  position: absolute; pointer-events: auto; width: 20px; height: 20px; padding: 0; margin-left: calc(-1 * var(--mark-gap)); transform: translate(-50%, -50%);
   display: grid; place-items: center; border-radius: 4px; color: var(--hue); opacity: 0.75; transition: opacity var(--t-1) ease-out;
 }
 .mark-icon:hover { opacity: 1; background: var(--bg-hover); }
@@ -2589,6 +2602,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
 /* Rename, Add author, a key point, a guess before reading and Leave anything out?: fields 44pt tall to the finger. */
 .phone .doc-head :is(.title-edit, .author-edit), .phone .cp-input, .phone .preq-input, .phone .quiz-leave { min-height: 44px; }
+/* Renaming from ⋯ keeps the title's own size (it is over 16px, so iOS doesn't zoom): the accent rule says it is being edited. */
+.phone .doc-head .title-edit { font-size: 26px !important; line-height: 1.25; outline: none; }
 /* The note's keyboard bar: nine 44pt buttons are wider than a 390pt iPhone; it scrolls the last few points sideways. */
 .phone .kb-bar { overflow-x: auto; scrollbar-width: none; }
 .phone .kb-btn { flex: 1 0 44px; }
@@ -2644,7 +2659,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-source::before { content: ""; position: absolute; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 6; }
 .phone-source .reader-tools { top: 0; right: 4px; transition: transform var(--t-3) ease-out, opacity var(--t-2); }
 .phone-source .reader-scroll { padding-top: 44px; }
-.phone-source .player-pin { top: 44px; }
+/* Sticky offsets count from inside the scroller's padding, which already clears the top bar. */
+.phone-source .player-pin { top: 0; }
 .phone .phone-source :is(.mynotes-text, .side-tabs-root, .reader > .empty-state, .reader-loading) { padding-top: 48px; }
 .phone-source:has(.reader.bars-hidden:not(.noting)) > .phone-bar { transform: translateY(-100%); }
 .phone .reader.bars-hidden:not(.noting) .reader-tools { transform: translateY(-44px); opacity: 0; pointer-events: none; }
@@ -2657,8 +2673,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
    rides that far up while the bar shows; a toast sits over the pill, and over the bar while it shows (Mail's Undo
    banner sits above its toolbar), so neither loses its taps; on the note page, with neither there, it is at the foot. */
 .phone { --tools-lift: 52px; }
-.phone .phone-app:has(.phone-source .reader:not(:is(.noting, .dragging)) .read-pill) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px); }
-.phone .phone-app:has(.phone-source .reader:not(:is(.bars-hidden, .dragging, .noting)) .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--tools-lift)); }
+.phone .phone-app:has(.phone-source .reader:not(:is(.noting, .dragging)) .read-pill) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--audio-bar)); }
+.phone .phone-app:has(.phone-source .reader:not(:is(.bars-hidden, .dragging, .noting)) .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--tools-lift) + var(--audio-bar)); }
 /* Toast buttons are finger-sized on the phone, without growing the toast. */
 .phone .toast-undo { min-height: 44px; margin: -12px -8px -12px 0; padding: 0 8px; display: inline-flex; align-items: center; }
 .phone .toast-x { width: 44px; height: 44px; margin: -12px -14px -12px -8px; }
@@ -2674,7 +2690,32 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* The video card on the phone (D92): no gutter, so each timestamp leads its paragraph. */
 .phone .doc .video-card { margin: 0 -8px 24px; }
 .phone .vc-head, .phone .vc-transcript { padding-left: 12px; padding-right: 12px; }
-.phone .vc-transcript .ts { position: static; margin-right: 6px; }
+.phone .doc .ts { position: static; margin-right: 6px; }
+/* A timestamp is a finger's size to tap (it seeks), without moving the line it leads. */
+.phone .doc .ts { padding: 14px 8px; margin: -14px 2px -14px -8px; }
+/* The player's buttons are finger-sized on the phone. */
+.phone .ctl { min-width: 44px; height: 44px; }
+.phone .ctl.rate { position: relative; height: 30px; }
+.phone .ctl.rate::before { content: ""; position: absolute; inset: -7px -2px; }
+/* A recording plays from a bar above the source's bottom bar, Podcasts' mini player: in reach of the thumb
+   and on screen wherever he reads. When the bottom bar leaves as he reads on, the player drops into its place. */
+.phone { --audio-bar: 0px; }
+.phone .phone-app:has(.phone-source .player.audio) { --audio-bar: 76px; }
+.phone-source .player-pin:has(> .player.audio) {
+  position: fixed; top: auto; left: 8px; right: 8px; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px + var(--tools-lift)); z-index: 6;
+  max-width: none; margin: 0; padding: 6px 12px 0; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--float);
+  transition: transform var(--t-3) var(--ease-out);
+}
+.phone-source .player-pin:has(> .player.audio)::after { content: none; }
+.phone-source .player-pin:has(> .player.audio) .controls { height: 48px; }
+.phone .reader:is(.bars-hidden, .dragging) .player-pin:has(> .player.audio) { transform: translateY(var(--tools-lift)); }
+.phone .reader.noting .player-pin:has(> .player.audio) { display: none; }
+.phone .reader-pane:has(.player.audio) .read-pill { transform: translate(-50%, calc(-1 * var(--audio-bar))); }
+.phone .reader:not(:is(.bars-hidden, .dragging, .noting)) .reader-pane:has(.phone-tools):has(.player.audio) .read-pill { transform: translate(-50%, calc(-1 * (var(--tools-lift) + var(--audio-bar)))); }
+.phone-reader .reader-pane:has(.player.audio) .doc { padding-bottom: calc(56px + var(--tools-lift) + var(--audio-bar)); }
+/* Back to current: above the bars at the foot, and above the recording's bar when the spoken text is up the page. */
+.phone .follow-down { bottom: calc(env(safe-area-inset-bottom, 0px) + 16px + var(--tools-lift) + var(--audio-bar)); }
+.phone-source .player-pin:has(> .player.audio) .back-current.up { top: auto; bottom: calc(100% + 8px); left: 50%; }
 
 /* The Feed: posts from what he follows. A read post dims: unread is what's new. The date stays at every width, since a feed is read by recency. */
 .row.post.read .title { color: var(--muted); }
@@ -2719,6 +2760,57 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-note-row:active { background: var(--bg-hover); }
 .phone .phone-note { padding: 8px 20px 40px; }
 .phone .phone-note .note-editor { --note-size: 17px; min-height: 60vh; }
+/* A skill's page on the phone (D228): the Mac's page in one column, its note a row that opens the note's screen. */
+.phone .phone-skill { padding: 8px 20px 40px; }
+.phone .phone-skill .skill-page { display: block; overflow: visible; }
+.phone .phone-skill .skill-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0 20px; }
+.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -4px 0 0 -12px; }
+.phone .phone-skill .skill-goal span { white-space: normal; }
+.phone .phone-skill .skill-col { padding-inline: 0; margin-inline: 0; }
+.phone .phone-skill .skill-cols.one { display: flex; flex-direction: column; gap: 24px; padding: 0; }
+.phone .phone-skill .skill-cols.one .phone-note-row { margin: 0; }
+.phone .phone-skill .phone-sources { padding: 0 6px; }
+.phone .phone-skill .phone-sources > .quiet { margin: 4px 2px; color: var(--faint); }
+.phone .phone-skill .answered-toggle { min-height: 44px; }
+/* No folding on the phone: one scrolling page, as Notes' folder is. */
+.phone .phone-skill .fold-head.caret-only { display: none; }
+.phone .phone-skill .card-head .icon-btn { width: 44px; height: 44px; margin: -9px -9px -9px 0; }
+.phone .phone-skill :is(.q-check, .try-check) { position: relative; }
+/* A question's and a try's actions are their long press on the phone (Mail's rows): the hover buttons never show. */
+.phone .phone-skill :is(.question, .try) .question-actions { display: none; }
+.phone .phone-skill :is(.question, .try) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.phone .phone-skill :is(.q-check, .try-check)::before { content: ""; position: absolute; inset: -14px; }
+/* A course as one row: its title, and under it the lesson a tap goes on with. */
+.phone-sources .phone-course .phone-two { display: flex; flex-direction: column; gap: 2px; }
+.phone-two > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-two small { font-size: 13px; color: var(--muted); }
+.phone-sources .phone-course > svg:last-child { flex: none; color: var(--faint); }
+/* The drawer's last rows: a new skill named in place, then Settings. */
+.phone-drawer .phone-drawer-quiet { color: var(--muted); }
+.phone-drawer .phone-drawer-foot { margin-top: 20px; }
+.phone-new-skill { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; }
+.phone-new-skill input { flex: 1; min-width: 0; height: 32px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: 16px var(--font); color: var(--text); }
+.phone-new-error { flex-basis: 100%; margin: 0 0 6px 26px; font-size: 13px; color: var(--c-red); }
+/* Settings on the phone (iOS Settings): grouped rows; a segmented choice goes under its name, full width. */
+.phone .phone-settings { padding: 8px 16px 40px; }
+.phone .phone-settings h1 { font-size: 30px; margin: 8px 0 20px; }
+.phone .phone-settings .settings-row { gap: 10px 16px; padding: 12px 14px; }
+.phone .phone-settings .settings-row-text > :is(span, label) { font-size: 16px; }
+.phone .phone-settings .settings-row-text p { font-size: 13px; }
+.phone .phone-settings .settings-row:has(.seg) { flex-direction: column; align-items: stretch; }
+.phone .phone-settings .settings-row:has(.seg) .settings-row-control { max-width: none; }
+.phone .phone-settings .seg { flex: 1; display: flex; }
+.phone .phone-settings .seg-item { flex: 1; height: 44px; font-size: 15px; }
+.phone .phone-settings .settings-plan { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.phone .phone-settings .settings-row:has(.settings-plan) { flex-direction: column; align-items: stretch; }
+.phone .phone-settings .settings-row:has(.settings-plan) .settings-row-control { max-width: none; }
+.phone .phone-settings .settings-plan .field { flex: 1; min-width: 140px; height: 44px; }
+.phone .phone-settings .settings-btn { height: 44px; padding: 0 14px; font-size: 15px; }
+.phone .phone-settings .phone-time { height: 44px; padding: 0 10px; color: var(--text); }
+/* iOS's switch size. */
+.phone .switch { width: 51px; height: 31px; }
+.phone .switch-thumb { width: 27px; height: 27px; }
+.phone .switch-thumb[data-state="checked"] { transform: translateX(22px); }
 /* A to-do's box answers a touch 44pt tall around its centre (0.775em + 1.5px down, 0.875em - 1.5px left of the
    text), from 22pt left of it to where the text starts, so a tap on the text still places the caret (Notes). One
    under another starts halfway between the two boxes (rows are 1.8em apart), so each row keeps its own taps. A
@@ -3060,6 +3152,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .original-pager { display: flex; align-items: center; justify-content: center; gap: 2px; height: 24px; margin-bottom: 8px; color: var(--faint); font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
 .original-pager span { min-width: 52px; text-align: center; }
 .original-pager .icon-btn:disabled { opacity: 0.35; }
+.phone .original-pager { height: 44px; }
+.phone .original-pager .icon-btn { width: 44px; height: 44px; }
 /* Three tabs in a panel at its narrowest: the names stay, the icons go. */
 .mynotes-head { container-type: inline-size; }
 @container (max-width: 330px) { .side-tabs:has(> :nth-child(3)) .card-icon { display: none; } }
@@ -3078,14 +3172,18 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .add-link .field { font-size: 17px; min-height: 44px; }
 .add-link .phone-error { padding: 0; }
 .add-link .pill-btn { justify-content: center; text-align: center; min-height: 44px; }
+.add-link-file { min-height: 44px; color: var(--muted); font: 500 15px var(--font); }
+.add-link-file:disabled { opacity: 0.45; }
 /* Above the keyboard, which the field brings up at once. */
 .phone .overlay:has(.add-link) { padding-bottom: var(--keyboard, 0px); }
 .phone-bar .phone-add { margin-left: auto; }
 .phone-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
 .phone-waiting .phone-error { flex-basis: 100%; order: 3; padding: 0 0 6px; }
+.phone-waiting-note { color: var(--faint); font-size: 13px; }
+.phone-waiting-why { flex-basis: 100%; order: 3; padding: 0 0 6px; }
 .phone-sources .phone-waiting button { width: auto; min-height: 44px; border: 0; padding: 0 0 0 8px; background: none; color: var(--accent); font: 500 15px var(--font); }
 
-/* The phone's diagram, view only (D227): its own screen, the drawing fit to it, pinch and pan by hand. */
+/* The phone's diagram, view only (D235): its own screen, the drawing fit to it, pinch and pan by hand. */
 .diagram-view { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: var(--bg); padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
 .diagram-view .diagram-head { height: 44px; }
 .diagram-view .diagram-name { width: auto; height: auto; margin: 0; padding: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; }
