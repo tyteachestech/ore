@@ -9183,10 +9183,10 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
   await page.route("https://example.com/articles/interleaving", (r) => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", headers: { "access-control-allow-origin": "*" }, body: article }));
   await page.route("https://example.com/articles/offline", (r) => r.abort());
   await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input").fill("not a link");
+  await page.locator(".add-link input.field").fill("not a link");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link .phone-error").filter({ hasText: "isn’t a link" }).waitFor();
-  await page.locator(".add-link input").fill("https://example.com/articles/interleaving");
+  await page.locator(".add-link input.field").fill("https://example.com/articles/interleaving");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link").waitFor({ state: "detached" });
   await page.getByText("Added “Interleaving in practice”").waitFor();
@@ -9196,11 +9196,34 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
   if (await page.locator(".phone-waiting").count()) throw new Error("the link it read is still listed as coming in");
   // One the phone can't reach keeps its reason, and the Mac tries it.
   await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input").fill("https://example.com/articles/offline");
+  await page.locator(".add-link input.field").fill("https://example.com/articles/offline");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link").waitFor({ state: "detached" });
   const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/offline" });
   await row.getByText("Your Mac will try it.").waitFor();
+  await tap(page, row.getByRole("button", { name: "Remove" }));
+  await row.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
+  // D227: the file is saved to the inbox beside its item, then imported here like a link.
+  const files = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
+  const pick = async (name: string) => {
+    await tap(page, page.getByRole("button", { name: "Add a link" }));
+    const chooser = page.waitForEvent("filechooser");
+    await tap(page, page.getByRole("button", { name: "Choose a file or photo" }));
+    await (await chooser).setFiles(join(files, name));
+  };
+  await pick("notes.docx");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText(/^Added “/).waitFor();
+  await pick("screenshot.png");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const row = page.locator(".phone-waiting").filter({ hasText: "screenshot.png" });
+  await row.getByText("Your Mac reads the text in a picture or a scan.").waitFor();
+  if (await page.locator(".phone-waiting").count() !== 1) throw new Error("the Word file it read is still listed as coming in");
   await tap(page, row.getByRole("button", { name: "Remove" }));
   await row.waitFor({ state: "detached" });
 }, "phone");
