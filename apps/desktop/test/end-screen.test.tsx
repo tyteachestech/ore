@@ -34,8 +34,8 @@ async function mount(e: never) {
   const q = (s: string) => body.querySelectorAll(s).length;
   return { q, body, done: () => act(async () => (root.unmount(), body.remove())) };
 }
-/** The mole's nose is two dots at rest and four when it cheers. */
-const cheering = (body: HTMLElement) => (body.querySelector(".mole-nose")?.getAttribute("d")?.match(/M/g)?.length ?? 0) === 4;
+/** The mole is playing its cheer. */
+const cheering = (body: HTMLElement) => body.querySelector(".review-mole .mole")?.getAttribute("data-mood") === "cheer";
 
 test("a session that filled the ring and cut a gem: the cart is there, the mole and the gem wait, then all of it settles", async () => {
   jest.useFakeTimers();
