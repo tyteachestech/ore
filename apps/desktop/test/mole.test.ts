@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { COLS, HEAD, MOVES, REST, ROWS, advance, moleDots, puppet, start, type State } from "../src/Mole";
 
-// D214: the mole is a puppet, a smooth shape sampled onto the fixed dot grid. Its body glides (dot sizes change),
+// D219: the mole is a puppet, a smooth shape sampled onto the fixed dot grid. Its body glides (dot sizes change),
 // its face stays whole dots.
 const at = (s: Partial<State> = {}) => moleDots({ ...REST, ...s });
 const cells = (d: ReturnType<typeof moleDots>, tone: string) => d.flatMap(([c, r, , t]) => (t === tone ? [[c, r]] : []));

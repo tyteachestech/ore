@@ -2227,7 +2227,7 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
-journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D215)", async (page) => {
+journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D219)", async (page) => {
   const lecture = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title.startsWith("Lecture 4"))!;
   const dir = ((await ore("show", lecture.id)) as { dir: string }).dir;
   const button = page.getByRole("button", { name: "Add the page’s text" });
