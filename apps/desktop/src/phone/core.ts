@@ -130,15 +130,12 @@ export async function run<T>(args: string[], input: string | null): Promise<T> {
 }
 
 /** SPIKE (launch timing): each boot phase and the first commands, as ms since the page started and as
- *  wall-clock time, in `debug-launch.json`, rewritten at each. */
+ *  wall-clock time, in the app's own Library/Caches/debug-launch.json (never the library), rewritten at each. */
 const marks: [string, number, number][] = [];
 function mark(what: string) {
   if (marks.length > 20 || !isTauri()) return;
   marks.push([what, Math.round(performance.now()), Date.now()]);
-  if (existsSync(`${ROOT}/skills.yaml`)) {
-    writeFileSync(`${ROOT}/debug-launch.json`, JSON.stringify({ timeOrigin: Math.round(performance.timeOrigin), marks }, null, 1));
-    void flush();
-  }
+  void invoke("spike_note", { text: JSON.stringify({ timeOrigin: Math.round(performance.timeOrigin), marks }, null, 1) }).catch(() => {});
 }
 
 async function command<T>({ commands, errorLine }: typeof import("ore-commands"), args: string[], input: string | null): Promise<T> {

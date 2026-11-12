@@ -44,13 +44,36 @@ class ShareViewController: UIViewController {
     #endif
   }
 
+  /// SPIKE: tries Ore's iCloud folder first (the Mac sees the link without the app opening), then the App
+  /// Group; which one worked, and why the other didn't, goes to share-log.json in the App Group.
   func save() async {
-    guard let url = await link(), let root = groupDir() else { return }
-    let dir = root.appendingPathComponent("inbox", isDirectory: true)
-    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    var log: [String: Any] = ["at": ISO8601DateFormatter().string(from: Date())]
+    defer {
+      if let g = groupDir(), let d = try? JSONSerialization.data(withJSONObject: log, options: [.prettyPrinted, .sortedKeys]) {
+        try? d.write(to: g.appendingPathComponent("share-log.json"))
+      }
+    }
+    guard let url = await link() else { log["error"] = "no link in the share"; return }
     let id = ulid()
     let item: [String: Any] = ["id": id, "url": url, "skills": [], "added": ISO8601DateFormatter().string(from: Date()), "device": "iphone"]
     guard let data = try? JSONSerialization.data(withJSONObject: item, options: [.prettyPrinted, .sortedKeys]) else { return }
-    try? (data + Data("\n".utf8)).write(to: dir.appendingPathComponent("\(id).link.json"), options: .atomic)
+    let body = data + Data("\n".utf8)
+    log["url"] = url
+    log["groupDir"] = groupDir()?.path ?? "none"
+    if let cloud = FileManager.default.url(forUbiquityContainerIdentifier: "iCloud.com.tylerpoelking.ore") {
+      let dir = cloud.appendingPathComponent("Documents/inbox", isDirectory: true)
+      do {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try body.write(to: dir.appendingPathComponent("\(id).link.json"), options: .atomic)
+        log["wrote"] = "icloud"; return
+      } catch { log["icloudError"] = "\(error)" }
+    } else { log["icloudError"] = "no iCloud container" }
+    guard let root = groupDir() else { log["groupError"] = "no App Group container"; return }
+    let dir = root.appendingPathComponent("inbox", isDirectory: true)
+    do {
+      try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+      try body.write(to: dir.appendingPathComponent("\(id).link.json"), options: .atomic)
+      log["wrote"] = "group"
+    } catch { log["groupError"] = "\(error)" }
   }
 }

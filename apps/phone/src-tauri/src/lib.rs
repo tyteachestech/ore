@@ -194,6 +194,14 @@ async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, S
     .map_err(|e| e.to_string())?
 }
 
+/// SPIKE: launch timing, written to the app's own Caches folder, outside the library.
+#[tauri::command]
+async fn spike_note(text: String) {
+    if let Some(home) = std::env::var_os("HOME") {
+        let _ = fs::write(Path::new(&home).join("Library/Caches/debug-launch.json"), text);
+    }
+}
+
 /// SPIKE: links the Share Extension (apps/phone/share) left in the App Group move into the library's inbox
 /// (D223), where the app shows them. Returns how many came in.
 #[tauri::command]
@@ -281,7 +289,7 @@ pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch, share_inbox, player_port])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch, share_inbox, player_port, spike_note])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }
