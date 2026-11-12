@@ -1,5 +1,6 @@
-import { Archive, CaretRight, Check, Collapse, Expand, MagnifyingGlass, Plus, Target, X } from "./icons";
+import { Archive, CaretRight, Check, Collapse, Expand, Plus, Target, X } from "./icons";
 import { ranked } from "./match";
+import { HeadSearch } from "./HeadSearch";
 import { ImportanceIcon, levelOf } from "./importance";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
@@ -141,6 +142,7 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
       {find.open && (
         <FindBar
           roots={() => [find.note ? noteCol.current?.querySelector<HTMLElement>(".skill-note") : pageRef.current]}
+          scope={find.note ? "note" : "page"}
           within={pageRef.current}
           query={find.query}
           onQuery={(query) => setFind((f) => ({ ...f, query }))}
@@ -299,47 +301,6 @@ function foldedIds(): string[] {
 
 /** A card that folds to its header, Notion toggle-heading style; the summary stays
  *  in the header so a folded section still says what is in it. Folds are remembered for every skill. */
-/** A section's search (D203), Linear's: a magnifying glass in the header that becomes a field. What is
- *  typed narrows the section's rows, best match first. Esc clears it, then closes it; so does leaving it empty. */
-function HeadSearch({ label, value, onChange, open, setOpen, onKeys }: { label: string; value: string; onChange: (v: string) => void; open: boolean; setOpen: (o: boolean) => void; onKeys: (e: ReactKeyboardEvent<HTMLInputElement>) => void }) {
-  const button = useRef<HTMLButtonElement>(null);
-  const field = useRef<HTMLInputElement>(null);
-  const shown = open || !!value;
-  useFocusBack(shown, button);
-  useEffect(() => {
-    if (open) field.current?.focus({ preventScroll: true });
-  }, [open]);
-  if (!shown)
-    return (
-      <Hint text={label}>
-        <button className="icon-btn" ref={button} aria-label={label} onClick={() => setOpen(true)}>
-          <MagnifyingGlass size={14} aria-hidden="true" />
-        </button>
-      </Hint>
-    );
-  return (
-    <label className="filter head-search">
-      <MagnifyingGlass size={13} aria-hidden="true" />
-      <input
-        ref={field}
-        value={value}
-        spellCheck={false}
-        aria-label={label}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={() => setOpen(false)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.preventDefault();
-            e.stopPropagation();
-            if (value) onChange("");
-            else setOpen(false);
-          } else onKeys(e);
-        }}
-      />
-    </label>
-  );
-}
-
 /** A card that folds. With `menu`, the menu is its title (the caret alone folds it), as a button
  *  can't hold another. */
 /** `actions`: the card's right-click menu (its create action), which unfolds it first, as its + does. */

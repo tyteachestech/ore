@@ -135,8 +135,10 @@ function show(all: Range[], on: Range | undefined) {
 
 /** The find bar at the top right of the source. `roots` lists what it searches, left to right;
  *  `within` is watched so typing in the note or the source finishing loading updates the count. */
-export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump }: {
+export function FindBar({ roots, scope, within, query, onQuery, focus, onClose, onJump }: {
   roots: () => (HTMLElement | null | undefined)[];
+  /** What `roots` covers, named in the field (D219): "source", "source and note" or "note". */
+  scope: string;
   within: HTMLElement | null;
   query: string;
   onQuery: (q: string) => void;
@@ -151,6 +153,8 @@ export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump 
   const [at, setAt] = useState(0);
   const atRef = useRef(at);
   atRef.current = at;
+  const rootsRef = useRef(roots);
+  rootsRef.current = roots;
 
   useLayoutEffect(() => {
     input.current?.focus();
@@ -183,7 +187,8 @@ export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump 
       if (ms.every((m) => (m.target as Element).closest?.(".find-bar") || m.target.parentElement?.closest(".find-bar"))) return;
       clearTimeout(t);
       t = window.setTimeout(() => {
-        const rs = search(roots().filter((r): r is HTMLElement => !!r), query);
+        // The latest `roots`: a tab opened or closed beside it changes what is searched (`scope`).
+        const rs = search(rootsRef.current().filter((r): r is HTMLElement => !!r), query);
         setFound(rs);
         setAt((i) => Math.min(i, Math.max(0, rs.length - 1)));
       }, 120);
@@ -194,6 +199,7 @@ export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump 
       clearTimeout(t);
     };
   }, [within, query]);
+
 
   useEffect(() => show(found, found[at]), [found, at]);
   useEffect(() => () => {
@@ -224,8 +230,8 @@ export function FindBar({ roots, within, query, onQuery, focus, onClose, onJump 
     <div className="find-bar" role="search">
       <input
         ref={input}
-        aria-label="Find in source"
-        placeholder="Find"
+        aria-label={`Find in ${scope}`}
+        placeholder={`Find in ${scope}`}
         spellCheck={false}
         value={query}
         onChange={(e) => onQuery(e.target.value)}
