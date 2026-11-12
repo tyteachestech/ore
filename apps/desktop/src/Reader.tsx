@@ -21,6 +21,7 @@ import { Grab } from "./Grab";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
+import { breakList, bulletOnSpace, fromBullets, showBullets } from "./list-keys";
 import { HideDots } from "./HideDots";
 import { Hint } from "./Hint";
 import { Thumb } from "./Thumb";
@@ -549,7 +550,8 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, c
   );
 });
 
-type Popup = { id: string; top: number; left: number; below: boolean; note: string };
+/** `wide`: the note ran past four lines, so the popup widened for it, and stays so while it is open. */
+type Popup = { id: string; top: number; left: number; below: boolean; note: string; wide?: boolean };
 /** Where a highlight's passage sits: in the body (to save) and on the page (to paint). */
 type Span = { exact: string; start: number; range: Range };
 
@@ -1513,7 +1515,7 @@ function ReaderView(p: Props & { reload: () => void }) {
 
   /** The popup's centre across the page, kept inside it. */
   function leftFor(x: number, box: DOMRect) {
-    const half = video ? 230 : 190; // half the popup's width, plus room
+    const half = 230; // half the widest popup (a long note's, .popup.wide), plus room
     // iPhone: the popup spans the screen less 12pt each side (styles.css), centred like an iOS sheet.
     return PHONE ? innerWidth / 2 - box.left : Math.min(Math.max(x - box.left, half), box.width - half);
   }
@@ -1556,7 +1558,15 @@ function ReaderView(p: Props & { reload: () => void }) {
     return () => obs.disconnect();
   }, [popup?.id]);
 
-  /** A passage a question may be answered by (D75): scrolled a third of the way down and tinted for a moment. */
+  // A note past four lines widens the popup once, 360 to 440px, so a dense note wraps less; it never narrows back
+  // under him while it is open. The phone's popup already spans the screen.
+  useLayoutEffect(() => {
+    const el = noteRef.current;
+    if (!popup || popup.wide || PHONE || !el) return;
+    if (el.scrollHeight > 4 * parseFloat(getComputedStyle(el).lineHeight) + 12) setPopup((cur) => cur && { ...cur, wide: true });
+  }, [popup?.note, popup?.wide]);
+
+    /** A passage a question may be answered by (D75): scrolled a third of the way down and tinted for a moment. */
   function jumpToQuote(m: { quote: string; start?: number }) {
     const el = scrollRef.current;
     const index = idx.current;
@@ -1811,7 +1821,23 @@ function ReaderView(p: Props & { reload: () => void }) {
   };
   const annotate = <T = unknown,>(id: string, ...args: string[]) => annotateWaking<T>(wakeOnLanding(), id, ...args);
 
-  /** The popup's marks are switches on one highlight (D118): Key point or Question, again for neither. */
+  /** A digit that just set the type from an empty note (D133), and how to take that change back. */
+  const typeKey = useRef<{ key: string; at: number; undo?: () => void } | null>(null);
+  /** "1." in an empty note starts a numbered list, not a type change then a stray "." (D133 sets the type on
+   *  1–4 while the note is empty): the "." or ")" right after the digit takes the change back and writes both. */
+  function numbered(e: KeyboardEvent, note: HTMLTextAreaElement) {
+    const key = typeKey.current;
+    typeKey.current = null;
+    if (!key || note.value || (e.key !== "." && e.key !== ")") || performance.now() - key.at > 1500) return false;
+    key.undo?.();
+    if (!document.execCommand("insertText", false, key.key + e.key)) {
+      note.setRangeText(key.key + e.key, 0, 0, "end");
+      note.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    return true;
+  }
+
+    /** The popup's marks are switches on one highlight (D118): Key point or Question, again for neither. */
   async function setIntent(want: Intent) {
     if (!popup) return;
     const now = annOf(popup.id)?.intent;
@@ -1831,6 +1857,11 @@ function ReaderView(p: Props & { reload: () => void }) {
     // On the history at once, so a ⌘Z right after the click takes this change back, not the step before it.
     const to = (i: Intent) => () => saved.then((rid) => setIntentOf(rid, i, false));
     const forget = undoable && was && was !== intent ? p.notify(`Changed to ${LABEL[intent]}`, "quiet", to(was), to(intent)) : undefined;
+    const key = typeKey.current;
+    if (undoable && key && !key.undo) key.undo = () => {
+      forget?.();
+      if (was && was !== intent) void to(was)();
+    };
     try {
       await annotateWaking(wake, await saved, "--intent", intent);
     } catch (e) {
@@ -2156,6 +2187,7 @@ function ReaderView(p: Props & { reload: () => void }) {
       if (!note.value && INTENTS.some((i) => is(e, i))) return;
       e.stopImmediatePropagation();
       note.focus();
+      if (numbered(e, note)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -2350,6 +2382,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           const typed = INTENTS.find((i) => is(e, i));
           if (typed && !noteRef.current?.value) {
             e.preventDefault();
+            typeKey.current = { key: e.key, at: performance.now(), undo: undefined };
             void setIntent(typed);
           } else if (plain && !e.shiftKey && e.key === "Enter" && !e.isComposing) {
             e.preventDefault();
@@ -2366,6 +2399,7 @@ function ReaderView(p: Props & { reload: () => void }) {
         const intent = INTENTS.find((i) => is(e, i));
         if (intent) {
           e.preventDefault();
+          if (!noteRef.current?.value) typeKey.current = { key: e.key, at: performance.now(), undo: undefined };
           void setIntent(intent);
         } else if (is(e, "note")) {
           e.preventDefault();
@@ -3296,7 +3330,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           )}
           {popup && (
             <div
-              className="popup"
+              className={`popup${popup.wide ? " wide" : ""}`}
               ref={popupRef}
               role="dialog"
               aria-label="Highlight"
@@ -3325,11 +3359,17 @@ function ReaderView(p: Props & { reload: () => void }) {
                 ref={noteRef}
                 className="field"
                 aria-label="Note"
-                value={popup.note}
+                value={showBullets(popup.note)}
                 // From the popup as it is now: a keystroke as the highlight's save lands must not put back its draft id.
                 onChange={(e) => {
-                  const note = e.target.value;
+                  const note = fromBullets(e.target.value);
                   setPopup((cur) => cur && { ...cur, note });
+                }}
+                // "- " or "* " shows as a bullet (saved as "- "); ⇧↵ on a bullet or "1. " line starts the next item, as in Claude's and ChatGPT's chat boxes; ↵ still closes.
+                onKeyDown={(e) => {
+                  if (numbered(e.nativeEvent, e.currentTarget)) e.preventDefault();
+                  else if (e.key === " " && !e.metaKey && !e.altKey && !e.ctrlKey && !e.nativeEvent.isComposing && bulletOnSpace(e.currentTarget)) e.preventDefault();
+                  else if (e.key === "Enter" && e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey && !e.nativeEvent.isComposing && breakList(e.currentTarget)) e.preventDefault();
                 }}
                 placeholder={PLACEHOLDER[intent]}
               />
