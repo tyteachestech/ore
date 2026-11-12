@@ -9158,6 +9158,59 @@ journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt
   for (let i = 1; i <= n; i++) await fits44(page, `.kb-bar > :nth-child(${i})`, `the keyboard bar's button ${i}`);
 }, "phone");
 
+journey("phone: a note's to-do box answers a touch over 44pt around it, and a tap on its text still edits it", async (page) => {
+  // The box is a 17pt ::before on a 27pt row: taps 12pt above, below or right of its centre landed on the text or
+  // the next row and did nothing.
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  await tap(page, note);
+  await page.keyboard.press("Meta+ArrowDown"); // the end of the note, then out of its list onto a line of its own
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("First task");
+  await tap(page, page.locator(".kb-bar").getByRole("button", { name: "To-do" }));
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Second task");
+  const first = note.locator('li[data-item-type="task"]').filter({ hasText: "First task" });
+  const second = note.locator('li[data-item-type="task"]').filter({ hasText: "Second task" });
+  await second.waitFor();
+  const at = () =>
+    first.evaluate((li) => {
+      const r = li.getBoundingClientRect();
+      const s = getComputedStyle(li, "::before");
+      const w = parseFloat(s.width) + parseFloat(s.borderLeftWidth) * 2;
+      const [x, y] = [r.left + parseFloat(s.left) + w / 2, r.top + parseFloat(s.top) + w / 2];
+      const text = li.querySelector("p")!.getBoundingClientRect();
+      return { x, y, textLeft: text.left, textMid: text.left + 30, textY: text.top + text.height / 2 };
+    });
+  const checked = async (li: typeof first) => (await li.getAttribute("data-checked")) === "true";
+  const b = await at();
+  for (const [what, dx, dy] of [
+    ["12pt above", 0, -12],
+    ["12pt below", 0, 12],
+    ["12pt left of", -12, 0],
+    ["just right, before the text,", Math.min(12, b.textLeft - 1 - b.x), 0],
+    ["the centre of", 0, 0],
+  ] as const) {
+    const [was, next] = [await checked(first), await checked(second)];
+    await page.touchscreen.tap(b.x + dx, b.y + dy);
+    await until(`a tap ${what} the box toggles it`, async () => (await checked(first)) !== was, 1500).catch(() => {
+      throw new Error(`a tap ${what} the first to-do's box (${Math.round(dx)}, ${dy}) did not toggle it`);
+    });
+    if ((await checked(second)) !== next) throw new Error(`a tap ${what} the first box toggled the second to-do`);
+  }
+  const was = await checked(first);
+  await page.touchscreen.tap(b.textMid, b.textY);
+  await Bun.sleep(300);
+  if ((await checked(first)) !== was) throw new Error("a tap on the to-do's text toggled it");
+  const caret = await first.evaluate((li) => {
+    const s = getSelection();
+    return s?.isCollapsed && li.querySelector("p")!.contains(s.anchorNode) ? "" : (s?.anchorNode?.parentElement?.closest("li, p")?.textContent ?? "nowhere");
+  });
+  if (caret) throw new Error(`a tap on the to-do's text put the caret in “${caret}”, not in its text`);
+}, "phone");
+
 journey("phone: Finish's closing card keeps its unsaved line through a failed save and a relaunch; Done recorded drops the recall", async (page) => {
   await phoneSource(page, TESTING);
   await tap(page, page.getByRole("button", { name: "Source actions" }));
