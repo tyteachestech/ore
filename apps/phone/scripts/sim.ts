@@ -9,11 +9,11 @@
 //   bun apps/phone/scripts/sim.ts shot | tree | launch | home | activate | wait SECS | rotate portrait|landscape
 //   bun apps/phone/scripts/sim.ts reset    delete the app and its data, install it again (a first launch)
 //   bun apps/phone/scripts/sim.ts stop
-// X and Y are iPhone points from the top left (a 2x screenshot's pixels / 3 on iPhone 18 Pro: use
-// `tree` for exact frames). Each command prints JSON: {"ok", "shot": png path, "error"}.
+// X and Y are iPhone points from the top left (the screenshot is 3x on iPhone 18 Pro: its pixels / 3;
+// `tree` gives exact frames). Each command prints JSON: {"ok", "shot": png path, "error"}.
 // The library is a copy built into the app (D78): --lib is a scratch library, never ~/Ore.
 import { spawnSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -58,8 +58,12 @@ function install(udid: string) {
 
 async function send(cmd: Record<string, unknown>, timeoutMs = 60_000) {
   const outFile = join(dir, "out.json");
-  const prev = existsSync(outFile) ? JSON.parse(readFileSync(outFile, "utf8")).seq ?? -1 : -1;
-  const seq = Math.max(prev, -1) + 1;
+  // The next number after the last command sent (not the last answered: one that timed out is still taken).
+  let prev = -1;
+  try {
+    prev = JSON.parse(readFileSync(join(dir, "cmd.json"), "utf8")).seq ?? -1;
+  } catch {}
+  const seq = prev + 1;
   writeFileSync(join(dir, "cmd.tmp"), JSON.stringify({ ...cmd, seq }));
   renameSync(join(dir, "cmd.tmp"), join(dir, "cmd.json"));
   const end = Date.now() + timeoutMs;
@@ -79,27 +83,34 @@ async function start() {
   writeFileSync(join(dir, "device"), udid);
   const lib = flag("--lib");
   if (lib) {
-    const abs = resolve(lib);
-    if (abs === resolve(homedir(), "Ore") || abs.includes("Mobile Documents")) throw new Error("use a scratch library, never ~/Ore");
+    const abs = realpathSync(resolve(lib));
+    const live = [resolve(homedir(), "Ore"), resolve(homedir(), "Library/Mobile Documents")].map((p) => (existsSync(p) ? realpathSync(p) : p));
+    if (live.some((p) => abs === p || abs.startsWith(p + "/"))) throw new Error("use a scratch library, never ~/Ore or iCloud");
     console.error("building the app for the Simulator with", abs, "(a few minutes)");
     sh("bun", ["run", "tauri", "ios", "build", "--debug", "--target", "aarch64-sim"], { cwd: phone, env: { ORE_PHONE_LIBRARY: abs } });
   }
   if (!existsSync(appPath)) throw new Error("no Simulator build yet: pass --lib DIR");
   if (lib || args.includes("--fresh")) install(udid);
   spawnSync("xcrun", ["simctl", "terminate", udid, bundle]);
+  // One driver at a time: two test runners on one Simulator fight over it.
+  const pidFile = join(dir, "driver.pid");
+  if (existsSync(pidFile)) spawnSync("kill", [readFileSync(pidFile, "utf8").trim()]);
   sh("xcodegen", ["generate", "--quiet"], { cwd: driver });
   sh("xcodebuild", ["build-for-testing", "-project", "OreSimDriver.xcodeproj", "-scheme", "Driver", "-destination", `id=${udid}`, "-derivedDataPath", "build", "-quiet"], { cwd: driver });
   writeFileSync(join(dir, "cmd.json"), JSON.stringify({ seq: -1 }));
   writeFileSync(join(dir, "out.json"), JSON.stringify({ seq: -2 }));
   const log = openSync(join(dir, "driver.log"), "w");
-  spawn("xcodebuild", ["test-without-building", "-project", "OreSimDriver.xcodeproj", "-scheme", "Driver", "-destination", `id=${udid}`, "-derivedDataPath", "build", "-only-testing:DriverUITests/Driver/testDrive"], {
+  const runner = spawn("xcodebuild", ["test-without-building", "-project", "OreSimDriver.xcodeproj", "-scheme", "Driver", "-destination", `id=${udid}`, "-derivedDataPath", "build", "-only-testing:DriverUITests/Driver/testDrive"], {
     cwd: driver, detached: true, stdio: ["ignore", log, log], env: { ...process.env, TEST_RUNNER_ORE_SIM_DIR: dir, TEST_RUNNER_ORE_SIM_BUNDLE: bundle },
-  }).unref();
+  });
+  runner.unref();
+  writeFileSync(pidFile, String(runner.pid));
   const end = Date.now() + 180_000;
-  while (Date.now() < end) {
+  while (true) {
     try {
       if (JSON.parse(readFileSync(join(dir, "out.json"), "utf8")).ready) break;
     } catch {}
+    if (Date.now() > end || runner.exitCode !== null) throw new Error(`the driver didn't start:\n${readFileSync(join(dir, "driver.log"), "utf8").slice(-1500)}`);
     await Bun.sleep(200);
   }
   return send({ op: "launch", settle: 2 });

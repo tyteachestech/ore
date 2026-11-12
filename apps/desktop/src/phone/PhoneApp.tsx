@@ -333,7 +333,15 @@ export function PhoneApp() {
     const id = start.openId;
     if (!loaded || !id || items!.some((i) => i.id === id)) return;
     void ore<Item[]>("ls", "--archived")
-      .then((archived) => archived.some((i) => i.id === id) || (setOpenId((now) => (now === id ? null : now)), setNoting(false)))
+      .then((archived) => {
+        if (archived.some((i) => i.id === id)) return;
+        // Only if he is still on it: he may have opened another source (and its note) meanwhile.
+        setOpenId((now) => {
+          if (now !== id) return now;
+          setNoting(false);
+          return null;
+        });
+      })
       .catch(() => {});
     // Once, on the first list: later a missing source is one he just archived from inside it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -367,10 +375,19 @@ export function PhoneApp() {
       const field = document.activeElement;
       if (!(field instanceof HTMLElement) || !field.isContentEditable || !field.closest(".phone-reader")) return;
       const sel = getSelection();
-      const caret = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+      // A caret, not a selection he is dragging out: moving the page under his finger would fight the handle.
+      if (!sel?.rangeCount || !sel.isCollapsed) return;
+      let caret = sel.getRangeAt(0).getBoundingClientRect();
+      // On a new empty line WebKit gives the caret no box: use its line's.
+      if (!caret.height) {
+        const node = sel.focusNode;
+        const line = node instanceof Element ? node : node?.parentElement;
+        if (!line) return;
+        caret = line.getBoundingClientRect();
+      }
       let box: HTMLElement | null = field;
       while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
-      if (!caret || !caret.height || !box) return;
+      if (!caret.height || !box) return;
       const bar = document.querySelector(".kb-bar")?.getBoundingClientRect().top ?? Infinity;
       const below = caret.bottom + 24 - Math.min(box.getBoundingClientRect().bottom, bar, vv.offsetTop + vv.height);
       if (below > 0) box.scrollTop += below;
