@@ -2719,7 +2719,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-note-row:active { background: var(--bg-hover); }
 .phone .phone-note { padding: 8px 20px 40px; }
 .phone .phone-note .note-editor { --note-size: 17px; min-height: 60vh; }
-/* A skill's page on the phone (D227): the Mac's page in one column, its note a row that opens the note's screen. */
+/* A skill's page on the phone (D228): the Mac's page in one column, its note a row that opens the note's screen. */
 .phone .phone-skill { padding: 8px 20px 40px; }
 .phone .phone-skill .skill-page { display: block; overflow: visible; }
 .phone .phone-skill .skill-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0 20px; }

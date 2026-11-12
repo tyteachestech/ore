@@ -9193,7 +9193,7 @@ journey("phone: a link added waits for the Mac on Sources, and Remove takes it o
   await row.waitFor({ state: "detached" });
 }, "phone");
 
-journey("phone: a skill's page is the Mac's in one column, and a course is one row that opens its lessons (D227)", async (page) => {
+journey("phone: a skill's page is the Mac's in one column, and a course is one row that opens its lessons (D228)", async (page) => {
   // Tyler 2026-11-12, iPhone parity phase 4: the phone's skill page listed only sources and a note row.
   const lesson = (part: number) => `topics: []\ncourse:\n  id: memory-101\n  title: Memory 101\n  part: ${part}\n`;
   await macChanges((lib) => itemFile(lib, "lecture-4-the-testing-effect", "doc.md"), "topics: []\n", lesson(1), () =>
@@ -9243,7 +9243,7 @@ journey("phone: New skill in the drawer names one in place and opens its page; a
   await page.locator(".phone-drawer section button").filter({ hasText: "Juggling" }).waitFor();
 }, "phone");
 
-journey("phone: Settings in the drawer changes the daily goal and the reminder, and they stay (D227)", async (page) => {
+journey("phone: Settings in the drawer changes the daily goal and the reminder, and they stay (D228)", async (page) => {
   const settings = async () => {
     await tap(page, page.getByRole("button", { name: "Open menu" }));
     await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));

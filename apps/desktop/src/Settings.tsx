@@ -46,7 +46,7 @@ const LAST = "ore.settings";
 const home = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 
 const AGENT_AT = "ore.reminder-agent";
-/** The reminder's time is in skills.yaml, which the iPhone's Settings can change through iCloud (D227): the Mac's
+/** The reminder's time is in skills.yaml, which the iPhone's Settings can change through iCloud (D228): the Mac's
  *  LaunchAgent follows it whenever the library changes. Only the installed app, so a dev build never takes it over. */
 export function useReminderAgent() {
   const changes = useLibraryChanges();

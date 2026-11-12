@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { reminderText, reminderTimes } from "../src/phone/reminder";
 
-// The iPhone can't ask at reminder time whether today's goal is open (D67), so it hands iOS the days ahead (D227).
+// The iPhone can't ask at reminder time whether today's goal is open (D67), so it hands iOS the days ahead (D228).
 const day = { reminder: "09:30", weekdays_only: false, counts: true, met: false, due: 12 };
 const at = (d: Date) => `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
 // Wednesday 11 Nov 2026, local time.
