@@ -2722,6 +2722,57 @@ journey("highlight note: what he types is kept when he clicks away or presses Es
   await reopen("decomposes a task", "Each step feeds the next");
 });
 
+journey("highlight note: a note whose save fails is kept, and saves when the highlight next closes", async (page) => {
+  await openSource(page, AGENTS);
+  const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
+  const away = () => page.locator(".doc-head h1").click(); // a click off the popup, as he does
+  const fail = (on: boolean) => page.evaluate((on) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = on ? { annotate: "The library is busy." } : {}), on);
+  const open = async () => {
+    const at = await page.evaluate(() => {
+      const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+        const i = n.data.indexOf("subtasks at once");
+        if (i < 0) continue;
+        n.parentElement!.scrollIntoView({ block: "center" });
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + 8);
+        const b = r.getClientRects()[0]!;
+        return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      }
+      return null;
+    });
+    if (!at) throw new Error("the passage is not in the reader");
+    await page.mouse.click(at.x, at.y);
+    await note.waitFor();
+  };
+  await select(page, "Parallelisation runs subtasks at once");
+  await note.click();
+  await page.keyboard.type("first thought");
+  await away();
+  await until("the popup closes", async () => !(await note.isVisible()));
+  await open();
+  await until("the first note is saved", async () => (await note.inputValue()) === "first thought");
+  await note.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and two");
+  await fail(true);
+  await away();
+  await until("the failed save says so", async () => (await page.locator(".toast").allInnerTexts()).some((t) => t.includes("The library is busy.")));
+  await fail(false);
+  // Leaving the source and coming back keeps them too.
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await openSource(page, AGENTS);
+  await open();
+  await until("the words he typed are still there", async () => (await note.inputValue()) === "first thought and two");
+  await away();
+  await until("the popup closes", async () => !(await note.isVisible()));
+  await page.reload();
+  await openSource(page, AGENTS);
+  await open();
+  await until("the retried save landed", async () => (await note.inputValue()) === "first thought and two");
+});
+
 journey("author: add one by hand from the title's menu or the empty byline field, it survives a reload, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   await page.locator(".doc-head h1").click({ button: "right" });
@@ -3456,6 +3507,87 @@ journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at on
     await ore("feed", "unfollow", feed).catch(() => {});
     server.stop(true);
   }
+});
+
+journey("Feed: ⇧↓ grows the pick, ⇧⌘U marks the whole pick read, a click on empty space drops it, and a title's first letters select its post (D232, D234)", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const titles = ["Keys alpha", "Keys beta", "Keys gamma", "Zebra keys"];
+  const item = (t: string, n: number) => `<item><title>${t}</title><link>http://localhost/keys-${n}.html</link><pubDate>${day}</pubDate></item>`;
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Keys Notes</title><link>http://localhost/</link>${titles.map(item).join("")}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", feed);
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const post = (t: string) => page.locator(".row.post", { hasText: t });
+    await post("Zebra keys").waitFor();
+    const isRead = async (t: string) => !(await post(t).count()) || (await post(t).getAttribute("class"))!.includes("read");
+    const sel = () => page.locator(".row.post.sel").count();
+    await page.locator(".feed-list").focus();
+    await page.keyboard.type("zeb");
+    await until("typing a title's first letters selects its post", async () => (await page.locator(".row.post.on", { hasText: "Zebra keys" }).count()) === 1);
+    await page.waitForTimeout(1100); // the typed prefix ends
+    await page.keyboard.type("keys a");
+    await until("a prefix with a space selects its post", async () => (await page.locator(".row.post.on", { hasText: "Keys alpha" }).count()) === 1);
+    await page.keyboard.press("Shift+ArrowDown");
+    await page.keyboard.press("Shift+ArrowDown");
+    await until("⇧↓ twice picks three posts", async () => (await sel()) === 3);
+    const list = (await page.locator(".feed-list").boundingBox())!;
+    await page.mouse.click(list.x + list.width - 12, list.y + list.height - 12);
+    await until("a click on empty space drops the pick", async () => (await sel()) === 0);
+    await post("Keys alpha").click({ modifiers: ["Meta"] });
+    await post("Keys beta").click({ modifiers: ["Meta"] });
+    await until("⌘-click picks two posts", async () => (await sel()) === 2);
+    await page.locator(".feed-list").focus();
+    await page.keyboard.press("Shift+Meta+KeyU");
+    await until("⇧⌘U marks both picked posts read", async () => (await isRead("Keys alpha")) && (await isRead("Keys beta")));
+    if (await isRead("Keys gamma")) throw new Error("⇧⌘U marked a post outside the pick");
+    await post("Keys gamma").click({ modifiers: ["Meta"] });
+    await page.locator(".feed-list").focus();
+    await page.keyboard.press("Shift+ArrowDown");
+    await until("⇧↓ after a ⌘-click grows that pick", async () => (await sel()) === 2);
+  } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
+journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space drops it, a title's first letters select its row, and ⌥⌘R renames the focused row (D232, D234)", async (page) => {
+  await openSource(page, AGENTS);
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const rows = page.locator(".home-read");
+  await rows.nth(1).waitFor();
+  const picked = () => page.locator(".home-read.sel").count();
+  const focused = () => page.evaluate(() => document.activeElement?.closest<HTMLElement>(".home-read")?.querySelector(".title")?.textContent ?? "");
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.type(AGENTS.slice(0, 5));
+  await until("typing a title's first letters selects its row", async () => (await focused()) === AGENTS);
+  await page.waitForTimeout(1100);
+  await page.keyboard.type(TESTING.slice(0, 6));
+  await until("another title's letters move to its row", async () => (await focused()) === TESTING);
+  const first = (await rows.nth(0).locator(".title").innerText()).trim();
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.press("Shift+ArrowDown");
+  await until("⇧↓ picks two rows", async () => (await picked()) === 2);
+  const home = (await page.locator(".home").boundingBox())!;
+  await page.mouse.click(home.x + home.width - 12, home.y + home.height - 12);
+  await until("a click on empty space drops the pick", async () => (await picked()) === 0);
+  if (await page.locator(".doc-head").count()) throw new Error("the click opened a source");
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.press("Alt+Meta+KeyR");
+  const field = rows.nth(0).locator("input");
+  await field.waitFor();
+  if ((await field.inputValue()) !== first) throw new Error(`⌥⌘R opened “${await field.inputValue()}”`);
+  await page.keyboard.press("Escape");
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.press("Shift+Meta+KeyA");
+  await until("⇧⌘A archives the row and focus goes to the next", async () => (await page.locator(".home-read .title", { hasText: first }).count()) === 0 && (await page.evaluate(() => !!document.activeElement?.closest(".home-read, .home-skill"))));
+  await page.keyboard.press("Meta+z");
+  await page.locator(".home-read .title", { hasText: first }).waitFor();
+  await rows.nth(0).locator(".home-open").click({ button: "right" });
+  const shown = (await page.getByRole("menuitem", { name: /Rename/ }).innerText()).replace(/\s+/g, "");
+  await page.keyboard.press("Escape");
+  if (!shown.includes("⌘R")) throw new Error(`Home's menu shows no Rename key: “${shown}”`);
 });
 
 journey("Home and Feed: ⌘C on the focused row copies it as Markdown with its link, as a list's selected row does", async (page) => {

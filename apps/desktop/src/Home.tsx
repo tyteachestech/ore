@@ -19,6 +19,8 @@ import { focusQuietly } from "./focus-near";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
 import { TitleField } from "./TitleField";
+import { pickRun, typeSelect } from "./typeahead";
+import { keepFocusNear } from "./focus-near";
 
 const day = () => new Date().toLocaleDateString("sv-SE");
 
@@ -49,6 +51,9 @@ let openedByKeys: string | null = null;
 let backHome = false;
 /** Back (⌘[, the back arrow) is landing on Home. */
 export const comingBackHome = () => void (backHome = true);
+
+/** What a press on Home is not on, for it to be a click on empty space. */
+const BLANK_NOT = ".home-read, .home-skill, button, a, input, [role=menu], [role=dialog]";
 
 export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource: openSource, onOpenSkill: openSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, onCopy, skillMenu, onRetry, notify, manyMenu, onDragSkill, onDropOnSkill}: {
   items: Item[];
@@ -139,6 +144,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
       const all = [...document.querySelectorAll<HTMLElement>(".home .home-skill, .home .home-read")];
       if (!all.length) return;
       const tile = t.closest<HTMLElement>(".home-skill, .home-read");
+      if (e.shiftKey && tile?.classList.contains("home-read") && (e.key === "ArrowDown" || e.key === "ArrowUp")) return; // ⇧↑↓ grow the pick (below)
+      if (!e.shiftKey) setPicked([]); // a plain arrow moves on alone, as in the lists
       const at = tile && t.classList.contains("home-open") ? all.indexOf(tile) : -1;
       if (at < 0 && t !== document.body) return;
       e.preventDefault();
@@ -174,6 +181,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   // Continue reading rows pick as a source list's do (F9, Finder): ⌘-click adds or drops one, ⇧-click
   // picks the run from the last one clicked, Esc clears; a plain click opens and clears.
   const [picked, setPicked] = useState<string[]>([]);
+  const pressedBlank = useRef(false);
   const anchor = useRef<string | null>(null);
   const pick = reading.filter((i) => picked.includes(i.id));
   const clickRow = (e: ReactMouseEvent, i: Item) => {
@@ -219,6 +227,57 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
     return { at, skill: document.elementFromPoint(at.x, at.y)?.closest<HTMLElement>("[data-drop-skill]")?.dataset.dropSkill || null };
   };
 
+  // The source lists' keys on Continue reading (D232, D234): ⇧↑↓ grow the pick from where it started,
+  // the first letters of a title select its tile or row (Finder), and Rename, Pin, Archive, Open original,
+  // Reveal and Copy path act on the focused row, or on the pick it is in, as its menu does.
+  const typed = useRef(typeSelect());
+  const live = useRef({ reading, picked, actionsFor });
+  live.current = { reading, picked, actionsFor };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (blocked || e.defaultPrevented || inTextField(e)) return;
+      const t = e.target as HTMLElement;
+      if (t.closest?.("[role='dialog'], [role='menu']")) return;
+      const { reading, picked, actionsFor } = live.current;
+      const rowEl = t.classList?.contains("home-open") ? t.closest<HTMLElement>(".home .home-read") : null;
+      const row = reading.find((i) => i.id === rowEl?.dataset.id);
+      const tiles = [...(root.current?.querySelectorAll<HTMLElement>(".home-skill, .home-read") ?? [])];
+      const onTile = (!!rowEl || !!t.closest?.(".home .home-skill") || t === document.body) && tiles.length > 0;
+      const from = tiles.findIndex((el) => el.contains(t) && t !== document.body);
+      const jump = onTile ? typed.current(e, tiles.map((el) => el.querySelector(".home-open")?.textContent ?? ""), from) : null;
+      if (row && e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        const ids = reading.map((i) => i.id);
+        const at = ids.indexOf(row.id);
+        const to = ids[Math.max(0, Math.min(ids.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)))]!;
+        if (!picked.length || !anchor.current || !ids.includes(anchor.current)) anchor.current = row.id;
+        setPicked(pickRun(ids, anchor.current, to));
+        root.current?.querySelector<HTMLElement>(`.home-read[data-id="${CSS.escape(to)}"] .home-open`)?.focus();
+        return;
+      }
+      const key = (["rename", "pin", "archive", "original", "reveal", "path"] as const).find((k) => is(e, k));
+      if (key) {
+        const on = row ?? (picked.length > 1 ? reading.find((i) => picked.includes(i.id)) : undefined);
+        const act = on && actionsFor(on).find((a) => a.id === key);
+        if (!act) return;
+        e.preventDefault();
+        // Focus stays with the row, or goes to the next one when it leaves, as after the same pick from its menu.
+        if (rowEl) keepFocusNear(rowEl);
+        act.run();
+        return;
+      }
+      if (jump !== null) {
+        e.preventDefault();
+        if (jump < 0) return;
+        setPicked([]);
+        tiles[jump]!.querySelector<HTMLElement>(".home-open")?.focus();
+        tiles[jump]!.scrollIntoView({ block: "nearest" });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [blocked]);
+
   // ⌘C on the focused Continue reading row copies it, as on a list's selected row; never selected text or a field's.
   useEffect(() => {
     if (!onCopy) return;
@@ -262,7 +321,13 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   const split = useSplit("ore.home-split", 1 / 3);
   const two = reading.length > 0 && shown.length > 0 && !!today;
   return (
-    <div className="home" ref={root}>
+    // A click on empty space drops the pick (Finder); not the end of a drag that began on a row.
+    <div
+      className="home"
+      ref={root}
+      onPointerDown={(e) => (pressedBlank.current = !(e.target as Element).closest(BLANK_NOT))}
+      onClick={(e) => picked.length && pressedBlank.current && !(e.target as Element).closest(BLANK_NOT) && setPicked([])}
+    >
       <section className="home-today" aria-label="Today">
         {error && (
           <div role="alert">
