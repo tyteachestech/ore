@@ -213,7 +213,7 @@ class ShareViewController: UIViewController {
     provider.timeout = 10
     fetching = provider
     provider.startFetchingMetadata(for: url) { [weak self] got, _ in
-      guard let got else { return }
+      guard let got else { self?.noPicture(); return }
       let title = got.title
       DispatchQueue.main.async {
         guard let self, given == nil, let title, !title.isEmpty else { return }
@@ -227,15 +227,26 @@ class ShareViewController: UIViewController {
   }
 
   private func picture(from provider: NSItemProvider?, icon: Bool = false) {
-    guard let provider, provider.canLoadObject(ofClass: UIImage.self) else { return }
+    guard let provider, provider.canLoadObject(ofClass: UIImage.self) else { return noPicture() }
     _ = provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
       // Drawn small before it is kept: a page's picture can be thousands of pixels wide, and an extension has little memory.
-      guard let small = (image as? UIImage)?.preparingThumbnail(of: CGSize(width: 192, height: 192)) else { return }
+      // In its own shape (its short side 192 px), so the slot crops it and never squashes it.
+      guard let full = image as? UIImage, full.size.width > 0, full.size.height > 0 else { self?.noPicture(); return }
+      let k = 192 / min(full.size.width, full.size.height)
+      guard let small = full.preparingThumbnail(of: CGSize(width: full.size.width * k, height: full.size.height * k)) else { self?.noPicture(); return }
       DispatchQueue.main.async {
         self?.thumb.contentMode = icon ? .center : .scaleAspectFill
         self?.thumb.image = icon ? small.preparingThumbnail(of: CGSize(width: 32, height: 32)) : small
         self?.thumb.isHidden = false
       }
+    }
+  }
+
+  /// Offline, or a page with neither picture nor icon: the empty slot goes, and the words take its place.
+  private func noPicture() {
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.thumb.image == nil else { return }
+      self.thumb.isHidden = true
     }
   }
 
