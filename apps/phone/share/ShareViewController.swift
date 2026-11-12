@@ -1,6 +1,7 @@
 // Ore's Share Extension: a link or page shared from Safari or any app becomes one inbox item,
 // `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in Ore's iCloud folder, or in the App
-// Group the app reads when it opens. The link is saved the moment the card appears; the card then offers his skills to file it under,
+// Group the app reads when it opens. A file (a PDF from Files, a photo) is copied to `inbox/<ulid>/<name>`
+// with `inbox/<ulid>.file.json` written after it. It is saved the moment the card appears; the card then offers his skills to file it under,
 // one tap each, and closes by itself if he leaves it alone (Raindrop's share card).
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
 import UIKit
@@ -58,14 +59,19 @@ class ShareViewController: UIViewController {
     card.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(card)
 
-    titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+    titleLabel.font = .preferredFont(forTextStyle: .headline)
+    titleLabel.adjustsFontForContentSizeCategory = true
+    titleLabel.numberOfLines = 0
     titleLabel.textColor = paper
     titleLabel.text = "Adding to Ore…"
 
     let done = UIButton(type: .system)
     done.setTitle("Done", for: .normal)
-    done.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
+    done.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+    done.titleLabel?.adjustsFontForContentSizeCategory = true
     done.tintColor = paper
+    done.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    done.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     done.addTarget(self, action: #selector(finish), for: .touchUpInside)
     done.setContentHuggingPriority(.required, for: .horizontal)
 
@@ -98,8 +104,13 @@ class ShareViewController: UIViewController {
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     Task { @MainActor in
-      guard let url = await link() else { return fail("Ore adds links. This isn’t one.") }
-      guard save(url) else { return fail("Open Ore once first, then share again.") }
+      if let url = await link() {
+        guard save(url) else { return fail("Open Ore once first, then share again.") }
+      } else if let p = fileProvider() {
+        guard await save(file: p) else { return fail("Couldn’t save that file. Open Ore once first, then share again.") }
+      } else {
+        return fail("Ore adds links and files. This isn’t one.")
+      }
       titleLabel.text = "Added to Ore"
       layoutChips(skills())
       // Left alone, the card goes by itself; a touch on it keeps it until Done.
@@ -121,22 +132,69 @@ class ShareViewController: UIViewController {
     return nil
   }
 
-  /// Ore's iCloud folder first, so the Mac sees the link without the app opening; the App Group when iCloud
+  /// The first thing shared that is a file and not a web link (a file's own URL is a file URL).
+  private func fileProvider() -> NSItemProvider? {
+    let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
+    return providers.first { $0.hasItemConformingToTypeIdentifier(UTType.data.identifier) }
+  }
+
+  /// Ore's iCloud folder first, so the Mac sees it without the app opening; the App Group when iCloud
   /// Drive is off or the folder isn't there yet (the app moves it in when it opens, lib.rs `share_inbox`).
-  private func save(_ url: String) -> Bool {
-    let id = ulid()
-    let stamp = ISO8601DateFormatter()
-    stamp.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    item = ["id": id, "url": url, "skills": [String](), "added": stamp.string(from: Date()), "device": "iphone"]
+  private func inboxes() -> [URL] {
     var roots: [URL] = []
     if let cloud = FileManager.default.url(forUbiquityContainerIdentifier: cloudId) { roots.append(cloud.appendingPathComponent("Documents", isDirectory: true)) }
     if let g = groupDir() { roots.append(g) }
-    for root in roots {
-      let dir = root.appendingPathComponent("inbox", isDirectory: true)
+    return roots.map { $0.appendingPathComponent("inbox", isDirectory: true) }
+  }
+
+  private func stamp() -> String {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f.string(from: Date())
+  }
+
+  private func save(_ url: String) -> Bool {
+    let id = ulid()
+    item = ["id": id, "url": url, "skills": [String](), "added": stamp(), "device": "iphone"]
+    for dir in inboxes() {
       try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
       file = dir.appendingPathComponent("\(id).link.json")
       if write() { return true }
     }
+    file = nil
+    return false
+  }
+
+  /// The file under the name it had, then its item, so no device sees the item before the file (inbox.ts `queueFile`).
+  /// Copied, never read into memory: an extension has little.
+  private func save(file p: NSItemProvider) async -> Bool {
+    let id = ulid()
+    let dirs = inboxes()
+    let saved: (dir: URL, name: String)? = await withCheckedContinuation { done in
+      // The file Apple hands over is gone when this block returns, so the copy is made inside it.
+      _ = p.loadFileRepresentation(forTypeIdentifier: UTType.data.identifier) { tmp, _ in
+        guard let tmp else { return done.resume(returning: nil) }
+        var name = tmp.lastPathComponent.replacingOccurrences(of: #"[/\\:]"#, with: "-", options: .regularExpression)
+        while name.hasPrefix(".") { name.removeFirst() }
+        if name.isEmpty { name = "file" }
+        for dir in dirs {
+          let into = dir.appendingPathComponent(id, isDirectory: true)
+          do {
+            try FileManager.default.createDirectory(at: into, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: tmp, to: into.appendingPathComponent(name))
+            return done.resume(returning: (dir, name))
+          } catch {
+            try? FileManager.default.removeItem(at: into)
+          }
+        }
+        done.resume(returning: nil)
+      }
+    }
+    guard let saved else { return false }
+    item = ["id": id, "url": saved.name, "file": "\(id)/\(saved.name)", "skills": [String](), "added": stamp(), "device": "iphone"]
+    file = saved.dir.appendingPathComponent("\(id).file.json")
+    if write() { return true }
+    try? FileManager.default.removeItem(at: saved.dir.appendingPathComponent(id, isDirectory: true))
     file = nil
     return false
   }
@@ -168,21 +226,25 @@ class ShareViewController: UIViewController {
     for (i, s) in all.prefix(12).enumerated() {
       var conf = UIButton.Configuration.plain()
       conf.title = s.name
-      conf.contentInsets = NSDirectionalEdgeInsets(top: 9, leading: 14, bottom: 9, trailing: 14)
+      conf.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)
+      conf.titleLineBreakMode = .byTruncatingTail
+      let font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 15, weight: .medium))
       conf.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { a in
         var a = a
-        a.font = .systemFont(ofSize: 15, weight: .medium)
+        a.font = font
         return a
       }
       let b = UIButton(configuration: conf)
       b.tag = i
-      b.layer.cornerRadius = 18
-      b.layer.borderWidth = 1
+      b.titleLabel?.numberOfLines = 1
       b.accessibilityTraits.insert(.button)
       b.addTarget(self, action: #selector(toggle(_:)), for: .touchUpInside)
       style(b, on: false)
-      let w = b.sizeThatFits(CGSize(width: width, height: 44)).width
+      // Its own width on one line, never wider than the card; at least 44 pt each way to tap.
+      let w = min(max(b.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude, height: 44)).width, 44), width)
       if used > 0 && used + w > width { newRow() }
+      b.widthAnchor.constraint(equalToConstant: w).isActive = true
+      b.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
       row.addArrangedSubview(b)
       used += w + 8
     }
@@ -191,10 +253,15 @@ class ShareViewController: UIViewController {
   private var shown: [Skill] = []
 
   private func style(_ b: UIButton, on: Bool) {
-    b.backgroundColor = on ? paper : .clear
-    b.layer.borderColor = (on ? paper : line).cgColor
-    b.configuration?.baseForegroundColor = on ? UIColor(white: 0.07, alpha: 1) : muted
-    b.isSelected = on
+    // Drawn by the configuration, as a full pill: `isSelected` would tint it the system's blue.
+    var conf = b.configuration ?? .plain()
+    conf.cornerStyle = .capsule
+    conf.background.backgroundColor = on ? paper : .clear
+    conf.background.strokeColor = on ? paper : line
+    conf.background.strokeWidth = 1
+    conf.baseForegroundColor = on ? UIColor(white: 0.07, alpha: 1) : muted
+    b.configuration = conf
+    if on { b.accessibilityTraits.insert(.selected) } else { b.accessibilityTraits.remove(.selected) }
   }
 
   @objc private func toggle(_ b: UIButton) {

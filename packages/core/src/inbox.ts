@@ -26,6 +26,8 @@ const LINK = ".link.json";
 const FILE = ".file.json";
 const SUFFIX = /\.(link|file)\.json$/;
 const item = (lib: Library, l: Pick<QueuedLink, "id" | "file">) => join(paths.inbox(lib), `${l.id}${l.file ? FILE : LINK}`);
+/** A file's place that would leave inbox/: only whole `.` and `..` parts, since a name may hold dots ("a..b.pdf"). */
+export const strays = (file: string) => file.split(/[\\/]/).some((part) => !part || part === "." || part === "..");
 const find = (lib: Library, id: string) => [LINK, FILE].map((x) => join(paths.inbox(lib), `${id}${x}`)).find((f) => existsSync(f));
 
 export function queueLink(lib: Library, url: string, skills: string[] = []): QueuedLink {
@@ -62,7 +64,7 @@ export function queuedLinks(lib: Library): QueuedLink[] {
     try {
       const l = JSON.parse(readFileSync(join(paths.inbox(lib), name), "utf8")) as QueuedLink;
       const isFile = name.endsWith(FILE);
-      if (isFile ? typeof l.file !== "string" || l.file.includes("..") || !existsSync(join(paths.inbox(lib), l.file)) : typeof l.url !== "string") continue;
+      if (isFile ? typeof l.file !== "string" || strays(l.file) || !existsSync(join(paths.inbox(lib), l.file)) : typeof l.url !== "string") continue;
       // The id is the item's name, so a synced copy ("<id> 2") is its own entry, removable on its own.
       out.push({ ...l, id: name.replace(SUFFIX, ""), url: typeof l.url === "string" ? l.url : basename(l.file!), skills: Array.isArray(l.skills) ? l.skills : [] });
     } catch {}

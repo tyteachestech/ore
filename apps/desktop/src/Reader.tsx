@@ -1252,7 +1252,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   }, [reveal, ready, body]);
 
-  // Icons in the left margin (Marks): a star on each key point and a ? on each question (a plain highlight's
+  // Icons in the left margin (Marks): a gem on each key point and a ? on each question (a plain highlight's
   // tint says enough, D118), and one per "In the source" passage while a quiz answer is open, so the
   // passing orange tint is not mistaken for a highlight.
   const marks = useMemo<Mark[]>(() => {
@@ -2423,6 +2423,21 @@ function ReaderView(p: Props & { reload: () => void }) {
     }, 150);
   };
 
+  // A press anywhere off the popup closes it and keeps the highlight (Notion, Readwise Reader): in the
+  // margins beside the text and around the page too, not only on the page (whose press closes it below).
+  // A menu the popup opens in a portal is still the popup.
+  useEffect(() => {
+    if (!popup) return;
+    const down = (e: globalThis.MouseEvent) => {
+      const t = e.target as Element;
+      if (pageRef.current?.contains(t) || popupRef.current?.contains(t) || t.closest?.("[data-radix-popper-content-wrapper]")) return;
+      keepNote();
+      setPopup(null);
+    };
+    document.addEventListener("mousedown", down);
+    return () => document.removeEventListener("mousedown", down);
+  });
+
   const pressedAt = useRef({ x: 0, y: 0 });
   const onMouseDown = (e: MouseEvent) => {
     // A click that is not the third of a triple: the double click's sentence is kept now, quietly (no popup,
@@ -3226,7 +3241,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
-              {video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
+              {doc.owed?.length ? (doc.owed_error ? `Couldn’t get the transcript: ${doc.owed_error} Reimport tries again.` : "The transcript comes in when Ore is open on your Mac. Watch it above meanwhile.") : video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
             </p>
           )}
           {PHONE && ready && canFinish && !closedBook && (
@@ -3286,7 +3301,7 @@ function ReaderView(p: Props & { reload: () => void }) {
                         className={`intent ${i}${intent === i ? " on" : ""}`}
                         onClick={() => void setIntent(i)}
                       >
-                        <Glyph size={14} weight={intent === i ? "fill" : "regular"} aria-hidden="true" />
+                        <Glyph size={14} aria-hidden="true" />
                         {LABEL[i]}
                       </button>
                     </Hint>

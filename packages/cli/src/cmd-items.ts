@@ -34,7 +34,7 @@ function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noE
 }
 import { int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
-import { importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
+import { fillOwed, importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
 
 const INTENTS = Intent.options;
 
@@ -126,7 +126,10 @@ export const itemCommands: Record<string, Command> = {
           afterAdd(lib, item, false);
           return { id: item.meta.id, title: item.meta.title, kept: !!item.kept };
         });
-        return { data: r, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`)].join("\n") };
+        // What a phone added with a part owed (a video's transcript) is filled here, then enriched.
+        const filled = (await fillOwed(lib)).map((i) => ({ id: i.meta.id, title: i.meta.title }));
+        for (const i of filled) startEnrich(lib, i.id);
+        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n") };
       }
       const all = queuedLinks(lib);
       return { data: all, text: all.length ? table(all.map((l) => [l.id, l.url, l.error ?? "waiting"])) : "Nothing waiting" };

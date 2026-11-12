@@ -13,7 +13,8 @@ const PICKED = "image/*,.pdf,.epub,.md,.markdown,.txt,.html,.htm,.docx,.pptx,.rt
 
 export type Waiting = { id: string; url: string; skills: string[]; error?: string };
 
-export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+/** `skill`: added from a skill's page, it is filed there. */
+export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: () => void; onAdded: () => void }) {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     if (!url.trim() || busy) return;
     setBusy(true);
     try {
-      await ore("inbox", "--add", url.trim());
+      await ore("inbox", "--add", url.trim(), ...(skill ? ["--skill", skill] : []));
       onAdded();
       onClose();
     } catch (e) {
@@ -39,7 +40,7 @@ export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     if (!list?.length || busy) return;
     setBusy(true);
     try {
-      for (const f of list) await queuePicked(f.name, new Uint8Array(await f.arrayBuffer()));
+      for (const f of list) await queuePicked(f.name, new Uint8Array(await f.arrayBuffer()), skill);
       onAdded();
       onClose();
     } catch (e) {
@@ -83,6 +84,7 @@ export function AddLink({ onClose, onAdded }: { onClose: () => void; onAdded: ()
  *  comes in. Anything else the phone couldn't read keeps its reason, and the Mac tries it. */
 export function macOnly(error: string): string | null {
   if (/yt-dlp/.test(error)) return "A video comes in through your Mac.";
+  if (/Transcribing audio needs/.test(error)) return "Your Mac writes the transcript for a podcast.";
   if (/scanned pages/.test(error)) return "Your Mac reads the text in a picture or a scan.";
   if (/only on the Mac|on a Mac only/.test(error)) return "This one comes in through your Mac.";
   return null;

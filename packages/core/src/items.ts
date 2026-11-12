@@ -80,6 +80,10 @@ export const ItemMetaSchema = z.object({
   published: z.string().optional(),
   // A PDF's tables or formulas that read as lines of text until Docling reads them (D125).
   structure: z.array(z.enum(["tables", "formulas"])).optional(),
+  // What a device with no tools couldn't bring in (a video's transcript, D227): a device that has them
+  // reads the source again and fills it (`fillOwed`). `owed_error`: why that failed; Reimport tries again.
+  owed: z.array(z.enum(["transcript"])).optional(),
+  owed_error: z.string().optional(),
   captured_at: z.string(),
   source_app: z.string().optional(),
   text_sha256: z.string(),
@@ -139,6 +143,7 @@ export interface NewItem {
   /** Opened from the Feed, not kept yet. */
   preview?: boolean;
   structure?: ("tables" | "formulas")[];
+  owed?: "transcript"[];
 }
 
 export type Asset = { name: string; data: Uint8Array };
@@ -162,6 +167,7 @@ export async function createItem(lib: Library, input: NewItem): Promise<Item> {
     author: input.author || undefined,
     published: input.published || undefined,
     structure: input.structure,
+    owed: input.owed,
     captured_at: nowIso(now),
     source_app: input.source_app,
     text_sha256: sha256(body),

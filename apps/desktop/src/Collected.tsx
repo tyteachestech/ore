@@ -1,9 +1,10 @@
 import { CaretRight, Plus } from "./icons";
+import { keepKeysIn } from "./keys";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { still } from "./SideCursor";
-import { PixelKeep, PixelQuestion, PixelStar, PixelTry } from "./PixelIcon";
+import { PixelKeep, PixelQuestion, PixelGem, PixelTry } from "./PixelIcon";
 import { INTENTS, PHONE, type Annotation, type Intent } from "./ore";
 import { passageText } from "./text";
 import { rankScore } from "./match";
@@ -12,7 +13,7 @@ import { load, save } from "./util";
 // D118: one highlight; a key point (`card` in the files) is a highlight he marked to come back, and the AI
 // plans the cards from all of them: the day after a sitting while he is still reading (D180), and at the finish.
 export const LABEL: Record<Intent, string> = { keep: "Highlight", card: "Key point", question: "Question", apply: "Try it" };
-export const ICON: Record<Intent, typeof PixelKeep> = { keep: PixelKeep, card: PixelStar, question: PixelQuestion, apply: PixelTry };
+export const ICON: Record<Intent, typeof PixelKeep> = { keep: PixelKeep, card: PixelGem, question: PixelQuestion, apply: PixelTry };
 /** What each mark means, said on hover where he picks it. */
 export const MEANS: Record<Intent, string> = {
   keep: "Exercises are planned from your highlights the next day",
@@ -251,7 +252,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
         {head(
           "card",
           "Key points",
-          PixelStar,
+          PixelGem,
           <Hint text="A key point of your own, from this spot" keys="card" side="left">
             <button className="icon-btn" aria-label="Add a key point" onClick={() => (shut.has("card") && toggle("card"), onAdding(true))}>
               <Plus size={12} weight="bold" aria-hidden="true" />
@@ -321,7 +322,7 @@ function AddLine({ value: v, ask, takeFocus, onChange, onDone }: { value: string
         aria-label="Key point"
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.key === "Enter" && !e.nativeEvent.isComposing) {
             e.preventDefault();
             finish(v);

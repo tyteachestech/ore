@@ -9,8 +9,8 @@ export const shareSkills = async (skills: { id: string; name: string }[]): Promi
   if (PHONE) (await import("./phone/core")).shareSkills(skills);
 };
 /** A file picked on the phone goes to the inbox to be imported (phone/core.ts `queuePicked`). */
-export const queuePicked = async (name: string, bytes: Uint8Array): Promise<void> => {
-  if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes);
+export const queuePicked = async (name: string, bytes: Uint8Array, skill?: string): Promise<void> => {
+  if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes, skill);
 };
 export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import("./phone/core")).pull() : false);
 
@@ -103,6 +103,9 @@ export type Item = {
   finished_at?: string;
   /** A PDF's tables or formulas that read as plain text until the optional reader reads them (D125). */
   structure?: ("tables" | "formulas")[];
+  /** What the device that added it couldn't bring in (a video's transcript on the iPhone, D227). */
+  owed?: "transcript"[];
+  owed_error?: string;
   /** `ore show`: being read now, or read; why the last reading failed; whether the reader is installed. */
   tables?: "reading" | "read";
   tables_error?: string;

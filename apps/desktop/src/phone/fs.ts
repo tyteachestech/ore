@@ -160,6 +160,10 @@ const sent = new Set<string>();
  *  wrongly thinks is there (an empty log, say), so that waits until it arrives. */
 const downloading = new Set<string>();
 let sending: Promise<void> = Promise.resolve();
+/** For Settings: when the folder last took a write or a scan, and the last write it refused. */
+let lastSync = 0;
+let lastError: string | null = null;
+export const syncState = () => ({ icloud: !!disk, at: lastSync, unsent: unsent.size, downloading: downloading.size, error: lastError });
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 const rel = (p: string) => p.slice(disk!.prefix.length + 1);
@@ -189,10 +193,12 @@ export function flush(): Promise<void> {
         const e = files.get(`${disk!.prefix}/${r}`);
         if (e) e.mtime = ms;
       }
+      [lastSync, lastError] = [Date.now(), null];
       for (const [r, op] of ops) if (op === null) for (const k of [...known.keys()]) if (k === r || k.startsWith(r + "/")) known.delete(k);
     } catch (e) {
       // Kept for the next try, unless a newer write replaced it.
       for (const [r, op] of ops) if (!unsent.has(r)) unsent.set(r, op);
+      lastError = String(e);
       dispatchEvent(new CustomEvent("ore:save-failed", { detail: String(e) }));
     }
   });
@@ -214,6 +220,7 @@ export async function mountDisk(prefix: string, root: string, invoke: Invoke) {
   setDownloading(scan.waiting);
   await read(scan.files);
   listOthers(scan.other);
+  lastSync = Date.now();
   // iOS may suspend the app soon after it leaves the screen: what it wrote goes now.
   addEventListener("visibilitychange", () => document.hidden && void flush());
 }
@@ -232,6 +239,20 @@ function listOthers(other: string[] = []) {
     files.set(p, { text: "", mtime: 0, unread: true });
     addDirs(p);
   }
+}
+
+/** Loads one listed file's bytes from the folder, so the core can read it: a file the share sheet saved to
+ *  the inbox. False when it isn't there to load. */
+export async function load(p: string): Promise<boolean> {
+  const e = files.get(p);
+  if (!e) return false;
+  if (!e.unread || e.bytes) return true;
+  if (!disk) return false;
+  const b64 = await disk.invoke<string | null>("library_bytes", { root: disk.root, path: rel(p) });
+  if (b64 == null) return false;
+  e.bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  e.text = new TextDecoder().decode(e.bytes); // as a written file has both: a shared .txt or .csv is read as text
+  return true;
 }
 
 function setDownloading(waiting: string[]) {
@@ -273,6 +294,7 @@ export async function rescan(): Promise<boolean> {
   if (gone.length) pruneDirs();
   await read(changed);
   listOthers(scan.other);
+  lastSync = Date.now();
   return changed.length + gone.length > 0;
 }
 
@@ -297,7 +319,7 @@ class Bytes extends Uint8Array {
 export function readFileSync(p: string, enc?: unknown): string {
   const e = files.get(p);
   if (!e) throw err("ENOENT", p);
-  if (e.unread) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
+  if (e.unread && !e.bytes) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
   if (enc === undefined && e.bytes) return Bytes.from(e.bytes) as unknown as string;
   return e.text;
 }

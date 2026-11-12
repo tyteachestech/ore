@@ -205,7 +205,22 @@ async fn share_inbox(root: String) -> usize {
     let to = Path::new(&root).join("inbox");
     let Ok(entries) = fs::read_dir(&from) else { return 0 };
     let _ = fs::create_dir_all(&to);
-    entries.flatten().filter(|e| e.file_name().to_string_lossy().ends_with(".link.json")).filter(|e| fs::rename(e.path(), to.join(e.file_name())).is_ok()).count()
+    let entries: Vec<_> = entries.flatten().collect();
+    // A shared file's folder goes before its item, so the item never arrives without its file.
+    for e in entries.iter().filter(|e| e.path().is_dir()) {
+        let _ = fs::rename(e.path(), to.join(e.file_name()));
+    }
+    let item = |e: &&fs::DirEntry| {
+        let n = e.file_name().to_string_lossy().to_string();
+        n.ends_with(".link.json") || (n.ends_with(".file.json") && !from.join(n.trim_end_matches(".file.json")).exists())
+    };
+    entries.iter().filter(item).filter(|e| fs::rename(e.path(), to.join(e.file_name())).is_ok()).count()
+}
+
+/// One file's bytes as base64: a file the share sheet saved to the inbox, read when the phone imports it.
+#[tauri::command]
+async fn library_bytes(root: String, path: String) -> Option<String> {
+    Some(base64::engine::general_purpose::STANDARD.encode(fs::read(inside(&root, &path).ok()?).ok()?))
 }
 
 /// His skills, as JSON, for the share card's chips: the extension can't read the library itself.
@@ -291,7 +306,8 @@ pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_apply, http_fetch, share_inbox, share_skills, player_port])
+        .plugin(tauri_plugin_notification::init())
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, http_fetch, share_inbox, share_skills, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }
