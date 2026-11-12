@@ -2535,7 +2535,9 @@ function ReaderView(p: Props & { reload: () => void }) {
           // begun since (a quick second one, on a busy Mac this runs late) keeps the selection it is making.
           setTimeout(() => {
             const now = sel.rangeCount ? sel.getRangeAt(0) : null;
-            if (!now || (now.compareBoundaryPoints(Range.START_TO_START, range) === 0 && now.compareBoundaryPoints(Range.END_TO_END, range) === 0)) sel.removeAllRanges();
+            const same = !!now && now.compareBoundaryPoints(Range.START_TO_START, range) === 0 && now.compareBoundaryPoints(Range.END_TO_END, range) === 0;
+            // One that runs past the text is no drag in it (a triple click on the last paragraph, in WebKit): cleared too.
+            if (!now || same || !el.contains(now.startContainer) || !el.contains(now.endContainer)) sel.removeAllRanges();
           }, 0);
         };
         if (e.detail === 2) {

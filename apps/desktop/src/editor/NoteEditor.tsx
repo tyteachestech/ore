@@ -885,8 +885,9 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
               const synced = is(e, "palette") && takeDomSelection(view);
               const words = view.state.selection instanceof TextSelection && !view.state.selection.empty;
               if (words && live.current.bar && is(e, "palette")) {
+                // Both: `linkNow` for a bar that comes up with this key, `askLink` for one that was up and stays.
                 if (synced) live.current.linkNow();
-                else live.current.askLink();
+                live.current.askLink();
                 e.preventDefault();
                 e.stopPropagation();
                 return true;
@@ -1342,11 +1343,12 @@ function MathField({ at, view, onClose }: { at: { pos: number; x: number; y: num
 /** The page's selection, when it is words in this editor the editor hasn't taken yet: taken now. True if it moved. */
 function takeDomSelection(view: EditorView): boolean {
   const d = view.dom.ownerDocument.getSelection();
+  if (!(view.state.selection instanceof TextSelection)) return false; // cells or a block selected: theirs to keep
   if (!d || d.isCollapsed || !d.anchorNode || !d.focusNode || !view.dom.contains(d.anchorNode) || !view.dom.contains(d.focusNode)) return false;
   const anchor = view.posAtDOM(d.anchorNode, d.anchorOffset);
   const head = view.posAtDOM(d.focusNode, d.focusOffset);
   const s = view.state.selection;
   if (s.anchor === anchor && s.head === head) return false;
-  view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, anchor, head)));
+  view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head))));
   return true;
 }
