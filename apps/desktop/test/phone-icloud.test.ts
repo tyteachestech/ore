@@ -126,6 +126,22 @@ test("a picture saved with an atomic write reaches the folder byte for byte", as
   expect(sent).toEqual([["items/c-03/assets/x.png", Buffer.from(png).toString("base64"), true]]);
 });
 
+test("an episode's audio reaches the folder whole, then leaves memory and stays listed", async () => {
+  // An hour's podcast is 60 MB or more: held after it was saved (and decoded as text), it cost the web view over a gigabyte.
+  const mp3 = new Uint8Array([0xff, 0xfb, 0x90, 0x00, 0x80, 0x01]);
+  sent.length = 0;
+  fs.writeFileSync(`${P}/items/e-05/source.mp3`, mp3);
+  expect(new Uint8Array(fs.readFileSync(`${P}/items/e-05/source.mp3`) as unknown as Uint8Array)).toEqual(mp3);
+  await flush();
+  expect(sent).toEqual([["items/e-05/source.mp3", Buffer.from(mp3).toString("base64"), true]]);
+  expect(fs.existsSync(`${P}/items/e-05/source.mp3`)).toBe(true);
+  expect(() => fs.readFileSync(`${P}/items/e-05/source.mp3`)).toThrow(/not loaded/);
+  other = ["items/e-05/source.mp3"];
+  await rescan();
+  expect(fs.existsSync(`${P}/items/e-05/source.mp3`)).toBe(true);
+  other = [];
+});
+
 test("a file the phone lists but doesn't load (audio, a PDF) is found, never copied as empty, and goes when the Mac deletes it", async () => {
   other = ["items/c-03/source.m4a"];
   await rescan();
