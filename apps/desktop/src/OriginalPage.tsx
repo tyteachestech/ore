@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import { Hint } from "./Hint";
+import { PHONE } from "./ore";
 import { CaretLeft, CaretRight } from "./icons";
 import { Working } from "./Working";
 
@@ -19,8 +21,12 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
   const [width, setWidth] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
+  /** On the phone a pinch zooms the page (Books): once it settles, the page is drawn again that much sharper. */
+  const [sharp, setSharp] = useState(1);
+  const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => setOwn(null), [page, file]);
+  useEffect(() => setSharp(1), [own, page, file]);
   useEffect(() => {
     let gone = false;
     let task: ReturnType<typeof getDocument> | undefined;
@@ -55,7 +61,7 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
     void pdf.getPage(shown).then((pg) => {
       if (gone) return;
       const base = pg.getViewport({ scale: 1 });
-      const view = pg.getViewport({ scale: (width / base.width) * (window.devicePixelRatio || 1) });
+      const view = pg.getViewport({ scale: (width / base.width) * (window.devicePixelRatio || 1) * sharp });
       // Drawn off the page and swapped in whole, so a turned page never shows half-drawn.
       const draft = document.createElement("canvas");
       draft.width = Math.round(view.width);
@@ -76,7 +82,7 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
       gone = true;
       task?.cancel();
     };
-  }, [pdf, shown, width]);
+  }, [pdf, shown, width, sharp]);
 
   return (
     <div className="original" ref={box}>
@@ -97,7 +103,24 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
               </Hint>
             </div>
           )}
-          <canvas ref={canvas} role="img" aria-label={`Page ${shown} of the original`} />
+          {PHONE ? (
+            <TransformWrapper
+              key={shown}
+              minScale={1}
+              maxScale={4}
+              doubleClick={{ mode: "toggle", step: 1.2 }}
+              panning={{ disabled: !zoomed }}
+              onTransformed={(_, t) => setZoomed(t.scale > 1.01)}
+              onZoomStop={(r) => setSharp(Math.min(3, Math.max(1, Math.ceil(r.state.scale))))}
+              onPinchingStop={(r) => setSharp(Math.min(3, Math.max(1, Math.ceil(r.state.scale))))}
+            >
+              <TransformComponent wrapperStyle={{ width: "100%" }} contentStyle={{ width: "100%" }}>
+                <canvas ref={canvas} role="img" aria-label={`Page ${shown} of the original`} />
+              </TransformComponent>
+            </TransformWrapper>
+          ) : (
+            <canvas ref={canvas} role="img" aria-label={`Page ${shown} of the original`} />
+          )}
         </>
       )}
     </div>

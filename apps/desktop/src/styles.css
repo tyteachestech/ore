@@ -736,6 +736,10 @@ img.thumb { filter: brightness(0.86); }
 .figure-zoom.open { background: var(--bg); }
 .figure-zoom img { position: fixed; max-width: none; border-radius: 6px; transform-origin: 0 0; transition: transform var(--t-4) var(--ease-in-out); }
 @media (prefers-reduced-motion: reduce) { .figure-zoom, .figure-zoom img { transition: none; } }
+/* The phone's picture view (phone/FigureView.tsx): the same grow and shrink, the whole screen, pinch to zoom. */
+.figure-view { position: fixed; inset: 0; z-index: 100; touch-action: none; transition: background-color var(--t-4) var(--ease-out); }
+.figure-view img { position: absolute; max-width: none; transform-origin: 0 0; transition: transform var(--t-4) var(--ease-in-out); }
+@media (prefers-reduced-motion: reduce) { .figure-view, .figure-view img { transition: none; } }
 /* D166: boxes over a figure, each a card; the one being drawn, and the field for what's under it. */
 .figure-zoom img.drawable { cursor: crosshair; }
 .figure-box { position: fixed; pointer-events: none; border-radius: 2px; }
@@ -2589,6 +2593,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
 /* Rename, Add author, a key point, a guess before reading and Leave anything out?: fields 44pt tall to the finger. */
 .phone .doc-head :is(.title-edit, .author-edit), .phone .cp-input, .phone .preq-input, .phone .quiz-leave { min-height: 44px; }
+/* Renaming from ⋯ keeps the title's own size (it is over 16px, so iOS doesn't zoom): the accent rule says it is being edited. */
+.phone .doc-head .title-edit { font-size: 26px !important; line-height: 1.25; outline: none; }
 /* The note's keyboard bar: nine 44pt buttons are wider than a 390pt iPhone; it scrolls the last few points sideways. */
 .phone .kb-bar { overflow-x: auto; scrollbar-width: none; }
 .phone .kb-btn { flex: 1 0 44px; }
@@ -2644,7 +2650,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-source::before { content: ""; position: absolute; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 6; }
 .phone-source .reader-tools { top: 0; right: 4px; transition: transform var(--t-3) ease-out, opacity var(--t-2); }
 .phone-source .reader-scroll { padding-top: 44px; }
-.phone-source .player-pin { top: 44px; }
+/* Sticky offsets count from inside the scroller's padding, which already clears the top bar. */
+.phone-source .player-pin { top: 0; }
 .phone .phone-source :is(.mynotes-text, .side-tabs-root, .reader > .empty-state, .reader-loading) { padding-top: 48px; }
 .phone-source:has(.reader.bars-hidden:not(.noting)) > .phone-bar { transform: translateY(-100%); }
 .phone .reader.bars-hidden:not(.noting) .reader-tools { transform: translateY(-44px); opacity: 0; pointer-events: none; }
@@ -2657,8 +2664,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
    rides that far up while the bar shows; a toast sits over the pill, and over the bar while it shows (Mail's Undo
    banner sits above its toolbar), so neither loses its taps; on the note page, with neither there, it is at the foot. */
 .phone { --tools-lift: 52px; }
-.phone .phone-app:has(.phone-source .reader:not(:is(.noting, .dragging)) .read-pill) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px); }
-.phone .phone-app:has(.phone-source .reader:not(:is(.bars-hidden, .dragging, .noting)) .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--tools-lift)); }
+.phone .phone-app:has(.phone-source .reader:not(:is(.noting, .dragging)) .read-pill) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--audio-bar)); }
+.phone .phone-app:has(.phone-source .reader:not(:is(.bars-hidden, .dragging, .noting)) .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--tools-lift) + var(--audio-bar)); }
 /* Toast buttons are finger-sized on the phone, without growing the toast. */
 .phone .toast-undo { min-height: 44px; margin: -12px -8px -12px 0; padding: 0 8px; display: inline-flex; align-items: center; }
 .phone .toast-x { width: 44px; height: 44px; margin: -12px -14px -12px -8px; }
@@ -2674,7 +2681,32 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* The video card on the phone (D92): no gutter, so each timestamp leads its paragraph. */
 .phone .doc .video-card { margin: 0 -8px 24px; }
 .phone .vc-head, .phone .vc-transcript { padding-left: 12px; padding-right: 12px; }
-.phone .vc-transcript .ts { position: static; margin-right: 6px; }
+.phone .doc .ts { position: static; margin-right: 6px; }
+/* A timestamp is a finger's size to tap (it seeks), without moving the line it leads. */
+.phone .doc .ts { padding: 14px 8px; margin: -14px 2px -14px -8px; }
+/* The player's buttons are finger-sized on the phone. */
+.phone .ctl { min-width: 44px; height: 44px; }
+.phone .ctl.rate { position: relative; height: 30px; }
+.phone .ctl.rate::before { content: ""; position: absolute; inset: -7px -2px; }
+/* A recording plays from a bar above the source's bottom bar, Podcasts' mini player: in reach of the thumb
+   and on screen wherever he reads. When the bottom bar leaves as he reads on, the player drops into its place. */
+.phone { --audio-bar: 0px; }
+.phone .phone-app:has(.phone-source .player.audio) { --audio-bar: 76px; }
+.phone-source .player-pin:has(> .player.audio) {
+  position: fixed; top: auto; left: 8px; right: 8px; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px + var(--tools-lift)); z-index: 6;
+  max-width: none; margin: 0; padding: 6px 12px 0; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--float);
+  transition: transform var(--t-3) var(--ease-out);
+}
+.phone-source .player-pin:has(> .player.audio)::after { content: none; }
+.phone-source .player-pin:has(> .player.audio) .controls { height: 48px; }
+.phone .reader:is(.bars-hidden, .dragging) .player-pin:has(> .player.audio) { transform: translateY(var(--tools-lift)); }
+.phone .reader.noting .player-pin:has(> .player.audio) { display: none; }
+.phone .reader-pane:has(.player.audio) .read-pill { transform: translate(-50%, calc(-1 * var(--audio-bar))); }
+.phone .reader:not(:is(.bars-hidden, .dragging, .noting)) .reader-pane:has(.phone-tools):has(.player.audio) .read-pill { transform: translate(-50%, calc(-1 * (var(--tools-lift) + var(--audio-bar)))); }
+.phone-reader .reader-pane:has(.player.audio) .doc { padding-bottom: calc(56px + var(--tools-lift) + var(--audio-bar)); }
+/* Back to current: above the bars at the foot, and above the recording's bar when the spoken text is up the page. */
+.phone .follow-down { bottom: calc(env(safe-area-inset-bottom, 0px) + 16px + var(--tools-lift) + var(--audio-bar)); }
+.phone-source .player-pin:has(> .player.audio) .back-current.up { top: auto; bottom: calc(100% + 8px); left: 50%; }
 
 /* The Feed: posts from what he follows. A read post dims: unread is what's new. The date stays at every width, since a feed is read by recency. */
 .row.post.read .title { color: var(--muted); }
@@ -3060,6 +3092,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .original-pager { display: flex; align-items: center; justify-content: center; gap: 2px; height: 24px; margin-bottom: 8px; color: var(--faint); font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
 .original-pager span { min-width: 52px; text-align: center; }
 .original-pager .icon-btn:disabled { opacity: 0.35; }
+.phone .original-pager { height: 44px; }
+.phone .original-pager .icon-btn { width: 44px; height: 44px; }
 /* Three tabs in a panel at its narrowest: the names stay, the icons go. */
 .mynotes-head { container-type: inline-size; }
 @container (max-width: 330px) { .side-tabs:has(> :nth-child(3)) .card-icon { display: none; } }
