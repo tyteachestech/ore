@@ -73,6 +73,31 @@ setMeasure((line, size, family) => {
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
+/** The + on each side of one selected node: a click makes the next linked node that way (FigJam's quick
+ *  create, Tyler 2026-11-11). Further out above, past the rotate handle. */
+function plusesOf(sel: El[], zoom: number, els: readonly El[]): { dir: Dir; p: Pt }[] {
+  const e = sel.length === 1 ? sel[0]! : null;
+  if (!e || !isShape(e) || e.type === "image" || e.locked || cellOf(e) || e.angle) return [];
+  const b = bounds(e);
+  const d = 26 / zoom;
+  // A side a link already leaves or arrives on keeps its arrow clear of a +.
+  const taken = new Set<Dir>();
+  for (const a of els) {
+    if (a.type !== "arrow") continue;
+    const pts = absPoints(a);
+    const end = a.startBinding?.elementId === e.id ? pts[0] : a.endBinding?.elementId === e.id ? pts[pts.length - 1] : null;
+    if (!end) continue;
+    const m = 8;
+    taken.add(end[0] >= b.x + b.w - m ? "right" : end[0] <= b.x + m ? "left" : end[1] <= b.y + m ? "up" : "down");
+  }
+  return ([
+    { dir: "right", p: [b.x + b.w + d, b.y + b.h / 2] },
+    { dir: "down", p: [b.x + b.w / 2, b.y + b.h + d] },
+    { dir: "left", p: [b.x - d, b.y + b.h / 2] },
+    { dir: "up", p: [b.x + b.w / 2, b.y - d - 22 / zoom] },
+  ] as { dir: Dir; p: Pt }[]).filter((x) => !taken.has(x.dir));
+}
+
 /** Handles for the selection: one rotated frame for a single shape, the union box for several. */
 function handlesOf(sel: El[], zoom: number): { box: Box; angle: number; at: { h: Handle | "rotate"; p: Pt }[] } | null {
   if (!sel.length) return null;
@@ -965,6 +990,8 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
       return toolDone();
     }
     // select
+    const plus = (handlesOf(selected.filter((x) => !isLabel(x)), live.current.view.zoom) ? plusesOf(selected.filter((x) => !isLabel(x)), live.current.view.zoom, live.current.els) : []).find((x) => Math.abs(x.p[0] - p[0]) <= 9 / live.current.view.zoom && Math.abs(x.p[1] - p[1]) <= 9 / live.current.view.zoom);
+    if (plus && tool === "select") return child(plus.dir);
     const axis = elbowAt(p);
     if (axis !== null) {
       g.current = { kind: "elbow", before: els, id: selected[0]!.id, axis };
@@ -1575,6 +1602,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
   const erasing = cur?.kind === "erase" ? withLabels(els, cur.ids) : null;
   const editingLabel = editing?.kind === "label" ? labelOf(els, editing.id)?.id : editing?.id;
   const handles = !editing && !multi && (!cur || cur.kind === "marquee") ? handlesOf(selected.filter((e) => !isLabel(e)), view.zoom) : null;
+  const pluses = handles && tool === "select" ? plusesOf(selected.filter((e) => !isLabel(e)), view.zoom, els) : [];
   const z = view.zoom;
   const containers = byId(shown);
 
@@ -1698,6 +1726,7 @@ export default function Editor({ initial, files: initialFiles, name, notify, onC
           <Overlay
               selected={moving ? [] : selected.filter((e) => !isLabel(e))}
               handles={handles}
+              pluses={pluses}
               z={z}
               hot={hot ? map.get(hot) : undefined}
               guides={guides}
@@ -1923,8 +1952,8 @@ const angleSnap = (s: Pt, p: Pt): Pt => {
 const ORDER: Handle[] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
 const rotHandle = (h: Handle, angle: number): Handle => ORDER[(ORDER.indexOf(h) + Math.round(angle / (Math.PI / 4)) + 8) % 8]!;
 
-function Overlay({ selected, handles, z, hot, guides, angleGuide, marquee, moveBox, showPoints }: {
-  selected: El[]; handles: ReturnType<typeof handlesOf>; z: number; hot?: El; guides: Guide[]; angleGuide: [Pt, Pt] | null; marquee: Box | null; moveBox: Box | null; showPoints: boolean;
+function Overlay({ selected, handles, pluses, z, hot, guides, angleGuide, marquee, moveBox, showPoints }: {
+  selected: El[]; handles: ReturnType<typeof handlesOf>; pluses: { dir: Dir; p: Pt }[]; z: number; hot?: El; guides: Guide[]; angleGuide: [Pt, Pt] | null; marquee: Box | null; moveBox: Box | null; showPoints: boolean;
 }) {
   const sw = 1 / z;
   const hs = 8 / z;
@@ -1979,6 +2008,15 @@ function Overlay({ selected, handles, z, hot, guides, angleGuide, marquee, moveB
           return <path key={i} d={d} fill="none" stroke="var(--accent)" strokeWidth={sw} />;
         }
         return gd.axis === "x" ? <line key={i} x1={gd.at} x2={gd.at} y1={gd.from - 8 / z} y2={gd.to + 8 / z} stroke="var(--accent)" strokeWidth={sw} /> : <line key={i} y1={gd.at} y2={gd.at} x1={gd.from - 8 / z} x2={gd.to + 8 / z} stroke="var(--accent)" strokeWidth={sw} />;
+      })}
+      {pluses.map(({ dir, p }) => {
+        const r = 7 / z, t = 3.5 / z;
+        return (
+          <g key={dir} className="draw-plus" data-dir={dir}>
+            <rect x={p[0] - r} y={p[1] - r} width={r * 2} height={r * 2} fill="var(--bg)" stroke="var(--paper)" strokeWidth={sw} />
+            <path d={`M${p[0] - t} ${p[1]} H${p[0] + t} M${p[0]} ${p[1] - t} V${p[1] + t}`} stroke="var(--paper)" strokeWidth={sw * 1.5} />
+          </g>
+        );
       })}
       {angleGuide && (() => {
         // Runs past both ends, so a line on 0°, 45° or 90° shows it is exactly there.

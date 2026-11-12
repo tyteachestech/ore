@@ -4939,6 +4939,58 @@ journey("diagram: a drawn box is selected under Select, Enter right after waits 
   await until("the arrow is labelled", async () => (await page.locator(".diagram .draw-canvas > g text").allTextContents()).join("").includes("strengthens"));
 });
 
+journey("diagram: a selected box's + makes the next linked node, and an elbow's middle drags and stays", async (page) => {
+  await openSource(page, TESTING);
+  const note = page.locator(".note-editor [contenteditable=true]").first();
+  await until("the note takes the caret", async () => {
+    if (await page.locator(".diagram").count()) await page.locator(".diagram-done").click();
+    await note.locator("p", { hasText: /\w/ }).first().click({ timeout: 1000 }).catch(() => {});
+    return !(await page.locator(".diagram").count()) && (await note.evaluate((e) => e.contains(document.activeElement)));
+  });
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/diagram");
+  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator(".diagram .draw").focus();
+  const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
+  const summary = () => page.locator(".diagram .sr-only[aria-live]").textContent();
+  await page.keyboard.press("r");
+  await page.mouse.click(c.x + 200, c.y + 150);
+  await page.keyboard.type("Memory");
+  await page.keyboard.press("Enter");
+  // The + on the right of the selected box makes a linked node there, its label open (FigJam's quick create, Tyler 2026-11-11).
+  const plus = page.locator('.draw-plus[data-dir="right"]');
+  await plus.waitFor();
+  const pb = (await plus.boundingBox())!;
+  await page.mouse.click(pb.x + pb.width / 2, pb.y + pb.height / 2);
+  await page.locator(".draw-text").waitFor();
+  await page.keyboard.type("Sleep");
+  await page.keyboard.press("Enter");
+  await until("Sleep is linked from Memory", async () => (await page.locator(".diagram .draw-canvas > g text").allTextContents()).join(" ").includes("Sleep") && (await page.locator(".diagram .draw-canvas > g path").count()) >= 1);
+  if (await page.locator('.draw-plus[data-dir="left"]').count()) throw new Error("a + sits on the side the link arrives on");
+  // Move Sleep down, make the link an elbow, and drag its middle segment: it stays where it was put.
+  for (let i = 0; i < 6; i++) await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Escape");
+  const link = page.locator(".diagram .draw-canvas > g path").first();
+  const lb = (await link.boundingBox())!;
+  await page.mouse.click(lb.x + lb.width / 2, lb.y + lb.height / 2);
+  await page.locator(".draw-style-chip").click();
+  await page.locator(".draw-quick-more").click();
+  await page.getByRole("button", { name: "Elbow" }).first().click();
+  await page.locator(".draw-style-chip").click();
+  const handle = page.locator(".draw-elbow-handle");
+  await handle.waitFor();
+  const hb = (await handle.boundingBox())!;
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 - 20, hb.y + hb.height / 2, { steps: 4 });
+  await page.mouse.move(hb.x + hb.width / 2 - 40, hb.y + hb.height / 2, { steps: 4 });
+  await page.mouse.up();
+  const moved = (await handle.boundingBox())!;
+  if (Math.abs(moved.x - (hb.x - 40)) > 3) throw new Error(`the elbow's middle went back: ${hb.x} → ${moved.x}`);
+  void summary;
+});
 journey("diagram: align and space from keys and the picker, drags snap to edges and equal gaps (⌘ off), and a node goes with its links", async (page) => {
   await openSource(page, "A very long title about the neuroscience");
   // The editing journey leaves a diagram at the note's end: open it if the preview has rendered, else make one.
