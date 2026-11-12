@@ -9099,6 +9099,15 @@ journey("phone: a long press on a Today source opens its menu", async (page) => 
   await page.reload();
   await press(page, page.locator(".phone-sources li button").first());
   await page.getByRole("menuitem", { name: "Archive" }).waitFor();
+  // Renamed in place, the row still holds: its touch listeners stay on the row through the field.
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const field = page.locator(".phone-row-rename input");
+  await field.fill("A renamed source");
+  await field.press("Enter");
+  const renamed = page.locator(".phone-sources li button").filter({ hasText: "A renamed source" });
+  await renamed.waitFor();
+  await press(page, renamed);
+  await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
 }, "phone");
 
 journey("phone: a long press on a skill, on Today or in the drawer, opens the skill's menu, and Review this skill reviews it", async (page) => {

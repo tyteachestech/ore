@@ -65,9 +65,10 @@ const Later = ({ children }: { children: () => ReactNode }) => <>{children()}</>
 export function holdMenu(el: HTMLElement, y: number) {
   const x = Math.min(el.getBoundingClientRect().left + 16, innerWidth / 2);
   const swallow = (e: Event) => (e.preventDefault(), e.stopPropagation(), done());
-  const done = () => (removeEventListener("click", swallow, true), removeEventListener("touchstart", done, true));
+  const done = () => (clearTimeout(t), removeEventListener("click", swallow, true), removeEventListener("touchstart", done, true));
   addEventListener("click", swallow, true);
-  addEventListener("touchstart", done, true); // The next touch's click is a real tap.
+  addEventListener("touchstart", done, true); // The next touch's click is a real tap,
+  const t = setTimeout(done, 800); // and so is a pointer's or a key's once the lift has passed.
   el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
 }
 

@@ -1305,7 +1305,7 @@ const pickArgs = (pick: string[] | null, source?: string) => [...(pick ?? []).ma
 /** Why a session has no cards, honestly: the pick leaves out skills with cards due, or the daily limits hold
  *  new cards back (D65), and only then "nothing is due". */
 function nothingDue(t: Today | null, pick: string[] | null, source?: string): string {
-  if (source) return "Nothing from this source is due. Its exercises come back when they are.";
+  if (source) return "Nothing from this source is due right now.";
   if (pick && t && t.due > 0) return `Nothing is due in the skills you picked today. ${t.due} ${t.due === 1 ? "exercise waits" : "exercises wait"} in the others.`;
   return t?.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Nothing is due right now.";
 }

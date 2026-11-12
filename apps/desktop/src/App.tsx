@@ -825,7 +825,8 @@ export function App() {
 
   const endReview = useCallback(
     (again?: boolean) => {
-      setReviewing((r) => (again ? { pick: null, run: (r?.run ?? 0) + 1 } : null));
+      // Keep going after Review this source stays on that source.
+      setReviewing((r) => (again ? { pick: null, source: r?.source, run: (r?.run ?? 0) + 1 } : null));
       if (!again && beforeReview.current) setOpenId(beforeReview.current);
       setHomeTick((n) => n + 1);
       void refresh();

@@ -209,17 +209,17 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
     <WithMenu actions={() => row.menu(item).flatMap((a) => (a.id === "open" && !item.archived_at ? [a, { id: "rename", label: "Rename…", run: () => setRenaming(true) }] : [a]))}>
       <li>
         {side && <span className={`phone-swipe ${side}`}>{side === "left" ? (item.archived_at ? "Restore" : "Archive") : item.status === "done" ? "To read" : "Done"}</span>}
-        {renaming ? (
+        {renaming && (
           <div className="phone-row-rename">
             <Thumb item={item} className="thumb phone-thumb" />
-            <TitleField value={item.title} onSave={(t) => row.retitle(item, t)} onClose={() => setRenaming(false)} />
+            <TitleField value={item.title} onSave={(t) => row.retitle(item, t)} onClose={() => (flushSync(() => setRenaming(false)), ref.current?.focus({ preventScroll: true }))} />
           </div>
-        ) : (
-          <button ref={ref} onClick={() => swiped.current || onOpen(item.id)} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
-            <Thumb item={item} className="thumb phone-thumb" />
-            <span className="phone-title">{item.title}</span>
-          </button>
         )}
+        {/* Hidden, not gone, while renaming: its swipes and hold are on this element. */}
+        <button ref={ref} hidden={renaming} onClick={() => swiped.current || onOpen(item.id)} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
+          <Thumb item={item} className="thumb phone-thumb" />
+          <span className="phone-title">{item.title}</span>
+        </button>
       </li>
     </WithMenu>
   );
@@ -348,6 +348,10 @@ export function PhoneApp() {
   // A place saved for a source that has since left the library (deleted on the Mac, or a new build) opens on
   // where he was before it, not on an error with the source's id.
   const loaded = items !== null;
+  // The same for a Review this source he left open: it goes back to Today, not to an error.
+  useEffect(() => {
+    if (loaded && reviewing?.source && !items!.some((i) => i.id === reviewing.source)) setReviewing(null);
+  }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const id = start.openId;
     if (!loaded || !id || items!.some((i) => i.id === id)) return;
@@ -518,12 +522,14 @@ export function PhoneApp() {
   /** Pins a source to the top of the Sources list, or unpins it, with Undo (the Mac's pinSource). */
   const pin = async (item: Item, undoable = true) => {
     const on = !item.pinned_at;
-    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: on ? new Date().toISOString() : undefined } : i)) ?? all);
+    const set = (pinned_at: string | undefined) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at } : i)) ?? all);
+    set(on ? new Date().toISOString() : undefined);
     try {
       await ore("pin", item.id, ...(on ? [] : ["--undo"]));
       const flip = (now: boolean) => () => pin({ ...item, pinned_at: now ? "x" : undefined }, false);
       if (undoable) notify(on ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(on), flip(!on));
     } catch (e) {
+      set(item.pinned_at);
       if (!undoable) throw e;
       notify(errorText(e), "error");
     } finally {
@@ -564,7 +570,7 @@ export function PhoneApp() {
   };
 
   // A full screen opens over the tabs, which stay underneath for the swipe back to reveal.
-  const over = reviewing ? (
+  const over = reviewing && (!reviewing.source || loaded) ? (
       <Screen className="phone-full" onBack={endReview}>
         <Boundary onBack={endReview}>
           <Review

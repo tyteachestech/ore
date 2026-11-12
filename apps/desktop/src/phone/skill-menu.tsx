@@ -4,6 +4,8 @@ import { layoutOf, skillGroups } from "../Skills";
 import { opt, ore, type Priority, type Skill } from "../ore";
 import { errorText, type Notify } from "../util";
 
+let arranging: Promise<unknown> = Promise.resolve();
+
 /** A skill's long-press menu on the iPhone: the Mac's right-click (App.tsx skillMenu), less Delete, which stays on
  *  the Mac where a slip can't take a skill's exercises with it. Each change is at once, with Undo. */
 export function skillMenu({ skills, refresh, notify, open, review, edit }: {
@@ -25,7 +27,12 @@ export function skillMenu({ skills, refresh, notify, open, review, edit }: {
       void refresh();
     }
   };
-  const arrange = (layout: ReturnType<typeof layoutOf>, fromHistory = false) => write(() => ore("skills", "arrange", JSON.stringify(layout)), fromHistory);
+  // One after another, as the Mac's are (App.tsx layoutWrites): an Undo tapped mid-write must land last.
+  const arrange = (layout: ReturnType<typeof layoutOf>, fromHistory = false) => {
+    const run = arranging.then(() => ore("skills", "arrange", JSON.stringify(layout)));
+    arranging = run.catch(() => {});
+    return write(() => run, fromHistory);
+  };
   const moveSkill = (s: Skill, collection: string) => {
     const before = layoutOf(skillGroups(skills));
     const out = before.map((g) => ({ ...g, skills: g.skills.filter((id) => id !== s.id) }));
@@ -44,7 +51,7 @@ export function skillMenu({ skills, refresh, notify, open, review, edit }: {
     const after = { priority: p, ...(s.archived && { archived: false }) };
     if (before.priority === p && !s.archived) return;
     void change(s.id, after);
-    notify(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, "quiet", () => change(s.id, before, true), () => change(s.id, after, true));
+    notify(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, before.archived ? "info" : "quiet", () => change(s.id, before, true), () => change(s.id, after, true));
   };
   const archive = (s: Skill, on: boolean) => {
     void change(s.id, { archived: on });
