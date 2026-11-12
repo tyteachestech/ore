@@ -4969,6 +4969,18 @@ journey("diagram: a selected box's + makes the next linked node, and an elbow's 
   await page.keyboard.press("Enter");
   await until("Sleep is linked from Memory", async () => (await page.locator(".diagram .draw-canvas > g text").allTextContents()).join(" ").includes("Sleep") && (await page.locator(".diagram .draw-canvas > g path").count()) >= 1);
   if (await page.locator('.draw-plus[data-dir="left"]').count()) throw new Error("a + sits on the side the link arrives on");
+  // A box drawn just under Sleep: Sleep's lower + would sit on it and take its click, so it isn't shown (Codex sweep 3).
+  const sleepBox = (await page.locator(".diagram .draw-canvas > g rect").nth(1).boundingBox())!;
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("r");
+  await page.mouse.click(sleepBox.x + sleepBox.width / 2, sleepBox.y + sleepBox.height + 50);
+  await page.keyboard.press("Escape");
+  await page.mouse.click(sleepBox.x + 10, sleepBox.y + 10);
+  await until("Sleep is selected again", async () => (await summary()) === "Selected: Sleep");
+  if (await page.locator('.draw-plus[data-dir="down"]').count()) throw new Error("a + sits on the box under it");
+  await page.mouse.click(sleepBox.x + sleepBox.width / 2, sleepBox.y + sleepBox.height + 50);
+  await page.keyboard.press("Backspace");
+  await page.mouse.click(sleepBox.x + 10, sleepBox.y + 10);
   // Move Sleep down, make the link an elbow, and drag its middle segment: it stays where it was put.
   for (let i = 0; i < 6; i++) await page.keyboard.press("Shift+ArrowDown");
   await page.keyboard.press("Escape");
@@ -4989,7 +5001,6 @@ journey("diagram: a selected box's + makes the next linked node, and an elbow's 
   await page.mouse.up();
   const moved = (await handle.boundingBox())!;
   if (Math.abs(moved.x - (hb.x - 40)) > 3) throw new Error(`the elbow's middle went back: ${hb.x} → ${moved.x}`);
-  void summary;
 });
 journey("diagram: align and space from keys and the picker, drags snap to edges and equal gaps (⌘ off), and a node goes with its links", async (page) => {
   await openSource(page, "A very long title about the neuroscience");

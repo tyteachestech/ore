@@ -1192,7 +1192,21 @@ export function tidy(els: Els, ids: Set<string> = new Set()): El[] {
   let out = [...els];
   let top = start.y;
   for (const comp of comps) {
-    const es = edges.filter((e) => comp.includes(e.from));
+    const all = edges.filter((e) => comp.includes(e.from));
+    // A loop's link back (found depth first, from the roots) doesn't set columns, so every column link runs
+    // left to right and none joins two nodes in one column (the layered layout's usual cycle break).
+    const back = new Set<(typeof all)[number]>();
+    const state = new Map<string, 1 | 2>();
+    const visit = (n: string) => {
+      state.set(n, 1);
+      for (const e of all.filter((x) => x.from === n)) {
+        if (state.get(e.to) === 1) back.add(e);
+        else if (!state.has(e.to)) visit(e.to);
+      }
+      state.set(n, 2);
+    };
+    for (const n of [...comp.filter((n) => !all.some((e) => e.to === n)), ...comp]) if (!state.has(n)) visit(n);
+    const es = all.filter((e) => !back.has(e));
     const depth = new Map(comp.map((n) => [n, 0]));
     for (let pass = 0; pass < comp.length; pass++) {
       let changed = false;
@@ -1231,35 +1245,45 @@ export function tidy(els: Els, ids: Set<string> = new Set()): El[] {
     cols.forEach((col, ci) => {
       if (!col.length) return;
       const w = Math.max(...col.map((n) => map.get(n)!.width));
+      // Each node level with its parents where there is room, so links run nearly flat (a steep one cuts
+      // through the nodes beside its end); the first column is centred as before.
       let y = top + (tallest - heights[ci]!) / 2;
+      let floor = -Infinity;
       for (const n of col) {
         const f = frame(out.find((v) => v.id === n)!);
-        out = out.map((v) => (v.id === n ? { ...v, x: x + (w - f.w) / 2, y, angle: 0 } : v));
-        y += f.h + 32;
+        const ps = ci ? es.filter((e) => e.to === n).map((e) => out.find((v) => v.id === e.from)!).filter((v) => depth.get(v.id)! < ci) : [];
+        const want = ps.length ? ps.reduce((a, v) => a + v.y + v.height / 2, 0) / ps.length - f.h / 2 : y;
+        const at = Math.max(floor, want);
+        out = out.map((v) => (v.id === n ? { ...v, x: x + (w - f.w) / 2, y: at, angle: 0 } : v));
+        floor = at + f.h + 32;
+        y = floor;
       }
       const next = cols[ci + 1];
       const labels = next ? es.filter((e) => col.includes(e.from) && next.includes(e.to)).map((e) => labelOf(els, e.a.id)?.width ?? 0) : [];
       x += w + Math.max(SPACE, Math.max(0, ...labels) + 56);
     });
-    for (let pass = 0; pass < comp.length * 2; pass++) {
+    // A link that still runs through a node it doesn't join moves that node off the line: down with the nodes
+    // under it in its column, or up with those over it when the link's own end is under it.
+    for (let pass = 0; pass < comp.length * 4; pass++) {
       const at = byId(out);
-      let hit: { col: string[]; i: number; dy: number } | null = null;
-      for (const e of es) {
+      let move: { ids: Set<string>; dy: number } | null = null;
+      for (const e of all) {
         const [p, q] = [centre(at.get(e.from)!), centre(at.get(e.to)!)];
-        const [c0, c1] = [depth.get(e.from)!, depth.get(e.to)!].sort((a, b) => a - b);
-        for (const col of cols.slice(c0! + 1, c1)) {
-          const i = col.findIndex((n) => segHits(p, q, frame(at.get(n)!), 20));
+        const yAt = (x: number) => p[1] + ((q[1] - p[1]) * (Math.min(Math.max(x, Math.min(p[0], q[0])), Math.max(p[0], q[0])) - p[0])) / (q[0] - p[0] || 1);
+        for (const col of cols) {
+          const i = col.findIndex((n) => n !== e.from && n !== e.to && segHits(p, q, frame(at.get(n)!), 16));
           if (i < 0) continue;
           const f = frame(at.get(col[i]!)!);
-          const yAt = (x: number) => p[1] + ((q[1] - p[1]) * (Math.min(Math.max(x, Math.min(p[0], q[0])), Math.max(p[0], q[0])) - p[0])) / (q[0] - p[0] || 1);
-          hit = { col, i, dy: Math.max(yAt(f.x), yAt(f.x + f.w)) + 36 - f.y };
-          break;
+          const [lo, hi] = [Math.min(yAt(f.x), yAt(f.x + f.w)), Math.max(yAt(f.x), yAt(f.x + f.w))];
+          const down = col.slice(i), up = col.slice(0, i + 1);
+          if (!down.includes(e.from) && !down.includes(e.to)) move = { ids: new Set(down), dy: hi + 36 - f.y };
+          else if (!up.includes(e.from) && !up.includes(e.to)) move = { ids: new Set(up), dy: lo - 36 - (f.y + f.h) };
+          if (move) break;
         }
-        if (hit) break;
+        if (move) break;
       }
-      if (!hit || hit.dy <= 0) break;
-      const below = new Set(hit.col.slice(hit.i));
-      out = out.map((v) => (below.has(v.id) ? { ...v, y: v.y + hit!.dy } : v));
+      if (!move || !move.dy) break;
+      out = out.map((v) => (move!.ids.has(v.id) ? { ...v, y: v.y + move!.dy } : v));
     }
     top = boundsOf(comp.map((n) => out.find((v) => v.id === n)!))!.y + boundsOf(comp.map((n) => out.find((v) => v.id === n)!))!.h + 64;
   }
