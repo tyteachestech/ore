@@ -231,12 +231,17 @@ async fn share_skills(json: String) -> bool {
 }
 
 /// The inbox item the share card's Open asked for (apps/phone/share writes its id to `open` in the App Group
-/// before bringing the app forward): read once, then gone.
+/// before bringing the app forward): read once, then gone. One left over a minute ago is from an Open that
+/// never brought the app forward, and isn't followed on some later launch.
 #[tauri::command]
 async fn share_open() -> Option<String> {
     let at = group()?.join("open");
     let id = fs::read_to_string(&at).ok()?;
+    let fresh = fs::metadata(&at).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|d| d.as_secs() < 60);
     let _ = fs::remove_file(&at);
+    if !fresh {
+        return None;
+    }
     let id = id.trim();
     (!id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric())).then(|| id.to_string())
 }

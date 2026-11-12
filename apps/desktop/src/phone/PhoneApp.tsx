@@ -510,8 +510,11 @@ export function PhoneApp() {
     await pullFromMac();
     await jumping.current();
   }, []);
+  // Asked for while one is running (a share that arrived after it listed the inbox): it runs once more after.
+  const readAgain = useRef(false);
+  const bringInRef = useRef<() => Promise<void>>(async () => {});
   const bringIn = useCallback(async () => {
-    if (readingNow.current) return;
+    if (readingNow.current) return void (readAgain.current = true);
     readingNow.current = true;
     try {
       if (!(await ore<Waiting[]>("inbox")).length) return;
@@ -528,9 +531,14 @@ export function PhoneApp() {
     } finally {
       readingNow.current = false;
       setReading(false);
-      void refresh();
+      void refresh().then(() => {
+        if (!readAgain.current) return;
+        readAgain.current = false;
+        void bringInRef.current();
+      });
     }
   }, [refresh, notify]);
+  bringInRef.current = bringIn;
   jumping.current = () => refresh().then(bringIn);
   useEffect(() => void (jump(), refresh().then(bringIn), planReminders()), [jump, refresh, bringIn]);
   // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
