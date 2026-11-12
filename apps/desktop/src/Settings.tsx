@@ -55,9 +55,10 @@ export function useReminderAgent() {
       void ore<Data>("settings")
         .then(({ review: { reminder: t } }) => (load(AGENT_AT) === t ? undefined : invoke("set_reminder", { time: t || null }).then(() => save(AGENT_AT, t))))
         .catch(() => {});
-    follow();
+    // Not at launch itself: every `ore` call then is a process competing with the ones that draw Home.
+    const first = setTimeout(follow, 3000);
     addEventListener("focus", follow);
-    return () => removeEventListener("focus", follow);
+    return () => (clearTimeout(first), removeEventListener("focus", follow));
   }, []);
 }
 

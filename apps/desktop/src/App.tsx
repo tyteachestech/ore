@@ -371,7 +371,8 @@ export function App() {
         busy = false;
       }
     };
-    void fromPhone();
+    // A moment after launch: the calls that draw Home go first (each `ore` call is a process of its own).
+    const first = setTimeout(() => void fromPhone(), 1500);
     // Only after a real absence (10 s away): a click on a menu or a dialog closing doesn't reload the lists.
     let left = 0;
     // Focus moving into the video player (an iframe) blurs the window too: that isn't away.
@@ -384,7 +385,7 @@ export function App() {
     };
     addEventListener("blur", away);
     addEventListener("focus", back);
-    return () => (removeEventListener("blur", away), removeEventListener("focus", back));
+    return () => (clearTimeout(first), removeEventListener("blur", away), removeEventListener("focus", back));
   }, [notify, refresh, reload]);
 
   useEffect(() => save("ore.view", JSON.stringify({ status, skill })), [status, skill]);
