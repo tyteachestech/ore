@@ -2268,9 +2268,10 @@ function ReaderView(p: Props & { reload: () => void }) {
         else copy(citeSources([doc]), "Copied as Markdown");
         return;
       }
-      if (doc && !popup && !inField && !inNote && (is(e, "rename") || is(e, "archive"))) {
+      if (doc && !popup && !inField && !inNote && (is(e, "rename") || is(e, "archive") || (is(e, "pin") && !doc.archived_at))) {
         e.preventDefault();
         if (is(e, "rename")) setRenaming(true);
+        else if (is(e, "pin")) pinRef.current();
         else p.onArchive(doc);
         return;
       }
@@ -2701,6 +2702,14 @@ function ReaderView(p: Props & { reload: () => void }) {
   const copyPath = (item: Item) =>
     navigator.clipboard.writeText(pathOf(item)).then(() => p.notify("Path copied"), (e) => p.notify(errorText(e), "error"));
   const copy = (c: Cited, done: string) => copyCited(c).then(() => p.notify(done), (e) => p.notify(errorText(e), "error"));
+  /** Pin or unpin the open source (⌥⌘P or its ⋯ menu), shown at once. */
+  const pin = () => {
+    if (!doc) return;
+    setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
+    p.onPin(doc);
+  };
+  const pinRef = useRef(pin);
+  pinRef.current = pin;
   /** A highlight as a quote with its source (Readwise), and his note under it. */
   const copyHighlight = (id: string, note?: string) => {
     const a = annOf(id);
@@ -2838,10 +2847,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     : [
         { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenaming(true) },
         { id: "author", label: doc.author ? "Edit author…" : "Add author…", run: () => setAuthoring(true) },
-        ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", run: () => {
-          setDoc((cur) => cur && { ...cur, pinned_at: cur.pinned_at ? undefined : new Date().toISOString() });
-          p.onPin(doc);
-        } }]),
+        ...(doc.archived_at ? [] : [{ id: "pin", label: doc.pinned_at ? "Unpin" : "Pin to top", hint: label(keys.pin), run: pin }]),
         ...group([
         ...(doc.status === "done"
           ? [{ id: "toread", label: "Move to To read", run: () => {

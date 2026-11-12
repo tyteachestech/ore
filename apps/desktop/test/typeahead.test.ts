@@ -36,3 +36,10 @@ test("type-select: only plain printable keys type, and Space only once a prefix 
   expect(typesTitle(k(" "), true)).toBe(true);
   expect(typesTitle(k("é"), false)).toBe(true);
 });
+
+test("type-select: a doubled letter a title starts with picks it; with nothing selected, a repeat still steps", () => {
+  const l = ["Lambda", "Lisp", "Llama"];
+  expect(typeJump(l, "l", -1)).toBe(0);
+  expect(typeJump(l, "ll", 0)).toBe(2);
+  expect(typeJump(titles, "ss", -1)).toBe(5);
+});

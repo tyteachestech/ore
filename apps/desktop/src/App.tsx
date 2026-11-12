@@ -1262,7 +1262,7 @@ export function App() {
   useEffect(() => {
     if (openId || overlay || onHome || !current) return;
     const onKey = (e: KeyboardEvent) => {
-      // O is a plain letter: in a field (the skill note, a new question) it is typing.
+      // In a field (the filter, the skill note, a new question) these act on the text, not a row.
       if ((is(e, "original") || is(e, "archive")) && inTextField(e)) return;
       if (is(e, "copy") && !window.getSelection()?.toString() && (many.length > 1 || keyed)) {
         // ⌘C on the picked rows, or the selected one, copies them as linked titles; a course as its page.
@@ -1352,6 +1352,10 @@ export function App() {
 
   const onListKey = (e: ReactKeyboardEvent) => {
     if (!lines.length || !currentLine) return;
+    const now = Date.now();
+    const begun = now - typed.current.at < TYPE_GAP && typed.current.text !== "";
+    // Any key but a letter of a title ends the title being typed (an arrow, Esc, a shortcut).
+    if (!typesTitle(e, begun)) typed.current.text = "";
     const at = lines.indexOf(currentLine);
     if (e.key === "Escape" && picked.length) {
       e.preventDefault();
@@ -1392,14 +1396,15 @@ export function App() {
     } else if (is(e.nativeEvent, "rename") && keyed) {
       e.preventDefault();
       setRenamingRow(lineKey(currentLine));
-    } else if (is(e.nativeEvent, "pin") && keyed && currentLine.kind === "item" && !currentLine.item.archived_at) {
+    } else if (is(e.nativeEvent, "pin") && keyed && many.length < 2 && currentLine.kind === "item" && !currentLine.item.archived_at) {
       e.preventDefault();
       void pinSource(currentLine.item);
-    } else if (!inTextField(e.nativeEvent) && typesTitle(e, Date.now() - typed.current.at < TYPE_GAP && typed.current.text !== "")) {
-      // Finder's type-select (F8): the first letters of a title select its row.
+    } else if (!inTextField(e.nativeEvent) && typesTitle(e, begun)) {
+      // Finder's type-select (F8): the first letters of a title select its row. Stopped here, so a plain
+      // letter bound elsewhere (N opens a skill's note) never also acts while he types a title.
       e.preventDefault();
-      const now = Date.now();
-      const text = (now - typed.current.at < TYPE_GAP ? typed.current.text : "") + e.key;
+      e.stopPropagation();
+      const text = (begun ? typed.current.text : "") + e.key;
       typed.current = { text, at: now };
       const i = typeJump(lines.map((l) => (l.kind === "item" ? l.item.title : l.title)), text, keyed ? at : -1);
       if (i < 0) return;

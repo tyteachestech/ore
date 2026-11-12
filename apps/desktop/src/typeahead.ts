@@ -16,11 +16,13 @@ export function typeJump(titles: string[], typed: string, from: number): number 
   if (!p) return -1;
   const n = titles.length;
   const starts = (i: number, prefix: string) => fold(titles[i]!).startsWith(prefix);
-  // One letter, or one letter repeated: step to the next row starting with it, after the selected one.
-  if ([...p].every((c) => c === p[0])) {
+  const any = (prefix: string) => titles.some((_, i) => starts(i, prefix));
+  // One letter, or one letter repeated that no title starts with ("ss" with no "Ssh"): step to the next row
+  // starting with that letter, after the selected one.
+  if ([...p].every((c) => c === p[0]) && (p.length === 1 || !any(p))) {
     for (let k = 1; k <= n; k++) {
-      const i = (from + k) % n;
-      if (starts(i, p[0]!)) return p.length > 1 && starts(from, p) ? from : i;
+      const i = (((from < 0 ? -1 : from) + k) % n + n) % n;
+      if (starts(i, p[0]!)) return i;
     }
     return -1;
   }

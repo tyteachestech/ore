@@ -18,7 +18,7 @@ const MENUS: Spec[] = [
   { title: "Edit", items: ["undo", "redo", "-", "@cut", "@copy", "@paste", "@select_all", "-", "filter"] },
   { title: "View", items: ["palette", "sidebar", "side-panel", "notes", "collected", "questions", "-", "@fullscreen"] },
   { title: "Go", items: ["home", "go-feed", "go-toread", "go-done", "-", "nav-back", "nav-forward", "-", "lesson-prev", "lesson-next"] },
-  { title: "Source", when: "reader", items: ["finish-source", "section", "look-up", "listen", "rename", "archive"] },
+  { title: "Source", when: "reader", items: ["finish-source", "section", "look-up", "listen", "rename", "pin", "archive"] },
   { title: "Review", items: ["review", "quick-quiz", "-", "no-idea", "in-head", "later", "edit-card", "retire-card", "ask", "bad-version"] },
   { title: "Window", role: "window", items: ["@minimize", "@maximize"] },
   { title: "Help", role: "help", items: ["shortcuts"] },

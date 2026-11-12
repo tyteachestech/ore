@@ -8257,7 +8257,8 @@ journey("list type-select: typing a title's first letters selects its row, as Fi
   const at = low.findLastIndex((t) => /^[a-z]/.test(t));
   if (at < 1) throw new Error(`no row past the first to type to: ${all.join(" / ")}`);
   let n = 1;
-  while (low.findIndex((t) => t.startsWith(low[at]!.slice(0, n))) !== at) n++;
+  while (n < low[at]!.length && low.findIndex((t) => t.startsWith(low[at]!.slice(0, n))) !== at) n++;
+  if (low.findIndex((t) => t.startsWith(low[at]!.slice(0, n))) !== at) throw new Error(`“${all[at]}” has no prefix of its own (a row above starts with it)`);
   await page.keyboard.type(low[at]!.slice(0, n), { delay: 60 });
   await until(`typing “${low[at]!.slice(0, n)}” selects “${all[at]}”`, async () => (await selected()) === all[at]);
   // A letter starting a row higher up, typed after a pause, starts over.
