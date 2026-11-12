@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.tylerpoelking.ore.phone",
   "build": {
-    "beforeBuildCommand": "cd ../desktop && ORE_PHONE=1 bunx vite build",
+    "beforeBuildCommand": "cp src-tauri/icons/ios/*.png src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/ && cd ../desktop && ORE_PHONE=1 bunx vite build",
     "frontendDist": "../../desktop/dist-phone"
   },
   "app": {

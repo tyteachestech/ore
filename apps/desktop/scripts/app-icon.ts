@@ -2,10 +2,10 @@
 // dark tile. Draws it and writes every icon file for the Mac app (the tile is 824 of 1024, with its shadow) and the
 // iPhone app (the full square, no transparency).
 //   bun apps/desktop/scripts/app-icon.ts [--preview <dir>]   (--preview writes mac.png and phone.png there only)
-// The iPhone app's own icon set lives in the Xcode project `tauri ios init` writes (apps/phone/src-tauri/gen/apple,
-// not in git): where that exists (the Mac) its files are rewritten too, so run this again after an `ios:init`.
+// The iPhone's Xcode icon set goes to apps/phone/src-tauri/icons/ios, and every phone build copies it into the Xcode
+// project (`beforeBuildCommand`), which is not in git and starts with Tauri's stock icons in each worktree.
 import { chromium } from "playwright";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** Dots across the drawing's unit square, and how much of the tile the pick's ink spans on its longer side. */
@@ -131,8 +131,10 @@ if (import.meta.main) {
       for (const [name, size] of [["32x32", 32], ["128x128", 128], ["128x128@2x", 256], ["icon", 512]] as const) writeFileSync(join(dir, `${name}.png`), png.get(size)!);
       writeFileSync(join(dir, "icon.icns"), icns(png));
     }
-    const set = join(import.meta.dir, "../../phone/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset");
-    if (existsSync(set)) for (const [name, size] of IOS) writeFileSync(join(set, `AppIcon-${name}.png`), await shoot(phoneSvg(), size, false));
+    // Opaque, with no alpha channel: what the App Store asks of an iPhone icon.
+    const set = join(import.meta.dir, "../../phone/src-tauri/icons/ios");
+    mkdirSync(set, { recursive: true });
+    for (const [name, size] of IOS) writeFileSync(join(set, `AppIcon-${name}.png`), await shoot(phoneSvg(), size, false));
   }
   await browser.close();
 }
