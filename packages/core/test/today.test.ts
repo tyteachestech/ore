@@ -150,6 +150,7 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     const day1 = T();
     for (const c of cards.slice(0, 6)) await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: day1 });
     const later = new Date(day1.getTime() + 90 * 864e5);
+    later.setHours(12, 0, 0, 0); // midday, so the minute after it is still the same day on any clock
     await recordReview(lib, cards[0]!.meta.id, { rating: 1, confidence: 3, now: later }); // a miss today owes one pass
     const q = dueQueue(lib, new Date(later.getTime() + 60_000));
     expect(q.map((e) => (e.relearn ? "R" : e.due === null ? "N" : "D")).join("")).toBe("DDDDNDNNNNNR");
