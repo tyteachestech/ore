@@ -1,0 +1,3 @@
+# Speed bench
+
+`bun run bench`: speed: the built app on a 950-source library (seed-big ×4), ms until each screen settles, `ore` calls and long tasks; put before/after in a speed PR (--only <step>, --calls, --compiled); CI's bench job (`.github/workflows/bench.yml`, app and core changes only) fails a step 1.5× over `apps/desktop/scripts/bench-baseline.json` on two passes running (times the runner's slowdown at fixed work, so a slow runner doesn't fail it), numbers from a CI run: a change that is slower on purpose, or a new step, updates it from that job's log (`--check` with no file prints them)

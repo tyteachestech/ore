@@ -29,7 +29,7 @@ const STATUS = /^(open|fixed #\d+|not a bug: .+|Tyler: .+|known limit: .+)$/;
 export function rows(md: string) {
   return md
     .split("\n")
-    .filter((l) => /^\| F\d+ \|/.test(l))
+    .filter((l) => /^\| F(\d+|-new-[a-z0-9-]+) \|/.test(l))
     .map((l) => {
       const [id, found, where, what, status, guard] = l.slice(1, -1).split(" | ").map((c) => c.trim());
       return { id, found, where, what, status, guard };
@@ -40,8 +40,11 @@ const table = rows(readFileSync(join(root, "docs/reviews/findings.md"), "utf8"))
 
 test("findings: every row has an ID in order, a date, a place, what happened and a known status", () => {
   expect(table.length).toBeGreaterThan(0);
+  // A branch's new rows are `F-new-<slug>` at the end until `bun run ids` numbers them at merge.
+  const numbered = table.filter((r) => !r.id!.startsWith("F-new-")).length;
   table.forEach((r, i) => {
-    expect(r.id).toBe(`F${i + 1}`);
+    if (i < numbered) expect(r.id).toBe(`F${i + 1}`);
+    else expect(r.id).toMatch(/^F-new-/);
     expect(r.found).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(r.where.length).toBeGreaterThan(0);
     expect(r.what.length).toBeGreaterThan(0);
