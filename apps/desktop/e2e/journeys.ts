@@ -2022,12 +2022,13 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await openSource(page, TESTING);
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
   const popup = page.getByRole("dialog", { name: "Highlight" });
-  await page.waitForTimeout(300); // the reader puts back where he was reading: a drag before that lands elsewhere
   await select(page, "ach successful retrieval changes the memory its");
   await popup.waitFor();
   await until("it snaps out to whole words", async () => (await active()) === "Each successful retrieval changes the memory itself.");
   await page.keyboard.press("Escape"); // drops the fresh one
   await popup.waitFor({ state: "hidden" });
+  // At once, before the reader has finished with the first drag: on a busy Mac its clearing of that selection came
+  // after this press and took the new one with it (the Highlight popup never came, 16 runs in 20).
   await page.keyboard.down("Alt");
   await select(page, "trengthens the route bac");
   await page.keyboard.up("Alt");
@@ -3050,9 +3051,13 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.keyboard.press("Escape");
   await page.keyboard.press("Backspace");
   await page.keyboard.type("Read the guide", { delay: 10 });
-  await page.keyboard.press("Shift+Home");
-  await page.waitForTimeout(150); // the editor takes the selection a moment after the page shows it
-  await page.keyboard.press("Meta+k"); // the palette's key, in the note with words selected
+  // The words selected to the line's start and ⌘K in the same moment, as a quick hand does: ⌘K reads the
+  // selection the note has when the key lands, never one a frame behind.
+  await page.evaluate(() => {
+    const t = document.querySelector(".note-editor .ProseMirror p")!.firstChild!;
+    getSelection()!.setBaseAndExtent(t, t.textContent!.length, t, 0);
+    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", metaKey: true, bubbles: true, cancelable: true }));
+  });
   await page.getByPlaceholder("Paste a link").waitFor();
   // Esc closes it with focus back on the words (Notion), so ⌘K asks again at once.
   await page.keyboard.press("Escape");
@@ -3066,10 +3071,12 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.waitForTimeout(200);
   if (await page.evaluate(() => !!document.activeElement?.closest(".note-editor"))) throw new Error("a press outside the link field put focus back in the note");
   await pm.getByText("Read the guide").click();
-  await page.keyboard.press("End");
-  await page.keyboard.press("Shift+Home");
-  await page.waitForTimeout(150);
-  await page.keyboard.press("Meta+k");
+  // The line's end, then select to its start, by this Mac's keys or Linux's (on the Mac, Home and End scroll).
+  const mac = process.platform === "darwin";
+  await page.keyboard.press(mac ? "Meta+ArrowRight" : "End");
+  await page.keyboard.press(mac ? "Meta+Shift+ArrowLeft" : "Shift+Home");
+  if ((await page.evaluate(() => String(getSelection()))) !== "Read the guide") throw new Error("the words aren't selected");
+  await page.keyboard.press("Meta+k"); // at once: ⌘K reads the selection the note has as the key lands
   await page.getByPlaceholder("Paste a link").waitFor();
   await page.keyboard.type("example.com/guide");
   await page.keyboard.press("Enter");
@@ -3625,9 +3632,14 @@ journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space
 journey("Home: after a ⌘-click picks a row, the first ⇧↓ grows the pick (Finder)", async (page) => {
   await openSource(page, AGENTS);
   await openSource(page, TESTING);
+  // Today's numbers slow to come, as on a busy Mac: the rows wait for them, or Today grows over the rows' place
+  // as they come and a click aimed at a row lands beside it (the ⌘-click picked nothing, CI 2026-11-13).
+  await page.evaluate(() => ((window as any).__ORE_SLOW = { today: 800 }));
   await page.getByRole("button", { name: /^Home/ }).click();
   const rows = page.locator(".home-read");
   await rows.nth(1).waitFor();
+  if (!(await page.locator(".home-goal").count())) throw new Error("Continue reading showed before Today, which then pushed it down");
+  await page.evaluate(() => delete (window as any).__ORE_SLOW);
   await rows.nth(0).locator(".home-open").click({ modifiers: ["Meta"] });
   await until("⌘-click picks the row", async () => (await page.locator(".home-read.sel").count()) === 1);
   await page.keyboard.press("Shift+ArrowDown");
@@ -3772,8 +3784,12 @@ journey("sidebar: ⌘Z while a collection's rename still saves puts the old name
   await page.getByLabel("Collection name").fill("Craft slowly");
   await page.keyboard.press("Enter");
   await label(/^Craft slowly$/i).waitFor();
+  // As in Finder, the renamed folder keeps focus: the header drawn in the field's place takes it, even when the
+  // next key comes before it is placed (⌘Z pressed at once once left focus on <body>, 3 runs in 4).
+  const focusOn = (name: string) => page.evaluate((n) => !!document.activeElement?.matches("button.side-label") && document.activeElement.textContent?.trim().toLowerCase() === n, name.toLowerCase());
   await page.keyboard.press("Meta+z");
   await label(/^Craft$/i).waitFor();
+  await until("focus is on the collection again, under its old name", () => focusOn("Craft"));
   const shown: string[] = [];
   for (const end = Date.now() + 2000; Date.now() < end; await page.waitForTimeout(25)) {
     const names = (await page.locator(".side-head .side-label-text").allInnerTexts()).map((t) => t.trim()).join(", ");

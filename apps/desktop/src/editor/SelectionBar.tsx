@@ -43,7 +43,7 @@ const NAMES: Record<Color, string> = { gray: "Gray", red: "Red", orange: "Orange
 
 /** Notion's bar over selected text: Turn into, bold, italic, underline, strikethrough, code, a web link, a
  *  link to a source or skill note ([[ ]], D39), and colour. Each is one editor step (⌘Z). */
-export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0 }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void; /** In the iPhone's keyboard bar, not over the text: iOS puts its Copy bar there. */ docked?: boolean; /** Goes up each time ⌘K asks for a web link on the selection (Notion). */ askLink?: number }) {
+export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0, linkNow = false }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void; /** In the iPhone's keyboard bar, not over the text: iOS puts its Copy bar there. */ docked?: boolean; /** Goes up each time ⌘K asks for a web link on the selection (Notion). */ askLink?: number; /** ⌘K came with the selection itself, before the bar was up: the link field opens as the bar does. */ linkNow?: boolean }) {
   const bar = useRef<HTMLDivElement>(null);
   useBarLeft(bar, sel.x, docked);
   const v = view();
@@ -98,7 +98,7 @@ export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0 }
       <Hint text="Strikethrough" keys="note-strike">{mark("Strikethrough", schema.marks.strike_through, <s>S</s>)}</Hint>
       <Hint text="Code" keys="note-code">{mark("Code", schema.marks.inlineCode, <span className="mono">{"</>"}</span>)}</Hint>
       <span className="sel-sep" />
-      <WebLink v={v} sel={sel} ask={askLink} />
+      <WebLink v={v} sel={sel} ask={askLink} now={linkNow} />
       <PageLink v={v} sel={sel} targets={targets} />
       <span className="sel-sep" />
       <Colors v={v} sel={sel} />
@@ -122,7 +122,7 @@ function useToNote(v: EditorView) {
 }
 
 /** A web link on the selection: paste or type the address, Enter applies it, Esc cancels. */
-function WebLink({ v, sel, ask }: { v: EditorView; sel: Sel; ask: number }) {
+function WebLink({ v, sel, ask, now: atOnce }: { v: EditorView; sel: Sel; ask: number; now: boolean }) {
   const toNote = useToNote(v);
   const t = v.state.schema.marks.link!;
   const now = (() => {
@@ -132,7 +132,7 @@ function WebLink({ v, sel, ask }: { v: EditorView; sel: Sel; ask: number }) {
   })();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState(now);
-  const asked = useRef(ask);
+  const asked = useRef(atOnce ? ask - 1 : ask);
   useEffect(() => {
     if (ask === asked.current) return;
     asked.current = ask;
