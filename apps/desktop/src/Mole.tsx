@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
+import { FINE_ORDER, fineDots } from "./mole-fine";
 
 /* The tutor's mole (D168, drawn D169, a puppet since D214, an old miner since D238): its head and two paws over a
    strip of dirt, drawn as round dots on a 22 by 18 grid, like Nothing's dot glyphs. He is the mine's old hand: a
@@ -125,12 +126,12 @@ export function moleDots(s: State): Dot[] {
 
 /** One path per tone, painted back to front: eyes over the face, glints over the eyes. */
 const ORDER: Tone[] = ["dirt", "fur", "helmet", "band", "housing", "brim", "paw", "stache", "brow", "nose", "lamp", "eye", "glint"];
-function paths(dots: Dot[]): Record<Tone, string> {
-  const by = Object.fromEntries(ORDER.map((t) => [t, ""])) as Record<Tone, string>;
+function paths<T extends string>(dots: readonly (readonly [number, number, number, T])[], order: readonly T[], half = 0.5): Record<T, string> {
+  const by = Object.fromEntries(order.map((t) => [t, ""])) as Record<T, string>;
   for (const [c, r, rad, t] of dots) {
     if (rad < 0.05) continue;
-    const x = c + 0.5 - rad;
-    by[t] += `M${x.toFixed(2)} ${r + 0.5}a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(2 * rad).toFixed(2)} 0a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(-2 * rad).toFixed(2)} 0`;
+    const x = c + half - rad;
+    by[t] += `M${x.toFixed(2)} ${(r + half).toFixed(2)}a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(2 * rad).toFixed(2)} 0a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(-2 * rad).toFixed(2)} 0`;
   }
   return by;
 }
@@ -222,6 +223,10 @@ const BLINK_MS = 120, LOOK_MS = 900;
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
+/** From this width up he is drawn as the traced concept (`mole-fine.ts`, D251); under it his dots would be under 2px,
+ *  so the small grid mole above stands in. */
+export const FINE_FROM = 48;
+
 /** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite; the dome may
  *  rise into the room above it). `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
  *  5 to 9 s and glances to a side every 15 to 20 s. `look` (hover or focus on its button) faces him with a blink.
@@ -229,7 +234,8 @@ const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
  *  reduced motion and while the window is hidden (a mood shows its still pose). */
 export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean }) {
   const svg = useRef<SVGSVGElement>(null);
-  const tones = useRef<Partial<Record<Tone, SVGPathElement | null>>>({});
+  const fine = size >= FINE_FROM, order: readonly string[] = fine ? FINE_ORDER : ORDER;
+  const tones = useRef<Record<string, SVGPathElement | null>>({});
   const p = useRef(puppet());
   const run = useRef({ frame: 0, last: 0 });
   const looking = useRef(look);
@@ -237,8 +243,8 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
 
   // `data-mood` is the move it is playing (or showing still), for tests.
   const draw = () => {
-    const d = paths(moleDots(p.current.v));
-    for (const t of ORDER) tones.current[t]?.setAttribute("d", d[t]);
+    const d: Record<string, string> = fine ? paths(fineDots(p.current.v), FINE_ORDER, 0) : paths(moleDots(p.current.v), ORDER);
+    for (const t of order) tones.current[t]?.setAttribute("d", d[t]!);
     svg.current?.setAttribute("data-mood", p.current.mood);
   };
   // Frames run while anything moves or a beat is still to come, then stop.
@@ -281,7 +287,7 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
     play();
     document.addEventListener("visibilitychange", shown);
     return () => document.removeEventListener("visibilitychange", shown);
-  }, [mood, cue]);
+  }, [mood, cue, fine]);
 
   // At rest: blinks and glances, never while it is facing him, hidden, or asked for less motion.
   useEffect(() => {
@@ -324,8 +330,8 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
 
   // The dirt sits low in the button, so the mole reads as poking out of the ground at its foot.
   return (
-    <svg ref={svg} className="mole" width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : `0 ${-LIFT} ${COLS} ${COLS}`} overflow="visible" aria-hidden="true">
-      {ORDER.map((t) => (
+    <svg ref={svg} className="mole" data-fine={fine || undefined} width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : `0 ${-LIFT} ${COLS} ${COLS}`} overflow="visible" aria-hidden="true">
+      {order.map((t) => (
         <path key={t} ref={(el) => { tones.current[t] = el; }} className={`mole-${t}`} />
       ))}
     </svg>
