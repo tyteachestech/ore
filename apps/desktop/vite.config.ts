@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { dots } from "./src/dots";
 import { FIXES } from "./src/skill-icon-fixes";
+import { scaleFontSizes } from "./src/phone/dynamic-type";
 
 // Skill icons (D157) on the UI icons' 16-pixel grid (D129), each pixel a round dot (2026-11-08): each MingCute icon of
 // src/skill-icon-set.ts as redrawn by scripts/pixel-skill-icons.ts, or by hand in src/skill-icon-fixes.ts, served as
@@ -40,6 +41,15 @@ const pixelSkillIcons: Plugin = {
 // (src/phone/core.ts), so the Node and Bun modules the core imports get phone stand-ins.
 const PHONE = process.env.ORE_PHONE === "1";
 const BUILD = process.argv.includes("build");
+// The iPhone's text size (F70, src/phone/dynamic-type.ts): the app's own CSS sizes its text times --type.
+const dynamicType: Plugin = {
+  name: "dynamic-type",
+  enforce: "pre",
+  transform(code, id) {
+    if (!/src\/(styles|retro)\.css($|\?)/.test(id)) return;
+    return { code: scaleFontSizes(code), map: null };
+  },
+};
 const phone = (f: string) => fileURLToPath(new URL(`./src/phone/${f}`, import.meta.url));
 const phoneAliases = [
   // The CLI's command table (src/phone/core.ts), aliased so the app's typecheck doesn't walk the core.
@@ -117,6 +127,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     pixelSkillIcons,
+    ...(PHONE ? [dynamicType] : []),
     ...(PHONE ? [phoneLibrary, textImports] : []),
   ],
   clearScreen: false,
