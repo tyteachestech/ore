@@ -67,4 +67,11 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F41 | 2026-11-12 | iPhone notes | With the keyboard up, the + menu's top row was cut off under the source's header | fixed #323 | `the + menu starts below the header` |
 | F42 | 2026-11-12 | iPhone Review | Review's ⋯ was three faint specks beside a bold × | fixed #323 | `Review's ⋯ is as strong as ×` |
 | F43 | 2026-11-12 | iPhone Review | In Edit exercise, the question went up under the head when the keyboard came up | fixed #323 | `the question stays below the head` |
-| F44 | 2026-11-12 | iPhone share | Ore was missing from the share sheet for a PDF shared from Safari's viewer: the extension's SupportsWebURL/File/Image keys didn't match it | fixed #336 | `the share extension activates for any link, text or file, a PDF from Safari included` |
+| F44 | 2026-11-12 | Skill page, All sources | The source folder tabs took one arrow and stopped: changing the tab handed focus to the list, so the next → did nothing (D226) | fixed #326 | `a second arrow goes back to To read` |
+| F45 | 2026-11-12 | Home | After a ⌘-click picked a Continue reading row, the first ⇧↓ didn't grow the pick: WebKit leaves a clicked button unfocused (F27 again) | fixed #326 | `after a ⌘-click picks a row, the first ⇧↓ grows the pick` |
+| F46 | 2026-11-12 | iPhone, Skill page | Holding a source in a skill's list opened two menus, the row's and the section's (Search sources, Add source) over it | fixed #326 | `the section's menu opened over the row's` |
+| F47 | 2026-11-12 | iPhone | Return in a Sources row's Rename field saved it and then opened the source | fixed #326 | `Return in the rename field opened the source` |
+| F48 | 2026-11-12 | iPhone, Today | Today's hold menu for a source had no Rename…, though Sources and a skill's list do (D225) | fixed #326 | `Return in Today's rename field opened the source` |
+| F49 | 2026-11-12 | iPhone | Once, the search field sat under the keyboard's accessory bar; not seen again on the repeat | open | — |
+| F50 | 2026-11-12 | Home, iPhone Today | Return in a Continue reading row's Rename field dropped focus to the page instead of the row (found by F48's journey) | fixed #326 | `Return in Today's rename field opened the source` |
+| F51 | 2026-11-12 | iPhone share | Ore was missing from the share sheet for a PDF shared from Safari's viewer: the extension's SupportsWebURL/File/Image keys didn't match it | fixed #336 | `the share extension activates for any link, text or file, a PDF from Safari included` |
