@@ -1534,7 +1534,7 @@ function EndLines({ run, children }: { run: boolean; children: React.ReactNode }
   );
 }
 
-/** A result's number in the ring's dots, running up from nothing once `go` (D251); whole at once under Reduce Motion. */
+/** A result's number in the ring's dots, running up from nothing once `go` (D252); whole at once under Reduce Motion. */
 function CountUp({ value, go }: { value: string; go: boolean }) {
   const m = /^(\D*)(\d+(?:\.(\d+))?)$/.exec(value);
   const [k, setK] = useState(still() ? 1 : 0);
@@ -1554,7 +1554,7 @@ function CountUp({ value, go }: { value: string; go: boolean }) {
 /** How long after one result the next lands. */
 const TALLY_GAP_MS = 320;
 
-/** The end screen's row of results (D251, after Duolingo's lesson-complete row): three at most, each a
+/** The end screen's row of results (D252, after Duolingo's lesson-complete row): three at most, each a
  *  mark, a number in dots and what it counts, landing one after another once `go`, then still. The number's text
  *  is in the page throughout for a reader. A rare one wears its skill's colour or the won-back gold. */
 function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skills: Skill[]; onDone: () => void }) {
@@ -1682,7 +1682,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem">
             <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
-            {/* D243, D251: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
+            {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {mood === "cheer" && (
               <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
             )}

@@ -146,7 +146,7 @@ test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem 
   await none.done();
 });
 
-test("the mole says one line at a session's end: typed out a letter at a time with his block, then it stays; under Reduce Motion it stands at once (D243, D245, D251)", async () => {
+test("the mole says one line at a session's end: typed out a letter at a time with his block, then it stays; under Reduce Motion it stands at once (D243, D245, D252)", async () => {
   jest.useFakeTimers();
   // No cart (the goal was met before), so the lines start turning at once.
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
@@ -167,7 +167,7 @@ test("the mole says one line at a session's end: typed out a letter at a time wi
   expect(s.body.querySelector(".says-rest")!.textContent).toBe("ss work.");
   for (let i = 0; i < 40 && s.q(".says[data-typing]"); i++) await act(async () => void jest.advanceTimersByTime(28));
   expect(typed()).toBe("Gneiss work.");
-  // He says one line and it stays (D251): the numbers are the row's, not his.
+  // He says one line and it stays (D252): the numbers are the row's, not his.
   await act(async () => void jest.advanceTimersByTime(9000));
   expect(line()!.textContent).toBe("Gneiss work.");
   await s.done();
@@ -178,14 +178,14 @@ test("the mole says one line at a session's end: typed out a letter at a time wi
   expect(flat.q(".says[data-typing]")).toBe(0);
   reduce = false;
   jest.useRealTimers();
-  // Under the emblem nothing of Ore's is left but the row of results (D251).
+  // Under the emblem nothing of Ore's is left but the row of results (D252).
   expect(flat.q(".review-end > p, .review-end > .end-lines")).toBe(0);
   expect(flat.q(".review-end > .end-tally > li")).toBe(2);
   expect(flat.q(".review-end h2")).toBe(0);
   await flat.done();
 });
 
-test("the end screen is one emblem over one row of results (D242, D251): the gems sit inside the ring, the numbers stand under it in dots, and the quick quiz keeps its lines", async () => {
+test("the end screen is one emblem over one row of results (D242, D252): the gems sit inside the ring, the numbers stand under it in dots, and the quick quiz keeps its lines", async () => {
   reduce = true;
   const two = end(["ai", "ai"]) as unknown as { session: Record<string, unknown> };
   Object.assign(two.session, { depth_days: 41, depth_extra_days: 12 });
@@ -309,7 +309,7 @@ test("then and now: his answer from weeks ago over today's, under the ring, and 
   await none.done();
 });
 
-test("the results land one after another and count up, and the mole speaks once the last is in (D251)", async () => {
+test("the results land one after another and count up, and the mole speaks once the last is in (D252)", async () => {
   jest.useFakeTimers();
   // No cart (the goal was met before), so the row starts at once.
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
@@ -333,7 +333,7 @@ test("the results land one after another and count up, and the mole speaks once 
   await s.done();
 });
 
-test("the row of results (D251): kept, days of memory, then the rarest true thing; a session of misses has none", async () => {
+test("the row of results (D252): kept, days of memory, then the rarest true thing; a session of misses has none", async () => {
   const { endTiles } = await import("../src/end-says");
   const session = (o: Record<string, unknown>) => ({ id: "s", reviews: 8, kept: 5, rescued: 0, ...o }) as never;
   const keys = (o: Record<string, unknown>, ups: { skill?: string; name: string; level: number }[] = []) => endTiles({ session: session(o), ups }).map((t) => `${t.key} ${t.value} ${t.label}`);

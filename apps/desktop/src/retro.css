@@ -149,7 +149,7 @@
 .home-goal .goal-of { font-family: var(--font); }
 /* The hero number is the one place a dot face is big enough to read (D183): 40px, never below 24. */
 .home-goal h1 .roll, .strength-big { font-family: var(--dot); font-weight: 400; font-size: 40px; line-height: 1; }
-/* Numbers drawn in the ring's own dots (`DotNumber`, D242): the end screen's row of results (D251). */
+/* Numbers drawn in the ring's own dots (`DotNumber`, D242): the end screen's row of results (D252). */
 .dot-number { display: block; }
 .dot-number circle { fill: var(--text); }
 

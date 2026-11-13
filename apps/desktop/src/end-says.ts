@@ -1,6 +1,6 @@
 import { depthParts, depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
 
-/** One of the end screen's results (D251): a number, what it counts, and for a rare one what kind. */
+/** One of the end screen's results (D252): a number, what it counts, and for a rare one what kind. */
 export type Tile = { key: "kept" | "depth" | "level" | "rescued" | "long" | "cut"; value: string; label: string; hint?: string; rare?: Said["rare"] };
 
 /** A line of the mole's. `rare`: a thing most sessions don't have, which leads and wears its own mark (D247). */
@@ -40,7 +40,7 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   return [...lead, ...depth, ...rest].slice(0, SAID_MAX);
 }
 
-/** The end screen's row of results (D251), three at most, always in this order: memories kept, the
+/** The end screen's row of results (D252), three at most, always in this order: memories kept, the
  *  days of memory they added, then the rarest true thing of the session (a skill's new level, memories pulled
  *  back in time, a long gap recalled across, else the gems cut). A session of misses has none (D62). */
 export function endTiles(o: { session: SessionEnd; ups: { skill?: string; name: string; level: number }[] }): Tile[] {
