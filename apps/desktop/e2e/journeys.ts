@@ -931,7 +931,7 @@ journey("ambience radio: the mole's twin at the bottom left; its pads play a cha
   await page.keyboard.press("Escape");
 });
 
-journey("ambience radio over Review: Esc closes the radio only, and its number keys pick channels, never rate (F-new-radio-esc-review)", async (page) => {
+journey("ambience radio over Review: Esc closes the radio only, and its number keys pick channels, never rate (F93)", async (page) => {
   await startReview(page, null);
   const q = page.locator(".review-q");
   const first = await q.innerText();

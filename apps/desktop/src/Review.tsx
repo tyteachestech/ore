@@ -921,7 +921,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   keyRef.current = (e: KeyboardEvent) => {
     if (paused || under) return;
     // A sheet over Review (its ⋯ on the phone) or a panel with its own keys (the ambience radio) is portaled out of it
-    // and takes its keys: Esc closes it only, a number picks a channel instead of rating (F-new-radio-esc-review).
+    // and takes its keys: Esc closes it only, a number picks a channel instead of rating (F93).
     // Whatever has focus: in the frame before the sheet takes it, the key's target is the page (F61).
     const here = root.current;
     if ([...document.querySelectorAll('[aria-modal="true"], [data-own-keys]')].some((m) => !here?.contains(m) && !m.contains(here))) return;
