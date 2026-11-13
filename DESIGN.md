@@ -238,7 +238,7 @@ One system, two moods (D185, Tyler's pick B "Glide" of three, 2026-11-10). The t
 
 - **Everyday** moves are quick and calm: `--t-1` to `--t-4` with `--ease-out`, never a bounce. A menu, a tab, a toast, a switch and a panel all belong here.
 - **Moments** are the few places the app celebrates real progress: a ring filling, a gem cut, a try or a question ticked, a finished session. They may take `--t-moment` and the spring, with dots lighting a `--stagger` apart. A moment that was drawn by hand and runs longer than 400ms (Settle, the ring's burst, the pixel burst) keeps its own time, as do the mole's springs (D214), stepped pixel frames (the working line) and endless loops.
-- **Nothing** moves for a keyboard-driven action or one done a hundred times a day: arrows through a list, rating an exercise, ⌘K. A highlight landing is the one exception (D240; Tyler: the rule is a default, not a law).
+- **Nothing** moves for a keyboard-driven action or one done a hundred times a day: arrows through a list, rating an exercise, ⌘K. Two exceptions: a highlight landing (D240; Tyler: the rule is a default, not a law), and the sidebar cursor's one-frame bounce after a click (D113; Tyler kept it, 2026-11-13, F83).
 - Under Reduce Motion everything appears in place.
 
 ## Do's and Don'ts
