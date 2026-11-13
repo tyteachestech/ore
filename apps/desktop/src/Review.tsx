@@ -904,8 +904,9 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   keyRef.current = (e: KeyboardEvent) => {
     if (paused || under) return;
     // A sheet over Review (its ⋯ on the phone) is portaled out of it and takes its own keys: Esc closes the sheet only.
-    const over = (e.target as HTMLElement | null)?.closest?.('[aria-modal="true"]');
-    if (over && !root.current?.contains(over)) return;
+    // Whatever has focus: in the frame before the sheet takes it, the key's target is the page (F61).
+    const here = root.current;
+    if ([...document.querySelectorAll('[aria-modal="true"]')].some((m) => !here?.contains(m) && !m.contains(here))) return;
     if (is(e, "undo") && busyNow.current && !((e.target as HTMLElement).isContentEditable || ownsUndo(e.target))) {
       // The step it should take back isn't on the history yet (or is being taken back): it waits.
       e.preventDefault();

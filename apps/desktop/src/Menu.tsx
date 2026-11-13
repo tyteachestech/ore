@@ -313,6 +313,9 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
     onOpenChange?.(on);
   };
   const close = () => show(false);
+  /** Esc: back a step, or closed. */
+  const dismiss = useRef(() => {});
+  dismiss.current = () => (stepId ? setStepId(null) : close());
   /** An action was picked: focus doesn't go back to a field the sheet put the keyboard away from. */
   const picked = useRef(false);
   useSwipeDown(box, close, open);
@@ -327,7 +330,15 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
     // A frame later: the sheet's own trap is in place by then and has paused the one around the page (Review's).
     // Focused at once, that trap, which doesn't hold the portaled sheet, took focus back to the answer field.
     const raf = requestAnimationFrame(() => box.current?.focus());
+    // Esc with focus not yet in the sheet (that frame, or a tap on the dimmed page) is still the sheet's (F61).
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || box.current?.contains(e.target as Node)) return;
+      e.stopPropagation();
+      dismiss.current();
+    };
+    window.addEventListener("keydown", esc);
     return () => {
+      window.removeEventListener("keydown", esc);
       cancelAnimationFrame(raf);
       if (!keepFocus && !(typing && picked.current)) back.current?.focus?.();
     };
@@ -354,7 +365,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
       {open && sheetLayer(
         <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
           <Trap>
-            <div ref={box} className="panel sheet action-sheet" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); step ? setStepId(null) : close(); } }}>
+            <div ref={box} className="panel sheet action-sheet" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); dismiss.current(); } }}>
               <div className="sheet-steps" style={{ height }}>
                 <div ref={inner} key={step?.id ?? "top"} className="pick-list">
                   {step && (
