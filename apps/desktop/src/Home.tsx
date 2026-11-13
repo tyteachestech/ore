@@ -482,7 +482,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                   ) : (
                     <Hint text={`${Math.round(at * 100)}% read`}>
                       {/* The hint needs an element to hold its ref, so the bar sits in a span. */}
-                      <span className="home-meter small"><DotBar className="" share={at} n={PHONE ? 27 : 10} /></span>
+                      <span className="home-meter small"><DotBar className="" share={at} n={10} /></span>
                     </Hint>
                   )}
                   {/* On hover the ⋯ takes the meter's place, as on every other row (Linear). */}

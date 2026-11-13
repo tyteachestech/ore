@@ -10100,7 +10100,7 @@ journey("phone: every screen's text follows the iPhone's text size, and Start re
   if (Math.abs(larger / body - 1.353) > 0.02) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
 }, "phone");
 
-journey("phone: a long title on Today and in Sources shows on two lines, with the reading dots along the picture's bottom edge, at every text size (F87)", async (page) => {
+journey("phone: a long title on Today and in Sources shows on two lines, with the reading dots on the picture's foot, at every text size (F87)", async (page) => {
   // The picture and the reading dots left a Continue reading title about 25 letters, and the lists cut theirs at one line.
   const check = async (where: string, rows: string, title: string) => {
     const bad = await page.locator(rows).evaluateAll((els, title) => els.flatMap((row) => {

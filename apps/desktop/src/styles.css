@@ -2677,18 +2677,18 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .home-h, .phone .home-cont .home-h { margin: 32px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .phone .home-read { margin: 0; padding: 0; height: 56px; border-bottom: 1px solid var(--border); }
 /* A title gets the row's whole width beside the picture on two lines (Tyler's pick C, 2026-11-13). The picture is as
-   big as a two-line row allows, and how far he is runs along its bottom edge as a line of fine dots on a dark band
-   (D-new-phone-thumb-progress; YouTube's red line), so it reads on a white page and a dark picture alike and
-   takes no room of its own. A source not opened yet says New in the same corner. */
+   big as a two-line row allows, and how far he is sits on its foot: the ten dots over a dark shade
+   (D-new-phone-thumb-progress, Tyler's pick A), so they read on a white page and a dark picture alike and take no
+   room of their own. A source not opened yet says New in the same corner. */
 .phone .home-read { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-content: center; height: auto; min-height: 56px; padding: 10px 0; }
 .phone .home-read .thumb { grid-area: 1 / 1 / 3 / 2; width: 112px; height: 63px; }
 .phone .home-read :is(.title, .row-rename) { grid-column: 2; grid-row: 1 / 3; align-self: center; }
 .phone .home-read .title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
 .phone .home-read:has(.course-of) .title { grid-row: 1; align-self: end; }
 .phone .home-read .course-of { grid-area: 2 / 2; max-width: none; align-self: start; }
-.phone .home-read .home-meter.small { grid-area: 1 / 1 / 3 / 2; align-self: end; z-index: 1; width: 112px; height: 7px; align-items: center; background: rgba(0, 0, 0, 0.78); border-radius: 0 0 6px 6px; }
-.phone .home-read .home-meter .dot-bar { width: 100%; height: 3px; gap: 0; justify-content: space-between; padding: 0 3px; box-sizing: border-box; }
-.phone .home-read .home-meter .dot-bar i { width: 3px; height: 3px; transform: none; background: rgba(255, 255, 255, 0.3); }
+.phone .home-read .home-meter.small { grid-area: 1 / 1 / 3 / 2; align-self: end; z-index: 1; width: 112px; height: 28px; align-items: flex-end; padding: 0 8px 7px; box-sizing: border-box; background: linear-gradient(transparent, rgba(0, 0, 0, 0.8) 55%); border-radius: 0 0 6px 6px; }
+.phone .home-read .home-meter .dot-bar { width: 100%; height: 6px; gap: 0; justify-content: space-between; }
+.phone .home-read .home-meter .dot-bar i { width: 6px; height: 6px; transform: none; background: rgba(255, 255, 255, 0.4); }
 .phone .home-read .home-meter .dot-bar i.on { background: #fff; }
 .phone .home-read .home-new { grid-area: 1 / 1 / 3 / 2; align-self: end; justify-self: start; z-index: 1; width: auto; margin: 0 0 5px 5px; padding: 3px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; font: 500 11px/1 var(--mono); }
 .phone .home-skills { display: flex; flex-direction: column; gap: 0; }
