@@ -71,12 +71,24 @@ if (q.has("film") || reduced) {
 } else {
   film.remove();
   // Rive's web runtime (MIT). canvas-lite is the small build; if it cannot run this file, use @rive-app/canvas.
-  await new Promise((ok, no) => { const s = document.createElement("script"); s.src = "https://unpkg.com/@rive-app/canvas-lite@2.40.1"; s.onload = ok; s.onerror = no; document.head.append(s); });
-  const { Rive, EventType, Layout, Fit } = window.rive;
-  let t0 = 0;
-  const now = () => (performance.now() - t0) / 1000;
+  // &runtime=vendor/lite/ loads a local copy (rive.js and rive.wasm in that folder) instead of the CDN's.
+  const base = q.get("runtime");
+  await new Promise((ok, no) => { const s = document.createElement("script"); s.src = base ? `${base}rive.js` : "https://unpkg.com/@rive-app/canvas-lite@2.40.1"; s.onload = ok; s.onerror = no; document.head.append(s); });
+  const { Rive, EventType, Layout, Fit, RuntimeLoader } = window.rive;
+  if (base) RuntimeLoader.setWasmUrl(`${base}rive.wasm`);
+  // &manual: time only moves when a recorder calls cart.step(ms), so every frame can be captured.
+  let clock = () => performance.now();
+  if (q.has("manual")) {
+    let vt = 0, queue = [];
+    window.requestAnimationFrame = (cb) => queue.push(cb);
+    window.cancelAnimationFrame = () => {};
+    clock = () => vt;
+    window.cart = { end: 7.1, step(ms) { vt += ms; const run = queue; queue = []; for (const cb of run) cb(vt); } };
+  }
+  let t0 = 0, loaded = false;
+  const now = () => (clock() - t0) / 1000;
   const r = new Rive({
-    src: "cart-ending.riv", canvas, artboard: "CartEnding", stateMachines: "Cart ending", autoplay: false, autoBind: true,
+    src: "../rive/build/cart-ending.riv", canvas, artboard: "CartEnding", stateMachines: "Cart ending", autoplay: false, autoBind: true,
     layout: new Layout({ fit: Fit.Contain }),
     onLoad() {
       // The page hands every piece its place: how much ore, how many stones, and where each one goes.
@@ -84,10 +96,10 @@ if (q.has("film") || reduced) {
       vm.number("ore").value = ORE; vm.number("stones").value = STONES;
       for (let i = 0; i < Math.min(ORE, 30); i++) { const [x, y] = ringDot(i); vm.number(`ore${i}x`).value = x; vm.number(`ore${i}y`).value = y; }
       for (let j = 0; j < Math.min(STONES, 3); j++) { const [x, y] = gemPlace(j); vm.number(`stone${j}x`).value = x; vm.number(`stone${j}y`).value = y; }
-      t0 = performance.now(); r.play();
+      t0 = clock(); r.play(); loaded = true; if (window.cart) window.cart.ready = true;
       const tick = () => { draw(now()); requestAnimationFrame(tick); }; tick();
     },
   });
-  r.on(EventType.RiveEvent, (e) => fire(e.data.name, now()));
+    r.on(EventType.RiveEvent, (e) => fire(e.data.name, now()));
 }
 document.getElementById("done").onclick = () => (document.getElementById("done").textContent = "Done ✓");

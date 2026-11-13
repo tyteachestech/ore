@@ -11,7 +11,9 @@ screen's own cart animation, its clips and its pull requests were not opened. No
   the rig, seven timelines, a state machine and a view model. No Rive editor was opened and no scripts are used.
 - `stage/` is the page it plays on: a stand-in end screen, 1280 by 800, that owns the ring, the gem place, the
   results, Done and the mole's line.
-- `film.sh` makes the clip and frame sheet (`shoot.sh`, `key.py`, `rec.mjs`).
+- `rive/build/cart-ending.riv` is the published file. `node rec.mjs out/live "runtime=vendor/lite/"` records it
+  in the web runtime (put `rive.js` and `rive.wasm` from `@rive-app/canvas-lite@2.40.1` in `stage/vendor/lite/`).
+- `film.sh` makes the same clip from Rive's headless renderer instead (`shoot.sh`, `key.py`, `rec.mjs`).
 
 Run: `node gen.mjs`, then `rive rive --verify` (Rive CLI 1.9.2).
 
@@ -55,6 +57,7 @@ Run: `node gen.mjs`, then `rive rive --verify` (Rive CLI 1.9.2).
 - The text has to be generated: the scene is 437 KB of markup from a 570-line script. Nobody edits it by hand,
   and it is not something to tweak in the Rive editor and merge back.
 - A `.riv` file cannot be written without signing in to a Rive account, even for a project with no scripts.
+- Recording the web runtime frame by frame needed the page to own the clock (`&manual`, `cart.step`).
 - The CLI's batch capture (`--commands`) returned blank frames after the first few on this Linux machine, so the
   film is one CLI run per frame.
 
@@ -64,18 +67,19 @@ honest difference from a renderer that re-samples a pose onto a fixed grid.
 
 **Size.** Rive's web runtime 2.40.1 (MIT): `@rive-app/canvas-lite` is 1.16 MB (396 KB gzipped: 84 KB script,
 312 KB wasm); the full `@rive-app/canvas` is 2.22 MB (836 KB gzipped). The scene itself is about 124 KB as Rive
-builds it in memory; the published file's size is not known yet.
+builds it in memory, and the published `.riv` is 123 KB.
+
+**Checked in the web runtime.** The published `rive/build/cart-ending.riv` (123 KB) plays on the stage page in
+the small runtime (`canvas-lite`) in Chromium: the counts and places are set through the view model, the
+constraints hold, and the ring, gem and speech box are driven by the file's events. The clip is recorded from
+that. No splash or watermark is drawn on it (account on the Cadet plan).
 
 **Not checked yet**
-- The scene in the web runtime. Everything shown is Rive's own headless renderer from the CLI, with the page's
-  cues worked out from the timeline. `stage/stage.js` has the runtime path written (bind the view model, listen
-  for events) but it has never run, because there is no `.riv` until Tyler signs in. Whether the small runtime
-  supports this file's data binding is part of that.
-- Whether the free plan adds a splash or watermark to the published file.
+- WKWebView on the Mac and the iPhone.
 - Counts other than twelve ore and one stone were not filmed.
 
 **What it would take to put it in the app**
-1. Sign in, publish the `.riv`, confirm it plays in the web runtime in WKWebView on the Mac and the iPhone.
+1. Confirm the `.riv` plays in WKWebView on the Mac and the iPhone (Chromium is checked).
 2. Add the runtime (lazy-loaded on the end screen; about 400 KB gzipped) and the `.riv` to the bundle.
 3. A small React wrapper: set the counts and the ring's dot positions, pass events to the ring, gems and the
    speech box, skip mounting under Reduce Motion, unmount at `settled` and show the app's own mole.

@@ -11,3 +11,5 @@ node gen.mjs   # back to the real scene: 1280 by 800, nothing behind it
 node rec.mjs "$OUT/page"
 ffmpeg -loglevel error -y -framerate 25 -i "$OUT/page/f%03d.png" -c:v libx264 -crf 16 -pix_fmt yuv420p -movflags +faststart "$OUT/cart-rive.mp4"
 ffmpeg -loglevel error -y -start_number 0 -i "$OUT/page/f%03d.png" -vf "select='not(mod(n\,7))',crop=1800:1060:560:0,scale=iw*0.42:ih*0.42,tile=6x4:padding=4:color=0x2b2d31" -frames:v 1 -update 1 "$OUT/cart-rive-frames.png"
+# The same, from the published .riv in the web runtime (needs rive/build/cart-ending.riv and stage/vendor/lite/):
+#   node rec.mjs out/live "runtime=vendor/lite/"
