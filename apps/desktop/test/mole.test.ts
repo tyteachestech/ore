@@ -213,8 +213,8 @@ test("traced: nothing shows through a part above it (fur under the helmet, a lid
   for (const [x, y, r, t] of d) if (t.startsWith("fine-")) for (const [ex, ey, er] of over) expect(Math.hypot(x - ex, y - ey)).toBeGreaterThan(Math.min(r, er));
 });
 
-// D-new-mole-emotions: twelve more emotions on the same puppet, each a move that ends back at rest.
-const EMOTIONS = ["nod", "shake", "wink", "laugh", "proud", "curious", "sad", "sleepy", "set", "shy", "wave", "huff"] as const;
+// D-new-mole-emotions: fourteen more emotions on the same puppet, each a move that ends back at rest.
+const EMOTIONS = ["nod", "shake", "wink", "laugh", "proud", "curious", "sad", "sleepy", "set", "shy", "wave", "huff", "anxious", "ecstatic"] as const;
 
 test("traced: each emotion plays, differs from rest while it plays, and settles back to the rest drawing", () => {
   const sig = (d: ReturnType<typeof fineDots>) => d.map(([x, y, r, t]) => `${x.toFixed(1)},${y.toFixed(1)},${r.toFixed(2)},${t}`).sort().join(";");
@@ -243,4 +243,24 @@ test("traced: a wink shuts one eye, a frown draws two brows, the lamp flares, sa
   const top = (d: ReturnType<typeof fineDots>) => Math.min(...d.map(([, y]) => y));
   expect(top(fine(MOVES.sad.still))).toBeGreaterThan(top(fine()) + 0.5);
   expect(top(fine(MOVES.proud.still))).toBeLessThan(top(fine()) - 1);
+});
+
+test("traced: comic marks. A tear and a bead of sweat show only on their way down, stars take his eyes' place, a wave keeps his eyes' glints", () => {
+  const white = (d: ReturnType<typeof fineDots>) => ink(d, "glint");
+  for (const k of ["tear", "sweat", "zzz"] as const) {
+    // Nothing at either end, so a move can put it back at its start unseen.
+    expect(white(fine({ [k]: 0 }))).toBeCloseTo(white(fine()), 5);
+    expect(white(fine({ [k]: 1 }))).toBeCloseTo(white(fine()), 5);
+    expect(white(fine({ [k]: 0.5 }))).toBeGreaterThan(white(fine()) + 0.1);
+  }
+  // The tear falls: lower at 0.7 than at 0.3.
+  const low = (d: ReturnType<typeof fineDots>) => Math.max(...d.filter(([, y, , t]) => t === "glint" && y < ROWS - 1).map(([, y]) => y));
+  expect(low(fine({ tear: 0.7 }))).toBeGreaterThan(low(fine({ tear: 0.3 })) + 1);
+  const stars = fine({ star: 1 });
+  expect(ink(stars, "eye")).toBe(0);
+  expect(ink(stars, "lamp")).toBeGreaterThan(ink(fine(), "lamp") * 1.5);
+  expect(ink(fine({ blush: 1 }), "nose")).toBeGreaterThan(ink(fine(), "nose") * 1.5);
+  expect(fine({ steam: 0.5 }).length).toBe(fine().length + 10);
+  // Tyler, 2026-11-13: the wave lost the white dot in his eyes.
+  for (const f of play("wave", 900)) expect(fineDots(f).filter(([, , , t]) => t === "glint").length).toBeGreaterThanOrEqual(2);
 });

@@ -48,7 +48,7 @@ export function fineDots(s: State): FineDot[] {
   // A brow, cocked on the side he looks up to and both when he is startled, tips his helmet back to show.
   const brows = SIDES.map(({ side }) => Math.max(wide, clamp(side * s.lx) * clamp(-s.ly)));
   const tip = -(wide * 1.5 + Math.max(brows[0]!, brows[1]!) * (1 - wide) * 1.0 + s.hat);
-  const frown = clamp(s.frown), tc = Math.cos(s.tilt), ts = Math.sin(s.tilt);
+  const frown = clamp(Math.abs(s.frown)), worry = s.frown < 0, tc = Math.cos(s.tilt), ts = Math.sin(s.tilt);
   // The helmet tips about the middle of its brim.
   const tilted = (p: P): P => { const dx = p.x, dy = p.y - BRIM; return { ...p, x: dx * tc - dy * ts, y: BRIM + dx * ts + dy * tc }; };
   const head = (p: P, dx = 0, dy = 0, lean = 1): [number, number] => {
@@ -58,6 +58,35 @@ export function fineDots(s: State): FineDot[] {
   // Layers from the top down: a dot shrinks under any dot of a layer above it.
   const layers: [x: number, y: number, r: number, tone: FineTone, hides: boolean][][] = [];
   const layer = () => { const l: (typeof layers)[number] = []; layers.push(l); return l; };
+
+  // Drawn marks sit over everything, each riding his head.
+  const marks = layer();
+  const mark = (x: number, y: number, r: number, tone: FineTone, lean = 1) => { if (r > 0.02 * U) { const [X, Y] = head({ x: x * U, y: y * U, r: 0, tone }, 0, 0, lean); marks.push([X, Y, r * U, tone, true]); } };
+  /** Nothing at 0 and from 0.9 on, whole between: a mark that travels shows only on its way. */
+  const show = (v: number) => clamp(v * 7) * clamp((0.9 - v) * 7);
+  const drop = (v: number, x0: number, y0: number, x1: number, y1: number) => {
+    const k = show(v), x = x0 + (x1 - x0) * v, y = y0 + (y1 - y0) * v;
+    mark(x, y, 0.58 * k, "glint"); mark(x - (x1 - x0) * 0.1, y - 0.8, 0.4 * k, "glint"); mark(x - (x1 - x0) * 0.2, y - 1.45, 0.22 * k, "glint");
+  };
+  const sparkle = (x: number, y: number, k: number, tone: FineTone = "glint") => {
+    mark(x, y, 0.42 * k, tone);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { mark(x + dx * 0.85, y + dy * 0.85, 0.3 * k, tone); mark(x + dx * 1.55, y + dy * 1.55, 0.17 * k, tone); }
+  };
+  drop(s.tear, -6.6, -10.4, -10.5, -4.6);
+  drop(s.sweat, 9.8, -10.6, 10.6, -4.8);
+  for (const side of [-1, 1]) {
+    // Steam: three dots a side, out and up from under the brim, spreading as they go.
+    const v = clamp(s.steam), k = show(v), x = side * (14 + 2.4 * v), y = -14.5 - 6.5 * v, w = 0.75 + 0.5 * v;
+    for (const [dx, dy, r, tone] of [[0, 0, 0.56, "fine-8"], [1, -0.5, 0.5, "fine-7"], [-0.7, -0.8, 0.46, "fine-7"], [0.4, -1.4, 0.4, "fine-6"], [1.5, -1.5, 0.28, "fine-5"]] as const) mark(x + side * dx * w, y + dy * w, r * k, tone, 0.4);
+  }
+  // Two Zs, the second bigger and later, drifting up off his helmet.
+  for (const [at, x0, y0, pitch] of [[0, 11.4, -22, 0.7], [0.28, 13.4, -25.6, 0.95]] as const) {
+    const v = clamp((s.zzz - at) / (1 - at)), k = show(v);
+    for (const [i, j] of [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3], [3, 3]] as const) mark(x0 + i * pitch + v * 1.2, y0 + j * pitch - v * 2.6, pitch * 0.4 * k, "glint", 0.3);
+  }
+  for (const [at, x, y] of [[0, -14.2, -8.5], [0.25, 14.6, -11], [0.5, -12.6, -23.6]] as const) sparkle(x, y, show(clamp((s.spark - at) / 0.5)), "lamp");
+  sparkle(14, -9.2, clamp(s.twinkle));
+  const star = clamp(s.star, 0, 1.3), blush = clamp(s.blush);
 
   const paws = layer();
   for (const { side, paw } of SIDES) {
@@ -87,26 +116,28 @@ export function fineDots(s: State): FineDot[] {
     // Open: the traced block, a row taller when he is startled. A blink leaves its lower row as a line. Pleased: an arc.
     const shut = side > 0 ? Math.max(shutBoth, clamp(s.wink)) : shutBoth;
     for (const p of eye) {
-      const upper = p.y < top + U / 2, k = (upper ? 1 - shut : 1 - 0.25 * shut) * (1 - arc);
+      const upper = p.y < top + U / 2, k = (upper ? 1 - shut : 1 - 0.25 * shut) * (1 - arc) * (1 - clamp(star));
       const [x, y] = head(p, ex, ey);
       if (k > 0.02) face.push([x, y, p.r * k, "eye", true]);
       if (upper && wide * (1 - arc) > 0.02) { const [x2, y2] = head(p, ex, ey - U); face.push([x2, y2, p.r * wide * (1 - arc) * (1 - shut), "eye", true]); }
     }
     const [gx, gy] = head(glint, ex, ey - wide * U);
-    face.push([gx, gy, glint.r * (1 - shut) * (1 - arc), "glint", false]);
-    if (arc > 0.02) for (const [dx, dy] of [[-1.5, 1.25], [-0.8, 0.5], [0, 0.2], [0.8, 0.5], [1.5, 1.25]] as const) {
+    face.push([gx, gy, glint.r * (1 - shut) * (1 - arc) * (1 - clamp(star)), "glint", false]);
+    if (star > 0.02) sparkle(cx / U + s.lx * 0.3, (top + U / 2) / U, star * 1.15, "lamp");
+    if (blush > 0.02) for (const [dx, dy] of [[2.1, 1.9], [3.1, 1.9], [4.1, 1.9], [2.6, 2.75], [3.6, 2.75]] as const) mark(cx / U + side * dx, top / U + dy, 0.36 * blush, "nose");
+    if (arc * (1 - clamp(star)) > 0.02) for (const [dx, dy] of [[-1.5, 1.25], [-0.8, 0.5], [0, 0.2], [0.8, 0.5], [1.5, 1.25]] as const) {
       const [x, y] = head({ x: cx + dx * U, y: top + dy * U, r: 0, tone: "eye" }, ex, ey);
-      face.push([x, y, 0.36 * U * arc, "eye", true]);
+      face.push([x, y, 0.36 * U * arc * (1 - clamp(star)), "eye", true]);
     }
     const brow = brows[n]!;
     if (brow > 0.02) for (let i = 0; i < 4; i++) {
       const [x, y] = head({ x: cx + (i - 1.5) * U, y: top - (1.45 + wide * 0.9 - Math.abs(i - 1.5 - side * 0.5) * 0.3 * (1 - wide)) * U, r: 0, tone: "glint" }, ex, ey);
       face.push([x, y, 0.34 * U * brow, "fine-9", true]);
     }
-      // A frown: both brows low on his eyes, their inner ends down.
+    // A frown: both brows low on his eyes, their inner ends down (worried: up).
     if (frown > 0.02) for (let i = 0; i < 4; i++) {
       const inner = (1.5 - side * (i - 1.5)) / 3;
-      const [x, y] = head({ x: cx + (i - 1.5) * U, y: top - (0.85 - 0.75 * inner) * U, r: 0, tone: "glint" }, ex, ey);
+      const [x, y] = head({ x: cx + (i - 1.5) * U, y: top - (worry ? 0.9 + 0.75 * inner : 0.85 - 0.75 * inner) * U, r: 0, tone: "glint" }, ex, ey);
       face.push([x, y, 0.36 * U * frown, "glint", true]);
     }
   }
