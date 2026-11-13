@@ -33,6 +33,16 @@ export function renumber(text: string, map: Map<string, string>): string {
   });
 }
 
+/** The findings table with its rows in number order: a merge of master puts a branch's new rows above the
+ *  rows master added since, and the findings test wants F1, F2, … (twice moved by hand, 2026-11-13). */
+export function ordered(findings: string): string {
+  const lines = findings.split("\n");
+  const at = lines.flatMap((l, i) => (/^\| F\d+ \|/.test(l) ? [i] : []));
+  const rows = at.map((i) => lines[i]!).sort((x, y) => Number(x.match(/\d+/)![0]) - Number(y.match(/\d+/)![0]));
+  at.forEach((i, n) => (lines[i] = rows[n]!));
+  return lines.join("\n");
+}
+
 if (import.meta.main) {
   const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
   const read = (f: string) => readFileSync(join(root, f), "utf8");
@@ -44,6 +54,7 @@ if (import.meta.main) {
   files = files.filter((f) => !f.endsWith("scripts/ids.ts") && !f.endsWith("test/ids.test.ts"));
   const out = files.map((f) => [f, renumber(read(f), map)] as const); // all or nothing: a bad name writes no file
   for (const [f, text] of out) writeFileSync(join(root, f), text);
+  writeFileSync(join(root, FINDINGS), ordered(read(FINDINGS)));
   for (const [name, n] of map) console.log(`${name} → ${n}`);
   if (!map.size) console.log("no new findings or decisions");
 }

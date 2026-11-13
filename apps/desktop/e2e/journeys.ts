@@ -98,7 +98,7 @@ async function openPhone(): Promise<Page> {
   const url = await phoneApp();
   const page = await (await safariBrowser()).newPage({ ...devices["iPhone 14"], viewport: { width: 390, height: 844 }, colorScheme: "dark" });
   page.setDefaultTimeout(8000);
-  // Named for the journey, as `open` does: a page error on a phone page once came with no name (F-new-phone-page-error).
+  // Named for the journey, as `open` does: a page error on a phone page once came with no name (F86).
   const of = running;
   page.on("pageerror", (e) => errors.push(`${of}: ${e.message}`));
   // What the app's Tauri shell gives the page and a browser lacks: an image saved with a source loads through it.
