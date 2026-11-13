@@ -56,6 +56,10 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   expect(s.q(".cart-ore")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(30);
   expect(s.q(".review-cut > span[data-wait]")).toBe(0);
+  // The stone that landed is cut where it stands: it ends as a gem of solid pixels (D239).
+  for (const t0 = Date.now(); Date.now() - t0 < 3000 && s.q(".gem-cutting[data-cutting]"); ) await act(async () => void (await wait(40)));
+  expect(s.q(".gem-cutting[data-cutting]")).toBe(0);
+  expect(s.q('.review-cut .gem[data-kind="cut"] rect')).toBeGreaterThan(50);
   // The mole cheers once it is up (560ms), not when the cart has finished leaving.
   expect(cheer - up).toBeGreaterThanOrEqual(540);
   expect(cheer - up).toBeLessThanOrEqual(580);
