@@ -642,7 +642,12 @@ export function Reader(p: Props) {
   // off and sent back to 0:00 when the transcript lands and its audio is a kept file.
   const [from, setFrom] = useState<{ id: string; file: string } | null>(null);
   const recording = useAudio(from?.id === p.id ? from.file : undefined, p.id);
-  const playFrom = useCallback((file: string) => setFrom((f) => (f?.id === p.id ? f : { id: p.id, file })), [p.id]);
+  // Only while it is this source's and plays: an address that failed gives way to the kept file, and
+  // another source opened in between starts this one from its file again.
+  const failed = useRef(false);
+  failed.current = recording.error !== null;
+  const playFrom = useCallback((file: string) => setFrom((f) => (f?.id === p.id && !failed.current ? f : { id: p.id, file })), [p.id]);
+  useEffect(() => setFrom((f) => (f?.id === p.id ? f : null)), [p.id]);
   return <ReaderView key={version} {...p} reload={() => setVersion((v) => v + 1)} recording={recording} playFrom={playFrom} />;
 }
 

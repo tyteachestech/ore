@@ -259,6 +259,7 @@ export function useAudio(file: string | undefined, id: string): Player {
   useEffect(() => {
     if (!file) return;
     moved.current = false;
+    setError(null); // another file (an episode's kept audio after its address failed) starts clean
     const a = new Audio(/^(https?:|data:|blob:)/i.test(file) ? file : convertFileSrc(file));
     a.preload = "metadata";
     a.playbackRate = savedRate();
