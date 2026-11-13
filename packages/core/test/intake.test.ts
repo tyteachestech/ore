@@ -1136,7 +1136,7 @@ describe("import coverage: audio and podcasts", () => {
     expect(item.body).toContain("[01:00] Thanks for listening.");
   });
 
-  test("an episode added with its transcript owed is in at once, then downloaded and heard with how far it is (F54)", async () => {
+  test("an episode added with its transcript owed is in at once, then downloaded and heard with how far it is (F60)", async () => {
     // He shared an hour-long episode on the phone and saw nothing for ten minutes: the source is there at
     // once by its title, show and date, and the download and the hearing fill it, saying where they are.
     const audio = "https://traffic.megaphone.fm/HSW1.mp3";

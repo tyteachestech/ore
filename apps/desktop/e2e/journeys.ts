@@ -2022,12 +2022,13 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await openSource(page, TESTING);
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
   const popup = page.getByRole("dialog", { name: "Highlight" });
-  await page.waitForTimeout(300); // the reader puts back where he was reading: a drag before that lands elsewhere
   await select(page, "ach successful retrieval changes the memory its");
   await popup.waitFor();
   await until("it snaps out to whole words", async () => (await active()) === "Each successful retrieval changes the memory itself.");
   await page.keyboard.press("Escape"); // drops the fresh one
   await popup.waitFor({ state: "hidden" });
+  // At once, before the reader has finished with the first drag: on a busy Mac its clearing of that selection came
+  // after this press and took the new one with it (the Highlight popup never came, 16 runs in 20).
   await page.keyboard.down("Alt");
   await select(page, "trengthens the route bac");
   await page.keyboard.up("Alt");
@@ -3050,9 +3051,13 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.keyboard.press("Escape");
   await page.keyboard.press("Backspace");
   await page.keyboard.type("Read the guide", { delay: 10 });
-  await page.keyboard.press("Shift+Home");
-  await page.waitForTimeout(150); // the editor takes the selection a moment after the page shows it
-  await page.keyboard.press("Meta+k"); // the palette's key, in the note with words selected
+  // The words selected to the line's start and ⌘K in the same moment, as a quick hand does: ⌘K reads the
+  // selection the note has when the key lands, never one a frame behind.
+  await page.evaluate(() => {
+    const t = document.querySelector(".note-editor .ProseMirror p")!.firstChild!;
+    getSelection()!.setBaseAndExtent(t, t.textContent!.length, t, 0);
+    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", metaKey: true, bubbles: true, cancelable: true }));
+  });
   await page.getByPlaceholder("Paste a link").waitFor();
   // Esc closes it with focus back on the words (Notion), so ⌘K asks again at once.
   await page.keyboard.press("Escape");
@@ -3066,10 +3071,12 @@ journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens 
   await page.waitForTimeout(200);
   if (await page.evaluate(() => !!document.activeElement?.closest(".note-editor"))) throw new Error("a press outside the link field put focus back in the note");
   await pm.getByText("Read the guide").click();
-  await page.keyboard.press("End");
-  await page.keyboard.press("Shift+Home");
-  await page.waitForTimeout(150);
-  await page.keyboard.press("Meta+k");
+  // The line's end, then select to its start, by this Mac's keys or Linux's (on the Mac, Home and End scroll).
+  const mac = process.platform === "darwin";
+  await page.keyboard.press(mac ? "Meta+ArrowRight" : "End");
+  await page.keyboard.press(mac ? "Meta+Shift+ArrowLeft" : "Shift+Home");
+  if ((await page.evaluate(() => String(getSelection()))) !== "Read the guide") throw new Error("the words aren't selected");
+  await page.keyboard.press("Meta+k"); // at once: ⌘K reads the selection the note has as the key lands
   await page.getByPlaceholder("Paste a link").waitFor();
   await page.keyboard.type("example.com/guide");
   await page.keyboard.press("Enter");
@@ -3625,9 +3632,14 @@ journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space
 journey("Home: after a ⌘-click picks a row, the first ⇧↓ grows the pick (Finder)", async (page) => {
   await openSource(page, AGENTS);
   await openSource(page, TESTING);
+  // Today's numbers slow to come, as on a busy Mac: the rows wait for them, or Today grows over the rows' place
+  // as they come and a click aimed at a row lands beside it (the ⌘-click picked nothing, CI 2026-11-13).
+  await page.evaluate(() => ((window as any).__ORE_SLOW = { today: 800 }));
   await page.getByRole("button", { name: /^Home/ }).click();
   const rows = page.locator(".home-read");
   await rows.nth(1).waitFor();
+  if (!(await page.locator(".home-goal").count())) throw new Error("Continue reading showed before Today, which then pushed it down");
+  await page.evaluate(() => delete (window as any).__ORE_SLOW);
   await rows.nth(0).locator(".home-open").click({ modifiers: ["Meta"] });
   await until("⌘-click picks the row", async () => (await page.locator(".home-read.sel").count()) === 1);
   await page.keyboard.press("Shift+ArrowDown");
@@ -3772,8 +3784,12 @@ journey("sidebar: ⌘Z while a collection's rename still saves puts the old name
   await page.getByLabel("Collection name").fill("Craft slowly");
   await page.keyboard.press("Enter");
   await label(/^Craft slowly$/i).waitFor();
+  // As in Finder, the renamed folder keeps focus: the header drawn in the field's place takes it, even when the
+  // next key comes before it is placed (⌘Z pressed at once once left focus on <body>, 3 runs in 4).
+  const focusOn = (name: string) => page.evaluate((n) => !!document.activeElement?.matches("button.side-label") && document.activeElement.textContent?.trim().toLowerCase() === n, name.toLowerCase());
   await page.keyboard.press("Meta+z");
   await label(/^Craft$/i).waitFor();
+  await until("focus is on the collection again, under its old name", () => focusOn("Craft"));
   const shown: string[] = [];
   for (const end = Date.now() + 2000; Date.now() < end; await page.waitForTimeout(25)) {
     const names = (await page.locator(".side-head .side-label-text").allInnerTexts()).map((t) => t.trim()).join(", ");
@@ -4422,6 +4438,16 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.keyboard.press("ArrowLeft");
   await until("a second arrow goes back to To read", async () => (await on("To read")) === "true");
+  // Also on a skill page opened from Home, whose tab used to remount the page under the focused tab (F55).
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await tabs.getByRole("tab", { name: "To read" }).click();
+  await page.keyboard.press("ArrowRight");
+  await until("→ from Home's skill page opens Done", async () => (await on("Done")) === "true");
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  if (!(await page.evaluate(() => !!document.activeElement?.closest("[role=tablist]")))) throw new Error("the tab lost focus on a skill page opened from Home");
+  await page.keyboard.press("ArrowLeft");
+  await until("a second arrow on Home's skill page goes back to To read", async () => (await on("To read")) === "true");
   // ⌘2, even from a focused tab, hands the keys to the list (Linear).
   await page.keyboard.press("Meta+2");
   await until("⌘2 focuses the list", () => page.evaluate(() => document.activeElement?.matches(".list") ?? false));
@@ -8927,8 +8953,9 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   await page.keyboard.type("x");
   await page.keyboard.press("Meta+z"); // the field's: the app leaves it alone
   if (!(await item()).skills.includes(others[1]!.id)) throw new Error("⌘Z with fresh typing in the filter took a skill off");
-  // Chromium on Linux undoes typing on ⌃Z only; the Mac's ⌘Z runs this (menubar.ts).
-  await page.evaluate(() => document.execCommand("undo"));
+  // Chromium on Linux undoes typing on ⌃Z only, so the x is still there: the Mac's ⌘Z runs this (menubar.ts).
+  // On a Mac the ⌘Z above already took it back, and another undo would eat the typed skill name.
+  if ((await page.locator(".skill-picker .menu-input").inputValue()).endsWith("x")) await page.evaluate(() => document.execCommand("undo"));
   await page.keyboard.press("Meta+z");
   await until("the typing undone, then the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
   await page.keyboard.press("Meta+z");
@@ -9826,7 +9853,7 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
   await page.locator(".add-link").waitFor({ state: "detached" });
   const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/offline" });
   await row.getByText("Your Mac will try it.").waitFor();
-  // F53: it shows on Today too, where a share's Open lands: an episode still downloading was nowhere he looked.
+  // F59: it shows on Today too, where a share's Open lands: an episode still downloading was nowhere he looked.
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Today" }));
   await row.getByText("Your Mac will try it.").waitFor();
@@ -9851,7 +9878,7 @@ journey("phone: a YouTube link is in the library at once and says its transcript
 }, "phone");
 
 journey("phone: an episode is in at once, says how far its transcript is, and fills in while he has it open", async (page) => {
-  // F54: an hour's episode took minutes to download and hear before anything showed. It is a source at once
+  // F60: an hour's episode took minutes to download and hear before anything showed. It is a source at once
   // (title, show), the wait says what it is doing, and the transcript lands in the open reader.
   const cors = { "access-control-allow-origin": "*" };
   const audio = "https://media.example.com/master-your-sleep.mp3";
@@ -10388,6 +10415,58 @@ const itemFile = (lib: string, slug: string, name: string) => {
   return join(lib, "items", year, readdirSync(join(lib, "items", year)).find((d) => d.startsWith(slug))!, name);
 };
 const cardFile = (lib: string, text: string) => join(lib, "cards", readdirSync(join(lib, "cards")).find((f) => f.endsWith(".md") && readFileSync(join(lib, "cards", f), "utf8").includes(text))!);
+
+journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's place, and the draft stays (F53)", async (page) => {
+  // Its sheet opened behind the keyboard: the field kept focus, so the keyboard stayed up over it (Mail and Notes put it away).
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  await page.locator(".review-q").waitFor();
+  const more = page.getByRole("button", { name: "Exercise actions" });
+  const field = page.getByLabel("Your answer");
+  for (let i = 0; i < 10 && !(await field.count()); i++) {
+    const was = await page.locator(".review-q").innerText();
+    await tap(page, more);
+    await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+    await until("Later moves on", async () => (await page.locator(".review-q").innerText()) !== was);
+  }
+  if (!(await field.count())) throw new Error("no Explain exercise came up in 10 Laters");
+  await field.focus();
+  await field.fill("Fluency feels like knowing");
+  const focused = () => field.evaluate((el) => el === document.activeElement);
+  await tap(page, more);
+  await page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }).waitFor();
+  if (await focused()) throw new Error("the answer field kept focus, so the keyboard stays up over the sheet");
+  // Dismissed, the sheet gives the field its focus (and keyboard) back, with the draft.
+  await page.keyboard.press("Escape");
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  await page.waitForTimeout(100);
+  if (!(await field.count())) throw new Error("Esc on the sheet also left Review");
+  if ((await field.inputValue()) !== "Fluency feels like knowing") throw new Error("closing the sheet lost the draft");
+  await until("dismissing the sheet gives the answer field its focus back", focused);
+  // An action picked moves on: the keyboard doesn't come back up over the next exercise.
+  const was = await page.locator(".review-q").innerText();
+  await tap(page, more);
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+  await until("Later moves on", async () => (await page.locator(".review-q").innerText()) !== was);
+  await page.waitForTimeout(100);
+  if (await field.count() && (await focused())) throw new Error("picking Later gave the answer field its focus back, so the keyboard comes up again");
+}, "phone");
+
+// iOS takes a first tap as a hover when the hover shows or hides something, and clicks only on the second (F54).
+journey("phone: a hover on a Today row or skill shows or hides nothing, so one tap opens it", async (page) => {
+  const row = page.locator(".home-read").first();
+  await row.waitFor();
+  await row.hover();
+  const read = await row.evaluate((el) => ({ more: getComputedStyle(el.querySelector(".more")!).display, meter: el.querySelector(".home-meter") ? getComputedStyle(el.querySelector(".home-meter")!).visibility : "visible" }));
+  if (read.more !== "none" || read.meter !== "visible") throw new Error(`a hover on a Today row changes it: ⋯ ${read.more}, dots ${read.meter}`);
+  const skill = page.locator(".home-skill").first();
+  await skill.hover();
+  const more = await skill.evaluate((el) => (el.querySelector(".more") ? getComputedStyle(el.querySelector(".more")!).visibility : "hidden"));
+  if (more !== "hidden") throw new Error("a hover on a Today skill shows its ⋯");
+  await tap(page, row.locator(".home-open"));
+  await page.locator(".phone-reader").waitFor();
+}, "phone");
 
 journey("phone: Review's ⋯ puts an exercise off with Later before its answer, and edits it after (D235)", async (page) => {
   // The phone's Review had no Later (D192 kept it on the Mac) and Edit only in a toolbar beside Ask, which needs the Mac.

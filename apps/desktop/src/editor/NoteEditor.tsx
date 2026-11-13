@@ -169,6 +169,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [index, setIndex] = useState(0);
   const [sel, setSel] = useState<Sel | null>(null);
   const [askLink, setAskLink] = useState(0);
+  /** ⌘K came before the format bar was up (the selection made that same moment): it opens with its link field. */
+  const [linkNow, setLinkNow] = useState(false);
+  useEffect(() => void (linkNow && setLinkNow(false)), [linkNow]);
   /** The equation open for editing: where it is, and where its field goes. */
   const [math, setMath] = useState<{ pos: number; x: number; y: number; w: number; h: number } | null>(null);
   /** Where images dragged in from Finder will land: a gap between the note's blocks. */
@@ -177,7 +180,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
   // The editor's plugins live as long as it does; they read the latest props, rows and menu
   // through this. The menu here is set as the caret moves, ahead of React's render.
-  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: { at: -1, ch: "" }, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), bar: false, putImages: async () => {}, editMath: () => {}, renames: new Set() });
+  const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: { at: -1, ch: "" }, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), linkNow: () => setLinkNow(true), bar: false, putImages: async () => {}, editMath: () => {}, renames: new Set() });
 
   /** The format bar's selection; `live.current.bar` says whether it is up, for ⌘K. */
   const showSel = (s: Sel | null) => {
@@ -711,7 +714,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {!PHONE && <BlockHandle view={view} host={host} />}
       {!PHONE && <TableControls view={view} host={host} />}
       {PHONE && <KeyboardBar view={view} targets={p.targets} onPicture={() => void live.current.putImages([undefined])} />}
-      {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => showSel(null)} askLink={askLink} />}
+      {sel && !menu && <SelectionBar key={`${sel.from}-${sel.to}`} view={view} sel={sel} targets={p.targets} onDone={() => showSel(null)} askLink={askLink} linkNow={linkNow} />}
       {menu && (menu.kind !== "date" || rows.length > 0) && (
         <div ref={menuBox} className="note-menu" role="listbox" onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
@@ -758,6 +761,8 @@ type Live = {
     draw: (name: string) => void;
     /** Opens the format bar's web link field on the selected text (⌘K), while the bar is up (`bar`). */
     askLink: () => void;
+    /** As `askLink`, when the bar comes up with this same key. */
+    linkNow: () => void;
     bar: boolean;
     /** Opens the equation at `pos` for editing. */
     editMath: (pos: number) => void;
@@ -923,9 +928,13 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
                 return true;
               }
               // With words selected, ⌘K links them and ⌘⇧H gives them the last colour, as in Notion;
-              // with none, ⌘K stays the palette.
+              // with none, ⌘K stays the palette. The selection is read from the page as the key lands: the
+              // editor takes a new one a moment later (selectionchange), and a quick ⌘K came before it.
+              const synced = is(e, "palette") && takeDomSelection(view);
               const words = view.state.selection instanceof TextSelection && !view.state.selection.empty;
               if (words && live.current.bar && is(e, "palette")) {
+                // Both: `linkNow` for a bar that comes up with this key, `askLink` for one that was up and stays.
+                if (synced) live.current.linkNow();
                 live.current.askLink();
                 e.preventDefault();
                 e.stopPropagation();
@@ -1377,4 +1386,17 @@ function MathField({ at, view, onClose }: { at: { pos: number; x: number; y: num
       </Popover.Portal>
     </Popover.Root>
   );
+}
+
+/** The page's selection, when it is words in this editor the editor hasn't taken yet: taken now. True if it moved. */
+function takeDomSelection(view: EditorView): boolean {
+  const d = view.dom.ownerDocument.getSelection();
+  if (!(view.state.selection instanceof TextSelection)) return false; // cells or a block selected: theirs to keep
+  if (!d || d.isCollapsed || !d.anchorNode || !d.focusNode || !view.dom.contains(d.anchorNode) || !view.dom.contains(d.focusNode)) return false;
+  const anchor = view.posAtDOM(d.anchorNode, d.anchorOffset);
+  const head = view.posAtDOM(d.focusNode, d.focusOffset);
+  const s = view.state.selection;
+  if (s.anchor === anchor && s.head === head) return false;
+  view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head))));
+  return true;
 }
