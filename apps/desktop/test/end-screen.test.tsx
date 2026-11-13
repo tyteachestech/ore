@@ -26,7 +26,7 @@ const end = (cut: string[], before = today(false, 0), now = today(true, 600_000)
 const skills = [{ id: "ai", name: "AI", color: "purple", icon: "ai" }] as never;
 const wait = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
 // A test that fails before it unmounts must not leave its screen (and its timers) running under the next file's
-// tests: that made a note test fail whenever one here did (F88).
+// tests: that made a note test fail whenever one here did (F91).
 const open = new Set<() => Promise<void>>();
 afterEach(async () => {
   jest.useRealTimers();
