@@ -9821,7 +9821,7 @@ async function press(page: Page, target: Locator, ms = 650) {
   await send("touchend", 0);
 }
 
-journey("phone: Move to To read from a done source's ⋯ moves it, and it stays moved after a relaunch (F-new-phone-move-to-read)", async (page) => {
+journey("phone: Move to To read from a done source's ⋯ moves it, and it stays moved after a relaunch (F69)", async (page) => {
   // The reader showed it unfinished, but the phone's reader handed the move to a refresh that wrote nothing.
   await phoneSource(page, "The Story Spine");
   await tap(page, page.getByRole("button", { name: "Source actions" }));
@@ -9836,7 +9836,7 @@ journey("phone: Move to To read from a done source's ⋯ moves it, and it stays 
   await toRead.getByText("The Story Spine").waitFor();
 }, "phone");
 
-journey("phone: a highlight's note being typed is still there after the app is quit with it open (F-new-phone-highlight-note-quit)", async (page) => {
+journey("phone: a highlight's note being typed is still there after the app is quit with it open (F76)", async (page) => {
   // The note saved only when the popup closed: iOS quitting the app with it open lost what he typed.
   await phoneSource(page, TESTING);
   await tap(page, page.locator(".phone-tools > :first-child"));
@@ -9857,7 +9857,7 @@ journey("phone: a highlight's note being typed is still there after the app is q
   if ((await field.inputValue()) !== "A note typed on the bus, then the app was quit.") throw new Error(`the note came back as “${await field.inputValue()}”`);
 }, "phone");
 
-journey("phone: renaming a low Continue reading row on Today keeps the field above the keyboard (F-new-phone-today-rename-keyboard)", async (page) => {
+journey("phone: renaming a low Continue reading row on Today keeps the field above the keyboard (F71)", async (page) => {
   // Today's lower rows sat where the keyboard comes up, and only the reader and the drawer lifted their fields.
   const rows = page.locator(".home-read");
   await rows.nth(2).waitFor();
@@ -9872,7 +9872,7 @@ journey("phone: renaming a low Continue reading row on Today keeps the field abo
   });
 }, "phone");
 
-journey("phone: Remove on a link still being read takes it off at once (F-new-phone-remove-waiting)", async (page) => {
+journey("phone: Remove on a link still being read takes it off at once (F79)", async (page) => {
   // The remove waited its turn behind the read of a link that hung, so the tap showed nothing for 15 s.
   await page.route("https://example.com/articles/slow", () => {}); // never answers
   await tap(page, page.getByRole("button", { name: "Add a link" }));
@@ -9884,7 +9884,7 @@ journey("phone: Remove on a link still being read takes it off at once (F-new-ph
   await row.waitFor({ state: "detached", timeout: 1000 });
 }, "phone");
 
-journey("phone: a jump from Sections puts the heading below the Back bar, not under it (F-new-phone-jump-under-bar)", async (page) => {
+journey("phone: a jump from Sections puts the heading below the Back bar, not under it (F73)", async (page) => {
   // The jump put the heading 24pt under the scroller's top, which on the phone is under the floating Back bar.
   await phoneSource(page, TESTING);
   await tap(page, page.locator(".read-pill"));
@@ -9901,7 +9901,7 @@ journey("phone: a jump from Sections puts the heading below the Back bar, not un
   ).catch(async (e) => { throw new Error(`${e.message}: ${JSON.stringify(await page.evaluate(() => (window as unknown as { __jump: unknown }).__jump))}`); });
 }, "phone");
 
-journey("phone: Today in a library with nothing to read says to add a first source with + (F-new-phone-empty-today)", async (page) => {
+journey("phone: Today in a library with nothing to read says to add a first source with + (F74)", async (page) => {
   // A first launch showed a zero ring and "All caught up. Read something new." with nothing to say how.
   await page.evaluate(async () => {
     const core = (await import("/src/phone/core.ts" as string)) as { run: <T>(args: string[], input: string | null) => Promise<T> };
@@ -9915,7 +9915,7 @@ journey("phone: Today in a library with nothing to read says to add a first sour
   if (await page.getByText("Read something new").count()) throw new Error("Today says to read something new in a library with nothing to read");
 }, "phone");
 
-journey("phone: an episode on a phone that can't hear speech says the Mac fills its transcript, not that it is on its way (F-new-phone-cant-hear)", async (page) => {
+journey("phone: an episode on a phone that can't hear speech says the Mac fills its transcript, not that it is on its way (F77)", async (page) => {
   // With no speech model (the Simulator, an older phone) the episode said “on its way” for good: the Mac fills it.
   const cors = { "access-control-allow-origin": "*" };
   const audio = "https://media.example.com/quiet-rooms.mp3";

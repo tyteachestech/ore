@@ -20,7 +20,7 @@ describe("phone fs stand-in", () => {
     expect(() => fs.readdirSync(`${ROOT}/nope`)).toThrow(/ENOENT/);
   });
 
-  test("a folder made where none of its parents are yet (a first source in an empty library) makes them too (F-new-phone-first-source)", () => {
+  test("a folder made where none of its parents are yet (a first source in an empty library) makes them too (F68)", () => {
     fs.mkdirSync(`${ROOT}/items/2026/a-source-01A`, { recursive: true });
     fs.writeFileSync(`${ROOT}/items/2026/a-source-01A/doc.md`, "# Hi");
     expect(fs.readdirSync(`${ROOT}/items`)).toEqual(["2026"]);
