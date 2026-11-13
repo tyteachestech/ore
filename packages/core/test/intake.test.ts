@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -44,8 +44,19 @@ afterAll(() => {
 });
 
 const realFetch = globalThis.fetch;
+let unserved: string[] = [];
+beforeEach(() => {
+  unserved = [];
+  // Refusals can catch a fetch error themselves; afterEach also checks that no live request was attempted.
+  globalThis.fetch = (async (input: string | URL | Request): Promise<Response> => {
+    const url = String(input instanceof Request ? input.url : input);
+    unserved.push(url);
+    throw new Error(`Unit tests must serve a local fixture: ${url}`);
+  }) as typeof fetch;
+});
 afterEach(() => {
   globalThis.fetch = realFetch;
+  expect(unserved).toEqual([]);
 });
 /** Serves saved pages by URL, with a content type; anything else is a 404. */
 function serve(pages: Record<string, { body: BodyInit; type: string }>) {
@@ -337,7 +348,9 @@ describe("import coverage: junk is refused with the next step", () => {
     await expect(addSource(await tempLibrary(), "https://traffic.megaphone.fm/EP1.mp3")).rejects.toThrow(/over 200 MB/);
   });
 
-  test("links Ore can't read yet say why at once", async () => {
+  test("links Ore can't read yet say why at once, without network access (F-new-spotify-refusal-test-network)", async () => {
+    // Spotify reads its page before refusing it; this unit test must never contact the live site.
+    serve({});
     const lib = await tempLibrary();
     await expect(addSource(lib, "https://x.com/karpathy/status/1617979122625712128")).rejects.toThrow(/X only shows posts to signed-in browsers/);
     await expect(addSource(lib, "https://open.spotify.com/episode/4rOoJ6Egrf8K2IrywzwOMk")).rejects.toThrow(/Couldn’t read that Spotify episode’s page.*Apple Podcasts/);
@@ -951,7 +964,8 @@ describe("import coverage: from the browser tab", () => {
   const shell = web("wall-notion.html");
   const visible = Array.from({ length: 8 }, (_, i) => `Paragraph ${i + 1} of the team wiki: we review each card on the day it is due and keep notes short.`).join("\n\n");
 
-  test("a signed-in article comes in from the tab's HTML, with the tab's link", async () => {
+  test("a signed-in article comes in from the tab's HTML, with the tab's link (F-new-intake-fixture-network)", async () => {
+    serve({});
     const url = "https://www.astralcodexten.com/p/the-psychopolitics-of-trauma";
     const item = await addTab(await tempLibrary(), { tab: { browser: "Safari", url, title: "x", html: web("substack.html") } });
     expect(item.meta.url).toBe(url);
@@ -959,7 +973,8 @@ describe("import coverage: from the browser tab", () => {
     expect(item.body).toContain("Research prompt teacher mind learn habit");
   });
 
-  test("a page built in the browser (Notion) comes in as its visible text", async () => {
+  test("a page built in the browser (Notion) comes in as its visible text (F-new-intake-fixture-network)", async () => {
+    serve({});
     const url = "https://www.notion.so/Team-wiki-8c11dd01c9d24ad4b27b31d6f19e1fd8";
     const item = await addTab(await tempLibrary(), { tab: { browser: "Chrome", url, title: "Team wiki", html: shell, text: `Team wiki\n\n${visible}` } });
     expect(item.meta.title).toBe("Team wiki");
@@ -986,7 +1001,8 @@ describe("import coverage: from the browser tab", () => {
     expect((await reimportSource(lib, item.meta.id, { local: true })).changed).toBe(false);
   });
 
-  test("a tab still showing a sign-in says to sign in there", async () => {
+  test("a tab still showing a sign-in says to sign in there (F-new-intake-fixture-network)", async () => {
+    serve({});
     const url = "https://x.com/karpathy/status/1";
     await expect(addTab(await tempLibrary(), { tab: { browser: "Safari", url, html: shell, text: "Log in to X" } })).rejects.toThrow(/Safari is showing almost no text on x\.com.*Sign in there/);
   });
@@ -1532,7 +1548,8 @@ describe("import coverage: videos heard from their sound", () => {
     else process.env.ORE_TRANSCRIBE = was;
   });
 
-  test("a YouTube video with no captions is heard: chapters, title and description kept", async () => {
+  test("a YouTube video with no captions is heard: chapters, title and description kept (F-new-intake-fixture-network)", async () => {
+    serve({});
     ytdlp(join(FIX, "video", "no-captions.info.json"));
     const seen: string[] = [];
     const item = await addSource(await tempLibrary(), "https://www.youtube.com/watch?v=Nc4pT10nSaA", { onProgress: (_d, label) => label && seen.push(label) });
