@@ -897,6 +897,12 @@ export function PhoneApp() {
           </div>
           <main className="phone-page" ref={main}>
             {error && <p className="phone-error">{error}</p>}
+            {/* A share's Open lands here: what is still downloading or being heard shows where he is looking. */}
+            {tab === "today" && waiting.length > 0 && (
+              <div className="phone-sources phone-coming">
+                <WaitingLinks links={waiting} reading={reading} onRemove={removeWaiting} />
+              </div>
+            )}
             {tab === "today" ? (
               <Home
                 items={items ?? []}
@@ -1013,10 +1019,12 @@ export function PhoneApp() {
                 // Searched, the sources that match, best first, lessons on their own (the Mac's filter, D203).
                 const lines: Line[] = q ? ranked(mine, q, (i) => [i.title, i.course?.title ?? ""]).map((item) => ({ kind: "item", item })) : linesOf(skillTab === "toread" ? [...mine].sort(toReadOrder) : mine, skillTab);
                 const shown = q || skillAll ? lines : lines.slice(0, SKILL_CAP);
+                const coming = q || skillTab !== "toread" ? [] : waiting.filter((l) => l.skills.includes(skill));
                 return (
                   <div className="phone-sources">
+                    <WaitingLinks links={coming} reading={reading} onRemove={removeWaiting} />
                     {!lines.length ? (
-                      <p className="quiet">{q ? `No sources match “${q}”.` : skillTab === "done" ? "Nothing done yet." : "Nothing to read. Add a link with +."}</p>
+                      coming.length > 0 ? null : <p className="quiet">{q ? `No sources match “${q}”.` : skillTab === "done" ? "Nothing done yet." : "Nothing to read. Add a link with +."}</p>
                     ) : (
                       <Rows lines={shown} row={row} onOpen={open} />
                     )}
