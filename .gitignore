@@ -19,3 +19,7 @@ apps/phone/src-tauri/gen/
 
 # The release build's bundled CLI (apps/desktop/scripts/bundle-cli.ts)
 apps/desktop/src-tauri/binaries/
+
+# The ambience radio's sounds (D246): ElevenLabs output, kept out of this public repo; the build reads them from
+# ~/Library/Application Support/Ore/sounds (vite.config.ts)
+apps/desktop/public/sounds/

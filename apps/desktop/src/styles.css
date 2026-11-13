@@ -34,6 +34,9 @@
   --mole-room: 84px; /* the tutor's mole and its margins (D160) */
   --float: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.45);
   --error: #ff7b7b;
+  --lamp: #ffb224; /* the mole's lamp (D238), lit on the ambience radio (D254) */
+  --lcd: #15110a; /* the radio's screen glass */
+  --lcd-edge: #2e2414;
 
   --keep: rgba(255, 190, 20, 0.3); /* gold, not olive: plain yellow at low alpha turns olive on near-black */
   --card: rgba(96, 165, 250, 0.32);
@@ -139,7 +142,7 @@ kbd {
 .sidebar {
   background: var(--bg-side);
   border-right: 1px solid var(--border);
-  padding: calc(var(--titlebar) + 6px) 8px 12px;
+  padding: calc(var(--titlebar) + 6px) 8px var(--mole-room); /* the ambience radio sits at its foot (D254) */
   overflow-y: auto;
   overscroll-behavior: none;
 }
@@ -3009,6 +3012,41 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-bubble:hover { background: var(--bg-hover); }
 .tutor-bubble:active { transform: scale(0.96); }
 .tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* The ambience radio (D254): the mole's twin at the bottom left, its big screen an amber dot LCD (the mole's lamp
+   colour, D238) over five pads. The screen is a device, so it stays dark in every theme. */
+.radio-orb {
+  position: fixed; left: 16px; bottom: 16px; z-index: 6;
+  width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg-raised); box-shadow: var(--float); color: var(--faint); transition: transform var(--t-2) ease-out;
+}
+.radio-orb:hover { background: var(--bg-hover); color: var(--muted); }
+.radio-orb:active { transform: scale(0.96); }
+.radio-orb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.radio-orb-dots { display: block; fill: currentColor; }
+.radio-tag {
+  position: fixed; left: 78px; bottom: 29px; z-index: 6; padding: 5px 8px; border-radius: 7px; pointer-events: none;
+  background: var(--lcd); box-shadow: 0 0 0 1px var(--lcd-edge), var(--float); animation: radio-tag var(--t-2) var(--ease-out);
+}
+.radio-tag canvas { display: block; }
+@keyframes radio-tag { from { opacity: 0; transform: translateX(-6px); } }
+.popover.radio { width: 320px; padding: 12px; }
+.radio-screen { display: block; width: 100% !important; height: auto !important; aspect-ratio: 295 / 110; border-radius: 8px; background: var(--lcd); box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--lcd-edge); }
+.radio-pads { display: flex; gap: 8px; margin-top: 10px; }
+.radio-pad {
+  position: relative; flex: 1; aspect-ratio: 1; border-radius: 10px; display: grid; place-items: center; color: var(--faint);
+  background: var(--bg-hover); box-shadow: var(--lift), 0 2px 0 var(--bg-side); transition: transform var(--t-1) var(--ease-out), color var(--t-2);
+}
+.radio-pad svg { fill: currentColor; }
+.radio-pad:hover { color: var(--muted); }
+.radio-pad:active { transform: translateY(2px) scale(0.96); box-shadow: var(--lift); }
+.radio-pad:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.radio-pad.on, .radio-pad.loading { color: var(--lamp); background: color-mix(in srgb, var(--lamp) 10%, var(--bg-hover)); }
+.radio-pad.on svg { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lamp) 60%, transparent)); }
+.radio-pad.on::after { content: ""; position: absolute; left: 50%; bottom: 6px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--lamp); }
+.radio-pad.loading svg { animation: radio-wait 1s steps(2) infinite; }
+@keyframes radio-wait { 50% { opacity: 0.4; } }
+.radio-pad.missing { color: color-mix(in srgb, var(--faint) 45%, transparent); }
+@media (prefers-reduced-motion: reduce) { .radio-tag, .radio-pad.loading svg { animation: none; } }
 .app:has(.quiz) .tutor-bubble { display: none; }
 /* The mole's tones (D169, the old miner D238): grey fur, a lighter helmet with a darker band and a bright brim,
    white paws, moustache and brows, black eyes with a glint, a pink nose, and the lamp, lit amber in its dark housing. */
