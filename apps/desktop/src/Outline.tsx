@@ -23,6 +23,10 @@ function outlineHeadings(doc: HTMLElement): Heading[] {
   return shown;
 }
 
+/** The section he is in, for the pill. Above the first heading it is the source's own first line when
+ *  that is its top heading, else nothing: never a top heading from further down (F-new-pill-late-heading). */
+export const sectionName = (headings: { level: number; title: string }[], current: number) => headings[current]?.title ?? (headings[0]?.level === 1 ? headings[0].title : "");
+
 type Place = { scroll: RefObject<HTMLDivElement | null>; doc: HTMLElement | null; ready: boolean; onJump?: () => void };
 
 /** How far down the source he is and which heading he is in, kept up as he scrolls. */
@@ -175,7 +179,7 @@ export function Position(place: Place) {
  *  opens the sections as a bottom sheet; one jumps there; swipe down, a tap outside or Esc closes it.
  *  The name crossfades when the section changes; nothing moves under reduced motion. */
 export function ReadingPill(place: Place) {
-  const { scroll, doc, onJump } = place;
+  const { scroll, onJump } = place;
   const { progress, current, headings } = useReadingPlace(place);
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -184,7 +188,7 @@ export function ReadingPill(place: Place) {
   useEffect(() => {
     if (open) requestAnimationFrame(() => (box.current?.querySelector<HTMLElement>("button.on") ?? box.current?.querySelector<HTMLElement>("button"))?.focus());
   }, [open]);
-  const name = headings[current]?.title ?? (headings.length ? doc?.querySelector("h1")?.textContent?.trim() ?? "" : "");
+  const name = sectionName(headings, current);
   const r = 6, c = 2 * Math.PI * r;
   const top = Math.min(...headings.map((x) => x.level));
   return (

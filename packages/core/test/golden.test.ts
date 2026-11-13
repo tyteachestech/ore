@@ -54,6 +54,7 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "pdf-textbook", add: join(FIX, "files/textbook.pdf") }, // margin notes, numbered headings, lists
   { name: "pdf-figures", add: join(FIX, "files/figures.pdf") },
   { name: "pdf-scripts", add: join(FIX, "files/scripts.pdf") }, // Russian, Greek, Japanese, Chinese, Arabic
+  { name: "pdf-code", add: join(FIX, "files/code.pdf") }, // code blocks and typewriter words (make-code-pdf.py)
   { name: "epub", add: join(FIX, "files/book.epub") }, // make-book-epub.ts
   { name: "word", add: join(FIX, "files/notes.docx") },
   { name: "powerpoint", add: join(FIX, "files/deck.pptx") },
