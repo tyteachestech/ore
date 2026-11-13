@@ -186,7 +186,7 @@ test("traced: every frame of every move is whole, stays over the dirt, and no fr
       for (const [x, y, r, t] of d) {
         expect(Number.isFinite(x) && Number.isFinite(y) && r > 0 && r < 0.4).toBe(true);
         // Nothing of him shows under the dirt line (drawn whole, there is no dirt).
-        if (t !== "dirt" && s.whole < 0.5) expect(y).toBeLessThan(ROWS - 0.5);
+        if (t !== "dirt" && s.whole < 0.5 && s.side < 0.5) expect(y).toBeLessThan(ROWS - 0.5);
       }
       // A part never pops in or out: what is drawn changes by a small share from one frame to the next.
       const now = ink(d);
@@ -307,4 +307,22 @@ test("traced: out of the ground he has a whole body and no dirt; asleep his eyes
   expect(wide(fall)).toBeGreaterThan(wide(nap) + 3);
   // His belly rises as he breathes in.
   expect(ink(fine({ ...MOVES.nap.still, breath: 1 }), "fine-7")).toBeGreaterThan(ink(nap, "fine-7"));
+});
+
+test("traced: asleep in profile he lies along the foot of the box, head to the left, and breathes", () => {
+  const d = fine(MOVES.doze.still), xs = d.map(([x]) => x), ys = d.map(([, y]) => y);
+  expect(d.some(([, , , t]) => t === "dirt" || t === "eye" || t === "glint")).toBe(false);
+  // Longer than he is tall, and nothing under the bed.
+  expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(36);
+  expect(Math.max(...ys)).toBeLessThan(ROWS);
+  expect(Math.min(...ys)).toBeGreaterThan(-4);
+  // The lamp is at the head end, the feet at the other.
+  const lamp = d.filter(([, , , t]) => t === "lamp").map(([x]) => x);
+  expect(Math.max(...lamp)).toBeLessThan(COLS / 2 - 8);
+  expect(ink(fine({ ...MOVES.doze.still, breath: 1 }), "fine-7")).toBeGreaterThan(ink(d, "fine-7"));
+});
+
+test("traced: no dot of the helmet is alone a shade whiter than the dots round it", () => {
+  const top = fine().filter(([, y, , t]) => t === "fine-9" && y < 8);
+  for (const [x, y] of top) expect(top.some(([a, b]) => (a !== x || b !== y) && Math.hypot(a - x, b - y) < 1)).toBe(true);
 });

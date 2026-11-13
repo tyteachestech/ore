@@ -39,9 +39,96 @@ const CROWN = -27 * U, BRIM = -15.5 * U, PIVOT_Y = -10.4 * U, PIVOT_X = 0.9 * U,
 /** Pleased, his cheeks lift: each lobe swings out a little (radians), rises and parts (dots). An open mouth parts them too. */
 const SMILE = 0.2, LIFT = 0.4, APART = 0.6, PART = 0.1;
 
+type Layers = [x: number, y: number, r: number, tone: FineTone, hides: boolean][][];
+/** The layers as dots, top layer first: each dot shrinks under any dot of a layer above it, and under `floor`. */
+function settle(layers: Layers, floor: number): FineDot[] {
+  // Top layer first: each dot is sized by the nearest dot above it, then joins what hides the layers below.
+  const out: FineDot[] = [], cell = 0.75, grid = new Map<number, number[]>();
+  const key = (cx: number, cy: number) => cx * 4096 + cy;
+  for (const l of layers) {
+    const kept: [number, number, number][] = [];
+    for (const [x, y, r0, tone, hides] of l) {
+      // The dirt hides what is below it.
+      let r = r0 * clamp((floor - y) / 0.3 + 0.5);
+      if (r < 0.02) continue;
+      const cx = Math.floor(x / cell), cy = Math.floor(y / cell);
+      let vis = 1;
+      for (let i = -1; i <= 1 && vis > 0; i++) for (let j = -1; j <= 1; j++) {
+        const b = grid.get(key(cx + i, cy + j));
+        if (!b) continue;
+        for (let n = 0; n < b.length; n += 3) vis = Math.min(vis, clamp((Math.hypot(b[n]! - x, b[n + 1]! - y) - b[n + 2]! * 1.75) / 0.12));
+      }
+      r *= vis;
+      if (r < 0.02) continue;
+      out.push([x, y, r, tone]);
+      if (hides) kept.push([x, y, r]);
+    }
+    for (const [x, y, r] of kept) {
+      const k = key(Math.floor(x / cell), Math.floor(y / cell));
+      let b = grid.get(k);
+      if (!b) grid.set(k, (b = []));
+      b.push(x, y, r);
+    }
+  }
+  return out;
+}
+
+const seg = (x: number, y: number, x1: number, y1: number, x2: number, y2: number, r: number) => {
+  const dx = x2 - x1, dy = y2 - y1, t = clamp(((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy));
+  return Math.hypot(x - x1 - dx * t, y - y1 - dy * t) - r;
+};
+const oval = (x: number, y: number, cx: number, cy: number, rx: number, ry: number) => (Math.hypot((x - cx) / rx, (y - cy) / ry) - 1) * Math.min(rx, ry);
+
+/** Asleep on his back, seen from the side (`s.side`): head to the left, belly up, lying along the foot of the box and
+ *  about 20 rows out past each side of it. He is drawn standing in profile, facing right, in his own dots (x forward,
+ *  y down from where the dirt would be), then laid back: the traced helmet tipped over his eyes, one lobe of the
+ *  moustache draped on his chest, a paw behind his head, one knee up and the other leg crossed over it. */
+function sideDots(s: State): FineDot[] {
+  const b = clamp(s.breath), layers: Layers = [], layer = () => { const l: Layers[number] = []; layers.push(l); return l; };
+  const BED = -11.5, MIDDLE = 5;
+  const lay = (x: number, y: number): [number, number] => [MID + (y - MIDDLE) * U, GROUND - 0.5 * U - (x - BED) * U + s.y];
+  const put = (l: Layers[number], x: number, y: number, r: number, tone: FineTone) => { const [X, Y] = lay(x, y); l.push([X, Y, r, tone, true]); };
+  const turn = (x: number, y: number, a: number, px: number, py: number): [number, number] => { const c = Math.cos(a), n = Math.sin(a); return [px + (x - px) * c - (y - py) * n, py + (x - px) * n + (y - py) * c]; };
+  // His nose in the air and the lobe off it, lifting on each breath out.
+  const face = layer(), NX = 13.6, NY = -8.2;
+  for (const p of NOSE) put(face, NX + p.x / U, NY + p.y / U + 10, p.r, "nose");
+  for (const p of SIDES[0]!.lobe) { const [x, y] = turn(p.x / U + 0.9 + 11.2, p.y / U + 10.4 - 6.6, 0.25 - s.puff * 0.3 - b * 0.12, 11.2, -6.6); put(face, x, y, p.r, p.tone); }
+  // The helmet, tipped forward over his eyes; its lamp rides round to the front.
+  const hat = layer(), TIP = 0.42;
+  for (const p of HELMET) { const [x, y] = turn(p.x / U + 1.5, p.y / U, TIP, 0, -10); put(hat, x, y, p.r, p.tone); }
+  for (const p of LAMP) { const [x, y] = turn(p.x / U + 7.5, p.y / U + 0.6, TIP, 0, -10); put(hat, x, y, p.r, p.tone); }
+  const under = layer(), foot = clamp(s.legs) * 1.6;
+  const TONES: FineTone[] = ["fine-9", "fine-5", "fine-5", "fine-7", "fine-9", "fine-5", "fine-5", "fine-5", "fine-5", "fine-9", "fine-4", "fine-4"], d = new Array<number>(12).fill(0);
+  for (let j = -27; j <= 37; j++) for (let i = -14; i <= 22; i++) {
+    const x = i + 0.07, y = j - 0.02;
+    d[0] = oval(x, y, 16 + foot, 31.5 - foot * 0.4, 2.7, 3.4);                              // the foot in the air
+    d[1] = seg(x, y, 10, 24, 14.5 + foot, 29 - foot * 0.4, 2.3);                            // its shin, over the other knee
+    d[2] = seg(x, y, 3, 18.5, 10, 24, 3);                                                   // its thigh
+    d[3] = oval(x, y, 7.6 + b * 0.7, 10.5, 4.6, 7);                                         // the pale of his belly
+    d[4] = oval(x, y, -8, -18.5, 2.6, 3);                                                   // a paw behind his head
+    d[5] = seg(x, y, -2.5, 1.5, -9, -14.5, 2.6);                                            // and its arm
+    d[6] = oval(x, y, 10.6, -7.6, 3.6, 3.2);                                                // snout
+    d[7] = oval(x, y, 0, -10, 11.2, 11);                                                    // head
+    d[8] = Math.min(oval(x, y, 0, 9, 10.6, 11.5), oval(x, y, 2.6 + b * 0.6, 11.5, 10.4, 8.6)); // torso, belly forward
+    d[9] = oval(x, y, -8.7, 33, 2.5, 3.6);                                                  // the far foot, flat on the bed
+    d[10] = seg(x, y, 8.5, 25, -7.5, 30.5, 2.3);                                            // far shin, knee up
+    d[11] = seg(x, y, 1, 19.5, 8.5, 25, 2.8);                                               // far thigh
+    for (let n = 0; n < 12; n++) {
+      let tone: FineTone | undefined;
+      if (d[n]! < 0) tone = n === 8 && x < -6 ? "fine-4" : TONES[n];
+      // A dark dot where a part ends over the one below it.
+      else if (n !== 3 && n !== 6 && d[n]! < 0.8) for (let m = n + 1; m < 12; m++) if (d[m]! < -0.4) { tone = "fine-2"; break; }
+      if (tone) { put(under, x, y, 0.4 * U, tone); break; }
+    }
+  }
+  return settle(layers, Infinity);
+}
+
 /** Every dot of the fine mole in state `s`, in the small mole's space (x 0 to 22, the dirt along the foot of row 17).
- *  `s.whole` draws his whole body and no dirt (asleep in the cart, falling): his feet reach 17 rows below the box. */
+ *  `s.whole` draws his whole body and no dirt (falling out of the cart): his feet reach 17 rows below the box.
+ *  `s.side` draws him asleep in profile instead (`sideDots`). */
 export function fineDots(s: State): FineDot[] {
+  if (s.side > 0.5) return sideDots(s);
   const body = s.whole > 0.5;
   // The head rides his height and a hop (`top` above its rest is a hop, below it a squat), and leans from the ground up.
   // The small mole flattens its dome when it is pleased or startled; this one keeps its head, so that part is taken back out.
@@ -58,8 +145,8 @@ export function fineDots(s: State): FineDot[] {
     return [MID + (p.x + dx) * sx + s.hx * 0.8 * up, GROUND + (p.y + dy) * sy + s.y + rise];
   };
   // Layers from the top down: a dot shrinks under any dot of a layer above it.
-  const layers: [x: number, y: number, r: number, tone: FineTone, hides: boolean][][] = [];
-  const layer = () => { const l: (typeof layers)[number] = []; layers.push(l); return l; };
+  const layers: Layers = [];
+  const layer = () => { const l: Layers[number] = []; layers.push(l); return l; };
 
   // Drawn marks sit over everything, each riding his head.
   const marks = layer();
@@ -161,11 +248,6 @@ export function fineDots(s: State): FineDot[] {
   if (body) {
     // Under his head, on the same pitch: belly, feet, legs, torso, then the arms behind it all. Units are his dots.
     const b = clamp(s.breath), k = clamp(s.arms), under = layer();
-    const seg = (x: number, y: number, x1: number, y1: number, x2: number, y2: number, r: number) => {
-      const dx = x2 - x1, dy = y2 - y1, t = clamp(((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy));
-      return Math.hypot(x - x1 - dx * t, y - y1 - dy * t) - r;
-    };
-    const oval = (x: number, y: number, cx: number, cy: number, rx: number, ry: number) => (Math.hypot((x - cx) / rx, (y - cy) / ry) - 1) * Math.min(rx, ry);
     const mixed = (a: number, c: number) => a + (c - a) * k;
     const TONES: FineTone[] = ["fine-7", "fine-9", "fine-4", "fine-5", "fine-9", "fine-4"], d = [0, 0, 0, 0, 0, 0];
     const ex = mixed(17.5, 16), ey2 = mixed(-7, -3), hx = mixed(11, 21), hy = mixed(-17, -11);
@@ -188,35 +270,7 @@ export function fineDots(s: State): FineDot[] {
     }
   }
 
-  // Top layer first: each dot is sized by the nearest dot above it, then joins what hides the layers below.
-  const out: FineDot[] = [], cell = 0.75, grid = new Map<number, number[]>();
-  const key = (cx: number, cy: number) => cx * 4096 + cy;
-  const floor = body ? Infinity : GROUND - 0.28;
-  for (const l of layers) {
-    const kept: [number, number, number][] = [];
-    for (const [x, y, r0, tone, hides] of l) {
-      // The dirt hides what is below it.
-      let r = r0 * clamp((floor - y) / 0.3 + 0.5);
-      if (r < 0.02) continue;
-      const cx = Math.floor(x / cell), cy = Math.floor(y / cell);
-      let vis = 1;
-      for (let i = -1; i <= 1 && vis > 0; i++) for (let j = -1; j <= 1; j++) {
-        const b = grid.get(key(cx + i, cy + j));
-        if (!b) continue;
-        for (let n = 0; n < b.length; n += 3) vis = Math.min(vis, clamp((Math.hypot(b[n]! - x, b[n + 1]! - y) - b[n + 2]! * 1.75) / 0.12));
-      }
-      r *= vis;
-      if (r < 0.02) continue;
-      out.push([x, y, r, tone]);
-      if (hides) kept.push([x, y, r]);
-    }
-    for (const [x, y, r] of kept) {
-      const k = key(Math.floor(x / cell), Math.floor(y / cell));
-      let b = grid.get(k);
-      if (!b) grid.set(k, (b = []));
-      b.push(x, y, r);
-    }
-  }
+  const out = settle(layers, body ? Infinity : GROUND - 0.28);
   // The dirt swells where he comes up through it.
   if (!body) for (let i = 0; i < 33; i++) out.push([(i + 0.5) * U, ROWS - 0.3, 0.42 * U * (1 + 0.22 * clamp(s.kick, -1, 1) * Math.exp(-(((i - 16) / 9) ** 2))), "dirt"]);
   return out;
