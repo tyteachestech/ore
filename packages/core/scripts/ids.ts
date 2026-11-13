@@ -49,7 +49,8 @@ if (import.meta.main) {
   const map = numbers(read(FINDINGS), read(DECISIONS));
   let files: string[] = [];
   try {
-    files = execFileSync("git", ["grep", "-lE", "\\b[FD]-new-[a-z0-9]"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+    // No `\b`: macOS's git grep -E takes it for a plain "b" and finds nothing, so no file was renumbered (F97).
+    files = execFileSync("git", ["grep", "-lE", "[FD]-new-[a-z0-9]"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
   } catch {} // git grep exits 1 when nothing matches
   files = files.filter((f) => !f.endsWith("scripts/ids.ts") && !f.endsWith("test/ids.test.ts"));
   const out = files.map((f) => [f, renumber(read(f), map)] as const); // all or nothing: a bad name writes no file

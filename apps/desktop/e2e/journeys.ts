@@ -931,6 +931,25 @@ journey("ambience radio: the mole's twin at the bottom left; its pads play a cha
   await page.keyboard.press("Escape");
 });
 
+journey("ambience radio over Review: Esc closes the radio only, and its number keys pick channels, never rate (F93)", async (page) => {
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  const first = await q.innerText();
+  await page.keyboard.press("Meta+Alt+KeyA");
+  const pop = page.locator(".popover.radio");
+  await pop.waitFor();
+  await page.keyboard.press("2");
+  await until("2 plays Rain", async () => (await pop.getByRole("button", { name: "Rain", exact: true }).getAttribute("aria-pressed")) === "true");
+  await page.keyboard.press("2");
+  await page.keyboard.press("Escape");
+  await pop.waitFor({ state: "detached" });
+  await page.waitForTimeout(300);
+  if (!(await page.locator(".review").isVisible())) throw new Error("Esc in the radio ended the review");
+  if ((await q.innerText()) !== first) throw new Error("a number key in the radio rated the exercise");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
   await openSource(page, TESTING);
   await page.keyboard.press("Meta+j");
