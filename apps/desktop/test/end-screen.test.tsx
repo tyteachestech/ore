@@ -278,3 +278,22 @@ test("a rare line leads the mole's lines and wears its own mark (D247)", async (
   jest.useRealTimers();
   await s.done();
 });
+
+test("then and now: his answer from weeks ago over today's, under the ring, and the mole points at it (D248)", async () => {
+  jest.useFakeTimers();
+  const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
+  const then_ts = new Date(Date.now() - 29 * 864e5).toISOString();
+  Object.assign(e.session, { depth_days: 41, then_now: { card: "c", question: "Why does testing beat rereading?", then_ts, then: "no idea", now: "Retrieval strengthens the memory itself" } });
+  const s = await mount(e as never);
+  const box = s.body.querySelector(".then-now")!;
+  expect(box.querySelector(".then-now-q")!.textContent).toBe("Why does testing beat rereading?");
+  expect([...box.querySelectorAll("dt, dd")].map((x) => x.textContent)).toEqual(["4 weeks ago", "no idea", "Today", "Retrieval strengthens the memory itself"]);
+  await act(async () => void jest.advanceTimersByTime(560));
+  expect(s.body.querySelector(".end-says .says-line")!.textContent).toBe("4 weeks back that one beat you. Read it now.");
+  jest.useRealTimers();
+  await s.done();
+  // Most sessions have none, and then nothing stands there.
+  const none = await mount(end([], today(true, 600_000)) as never);
+  expect(none.q(".then-now")).toBe(0);
+  await none.done();
+});

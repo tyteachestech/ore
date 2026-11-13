@@ -39,7 +39,14 @@ export interface SessionReceipt {
   longest_days?: number;
   /** Nothing was left to review when the session ended, so the day's goal counts as met (D60). */
   caught_up?: boolean;
+  /** Then and now (D248), at most once every four weeks: an exercise he missed or guessed three weeks
+   *  or more ago and passed in this session, with what he typed then and what he typed now. */
+  then_now?: { card: string; question: string; then_ts: string; then: string; now: string };
 }
+
+/** Then and now shows at most once in this many days, and looks this far back for the earlier answer (D248). */
+export const THEN_NOW_EVERY_DAYS = 28;
+export const THEN_NOW_BACK_DAYS = 21;
 
 export const RESCUE_BELOW = 0.85;
 /** A card is rescued when its recall chance had fallen under 85% and at least 5 points under the
@@ -164,9 +171,26 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
     active += Math.min(x.elapsed_ms ?? 0, ACTIVE_CAP_MS);
   }
   const extra = Math.round(kept.filter((x) => pastGoal.has(x.ts + x.card)).reduce((n, x) => n + gain(x), 0));
+  // Then and now (D248): the oldest typed answer he missed or guessed, on an exercise he typed and passed today.
+  // Once shown, not again for four weeks, so it marks the month and never becomes a thing to chase.
+  const at = now.getTime();
+  const shown = readSessions(lib).some((r) => r.type === "end" && r.id !== id && r.then_now && at - Date.parse(r.ts) < THEN_NOW_EVERY_DAYS * 864e5);
+  let thenNow: SessionReceipt["then_now"];
+  if (!shown) {
+    for (const x of kept) {
+      if (!x.answer?.trim()) continue;
+      const was = all.find((r) => r.card === x.card && r.session !== id && !!r.answer?.trim() && (r.rating === 1 || r.confidence === 1) && at - Date.parse(r.ts) >= THEN_NOW_BACK_DAYS * 864e5);
+      if (!was || (thenNow && was.ts >= thenNow.then_ts)) continue;
+      try {
+        thenNow = { card: x.card, question: findCard(lib, x.card).question, then_ts: was.ts, then: was.answer!.trim(), now: x.answer.trim() };
+      } catch {
+        // its file is gone since: nothing to show the answers against
+      }
+    }
+  }
   const gaps = kept.flatMap((x) => (x.state_before.reps > 0 && x.state_before.last_review ? [Math.floor((Date.parse(x.ts) - Date.parse(x.state_before.last_review)) / 864e5)] : []));
   const longest = Math.max(0, ...gaps);
-  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
+  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
   if (openSessionId(lib) === id) unlinkSync(paths.openSession(lib));
   return r;

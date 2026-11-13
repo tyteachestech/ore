@@ -1,6 +1,25 @@
 # The reward loop: audit and proposals
 
-> Research and design pass, 2026-11-13. **Nothing here is built or decided.** Tyler asked for a rigorous look at the metrics Ore shows, when its messages arrive, and the whole "make it maximally rewarding" layer: flaws first, then enhancements from first principles, both to the metaphor and loop and to single moments. Read against master at 974441d (D242) plus the open #341 (D243, the mole speaks at a session's end). `DECISIONS.md` stays the source of truth; each proposal names the decisions it would amend. Earlier rounds: `rewarding.md` (D197), `skill-metrics-motivation.md` (D90), `design/daily-session.md`, `design/learning-system.md`.
+> Research and design pass, 2026-11-13. **Written before anything was built or decided; see "What Tyler decided" for what happened.** Tyler asked for a rigorous look at the metrics Ore shows, when its messages arrive, and the whole "make it maximally rewarding" layer: flaws first, then enhancements from first principles, both to the metaphor and loop and to single moments. Read against master at 974441d (D242) plus the open #341 (D243, the mole speaks at a session's end). `DECISIONS.md` stays the source of truth; each proposal names the decisions it would amend. Earlier rounds: `rewarding.md` (D197), `skill-metrics-motivation.md` (D90), `design/daily-session.md`, `design/learning-system.md`.
+
+## What Tyler decided (2026-11-13)
+
+This section is the record; where it differs from the proposals below, it wins.
+
+| Proposal | Outcome |
+|---|---|
+| P1 header goal ring | **Changed.** Nothing counts the session up top: a ring or timer there "would be distracting". The mole says "Goal met. The rest is extra." when the goal closes and the session flows on (D246). No points or multiplier after the goal; what came after is said as part of days of memory. |
+| P2 a session has a named find | **Rejected.** A line quoting one exercise "sounds like a weird AI slot message". "N memories kept" stays the hero: a plain count he can picture beats a templated sentence. Kept from it: three lines at most, the rare ones first with their own mark, the everyday ones shuffled (D247). |
+| P3 honest-rating guard | **Built** (D246): no nearly-cut gem before the rating, no gem on a Fact exercise, `ore stats` `near_cut` to watch. |
+| P4 three sizes of ending | Agreed; options to be mocked for his pick. |
+| P5 moment on its own exercise | To be mocked as a recording before deciding. |
+| P6 drop the session's days of memory | **Withdrawn.** He finds the line "very meaningful". Kept, with each exercise capped at 30 days and the part after the goal named (D246). |
+| P7 picker shows gems | Agreed; options to be mocked for his pick. |
+| P8 then and now | **Built to try** (D248), without the month's row of gems; he will critique it in use. Charts or an analytics section are open, to think through later. |
+| P9 metaphor chain | Agreed as a rule for new copy; nothing built. |
+| P10 sound | With the sound work in the house style thread. |
+
+Also from him: use the mole more, with character, wherever it fits.
 
 How to read the evidence tags: **[meta]** a meta-analysis or large preregistered study; **[study]** one or a few experiments; **[repo]** taken from the guidebook paper summaries in `docs/guidebooks/`; **[inference]** my reasoning from the code or from theory, no direct study. What I read and how is in Sources.
 

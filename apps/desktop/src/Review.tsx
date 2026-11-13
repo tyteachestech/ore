@@ -16,7 +16,7 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { endSays, type Said } from "./end-says";
+import { endSays, weeksAgo, type Said } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -1613,7 +1613,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const skill = (id: string) => skills.find((x) => x.id === id);
   // D247: a rare line wears its own mark, in the drawing that thing already has: the skill's icon in its colour,
   // the clock for a long gap, the gold-rimmed gem for one pulled back.
-  const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" ? <Clock size={14} /> : <Gem kind="cut" size={14} seam />);
+  const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" || l.rare.kind === "then" ? <Clock size={16} /> : <Gem kind="cut" size={16} seam />);
   const said = endSays({
     session: s, today: t, closed, short, roll,
     ups: ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level })),
@@ -1659,6 +1659,19 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           {kept}
           {said.filter((l) => !l.verdict || s.kept === 0).map((l) => <p key={l.text} className={l.verdict ? "review-kept" : "review-rescued"}>{l.text}</p>)}
         </EndLines>
+      )}
+      {/* D248: once in four weeks, an exercise that beat him weeks ago and that he passed today, his answer
+          then over his answer now. His own words are the evidence; nothing is counted. */}
+      {s.then_now && (
+        <section className="then-now" aria-label="Then and now">
+          <p className="then-now-q">{s.then_now.question.replace(/_{4,}/g, "____")}</p>
+          <dl>
+            <dt>{weeksAgo(s.then_now.then_ts)} ago</dt>
+            <dd data-then>{s.then_now.then}</dd>
+            <dt>Today</dt>
+            <dd>{s.then_now.now}</dd>
+          </dl>
+        </section>
       )}
       {/* D165: how often he is right at each of his three taps, so he sees whether they mean anything, not only whether Sure is too sure. */}
       {s.calibration && (
