@@ -10358,6 +10358,46 @@ const itemFile = (lib: string, slug: string, name: string) => {
 };
 const cardFile = (lib: string, text: string) => join(lib, "cards", readdirSync(join(lib, "cards")).find((f) => f.endsWith(".md") && readFileSync(join(lib, "cards", f), "utf8").includes(text))!);
 
+journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's place, and the draft stays (F52)", async (page) => {
+  // Its sheet opened behind the keyboard: the field kept focus, so the keyboard stayed up over it (Mail and Notes put it away).
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  await page.locator(".review-q").waitFor();
+  const more = page.getByRole("button", { name: "Exercise actions" });
+  const field = page.getByLabel("Your answer");
+  for (let i = 0; i < 10 && !(await field.count()); i++) {
+    const was = await page.locator(".review-q").innerText();
+    await tap(page, more);
+    await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+    await until("Later moves on", async () => (await page.locator(".review-q").innerText()) !== was);
+  }
+  await field.waitFor();
+  await field.focus();
+  await field.fill("Fluency feels like knowing");
+  await tap(page, more);
+  await page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }).waitFor();
+  if (await field.evaluate((el) => el === document.activeElement)) throw new Error("the answer field kept focus, so the keyboard stays up over the sheet");
+  await page.keyboard.press("Escape");
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  if ((await field.inputValue()) !== "Fluency feels like knowing") throw new Error("closing the sheet lost the draft");
+}, "phone");
+
+// iOS takes a first tap as a hover when the hover shows or hides something, and clicks only on the second (F53).
+journey("phone: a hover on a Today row or skill shows or hides nothing, so one tap opens it", async (page) => {
+  const row = page.locator(".home-read").first();
+  await row.waitFor();
+  await row.hover();
+  const read = await row.evaluate((el) => ({ more: getComputedStyle(el.querySelector(".more")!).display, meter: el.querySelector(".home-meter") ? getComputedStyle(el.querySelector(".home-meter")!).visibility : "visible" }));
+  if (read.more !== "none" || read.meter !== "visible") throw new Error(`a hover on a Today row changes it: ⋯ ${read.more}, dots ${read.meter}`);
+  const skill = page.locator(".home-skill").first();
+  await skill.hover();
+  const more = await skill.evaluate((el) => (el.querySelector(".more") ? getComputedStyle(el.querySelector(".more")!).visibility : "hidden"));
+  if (more !== "hidden") throw new Error("a hover on a Today skill shows its ⋯");
+  await tap(page, row.locator(".home-open"));
+  await page.locator(".phone-reader").waitFor();
+}, "phone");
+
 journey("phone: Review's ⋯ puts an exercise off with Later before its answer, and edits it after (D235)", async (page) => {
   // The phone's Review had no Later (D192 kept it on the Mac) and Edit only in a toolbar beside Ask, which needs the Mac.
   await tap(page, page.getByRole("button", { name: "Start review" }).first());

@@ -2650,6 +2650,13 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* A tap leaves :hover on the element under the finger: on touch, hover looks like rest. */
 @media (hover: none) {
   .phone :is(.home-skill, .home-read, .pick-row, .phone-sources li button):hover:not(:active) { background: transparent; }
+}
+/* iOS takes a first tap as a hover when the hover shows or hides something, and opens on the second (F53).
+   On the phone a row's actions are its long press, so its hover shows no ⋯ and keeps its dots. */
+.phone .home-read:hover .more:not([aria-expanded="true"]) { display: none; }
+.phone .home-read:hover:not(:has(.more[aria-expanded="true"])) .home-meter.small { visibility: visible; }
+.phone .home-skill:hover .more:not([aria-expanded="true"]) { visibility: hidden; }
+@media (hover: none) {
   .phone .quiz-sure button:hover { background: none; color: var(--muted); }
   .phone .note-toggle:hover, .phone .home-gear:hover { background: none; }
 }

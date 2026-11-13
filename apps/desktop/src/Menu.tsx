@@ -308,7 +308,12 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   const [height, setHeight] = useState<number>();
   const back = useRef<HTMLElement | null>(null);
   const show = (on: boolean) => {
-    if (on) back.current = document.activeElement as HTMLElement | null;
+    if (on) {
+      back.current = document.activeElement as HTMLElement | null;
+      // A sheet opened over a field being typed puts the keyboard away, as Mail and Notes do, or it opens
+      // behind it (F52). The draft stays; closing the sheet gives the field its focus back.
+      if (!keepFocus && back.current?.matches("input, textarea, [contenteditable='true']")) back.current.blur();
+    }
     setOwn(on);
     if (!on) {
       setStepId(null);
