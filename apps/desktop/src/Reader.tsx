@@ -214,6 +214,13 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
   };
   const backRef = useRef(back);
   backRef.current = back;
+  // Put back before it had moved (a scroll in the frame it starts to grow): no transition runs, so none ends.
+  const pic = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (open || !leaving.current) return;
+    const id = requestAnimationFrame(() => !pic.current?.getAnimations().length && close.current());
+    return () => cancelAnimationFrame(id);
+  }, [open]);
   useEffect(() => {
     if (!src || !item) return;
     let live = true;
@@ -303,6 +310,7 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
       onMouseMove={stop}
     >
       <img
+        ref={pic}
         src={fig.img.currentSrc || fig.img.src}
         alt={fig.img.alt}
         draggable={false}

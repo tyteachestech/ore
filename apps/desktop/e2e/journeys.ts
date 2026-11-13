@@ -2253,6 +2253,17 @@ journey("figure zoom: a click opens a figure to fill the window and keys don't r
   await page.mouse.wheel(0, 200);
   await shut();
   if ((await page.locator(".reader-scroll").evaluate((el) => el.scrollTop)) !== top) throw new Error("the scroll that put the figure back moved the page too");
+  // A scroll in the very frame it starts to grow (F98): it had not moved yet, so no transition
+  // ran back and nothing ever closed it; it sat unseen over the page.
+  await page.evaluate(() => {
+    new MutationObserver((_, o) => {
+      if (!document.querySelector(".figure-zoom.open")) return;
+      o.disconnect();
+      window.dispatchEvent(new WheelEvent("wheel", { deltaY: 200, cancelable: true }));
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["class"] });
+  });
+  await fig.click();
+  await shut();
 });
 
 journey("figure cards: a drag over a zoomed figure draws a box, what's under it makes a Fact card that hides it, Undo takes it back (D166)", async (page) => {
