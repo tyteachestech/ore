@@ -2571,6 +2571,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .overlay .panel .panel-foot:not(:has(.err)) { display: none; }
 .phone .overlay .panel .panel-foot .right { display: none; }
 .phone-page { overflow-y: auto; padding-top: env(safe-area-inset-top, 0px); }
+/* A row being renamed in place can be scrolled above the keyboard (PhoneApp's RENAMING). */
+.phone-root .phone-page:has(.home-read input:focus, .phone-row-rename input:focus) { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--keyboard, 0px)); scroll-padding-bottom: var(--keyboard, 0px); }
 /* The status bar sits over content that scrolls under it, as in Apple's apps: a bar behind it keeps the clock readable. */
 .phone-app::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 5; }
 .phone-full { position: fixed; inset: 0; z-index: 20; background: var(--bg); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
@@ -2751,7 +2753,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-source > .phone-bar { position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0; transition: transform var(--t-3) ease-out; }
 .phone-source::before { content: ""; position: absolute; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 6; }
 .phone-source .reader-tools { top: 0; right: 4px; transition: transform var(--t-3) ease-out, opacity var(--t-2); }
-.phone-source .reader-scroll { padding-top: 44px; }
+.phone-source .reader-scroll { padding-top: 44px; scroll-padding-top: 44px; }
 /* Sticky offsets count from inside the scroller's padding, which already clears the top bar. */
 .phone-source .player-pin { top: 0; }
 .phone .phone-source :is(.mynotes-text, .side-tabs-root, .reader > .empty-state, .reader-loading) { padding-top: 48px; }

@@ -20,6 +20,13 @@ describe("phone fs stand-in", () => {
     expect(() => fs.readdirSync(`${ROOT}/nope`)).toThrow(/ENOENT/);
   });
 
+  test("a folder made where none of its parents are yet (a first source in an empty library) makes them too (F68)", () => {
+    fs.mkdirSync(`${ROOT}/items/2026/a-source-01A`, { recursive: true });
+    fs.writeFileSync(`${ROOT}/items/2026/a-source-01A/doc.md`, "# Hi");
+    expect(fs.readdirSync(`${ROOT}/items`)).toEqual(["2026"]);
+    expect(fs.readdirSync(`${ROOT}/items/2026`)).toEqual(["a-source-01A"]);
+  });
+
   test("an atomic write (temp file, then rename over the file) leaves one file with the new text", () => {
     fs.writeFileSync(`${ROOT}/skills.yaml`, "old");
     fs.writeFileSync(`${ROOT}/.skills.yaml.tmp`, "new");

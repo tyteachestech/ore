@@ -353,7 +353,8 @@ export function readFileSync(p: string, enc?: unknown): string {
 export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, "", Date.now(), s));
 export const appendFileSync = (p: string, s: string) => put(p, (files.get(p)?.text ?? "") + s);
 export function mkdirSync(p: string, _o?: unknown) {
-  dirs.add(p);
+  // The folder and every parent not made yet: adding p first stopped addDirs at once (it stops at a known
+  // folder), so a first source in an empty library left items/ unlisted and the source nowhere.
   addDirs(p + "/x");
 }
 export const unlinkSync = (p: string) => {

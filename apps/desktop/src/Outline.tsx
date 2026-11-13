@@ -70,7 +70,9 @@ function jumpTo(scroll: RefObject<HTMLDivElement | null>, h: Heading, onJump?: (
   const el = scroll.current;
   if (!el) return;
   onJump?.();
-  el.scrollTop += h.el.getBoundingClientRect().top - el.getBoundingClientRect().top - 24;
+  // Below whatever floats over the scroller's top (the phone's Back bar, its scroll-padding-top).
+  const covered = parseFloat(getComputedStyle(el).scrollPaddingTop) || 0;
+  el.scrollTop += h.el.getBoundingClientRect().top - el.getBoundingClientRect().top - covered - 24;
   el.focus({ preventScroll: true });
 }
 

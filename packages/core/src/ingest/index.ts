@@ -794,7 +794,7 @@ const owedNote = (lib: Library, id: string) => join(paths.inbox(lib), `${id}.owe
 
 /** Whether this device has what a source's owed part takes: yt-dlp for a video's transcript, speech for
  *  an episode's. */
-const canFill = async (item: Item) => (item.meta.type === "youtube" ? !!ytDlp() : (await import("./audio.ts")).canTranscribe());
+export const canFill = async (item: Item) => (item.meta.type === "youtube" ? !!ytDlp() : (await import("./audio.ts")).canTranscribe());
 
 /** Fills what was added with a part owed (D227): a video a phone has no yt-dlp for, an episode that came
  *  in at once and is downloaded and heard after. Each is read again here, as a reimport, when this device
