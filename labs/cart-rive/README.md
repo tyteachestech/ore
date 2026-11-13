@@ -13,7 +13,16 @@ wake him; the cart stops so the lip leaves him right over his hole; he creeps wh
 as the stones drop; then a long stare, a scramble on nothing, a look down, a look at us, and a drop feet first
 with his arms and helmet a beat behind. This departs from the briefing's head-first dive.
 
-Still a front view turned on its side: a true on-his-back pose needs a side-view drawing of him.
+## Third pass (Tyler, 2026-11-13)
+
+"He needs to be on his back while on the cart", "stout", "overalls are good". He now has a second drawing, a
+side view flat on his back: round belly up, overalls with a strap and button, helmet with its lamp, nose and
+bubble pointing up, feet in the air. It is used for the ride, the slide and the float; when the bubble pops the
+scene cuts to the front view (now also in overalls). On the tipped bucket he sinks onto the rim as the load
+leaves, slides off feet first, hangs tilted until the bucket has swung home and the cart is leaving, then
+settles level in the air. Checked beat by beat that the bucket never passes through him.
+
+Two drawings and a cut is the cheap way. A rig that turns from side view to front view is a bigger job in any tool.
 
 ## What is here
 
