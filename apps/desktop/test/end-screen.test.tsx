@@ -41,7 +41,7 @@ async function mount(e: never, roll = 0) {
   const q = (s: string) => body.querySelectorAll(s).length;
   return { q, body, done: () => act(async () => (root.unmount(), body.remove())) };
 }
-/** The mole is reacting to the day: a session that cut a gem pleases him (the hop is a new level's alone, D-new-mole-moments). */
+/** The mole is reacting to the day: a session that cut a gem pleases him (the hop is a new level's alone, D256). */
 const cheering = (body: HTMLElement) => body.querySelector(".review-mole .mole")?.getAttribute("data-mood") === "happy";
 
 test("a session that filled the ring and cut a gem: the cart is there, the mole and the gem wait, then all of it settles", async () => {
@@ -291,7 +291,7 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   const plain = (roll: number) => endSays({ ...base, roll, session: session({}), minutesLeft: "4" }).map((l) => l.text);
   expect(plain(0)).toEqual(["Gneiss work.", "4 min to today’s goal. Your call."]);
   expect(plain(0.9)).toEqual(["Don’t take that for granite.", "4 min to today’s goal. Your call."]);
-  // His pose is for the line he says, sized to how rare it is (D-new-mole-moments): the hop is a new level's alone.
+  // His pose is for the line he says, sized to how rare it is (D256): the hop is a new level's alone.
   const { endMood } = await import("../src/end-says");
   const pose = (o: Parameters<typeof endSays>[0]) => endMood(endSays(o)[0], o);
   expect(pose({ ...base, ups: [{ name: "AI", level: 3 }], session: session({}) })).toBe("cheer");

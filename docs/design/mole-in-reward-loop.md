@@ -2,7 +2,7 @@
 
 Where the old miner comes in during a review session, what he does there, and what he says. Written 2026-11-13 at Tyler's ask, while the mole's look and his wider set of expressions are being finished in another thread, so the two can be joined without a second round of design.
 
-Status: built where a moment already existed (D-new-mole-moments, Tyler 2026-11-13: "the moments we do have that fit, yes utilize him"): the poses during a session, the goal note's wave, and the end screen's reaction by the day. Built simpler than the table in two places: a long gap is `surprised` without the `nod` after, and goal met is `happy` without it. Not built: him watching the results land (`lookdown`), the wave on Done, and anything on a screen he is not on today.
+Status: built where a moment already existed (D256, Tyler 2026-11-13: "the moments we do have that fit, yes utilize him"): the poses during a session, the goal note's wave, and the end screen's reaction by the day. Built simpler than the table in two places: a long gap is `surprised` without the `nod` after, and goal met is `happy` without it. Not built: him watching the results land (`lookdown`), the wave on Done, and anything on a screen he is not on today.
 
 ## What he is for
 

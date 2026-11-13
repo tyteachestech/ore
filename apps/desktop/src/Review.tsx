@@ -1667,7 +1667,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   }).map((l) => ({ ...l, mark: mark(l) }));
   const tiles = endTiles({ session: s, ups: named });
-  // His pose is for the line he says (D-new-mole-moments). Off the cart he is already startled, so a long gap gets his nod.
+  // His pose is for the line he says (D256). Off the cart he is already startled, so a long gap gets his nod.
   const react = endMood(said[0], { session: s, closed });
   const mood = !settled ? (nap ? "surprised" : "peek") : nap && react === "surprised" ? "nod" : react;
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;

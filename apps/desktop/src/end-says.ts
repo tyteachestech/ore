@@ -40,7 +40,7 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   return [...lead, ...depth, ...rest].slice(0, SAID_MAX);
 }
 
-/** The mole's pose once he is up (D-new-mole-moments), for the line he is about to say, sized to how rare it is:
+/** The mole's pose once he is up (D256), for the line he is about to say, sized to how rare it is:
  *  the hop is a new level's alone; a session of misses gets a steady look, never a sad one (D62). */
 export function endMood(first: Said | undefined, o: { session: SessionEnd; closed: boolean }): "cheer" | "curious" | "surprised" | "proud" | "set" | "happy" | "nod" {
   const rare = first?.rare?.kind;
