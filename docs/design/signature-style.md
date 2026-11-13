@@ -17,13 +17,13 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 - Big numbers in the mono; Geist Pixel retired. Labels in sentence case.
 - Wordmark: A "ore_" in Poppins ExtraBold Italic with a green cursor underscore.
 - App icon (D221, Tyler 2026-11-12): a plain pickaxe in halftone dots, white fading to gray, on the dark tile; Mac and iPhone. `apps/desktop/scripts/app-icon.ts`.
-- Railway touch: B Rail + stations (Review steps as track with an ore cart; Home week as stations). The dot grid was dropped: no purpose.
+- Railway touch: B Rail + stations (Home week as stations; Review's track and its cart went with D246, and the cart's run is now on the end screen, D190). The dot grid was dropped: no purpose.
 - Popup closing animation: A Settle (popup lifts away, margin mark pops in three pixel steps, the passage glows once).
 - Dropped: cute (too Duolingo), 3D pressed keys, 8bitcn.
 
 ## Picked (2026-11-10, D183)
-- One way of drawing, round dots (Tyler's pick B of four on the real app): gems are halftone dots (dot size is the shade), rings are one dot per step, Home's week days are round, and a screen's one hero number is Geist Pixel Circle at 40px. Square pixels are leaving the app; still square and next: skill badge corners, Start review, skill chips, dithered bars, Review's rail.
-- House laws he said yes to (2026-11-10): mining lives in moments and nouns, never in the app's frame; two moods of motion (everyday actions fast with no bounce, a playful spring only on a few named moments, and celebrations matter); juice follows success and stays on screen as the record; every sound has a visual twin. The mole may animate as long as it costs no performance and doesn't distract. Consult: https://claude.ai/artifact/5byfzYUCuVvgkQeGKTUAL2.
+- One way of drawing, round dots (Tyler's pick B of four on the real app): gems are halftone dots (dot size is the shade), rings are one dot per step, Home's week days are round, and a screen's one hero number is Geist Pixel Circle at 40px. Square pixels left the app (D184), except a cut gem, whose dots fuse into pixels (D236).
+- House laws he said yes to (2026-11-10): mining lives in moments and nouns, never in the app's frame; two moods of motion (everyday actions fast with no bounce, a playful spring only on a few named moments, the mole's springs (D214) and a highlight landing (D240), and celebrations matter); juice follows success and stays on screen as the record; every sound has a visual twin. The mole may animate as long as it costs no performance and doesn't distract. Consult: https://claude.ai/artifact/5byfzYUCuVvgkQeGKTUAL2.
 
 ## Picked (2026-11-10, D184)
 - The squares that were left (Tyler's pick B of three on the real app): bars are rows of dots, Review's track has a round dot per exercise and a cart drawn in dots, and corners are soft (rows 8, controls 6, chips 4, floating things 12, a rounded skill badge). Not picked: dots with square corners (still two styles), full pills for the main button and chips (a generic app look). Mocks: `/mnt/project-files/house-style/squares-round-1/`.

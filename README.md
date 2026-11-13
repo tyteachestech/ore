@@ -33,7 +33,7 @@ Your library is the folder `Ore` in your home folder: plain files you own. Nothi
 4. **Review.** Exercises from your highlights and notes come back on an FSRS schedule. Fact exercises are flipped; Explain exercises are typed and checked against their key points by AI. You always set the rating.
 5. **Grow.** Each skill shows its *strength* as gems: one cut gem per memory you'd still recall three weeks out. No streaks, XP or leaderboards.
 
-Glossary: [`CONTEXT.md`](CONTEXT.md).
+Glossary: [`GLOSSARY.md`](GLOSSARY.md).
 
 ## Running it
 
@@ -94,7 +94,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | --- | --- |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Every settled decision, D1 onward. The source of truth |
 | [`docs/SPEC.md`](docs/SPEC.md) | Data model, library layout, CLI, scheduling, AI adapter |
-| [`CONTEXT.md`](CONTEXT.md) | Glossary: source, highlight, intent, prequestion, finish, skill… |
+| [`GLOSSARY.md`](GLOSSARY.md) | Glossary: source, highlight, intent, prequestion, finish, skill… |
 | [`PRODUCT.md`](PRODUCT.md) · [`DESIGN.md`](DESIGN.md) | Product brief and design system (tokens, components, states) |
 | [`AGENTS.md`](AGENTS.md) | Working agreement for AI coding agents: rules, UI quality bar, interaction checklist |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Reporting a broken import, setting up, and what a pull request needs |
@@ -115,6 +115,10 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`brief-tech.md`](docs/research/brief-tech.md) | Stack options: Tauri vs others, FSRS, ingest, local AI |
 | [`brief-notionrpg-engram.md`](docs/research/brief-notionrpg-engram.md) · [`brief-notetaking-notionrpg.md`](docs/research/brief-notetaking-notionrpg.md) | Tyler's earlier tools, and what carried over |
 | [`tp-learn-reference-map.md`](docs/research/tp-learn-reference-map.md) | Open-source projects studied as references |
+| [`brief-exercise-types.md`](docs/research/brief-exercise-types.md) | How an exercise is written: the process, each type, what to avoid (led to D182) |
+| [`brief-diagram-editor.md`](docs/research/brief-diagram-editor.md) | Ore's own diagram editor: what the evidence asks of it (led to D103) |
+| [`gems-pm-review.md`](docs/research/gems-pm-review.md) | A PM-style review loop on the gems design (D90) |
+| [`reward-loop-audit.md`](docs/research/reward-loop-audit.md) | The reward loop: an audit of what Ore shows and ranked proposals, with what Tyler decided |
 
 **Design docs** ([`docs/design/`](docs/design/), [index by area](docs/design/README.md)): proposals Tyler approved, with the reasoning.
 
@@ -160,7 +164,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 
 **Guidebooks** ([`docs/guidebooks/`](docs/guidebooks/)): four evidence-based books the research briefs draw on (Learning Science, Teaching, Gamification, UX and UI Design), each with its paper summaries and source lists.
 
-**Guides**: [`docs/guides/ai-user-testing.md`](docs/guides/ai-user-testing.md) (usability testing with an AI agent driving the app) and its [iPhone version](docs/guides/ai-user-testing-iphone.md), the AI evals ([grading](docs/guides/grading-eval.md), [Ask your library](docs/guides/ask-library.md), [tutor](docs/guides/tutor-eval.md), [question quality](docs/guides/question-eval.md)), [`skills/ore/README.md`](skills/ore/README.md) (the `/ore` Claude Code skill), [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md) (the mocked app for screenshots).
+**Guides**: [`docs/guides/ai-user-testing.md`](docs/guides/ai-user-testing.md) (usability testing with an AI agent driving the app) and its [iPhone version](docs/guides/ai-user-testing-iphone.md), the AI evals ([grading](docs/guides/grading-eval.md), [Ask your library](docs/guides/ask-library.md), [tutor](docs/guides/tutor-eval.md), [question quality](docs/guides/question-eval.md), [transcripts](docs/guides/transcript-eval.md)), the [speed bench](docs/guides/bench.md), [`skills/ore/README.md`](skills/ore/README.md) (the `/ore` Claude Code skill), [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md) (the mocked app for screenshots).
 
 ## Contributing
 
