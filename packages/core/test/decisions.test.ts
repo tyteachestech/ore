@@ -12,7 +12,7 @@ test("every decision in DECISIONS.md has its own number", () => {
 });
 
 // A placeholder row numbered on one side of a merge can come back beside its numbered copy, since
-// `merge=union` keeps both sides' lines (D-new-dot-glint stayed next to D257, 2026-11-13).
+// `merge=union` keeps both sides' lines (the glint's placeholder row stayed next to D257, 2026-11-13).
 test("no decision is written twice under two ids", () => {
   const text = readFileSync(join(import.meta.dir, "..", "..", "..", "docs", "DECISIONS.md"), "utf8");
   const ids = new Map<string, string[]>();

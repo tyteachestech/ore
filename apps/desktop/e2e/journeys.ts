@@ -9967,7 +9967,7 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
   if (small.length) throw new Error(`taps under 44 pt on the skill page: ${small.join(", ")}`);
 }, "phone");
 
-journey("phone: Review's confidence labels stay in their buttons at the largest text, and Open in source is a 44 pt tap (F-new-sure-overflow, F-new-review-source-tap)", async (page) => {
+journey("phone: Review's confidence labels stay in their buttons at the largest text, and Open in source is a 44 pt tap (F100, F101)", async (page) => {
   // At iOS's largest text "Think so" wrapped and its "so" hung below the button, which kept the Mac's 40px height;
   // Open in source stayed the Mac's 24px link, and a tap just off it did nothing.
   await page.evaluate(() => document.documentElement.style.setProperty("--type", String(28 / 17)));
@@ -10158,7 +10158,7 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
       const cut = t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1;
       // Beside the picture, the title has the rest of the row: nothing else takes its width.
       const room = row.getBoundingClientRect().right - t.getBoundingClientRect().right;
-      // And never more than two: WebKit drew a clamped <button> title whole, four lines and more (F-new-today-clamp).
+      // And never more than two: WebKit drew a clamped <button> title whole, four lines and more (F99).
       return (cut && lines < 2) || lines > 2 || room > 4 ? [`"${t.textContent.slice(0, 40)}": ${lines} line(s), ${Math.round(room)}px left of the row's edge`] : [];
     }), title);
     if (bad.length) throw new Error(`${where}: a title is cut short: ${bad.join("; ")}`);
