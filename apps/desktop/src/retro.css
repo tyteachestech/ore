@@ -149,6 +149,11 @@
 .home-goal .goal-of { font-family: var(--font); }
 /* The hero number is the one place a dot face is big enough to read (D183): 40px, never below 24. */
 .home-goal h1 .roll, .strength-big { font-family: var(--dot); font-weight: 400; font-size: 40px; line-height: 1; }
+/* The end screen's one hero number (D242): drawn in the ring's own dots (`DotNumber`), its words in the mono. */
+.end-emblem .review-kept b, .end-emblem + .review-kept b { position: relative; line-height: 0; }
+.dot-number { display: block; }
+.dot-number circle { fill: var(--text); }
+.end-emblem .review-kept, .end-emblem + .review-kept { font-family: var(--mono); font-size: 13px; }
 
 /* Soft corners (D184, Tyler's pick B, 2026-11-10): round dots sit in round-cornered things. Rows 8, controls 6,
    chips 4, what floats 12, what he reads or writes in Review 10. */

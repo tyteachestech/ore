@@ -40,11 +40,10 @@ if (!p.includes("OreShare:")) {
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: ShareViewController
           NSExtensionAttributes:
-            NSExtensionActivationRule:
-              NSExtensionActivationSupportsWebURLWithMaxCount: 1
-              NSExtensionActivationSupportsText: true
-              NSExtensionActivationSupportsFileWithMaxCount: 1
-              NSExtensionActivationSupportsImageWithMaxCount: 1
+            # A predicate, not the SupportsWebURL/File/Image keys: those miss a PDF shared from Safari's
+            # viewer (and other apps' typed attachments), so Ore never showed for it. Any link, text or
+            # file activates; what core can't import is refused in the app with the next step (D96).
+            NSExtensionActivationRule: 'SUBQUERY(extensionItems, $e, SUBQUERY($e.attachments, $a, ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.url" OR ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.plain-text" OR ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.data").@count >= 1).@count >= 1'
     entitlements:
       path: OreShare/OreShare.entitlements
 ${ent("      ")}

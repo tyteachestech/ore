@@ -134,3 +134,81 @@ test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem 
   expect(none.q(".review-depth")).toBe(0);
   await none.done();
 });
+
+test("the end screen's lines share one place: one shows, the next rolls up after a hold, and under Reduce Motion they are a plain list (D241)", async () => {
+  jest.useFakeTimers();
+  // No cart (the goal was met before), so the lines start turning at once.
+  const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { depth_days: 41, rescued: 2 });
+  const s = await mount(e as never);
+  const on = () => s.body.querySelector('.end-lines > [data-at="on"]')?.textContent;
+  expect(s.q(".end-lines > div")).toBeGreaterThanOrEqual(2);
+  expect(s.q('.end-lines > [data-at="on"]')).toBe(1);
+  // The count of memories kept is the hero under the ring now (D242), not one of the lines.
+  expect(on()).toBe("+41 days of memory");
+  // Every line but the one showing is out of reach of the keyboard and the reader.
+  expect(s.q(".end-lines > div[inert]")).toBe(s.q(".end-lines > div") - 1);
+  await act(async () => void jest.advanceTimersByTime(2600));
+  const second = on();
+  expect(second).toContain("rescued");
+  expect(s.body.querySelector('.end-lines > [data-at="was"]')?.textContent).toBe("+41 days of memory");
+  // The pointer on a line holds it.
+  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new (s.body.ownerDocument.defaultView as unknown as { MouseEvent: typeof MouseEvent }).MouseEvent("mouseover", { bubbles: true })));
+  await act(async () => void jest.advanceTimersByTime(6000));
+  expect(on()).toBe(second);
+  // Focus on the line holds it too, and the pointer leaving doesn't let go of that hold.
+  const win = s.body.ownerDocument.defaultView as unknown as { MouseEvent: typeof MouseEvent; FocusEvent: typeof FocusEvent };
+  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new win.FocusEvent("focusin", { bubbles: true })));
+  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new win.MouseEvent("mouseout", { bubbles: true })));
+  await act(async () => void jest.advanceTimersByTime(6000));
+  expect(on()).toBe(second);
+  jest.useRealTimers();
+  await s.done();
+  // One line has nothing to take turns with.
+  const one = await mount(end([], today(true, 600_000)));
+  expect(one.q(".end-lines")).toBe(0);
+  expect(one.q(".review-kept")).toBe(1);
+  await one.done();
+  reduce = true;
+  const flat = await mount(e as never);
+  reduce = false;
+  expect(flat.q(".end-lines")).toBe(0);
+  expect(flat.q(".review-kept, .review-rescued")).toBeGreaterThanOrEqual(2);
+  await flat.done();
+});
+
+test("the end screen is one emblem (D242): the gems sit inside the ring with the count under it, the count stands in the ring when no gem was cut, and the quick quiz keeps its row", async () => {
+  reduce = true;
+  const s = await mount(end(["ai", "ai"]));
+  expect(s.q(".end-emblem .end-ring > .ring")).toBe(1);
+  expect(s.q(".end-emblem .end-ring > .review-cut > span")).toBe(2);
+  // The count is said once: under the emblem, never also among the lines.
+  expect(s.q(".review-kept")).toBe(1);
+  expect(s.q(".end-emblem + .review-kept")).toBe(1);
+  // The count is drawn in dots (a 7 is 11 of them), and its text is the true number for a reader and for a test.
+  expect(s.q(".review-kept b .dot-number circle")).toBeGreaterThan(5);
+  expect(s.body.querySelector(".review-kept")!.textContent).toBe("5 memories kept");
+  // The gem's own hint names its skill, so no icon repeats it under the gem.
+  expect(s.q(".review-cut-skill")).toBe(0);
+  await s.done();
+  const none = await mount(end([]));
+  expect(none.q(".end-ring > .review-kept")).toBe(1);
+  expect(none.q(".review-kept")).toBe(1);
+  await none.done();
+  // A session of misses has no count to stand anywhere: its one line stays a line.
+  const missed = end([]) as unknown as { session: Record<string, unknown> };
+  missed.session.kept = 0;
+  const m = await mount(missed as never);
+  expect(m.q(".end-ring > .review-kept")).toBe(0);
+  expect(m.body.querySelector(".review-kept")!.textContent).toContain("Every miss");
+  await m.done();
+  const body = document.createElement("div");
+  document.body.appendChild(body);
+  const root = createRoot(body);
+  await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"])} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} /></TooltipProvider>));
+  expect(body.querySelectorAll(".end-emblem").length).toBe(0);
+  expect(body.querySelectorAll(".review-end > .review-cut").length).toBe(1);
+  expect(body.querySelectorAll(".review-kept").length).toBe(1);
+  await act(async () => (root.unmount(), body.remove()));
+  reduce = false;
+});
