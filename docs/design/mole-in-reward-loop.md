@@ -25,34 +25,34 @@ Mood names are the ones in `Mole.tsx`. "Today" moods are on master; the rest com
 
 ### During a session
 
-| Moment | Today | Proposed | Line |
+| Moment | Before D256 | Proposed | Line |
 |---|---|---|---|
 | A question is open, or being rated | not on screen | not on screen | none |
 | An ordinary pass, nothing changed | not on screen | not on screen (rule 3) | none |
-| A gem is cut | small mole, `happy`, beside the two gems | looks across at the gem as it cuts, then `proud` | today's line ("Cut: you'd still recall this three weeks from now.") |
-| A gem is won back (gold rim) | `happy` | `laugh`: the biggest mid-session pose, since it is the hardest thing to do | "Won back. It keeps a gold rim." |
-| A gem is polished (passed on a new case) | `happy` | `wink` | "Polished: you recalled it on a new case." |
-| Recalled across a long gap | `happy` | `surprised`, settling into `nod` | today's line (how long it had been) |
-| A miss on a cut gem | `peek` (he only looks up) | `set`: chin up, steady. Never `sad` or `shake` | today's lines ("Loose, not lost…") |
-| Today's goal is met | 48px, `happy`, "Goal met. The rest is extra." | rises, one `wave`, then rests while the line is up | same line |
+| A gem is cut | small mole, `happy`, beside the two gems | looks across at the gem as it cuts, then `proud`. Built: `proud` | today's line ("Cut: you'd still recall this three weeks from now.") |
+| A gem is won back (gold rim) | `happy` | `laugh`: the biggest mid-session pose, since it is the hardest thing to do. Built | "Won back. It keeps a gold rim." |
+| A gem is polished (passed on a new case) | `happy` | `wink`. Built | "Polished: you recalled it on a new case." |
+| Recalled across a long gap | `happy` | `surprised`, settling into `nod`. Built: `surprised` | today's line (how long it had been) |
+| A miss on a cut gem | `peek` (he only looks up) | `set`: chin up, steady. Never `sad` or `shake`. Built | today's lines ("Loose, not lost…") |
+| Today's goal is met | 48px, `happy`, "Goal met. The rest is extra." | rises, one `wave`, then rests while the line is up. Built | same line |
 | Past the goal, still going | not on screen | not on screen: the bonus is in the end screen's numbers | none |
 
-The mid-session mole is 40px today, which is under the size where the new traced drawing is used (48px). Proposed: show him at 48px there too, so it is one mole all through a session.
+The mid-session mole was 40px, under the size where the traced drawing is used (48px). He is 48px there since D256, so it is one mole all through a session.
 
 ### The end screen
 
 In order, as it plays:
 
-| Beat | Today | Proposed |
+| Beat | Before D256 | Proposed |
 |---|---|---|
 | The cart tips into the ring | he is not up yet | same |
 | He comes up | `peek` (rises out of the ground) | built since (D255): two endings in three he rides the cart in asleep (`doze`), hangs in the air when it leaves, falls (`fall`) onto the ring and covers for it in his line; otherwise `peek` |
-| The row of results lands, one at a time | he cheers at once, before the row is in | `lookdown`: he watches each one land |
-| The last result is in | he says his line | he reacts to the day (table below), then says his line |
+| The row of results lands, one at a time | he cheers at once, before the row is in | `lookdown`: he watches each one land. Not built: the row lands while he arrives |
+| The last result is in | he says his line | he reacts to the day (table below), then says his line. Built |
 | After | idle blinks and glances | same; hovering a result turns him to `lookdown` again |
 | Done is pressed | the screen closes | a `wave` only if it costs no wait (he waves as the screen leaves) |
 
-His reaction once the row is in, by what the day's third result is:
+His reaction, by the line he says (built as `endMood`; where the table says two poses, the first alone was built, and off the cart a long gap gets the `nod`):
 
 | The day | Pose | His line (one of a few, as built) |
 |---|---|---|
@@ -66,7 +66,7 @@ His reaction once the row is in, by what the day's third result is:
 | Every answer a miss | `set`, no cheer | "Schist happens. Every miss comes back sooner." |
 | Then and now is showing (once in four weeks) | `curious`, looking down at the two answers | "6 weeks back that one beat you. Read it now." |
 
-Today every day with something kept ends on the same `cheer`. Scaling it is the last piece of "three sizes of ending": the row's colour already makes a big day look bigger, and his pose would make it feel bigger.
+Before D256 every day with something kept ended on the same `cheer`. Scaling it was the last piece of "three sizes of ending": the row's colour already makes a big day look bigger, and his pose would make it feel bigger.
 
 ### Where he stays out
 
@@ -78,7 +78,6 @@ Today every day with something kept ends on the same `cheer`. Scaling it is the 
 
 - `sleepy`, `shy`, `huff`, `shake`, `sad` have no place in the reward loop under the rules above. They may fit the tutor chat; that is the mole thread's call.
 - Whether he waves on Done.
-- Whether the mid-session mole grows to 48px.
 - iPhone: the same cues without the cart. The bubble sits to his right and is narrow at 390pt, so lines there stay under about 40 letters.
 
 ## Wiring, once the look is final

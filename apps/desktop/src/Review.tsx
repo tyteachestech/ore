@@ -1611,7 +1611,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   // cart: rolling and pouring · poured: the ring is full · leaving: the cart starts off, and the mole comes up unless he is riding it (then when he has fallen) · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
-  // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D255): then he is there, startled (under Reduce Motion he is just there, pleased).
+  // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D255): then he is there, startled (under Reduce Motion he is just there, at rest: pleased, or plain after a session of misses).
   const [settled, setSettled] = useState(still);
   const [fell, setFell] = useState(false);
   // The mole reacts to the day 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
@@ -1667,9 +1667,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   }).map((l) => ({ ...l, mark: mark(l) }));
   const tiles = endTiles({ session: s, ups: named });
-  // His pose is for the line he says (D256). Off the cart he is already startled, so a long gap gets his nod.
-  const react = endMood(said[0], { session: s, closed });
-  const mood = !settled ? (nap ? "surprised" : "peek") : nap && react === "surprised" ? "nod" : react;
+  // His pose is for the line he says (D256).
+  const mood = !settled ? (nap ? "surprised" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;

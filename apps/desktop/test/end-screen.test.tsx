@@ -1,4 +1,4 @@
-import { expect, jest, test } from "bun:test";
+import { afterEach, expect, jest, test } from "bun:test";
 import { Window } from "happy-dom";
 import { act } from "react";
 
@@ -25,6 +25,14 @@ const today = (met: boolean, active_ms: number) => ({ goal_minutes: 10, goal_ms:
 const end = (cut: string[], before = today(false, 0), now = today(true, 600_000)) => ({ session: { id: "s", reviews: 5, kept: 5, rescued: 0, cut }, today: now, before, next: null }) as never;
 const skills = [{ id: "ai", name: "AI", color: "purple", icon: "ai" }] as never;
 const wait = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
+// A test that fails before it unmounts must not leave its screen (and its timers) running under the next file's
+// tests: that made a note test fail whenever one here did (F87).
+const open = new Set<() => Promise<void>>();
+afterEach(async () => {
+  jest.useRealTimers();
+  reduce = false;
+  for (const done of [...open]) await done();
+});
 async function mount(e: never, roll = 0) {
   const body = document.createElement("div");
   body.className = "review-body";
@@ -39,10 +47,12 @@ async function mount(e: never, roll = 0) {
     Math.random = random;
   }
   const q = (s: string) => body.querySelectorAll(s).length;
-  return { q, body, done: () => act(async () => (root.unmount(), body.remove())) };
+  const done = async () => { if (open.delete(done)) await act(async () => (root.unmount(), body.remove())); };
+  open.add(done);
+  return { q, body, done };
 }
-/** The mole is reacting to the day: a session that cut a gem pleases him (the hop is a new level's alone, D256). */
-const cheering = (body: HTMLElement) => body.querySelector(".review-mole .mole")?.getAttribute("data-mood") === "happy";
+/** The mole is reacting to the day. These sessions cut a gem, which pleases him: the hop is a new level's alone (D256). */
+const reacted = (body: HTMLElement, mood = "happy") => body.querySelector(".review-mole .mole")?.getAttribute("data-mood") === mood;
 
 test("a session that filled the ring and cut a gem: the cart is there, the mole and the gem wait, then all of it settles", async () => {
   jest.useFakeTimers();
@@ -52,12 +62,12 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   expect(s.q(".review-mole .mole")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(0);
   expect(s.q(".review-cut > span[data-wait]")).toBe(1);
-  // A clock the test turns by hand, so the gap between the mole coming up and its cheer is exact on any runner.
-  let up = -1, cheer = -1;
-  for (let t = 0; t < 6000 && !(cheer >= 0 && !s.q(".cart-tip")); t += 20) {
+  // A clock the test turns by hand, so the gap between the mole coming up and its reaction is exact on any runner.
+  let up = -1, react = -1;
+  for (let t = 0; t < 6000 && !(react >= 0 && !s.q(".cart-tip")); t += 20) {
     await act(async () => void jest.advanceTimersByTime(20));
     if (up < 0 && s.q(".review-mole .mole")) up = t;
-    if (up >= 0 && cheer < 0 && cheering(s.body)) cheer = t;
+    if (up >= 0 && react < 0 && reacted(s.body)) react = t;
   }
   jest.useRealTimers();
   expect(s.q(".cart-tip")).toBe(0);
@@ -69,8 +79,8 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   expect(s.q(".gem-cutting[data-cutting]")).toBe(0);
   expect(s.q('.review-cut .gem[data-kind="cut"] rect')).toBeGreaterThan(50);
   // The mole cheers once it is up (560ms), not when the cart has finished leaving.
-  expect(cheer - up).toBeGreaterThanOrEqual(540);
-  expect(cheer - up).toBeLessThanOrEqual(580);
+  expect(react - up).toBeGreaterThanOrEqual(540);
+  expect(react - up).toBeLessThanOrEqual(580);
   await s.done();
 }, 10_000);
 
@@ -121,7 +131,7 @@ test("nothing to tip, or Reduce Motion: no cart, and the mole, the ring and the 
   reduce = false;
   expect(still.q(".cart-tip")).toBe(0);
   expect(still.q(".review-mole .mole")).toBe(1);
-  expect(cheering(still.body)).toBe(true);
+  expect(reacted(still.body)).toBe(true);
   expect(still.q(".review-cut > span[data-wait]")).toBe(0);
   await still.done();
 });
@@ -300,6 +310,11 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   expect(pose({ ...base, session: session({ cut: ["ai"] }) })).toBe("happy");
   expect(pose({ ...base, closed: true, session: session({}) })).toBe("happy");
   expect(pose({ ...base, session: session({}) })).toBe("nod");
+  // Off the cart he is already startled, so a long gap gets his nod; without the nap, the start.
+  const gap = { ...base, session: session({ longest_days: 41 }) };
+  expect([pose(gap), pose({ ...gap, napped: true })]).toEqual(["surprised", "nod"]);
+  // Reduce Motion holds one pose for as long as the screen is up: a resting one, never a start or a frown.
+  expect([endMood(endSays(gap)[0], { ...gap, still: true }), endMood(undefined, { ...base, session: session({ kept: 0 }), still: true })]).toEqual(["happy", "idle"]);
   // The quick quiz has no mole: its line for a session of misses stays in plain words.
   expect(endSays({ ...base, plain: true, session: session({ kept: 0 }) })[0]!.text).toBe("Every miss comes back sooner. That’s how they stick.");
   // The verdict is a pun, one of a few of its kind by the roll; every one for a session of misses says why it was worth it.

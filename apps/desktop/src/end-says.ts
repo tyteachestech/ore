@@ -1,3 +1,4 @@
+import type { Mood } from "./Mole";
 import { depthParts, depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
 
 /** One of the end screen's results (D252): a number, what it counts, and for a rare one what kind. */
@@ -40,11 +41,14 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   return [...lead, ...depth, ...rest].slice(0, SAID_MAX);
 }
 
-/** The mole's pose once he is up (D256), for the line he is about to say, sized to how rare it is:
- *  the hop is a new level's alone; a session of misses gets a steady look, never a sad one (D62). */
-export function endMood(first: Said | undefined, o: { session: SessionEnd; closed: boolean }): "cheer" | "curious" | "surprised" | "proud" | "set" | "happy" | "nod" {
+/** The mole's pose once he is up (D256), for the line he is about to say, sized to how rare it is: the hop is a
+ *  new level's alone; a session of misses gets a steady look, never a sad one (D62). `napped`: off the cart he is
+ *  already startled, so a long gap gets his nod. `still` (Reduce Motion): he holds one pose for as long as the
+ *  screen is up, so it is a resting one, never a start, a question or a frown. */
+export function endMood(first: Said | undefined, o: { session: SessionEnd; closed: boolean; napped?: boolean; still?: boolean }): Mood {
+  if (o.still) return o.session.kept === 0 ? "idle" : "happy";
   const rare = first?.rare?.kind;
-  if (rare) return rare === "level" ? "cheer" : rare === "then" ? "curious" : rare === "long" ? "surprised" : "proud";
+  if (rare) return rare === "level" ? "cheer" : rare === "then" ? "curious" : rare === "long" ? (o.napped ? "nod" : "surprised") : "proud";
   if (o.session.kept === 0) return "set";
   return o.session.cut?.length || o.closed ? "happy" : "nod";
 }
