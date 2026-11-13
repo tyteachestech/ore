@@ -2253,7 +2253,7 @@ journey("figure zoom: a click opens a figure to fill the window and keys don't r
   await page.mouse.wheel(0, 200);
   await shut();
   if ((await page.locator(".reader-scroll").evaluate((el) => el.scrollTop)) !== top) throw new Error("the scroll that put the figure back moved the page too");
-  // A scroll in the very frame it starts to grow (F98): it had not moved yet, so no transition
+  // A scroll in the very frame it starts to grow (F103): it had not moved yet, so no transition
   // ran back and nothing ever closed it; it sat unseen over the page.
   await page.evaluate(() => {
     new MutationObserver((_, o) => {
