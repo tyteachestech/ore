@@ -5,12 +5,14 @@ import type { MenuAction } from "./Menu";
 /* The icon at the left of each ⋯ and right-click menu item (ChatGPT's menus, Tyler 2026-11-12): one table, so
    an action reads the same in every menu it is in, and the lists that build menus stay text. Keyed by the
    action's id; a label that turns the same id into another action (Restore on Archive's id) wins.
-   A submenu's items draw none, as in ChatGPT; the diagram canvas's long command menu draws none (`plain`),
-   as Excalidraw's and Figma's don't. */
+   A submenu's items draw one only where the item is a thing with its own mark (a skill's icon, a highlight
+   type, a level, a collection's folder); the diagram canvas's long command menu draws none (`plain`), as
+   Excalidraw's and Figma's don't. The iPhone's ⋯ sheet draws the same icons as the Mac's menus. */
 const BY_ID: Record<string, Icon> = {
   open: ArrowRight,
   lead: ArrowRight,
   "review-source": Play,
+  review: Play,
   rename: PencilSimple,
   edit: PencilSimple,
   author: User,
