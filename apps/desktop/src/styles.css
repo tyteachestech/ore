@@ -1608,7 +1608,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .skill-col.side .question-quote .from { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question.done .question-quote .note { text-decoration: line-through; }
 .q-lead { position: absolute; right: 8px; top: 9px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; }
-.q-lead::before { content: ""; width: 8px; height: 8px; background: var(--question-solid); }
+.q-lead::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--question-solid); }
 .q-lead:hover { background: var(--bg-hover); }
 .q-lead:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .hint-lines { display: flex; flex-direction: column; gap: 2px; }
@@ -2073,7 +2073,7 @@ button.home-plan:hover { color: var(--text); }
 .review-calibration-row:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
 .review-calibration-name { text-align: right; }
 .review-calibration-bar { display: flex; gap: 2px; }
-.review-calibration-bar i { width: 6px; height: 6px; background: var(--bg-active); }
+.review-calibration-bar i { width: 6px; height: 6px; border-radius: 50%; background: var(--bg-active); }
 .review-calibration-bar i[data-on] { background: var(--muted); }
 .review-calibration-pct { font-variant-numeric: tabular-nums; text-align: left; }
 .review-original { margin: 14px 0 0; color: var(--muted); font-size: 13px; }

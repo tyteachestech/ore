@@ -77,3 +77,12 @@ test("a gem caught mid-cut: its dots are part fused, and the light crossing it b
   const fills = (html: string) => html.match(/white 70%/g)?.length ?? 0;
   expect(fills(renderToStaticMarkup(<Gem kind="cut" size={36} band={8} />))).toBeGreaterThan(fills(renderToStaticMarkup(<Gem kind="cut" size={36} />)));
 });
+
+test("the last two square marks are round dots: a question's may-answer lead and the calibration cells (F82, D184)", () => {
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const css = readFileSync(`${import.meta.dir}/../src/styles.css`, "utf8");
+  for (const sel of [".q-lead::before", ".review-calibration-bar i"]) {
+    const rule = css.match(new RegExp(`^${sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{([^}]*)\\}`, "m"))?.[1] ?? "";
+    expect(rule, sel).toContain("border-radius: 50%");
+  }
+});
