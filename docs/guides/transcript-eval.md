@@ -4,6 +4,8 @@
 written by people? It runs on the Mac by hand (it needs yt-dlp and macOS 26's speech recognition,
 downloads audio, and reads live sites), never in CI.
 
+Flags: `--only <id>`, `--kind youtube|podcast`, `--method auto,page,heard`, `--keep <dir>` (saves the words to compare). Cases: `packages/core/eval/transcript-cases.json`; results: `packages/core/eval/results/transcripts-<date>.json`.
+
 ## What it scores
 
 The **key** is a human transcript: a video's captions written by people, or the transcript a podcast
