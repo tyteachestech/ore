@@ -2165,7 +2165,9 @@ button.home-plan:hover { color: var(--text); }
 /* The ground he falls into: a clip set as he falls, so his body goes under the dirt line. */
 .cart-ground { position: absolute; inset: 0; }
 .cart-mole { position: absolute; left: 0; top: 0; width: 96px; height: calc(96px * 18 / 22); margin: calc(-96px * 18 / 22) 0 0 -48px; transform-origin: 50% 100%; line-height: 0; will-change: transform; }
-.cart-mole-body { display: block; width: 100%; height: 100%; will-change: transform; }
+.cart-mole-body { display: block; width: 100%; height: 100%; will-change: transform; filter: url(#cart-solid); }
+.cart-bucket { filter: url(#cart-solid-fine); }
+.cart-solid-fill { flood-color: var(--bg); }
 .cart-dirt { position: absolute; left: 0; top: 0; margin: -4px 0 0 -4px; border-radius: 50%; background: color-mix(in oklab, var(--text) 78%, var(--bg)); will-change: transform; }
 .cart-zzz { position: absolute; left: -30px; top: -110px; width: 110px; height: 86px; overflow: visible; fill: var(--muted); }
 .cart-zzz g { animation: cart-zzz 1400ms infinite both; }

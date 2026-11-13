@@ -29,7 +29,9 @@ const RIDER_PX = 96, DOZE = 0.45;
 /** The middle of each drawing's body from the foot of its box, in px at full size: asleep he lies over it, awake he straddles it. */
 const SLEEPER = [0, -45] as const, FALLER = [-1, -6] as const;
 /** How far he is tipped when his slide leaves him hanging past the lip (degrees). */
-const SLID = 44;
+const SLID = 58;
+/** How far the middle of his body lies off the tipped rim he slides down, in px: half his girth, so the bucket never crosses him. */
+const GIRTH = 22;
 /** How far over the foot of his seat the dirt line is: the top of the seated mole's row of dirt. */
 const GROUND = 3;
 /** The gravity he dives under, px/s²: slower than the ore's, so a turn in the air can be seen. */
@@ -196,13 +198,13 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       // The bucket tips under him, and while his bed pours out he slides down it, slowly, then faster, until he
       // hangs past the lip (Tyler, 2026-11-13: "he should be sliding slowly off the cart before fully falling").
       // From the tip on he is drawn over the cart, so its rim never crosses him.
-      const tip = MOMENT - 100, tipped = [x + 10, y + 4, 22] as const;
-      let end = [x + 46, y + 24, SLID] as [number, number, number];
+      const tip = MOMENT - 100, tipped = [x + 40, y - 16, SLID] as const;
+      let end = [x + 61, y + 14, SLID] as [number, number, number];
       later(tip, () => { ground.style.zIndex = "1"; play(rider, [{ transform: asleep(x, y, 0) }, { transform: asleep(...tipped) }], { duration: T4, easing: SPRING }); });
       later(tip + T4, () => {
         // The lip of the tipped bucket: he ends with his middle well past it, head and shoulders in the open.
         const o = el.getBoundingClientRect(), at2 = at(lip.getBoundingClientRect(), o);
-        end = [at2.x + 18, at2.y - 12, SLID];
+        end = [at2.x + GIRTH * 0.85, at2.y - GIRTH * 0.53 - 2, SLID];
         const N = 14;
         // Most of the way in the last third: he creeps, then goes.
         play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = (i / N) ** 3 * 0.8 + (i / N) * 0.2; return { transform: asleep(tipped[0] + (end[0] - tipped[0]) * t, tipped[1] + (end[1] - tipped[1]) * t, tipped[2] + (SLID - tipped[2]) * t) }; }), { duration: Math.max(T4, stoned + 160 - tip - T4), easing: "linear" });
@@ -295,6 +297,18 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
   return (
     <div className="cart-tip" ref={layer} aria-hidden="true">
       <span className="cart-rail" />
+      {/* Dots have gaps, and what lies behind a drawing would show through them. These fill a drawing's shape with
+          the page behind its dots, so the mole and the bucket hide what they are in front of. */}
+      <svg width="0" height="0" style={{ position: "absolute" }}>
+        {([["cart-solid", 2.4], ["cart-solid-fine", 0.42]] as const).map(([id, r]) => (
+          <filter key={id} id={id} x="-100%" y="-150%" width="300%" height="400%" colorInterpolationFilters="sRGB">
+            <feMorphology in="SourceAlpha" operator="dilate" radius={r} result="shape" />
+            <feFlood className="cart-solid-fill" />
+            <feComposite operator="in" in2="shape" />
+            <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        ))}
+      </svg>
       {/* Before the cart, so he lies in the bucket, behind its near side. */}
       {mole && pose !== "gone" && (
         <span className="cart-ground"><span className="cart-mole"><span className="cart-mole-body">

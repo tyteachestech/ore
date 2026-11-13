@@ -116,13 +116,14 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   await plain.done();
 });
 
-test("the fall off the cart has weight: he is pressed short then pulled long, dives swept back, throws dirt, knocks the ring, and the cart hops as he leaves it", async () => {
+test("the fall off the cart has weight, and the bucket never turns through him: he lies along its tipped rim, is pressed short then pulled long, dives swept back, throws dirt, knocks the ring, and the cart hops as he leaves it", async () => {
   jest.useFakeTimers();
   const proto = w.Element.prototype as unknown as Record<string, unknown>, plain = proto.animate;
   const seen: { cls: string; keys: Record<string, string>[]; o: { composite?: string } }[] = [];
   proto.animate = function (this: Element, keys: Record<string, string>[], o: { composite?: string }) { seen.push({ cls: this.getAttribute("class") ?? this.tagName, keys, o }); return { cancel() {} }; };
   try {
     const s = await mount(end(["ai"]));
+    const backed = s.q("#cart-solid") + s.q("#cart-solid-fine");
     let dived = false, dirt = 0;
     for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
       await act(async () => void jest.advanceTimersByTime(20));
@@ -135,6 +136,11 @@ test("the fall off the cart has weight: he is pressed short then pulled long, di
     const pulls = seen.filter((a) => a.cls === "cart-mole-body").flatMap((a) => a.keys.map((k) => Number(/scale\(([\d.]+), ([\d.]+)\)/.exec(k.transform!)![2])));
     expect(Math.min(...pulls)).toBeLessThan(0.9);
     expect(Math.max(...pulls)).toBeGreaterThan(1.15);
+    // F-new-cart-through-mole: tipped, he lies along the bucket's rim at the bucket's own angle (58°) and slides
+    // down it, so the bucket never turns through him; and his dots and the bucket's are backed, so neither shows through the other.
+    const slide = seen.filter((a) => a.cls === "cart-mole" && a.keys.length > 10 && a.keys[0]!.transform!.includes("scale(0.45)"))[0]!;
+    for (const k of slide.keys) expect(k.transform).toContain("rotate(58deg)");
+    expect(backed).toBe(2);
     // The cart's hop is added to its roll, never in place of it.
     expect(seen.some((a) => a.cls === "cart" && a.o.composite === "add" && a.keys.some((k) => k.transform === "translateY(-4px)"))).toBe(true);
     await s.done();
