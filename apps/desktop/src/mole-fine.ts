@@ -36,8 +36,8 @@ const SIDES = [-1, 1].map((side) => {
 });
 /** Top of his head, for how far a lean carries a dot; where each lobe hangs from; the mouth, between the lobes. */
 const CROWN = -27 * U, PIVOT_Y = -10.4 * U, PIVOT_X = 0.9 * U, MOUTH_Y = -6.1 * U;
-/** How far a lobe swings out when he is pleased, and a little when his mouth opens (radians). */
-const SPREAD = 0.44, PART = 0.1;
+/** Pleased, his cheeks lift: each lobe swings out a little (radians), rises and parts (dots). An open mouth parts them too. */
+const SMILE = 0.2, LIFT = 0.4, APART = 0.6, PART = 0.1;
 
 /** Every dot of the fine mole in state `s`, in the small mole's space (x 0 to 22, the dirt along the foot of row 17). */
 export function fineDots(s: State): FineDot[] {
@@ -69,10 +69,10 @@ export function fineDots(s: State): FineDot[] {
   const fx = s.lx * 0.5, ex = s.lx * 0.3, ey = Math.max(0, s.ly) * 0.3, fy = s.ly * 0.2;
   const lobes = layer();
   for (const { side, lobe } of SIDES) {
-    const a = -side * (s.arc * SPREAD + clamp(s.mouth) * PART), cos = Math.cos(a), sin = Math.sin(a), px = side * PIVOT_X;
+    const a = -side * (arc * SMILE + clamp(s.mouth) * PART), cos = Math.cos(a), sin = Math.sin(a), px = side * PIVOT_X;
     for (const p of lobe) {
       const rx = p.x - px, ry = p.y - PIVOT_Y;
-      const [x, y] = head({ ...p, x: px + rx * cos - ry * sin, y: PIVOT_Y + rx * sin + ry * cos }, fx, fy);
+      const [x, y] = head({ ...p, x: px + rx * cos - ry * sin + side * APART * U * arc, y: PIVOT_Y + rx * sin + ry * cos - LIFT * U * arc }, fx, fy);
       lobes.push([x, y, p.r, p.tone, true]);
     }
   }
@@ -90,9 +90,9 @@ export function fineDots(s: State): FineDot[] {
     }
     const [gx, gy] = head(glint, ex, ey - wide * U);
     face.push([gx, gy, glint.r * (1 - shut) * (1 - arc), "glint", false]);
-    if (arc > 0.02) for (const [dx, dy] of [[-1.3, 1.1], [-0.5, 0.35], [0.5, 0.35], [1.3, 1.1]] as const) {
+    if (arc > 0.02) for (const [dx, dy] of [[-1.5, 1.25], [-0.8, 0.5], [0, 0.2], [0.8, 0.5], [1.5, 1.25]] as const) {
       const [x, y] = head({ x: cx + dx * U, y: top + dy * U, r: 0, tone: "eye" }, ex, ey);
-      face.push([x, y, 0.46 * U * arc, "eye", true]);
+      face.push([x, y, 0.36 * U * arc, "eye", true]);
     }
     const brow = brows[n]!;
     if (brow > 0.02) for (let i = 0; i < 4; i++) {
