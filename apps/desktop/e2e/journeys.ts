@@ -8937,8 +8937,9 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   await page.keyboard.type("x");
   await page.keyboard.press("Meta+z"); // the field's: the app leaves it alone
   if (!(await item()).skills.includes(others[1]!.id)) throw new Error("⌘Z with fresh typing in the filter took a skill off");
-  // Chromium on Linux undoes typing on ⌃Z only; the Mac's ⌘Z runs this (menubar.ts).
-  await page.evaluate(() => document.execCommand("undo"));
+  // Chromium on Linux undoes typing on ⌃Z only, so the x is still there: the Mac's ⌘Z runs this (menubar.ts).
+  // On a Mac the ⌘Z above already took it back, and another undo would eat the typed skill name.
+  if ((await page.locator(".skill-picker .menu-input").inputValue()).endsWith("x")) await page.evaluate(() => document.execCommand("undo"));
   await page.keyboard.press("Meta+z");
   await until("the typing undone, then the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
   await page.keyboard.press("Meta+z");
@@ -10392,6 +10393,8 @@ journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's
   // Dismissed, the sheet gives the field its focus (and keyboard) back, with the draft.
   await page.keyboard.press("Escape");
   await page.locator(".action-sheet").waitFor({ state: "detached" });
+  await page.waitForTimeout(100);
+  if (!(await field.count())) throw new Error("Esc on the sheet also left Review");
   if ((await field.inputValue()) !== "Fluency feels like knowing") throw new Error("closing the sheet lost the draft");
   await until("dismissing the sheet gives the answer field its focus back", focused);
   // An action picked moves on: the keyboard doesn't come back up over the next exercise.
