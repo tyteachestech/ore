@@ -17,6 +17,12 @@ const ent = (indent: string) =>
     "  com.apple.developer.ubiquity-container-identifiers: [iCloud.com.tylerpoelking.ore]",
     "  com.apple.developer.icloud-services: [CloudDocuments]",
   ].map((l) => indent + l).join("\n");
+// Ore shows in the share sheet for anything that carries a link or a file of any kind (a PDF, a book, audio,
+// a picture, text): the count-based keys missed a PDF handed over as its data with no file URL, as a preview
+// does. What the importer can't read is refused in the app with the next step (D96), never hidden here.
+const RULE =
+  'SUBQUERY(extensionItems, $e, SUBQUERY($e.attachments, $a, ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.url" OR ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.data").@count > 0).@count > 0';
+const OLD_RULE = /NSExtensionActivationRule:\n(?: +NSExtensionActivationSupports\w+: \w+\n)+/;
 let p = readFileSync(yml, "utf8");
 if (!p.includes("OreShare:")) {
   p = p.replace(/(    dependencies:\n)(      - framework: libapp.a)/, "$1      - target: OreShare\n$2");
@@ -40,11 +46,7 @@ if (!p.includes("OreShare:")) {
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: ShareViewController
           NSExtensionAttributes:
-            NSExtensionActivationRule:
-              NSExtensionActivationSupportsWebURLWithMaxCount: 1
-              NSExtensionActivationSupportsText: true
-              NSExtensionActivationSupportsFileWithMaxCount: 1
-              NSExtensionActivationSupportsImageWithMaxCount: 1
+            NSExtensionActivationRule: '${RULE}'
     entitlements:
       path: OreShare/OreShare.entitlements
 ${ent("      ")}
@@ -57,6 +59,9 @@ ${ent("      ")}
         ARCHS: [arm64]
 `;
   writeFileSync(yml, p);
+} else if (OLD_RULE.test(p)) {
+  // A project made before the rule above: swap it in place.
+  writeFileSync(yml, p.replace(OLD_RULE, `NSExtensionActivationRule: '${RULE}'\n`));
 }
 const r = spawnSync("xcodegen", ["generate", "--quiet"], { cwd: gen, stdio: "inherit" });
 process.exit(r.status ?? 1);
