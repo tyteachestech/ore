@@ -2575,6 +2575,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-chip { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; color: var(--text); padding: 6px 12px; font: 14px var(--font); }
 .phone-empty, .phone-error { color: var(--muted); padding: 16px; }
 .phone-error { color: var(--error); }
+/* Shown only once the wait is felt (a slide's time): a library that opens at once never flashes it. */
+.phone-opening { animation: hint-in var(--t-4) var(--t-4) both; }
 /* No hardware keyboard on the phone: the key hints have nothing to point at. */
 .phone-full .review-keys { display: none; }
 /* iPhone: the highlight types for a touch selection (Reader.tsx), bottom centre, clear of iOS's Copy bar and the collected pill. */
