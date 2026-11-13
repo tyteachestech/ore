@@ -1190,6 +1190,8 @@ describe("import coverage: audio and podcasts", () => {
       expect(existsSync(join(item.dir, "thumbnail.png"))).toBe(true); // the show's artwork
       const note = join(lib.root, "inbox", `${item.meta.id}.owed.json`);
       expect(JSON.parse(readFileSync(note, "utf8"))).toMatchObject({ device: "iphone", self: true });
+      // It plays at once from the episode's own address, before a word is heard.
+      expect(audioOf(item, lib)).toEqual({ file: audio, words: [] });
       // Another device leaves it to the one that added it for five minutes, then takes it.
       process.env.ORE_DEVICE = "mac";
       expect(await fillOwed(lib)).toEqual([]);
@@ -1210,6 +1212,7 @@ describe("import coverage: audio and podcasts", () => {
       expect(now.body).toContain("[01:00] Thanks for listening.");
       expect(readFileSync(join(now.dir, "source.mp3")).length).toBe(3_000_000);
       expect(existsSync(note)).toBe(false);
+      expect(audioOf(now, lib)).toMatchObject({ file: join(now.dir, "source.mp3") }); // then from the kept file
     } finally {
       if (device === undefined) delete process.env.ORE_DEVICE;
       else process.env.ORE_DEVICE = device;

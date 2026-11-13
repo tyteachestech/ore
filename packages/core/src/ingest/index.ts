@@ -91,9 +91,17 @@ const VIDEO_TYPES = ["mp4", "mov", "m4v"];
 
 /** A podcast or recording kept whole (D167): its audio file, to play in place, and the transcript's word
  *  times, as `transcriptOf` gives a video's. Audio added before D167 kept only its transcript: null. */
-export function audioOf(item: Item): { file: string; words: [number, string][] } | null {
+export function audioOf(item: Item, lib?: Library): { file: string; words: [number, string][] } | null {
   const file = sourceFile(item);
   const vtt = join(item.dir, "transcript.vtt");
+  if (lib && !file && item.meta.owed?.length) {
+    // An episode whose transcript is owed (D227) plays from its own address until its audio is kept.
+    try {
+      const at = (JSON.parse(readFileSync(owedNote(lib, item.meta.id), "utf8")) as { audio?: unknown }).audio;
+      if (typeof at === "string" && /^https:\/\//.test(at)) return { file: at, words: [] };
+    } catch {}
+    return null;
+  }
   if (!file || !AUDIO_TYPES.includes(extname(file).slice(1).toLowerCase()) || !existsSync(vtt)) return null;
   return { file, words: vttWords(readFileSync(vtt, "utf8")).map((w) => [Math.round(w.t * 100) / 100, w.w]) };
 }
@@ -304,7 +312,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   if (PODCAST.test(url)) {
     // An episode link: its audio, transcribed, under the episode's title (D96).
     const ep = await (await import("./audio.ts")).episode(url);
-    if (opts.owe) return { type: "article", title: ep.title ?? "Episode", url, author: ep.show, published: ep.published, body: "", owed: ["transcript"], picture: ep.artwork };
+    if (opts.owe) return { type: "article", title: ep.title ?? "Episode", url, author: ep.show, published: ep.published, body: "", owed: ["transcript"], picture: ep.artwork, listen: ep.audio };
     opts.onProgress?.(0, "Downloading");
     const res = await get(ep.audio, new URL(ep.audio).host);
     const ext = kindOf(new URL(res.url || ep.audio).pathname, res.headers.get("content-type") ?? "") ?? "mp3";
@@ -494,7 +502,7 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same && ready.owed?.length) {
     mkdirSync(paths.inbox(lib), { recursive: true });
-    writeAtomic(owedNote(lib, item.meta.id), JSON.stringify({ id: item.meta.id, owed: ready.owed, device: deviceName(), added: nowIso(), ...((await canFill(item)) ? { self: true } : {}) }) + "\n");
+    writeAtomic(owedNote(lib, item.meta.id), JSON.stringify({ id: item.meta.id, owed: ready.owed, device: deviceName(), added: nowIso(), ...((await canFill(item)) ? { self: true } : {}), ...(ready.listen ? { audio: ready.listen } : {}) }) + "\n");
   }
   if (!same) await makeThumbnail(item, { from: ready.picture });
   if (!opts.preview) await unarchive(lib, opts.skills); // a Feed post read as a preview isn't filed

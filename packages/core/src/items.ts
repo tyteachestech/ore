@@ -146,6 +146,8 @@ export interface NewItem {
   owed?: "transcript"[];
   /** Its own picture's address (an episode's artwork), saved as the thumbnail; never kept in the meta. */
   picture?: string;
+  /** An owed episode's audio address, to play from until the file is kept; noted beside it, never in the meta. */
+  listen?: string;
 }
 
 export type Asset = { name: string; data: Uint8Array };

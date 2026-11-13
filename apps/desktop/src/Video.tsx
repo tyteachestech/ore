@@ -259,6 +259,7 @@ export function useAudio(file: string | undefined, id: string): Player {
   useEffect(() => {
     if (!file) return;
     moved.current = false;
+    setError(null); // another file (an episode's kept audio after its address failed) starts clean
     const a = new Audio(/^(https?:|data:|blob:)/i.test(file) ? file : convertFileSrc(file));
     a.preload = "metadata";
     a.playbackRate = savedRate();
@@ -395,7 +396,7 @@ function useVideoWidth(box: RefObject<HTMLDivElement | null>) {
 /** The pinned video and its control row (D48). Copies Eleven Reader's player: a full-width scrubber,
  *  then −15, play and +30 as plain text and a dot triangle in the middle (D209), time on the left and speed on
  *  the right. YouTube's own controls are off. Every control shows its shortcut on hover (Hint). */
-export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ticks = [] }: { player: Player; title: string; onFinish: () => void; onOpen: () => void; audio?: boolean; ticks?: number[] }) {
+export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, owed = false, ticks = [] }: { player: Player; title: string; onFinish: () => void; onOpen: () => void; audio?: boolean; owed?: boolean; ticks?: number[] }) {
   const [scrub, setScrub] = useState<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const size = useVideoWidth(box);
@@ -405,7 +406,7 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ti
   return (
     <div className={`player${audio ? " audio" : ""}`} ref={box} style={size.fit && !audio ? { width: size.fit.width, marginLeft: size.fit.left } : undefined}>
       {audio ? (
-        player.error !== null && <div className="video-error">This recording won’t play here. Its transcript is below.</div>
+        player.error !== null && <div className="video-error">{owed ? "This episode won’t play here. Its transcript is on its way." : "This recording won’t play here. Its transcript is below."}</div>
       ) : (
       <div className="video-frame">
         <iframe

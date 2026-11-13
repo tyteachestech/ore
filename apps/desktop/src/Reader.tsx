@@ -44,7 +44,7 @@ import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, pageChunks, pageOf, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
-import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
+import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer, type Player } from "./Video";
 import { ownsMediaKey } from "./media-keys";
 import { FillingLine, useFilling } from "./Filling";
 import { errorText, focusQuietly, inOrder, kept, load, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
@@ -637,10 +637,21 @@ const NEAR = 64;
  *  starts over on the new text rather than patching what it drew. */
 export function Reader(p: Props) {
   const [version, setVersion] = useState(0);
-  return <ReaderView key={version} {...p} reload={() => setVersion((v) => v + 1)} />;
+  // A recording's audio lives here, above the view that is drawn anew when the source is read again, and
+  // keeps the address it began with: an episode streamed while its transcript was owed (D227) isn't cut
+  // off and sent back to 0:00 when the transcript lands and its audio is a kept file.
+  const [from, setFrom] = useState<{ id: string; file: string } | null>(null);
+  const recording = useAudio(from?.id === p.id ? from.file : undefined, p.id);
+  // Only while it is this source's and plays: an address that failed gives way to the kept file, and
+  // another source opened in between starts this one from its file again.
+  const failed = useRef(false);
+  failed.current = recording.error !== null;
+  const playFrom = useCallback((file: string) => setFrom((f) => (f?.id === p.id && !failed.current ? f : { id: p.id, file })), [p.id]);
+  useEffect(() => setFrom((f) => (f?.id === p.id ? f : null)), [p.id]);
+  return <ReaderView key={version} {...p} reload={() => setVersion((v) => v + 1)} recording={recording} playFrom={playFrom} />;
 }
 
-function ReaderView(p: Props & { reload: () => void }) {
+function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom: (file: string) => void }) {
   const [doc, setDoc] = useState<Doc | null>(null);
   /** In a course (D79), the first lesson after this one not done yet: the closing card offers it. */
   const nextUp = p.lessons?.slice(p.lessons.findIndex((l) => l.id === p.id) + 1).find((l) => l.status !== "done");
@@ -832,7 +843,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   const { onSound } = p;
   useEffect(() => onSound?.(!!video), [onSound, video]);
   const youtube = useYouTube(doc?.transcript?.video, p.id);
-  const recording = useAudio(audio?.file, p.id);
+  const { recording, playFrom } = p;
+  useEffect(() => void (audio && playFrom(audio.file)), [audio, playFrom]);
   const player = audio ? recording : youtube;
   // A page with its video (D92): the player and its transcript sit in a card at the top of the text,
   // not pinned, and the transcript follows the speaker inside the card. Folding is kept per source.
@@ -3281,7 +3293,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's
                 og:image or site logo only repeats what the title says, and a video's picture is its player. */}
-            {doc.thumbnail && (doc.type === "pdf" || doc.type === "epub" || (!video && (!!doc.audio || !!doc.owed?.length))) && <Thumb item={doc} className="doc-thumb" />}
+            {doc.thumbnail && (doc.type === "pdf" || doc.type === "epub" || (!doc.transcript && !!doc.owed?.length)) && <Thumb item={doc} className="doc-thumb" />}
             {doc.course && p.lessons && p.lessons.length > 1 && <CourseLine id={doc.id} course={doc.course} lessons={p.lessons} onOpen={p.onOpenLesson} />}
             {renaming ? (
               <TitleField className="title-edit" value={doc.title} onSave={(t) => retitle(doc.id, doc.title, t.trim())} onClose={() => setRenaming(false)} />
@@ -3363,6 +3375,7 @@ function ReaderView(p: Props & { reload: () => void }) {
               <VideoPlayer
                 player={player}
                 audio={!!audio}
+                owed={!!doc.owed?.length}
                 ticks={ticks}
                 title={doc.title}
                 onFinish={() => p.setFinishing(true)}
