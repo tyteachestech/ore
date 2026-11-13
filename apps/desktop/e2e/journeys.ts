@@ -9909,6 +9909,53 @@ async function press(page: Page, target: Locator, ms = 650) {
   await send("touchend", 0);
 }
 
+// iPhone sizes, not the Mac's (Tyler 2026-11-13, option A): list titles 17 pt, every tap 44 pt, the bar's buttons round.
+journey("phone: Finish comes straight after a source's text, with the room for the bars under it (F-new-phone-finish-gap)", async (page) => {
+  // The text's bottom room (for the player and the bar) sat above Finish, so a short recording's Finish hung 200 pt
+  // below its last line, down by the player.
+  await phoneSource(page, "Lecture 4 the testing effect");
+  await page.locator(".phone-source .player.audio").waitFor();
+  const gap = await page.locator(".phone-source").evaluate((root) => {
+    const ps = [...root.querySelectorAll<HTMLElement>(".doc p")];
+    return root.querySelector(".phone-finish button")!.getBoundingClientRect().top - ps[ps.length - 1]!.getBoundingClientRect().bottom;
+  });
+  if (gap > 80) throw new Error(`Finish sits ${Math.round(gap)} px below the last line`);
+  await page.locator(".phone-source .reader-scroll").evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await Bun.sleep(300);
+  const fin = (await page.locator(".phone-finish button").boundingBox())!;
+  const player = (await page.locator(".phone-source .player.audio").boundingBox())!;
+  if (fin.y + fin.height > player.y) throw new Error(`scrolled to the end, Finish (foot ${Math.round(fin.y + fin.height)}) runs under the player (top ${Math.round(player.y)})`);
+}, "phone");
+
+journey("phone: every tap on a skill page is at least 44 pt (F-new-phone-skill-small-taps)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
+  await page.locator(".phone-skill .head-tab-btn").first().waitFor();
+  // What a finger hits: the control, grown by an unseen ::before or ::after laid over it (the question circles' way).
+  const small = await page.locator(".phone-skill").evaluate((root) => [...root.querySelectorAll<HTMLElement>("button, [role=button], [role=tab]")].flatMap((e) => {
+    const r = e.getBoundingClientRect();
+    if (!r.width || !r.height) return [];
+    let [w, h] = [r.width, r.height];
+    for (const at of ["::before", "::after"]) {
+      const cs = getComputedStyle(e, at);
+      if (cs.content === "none" || cs.position !== "absolute") continue;
+      const out = (v: string) => Math.max(0, -parseFloat(v) || 0);
+      w = Math.max(w, r.width + out(cs.left) + out(cs.right));
+      h = Math.max(h, r.height + out(cs.top) + out(cs.bottom));
+    }
+    return w < 44 || h < 44 ? [`${e.getAttribute("aria-label") ?? e.textContent?.trim().slice(0, 20)} ${Math.round(w)}×${Math.round(h)}`] : [];
+  }));
+  if (small.length) throw new Error(`taps under 44 pt on the skill page: ${small.join(", ")}`);
+}, "phone");
+
+journey("phone: Today's list titles are 17 pt and the bar's buttons are 44 pt rounds (iPhone sizing A)", async (page) => {
+  await page.locator(".home-read").first().waitFor();
+  const size = await page.locator(".home-read .title").first().evaluate((e) => getComputedStyle(e).fontSize);
+  if (size !== "17px") throw new Error(`Continue reading titles are ${size}, the Mac's size; iOS lists are 17 pt`);
+  const bar = await page.locator(".phone-bar .phone-back").first().evaluate((e) => { const r = e.getBoundingClientRect(); return [r.width, r.height, getComputedStyle(e).borderRadius]; });
+  if (bar[0] !== 44 || bar[1] !== 44 || !String(bar[2]).startsWith("999")) throw new Error(`the bar's menu button is ${bar[0]}×${bar[1]}, radius ${bar[2]}: want a 44 pt round`);
+}, "phone");
+
 // The phone's ⋯ is a sheet, not a menu: it draws the same icons as the Mac's menus (Tyler 2026-11-13).
 journey("phone: every row of a source's ⋯ sheet has its icon", async (page) => {
   await phoneSource(page, "The Story Spine");
