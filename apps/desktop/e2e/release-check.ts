@@ -41,6 +41,7 @@ let lib: string | undefined;
 let bridge: ReturnType<typeof Bun.spawn> | undefined;
 let server: ReturnType<typeof Bun.serve> | undefined;
 let browser: Browser | undefined;
+let at = "the start"; // the screen the walk is on, so a timeout says where
 try {
   lib = mkdtempSync(join(tmpdir(), "ore-release-"));
   await $`bun ${join(MOCK, "seed.ts")} ${lib}`.quiet();
@@ -87,13 +88,19 @@ try {
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
   await page.goto(`${origin}/`);
 
+  at = "Home";
   await page.locator(".side-item").first().waitFor();
+  at = "All sources";
   await page.getByRole("button", { name: /^All sources/ }).click();
   await page.locator(".row").first().click();
+  at = "a source";
   await page.locator(".doc-head").waitFor();
+  at = "a skill";
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  at = "All sources again";
   await page.getByRole("button", { name: /^All sources/ }).click();
   await page.locator(".row").first().waitFor();
+  at = "a review";
   await page.keyboard.press("Meta+r");
   const pick = page.getByRole("dialog", { name: "What to review" });
   const q = page.locator(".review-q");
@@ -108,7 +115,7 @@ try {
   for (const f of fonts) if (f) problems.push(`font failed to load: ${f}`);
   await page.waitForTimeout(300);
 } catch (e) {
-  problems.push(`the walk broke: ${(e as Error).message.split("\n")[0]}`);
+  problems.push(`the walk broke at ${at}: ${(e as Error).message.split("\n")[0]}`);
 } finally {
   await browser?.close();
   server?.stop(true);
