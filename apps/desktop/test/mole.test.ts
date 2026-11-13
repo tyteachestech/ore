@@ -313,9 +313,16 @@ test("traced: asleep in profile he lies along the foot of the box, head to the l
   const d = fine(MOVES.doze.still), xs = d.map(([x]) => x), ys = d.map(([, y]) => y);
   expect(d.some(([, , , t]) => t === "dirt" || t === "eye" || t === "glint")).toBe(false);
   // Longer than he is tall, and nothing under the bed.
-  expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(36);
+  expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(30);
   expect(Math.max(...ys)).toBeLessThan(ROWS);
-  expect(Math.min(...ys)).toBeGreaterThan(-4);
+  expect(Math.min(...ys)).toBeGreaterThan(-7);
+  // Stout (Tyler, 2026-11-13): his belly is a hill higher than his nose, and he has feet but no legs: the white of
+  // his feet starts within five rows of his far end.
+  const nose = Math.min(...d.filter(([, , , t]) => t === "nose").map(([, y]) => y));
+  expect(Math.min(...ys)).toBeLessThan(nose - 1);
+  const feet = d.filter(([x, , , t]) => t === "fine-9" && x > COLS / 2 + 13);
+  expect(feet.length).toBeGreaterThan(40);
+  expect(Math.max(...xs) - Math.min(...feet.map(([x]) => x))).toBeLessThan(5.5);
   // The lamp is at the head end, the feet at the other.
   const lamp = d.filter(([, , , t]) => t === "lamp").map(([x]) => x);
   expect(Math.max(...lamp)).toBeLessThan(COLS / 2 - 8);
