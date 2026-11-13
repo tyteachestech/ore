@@ -391,3 +391,27 @@ test("the row of results (D252): kept, days of memory, then the rarest true thin
   expect(endTiles({ session: session({ depth_days: 900 }), ups: [] })[1]).toMatchObject({ value: "+2.5", label: "years of memory" });
   expect(endTiles({ session: session({ rescued: 1 }), ups: [] })[1]!.hint).toContain("lose it");
 });
+
+test("the glint (D-new-dot-glint): a light crosses the ring and the field behind it only when this session closed the goal, and each number once it has landed; Reduce Motion plays none", async () => {
+  reduce = true;
+  try {
+    // The goal closed in this session: the ring, the field and the numbers all carry it.
+    const closed = await mount(end([]));
+    expect(closed.q(".ring.glint")).toBe(1);
+    expect(closed.q(".end-emblem[data-glint]")).toBe(1);
+    expect(closed.q(".end-tally .dot-number.glint")).toBe(closed.q(".end-tally .dot-number"));
+    expect(closed.q(".end-tally .dot-number")).toBeGreaterThan(0);
+    await closed.done();
+    // The goal was already met before it: the numbers still land, but the ring and the field stay still.
+    const met = await mount(end([], today(true, 600_000), today(true, 660_000)));
+    expect(met.q(".ring.glint")).toBe(0);
+    expect(met.q(".end-emblem[data-glint]")).toBe(0);
+    await met.done();
+  } finally {
+    reduce = false;
+  }
+  const css = await Bun.file(new URL("../src/styles.css", import.meta.url)).text();
+  // Once, never a loop, and off under Reduce Motion.
+  expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.glint circle, \.end-emblem\[data-glint\]::after \{ animation: none; \} \}/);
+  for (const [rule] of css.matchAll(/[^{}]*glint[^{}]*\{[^{}]*animation:[^{}]*\}/g)) expect(rule).not.toContain("infinite");
+});

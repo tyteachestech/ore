@@ -17,7 +17,7 @@ export function DotRing({ size, share, ghost = 0 }: { size: number; share: numbe
     <svg className="dot-ring" width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
       {Array.from({ length: n }, (_, i) => {
         const a = (i / n) * 2 * Math.PI - Math.PI / 2;
-        return <circle key={i} className={i < on ? "on" : i < soon ? "soon" : undefined} cx={+(50 + 43 * Math.cos(a)).toFixed(2)} cy={+(50 + 43 * Math.sin(a)).toFixed(2)} r={+r.toFixed(2)} style={{ transitionDelay: `calc(${i} * var(--stagger))` }} />;
+        return <circle key={i} className={i < on ? "on" : i < soon ? "soon" : undefined} cx={+(50 + 43 * Math.cos(a)).toFixed(2)} cy={+(50 + 43 * Math.sin(a)).toFixed(2)} r={+r.toFixed(2)} style={{ transitionDelay: `calc(${i} * var(--stagger))`, "--i": i } as React.CSSProperties} />;
       })}
     </svg>
   );
@@ -34,7 +34,8 @@ export function DotBar({ share, n, className }: { share: number; n: number; clas
 }
 
 /** The daily goal as a ring (D60), like Apple Fitness's move ring: it fills from `from` to `value`
- *  when shown and plays one short burst when `burst` is set (D62; none under Reduce Motion). */
+ *  when shown and plays one short burst when `burst` is set (D62; none under Reduce Motion), a glint running
+ *  once round its dots with it (D-new-dot-glint). */
 export function Ring({ value, from = 0, size = 64, met, burst = false, label }: { value: number; from?: number; size?: number; met: boolean; burst?: boolean; label: string }) {
   const [shown, setShown] = useState(from);
   const target = met ? 1 : Math.max(0, Math.min(1, value));
@@ -43,7 +44,7 @@ export function Ring({ value, from = 0, size = 64, met, burst = false, label }: 
     return () => cancelAnimationFrame(f);
   }, [target]);
   return (
-    <div className={`ring${met ? " met" : ""}`} style={{ width: size, height: size }} role="img" aria-label={label}>
+    <div className={`ring${met ? " met" : ""}${burst ? " glint" : ""}`} style={{ width: size, height: size }} role="img" aria-label={label}>
       <DotRing size={size} share={shown} />
       {burst && <span className="ring-burst" aria-hidden="true" />}
     </div>
@@ -71,13 +72,14 @@ const DIGITS: Record<string, string[]> = {
 };
 
 /** A number drawn in the ring's own fat round dots (D242), `height` px tall: a screen's hero number where the dot
- *  face's one-dot stroke is too thin to carry it. Decorative: the caller says the number in text beside it. */
-export function DotNumber({ value, height }: { value: number | string; height: number }) {
+ *  face's one-dot stroke is too thin to carry it. Decorative: the caller says the number in text beside it.
+ *  `glint`: a light crosses its dots once, as the number lands (D-new-dot-glint). */
+export function DotNumber({ value, height, glint }: { value: number | string; height: number; glint?: boolean }) {
   const chars = [...(typeof value === "string" ? value : String(Math.max(0, Math.round(value))))];
   const w = chars.length * 6 - 1;
   return (
-    <svg className="dot-number" width={(height * w) / 7} height={height} viewBox={`0 0 ${w} 7`} aria-hidden="true">
-      {chars.flatMap((ch, k) => (DIGITS[ch] ?? []).flatMap((row, y) => [...row].map((on, x) => (on === "1" ? <circle key={`${k}-${x}-${y}`} cx={k * 6 + x + 0.5} cy={y + 0.5} r={0.46} /> : null))))}
+    <svg className={`dot-number${glint ? " glint" : ""}`} width={(height * w) / 7} height={height} viewBox={`0 0 ${w} 7`} aria-hidden="true">
+      {chars.flatMap((ch, k) => (DIGITS[ch] ?? []).flatMap((row, y) => [...row].map((on, x) => (on === "1" ? <circle key={`${k}-${x}-${y}`} cx={k * 6 + x + 0.5} cy={y + 0.5} r={0.46} style={glint ? ({ "--i": k * 6 + x + y * 0.6 } as React.CSSProperties) : undefined} /> : null))))}
     </svg>
   );
 }
