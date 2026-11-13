@@ -9910,7 +9910,7 @@ async function press(page: Page, target: Locator, ms = 650) {
 }
 
 // iPhone sizes, not the Mac's (Tyler 2026-11-13, option A): list titles 17 pt, every tap 44 pt, the bar's buttons round.
-journey("phone: Finish comes straight after a source's text, with the room for the bars under it (F-new-phone-finish-gap)", async (page) => {
+journey("phone: Finish comes straight after a source's text, with the room for the bars under it (F88)", async (page) => {
   // The text's bottom room (for the player and the bar) sat above Finish, so a short recording's Finish hung 200 pt
   // below its last line, down by the player.
   await phoneSource(page, "Lecture 4 the testing effect");
@@ -9927,7 +9927,7 @@ journey("phone: Finish comes straight after a source's text, with the room for t
   if (fin.y + fin.height > player.y) throw new Error(`scrolled to the end, Finish (foot ${Math.round(fin.y + fin.height)}) runs under the player (top ${Math.round(player.y)})`);
 }, "phone");
 
-journey("phone: every tap on a skill page is at least 44 pt (F-new-phone-skill-small-taps)", async (page) => {
+journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
   await page.locator(".phone-skill .head-tab-btn").first().waitFor();

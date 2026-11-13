@@ -2694,9 +2694,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .phone-bar .phone-back svg { width: 22px; height: 22px; }
 .phone .phone-source .reader-tools .width-toggle { display: grid; place-items: center; }
 .phone :is(.home-h, .home-cont .home-h, .phone-sources h2) { font: 500 13px var(--mono); letter-spacing: .04em; color: var(--faint); margin-top: 28px; padding-bottom: 8px; }
-.phone .home-read { height: 60px; gap: 12px; }
+.phone .home-read { min-height: 60px; }
 .phone .home-read .title { font-size: 17px; }
-.phone .home-new { font-size: 15px; }
 .phone .phone-sources li button { min-height: 60px; font-size: 17px; gap: 12px; }
 .phone .home-skill { min-height: 60px; }
 .phone .home-day { font-size: 13px; }
