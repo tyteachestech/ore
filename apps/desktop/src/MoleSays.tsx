@@ -30,7 +30,8 @@ export function MoleSays({ lines, run = true, tail = "left", className = "", chi
     if (!run || !done || over || within || lines.length < 2) return;
     const id = setTimeout(() => (setAt((i) => i + 1), setTyped(0)), HOLD_MS);
     return () => clearTimeout(id);
-  }, [run, done, over, within, lines.length]);
+  // `at`: under Reduce Motion every line is whole at once, so only the turn itself starts the next hold.
+  }, [run, done, over, within, lines.length, at]);
   if (!line) return null;
   const words = (
     <p className="says-line" tabIndex={line.hint ? 0 : undefined}>

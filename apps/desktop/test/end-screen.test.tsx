@@ -179,14 +179,20 @@ test("the mole's lines share one speech box: each is typed out a letter at a tim
   await act(async () => void box.dispatchEvent(new win.MouseEvent("mouseout", { bubbles: true })));
   await act(async () => void jest.advanceTimersByTime(6000));
   expect(line()!.textContent).toBe(second);
-  jest.useRealTimers();
   await s.done();
   reduce = true;
   const flat = await mount(e as never);
-  reduce = false;
   // Reduce Motion: the line stands whole at once, nothing left to type.
   expect(flat.body.querySelector(".end-says .says-line")!.firstChild!.textContent).toBe("Honest work.");
   expect(flat.q(".says[data-typing]")).toBe(0);
+  // And the lines still take turns, each whole, round and round.
+  const said = () => flat.body.querySelector(".end-says .says-line")!.textContent;
+  await act(async () => void jest.advanceTimersByTime(2600));
+  expect(said()).toBe("+41 days of memory. You dug that.");
+  await act(async () => void jest.advanceTimersByTime(2600));
+  expect(said()).toBe("2 pulled back just before you’d have lost them.");
+  reduce = false;
+  jest.useRealTimers();
   // Under the emblem nothing of Ore's is left but the count, and with no gem cut that stands in the ring (D242, D243).
   expect(flat.q(".review-end > p, .review-end > .end-lines")).toBe(0);
   expect(flat.q(".review-end h2")).toBe(0);

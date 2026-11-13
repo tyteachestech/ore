@@ -16,7 +16,7 @@ import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { endSays } from "./end-says";
-import { MoleSays } from "./MoleSays";
+import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotBar, DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
@@ -1480,8 +1480,6 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
   );
 }
 
-/** How long one line of the end screen holds before the next rolls up. */
-const LINE_MS = 2600;
 
 /** The end screen's lines (D241): one place, one line at a time. Each rolls up into it, holds, and rolls on up
  *  as the next arrives, round and round; the pointer or the keyboard on a line holds it. Every line is in the
@@ -1496,7 +1494,7 @@ function EndLines({ run, children }: { run: boolean; children: React.ReactNode }
   const flat = still();
   useEffect(() => {
     if (flat || !run || held || lines.length < 2) return;
-    const id = setInterval(() => setAt((i) => i + 1), LINE_MS);
+    const id = setInterval(() => setAt((i) => i + 1), HOLD_MS);
     return () => clearInterval(id);
   }, [flat, run, held, lines.length]);
   if (flat || lines.length < 2) return <>{lines}</>;
