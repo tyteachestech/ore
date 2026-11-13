@@ -4422,7 +4422,7 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.keyboard.press("ArrowLeft");
   await until("a second arrow goes back to To read", async () => (await on("To read")) === "true");
-  // Also on a skill page opened from Home, whose tab used to remount the page under the focused tab (F54).
+  // Also on a skill page opened from Home, whose tab used to remount the page under the focused tab (F55).
   await page.getByRole("button", { name: /^Home/ }).click();
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   await tabs.getByRole("tab", { name: "To read" }).click();
@@ -10368,7 +10368,7 @@ const itemFile = (lib: string, slug: string, name: string) => {
 };
 const cardFile = (lib: string, text: string) => join(lib, "cards", readdirSync(join(lib, "cards")).find((f) => f.endsWith(".md") && readFileSync(join(lib, "cards", f), "utf8").includes(text))!);
 
-journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's place, and the draft stays (F52)", async (page) => {
+journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's place, and the draft stays (F53)", async (page) => {
   // Its sheet opened behind the keyboard: the field kept focus, so the keyboard stayed up over it (Mail and Notes put it away).
   await tap(page, page.getByRole("button", { name: "Start review" }).first());
   await page.locator(".review-pick").waitFor();
@@ -10403,7 +10403,7 @@ journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's
   if (await field.count() && (await focused())) throw new Error("picking Later gave the answer field its focus back, so the keyboard comes up again");
 }, "phone");
 
-// iOS takes a first tap as a hover when the hover shows or hides something, and clicks only on the second (F53).
+// iOS takes a first tap as a hover when the hover shows or hides something, and clicks only on the second (F54).
 journey("phone: a hover on a Today row or skill shows or hides nothing, so one tap opens it", async (page) => {
   const row = page.locator(".home-read").first();
   await row.waitFor();

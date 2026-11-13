@@ -53,3 +53,29 @@ export function Ring({ value, from = 0, size = 64, met, burst = false, label }: 
 export const minutes = (ms: number) => Math.max(0, Math.round(ms / 60_000));
 /** Minutes for display: a few seconds of review shows as "<1", never as 0. */
 export const minutesText = (ms: number) => (ms > 0 && ms < 30_000 ? "<1" : String(minutes(ms)));
+
+// Digits on a 5 by 7 grid, one string per row, for `DotNumber`.
+const DIGITS: Record<string, string[]> = {
+  "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+  "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+  "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+  "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+  "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+  "5": ["11111", "10000", "11110", "00001", "00001", "10001", "01110"],
+  "6": ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
+  "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+  "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+  "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+};
+
+/** A number drawn in the ring's own fat round dots (D242), `height` px tall: a screen's hero number where the dot
+ *  face's one-dot stroke is too thin to carry it. Decorative: the caller says the number in text beside it. */
+export function DotNumber({ value, height }: { value: number; height: number }) {
+  const chars = [...String(Math.max(0, Math.round(value)))];
+  const w = chars.length * 6 - 1;
+  return (
+    <svg className="dot-number" width={(height * w) / 7} height={height} viewBox={`0 0 ${w} 7`} aria-hidden="true">
+      {chars.flatMap((ch, k) => (DIGITS[ch] ?? []).flatMap((row, y) => [...row].map((on, x) => (on === "1" ? <circle key={`${k}-${x}-${y}`} cx={k * 6 + x + 0.5} cy={y + 0.5} r={0.46} /> : null))))}
+    </svg>
+  );
+}

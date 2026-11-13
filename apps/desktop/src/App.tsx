@@ -2324,7 +2324,7 @@ export function App() {
         {tutorButton}
         <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
         {/* A skill page is the same page wherever it was opened from: a place change under it (its folder tab,
-            ⌘1, from Home) must not remount it and drop the tab that has focus (F54). */}
+            ⌘1, from Home) must not remount it and drop the tab that has focus (F55). */}
         <Boundary key={`${openId}-${skill}-${skill ? "" : place}`} onBack={goHome}>
         {openId ? (
           <Reader

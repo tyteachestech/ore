@@ -321,7 +321,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
     picked.current = false;
     const was = (back.current = document.activeElement as HTMLElement | null);
     // A sheet opened over a field being typed puts the keyboard away, as Mail and Notes do, or iOS leaves
-    // it up over the sheet (F52). The draft stays; dismissing the sheet gives the field its focus back.
+    // it up over the sheet (F53). The draft stays; dismissing the sheet gives the field its focus back.
     const typing = !keepFocus && !!was && (was.isContentEditable || was.matches("input, textarea"));
     if (typing) was.blur();
     // A frame later: the sheet's own trap is in place by then and has paused the one around the page (Review's).
