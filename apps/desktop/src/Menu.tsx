@@ -324,8 +324,11 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
     // it up over the sheet (F52). The draft stays; dismissing the sheet gives the field its focus back.
     const typing = !keepFocus && !!was && (was.isContentEditable || was.matches("input, textarea"));
     if (typing) was.blur();
-    box.current?.focus();
+    // A frame later: the sheet's own trap is in place by then and has paused the one around the page (Review's).
+    // Focused at once, that trap, which doesn't hold the portaled sheet, took focus back to the answer field.
+    const raf = requestAnimationFrame(() => box.current?.focus());
     return () => {
+      cancelAnimationFrame(raf);
       if (!keepFocus && !(typing && picked.current)) back.current?.focus?.();
     };
   }, [open, keepFocus]);
