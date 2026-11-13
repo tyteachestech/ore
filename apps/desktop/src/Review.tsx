@@ -1548,7 +1548,7 @@ function CountUp({ value, go }: { value: string; go: boolean }) {
     });
     return () => cancelAnimationFrame(frame);
   }, [go]);
-  return <DotNumber value={m ? `${m[1]}${(Number(m[2]) * k).toFixed(m[3]?.length ?? 0)}` : value} height={28} />;
+  return <DotNumber value={m ? `${m[1]}${(Number(m[2]) * k).toFixed(m[3]?.length ?? 0)}` : value} height={28} glint={go && k >= 1} />;
 }
 
 /** How long after one result the next lands. */
@@ -1687,7 +1687,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       ) : (
         <>
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
-          <div className="end-emblem">
+          <div className="end-emblem" data-glint={(closed && full) || undefined}>
             <span className={`review-mole${nap && fell ? " fell" : ""}`}>{up && <Mole bare size={96} mood={mood} />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {settled && (

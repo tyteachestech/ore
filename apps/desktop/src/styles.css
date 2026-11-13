@@ -2025,6 +2025,17 @@ button.home-plan:hover { color: var(--text); }
 .ring { position: relative; flex: none; }
 .ring-burst { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); animation: ring-burst 700ms ease-out 550ms 1 both; }
 @keyframes ring-burst { from { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); } to { transform: scale(1.25); opacity: 0; box-shadow: 0 0 0 14px transparent; } }
+/* The glint (D257, after Magic UI's shiny text): a light that crosses a dot drawing once, at a moment that was
+   earned. Each dot lights and swells in its turn, `--i` beats after the first; nothing is laid over them. Never a loop. */
+.glint circle { transform-box: fill-box; transform-origin: center; animation: glint var(--t-4) var(--ease-out) calc(var(--glint-at, 0ms) + var(--i, 0) * var(--glint-gap, 40ms)); }
+.ring.glint { --glint-at: 550ms; --glint-gap: 24ms; }
+.review-end.carted .ring.glint { --glint-at: 0ms; }
+@keyframes glint { 35% { fill: #fff; transform: scale(1.25); } }
+/* With the goal closing, the same light crosses the field of dots behind the emblem, once. */
+.end-emblem[data-glint]::after { content: ""; position: absolute; inset: -48px 0 -72px; z-index: -1; pointer-events: none; background-image: radial-gradient(circle, color-mix(in oklab, var(--c-green) 70%, var(--text)) 1.3px, transparent 1.8px); background-size: 9px 9px; background-position: center; -webkit-mask-image: linear-gradient(115deg, transparent 42%, #000 50%, transparent 58%), radial-gradient(closest-side, #000, transparent); mask-image: linear-gradient(115deg, transparent 42%, #000 50%, transparent 58%), radial-gradient(closest-side, #000, transparent); -webkit-mask-composite: source-in; mask-composite: intersect; -webkit-mask-size: 300% 100%, auto; mask-size: 300% 100%, auto; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: 100% 0, 0 0; mask-position: 100% 0, 0 0; opacity: 0; animation: glint-field 1100ms var(--ease-in-out) var(--glint-at, 550ms); }
+.review-end.carted .end-emblem[data-glint]::after { --glint-at: 0ms; }
+@keyframes glint-field { from { opacity: 1; -webkit-mask-position: 100% 0, 0 0; mask-position: 100% 0, 0 0; } to { opacity: 1; -webkit-mask-position: 0% 0, 0 0; mask-position: 0% 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) { .glint circle, .end-emblem[data-glint]::after { animation: none; } }
 
 /* Review (D59): one card centred, the keys at the foot; nothing counts the session on top (D246). */
 .review[hidden] { display: none; }
@@ -2617,6 +2628,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-swipe { position: absolute; inset: 0; display: flex; align-items: center; color: var(--muted); font: 400 12px var(--mono); }
 .phone-swipe.left { justify-content: flex-end; }
 .phone-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A source's title in a list takes two lines before it cuts (Books, Podcasts); the row grows only when it needs to. */
+.phone-sources .phone-title:not(.phone-two) { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+.phone-sources li button { padding-block: 8px; }
 /* The source's picture (D77) tells it apart; its kind shows as the icon when it has none. 16:9 like the Mac's, at list size. */
 .phone-thumb { width: 48px; height: 27px; }
 .phone-thumb.none svg { width: 16px; height: 16px; }
@@ -2648,6 +2662,16 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .home-cols .col-divider { display: none; }
 .phone .home-h, .phone .home-cont .home-h { margin: 32px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .phone .home-read { margin: 0; padding: 0; height: 56px; border-bottom: 1px solid var(--border); }
+/* A title gets the row's whole width on two lines, and how far he is sits under the picture (Tyler's pick C,
+   2026-11-13; the Mac's rows put progress under the picture too). The row grows to fit the second line. */
+.phone .home-read { display: grid; grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: 36px auto; column-gap: 12px; row-gap: 5px; align-content: center; height: auto; min-height: 56px; padding: 10px 0; }
+.phone .home-read .thumb { grid-area: 1 / 1; }
+.phone .home-read :is(.title, .row-rename) { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+.phone .home-read .title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+.phone .home-read:has(.course-of) .title { grid-row: 1; align-self: end; }
+.phone .home-read .course-of { grid-area: 2 / 2; max-width: none; align-self: start; }
+.phone .home-read :is(.home-meter, .home-new) { grid-area: 2 / 1; width: 64px; text-align: center; line-height: 1; }
+.phone .home-read .home-meter .dot-bar { width: 100%; justify-content: space-between; }
 .phone .home-skills { display: flex; flex-direction: column; gap: 0; }
 .phone .home-skill { flex-direction: row; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border); margin: 0; padding: 0; min-height: 56px; }
 .phone :is(.home-read, .home-skill):last-child { border-bottom: 0; }
