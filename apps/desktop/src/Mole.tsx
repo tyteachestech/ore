@@ -139,7 +139,7 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   doze: { from: DOZE, to: DOZE, loop: 3000, still: DOZE,
     at: [[0, { to: { breath: 1 } }], [1300, { to: { breath: 0 }, kick: { puff: 2 } }], [2000, { to: { legs: 1 } }], [2250, { to: { legs: 0 } }]] },
   // Falling: eyes wide, mouth an O, arms flung out and his feet running on nothing.
-  fall: { from: { whole: 1 }, to: FALL, loop: 360, still: FALL, at: [[0, { to: { legs: 1, arms: 0.75 } }], [180, { to: { legs: -1, arms: 1 } }]] },
+  fall: { from: { whole: 1, side: 0 }, to: FALL, loop: 360, still: FALL, at: [[0, { to: { legs: 1, arms: 0.75 } }], [180, { to: { legs: -1, arms: 1 } }]] },
 };
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */

@@ -219,3 +219,13 @@ test("traced: no dot of the helmet is alone a shade whiter than the dots round i
   const top = fine().filter(([, y, , t]) => t === "fine-9" && y < 8);
   for (const [x, y] of top) expect(top.some(([a, b]) => (a !== x || b !== y) && Math.hypot(a - x, b - y) < 1)).toBe(true);
 });
+
+test("waking from his sleep on the cart he is the front view from the first frame, never the sleeper stood on end (F98)", () => {
+  const s = puppet();
+  start(s, "doze", 0);
+  for (let t = 16; t < 2000; t += 16) advance(s, t, 0.016);
+  expect(s.v.side).toBeGreaterThan(0.5);
+  start(s, "fall", 2000);
+  expect(s.v.side).toBeLessThan(0.5);
+  expect(s.v.whole).toBeGreaterThan(0.5);
+});

@@ -91,14 +91,17 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   expect(s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood")).toBe("doze");
   expect(s.q(".cart-zzz")).toBe(1);
   expect(s.q(".review-mole .mole")).toBe(0);
-  let awake = false;
+  let awake = false, grounded = false;
   for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
     await act(async () => void jest.advanceTimersByTime(20));
     // Awake in the air before he lands, and never two moles at once.
     if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "fall") awake = true;
     if (s.q(".cart-tip")) expect(s.q(".review-mole .mole")).toBe(0);
+    // He falls into his hole: under the dirt line nothing of him is drawn, so the ring never crosses his belly (F94).
+    if (s.body.querySelector<HTMLElement>(".cart-ground")?.style.clipPath.startsWith("inset(")) grounded = true;
   }
   expect(awake).toBe(true);
+  expect(grounded).toBe(true);
   expect(s.q(".review-mole .mole")).toBe(1);
   for (let i = 0; i < 200; i++) await act(async () => void jest.advanceTimersByTime(50));
   expect(s.body.querySelector(".end-says")!.textContent).toContain("Goal met. I supervised.");

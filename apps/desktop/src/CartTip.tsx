@@ -26,6 +26,8 @@ const HEAP: [number, number][] = [[5.6, -0.3], [8.4, -0.3], [11.2, -0.3], [14, -
 const ROUGH = 6;
 /** The mole riding the load: drawn at the size he stands at on the ring, shown smaller on the cart: `DOZE` asleep (side on, about 80px long), `RIDER` once awake. */
 const RIDER_PX = 96, DOZE = 0.45, RIDER = 0.55;
+/** How far over the foot of his seat the dirt line is: the top of the seated mole's row of dirt. */
+const GROUND = 3;
 /** A snoring Z, in dots on a 4 by 4 grid (the mole's own Z). */
 const Z = [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3], [3, 3]] as const;
 
@@ -169,7 +171,11 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       const gone = stoned + 340, HANG = ms("--t-3", 200);
       later(gone + HANG, () => { flushSync(() => setAwake(true)); play(rider, [{ transform: tf(x + 6, up, -90, RIDER) }, { transform: tf(x + 6, up, -90, RIDER) }], { duration: 1 }); });
       later(gone + 2 * HANG, () => {
-        const o = el.getBoundingClientRect(), to = seat.getBoundingClientRect(), dx = to.left - o.left + to.width / 2 - (x + 6), dy = to.bottom - o.top - up, T = flight(dy), N = 14;
+        const o = el.getBoundingClientRect(), to = seat.getBoundingClientRect();
+        // He lands in his hole, feet first: nothing of him is drawn under the dirt line he will sit behind, so his
+        // body goes into the ground and his head stops where the seated mole's is (F94).
+        if (rider.parentElement) rider.parentElement.style.clipPath = `inset(-9999px -9999px ${o.bottom - to.bottom + GROUND}px -9999px)`;
+        const dx = to.left - o.left + to.width / 2 - (x + 6), dy = to.bottom - o.top - up, T = flight(dy), N = 14;
         // Head over heels onto the ring, growing to the size he stands at, and up on his feet as he lands.
         play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = i / N, [ax, ay] = along(dx, dy, T, t * T); return { transform: tf(x + 6 + ax, up + ay, -90 + 450 * t, RIDER + (1 - RIDER) * t) }; }), { duration: T * 1000, easing: "linear" });
         // The standing mole takes his place in the same frame he lands in.
@@ -193,11 +199,11 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       <span className="cart-rail" />
       {/* Before the cart, so he lies in the bucket, behind its near side. */}
       {mole && (
-        <span className="cart-mole">
+        <span className="cart-ground"><span className="cart-mole">
           <Mole bare size={RIDER_PX} mood={awake ? "fall" : "doze"} />
           {/* His snoring, in his wrapper so it stays over his head as the bucket tips him. */}
           {!awake && <svg className="cart-zzz" viewBox="0 0 28 22">{([[0, 16, 1.4], [9, 8, 1.7], [19, 0, 2]] as const).map(([x0, y0, p], n) => <g key={n}>{Z.map(([i, j]) => <circle key={`${i},${j}`} cx={x0 + (i + 0.5) * p} cy={y0 + (j + 0.5) * p} r={p * 0.4} />)}</g>)}</svg>}
-        </span>
+        </span></span>
       )}
       <svg className="cart" width={W} height={H} viewBox={`0 ${-HEAD} 20 ${15 + HEAD}`}>
         {/* The rect fixes the group's box, so its foot is the same point whatever it carries. */}
