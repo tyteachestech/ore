@@ -807,10 +807,13 @@ export async function fillOwed(lib: Library, opts: { onProgress?: (id: string, d
     const theirs = note.self && note.device !== deviceName() && (opts.now ?? Date.now()) - Date.parse(note.added ?? "") < THEIRS_FIRST_MS;
     if (theirs) continue;
     if (item.meta.owed?.length && !item.meta.owed_error) {
+      // Its own now: a long download here starts the other devices' five minutes again, so two never hear it at once.
+      writeAtomic(owedNote(lib, id), JSON.stringify({ ...note, id, owed: item.meta.owed, device: deviceName(), added: nowIso(), self: true }) + "\n");
       try {
         filled.push((await reimportSource(lib, id, { onProgress: (done, label) => opts.onProgress?.(id, done, label), turn })).item);
       } catch (e) {
-        await turn(() => updateItemMeta(lib, id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) })));
+        // Archived or deleted while it downloaded: nothing left to mark.
+        await turn(() => updateItemMeta(lib, id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) }))).catch(() => {});
       }
     }
     rmSync(owedNote(lib, id), { force: true });
