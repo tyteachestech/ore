@@ -86,7 +86,7 @@ export function epubCover(epub: Uint8Array): Picture | undefined {
 type Canvas = { width: number; height: number; toBlob(done: (b: Blob | null) => void, type: string, quality: number): void };
 const canvas = () => (globalThis as { document?: { createElement(tag: "canvas"): Canvas } }).document?.createElement("canvas");
 
-/** First page of a PDF, drawn by pdf.js at SIZE on a white sheet (F67). */
+/** First page of a PDF, drawn by pdf.js at SIZE on a white sheet (F80). */
 async function drawnPage(data: Uint8Array, sheet: Canvas): Promise<Picture | undefined> {
   // Loaded only here: pdf.js is heavy, and `ore` must not pay for it at every start.
   const pdf = (await import("./pdf.ts")).openPdf(data);

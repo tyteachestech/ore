@@ -10136,7 +10136,7 @@ journey("phone: a file picked with + is read on the phone; a picture waits for t
   await page.getByText(/^Added “/).waitFor();
   await pick("screenshot.png");
   await page.locator(".add-link").waitFor({ state: "detached" });
-  // F67: a PDF added here drew no first page (only the Mac's Quick Look did), so its row had a bare icon.
+  // F80: a PDF added here drew no first page (only the Mac's Quick Look did), so its row had a bare icon.
   await pick("outline.pdf");
   await page.locator(".add-link").waitFor({ state: "detached" });
   await page.getByText("Added “Remembering on purpose”").waitFor();
