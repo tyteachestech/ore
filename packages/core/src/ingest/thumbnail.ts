@@ -146,11 +146,11 @@ function isPicture(path: string): boolean {
 
 /** Makes the source's thumbnail if it has none (or a broken one) and one can be found; never throws (a missing picture
  *  never fails an add). Returns its path, or undefined. */
-export async function makeThumbnail(item: Item, opts: { replace?: boolean } = {}): Promise<string | undefined> {
+export async function makeThumbnail(item: Item, opts: { replace?: boolean; from?: string } = {}): Promise<string | undefined> {
   const had = thumbnailFile(item);
   if (had && !opts.replace && isPicture(had)) return had;
   try {
-    const pic = await picture(item);
+    const pic = (await picture(item)) ?? (opts.from ? await download(opts.from) : undefined);
     if (!pic) return had;
     if (had) unlinkSync(had);
     const path = join(item.dir, `thumbnail.${pic.ext}`);

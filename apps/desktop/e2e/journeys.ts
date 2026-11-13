@@ -9853,6 +9853,10 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
   await page.locator(".add-link").waitFor({ state: "detached" });
   const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/offline" });
   await row.getByText("Your Mac will try it.").waitFor();
+  // F59: it shows on Today too, where a share's Open lands: an episode still downloading was nowhere he looked.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Today" }));
+  await row.getByText("Your Mac will try it.").waitFor();
   await tap(page, row.getByRole("button", { name: "Remove" }));
   await row.waitFor({ state: "detached" });
 }, "phone");
@@ -9871,6 +9875,33 @@ journey("phone: a YouTube link is in the library at once and says its transcript
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
   await tap(page, page.locator(".phone-sources button").filter({ hasText: "How spacing works" }));
   await page.locator(".doc-empty").filter({ hasText: "The transcript comes in when Ore is open on your Mac." }).waitFor();
+}, "phone");
+
+journey("phone: an episode is in at once, says how far its transcript is, and fills in while he has it open", async (page) => {
+  // F60: an hour's episode took minutes to download and hear before anything showed. It is a source at once
+  // (title, show), the wait says what it is doing, and the transcript lands in the open reader.
+  const cors = { "access-control-allow-origin": "*" };
+  const audio = "https://media.example.com/master-your-sleep.mp3";
+  await page.route("https://itunes.apple.com/lookup?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: cors, body: JSON.stringify({ results: [{ trackId: 1000560143046, episodeUrl: audio, trackName: "Master your sleep", collectionName: "Huberman Lab", releaseDate: "2021-01-11T08:00:00Z" }] }) }));
+  await page.route(audio, (r) => r.fulfill({ status: 200, contentType: "audio/mpeg", headers: cors, body: Buffer.alloc(2_000_000) }));
+  // The iPhone's speech, standing in: it hears nothing until the journey lets it.
+  await page.evaluate(() => void ((window as unknown as { __ORE_HEAR: { vtt: string; hold: boolean } }).__ORE_HEAR = { vtt: "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nWelcome back to the show.\n\n00:01:00.000 --> 00:01:05.000\nThanks for listening.\n\n", hold: true }));
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://podcasts.apple.com/us/podcast/master-your-sleep/id1545953110?i=1000560143046");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “Master your sleep”").waitFor();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const row = page.locator(".phone-sources button").filter({ hasText: "Master your sleep" });
+  await row.locator(".filling").filter({ hasText: "Transcribing" }).waitFor();
+  await tap(page, row);
+  const wait = page.locator(".doc-empty .filling");
+  await wait.filter({ hasText: "Transcribing" }).waitFor();
+  await wait.getByText("Keep Ore open to finish.").waitFor();
+  await page.evaluate(() => void ((window as unknown as { __ORE_HEAR: { hold: boolean } }).__ORE_HEAR.hold = false));
+  await page.getByText("Thanks for listening.").waitFor();
+  if (await page.locator(".doc-empty").count()) throw new Error("the transcript is in, and the reader still says it is waiting");
 }, "phone");
 
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {

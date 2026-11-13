@@ -14,6 +14,10 @@ export const shareOpen = async (): Promise<string | null> => (PHONE ? (await imp
 export const queuePicked = async (name: string, bytes: Uint8Array, skill?: string): Promise<void> => {
   if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes, skill);
 };
+/** Fills what came in with a part owed (an episode's transcript), outside any command; `landed` after each (phone/core.ts `fill`). */
+export const fillOwed = async (landed: () => void): Promise<void> => {
+  if (PHONE) await (await import("./phone/core")).fill(landed);
+};
 export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import("./phone/core")).pull() : false);
 
 // Every library read and write goes through the `ore` CLI (D30). Errors are the CLI's one-line message.

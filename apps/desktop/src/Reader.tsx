@@ -46,6 +46,7 @@ import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcrip
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer } from "./Video";
 import { ownsMediaKey } from "./media-keys";
+import { FillingLine, useFilling } from "./Filling";
 import { errorText, focusQuietly, inOrder, kept, load, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
 import { mergeAnns } from "./anns";
 import { TitleField } from "./TitleField";
@@ -1065,6 +1066,7 @@ function ReaderView(p: Props & { reload: () => void }) {
   // Read again when a ⌘Z lands. `opened` keeps that from counting as opening it again, and a text that
   // changed (a cut or a reimport undone) starts the reader over, since every highlight is placed on the text.
   const changes = useLibraryChanges();
+  const filling = useFilling(p.id);
   const opened = useRef<string | null>(null);
   const shownBodyOf = useRef<string | null>(null);
   useEffect(() => {
@@ -3049,7 +3051,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   p.actionsRef.current = closedBook ? [] : actions;
   // The phone has no Finder, no side panel and no sidebar to pin to yet.
   const menuActions = actions.filter((a) => !a.paletteOnly);
-  const canFinish = !!doc && doc.status !== "done" && !doc.preview;
+  // Nothing to finish while its text is still owed (an episode coming in, D227).
+  const canFinish = !!doc && doc.status !== "done" && !doc.preview && !(doc.owed?.length && !doc.body.trim());
   // On the phone Finish lives here and at the end of the source; the top bar stays Back and ⋯ (D156).
   const phoneActions = menuActions.filter((a) => !["reveal", "path", "questions", "pin"].includes(a.id) && (a.id !== "original" || !!doc?.url));
   const shownActions = PHONE
@@ -3278,7 +3281,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's
                 og:image or site logo only repeats what the title says, and a video's picture is its player. */}
-            {doc.thumbnail && (doc.type === "pdf" || doc.type === "epub") && <Thumb item={doc} className="doc-thumb" />}
+            {doc.thumbnail && (doc.type === "pdf" || doc.type === "epub" || (!video && (!!doc.audio || !!doc.owed?.length))) && <Thumb item={doc} className="doc-thumb" />}
             {doc.course && p.lessons && p.lessons.length > 1 && <CourseLine id={doc.id} course={doc.course} lessons={p.lessons} onOpen={p.onOpenLesson} />}
             {renaming ? (
               <TitleField className="title-edit" value={doc.title} onSave={(t) => retitle(doc.id, doc.title, t.trim())} onClose={() => setRenaming(false)} />
@@ -3395,7 +3398,7 @@ function ReaderView(p: Props & { reload: () => void }) {
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
-              {doc.owed?.length ? (doc.owed_error ? `Couldn’t get the transcript: ${doc.owed_error} Reimport tries again.` : "The transcript comes in when Ore is open on your Mac. Watch it above meanwhile.") : video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
+              {doc.owed?.length ? (doc.owed_error ? `Couldn’t get the transcript: ${doc.owed_error} Reimport tries again.` : filling ? <FillingLine filling={filling} /> : doc.type === "youtube" ? "The transcript comes in when Ore is open on your Mac. Watch it above meanwhile." : "This episode’s transcript is on its way: its audio is downloaded, then heard.") : video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
             </p>
           )}
           {PHONE && ready && canFinish && !closedBook && (

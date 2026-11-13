@@ -6,6 +6,7 @@ import { Archive, BookOpen, CaretLeft, CaretRight, Check, GearSix, GraduationCap
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
+import { FillingLine, useFilling } from "../Filling";
 import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
 import { Home } from "../Home";
@@ -23,12 +24,12 @@ import { Palette } from "../Palette";
 import { SkillEditor, skillGroups } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { courseThumb, lessonsOf, nextLesson, opt, ore, pullFromMac, shareOpen, shareSkills, type Item, type Skill, touched } from "../ore";
+import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, shareOpen, shareSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
-import { errorText, useKeptScroll, type Notify } from "../util";
+import { errorText, stepLanded, useKeptScroll, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
@@ -183,6 +184,7 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   const swiped = useRef(false);
   const [side, setSide] = useState<"left" | "right" | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const filling = useFilling(item.id);
   /** An archived row only restores, to the left. */
   const only = (dx: number) => (item.archived_at ? Math.min(0, dx) : dx);
   useHorizontalDrag(ref, {
@@ -231,7 +233,14 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
         {/* Hidden, not gone, while renaming: its swipes and hold are on this element. */}
         <button ref={ref} hidden={renaming} onClick={() => swiped.current || onOpen(item.id)} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
           <Thumb item={item} className="thumb phone-thumb" />
-          <span className="phone-title">{item.title}</span>
+          {filling ? (
+            <span className="phone-title phone-two">
+              <span>{item.title}</span>
+              <FillingLine filling={filling} row />
+            </span>
+          ) : (
+            <span className="phone-title">{item.title}</span>
+          )}
         </button>
       </li>
     </WithMenu>
@@ -514,6 +523,10 @@ export function PhoneApp() {
     await pullFromMac();
     await jumping.current();
   }, []);
+  // An episode is in at once (D227); its audio is downloaded and heard after, while the app stays his. Each
+  // one that lands wakes the lists and the reader that shows it.
+  // A relaunch can cut the module's load short (WebKit rejects the import): the next pass fills it.
+  const fill = useCallback(() => void fillOwed(() => (stepLanded({}), void refresh())).catch(() => {}), [refresh]);
   // Asked for while one is running (a share that arrived after it listed the inbox): it runs once more after.
   const readAgain = useRef(false);
   const bringInRef = useRef<() => Promise<void>>(async () => {});
@@ -523,7 +536,7 @@ export function PhoneApp() {
     try {
       if (!(await ore<Waiting[]>("inbox")).length) return;
       setReading(true);
-      const r = await ore<{ added: { id: string; inbox: string; title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+      const r = await ore<{ added: { id: string; inbox: string; title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import", "--owe");
       for (const a of r.added) came.current.set(a.inbox, a.id);
       for (const a of r.added) notify(a.kept ? `Already here: “${a.title}”` : `Added “${a.title}”`, "info");
       for (const f of r.failed) {
@@ -536,18 +549,19 @@ export function PhoneApp() {
       readingNow.current = false;
       setReading(false);
       void refresh().then(() => {
+        fill();
         if (!readAgain.current) return;
         readAgain.current = false;
         void bringInRef.current();
       });
     }
-  }, [refresh, notify]);
+  }, [refresh, notify, fill]);
   bringInRef.current = bringIn;
   jumping.current = () => refresh().then(bringIn);
   useEffect(() => void (jump(), refresh().then(bringIn), planReminders()), [jump, refresh, bringIn]);
   // The Mac's changes arrive through iCloud: read them in when the app comes back, and every 30 s while it shows.
   useEffect(() => {
-    const check = () => void (jump(), pullFromMac().then((changed) => changed && (pulled(), void bringIn())));
+    const check = () => void (jump(), fill(), pullFromMac().then((changed) => changed && (pulled(), void bringIn())));
     const back = () => !document.hidden && check();
     // Leaving the screen plans the reminders again: today's goes once the goal is met (the Mac's changes, in `pulled`).
     const seen = () => (document.hidden ? void planReminders() : check());
@@ -897,6 +911,12 @@ export function PhoneApp() {
           </div>
           <main className="phone-page" ref={main}>
             {error && <p className="phone-error">{error}</p>}
+            {/* A share's Open lands here: what is still downloading or being heard shows where he is looking. */}
+            {tab === "today" && waiting.length > 0 && (
+              <div className="phone-sources phone-coming">
+                <WaitingLinks links={waiting} reading={reading} onRemove={removeWaiting} />
+              </div>
+            )}
             {tab === "today" ? (
               <Home
                 items={items ?? []}
@@ -1013,10 +1033,12 @@ export function PhoneApp() {
                 // Searched, the sources that match, best first, lessons on their own (the Mac's filter, D203).
                 const lines: Line[] = q ? ranked(mine, q, (i) => [i.title, i.course?.title ?? ""]).map((item) => ({ kind: "item", item })) : linesOf(skillTab === "toread" ? [...mine].sort(toReadOrder) : mine, skillTab);
                 const shown = q || skillAll ? lines : lines.slice(0, SKILL_CAP);
+                const coming = q || skillTab !== "toread" ? [] : waiting.filter((l) => l.skills.includes(skill));
                 return (
                   <div className="phone-sources">
+                    <WaitingLinks links={coming} reading={reading} onRemove={removeWaiting} />
                     {!lines.length ? (
-                      <p className="quiet">{q ? `No sources match “${q}”.` : skillTab === "done" ? "Nothing done yet." : "Nothing to read. Add a link with +."}</p>
+                      coming.length > 0 ? null : <p className="quiet">{q ? `No sources match “${q}”.` : skillTab === "done" ? "Nothing done yet." : "Nothing to read. Add a link with +."}</p>
                     ) : (
                       <Rows lines={shown} row={row} onOpen={open} />
                     )}

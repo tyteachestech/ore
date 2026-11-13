@@ -144,6 +144,8 @@ export interface NewItem {
   preview?: boolean;
   structure?: ("tables" | "formulas")[];
   owed?: "transcript"[];
+  /** Its own picture's address (an episode's artwork), saved as the thumbnail; never kept in the meta. */
+  picture?: string;
 }
 
 export type Asset = { name: string; data: Uint8Array };

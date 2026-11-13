@@ -5,7 +5,9 @@ import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
-import { latestRevs, sha256, writeAtomic } from "../fsutil.ts";
+import { deviceName, latestRevs, sha256, writeAtomic } from "../fsutil.ts";
+import { nowIso } from "../ids.ts";
+import { THEIRS_FIRST_MS } from "../inbox.ts";
 import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
@@ -44,6 +46,9 @@ export interface AddOptions {
   /** A page that is an episode (D215): read as its episode (unset, a new add: when its audio comes),
    *  always (true: a Reimport of an episode, which must stay one), or never (false: of an article). */
   episode?: boolean;
+  /** An episode comes in at once, by its title, show and date, with its transcript owed (D227): the
+   *  download and the hearing are `fillOwed`'s, so he sees the source while they run. */
+  owe?: boolean;
 }
 
 // The first `# ` heading outside fenced code (a `# comment` in a code block is no title).
@@ -299,10 +304,14 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   if (PODCAST.test(url)) {
     // An episode link: its audio, transcribed, under the episode's title (D96).
     const ep = await (await import("./audio.ts")).episode(url);
+    if (opts.owe) return { type: "article", title: ep.title ?? "Episode", url, author: ep.show, published: ep.published, body: "", owed: ["transcript"], picture: ep.artwork };
+    opts.onProgress?.(0, "Downloading");
     const res = await get(ep.audio, new URL(ep.audio).host);
     const ext = kindOf(new URL(res.url || ep.audio).pathname, res.headers.get("content-type") ?? "") ?? "mp3";
-    const draft = await fromBytes(await readCapped(res), ext, ep.title ?? "Episode", url, url, { ...opts, language: ep.language ?? opts.language });
-    return { ...draft, title: ep.title ?? draft.title, author: ep.show, published: ep.published };
+    const mb = (n: number) => Math.max(1, Math.round(n / 1e6));
+    const bytes = await readCapped(res, (got, of) => opts.onProgress?.(got / of, `Downloading ${mb(got)} of ${mb(of)} MB`));
+    const draft = await fromBytes(bytes, ext, ep.title ?? "Episode", url, url, { ...opts, language: ep.language ?? opts.language });
+    return { ...draft, title: ep.title ?? draft.title, author: ep.show, published: ep.published, picture: ep.artwork };
   }
   if (VIDEO_SITE.test(url)) {
     // Played on its own site (the reader's player is YouTube's); the transcript reads like an article.
@@ -348,8 +357,9 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
 /** The response's body, refused once it passes MAX_BYTES (a server need not say how big it is). */
 const tooBig = () => `That file is over ${MAX_BYTES / 1024 / 1024} MB, too big to read as a source. Add the part you want instead.`;
 
-export async function readCapped(res: Response): Promise<Uint8Array> {
-  if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) {
+export async function readCapped(res: Response, onProgress?: (got: number, of: number) => void): Promise<Uint8Array> {
+  const of = Number(res.headers.get("content-length") ?? 0);
+  if (of > MAX_BYTES) {
     await res.body?.cancel();
     throw new Error(tooBig());
   }
@@ -364,6 +374,7 @@ export async function readCapped(res: Response): Promise<Uint8Array> {
       throw new Error(tooBig());
     }
     parts.push(r.value);
+    if (of > 0) onProgress?.(Math.min(size, of), of);
   }
   const out = new Uint8Array(size);
   let at = 0;
@@ -483,9 +494,9 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same && ready.owed?.length) {
     mkdirSync(paths.inbox(lib), { recursive: true });
-    writeAtomic(owedNote(lib, item.meta.id), JSON.stringify({ id: item.meta.id, owed: ready.owed }) + "\n");
+    writeAtomic(owedNote(lib, item.meta.id), JSON.stringify({ id: item.meta.id, owed: ready.owed, device: deviceName(), added: nowIso(), ...((await canFill(item)) ? { self: true } : {}) }) + "\n");
   }
-  if (!same) await makeThumbnail(item);
+  if (!same) await makeThumbnail(item, { from: ready.picture });
   if (!opts.preview) await unarchive(lib, opts.skills); // a Feed post read as a preview isn't filed
   return item;
 }
@@ -696,7 +707,7 @@ async function lessonOf(item: Item): Promise<CourseLesson> {
  *  notes, progress, title he gave it), its highlights re-anchored where their passage still is, and
  *  the ones whose passage is gone removed, except questions (his own words, listed on the skill page).
  *  The previous version is kept for `undoReimport`. */
-export async function reimportSource(lib: Library, ref: string, { local = false, regions: read }: { local?: boolean; regions?: Region[] } = {}): Promise<Reimported> {
+export async function reimportSource(lib: Library, ref: string, { local = false, regions: read, onProgress, turn = (f) => f() }: { local?: boolean; regions?: Region[]; onProgress?: AddOptions["onProgress"]; turn?: Turn } = {}): Promise<Reimported> {
   const item = findItem(lib, ref);
   const { url, course, type } = item.meta;
   // A file is read again from the copy kept beside it (source.*), so a better reader reaches it. Text
@@ -708,8 +719,21 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const regions = read ?? layoutOf(item.dir);
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
-  const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)) }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
+  const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)), onProgress }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
+  return turn(() => rewrite(lib, item, draft, regions));
+}
+
+/** One library change at a time where commands share a process (the iPhone): the reading above can take
+ *  minutes and holds nothing; the writing below takes its turn. */
+export type Turn = <T>(f: () => Promise<T>) => Promise<T>;
+
+/** `draft`, read again from where `item` came from, in its place: the old version stashed for Undo, its
+ *  highlights moved to the new text. */
+async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[] | undefined): Promise<Reimported> {
+  // As it is now: he may have renamed or filed it while it was read, and one he deleted is not brought back.
+  const item = findItem(lib, was.meta.id);
+  const { url, course } = item.meta;
   if (!draft.body.trim()) throw new Error("Found no text to read at the original now. It may have moved; open it to check.");
   // An episode he added its page text to keeps it, after the transcript, so its highlights re-anchor (D215).
   const section = item.meta.page_added && draft.page ? await pageSection(draft.page, url, item.meta.title) : undefined;
@@ -755,26 +779,41 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
  *  reads one folder, not every source. */
 const owedNote = (lib: Library, id: string) => join(paths.inbox(lib), `${id}.owed.json`);
 
-/** Fills what a device with no tools left owed (D227): each such source is read again here, as a reimport,
- *  when this device has the tools. One that fails keeps its reason and waits for a Reimport by hand, so a
- *  video that is gone isn't asked for on every pass. */
-export async function fillOwed(lib: Library): Promise<Item[]> {
+/** Whether this device has what a source's owed part takes: yt-dlp for a video's transcript, speech for
+ *  an episode's. */
+const canFill = async (item: Item) => (item.meta.type === "youtube" ? !!ytDlp() : (await import("./audio.ts")).canTranscribe());
+
+/** Fills what was added with a part owed (D227): a video a phone has no yt-dlp for, an episode that came
+ *  in at once and is downloaded and heard after. Each is read again here, as a reimport, when this device
+ *  can. The device that added one and can fill it goes first; another waits five minutes, as for the links
+ *  in the inbox. One that fails keeps its reason and waits for a Reimport by hand, so a video that is gone
+ *  isn't asked for on every pass. */
+export async function fillOwed(lib: Library, opts: { onProgress?: (id: string, done: number, label?: string) => void; turn?: Turn; now?: number } = {}): Promise<Item[]> {
   if (!existsSync(paths.inbox(lib))) return [];
-  const ids = readdirSync(paths.inbox(lib)).filter((n) => n.endsWith(".owed.json") && !n.startsWith(".")).map((n) => n.replace(/\.owed\.json$/, ""));
-  if (!ids.length || !ytDlp()) return [];
+  const notes = readdirSync(paths.inbox(lib)).filter((n) => n.endsWith(".owed.json") && !n.startsWith("."));
+  const turn: Turn = opts.turn ?? ((f) => f());
   const filled: Item[] = [];
-  for (const id of ids) {
+  for (const name of notes) {
+    const id = name.replace(/\.owed\.json$/, "");
     let item: Item;
+    let note: { device?: string; added?: string; self?: boolean } = {};
     try {
       item = findItem(lib, id);
+      note = JSON.parse(readFileSync(join(paths.inbox(lib), name), "utf8")) as typeof note;
     } catch {
       continue; // its source hasn't arrived yet (iCloud), or a synced copy of the note
     }
+    if (!(await canFill(item))) continue;
+    const theirs = note.self && note.device !== deviceName() && (opts.now ?? Date.now()) - Date.parse(note.added ?? "") < THEIRS_FIRST_MS;
+    if (theirs) continue;
     if (item.meta.owed?.length && !item.meta.owed_error) {
+      // Its own now: a long download here starts the other devices' five minutes again, so two never hear it at once.
+      writeAtomic(owedNote(lib, id), JSON.stringify({ ...note, id, owed: item.meta.owed, device: deviceName(), added: nowIso(), self: true }) + "\n");
       try {
-        filled.push((await reimportSource(lib, id)).item);
+        filled.push((await reimportSource(lib, id, { onProgress: (done, label) => opts.onProgress?.(id, done, label), turn })).item);
       } catch (e) {
-        await updateItemMeta(lib, id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) }));
+        // Archived or deleted while it downloaded: nothing left to mark.
+        await turn(() => updateItemMeta(lib, id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) }))).catch(() => {});
       }
     }
     rmSync(owedNote(lib, id), { force: true });

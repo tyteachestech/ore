@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, tr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
-import { addPageText, addSource, addTab, addText, audioOf, hasPageText, redoPageText, reimportSource, undoPageText } from "../src/ingest/index.ts";
+import { addPageText, addSource, addTab, addText, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText } from "../src/ingest/index.ts";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
 import { cutText } from "../src/cut.ts";
 import { findItem } from "../src/items.ts";
@@ -1134,6 +1134,57 @@ describe("import coverage: audio and podcasts", () => {
     const item = await addSource(await tempLibrary(), url);
     expect(item.meta).toMatchObject({ title: "Master your sleep", author: "Huberman Lab", published: "2021-01-11T08:00:00Z", url });
     expect(item.body).toContain("[01:00] Thanks for listening.");
+  });
+
+  test("an episode added with its transcript owed is in at once, then downloaded and heard with how far it is (F60)", async () => {
+    // He shared an hour-long episode on the phone and saw nothing for ten minutes: the source is there at
+    // once by its title, show and date, and the download and the hearing fill it, saying where they are.
+    const audio = "https://traffic.megaphone.fm/HSW1.mp3";
+    const fetched: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const u = String(input instanceof Request ? input.url : input);
+      fetched.push(u);
+      if (u.startsWith("https://itunes.apple.com/lookup")) return new Response(JSON.stringify({ results: [{ trackId: 1000560143046, episodeUrl: audio, trackName: "Master your sleep", collectionName: "Huberman Lab", releaseDate: "2021-01-11T08:00:00Z", artworkUrl600: "https://is1-ssl.mzstatic.com/art/600x600bb.png" }] }), { headers: { "content-type": "application/json" } });
+      if (u.endsWith("600x600bb.png")) return new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, ...new Array(96).fill(0)]), { headers: { "content-type": "image/png" } });
+      if (u === audio) return new Response(new Uint8Array(3_000_000), { headers: { "content-type": "audio/mpeg", "content-length": "3000000" } });
+      return new Response("not found", { status: 404 });
+    }) as typeof fetch;
+    const url = "https://podcasts.apple.com/us/podcast/master-your-sleep/id1545953110?i=1000560143046";
+    const lib = await tempLibrary();
+    const device = process.env.ORE_DEVICE;
+    process.env.ORE_DEVICE = "iphone";
+    try {
+      const item = await addSource(lib, url, { owe: true });
+      expect(item.meta).toMatchObject({ title: "Master your sleep", author: "Huberman Lab", published: "2021-01-11T08:00:00Z", url, owed: ["transcript"] });
+      expect(item.body.trim()).toBe("");
+      expect(fetched).not.toContain(audio); // nothing downloaded yet
+      expect(existsSync(join(item.dir, "thumbnail.png"))).toBe(true); // the show's artwork
+      const note = join(lib.root, "inbox", `${item.meta.id}.owed.json`);
+      expect(JSON.parse(readFileSync(note, "utf8"))).toMatchObject({ device: "iphone", self: true });
+      // Another device leaves it to the one that added it for five minutes, then takes it.
+      process.env.ORE_DEVICE = "mac";
+      expect(await fillOwed(lib)).toEqual([]);
+      expect(fetched).not.toContain(audio);
+      process.env.ORE_DEVICE = "iphone";
+      const seen: string[] = [];
+      const turns: number[] = [];
+      const filled = await fillOwed(lib, { onProgress: (id, done, label) => seen.push(`${id === item.meta.id ? "it" : id} ${label ?? done}`), turn: (f) => (turns.push(seen.length), f()) });
+      expect(filled.map((i) => i.meta.id)).toEqual([item.meta.id]);
+      expect(seen[0]).toBe("it Downloading"); // before the first byte, so the wait is named at once
+      expect(seen[1]).toMatch(/^it Downloading \d of 3 MB$/);
+      const got = seen.indexOf("it Downloading 3 of 3 MB");
+      expect(got).toBeGreaterThan(-1);
+      expect(seen.indexOf("it 0.5")).toBeGreaterThan(got); // the hearing's own progress, after the download's
+      expect(turns).toEqual([seen.length]); // the writing took its turn once, after all the reading
+      const now = findItem(lib, item.meta.id);
+      expect(now.meta.owed).toBeUndefined();
+      expect(now.body).toContain("[01:00] Thanks for listening.");
+      expect(readFileSync(join(now.dir, "source.mp3")).length).toBe(3_000_000);
+      expect(existsSync(note)).toBe(false);
+    } finally {
+      if (device === undefined) delete process.env.ORE_DEVICE;
+      else process.env.ORE_DEVICE = device;
+    }
   });
 
   test("another player's episode page: the audio it links", async () => {

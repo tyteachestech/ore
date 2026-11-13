@@ -4,6 +4,7 @@ declare module "ore-commands" {
   export type Commands = Record<string, Command>;
   export const commands: Commands;
   export function errorLine(e: unknown): string;
+  export function fillOwedHere(opts: { onProgress?: (id: string, done: number, label?: string) => void; turn?: <T>(f: () => Promise<T>) => Promise<T> }): Promise<{ id: string; title: string }[]>;
   export function setTranscriber(hear: ((data: Uint8Array, ext: string, onProgress?: (done: number, label?: string) => void, language?: string) => Promise<string>) | null): Promise<void>;
 }
 
