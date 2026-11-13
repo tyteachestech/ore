@@ -1967,6 +1967,9 @@ button.home-plan:hover { color: var(--text); }
 .home-lv { flex: none; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .home-meter { flex: 1; height: 6px; border-radius: 4px; background: var(--bg-active); overflow: hidden; }
 .home-meter.small { flex: none; width: 64px; height: 4px; }
+/* A source added and not opened yet, in the meter's place: the section head's quiet label, no colour (it is no intent). */
+.home-new { flex: none; width: 64px; text-align: right; font-size: 12px; color: var(--faint); }
+:root:not(.phone) .home-read:hover .home-new, .home-read:has(.more[aria-expanded="true"]) .home-new { visibility: hidden; }
 .home-skill-foot { color: var(--faint); font-size: 12px; }
 .home-cont { margin-top: 12px; padding: 6px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--lift); }
 .home-cont .home-h { margin: 8px 12px 4px; color: var(--text); font-size: 14px; font-weight: 600; }

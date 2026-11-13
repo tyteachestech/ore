@@ -32,9 +32,25 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 /** Continue reading: what he opened last first. This Mac's own list of what it opened (`recent`, the
  *  newest first) leads, then every source in reading by when the files say it was last opened (D110),
  *  so a fresh install or the other Mac doesn't fall back to title order. A lesson he opened stands for
- *  its course (D79): the lesson to read next, once, even when the one he opened is done. */
-export function continueReading(items: Item[], recent: string[]): Item[] {
-  const byTouch = items.filter((i) => i.status === "reading").sort((a, b) => (touched(b) > touched(a) ? 1 : touched(b) < touched(a) ? -1 : 0));
+ *  its course (D79): the lesson to read next, once, even when the one he opened is done.
+ *  What he added in the last week and hasn't opened joins it by when it was added (Tyler, 2026-11-13:
+ *  "favor recently added in home", one list, newest on top), each above the first row older than it; the
+ *  older unread stays in To read, so Home never fills with the backlog. */
+const NEW_MS = 7 * 86_400_000;
+export const isNew = (i: Item, now = Date.now()) => i.status === "inbox" && !i.opened_at && !i.course && !i.archived_at && now - Date.parse(i.captured_at) < NEW_MS;
+export function continueReading(items: Item[], recent: string[], now = Date.now()): Item[] {
+  const newest = (a: Item, b: Item) => (touched(b) > touched(a) ? 1 : touched(b) < touched(a) ? -1 : 0);
+  const byTouch = items.filter((i) => i.status === "reading").sort(newest);
+  const list = reading(items, recent, byTouch);
+  let from = 0;
+  for (const i of items.filter((x) => isNew(x, now)).sort(newest)) {
+    const at = list.findIndex((x, n) => n >= from && touched(x) < touched(i));
+    from = at < 0 ? list.length : at;
+    list.splice(from++, 0, i);
+  }
+  return list;
+}
+function reading(items: Item[], recent: string[], byTouch: Item[]): Item[] {
   return [
     ...new Set(
       [...recent, ...byTouch.map((i) => i.id)].flatMap((id) => {
@@ -460,10 +476,15 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                       {i.skills.length > 0 && <SkillChips ids={i.skills} skills={skills} />}
                     </SkillPicker>
                   )}
-                  <Hint text={`${Math.round(at * 100)}% read`}>
-                    {/* The hint needs an element to hold its ref, so the bar sits in a span. */}
-                    <span className="home-meter small"><DotBar className="" share={at} n={10} /></span>
-                  </Hint>
+                  {isNew(i) ? (
+                    // Not opened yet: where the others show how far he is, this one says it is new.
+                    <span className="home-new">New</span>
+                  ) : (
+                    <Hint text={`${Math.round(at * 100)}% read`}>
+                      {/* The hint needs an element to hold its ref, so the bar sits in a span. */}
+                      <span className="home-meter small"><DotBar className="" share={at} n={10} /></span>
+                    </Hint>
+                  )}
                   {/* On hover the ⋯ takes the meter's place, as on every other row (Linear). */}
                   {sourceMenu && <MoreButton label="Source actions" actions={() => actionsFor(i)} hoverOnly />}
                 </HomeRow>

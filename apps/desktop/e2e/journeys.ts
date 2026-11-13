@@ -3297,13 +3297,13 @@ journey("Home: Continue reading rows rename from their menu, in place; Esc keeps
   const title = () => row.locator(".title").innerText();
   await row.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
-  await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
+  await page.locator(".home-read").getByRole("textbox", { name: "Title" }).fill("Testing, renamed");
   await page.keyboard.press("Escape");
   await until("Esc keeps the old title", async () => (await title()) === TESTING);
   await until("and gives the row its focus back", () => row.locator(".home-open").evaluate((el) => el === document.activeElement));
   await row.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
-  await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
+  await page.locator(".home-read").getByRole("textbox", { name: "Title" }).fill("Testing, renamed");
   await page.keyboard.press("Enter");
   const renamed = page.locator(".home-read").filter({ hasText: "Testing, renamed" });
   await until("Enter saves it", async () => (await renamed.count()) === 1);
@@ -3322,7 +3322,7 @@ journey("Home: after Rename… or Edit skill… from a row's menu, focus is on t
   const row = page.locator(".home-read").filter({ hasText: TESTING }).first();
   await row.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
-  await page.locator(".home-read").getByLabel("Title").fill("Testing, renamed");
+  await page.locator(".home-read").getByRole("textbox", { name: "Title" }).fill("Testing, renamed");
   await page.keyboard.press("Enter");
   await until("focus is on the renamed row", async () => (await focusedOn(page)) === "Testing, renamed");
   await page.keyboard.press("Meta+z");
