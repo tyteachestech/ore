@@ -10382,6 +10382,65 @@ journey("phone: the note's keyboard bar moves a block, edits a table and adds a 
   }
 }, "phone");
 
+/** iOS's keyboard, as the page sees it: the visual viewport shrinks by its height while the layout viewport stays. */
+const keyboardUp = (page: Page, h: number) =>
+  page.evaluate((h) => {
+    const vv = window.visualViewport!;
+    const full = innerHeight;
+    Object.defineProperty(vv, "height", { configurable: true, get: () => full - h });
+    vv.dispatchEvent(new Event("resize"));
+  }, h);
+
+journey("phone: the note's keyboard bar fits the screen, and the + menu stays under the header with the keyboard up", async (page) => {
+  // ten 44pt buttons on a 402pt screen put Hide the keyboard past the edge, with nothing to say the bar scrolls.
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  const bar = page.locator(".kb-bar");
+  await tap(page, note.locator("p").first());
+  const hide = bar.getByRole("button", { name: "Hide the keyboard" });
+  const onScreen = async () => ((await hide.boundingBox())?.x ?? Infinity) + 44 <= (page.viewportSize()?.width ?? 0) + 0.5;
+  await until("Hide the keyboard is on screen outside a list", onScreen);
+  if (await bar.getByRole("button", { name: "Indent" }).count()) throw new Error("Indent shows outside a list, where it does nothing");
+  await tap(page, bar.getByRole("button", { name: "Bulleted list" }));
+  await bar.getByRole("button", { name: "Indent" }).waitFor();
+  await until("Hide the keyboard is on screen in a list", onScreen);
+  await until("the bar fades where more buttons are", async () => (await bar.locator(".kb-scroll[data-more]").count()) === 1);
+  await tap(page, bar.getByRole("button", { name: "Bulleted list" }));
+  // the + menu grew past the header when the keyboard left less than 40vh.
+  await keyboardUp(page, 420); // with iOS's own bar and the notch, as on a 402pt iPhone
+  await tap(page, bar.getByRole("button", { name: "Add a block" }));
+  const menu = page.locator(".note-menu");
+  await menu.waitFor();
+  const head = await page.locator(".phone-source > .phone-bar").boundingBox();
+  await until("the + menu starts below the header", async () => ((await menu.boundingBox())?.y ?? 0) >= head!.y + head!.height);
+}, "phone");
+
+journey("phone: Review's ⋯ is as strong as ×, and Edit exercise's question stays under the head with the keyboard up", async (page) => {
+  // the ⋯ beside × was three specks; its ink now weighs what ×'s does.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  await page.locator(".review-q").waitFor();
+  const ink = (name: string) =>
+    page.getByRole("button", { name, exact: true }).evaluate((b) => {
+      const d = b.querySelector("svg path")?.getAttribute("d") ?? "";
+      return (d.match(/[aA]/g) ?? []).length; // one arc per dot
+    });
+  const [dots, x] = [await ink("Exercise actions"), await ink("Leave review")];
+  if (dots < x * 0.6) throw new Error(`⋯ has ${dots} dots of ink to ×'s ${x}`);
+  // Edit exercise's question went up under the head when the keyboard came up (the answer's buttons were pulled into sight).
+  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await tap(page, page.getByRole("button", { name: "Exercise actions" }));
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
+  const question = page.locator(".review-body textarea").first();
+  await tap(page, question);
+  await keyboardUp(page, 420); // with iOS's own bar and the notch, as on a 402pt iPhone
+  const reviewHead = await page.locator(".review-head").boundingBox();
+  await until("the question stays below the head", async () => ((await question.boundingBox())?.y ?? -1) >= reviewHead!.y + reviewHead!.height - 1);
+}, "phone");
+
 journey("phone: a kept draft goes when the Mac changes what it answered, and nothing is kept before he types", async (page) => {
   // Kept drafts outlived their questions: Finish kept one (with a copy of the questions) the moment it opened, and
   // after the Mac changed the questions the phone showed and sent answers against the old ones.
