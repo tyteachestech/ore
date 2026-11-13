@@ -129,7 +129,13 @@ ts+='export const PARTS: Record<string, number[]> = {\n'
 for k in ['fur','gap','eyeL','eyeR','glintL','glintR','nose','lobeL','lobeR','helmet','lamp','pawL','pawR']:
     v=parts[k]+ext.get(k,[])
     flat=[]
-    for x,y,r,c in v: flat+=[round((x-CX)/PITCH,2),round((y-DY)/PITCH,2),round(min(r,3.7 if not k.startswith('eye') else 4.6)/PITCH,2),int(round(br(c)))]
-    ts+='  %s: [%s],\n'%(k,','.join(('%g'%n) for n in flat))
+    for x,y,r,c in v: row=[round((x-CX)/PITCH,2),round((y-DY)/PITCH,2),round(min(r,3.7 if not k.startswith('eye') else 4.6)/PITCH,2),int(round(br(c)))]; flat.append(row)
+    # One dot of the helmet a shade whiter than every dot round it reads as a stray bright dot (Tyler, 2026-11-13):
+    # it takes the grey of its brightest neighbour. 228 is where the top grey starts (`grey` in mole-fine.ts).
+    if k=='helmet':
+        for d in flat:
+            near=[e[3] for e in flat if e is not d and (e[0]-d[0])**2+(e[1]-d[1])**2<1.3**2]
+            if d[3]>=228 and near and max(near)<228: print('stray',d); d[3]=max(near)
+    ts+='  %s: [%s],\n'%(k,','.join(('%g'%n) for row in flat for n in row))
 ts+='};\n'
 open(os.path.join(HERE,'../src/mole-fine-data.ts'),'w').write(ts); print(len(ts),'bytes')

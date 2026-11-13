@@ -99,7 +99,9 @@ async function openPhone(): Promise<Page> {
   const url = await phoneApp();
   const page = await (await safariBrowser()).newPage({ ...devices["iPhone 14"], viewport: { width: 390, height: 844 }, colorScheme: "dark" });
   page.setDefaultTimeout(8000);
-  page.on("pageerror", (e) => errors.push(e.message));
+  // Named for the journey, as `open` does: a page error on a phone page once came with no name (F86).
+  const of = running;
+  page.on("pageerror", (e) => errors.push(`${of}: ${e.message}`));
   // What the app's Tauri shell gives the page and a browser lacks: an image saved with a source loads through it.
   // A source's own files come from the phone build's dev server (vite.config.ts `/library-file`), as the shell's
   // asset protocol serves them from the folder.
