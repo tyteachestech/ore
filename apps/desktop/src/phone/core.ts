@@ -13,6 +13,7 @@ import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSyn
 import { ready } from "./sqlite";
 import { iterableStreams } from "./streams";
 import { shareList } from "./share-skills";
+import { setFilling } from "../Filling";
 
 // Before any import runs: iOS 26 can't iterate a stream with `for await`, and pdf.js reads a PDF's text that way.
 iterableStreams();
@@ -105,10 +106,12 @@ export const shareOpen = () => (isTauri() ? invoke<string | null>("share_open").
 
 /** Speech to a timed transcript in the shell (lib.rs `transcribe`): the audio goes over as raw bytes, its
  *  WebVTT comes back, or why not in the phone's own words. It works only while Ore is on screen. */
-const hear = (data: Uint8Array, ext: string, _progress?: unknown, language?: string) =>
+const hear = (data: Uint8Array, ext: string, progress?: (done: number, label?: string) => void, language?: string) => (
+  progress?.(0),
   invoke<string>("transcribe", data, { headers: { "x-ext": ext, ...(language ? { "x-language": language } : {}) } }).catch((e) => {
     throw new Error(String(e));
-  });
+  })
+);
 
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
@@ -143,6 +146,43 @@ function exclusive<T>(f: () => Promise<T>): Promise<T> {
   const r = turn.then(f, f);
   turn = r.catch(() => {});
   return r;
+}
+
+/** What came in with a part owed (an episode in at once, D227) is downloaded and heard here, outside any
+ *  command so the app stays his meanwhile; only its writing takes a turn. One pass at a time; `landed`
+ *  after each source filled. The screens read how far it is from Filling.tsx. */
+let filling = false;
+let fillAgain = false;
+export async function fill(landed: () => void): Promise<void> {
+  if (filling) return void (fillAgain = true);
+  filling = true;
+  let on: string | null = null;
+  try {
+    const lib = await boot();
+    // The journeys' stand-in for the iPhone's speech: `window.__ORE_HEAR = { vtt, hold }`, heard once `hold` is off.
+    const stand = import.meta.env.DEV && (globalThis as { __ORE_HEAR?: { vtt: string; hold?: boolean } }).__ORE_HEAR;
+    if (stand)
+      await lib.setTranscriber(async (_data, _ext, progress) => {
+        progress?.(0);
+        while (stand.hold) await new Promise((r) => setTimeout(r, 50));
+        return stand.vtt;
+      });
+    await lib.fillOwedHere({
+      onProgress: (id, done, label) => {
+        if (on && on !== id) landed();
+        on = id;
+        setFilling({ id, done, label });
+      },
+      turn: exclusive,
+    });
+  } catch {
+    // One that failed keeps its reason on the source itself (core `fillOwed`).
+  } finally {
+    setFilling(null);
+    filling = false;
+    if (on) landed();
+    if (fillAgain) (fillAgain = false), void fill(landed);
+  }
 }
 
 /** Reads in what changed on the Mac (through iCloud) since; true if anything did. */

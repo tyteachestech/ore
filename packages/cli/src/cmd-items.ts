@@ -104,8 +104,8 @@ export const itemCommands: Record<string, Command> = {
   },
 
   inbox: {
-    usage: "[--add <url> | --add-file <path> [--name n]] [--skill s] [--remove <id>] [--import]   links and files saved on a device, waiting to be imported (D223, D227): --add saves a link, --add-file a copy of a file (under the name it should be titled by), --import adds each that is this device's to import (its own; another device's after five minutes, or at once when that one couldn't) with the whole import, --remove drops one; with none, lists them",
-    options: { add: { type: "string" }, "add-file": { type: "string" }, name: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" } },
+    usage: "[--add <url> | --add-file <path> [--name n]] [--skill s] [--remove <id>] [--import [--owe]]   links and files saved on a device, waiting to be imported (D223, D227): --add saves a link, --add-file a copy of a file (under the name it should be titled by), --import adds each that is this device's to import (its own; another device's after five minutes, or at once when that one couldn't) with the whole import, --remove drops one; with none, lists them",
+    options: { add: { type: "string" }, "add-file": { type: "string" }, name: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" }, owe: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
       if (f["add-file"] !== undefined) {
@@ -122,12 +122,13 @@ export const itemCommands: Record<string, Command> = {
       }
       if (f.import) {
         const r = await importQueued(lib, async (url, skills) => {
-          const item = await addSource(lib, url, { skills });
+          const item = await addSource(lib, url, { skills, owe: !!f.owe });
           afterAdd(lib, item, false);
           return { id: item.meta.id, title: item.meta.title, kept: !!item.kept };
         });
         // What a phone added with a part owed (a video's transcript) is filled here, then enriched.
-        const filled = (await fillOwed(lib)).map((i) => ({ id: i.meta.id, title: i.meta.title }));
+        // --owe (the iPhone): an episode is in at once, and the app fills it after, showing how far it is.
+        const filled = f.owe ? [] : (await fillOwed(lib)).map((i) => ({ id: i.meta.id, title: i.meta.title }));
         for (const i of filled) startEnrich(lib, i.id);
         return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n") };
       }

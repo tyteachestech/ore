@@ -81,6 +81,8 @@ export interface Episode {
   published?: string;
   /** The speech's language as the show's feed names it ("es-419"), so it is heard in it. */
   language?: string;
+  /** The episode's or show's own picture, where the directory or page names one. */
+  artwork?: string;
 }
 
 /** A feed's or page's language tag in its usual spelling ("en-us" → "en-US"); none when it isn't one. */
@@ -129,14 +131,14 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
     if (!hit) throw new Error("Couldn’t find that episode’s audio on Apple Podcasts (it may be older than the show’s last 200). Add the episode from the show’s own site instead.");
     // The show's own feed names the language it speaks.
     const feed = results.find((r) => r.feedUrl)?.feedUrl;
-    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, language: feed ? await showLanguage(feed, fetcher) : undefined };
+    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, artwork: hit.artworkUrl600 ?? hit.artworkUrl160, language: feed ? await showLanguage(feed, fetcher) : undefined };
   }
   const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
   const html = res?.ok ? await res.text() : "";
   const meta = metaOf(html);
   const audio = pageAudio(html, url, true);
   if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
-  return { audio, title: meta("og:title"), show: meta("og:site_name") };
+  return { audio, title: meta("og:title"), show: meta("og:site_name"), artwork: meta("og:image") };
 }
 
 /** A page's `<meta>` values by property or name, in either attribute order: pages write `content`
