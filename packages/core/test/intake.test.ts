@@ -348,7 +348,7 @@ describe("import coverage: junk is refused with the next step", () => {
     await expect(addSource(await tempLibrary(), "https://traffic.megaphone.fm/EP1.mp3")).rejects.toThrow(/over 200 MB/);
   });
 
-  test("links Ore can't read yet say why at once, without network access (F-new-spotify-refusal-test-network)", async () => {
+  test("links Ore can't read yet say why at once, without network access (F106)", async () => {
     // Spotify reads its page before refusing it; this unit test must never contact the live site.
     serve({});
     const lib = await tempLibrary();
@@ -964,7 +964,7 @@ describe("import coverage: from the browser tab", () => {
   const shell = web("wall-notion.html");
   const visible = Array.from({ length: 8 }, (_, i) => `Paragraph ${i + 1} of the team wiki: we review each card on the day it is due and keep notes short.`).join("\n\n");
 
-  test("a signed-in article comes in from the tab's HTML, with the tab's link (F-new-intake-fixture-network)", async () => {
+  test("a signed-in article comes in from the tab's HTML, with the tab's link (F107)", async () => {
     serve({});
     const url = "https://www.astralcodexten.com/p/the-psychopolitics-of-trauma";
     const item = await addTab(await tempLibrary(), { tab: { browser: "Safari", url, title: "x", html: web("substack.html") } });
@@ -973,7 +973,7 @@ describe("import coverage: from the browser tab", () => {
     expect(item.body).toContain("Research prompt teacher mind learn habit");
   });
 
-  test("a page built in the browser (Notion) comes in as its visible text (F-new-intake-fixture-network)", async () => {
+  test("a page built in the browser (Notion) comes in as its visible text (F107)", async () => {
     serve({});
     const url = "https://www.notion.so/Team-wiki-8c11dd01c9d24ad4b27b31d6f19e1fd8";
     const item = await addTab(await tempLibrary(), { tab: { browser: "Chrome", url, title: "Team wiki", html: shell, text: `Team wiki\n\n${visible}` } });
@@ -1001,7 +1001,7 @@ describe("import coverage: from the browser tab", () => {
     expect((await reimportSource(lib, item.meta.id, { local: true })).changed).toBe(false);
   });
 
-  test("a tab still showing a sign-in says to sign in there (F-new-intake-fixture-network)", async () => {
+  test("a tab still showing a sign-in says to sign in there (F107)", async () => {
     serve({});
     const url = "https://x.com/karpathy/status/1";
     await expect(addTab(await tempLibrary(), { tab: { browser: "Safari", url, html: shell, text: "Log in to X" } })).rejects.toThrow(/Safari is showing almost no text on x\.com.*Sign in there/);
@@ -1548,7 +1548,7 @@ describe("import coverage: videos heard from their sound", () => {
     else process.env.ORE_TRANSCRIBE = was;
   });
 
-  test("a YouTube video with no captions is heard: chapters, title and description kept (F-new-intake-fixture-network)", async () => {
+  test("a YouTube video with no captions is heard: chapters, title and description kept (F107)", async () => {
     serve({});
     ytdlp(join(FIX, "video", "no-captions.info.json"));
     const seen: string[] = [];

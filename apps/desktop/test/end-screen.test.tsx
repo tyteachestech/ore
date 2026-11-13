@@ -450,7 +450,7 @@ test("the glint (D257): a light crosses the ring and the field behind it only wh
   for (const [rule] of css.matchAll(/[^{}]*glint[^{}]*\{[^{}]*animation:[^{}]*\}/g)) expect(rule).not.toContain("infinite");
 });
 
-test("D252: the mole starts typing only after the last result lands (F-new-tally-before-speech)", async () => {
+test("D252: the mole starts typing only after the last result lands (F104)", async () => {
   jest.useFakeTimers();
   const e = end([], today(true, 600_000), { ...today(true, 600_000), caught_up: true, new_waiting: 7 }) as unknown as { session: Record<string, unknown> };
   Object.assign(e.session, { depth_days: 41, rescued: 2 });
