@@ -1,5 +1,7 @@
 # AI user testing for Ore: ChatGPT (GPT-6 Astra) prompt
 
+> **Retired (Tyler, 2026-11-13).** This ChatGPT prompt predates the exercise rename (D181) and the ⌘ list keys (D232), so it sends a tester to old names and keys. Hands-on passes now use the Codex prompt in the project Library (`codex-ux/hands-on-prompt-v2.md`); the old paste parts are in `ai-user-testing/retired/`. Kept for the record.
+
 For the iPhone build in the Simulator, see `ai-user-testing-iphone.md`.
 
 Two parts: a 2-minute setup you run yourself, then the prompt to paste into ChatGPT with computer use on.
