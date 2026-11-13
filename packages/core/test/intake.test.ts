@@ -444,7 +444,7 @@ describe("import coverage: files", () => {
     expect(text).not.toContain("## Spacing the practice");
   });
 
-  test("PDF: a programming book's code keeps its lines and indents, typewriter words in a sentence are code (F-new-pdf-code)", async () => {
+  test("PDF: a programming book's code keeps its lines and indents, typewriter words in a sentence are code (F65)", async () => {
     // code.pdf (make-code-pdf.py): set as LaTeX books are, prose in a serif face and code in a typewriter one.
     // It came in as prose: lines run together, indents gone, "# inside class Card:" a heading over the whole book.
     const b = (await addSource(await tempLibrary(), file("code.pdf"))).body;

@@ -24,7 +24,7 @@ function outlineHeadings(doc: HTMLElement): Heading[] {
 }
 
 /** The section he is in, for the pill. Above the first heading it is the source's own first line when
- *  that is its top heading, else nothing: never a top heading from further down (F-new-pill-late-heading). */
+ *  that is its top heading, else nothing: never a top heading from further down (F66). */
 export const sectionName = (headings: { level: number; title: string }[], current: number) => headings[current]?.title ?? (headings[0]?.level === 1 ? headings[0].title : "");
 
 type Place = { scroll: RefObject<HTMLDivElement | null>; doc: HTMLElement | null; ready: boolean; onJump?: () => void };

@@ -1,6 +1,6 @@
 # Makes files/code.pdf: one page of a programming book written for Ore, set the way LaTeX books are:
 # prose in a serif face, code in a typewriter face on its own lines (a comment first, indented lines,
-# a blank line inside, a prompt session) and typewriter words inside the prose (F-new-pdf-code).
+# a blank line inside, a prompt session) and typewriter words inside the prose (F65).
 # Run: python3 make-code-pdf.py (needs reportlab).
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
