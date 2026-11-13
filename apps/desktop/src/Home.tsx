@@ -468,7 +468,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                       root.current?.querySelector<HTMLElement>(`.home-read[data-id="${CSS.escape(i.id)}"] .home-open`)?.focus({ preventScroll: true });
                     }} />
                   ) : (
-                    <button className="title home-open" onClick={(e) => clickRow(e, i)}>{i.title}</button>
+                    <button className="title home-open" onClick={(e) => clickRow(e, i)}><span>{i.title}</span></button>
                   )}
                   {i.course && <span className="course-of">{i.course.title}</span>}
                   {onRefile && onCreateSkill && (
