@@ -572,10 +572,12 @@ export function PhoneApp() {
       document.documentElement.style.setProperty("--keyboard", `${kb}px`);
       if (!kb) return;
       document.querySelector(".phone-full .review-foot")?.scrollIntoView({ block: "end" });
-      // A field in the reader (a prequestion, a highlight's note) or the drawer (New skill, with its refusal
-      // under it) stays in sight above the keyboard. Sheets and Review lift themselves by --keyboard.
       const field = document.activeElement;
       if (!(field instanceof HTMLElement)) return;
+      // ...but never past the field he is typing in: Edit exercise's question sat above the foot, under the head.
+      if (field.closest(".phone-full .review-body")) return field.scrollIntoView({ block: "nearest" });
+      // A field in the reader (a prequestion, a highlight's note) or the drawer (New skill, with its refusal
+      // under it) stays in sight above the keyboard. Sheets and Review lift themselves by --keyboard.
       if (field.closest(".phone-drawer")) return (field.closest("form") ?? field).scrollIntoView({ block: "nearest" });
       if (!field.closest(".phone-reader")) return;
       if (!field.isContentEditable) return field.scrollIntoView({ block: "nearest" });

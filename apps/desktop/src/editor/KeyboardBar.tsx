@@ -26,9 +26,12 @@ const TABLE: [TableEdit, string][] = [
   ["col-left", "Insert column left"], ["col-right", "Insert column right"], ["col-move-left", "Move column left"], ["col-move-right", "Move column right"], ["col-delete", "Delete column"],
 ];
 
+/** Fades the bar's right edge while more buttons sit past it. */
+const more = (el: HTMLElement | null) => void el?.toggleAttribute("data-more", el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+
 /** The iPhone's bar over the keyboard while he writes a note (Notion, Bear): + opens the / menu,
  *  then to-do, bullet, heading, [[ link, a picture, indent and outdent, and a key that puts the keyboard away.
- *  In a table, the table's edits take the place of the block kinds. A tap keeps the keyboard up (no blur), and
+ *  Indent and outdent show only in a list, where they do something. In a table, the table's edits take the place of the block kinds. A tap keeps the keyboard up (no blur), and
  *  acts as one editor step. Over selected text it is the format bar. Move (from ⋮⋮) picks the block up: the bar
  *  becomes ↑ ↓ Done, one step a tap (D235). */
 export function KeyboardBar({ view, targets, onPicture }: { view: () => EditorView | undefined; targets: LinkTarget[]; onPicture: () => void }) {
@@ -151,13 +154,14 @@ export function KeyboardBar({ view, targets, onPicture }: { view: () => EditorVi
   };
   return createPortal(
     <div className="kb-bar" role="toolbar" aria-label="Note blocks" onMouseDown={(e) => e.preventDefault()}>
-      {(cell ? BUTTONS.filter((b) => b.a === "link") : BUTTONS).map((b) => (
+      {/* Wider than a phone in a list: the rest scrolls under a fade, and Hide stays put at the right (Notion). */}
+      <div className="kb-scroll" ref={(el) => more(el)} onScroll={(e) => more(e.currentTarget)}>
+      {(cell ? BUTTONS.filter((b) => b.a === "link") : BUTTONS.filter((b) => s.inList || (b.a !== "indent" && b.a !== "outdent"))).map((b) => (
         <button
           key={b.a}
           className={`kb-btn${active(b.a) ? " on" : ""}`}
           aria-label={b.label}
           aria-pressed={b.a === "todo" || b.a === "bullet" || b.a === "heading" ? active(b.a) : undefined}
-          disabled={(b.a === "indent" || b.a === "outdent") && !s.inList}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => tap(b.a)}
         >
@@ -194,7 +198,8 @@ export function KeyboardBar({ view, targets, onPicture }: { view: () => EditorVi
           if (!o) v.focus();
         }}
       />}
-      <button className="kb-btn" aria-label="Hide the keyboard" onMouseDown={(e) => e.preventDefault()} onClick={() => (v.dom as HTMLElement).blur()}>
+      </div>
+      <button className="kb-btn kb-hide" aria-label="Hide the keyboard" onMouseDown={(e) => e.preventDefault()} onClick={() => (v.dom as HTMLElement).blur()}>
         <Keyboard size={16} />
       </button>
     </div>,
