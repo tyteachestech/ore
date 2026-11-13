@@ -98,7 +98,11 @@ function useHold(on: boolean | undefined) {
     if (!on || !el) return;
     const stop = trackDrag(el, () => ({
       // Text in a field or the reader keeps iOS's own press (select, Look Up).
-      accept: (t) => !nativeMenu(document.elementFromPoint(t.clientX, t.clientY), getSelection()),
+      // So does a row inside with a menu of its own, which opens alone (F46).
+      accept: (t) => {
+        const at = document.elementFromPoint(t.clientX, t.clientY);
+        return !nativeMenu(at, getSelection()) && (!at || at.closest("[data-menu-row]") === el);
+      },
       begin: () => false, // A slide is a scroll or a swipe, never this.
       move: () => {},
       end: () => {},
