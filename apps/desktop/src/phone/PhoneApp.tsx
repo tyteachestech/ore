@@ -219,7 +219,7 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   });
   return (
     // Rename… goes after Open, and edits the title in place (Finder, the Mac's rows); not on an archived row.
-    <WithMenu actions={() => row.menu(item).flatMap((a) => (a.id === "open" && !item.archived_at ? [a, { id: "rename", label: "Rename…", run: () => setRenaming(true) }] : [a]))}>
+    <WithMenu actions={() => row.menu(item).map((a) => (a.id === "rename" ? { ...a, run: () => setRenaming(true) } : a))}>
       <li>
         {side && <span className={`phone-swipe ${side}`}>{side === "left" ? (item.archived_at ? "Restore" : "Archive") : item.status === "done" ? "To read" : "Done"}</span>}
         {renaming && (
@@ -776,6 +776,8 @@ export function PhoneApp() {
       { id: "restore", label: "Restore", run: () => restore(item) },
     ] : [
       { id: "open", label: "Open", run: () => open(item.id) },
+      // Each list types the new title on its own row: SwipeRow and Today's Home set what Rename… runs (F48).
+      { id: "rename", label: "Rename…", run: () => {} },
       { id: "review-source", label: "Review this source", run: () => setReviewing({ pick: null, source: item.id, run: 0 }) },
       { id: "pin", label: item.pinned_at ? "Unpin" : "Pin to top", run: () => void pin(item) },
       { id: "move", label: item.status === "done" ? "Move to To read" : "Move to Done", run: () => row.toggle(item) },

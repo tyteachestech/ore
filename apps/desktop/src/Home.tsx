@@ -7,6 +7,7 @@ import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { SkillIcon } from "./IconPicker";
 import { lessonsOf, levelProgress, nextLesson, opt, ore, PHONE, touched, type DueEntry, type Item, type Skill, type Today } from "./ore";
 import * as HoverCard from "@radix-ui/react-hover-card";
+import { flushSync } from "react-dom";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { DotBar, minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
@@ -197,6 +198,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
         setPicked(ids.slice(Math.min(a, b), Math.max(a, b) + 1));
       }
       if (e.metaKey || !anchor.current || !reading.some((r) => r.id === anchor.current)) anchor.current = i.id;
+      // WebKit leaves a clicked button unfocused; ⇧↑↓ grow the pick from the focused row (F45, Finder).
+      (e.currentTarget as HTMLElement).closest(".home-read")?.querySelector<HTMLElement>(".home-open")?.focus({ preventScroll: true });
       return;
     }
     setPicked([]);
@@ -440,7 +443,11 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                   <Thumb item={i} iconSize={16} />
                   {renaming === i.id ? (
                     // Focus goes back to the row once it closes, as after any pick from its menu (keepFocusNear).
-                    <TitleField value={i.title} onSave={(t) => onRename!(i, t)} onClose={() => setRenaming(null)} />
+                    <TitleField value={i.title} onSave={(t) => onRename!(i, t)} onClose={() => {
+                      // Focus goes back to the row the field stood in, not to the page (Finder, the lists).
+                      flushSync(() => setRenaming(null));
+                      root.current?.querySelector<HTMLElement>(`.home-read[data-id="${CSS.escape(i.id)}"] .home-open`)?.focus({ preventScroll: true });
+                    }} />
                   ) : (
                     <button className="title home-open" onClick={(e) => clickRow(e, i)}>{i.title}</button>
                   )}
