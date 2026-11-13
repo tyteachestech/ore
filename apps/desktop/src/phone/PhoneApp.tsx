@@ -29,6 +29,7 @@ import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
+import { Working } from "../Working";
 import { errorText, stepLanded, useKeptScroll, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
@@ -911,6 +912,12 @@ export function PhoneApp() {
           </div>
           <main className="phone-page" ref={main}>
             {error && <p className="phone-error">{error}</p>}
+            {/* The library is read from iCloud's folder at launch: a moment on a big one, said once it is felt. */}
+            {!loaded && !error && (
+              <p className="phone-empty phone-opening">
+                <Working label="Opening your library" stage="read" />
+              </p>
+            )}
             {/* A share's Open lands here: what is still downloading or being heard shows where he is looking. */}
             {tab === "today" && waiting.length > 0 && (
               <div className="phone-sources phone-coming">

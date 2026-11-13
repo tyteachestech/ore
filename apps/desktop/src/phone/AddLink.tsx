@@ -2,6 +2,7 @@
 // imports it itself with the Mac's importer; what it can't read (a video's transcript) the Mac brings in.
 // The sheet is one field, as Raindrop's add-a-link is; a link already on the clipboard is offered by the
 // field's own Paste (iOS), never read without his tap.
+import { Working } from "../Working";
 import { useEffect, useRef, useState } from "react";
 import { Trap } from "../Trap";
 import { ore, queuePicked } from "../ore";
@@ -124,7 +125,11 @@ export function WaitingLinks({ links, reading, onRemove }: { links: Waiting[]; r
                 <span className="phone-error">{phoneReason(l.error)} Your Mac will try it.</span>
               )
             ) : (
-              reading && <span className="phone-waiting-note">Reading…</span>
+              reading && (
+                <span className="phone-waiting-note">
+                  <Working label="Reading" stage="read" />
+                </span>
+              )
             )}
             <button className="phone-back" onClick={() => onRemove(l)}>
               Remove

@@ -10437,7 +10437,9 @@ journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's
   await tap(page, more);
   await page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }).waitFor();
   if (await focused()) throw new Error("the answer field kept focus, so the keyboard stays up over the sheet");
-  // Dismissed, the sheet gives the field its focus (and keyboard) back, with the draft.
+  // Dismissed, the sheet gives the field its focus (and keyboard) back, with the draft. Esc lands with focus
+  // nowhere, as it does in the frame before the sheet has taken it: it is still the sheet's key (F61).
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Escape");
   await page.locator(".action-sheet").waitFor({ state: "detached" });
   await page.waitForTimeout(100);
