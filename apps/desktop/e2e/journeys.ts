@@ -9826,7 +9826,7 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
   await page.locator(".add-link").waitFor({ state: "detached" });
   const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/offline" });
   await row.getByText("Your Mac will try it.").waitFor();
-  // F52: it shows on Today too, where a share's Open lands: an episode still downloading was nowhere he looked.
+  // F53: it shows on Today too, where a share's Open lands: an episode still downloading was nowhere he looked.
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Today" }));
   await row.getByText("Your Mac will try it.").waitFor();
