@@ -315,7 +315,6 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   const close = () => show(false);
   /** Esc: back a step, or closed. */
   const dismiss = useRef(() => {});
-  dismiss.current = () => (stepId ? setStepId(null) : close());
   /** An action was picked: focus doesn't go back to a field the sheet put the keyboard away from. */
   const picked = useRef(false);
   useSwipeDown(box, close, open);
@@ -332,7 +331,8 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
     const raf = requestAnimationFrame(() => box.current?.focus());
     // Esc with focus not yet in the sheet (that frame, or a tap on the dimmed page) is still the sheet's (F61).
     const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || box.current?.contains(e.target as Node)) return;
+      // A layer of its own (the sheet's, or one opened over it) keeps its key.
+      if (e.key !== "Escape" || e.defaultPrevented || (e.target as HTMLElement | null)?.closest?.('[aria-modal="true"]')) return;
       e.stopPropagation();
       dismiss.current();
     };
@@ -350,6 +350,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   const list = open ? listOf(actions) : [];
   const step = stepId ? list.find((a) => a.id === stepId) : undefined;
   const rows = step?.sub ?? list;
+  dismiss.current = () => (step ? setStepId(null) : close());
   const pick = (a: MenuAction) => {
     if (a.sub) return setStepId(a.id);
     if (a.keep) return a.run();
