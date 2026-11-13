@@ -4,7 +4,7 @@ import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
-import { Gem } from "./Gem";
+import { Cutting, Gem } from "./Gem";
 import { Mole } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
 import { still } from "./SideCursor";
@@ -1531,8 +1531,9 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
             return (
               // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then. A gem cut before today and polished now shows once the cart has poured.
               <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: you passed it as a remix" : g.seam ? "Won back: you missed it once and cut it again" : "Cut: you'd still recall it three weeks from now"}`}>
-                <span data-color={sk?.color} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
-                  <Gem kind="cut" size={36} seam={g.seam} polished={g.polished} />
+                <span data-color={sk?.color} data-stone={(pour && !g.old) || undefined} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
+                  {/* With the cart, the stone that lands is cut where it stands: its dots fuse into pixels (D239). */}
+                  {pour && !g.old ? <Cutting go={i < landed} size={36} seam={g.seam} polished={g.polished} /> : <Gem kind="cut" size={36} seam={g.seam} polished={g.polished} />}
                   {sk && <span className="review-cut-skill"><SkillIcon icon={sk.icon} color={sk.color} dot /></span>}
                 </span>
               </Hint>

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { levelProgress, type Strength } from "./ore";
 import { DotRing } from "./Ring";
 
@@ -32,7 +33,9 @@ export const FUSE: Record<GemKind, number> = { rough: 0, empty: 0, ready: 0.5, c
 const LAP = 0.03;
 
 /** One cell: a round dot at `fuse` 0, growing and squaring until it fills its cell at 1. `gold`: a won-back cell. */
-const cell = (x: number, y: number, t: string, fuse: number, gold = false) => {
+const cell = (x: number, y: number, t0: string, fuse: number, gold = false, band?: number) => {
+  // The light that runs across a gem as it is cut: the cells under it take the highlight's tone.
+  const t = band !== undefined && t0 !== "D" && Math.abs(x + y * 0.9 - band) < 1.3 ? "W" : t0;
   const solid = (gold ? GOLD : SOLID)[t];
   const loose = gold ? GOLD[t === "W" ? "W" : "H"] : t === "W" ? SHINE : LIGHT;
   if (fuse <= 0) return <circle key={`${x},${y}`} cx={x + 0.5} cy={y + 0.5} r={RADIUS[t]} fill={loose} />;
@@ -44,14 +47,14 @@ const cell = (x: number, y: number, t: string, fuse: number, gold = false) => {
 
 /** One mark per cell. `outline` keeps only the edge cells, small, for an empty slot; `face` cuts the rock's top
  *  left face solid (nearly cut); `gold` turns the gem's rim, its edge cells, gold (won back). */
-const dots = (rows: readonly string[], fuse: number, o: { outline?: boolean; face?: boolean; gold?: boolean } = {}) =>
+const dots = (rows: readonly string[], fuse: number, o: { outline?: boolean; face?: boolean; gold?: boolean; band?: number } = {}) =>
   rows.flatMap((row, y) =>
     [...row].map((t, x) => {
       if (t === ".") return null;
       const inside = [rows[y - 1]?.[x], rows[y + 1]?.[x], row[x - 1], row[x + 1]].every((n) => n && n !== ".");
       if (o.outline) return inside ? null : <circle key={`${x},${y}`} cx={x + 0.5} cy={y + 0.5} r={0.25} fill={C} />;
       const cut = o.face && x + y * 1.2 < row.length * 0.62 && y < rows.length * 0.55;
-      return cell(x, y, t, cut ? 1 : fuse, o.gold && !inside);
+      return cell(x, y, t, cut ? 1 : fuse, o.gold && !inside, o.band);
     }),
   );
 
@@ -61,16 +64,64 @@ const sparkle = (cx: number, cy: number, large: boolean) =>
     <rect key={`s${dx},${dy}`} className="gem-sparkle" x={cx + dx! - k! / 2} y={cy + dy! - k! / 2} width={k} height={k} fill="var(--text)" />
   ));
 
-/** `breathe`: a nearly cut gem due today swells and settles slowly; one due later sits still. */
-export function Gem({ kind, size = 16, breathe, seam, polished }: { kind: GemKind; size?: number; breathe?: boolean; seam?: boolean; polished?: boolean }) {
+/** `breathe`: a nearly cut gem due today swells and settles slowly; one due later sits still. `fuse` and `band`
+ *  are for a gem caught mid-cut (`Cutting`): how far its dots have joined, and where the light is on it. */
+export function Gem({ kind, size = 16, breathe, seam, polished, fuse, band }: { kind: GemKind; size?: number; breathe?: boolean; seam?: boolean; polished?: boolean; fuse?: number; band?: number }) {
   const large = size >= 22;
   const shine = kind === "cut" && !!polished;
   const rows = kind === "rough" || kind === "ready" ? (large ? ROUGH_L : ROUGH) : large ? CUT_L : CUT;
   return (
     <svg className="gem" data-kind={kind} data-breathe={breathe || undefined} data-polished={shine || undefined} width={size} height={size} viewBox={large ? "-1 -2.5 16 16" : "-1 -2 12 12"} aria-hidden="true">
-      {dots(rows, FUSE[kind], { outline: kind === "empty", face: kind === "ready", gold: !!seam && (kind === "cut" || kind === "dull") })}
+      {dots(rows, fuse ?? FUSE[kind], { outline: kind === "empty", face: kind === "ready" && fuse === undefined, gold: !!seam && (kind === "cut" || kind === "dull"), band })}
       {shine && sparkle(large ? 12 : 8.5, large ? 0.5 : 0, large)}
     </svg>
+  );
+}
+
+const BURST = Array.from({ length: 8 }, (_, i) => i * (Math.PI / 4) + 0.4);
+const easeOut = (x: number) => 1 - (1 - x) ** 3;
+
+/** A stone being cut, at a session's end (D239, the look of D236 in motion): loose dots while it moves, solid
+ *  pixels at rest. The rough stone lands with a squash, its dots swell as it grows to a gem's size, then they take
+ *  the gem's outline and fuse into pixels with a pop, a ring of loose dots flies off it and a light runs across
+ *  its faces. `go` starts it (the stone has landed); with `still` it is simply cut. Times are the motion tokens. */
+export function Cutting({ go, still, size = 36, seam, polished }: { go: boolean; still?: boolean; size?: number; seam?: boolean; polished?: boolean }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const times = useRef({ land: 150, swell: 300, fuse: 600 });
+  // Milliseconds since it landed; Infinity once it is cut.
+  const [at, setAt] = useState(still ? Infinity : 0);
+  useEffect(() => {
+    if (!go || still) return;
+    const css = getComputedStyle(box.current!), ms = (name: string, or: number) => parseFloat(css.getPropertyValue(name)) || or;
+    const d = (times.current = { land: ms("--t-2", 150), swell: ms("--t-4", 300), fuse: ms("--t-moment", 600) });
+    const t0 = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      const t = now - t0;
+      if (t >= d.land + d.swell + d.fuse) return setAt(Infinity);
+      setAt(t);
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [go, still]);
+  if (at === Infinity) return <span className="gem-cutting" ref={box}><Gem kind="cut" size={size} seam={seam} polished={polished} /></span>;
+  const { land, swell, fuse } = times.current;
+  // Landing: half a gem's size, as it flew, squashed against the ground it hit.
+  const hit = Math.sin(Math.min(1, at / land) * Math.PI) * 0.16;
+  const k = easeOut(Math.max(0, Math.min(1, (at - land) / swell)));
+  const q = Math.max(0, (at - land - swell) / fuse);
+  const cutNow = at >= land + swell;
+  const pop = cutNow ? 1 + 0.22 * Math.sin(Math.min(1, q * 2) * Math.PI) * (1 - q) : 0.5 + 0.5 * k;
+  return (
+    <span className="gem-cutting" ref={box} data-cutting>
+      <span style={{ transform: `scale(${pop * (1 + hit)}, ${pop * (1 - hit)})` }}>
+        {cutNow ? (
+          <Gem kind="cut" size={size} seam={seam} fuse={Math.min(1, 0.55 + 0.45 * easeOut(Math.min(1, q * 2.5)))} band={q > 0.35 ? ((q - 0.35) / 0.65) * 30 - 3 : undefined} />
+        ) : (
+          <Gem kind="rough" size={size} fuse={0.55 * k} />
+        )}
+      </span>
+      {cutNow && BURST.map((a, i) => <i key={i} style={{ "--x": `${Math.cos(a) * size * 1.3}px`, "--y": `${Math.sin(a) * size * 1.05}px` } as React.CSSProperties} />)}
+    </span>
   );
 }
 

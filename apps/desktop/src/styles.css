@@ -2156,6 +2156,13 @@ button.home-plan:hover { color: var(--text); }
 .review-cut > span { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; animation: gem-in var(--t-4) var(--ease-spring) both; }
 .review-cut-skill { display: flex; justify-content: center; width: 100%; line-height: 1; font-size: 14px; }
 .review-cut b { font-family: var(--round); font-size: 24px; color: var(--text); font-variant-numeric: tabular-nums; animation: pop var(--t-4) var(--ease-out) 700ms both; }
+/* A stone the cart dropped is cut in place (Cutting, D239): it arrives by landing, so it has no entrance of its own. */
+.review-cut > span[data-stone] { animation: none; }
+.gem-cutting { position: relative; display: inline-grid; place-items: center; }
+.gem-cutting > span { display: block; transform-origin: 50% 85%; will-change: transform; }
+.gem-cutting[data-cutting] .gem { opacity: 1; }
+.gem-cutting > i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: color-mix(in oklab, var(--skill, var(--accent)), white 40%); pointer-events: none; animation: gem-burst var(--t-moment) var(--ease-out) both; }
+@keyframes gem-burst { from { transform: none; opacity: 1; } to { transform: translate(var(--x), var(--y)) scale(0.5); opacity: 0; } }
 @keyframes gem-in { from { opacity: 0; transform: translateY(8px) scale(0.7) rotate(-10deg); } to { opacity: 1; transform: none; } }
 .review-levelup { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; padding: 6px 12px 6px 8px; border-radius: 999px; background: color-mix(in srgb, var(--skill, var(--c-green)) 12%, transparent); color: var(--text); font-weight: 600; animation: pop var(--t-4) var(--ease-spring) 700ms both; }
 @keyframes pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }

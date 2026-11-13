@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Gem } from "../src/Gem";
+import { Cutting, Gem } from "../src/Gem";
 import { DotBar, DotRing, lit } from "../src/Ring";
 
 // D183: one way of drawing. Gems, rings and icons are round dots; no square pixel is left beside them.
@@ -59,3 +59,21 @@ test("a gem is loose dots until it is cut, then solid pixels, and no state glows
   }
 });
 
+
+test("a stone at a session's end waits as loose dots where it landed, and is cut at once when nothing may move (D239)", () => {
+  const waiting = renderToStaticMarkup(<Cutting go={false} />);
+  expect(waiting).toContain('data-kind="rough"');
+  expect(waiting).not.toContain("<rect");
+  const cut = renderToStaticMarkup(<Cutting go still seam />);
+  expect(cut).toContain('data-kind="cut"');
+  expect(cut).not.toContain("<circle");
+  expect(cut).toContain("data-gold");
+  expect(cut).not.toContain("data-cutting");
+});
+
+test("a gem caught mid-cut: its dots are part fused, and the light crossing it brightens only the cells under it", () => {
+  const mid = renderToStaticMarkup(<Gem kind="cut" size={36} fuse={0.7} />);
+  expect(mid).toContain("rx=");
+  const fills = (html: string) => html.match(/white 70%/g)?.length ?? 0;
+  expect(fills(renderToStaticMarkup(<Gem kind="cut" size={36} band={8} />))).toBeGreaterThan(fills(renderToStaticMarkup(<Gem kind="cut" size={36} />)));
+});
