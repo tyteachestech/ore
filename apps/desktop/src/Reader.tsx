@@ -2157,7 +2157,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       id: "type",
       label: "Type",
       run: () => {},
-      sub: INTENTS.map((i) => ({ id: i, label: LABEL[i], checked: a.intent === i, run: () => void (a.intent !== i && setIntentOf(a.id, i)) })),
+      sub: INTENTS.map((i) => ({ id: i, label: LABEL[i], icon: <Mark i={i} />, checked: a.intent === i, run: () => void (a.intent !== i && setIntentOf(a.id, i)) })),
     },
     { id: "copy", label: "Copy with source", run: () => copyHighlight(a.id) },
     { id: "remove", label: "Remove highlight", danger: true, divider: true, run: () => void removeSaved(a.id) },
@@ -3750,6 +3750,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 }
 
 /** Eleven Reader's pill: shown while he has scrolled away from the spoken text, pointing to it. */
+/** A highlight type's mark in its Type submenu, in the type's own colour, as on the highlight popup. */
+function Mark({ i }: { i: Intent }) {
+  const Glyph = ICON[i];
+  return <Glyph className={`menu-mark ${i}`} aria-hidden="true" />;
+}
+
 function BackToCurrent({ dir, onClick }: { dir: "up" | "down"; onClick: () => void }) {
   return (
     <button className={`back-current ${dir}`} onClick={onClick}>

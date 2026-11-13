@@ -1000,7 +1000,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
         </ul>
       )}
       {maybe.length > 0 && !done && (
-        // A purple square at the right: a source that may answer it; the hint names them, a click opens the first.
+        // A purple dot at the right (F82: round, D184): a source that may answer it; the hint names them, a click opens the first.
         <Hint text={<span className="hint-lines">{maybe.map((m) => <span key={m.item}>{m.quote ? "May answer it" : "To read"} · {m.title}</span>)}</span>} side="left">
           <button className="q-lead" tabIndex={-1} aria-label={`Open ${maybe[0]!.title}, which may answer it`} onClick={() => onOpenSource(maybe[0]!.item)} />
         </Hint>
