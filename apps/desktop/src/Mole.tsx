@@ -194,9 +194,13 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
     at: [[0, { to: { hx: 1.5, lx: 1 } }], [170, { to: { hx: -1.5, lx: -1 } }], [340, { to: { hx: 1.5, lx: 1 } }], [510, { to: { hx: -1.5, lx: -1 } }], [680, { to: { hx: 0, lx: 0 } }], [800, { to: { open: 1 } }]] },
   // A wink: one eye, a lean and the moustache lifting on that side.
   wink: { to: { hx: 0.7, puff: 0.5 }, end: 1100, still: { wink: 1, hx: 0.7, twinkle: 1 }, at: [[140, { to: { wink: 1, twinkle: 1 } }], [520, { to: { wink: 0, twinkle: 0 } }], [700, { to: { hx: 0, puff: 0 } }]] },
-  // A laugh: arc eyes, mouth open, his head and moustache shaking with it.
-  laugh: { to: { arc: 1, mouth: 0.5 }, end: 1500, still: { arc: 1, mouth: 0.5 },
-    at: [0, 170, 340, 510, 680, 850].map((ms): [number, Beat] => [ms + 120, { kick: { top: -34, puff: 2.5 } }]) },
+  // A laugh from the belly, deep and slow: three heaves. On each his head goes back, helmet tipping, mouth wide and
+  // the moustache blown out, paws lifting; then he sinks under it. The last is the biggest and shakes the dirt.
+  laugh: { to: { arc: 1, mouth: 0.5 }, end: 2700, still: { arc: 1, mouth: 1, top: -1.2, hat: 0.5, tilt: -0.1, puff: 0.8 },
+    at: [...[150, 760, 1400].flatMap((ms, i): [number, Beat][] => [
+      [ms, { to: { top: -1.2 - i * 0.25, hat: 0.5, tilt: -0.1, mouth: 1, puff: 0.8, pawL: 1.6, pawR: 1.6 }, kick: { puff: 3 } }],
+      [ms + 300, { to: { top: 1, hat: -0.15, tilt: 0, mouth: 0.4, puff: 0, pawL: 0, pawR: 0 } }]]),
+      [1720, { kick: { kick: 6 } }], [2150, { to: { top: REST.top, hat: 0, mouth: 0, arc: 0 } }]] },
   // Proud: he draws up and tips his helmet back, pleased, lamp bright, cheeks pink.
   proud: { to: { top: -1.3, hat: 1.1, tilt: -0.16, arc: 1, lamp: 1, blush: 0.8 }, kick: { top: -30 }, end: 1900, still: { top: -1.3, hat: 1.1, tilt: -0.16, arc: 1, lamp: 1, blush: 0.8 }, at: [[1300, { to: { hat: 0, tilt: 0, lamp: 0, blush: 0 } }]] },
   // Curious: his head cocked, one brow up, a look, a "?" over him.
