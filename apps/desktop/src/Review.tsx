@@ -1662,7 +1662,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       )}
       {/* D248: once in four weeks, an exercise that beat him weeks ago and that he passed today, his answer
           then over his answer now. His own words are the evidence; nothing is counted. */}
-      {!quick && s.then_now && (
+      {s.then_now && (
         <section className="then-now" aria-label="Then and now">
           <p className="then-now-q">{s.then_now.question.replace(/_{4,}/g, "____")}</p>
           <dl>
