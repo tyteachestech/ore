@@ -6012,8 +6012,8 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   if (await pick.isVisible()) await page.keyboard.press("Enter");
   await q.waitFor();
   const first = await q.innerText();
-  const session = page.locator(".review [role=progressbar]").first();
-  const done = async () => Number(await session.getAttribute("aria-valuenow"));
+  const session = page.locator(".review");
+  const done = async () => Number(await session.getAttribute("data-done"));
   const before = await done();
   // A card asks how sure he is, then shows the answer; a question asks for his answer first.
   await reveal(page);
@@ -6082,14 +6082,14 @@ journey("review: Later puts the exercise off to the end of the session with noth
   const log = reviewLog();
   const today = (await ore("today")) as TodayNow;
   const q = page.locator(".review-q");
-  const bar = page.locator(".review [role=progressbar]").first();
-  const step = async () => `${await bar.getAttribute("aria-valuenow")} of ${await bar.getAttribute("aria-valuemax")}`;
+  const bar = page.locator(".review");
+  const step = async () => `${await bar.getAttribute("data-done")} of ${await bar.getAttribute("data-steps")}`;
   const good = page.getByRole("button", { name: "Good", exact: true });
   const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
   try {
     await startReview(page, /Learning/);
     const first = await q.innerText();
-    const total = Number(await bar.getAttribute("aria-valuemax"));
+    const total = Number(await bar.getAttribute("data-steps"));
     await reveal(page);
     // With Ask open: ⌘L from its field puts the exercise off too, and ⌘Z brings Ask back open.
     const askToggle = page.getByRole("button", { name: "Ask about this" });
@@ -6185,7 +6185,7 @@ journey("review: putting off every exercise left, one after another, ends the se
   const calls = oreCalls(page);
   const log = reviewLog();
   await startReview(page, null);
-  const total = Number(await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax"));
+  const total = Number(await page.locator(".review").getAttribute("data-steps"));
   const n = await laterAll(page, total);
   if (n !== total) throw new Error(`put off ${n} of ${total} before it ended`);
   if (calls.calls.some((a) => a[0] === "review") || reviewLog() !== log) throw new Error("Later logged a review");
@@ -6290,7 +6290,7 @@ journey("review: ⌘Z from the end screen after a Later doesn't count the time s
   const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
   try {
     await startReview(page, /Learning/);
-    const total = Number(await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax"));
+    const total = Number(await page.locator(".review").getAttribute("data-steps"));
     for (let n = 1; n < total; n++) {
       const was = await q.innerText();
       await reveal(page);
@@ -6315,7 +6315,7 @@ journey("review: ⌘Z from the end screen after a Later doesn't count the time s
   }
 });
 
-journey("review: a Later on the one more exercise served after a miss closed the goal passes that turn on, so the session still doesn't end on a miss (D177, D192)", async (page) => {
+journey("review: a Later on the one more exercise served after a miss closed the goal passes that turn on, so the mole's goal note still doesn't follow a miss (D177, D192, D246)", async (page) => {
   const calls = oreCalls(page);
   // A one-millisecond goal, so the first rating closes it.
   await page.route(/\/ore$/, async (route) => {
@@ -6327,7 +6327,7 @@ journey("review: a Later on the one more exercise served after a miss closed the
   });
   const q = page.locator(".review-q");
   const again = page.getByRole("button", { name: "Again", exact: true });
-  const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
+  const told = page.locator('.review-moment[data-tone="goal"]');
   try {
     await startReview(page, /Learning/);
     const first = await q.innerText();
@@ -6338,27 +6338,26 @@ journey("review: a Later on the one more exercise served after a miss closed the
     await page.keyboard.press("Meta+l");
     await until("Later moves on from it", async () => (await q.innerText()) !== win);
     const next = await q.innerText();
-    const ends = () => calls.calls.filter((a) => a[0] === "session" && a[1] === "end").length;
-    const ended = ends();
     await reveal(page);
     await again.click();
     await until("the miss is logged", async () => calls.rated.length === 2);
-    await page.waitForTimeout(800); // a session ending on that miss would have been ended by now
-    if ((await doneButton.isVisible()) || ends() > ended) throw new Error("the session ended on a miss after a Later");
+    await page.waitForTimeout(800); // a note told on that miss would be up by now
+    if (await told.count()) throw new Error("the goal was told on a miss after a Later");
     await until("that miss gets its own one more", async () => (await q.count()) > 0 && (await q.innerText()) !== next);
     // ⌘Z takes that miss back: the turn it earned goes with it, so missing it again still earns one more.
     await page.keyboard.press("Meta+z");
     await until("⌘Z brings the missed one back", async () => (await q.innerText()) === next && !(await again.isVisible()));
-    const ended2 = ends();
     await reveal(page);
     await again.click();
     await until("the miss is logged again", async () => calls.rated.length === 3);
     await page.waitForTimeout(800);
-    if ((await doneButton.isVisible()) || ends() > ended2) throw new Error("the session ended on a miss after ⌘Z");
+    if (await told.count()) throw new Error("the goal was told on a miss after ⌘Z");
     await until("one more after it", async () => (await q.count()) > 0 && (await q.innerText()) !== next);
     await reveal(page);
     await page.getByRole("button", { name: "Good", exact: true }).click();
-    await doneButton.waitFor();
+    await told.waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator(".review-end").waitFor();
     await page.keyboard.press("Enter");
     await page.locator(".review").waitFor({ state: "detached" });
   } finally {
@@ -6481,16 +6480,12 @@ async function startReview(page: Page, only: RegExp | null) {
   await page.locator(".review-q").waitFor();
 }
 
-journey("review: a rating always moves \"Exercise N of M\" on, and a miss adds its retry as one more step (D59)", async (page) => {
+journey("review: a rating always moves the session one step on, and a miss adds its retry as one more step (D59)", async (page) => {
   const log = oreCalls(page);
   try {
     await startReview(page, null);
-    const live = page.locator(".review .sr-only[aria-live]");
-    const at = async () => {
-      const m = /^Exercise (\d+) of (\d+)\./.exec(await live.innerText());
-      if (!m) throw new Error(`no step in the label: ${await live.innerText()}`);
-      return `${m[1]} of ${m[2]}`;
-    };
+    const root = page.locator(".review");
+    const at = async () => `${Number(await root.getAttribute("data-done")) + 1} of ${await root.getAttribute("data-steps")}`;
     const n = Number((await at()).split(" of ")[1]);
     const rate = async (name: "Again" | "Good", want: string) => {
       await reveal(page);
@@ -6515,7 +6510,47 @@ journey("review: a rating always moves \"Exercise N of M\" on, and a miss adds i
   }
 });
 
-journey("review: the header keeps its form for the session: 30 steps stay dots when a miss makes them 31", async (page) => {
+journey("review: when the day's goal closes the mole says so and the session goes on; Esc ends it on the end screen (D246)", async (page) => {
+  const log = oreCalls(page);
+  const was = (await ore("today")) as { goal_minutes: number; met: boolean; due: number };
+  if (was.met || was.due < 3) throw new Error(`needs an unmet goal and three exercises due: ${JSON.stringify({ met: was.met, due: was.due })}`);
+  const q = page.locator(".review-q");
+  const note = page.locator('.review-moment[data-tone="goal"]');
+  const good = page.getByRole("button", { name: "Good", exact: true });
+  try {
+    await ore("goal", "--minutes", "1");
+    await page.reload();
+    await startReview(page, null);
+    // A minute and a bit on the first exercise: the one-minute goal closes on its rating.
+    await page.evaluate(() => {
+      const now = Date.now;
+      Date.now = () => now() + 61_000;
+    });
+    const first = await q.innerText();
+    await reveal(page);
+    await good.click();
+    await note.waitFor();
+    if (!/Goal met/.test(await note.innerText())) throw new Error(`the note says ${JSON.stringify(await note.innerText())}`);
+    await until("the next exercise", async () => (await q.innerText()) !== first);
+    if (await page.locator(".review-end").count()) throw new Error("the session ended at the goal");
+    // The note leaves with the next rating, and the session is still going.
+    const second = await q.innerText();
+    await reveal(page);
+    await good.click();
+    await until("the exercise after", async () => (await q.innerText()) !== second);
+    if (await note.count()) throw new Error("the goal's note outlived the next rating");
+    if (await page.locator(".review-end").count()) throw new Error("the session ended after the goal");
+    await page.keyboard.press("Escape");
+    await page.locator(".review-end").waitFor();
+  } finally {
+    await page.keyboard.press("Enter").catch(() => {});
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
+    await log.undoAll();
+    await ore("goal", "--minutes", String(was.goal_minutes));
+  }
+});
+
+journey("review: nothing counts the session up top (D246), and a miss still adds its retry to the session", async (page) => {
   const log = oreCalls(page);
   const { new_per_day } = (await ore("today")) as { new_per_day: number };
   const made: string[] = [];
@@ -6532,12 +6567,12 @@ journey("review: the header keeps its form for the session: 30 steps stay dots w
       made.push(join(cards, `${id}.md`));
     }
     await startReview(page, null);
-    const dots = page.locator(".review .review-steps");
-    if ((await dots.getAttribute("aria-valuemax")) !== "30") throw new Error(`the session has ${await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax")} steps, not 30`);
+    const dots = page.locator(".review");
+    if ((await dots.getAttribute("data-steps")) !== "30") throw new Error(`the session has ${await page.locator(".review").getAttribute("data-steps")} steps, not 30`);
     await reveal(page);
     await page.getByRole("button", { name: "Again", exact: true }).click();
-    await until("the miss adds its retry", async () => (await page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax")) === "31");
-    if (!(await dots.isVisible())) throw new Error("a miss at 30 steps switched the step dots to the bar");
+    await until("the miss adds its retry", async () => (await page.locator(".review").getAttribute("data-steps")) === "31");
+    if (await page.locator(".review-head [role=progressbar], .review-head .dot-bar, .review-head .quiz-steps").count()) throw new Error("Review's header still counts the session");
   } finally {
     await page.keyboard.press("Escape");
     await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
@@ -6561,7 +6596,7 @@ journey("review: What to review has a No skill row for exercises filed under no 
     const rows = await pick.getByRole("checkbox").allInnerTexts();
     if (!rows.some((r) => /No skill/.test(r) && /1 exercise ready/.test(r))) throw new Error(`no "No skill · 1 exercise ready" row: ${JSON.stringify(rows)}`);
     await page.keyboard.press("Escape");
-    const total = () => page.locator(".review [role=progressbar]").first().getAttribute("aria-valuemax").then(Number);
+    const total = () => page.locator(".review").getAttribute("data-steps").then(Number);
     await startReview(page, null);
     if ((await total()) !== due) throw new Error(`every row ticked gave a session of ${await total()}, Home said ${due}`);
     await page.keyboard.press("Escape");
@@ -8371,7 +8406,7 @@ journey("review that can't start because ore failed offers Try again, focused, w
 
 journey("review: a card that fails to load offers Try again, focused, which loads it without losing the rating before it; Undo clears the error", async (page) => {
   const q = page.locator(".review-q");
-  const session = page.locator(".review [role=progressbar]").first();
+  const session = page.locator(".review");
   // Every load of a card other than the first one shown fails: the next card loads while he answers
   // this one, and again when it is due if that failed (and twice under React's dev StrictMode).
   let firstId: string | undefined;
@@ -8407,7 +8442,7 @@ journey("review: a card that fails to load offers Try again, focused, which load
   await until("Try again has the focus", () => retry.evaluate((b) => b === document.activeElement));
   await page.keyboard.press("Enter");
   await until("the next card shows", async () => (await q.isVisible()) && (await q.innerText()) !== first);
-  if ((await session.getAttribute("aria-valuenow")) !== "1") throw new Error("the rating before it was lost");
+  if ((await session.getAttribute("data-done")) !== "1") throw new Error("the rating before it was lost");
   // Undo still takes that rating back (and leaves the card due for the journeys after this one).
   await page.getByRole("button", { name: "Undo last rating" }).click();
   await until("Undo puts the first card back", async () => (await q.isVisible()) && (await q.innerText()) === first);

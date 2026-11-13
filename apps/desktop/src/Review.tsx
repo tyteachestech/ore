@@ -16,7 +16,7 @@ import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { endSays } from "./end-says";
-import { DotBar, DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
+import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -117,9 +117,6 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   giveBack?: () => HTMLElement | null | undefined;
 }) {
   const [queue, setQueue] = useState<DueEntry[] | null>(null);
-  /** The header's form, chosen from the session's length at its first exercise: step dots up to 30, else a bar.
-   *  A miss adds a step, so deciding on every rating flipped a 30-step session to the bar. */
-  const asDots = useRef(true);
   const [done, setDone] = useState(0);
   const [card, setCard] = useState<CardFull | null>(null);
   const [phase, setPhase] = useState<Phase>("answer");
@@ -175,6 +172,10 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     const t = setTimeout(() => setMoment(null), moment.tone === "miss" ? 6000 : 4000);
     return () => clearTimeout(t);
   }, [moment]);
+  /** D246: the day's goal closed during this session. The mole says so once, over the next exercise, and the
+   *  session goes on: everything after is extra, and Esc (his Done) ends it on the end screen. */
+  const [goalSaid, setGoalSaid] = useState(false);
+  const goalTold = useRef(false);
   /** Each card's Ask chat, kept while he closes and reopens it. */
   const [asks, setAsks] = useState<Record<string, AskChat>>({});
   const [end, setEnd] = useState<End | null>(null);
@@ -260,7 +261,6 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         // An empty queue ends the session at once, and why ("nothing due in the skills you picked",
         // new cards waiting) reads today: let it land first.
         if (!q.length) await t;
-        asDots.current = q.length <= 30;
         setQueue(q);
       } catch (e) {
         setError(errorText(e));
@@ -609,7 +609,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
-      // The session is today's slice (D65): it ends when the goal closes, and Keep going goes on.
+      // The day's goal closing (D65) is told by the mole; the session flows on (D246).
       const b = before.current;
       goalClosed = !!b && b.counts && !b.met && b.active_ms + activeMs.current >= b.goal_ms;
     } catch (e) {
@@ -617,13 +617,20 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     } finally {
       setBusy(false);
     }
-    if (!goalClosed) return;
-    // D177: a goal that closes on a miss gets one more card first, a likely recall, so the session doesn't
-    // end on a failure. Once only: whatever he answers next, it ends.
+    // The mole's goal note stays until the next rating.
+    if (goalTold.current) setGoalSaid(false);
+    if (!goalClosed || goalTold.current) return;
+    // D177: a goal that closes on a miss gets one more card first, a likely recall, so its moment doesn't
+    // follow a failure. Once only: whatever he answers next, the goal is told.
     const win = rating === 1 && !wonLast.current ? lastWin(afterAnswer(queue ?? [], true)) : null;
-    if (!win) return void finish();
-    wonLast.current = true;
-    setQueue(win);
+    if (win) {
+      wonLast.current = true;
+      return void setQueue(win);
+    }
+    // The quick quiz is a glance: it still ends at the goal. A full session flows on (D246).
+    if (quick) return void finish();
+    goalTold.current = true;
+    setGoalSaid(true);
   };
 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
@@ -1010,15 +1017,19 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   }, []);
 
   const left = queue?.length ?? 0;
-  const progress = done + left ? done / (done + left) : 0;
   const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
+  // D246: the gem he sees before he rates never shows what a Good would win. A Fact exercise, rated by him
+  // alone, shows none; a nearly cut one reads as growing. People just short of a goal overstate (Schweitzer 2004),
+  // and a generous Good here costs the memory the gem stands for.
+  const gemNow = card?.kind === "card" ? undefined : card?.history?.gem?.kind;
+  const gemShown = gemNow === "ready" ? "rough" : gemNow;
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
 
   return (
     // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it. Let go while a
     // layer sits over it (⌘K, ⌘/) or it is paused on a source, so that layer owns focus and Esc.
     <Trap off={paused || under}>
-    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="">
+    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="" data-done={done} data-steps={done + left}>
       <div className="review-head" data-tauri-drag-region>
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).
@@ -1029,17 +1040,10 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
               </div>
             </Hint>
           )
-        ) : asDots.current && !end ? (
-          <div className="quiz-steps review-steps" role="progressbar" aria-label="Session" aria-valuemin={0} aria-valuemax={done + left} aria-valuenow={done}>
-            {Array.from({ length: done + left }, (_, i) => (
-              <span key={i} className={i < done ? "done" : i === done ? "now" : ""} />
-            ))}
-          </div>
         ) : (
-          <div className="review-bar" role="progressbar" aria-label="Session" aria-valuemin={0} aria-valuemax={done + left} aria-valuenow={done}>
-            {/* 6px dots: 60 need 360px, which the phone's head does not have. */}
-            <DotBar className="review-dots" share={end ? 1 : progress} n={PHONE ? 30 : 60} />
-          </div>
+          // D246: nothing counts the session up here. Exercises done over everything due drew the backlog as a bar
+          // that a miss set back, and the session never ended on it. The spacer keeps the buttons to the right.
+          <span className="review-head-gap" />
         )}
         {last && (
           <Hint text="Undo last rating" keys="undo">
@@ -1074,7 +1078,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
       {/* VoiceOver hears each new card and the key points as marked (by the AI, or by him), not only the end screen. */}
       <div className="sr-only" aria-live="polite">
-        {card && !end && queue?.length ? `Exercise ${done + 1} of ${done + left}. ${card.question.replace(/_{4,}/g, "blank")}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
+        {card && !end && queue?.length ? `Exercise ${done + 1}. ${card.question.replace(/_{4,}/g, "blank")}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
         {error && (
@@ -1096,7 +1100,19 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick, source)}</p>}
 
-        {moment && !end && (
+        {goalSaid && !end && (
+          <div className="review-moment" data-tone="goal" role="status">
+            <span className="moment-mole"><Mole bare size={40} mood="happy" /></span>
+            <span className="moment-text">
+              <b>Goal met.</b>
+              <span>The rest is extra.</span>
+            </span>
+            <Hint text={<>End the session <kbd>Esc</kbd></>}>
+              <button className="moment-done" onClick={() => void finish()}>Done</button>
+            </Hint>
+          </div>
+        )}
+        {moment && !goalSaid && !end && (
           <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} role="status">
             {!quick && <span className="moment-mole"><Mole bare size={40} mood={moment.tone === "miss" ? "peek" : "happy"} /></span>}
             <span className="moment-gem" aria-hidden="true">
@@ -1296,9 +1312,9 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                 {card.history && card.history.reviews.length > 0 && (
                   <div className="review-memory" data-color={skillOf(entry.skills[0] ?? "").color}>
                     {/* D237: the exercise's own gem, as it is before this rating. */}
-                    {card.history.gem && (
-                      <Hint text={GEM_SAYS[card.history.gem.kind]} side="top">
-                        <span className="review-gem" tabIndex={0} aria-label={GEM_SAYS[card.history.gem.kind]}><Gem kind={card.history.gem.kind} size={18} seam={card.history.gem.seam} polished={card.history.gem.polished} /></span>
+                    {gemShown && (
+                      <Hint text={GEM_SAYS[gemShown]} side="top">
+                        <span className="review-gem" tabIndex={0} aria-label={GEM_SAYS[gemShown]}><Gem kind={gemShown} size={18} seam={card.history.gem!.seam} polished={card.history.gem!.polished} /></span>
                       </Hint>
                     )}
                     <Timeline history={card.history} rating={(preview ?? suggested ?? 3) as Rating} />
