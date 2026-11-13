@@ -2202,8 +2202,8 @@ button.home-plan:hover { color: var(--text); }
    its head. A dot's turn is `--at`, its resting light `--o` (EndMark.tsx). Endless loops keep their own time (D185). */
 .end-mark circle { transform-box: fill-box; transform-origin: center; }
 .end-tally li:not([data-wait]) .end-mark[data-kind="gem"] circle { animation: end-facet 3600ms var(--ease-in-out) var(--at) infinite; }
-.end-tally li:not([data-wait]) .end-mark[data-kind="calendar"] circle[data-turn] { animation: end-day 4000ms var(--ease-out) var(--at) infinite; }
-.end-tally li:not([data-wait]) .end-mark[data-kind="comet"] circle[data-turn] { animation: end-stream 1500ms linear var(--at) infinite; }
+.end-tally li:not([data-wait]) .end-mark[data-kind="calendar"] circle[data-turn] { animation: end-day 4000ms var(--ease-out) var(--at) infinite backwards; }
+.end-tally li:not([data-wait]) .end-mark[data-kind="comet"] circle[data-turn] { animation: end-stream 1500ms linear var(--at) infinite backwards; }
 .end-tally li:not([data-wait]) .end-mark[data-kind="comet"] circle:not([data-turn]) { animation: end-head 3000ms var(--ease-in-out) infinite; }
 @keyframes end-facet { 0%, 16%, 100% { transform: scale(1); opacity: var(--o); } 7% { transform: scale(1.4); opacity: 1; } }
 @keyframes end-day { 0% { transform: scale(0.45); opacity: 0.5; } 6% { transform: scale(1.35); opacity: 1; } 12%, 100% { transform: scale(1); opacity: var(--o); } }
