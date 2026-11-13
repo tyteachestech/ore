@@ -145,7 +145,7 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
     at: [[0, { to: { breath: 1 } }], [1300, { to: { breath: 0 }, kick: { puff: 2 } }], [2000, { to: { legs: 1 } }], [2250, { to: { legs: 0 } }]] },
   // Falling: eyes wide, mouth an O, arms flung out and his feet running on nothing. His helmet, pressed down by the
   // start up, floats off his brows a beat late.
-  fall: { from: { whole: 1, side: 0, hat: -0.8 }, to: FALL, loop: 280, still: FALL, at: [[0, { to: { legs: 1, arms: 0.55, tilt: -0.2 } }], [140, { to: { legs: -1, arms: 1, tilt: 0.2 } }]] },
+  fall: { from: { whole: 1, side: 0, hat: -0.8 }, to: FALL, loop: 240, still: FALL, at: [[0, { to: { legs: 1, arms: 0.55, tilt: -0.2 }, kick: { legs: 30 } }], [120, { to: { legs: -1, arms: 1, tilt: 0.2 }, kick: { legs: -30 } }]] },
   // Diving head first: what was thrashing is swept back by the air, his helmet pushed down to his brows, feet together.
   dive: { from: { whole: 1, side: 0 }, to: { ...FALL, hat: -0.5, arms: 0.55, legs: 0, tilt: 0 }, loop: 3000, still: { ...FALL, hat: -0.5, arms: 0.55, legs: 0 } },
 };

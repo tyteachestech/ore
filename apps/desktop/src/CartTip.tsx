@@ -38,6 +38,8 @@ const GROUND = 3;
 const DIVE = 1500;
 /** How long he is pulled going up and diving, and how short he is pressed in the brace before it. */
 const STRETCH = 1.2, SQUASH = 0.86;
+/** Awake at the top of his start: each beat's lean in degrees and how far he has sunk in px. The last is a grab upward, from which he dives. */
+const THRASH: [number, number][] = [[-14, 0], [9, 3], [-12, 7], [10, 11], [-9, 14], [4, 16], [-14, 0]];
 /** The cart's hop as his weight leaves it, in px. */
 const HOPPED = [0, -4, 1, 0];
 /** How far the ring's nearest dot is knocked down as he hits, in px. */
@@ -211,7 +213,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       });
       // The bucket drops back, its lip flicking him up a little, and the cart backs out the way it came. He does
       // not: asleep on nothing, sagging; then awake with a start, up off nothing and bigger, limbs going; then down.
-      const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = T4, HANG = 320, SAG = 4, JUMP = 62, NEAR = 0.72;
+      const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = 380, HANG = 620, SAG = 4, JUMP = 62, NEAR = 0.72;
       // Asleep on nothing he bobs with his breath, clear of the dirt line, so it reads as air and not a perch.
       later(stoned + 160, () => { play(cart, HOPPED.map((y) => ({ transform: `translateY(${y}px)` })), { duration: T4, easing: OUT, composite: "add" }); });
       later(stoned + 160, () => play(rider, [
@@ -233,10 +235,16 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
         // Pressed short in the brace, he goes up long and gathers at the top.
         about(FALLER);
         pull([SQUASH, STRETCH, 0.94], START, OUT);
-        later(START, () => pull([0.94, 1.04, 0.97, 1], HANG, IN_OUT));
-        play(rider, [{ transform: place(FALLER, cx, cy, SLID + 14 - 90, DOZE) }, { transform: place(FALLER, top[0], top[1], -14, NEAR) }], { duration: START, easing: SPRING });
+        later(START, () => pull([0.94, 1.03, 0.97, 1.02, 0.92, 1.08], HANG, IN_OUT));
+        // Up on an arc, not a line: he leaves the lip going up, and drifts across over his hole as the rise spends itself.
+        const A = 12;
+        play(rider, Array.from({ length: A + 1 }, (_, i) => {
+          const t = i / A, up = 1 - (1 - t) ** 2, over = t * t * (3 - 2 * t);
+          return { transform: place(FALLER, cx + (top[0] - cx) * over, cy + (top[1] - cy) * up - 10 * Math.sin(Math.PI * t), SLID - 76 + (62 - SLID) * over, DOZE + (NEAR - DOZE) * t) };
+        }), { duration: START, easing: "linear" });
         // At the top he thrashes on nothing: his whole body rocks while his limbs go, and he starts to sink.
-        later(START, () => play(rider, [-14, 6, -16, 4, -14].map((turn, i) => ({ transform: place(FALLER, top[0], top[1] + [0, -5, -6, -4, 0][i]!, turn, NEAR) })), { duration: HANG, easing: "linear" }));
+        // At the top he runs on nothing, rocking, and sinks as it dawns on him; then one last grab upward before he goes.
+        later(START, () => play(rider, THRASH.map(([turn, dy]) => ({ transform: place(FALLER, top[0], top[1] + dy, turn, NEAR), easing: IN_OUT })), { duration: HANG }));
       });
       later(gone + SLEEP + BRACE + START + HANG, () => {
         const o = el.getBoundingClientRect(), to = seat.getBoundingClientRect();
@@ -254,7 +262,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
         }), { duration: (T + UNDER) * 1000, easing: "linear" });
         // Head down, arms and helmet trailing, and longer the faster he goes.
         setPose("dive");
-        pull([1, STRETCH], T * 1000, "ease-in");
+        pull([1.08, STRETCH], T * 1000, "ease-in");
         // The hit, as his head meets the dirt: it flies, and the ring takes the knock, nearest dots first.
         later(T * 1000 * HIT, () => {
           const hx = to.left - o.left + to.width / 2;
