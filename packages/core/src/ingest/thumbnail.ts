@@ -6,7 +6,6 @@ import { promisify } from "node:util";
 import { strFromU8, unzipSync } from "fflate";
 import { writeAtomic } from "../fsutil.ts";
 import { sourceFile, type Item } from "../items.ts";
-import { openPdf } from "./pdf.ts";
 import { youtubeId } from "./youtube.ts";
 
 // A picture that stands for a source (D77): `thumbnail.<ext>` beside doc.md, like source.*. Made from
@@ -89,7 +88,8 @@ const canvas = () => (globalThis as { document?: { createElement(tag: "canvas"):
 
 /** First page of a PDF, drawn by pdf.js at SIZE on a white sheet (F67). */
 async function drawnPage(data: Uint8Array, sheet: Canvas): Promise<Picture | undefined> {
-  const pdf = openPdf(data);
+  // Loaded only here: pdf.js is heavy, and `ore` must not pay for it at every start.
+  const pdf = (await import("./pdf.ts")).openPdf(data);
   try {
     const page = await (await pdf.promise).getPage(1);
     const full = page.getViewport({ scale: 1 });
