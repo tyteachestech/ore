@@ -1553,6 +1553,8 @@ function CountUp({ value, go }: { value: string; go: boolean }) {
 
 /** How long after one result the next lands. */
 const TALLY_GAP_MS = 320;
+/** How often, when the cart comes, the mole is asleep on it. */
+const NAP_SHARE = 2 / 3;
 
 /** The end screen's row of results (D252, after Duolingo's lesson-complete row): three at most, each a
  *  mark, a number in dots and what it counts, landing one after another once `go`, then still. The number's text
@@ -1604,16 +1606,19 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     const dots = oreFor(part(b), part(t), ringDots(END_RING));
     return !quick && !PHONE && !document.hidden && !still() && (dots.length > 0 || shown.length > 0) ? dots : null;
   });
-  // cart: rolling and pouring · poured: the ring is full · leaving: the mole comes up · done: the cart has gone.
+  // D255: two endings in three with a cart, the mole rides it in asleep and falls out onto the ring; else he comes up out of the ground.
+  const [nap] = useState(() => !!pour && Math.random() < NAP_SHARE);
+  // cart: rolling and pouring · poured: the ring is full · leaving: the cart starts off, and the mole comes up unless he is riding it (then when he has fallen) · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
-  // It always comes up out of the ground first, with or without a cart before it (under Reduce Motion it is just there, pleased).
-  const [mood, setMood] = useState<"peek" | "cheer">(() => (still() ? "cheer" : "peek"));
-  // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that.
-  const up = stage === "leaving" || stage === "done";
+  // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D255): then he is there, startled (under Reduce Motion he is just there, pleased).
+  const [mood, setMood] = useState<"peek" | "cheer" | "surprised">(() => (still() ? "cheer" : nap ? "surprised" : "peek"));
+  const [fell, setFell] = useState(false);
+  // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
+  const up = nap ? fell : stage === "leaving" || stage === "done";
   useEffect(() => {
     if (!up) return;
-    const id = setTimeout(() => setMood("cheer"), 560);
+    const id = setTimeout(() => setMood("cheer"), nap ? 400 : 560);
     return () => clearTimeout(id);
   }, [up]);
   const full = stage !== "cart";
@@ -1658,7 +1663,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" || l.rare.kind === "then" ? <Clock size={16} /> : <Gem kind="cut" size={16} seam />);
   const named = ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level }));
   const said = endSays({
-    session: s, today: t, closed, short, roll, ups: named, plain: quick,
+    session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   }).map((l) => ({ ...l, mark: mark(l) }));
   const tiles = endTiles({ session: s, ups: named });
@@ -1668,7 +1673,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   return (
     <div className={`review-end${pour ? " carted" : ""}`} role="status" ref={setHost}>
       {pour && stage !== "done" && host && (
-        <CartTip host={host} lit={pour} rich={rescuedWorthSaying(s) ? s.rescued : 0} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
+        <CartTip host={host} mole={nap} onFell={() => setFell(true)} lit={pour} rich={rescuedWorthSaying(s) ? s.rescued : 0} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
       )}
       {quick ? (
         <>
@@ -1681,7 +1686,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         <>
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem">
-            <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
+            <span className={`review-mole${nap && fell ? " fell" : ""}`}>{up && <Mole bare size={96} mood={mood} />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {mood === "cheer" && (
               <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />

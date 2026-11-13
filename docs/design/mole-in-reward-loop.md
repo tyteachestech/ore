@@ -46,7 +46,7 @@ In order, as it plays:
 | Beat | Today | Proposed |
 |---|---|---|
 | The cart tips into the ring | he is not up yet | same |
-| He comes up | `peek` (rises out of the ground) | same |
+| He comes up | `peek` (rises out of the ground) | built since (D255): two endings in three he rides the cart in asleep (`doze`), hangs in the air when it leaves, falls (`fall`) onto the ring and covers for it in his line; otherwise `peek` |
 | The row of results lands, one at a time | he cheers at once, before the row is in | `lookdown`: he watches each one land |
 | The last result is in | he says his line | he reacts to the day (table below), then says his line |
 | After | idle blinks and glances | same; hovering a result turns him to `lookdown` again |
