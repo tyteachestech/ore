@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cart ending, built in Rive</title>
+<style>
+  html, body { margin: 0; background: #121316; color: #f5f6f7; font: 13px/1.3 ui-monospace, "SF Mono", Menlo, monospace; }
+  #stage { position: relative; width: 1280px; height: 800px; overflow: hidden; }
+  #page, #rive, #film { position: absolute; left: 0; top: 0; width: 1280px; height: 800px; }
+  /* The animation never takes a click: the results and Done stay usable under it. */
+  #rive, #film { pointer-events: none; }
+  #results { position: absolute; left: 0; right: 0; top: 520px; display: flex; justify-content: center; gap: 56px; }
+  #results b { display: block; font-size: 22px; font-weight: 500; }
+  #results span { color: #8b8d93; }
+  #done { position: absolute; left: 590px; top: 620px; width: 100px; height: 32px; border: 0; border-radius: 6px; background: #f5f6f7; color: #121316; font: inherit; cursor: pointer; }
+  #done:active { opacity: .7; }
+  #say { position: absolute; left: 708px; top: 196px; padding: 6px 10px; border: 1px solid #2b2d31; border-radius: 6px; opacity: 0; }
+  #say.on { opacity: 1; }
+</style>
+<div id="stage">
+  <canvas id="page" width="2560" height="1600"></canvas>
+  <div id="results"><div><b>12</b><span>reviewed</span></div><div><b>1</b><span>key point</span></div><div><b>9 min</b><span>today</span></div></div>
+  <button id="done">Done</button>
+  <canvas id="rive" width="2560" height="1600"></canvas>
+  <img id="film" alt="">
+  <div id="say">Goal met. I supervised.</div>
+</div>
+<script src="stage.js" type="module"></script>
