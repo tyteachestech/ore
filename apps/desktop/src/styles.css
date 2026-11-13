@@ -2262,14 +2262,14 @@ button.home-plan:hover { color: var(--text); }
 .reading-for-card li { padding: 6px 0; font-size: 14px; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; }
 .reading-for-card li span { margin-top: 2px; font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .collected-chip svg, .collected-tab svg, .collected-list [cmdk-item] svg { color: var(--hue); flex: none; }
-.collected-chip.pop { animation: collected-pop var(--t-4) var(--ease-out) 380ms both; }
+.collected-chip.pop { animation: collected-pop var(--t-4) var(--ease-out) 520ms both; }
 .collected-chip .plus {
   position: absolute; left: 50%; top: -4px; transform: translateX(-50%); pointer-events: none;
-  font-size: 12px; font-weight: 700; color: var(--hue); animation: collected-plus 900ms ease-out 400ms both;
+  font-size: 12px; font-weight: 700; color: var(--hue); animation: collected-plus 900ms ease-out 540ms both;
 }
 .collect-fly {
-  position: fixed; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; z-index: 40; pointer-events: none;
-  background: var(--hue);
+  position: fixed; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; z-index: 40; pointer-events: none;
+  background: color-mix(in oklab, var(--hue), white 25%);
 }
 @keyframes collected-in { from { opacity: 0; transform: translate(-50%, 8px) scale(.9); } }
 @keyframes collected-pop {
