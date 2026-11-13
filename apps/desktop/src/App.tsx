@@ -20,6 +20,9 @@ import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, searchF
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
+import { Radio } from "./Radio";
+import { CHANNELS } from "./ambience-art";
+import { stop as stopAmbience, toggle as playAmbience, ambienceState } from "./ambience";
 import { Reader, type PracticeRef } from "./Reader";
 import { setSidebarShown, useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
@@ -229,6 +232,7 @@ export function App() {
   const leaveReview = useRef<(() => Promise<void>) | null>(null);
   // The tutor (D128): open, and the thread so far (kept while he moves around the app).
   const [tutorOpen, setTutorOpen] = useState(false);
+  const [radioOpen, setRadioOpen] = useState(false);
   // Floating over the corner (Notion AI's default) or docked at the right, as he last chose (D128).
   const [tutorDock, setTutorDock] = useState(() => load("ore.tutor.fit") === "dock");
   const tutorDocked = tutorOpen && tutorDock;
@@ -1028,6 +1032,9 @@ export function App() {
         close();
         if (tutorOpen) closeTutor();
         else openTutor();
+      } else if (is(e, "ambience") && !PHONE) {
+        close();
+        setRadioOpen((o) => !o);
       } else if (is(e, "add")) {
         close();
         setAdding(true);
@@ -1880,6 +1887,11 @@ export function App() {
       requestAnimationFrame(() => filterRef.current?.focus());
     } }] : []),
     { id: "tutor", label: tutorOpen ? "Close the tutor" : "Tutor chat…", hint: label(keys.tutor), keywords: ["ask", "library", "question", "chat", "answer", "ai", "quiz"], run: () => (tutorOpen ? closeTutor() : openTutor()) },
+    ...(PHONE ? [] : [
+      { id: "ambience", label: "Ambience…", hint: label(keys.ambience), keywords: ["sound", "music", "focus", "noise", "radio"], run: () => setRadioOpen(true) },
+      ...CHANNELS.filter((c) => ambienceState().playing !== c.id).map((c) => ({ id: `ambience-${c.id}`, label: `Play ${c.name}`, keywords: ["ambience", "sound", "music", "focus"], run: () => void playAmbience(c.id) })),
+      ...(ambienceState().playing ? [{ id: "ambience-stop", label: "Stop ambience", keywords: ["sound", "music", "silence", "mute"], run: stopAmbience }] : []),
+    ]),
     ...(tutor.turns.length ? [{ id: "tutor-new", label: "New tutor chat", keywords: ["ask", "chat", "clear"], run: () => { tutor.fresh(); openTutor(); } }] : []),
     ...(onHome ? [] : [{ id: "home", label: "Go to Home", hint: label(keys.home), run: goHome }]),
     ...(onFeed ? [] : [{ id: "go-feed", label: "Go to Feed", hint: label(keys["go-feed"]), keywords: ["rss", "newsletter", "blog", "follow"], run: goFeed }]),
@@ -2325,6 +2337,8 @@ export function App() {
         {/* The tutor's mole floats at the bottom right (D160). Its live line stays when the mole hides (an overlay),
             so VoiceOver hears a reply that lands then (D159). */}
         {tutorButton}
+        {/* The ambience radio, the mole's twin at the bottom left (D253). */}
+        {!PHONE && <Radio open={radioOpen} onOpenChange={setRadioOpen} />}
         <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
         {/* A skill page is the same page wherever it was opened from: a place change under it (its folder tab,
             ⌘1, from Home) must not remount it and drop the tab that has focus (F55). */}

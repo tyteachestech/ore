@@ -35,7 +35,8 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   chmodSync(docling, 0o755);
   // Ports of their own, so a mock left running for screenshots (1420, 1421) never answers instead.
   const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50", ORE_MOCK_ENRICH: "1" }, stdout: "ignore", stderr: "inherit" });
-  const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), stdout: "ignore", stderr: "ignore" });
+  // The ambience radio plays plain tones of its own (e2e/sounds), never the sounds on the Mac (D253).
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_SOUNDS: join(import.meta.dir, "sounds") }, stdout: "ignore", stderr: "ignore" });
   const url = `http://localhost:${PORT}/`;
   // A cold vite bundles its dependencies before it answers (pdf.js among them, D202), which took over 20 s on a
   // slow runner: the journeys then started against nothing and the first six failed on a refused connection.
@@ -877,6 +878,42 @@ journey("tutor mole: it sits at the bottom right on every screen, pages keep roo
   await until("the quiz panel's corner is its own", async () => !(await button.isVisible()));
   await page.keyboard.press("Escape");
   await button.waitFor();
+});
+
+journey("ambience radio: the mole's twin at the bottom left; its pads play a channel and stop it, Esc closes, ⌥⌘A opens, a missing file says so (D253)", async (page) => {
+  const orb = page.getByRole("button", { name: /^Ambience/ });
+  const vp = page.viewportSize()!;
+  const b = (await orb.boundingBox())!;
+  if (Math.abs(b.x - 16) > 1 || Math.abs(vp.height - (b.y + b.height) - 16) > 1) throw new Error(`the radio is not 16px in from the bottom left corner (${b.x}, ${b.y})`);
+  const room = await page.locator(".sidebar").evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
+  if (room < vp.height - b.y) throw new Error(`the sidebar keeps ${room}px at its foot, less than the radio's ${vp.height - b.y}px`);
+  await orb.click();
+  const pop = page.locator(".popover.radio");
+  await pop.waitFor();
+  const pads = pop.locator(".radio-pad");
+  if ((await pads.count()) !== 5) throw new Error(`the radio has ${await pads.count()} pads, not 5`);
+  if (!(await pads.first().evaluate((el) => el === document.activeElement))) throw new Error("opening the radio did not put focus on its first pad");
+  const rain = pop.getByRole("button", { name: "Rain", exact: true });
+  await rain.click();
+  await until("Rain plays", async () => (await rain.getAttribute("aria-pressed")) === "true" && (await page.getByRole("button", { name: "Ambience: Rain playing" }).count()) === 1);
+  await rain.click();
+  await until("Rain stops", async () => (await rain.getAttribute("aria-pressed")) === "false");
+  // A number key picks a channel while the radio is open.
+  await page.keyboard.press("5");
+  await until("5 plays Focus", async () => (await pop.getByRole("button", { name: "Focus", exact: true }).getAttribute("aria-pressed")) === "true");
+  await page.keyboard.press("Escape");
+  await pop.waitFor({ state: "detached" });
+  if (!(await orb.evaluate((el) => el === document.activeElement))) throw new Error("Esc did not give focus back to the radio");
+  await page.keyboard.press("Meta+Alt+KeyA");
+  await pop.waitFor();
+  // A channel whose file is not on this Mac stays off and says so.
+  await page.route("**/sounds/lamp.mp3", (r) => r.fulfill({ status: 404, body: "" }));
+  const lamp = pop.getByRole("button", { name: "Lamp", exact: true });
+  await lamp.click();
+  await until("Lamp says it has no file", async () => (await lamp.getAttribute("class"))!.includes("missing") && (await pop.getByRole("img", { name: "Lamp has no sound file" }).count()) === 1);
+  if ((await lamp.getAttribute("aria-pressed")) !== "false") throw new Error("a channel with no file shows as playing");
+  await page.unroute("**/sounds/lamp.mp3");
+  await page.keyboard.press("Escape");
 });
 
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
