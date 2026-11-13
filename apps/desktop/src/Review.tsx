@@ -1606,12 +1606,12 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     const dots = oreFor(part(b), part(t), ringDots(END_RING));
     return !quick && !PHONE && !document.hidden && !still() && (dots.length > 0 || shown.length > 0) ? dots : null;
   });
-  // D254: two endings in three with a cart, the mole rides it in asleep and falls out onto the ring; else he comes up out of the ground.
+  // D255: two endings in three with a cart, the mole rides it in asleep and falls out onto the ring; else he comes up out of the ground.
   const [nap] = useState(() => !!pour && Math.random() < NAP_SHARE);
   // cart: rolling and pouring · poured: the ring is full · leaving: the cart starts off, and the mole comes up unless he is riding it (then when he has fallen) · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
-  // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D254): then he is there, startled (under Reduce Motion he is just there, pleased).
+  // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D255): then he is there, startled (under Reduce Motion he is just there, pleased).
   const [mood, setMood] = useState<"peek" | "cheer" | "surprised">(() => (still() ? "cheer" : nap ? "surprised" : "peek"));
   const [fell, setFell] = useState(false);
   // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.

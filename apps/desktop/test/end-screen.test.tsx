@@ -74,7 +74,7 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   await s.done();
 }, 10_000);
 
-test("the mole rides the cart in asleep, falls out onto the ring once it has gone, and covers for it (D254)", async () => {
+test("the mole rides the cart in asleep, falls out onto the ring once it has gone, and covers for it (D255)", async () => {
   jest.useFakeTimers();
   const s = await mount(end(["ai"]));
   // Asleep on the load, his whole body; nobody on the ring yet.

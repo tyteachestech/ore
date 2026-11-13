@@ -46,7 +46,7 @@ type Flying = { el: HTMLElement; ours: boolean; x0: number; y0: number; dx: numb
 /** `host` is the end screen. `lit` are the ring dots to light, in order; `stones` the colours of the gems cut
  *  (already capped to those shown); `rich` how many of the ore are rich, poured first. `onStone(i)` when stone i lands, `onPoured` when the ring is full, `onLeave`
  *  as the cart starts off (the mole comes up, unless he is riding), `onDone` when it has gone. `mole`: he rides in asleep on the load and
- *  falls out onto the ring once the cart has left (D254); `onFell` as he lands, and `onDone` waits for it. */
+ *  falls out onto the ring once the cart has left (D255); `onFell` as he lands, and `onDone` waits for it. */
 export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onStone, onPoured, onLeave, onDone }: {
   mole?: boolean; onFell?: () => void;
   host: HTMLElement | null; lit: number[]; rich?: number; stones: (string | undefined)[];
@@ -55,7 +55,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
   const layer = useRef<HTMLDivElement>(null);
   const calls = useRef({ onStone, onPoured, onLeave, onDone, onFell });
   calls.current = { onStone, onPoured, onLeave, onDone, onFell };
-  // The mole asleep on the load (D254) wakes once the cart has gone from under him.
+  // The mole asleep on the load (D255) wakes once the cart has gone from under him.
   const [awake, setAwake] = useState(false);
 
   useEffect(() => {
