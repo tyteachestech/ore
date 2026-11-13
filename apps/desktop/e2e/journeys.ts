@@ -9967,6 +9967,63 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
   if (small.length) throw new Error(`taps under 44 pt on the skill page: ${small.join(", ")}`);
 }, "phone");
 
+journey("phone: Review's confidence labels stay in their buttons at the largest text, and Open in source is a 44 pt tap (F100, F101)", async (page) => {
+  // At iOS's largest text "Think so" wrapped and its "so" hung below the button, which kept the Mac's 40px height;
+  // Open in source stayed the Mac's 24px link, and a tap just off it did nothing.
+  await page.evaluate(() => document.documentElement.style.setProperty("--type", String(28 / 17)));
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const reach = (e: HTMLElement): [number, number] => {
+    const r = e.getBoundingClientRect();
+    let [w, h] = [r.width, r.height];
+    for (const at of ["::before", "::after"]) {
+      const cs = getComputedStyle(e, at);
+      if (cs.content === "none" || cs.position !== "absolute") continue;
+      const out = (v: string) => Math.max(0, -parseFloat(v) || 0);
+      w = Math.max(w, r.width + out(cs.left) + out(cs.right));
+      h = Math.max(h, r.height + out(cs.top) + out(cs.bottom));
+    }
+    return [w, h];
+  };
+  for (let i = 0; ; i++) {
+    if (i > 12) throw new Error("no exercise in the review showed its source");
+    const sure = page.getByRole("radio", { name: "Think so" });
+    await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
+    if (!(await sure.count())) throw new Error("the review ended before any exercise showed its source");
+    const spill = await page.locator(".quiz-sure button").evaluateAll((els) => els.flatMap((b) => {
+      const box = b.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(b);
+      const text = range.getBoundingClientRect();
+      return text.bottom > box.bottom + 1 || text.top < box.top - 1 ? [`${b.textContent}: text ${Math.round(text.top)}–${Math.round(text.bottom)}, button ${Math.round(box.top)}–${Math.round(box.bottom)}`] : [];
+    }));
+    if (spill.length) throw new Error(`a confidence label spills out of its button: ${spill.join("; ")}`);
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    const good = page.getByRole("button", { name: "Good", exact: true });
+    await good.waitFor();
+    const open = page.getByRole("button", { name: /Open in source/ });
+    if (await open.count()) {
+      const [w, h] = await open.evaluate(reach);
+      if (w < 44 || h < 44) throw new Error(`Open in source is ${Math.round(w)}×${Math.round(h)} pt to a finger: want 44`);
+      // And a finger 20 pt above or below its middle lands on it: nothing clips or covers the margin.
+      const off = await open.evaluate((b) => {
+        const r = b.getBoundingClientRect();
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        return [y - 20, y + 20].filter((at) => !b.contains(document.elementFromPoint(x, at))).map((at) => Math.round(at - y));
+      });
+      if (off.length) throw new Error(`a tap ${off.join(" and ")} pt off Open in source's middle misses it`);
+      break;
+    }
+    const q = await page.locator(".review-q").innerText();
+    await tap(page, good);
+    await until("the next exercise comes up", async () => (await page.locator(".phone-full .review-end").count()) > 0 || (await page.locator(".review-q").innerText().catch(() => "")) !== q);
+  }
+}, "phone");
+
 journey("phone: Today's list titles are 17 pt and the bar's buttons are 44 pt rounds (iPhone sizing A)", async (page) => {
   await page.locator(".home-read").first().waitFor();
   const size = await page.locator(".home-read .title").first().evaluate((e) => getComputedStyle(e).fontSize);
@@ -10110,14 +10167,16 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
       const cut = t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1;
       // Beside the picture, the title has the rest of the row: nothing else takes its width.
       const room = row.getBoundingClientRect().right - t.getBoundingClientRect().right;
-      return (cut && lines < 2) || room > 4 ? [`"${t.textContent.slice(0, 40)}": ${lines} line(s), ${Math.round(room)}px left of the row's edge`] : [];
+      // And never more than two: WebKit drew a clamped <button> title whole, four lines and more (F99).
+      return (cut && lines < 2) || lines > 2 || room > 4 ? [`"${t.textContent.slice(0, 40)}": ${lines} line(s), ${Math.round(room)}px left of the row's edge`] : [];
     }), title);
     if (bad.length) throw new Error(`${where}: a title is cut short: ${bad.join("; ")}`);
   };
   await page.locator(".home-read .title").first().waitFor();
   for (const t of [1, 28 / 17]) {
     await page.evaluate((t) => document.documentElement.style.setProperty("--type", String(t)), t);
-    await check(`Today at ${t.toFixed(2)}`, ".home-read", ".title");
+    // The text itself: the cut is on the button's span, since WebKit draws a clamped <button> whole.
+    await check(`Today at ${t.toFixed(2)}`, ".home-read", ".title > span");
   }
   const meter = await page.locator(".home-read").first().evaluate((row) => {
     const pic = row.querySelector(".thumb")!.getBoundingClientRect();
