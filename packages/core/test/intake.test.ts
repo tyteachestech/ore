@@ -1242,7 +1242,7 @@ describe("import coverage: audio and podcasts", () => {
     expect(item.meta.author).toBe("Learning Show");
   });
 
-  test("a podcast player's episode keeps its published date (F-new-player-date)", async () => {
+  test("a podcast player's episode keeps its published date (F104)", async () => {
     const url = "https://overcast.fm/+Sundial";
     const html = readFileSync(join(FIX, "audio/player-date.html"), "utf8");
     const pages = (page: string) => ({
@@ -1723,7 +1723,7 @@ describe("import coverage: other languages", () => {
     const language = () => readFileSync(join(dir, "args"), "utf8").trim().split(" ").slice(1).join(" ");
     const feed = (lang: string, items = "") => `<?xml version="1.0"?><rss><channel><title>Radio Ambulante</title><language>${lang}</language>${items}</channel></rss>`;
 
-    test("a publisher's episode is heard in its declared spoken language from a link or tab (F-new-episode-language)", async () => {
+    test("a publisher's episode is heard in its declared spoken language from a link or tab (F105)", async () => {
       const url = "https://workshop.test/episodes/sundial";
       const html = readFileSync(join(FIX, "audio/episode-language.html"), "utf8");
       const transcript = readFileSync(join(FIX, "audio/sundial.vtt"), "utf8");
@@ -1748,7 +1748,7 @@ describe("import coverage: other languages", () => {
       }
     });
 
-    test("a podcast player's episode uses its declared spoken language, not its UI language (F-new-player-language)", async () => {
+    test("a podcast player's episode uses its declared spoken language, not its UI language (F106)", async () => {
       const url = "https://pca.st/episode/sundial";
       const transcript = readFileSync(join(FIX, "audio/sundial.vtt"), "utf8");
       serve({
