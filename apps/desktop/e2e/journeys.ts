@@ -9933,6 +9933,26 @@ journey("phone: Today in a library with nothing to read says to add a first sour
   if (await page.getByText("Read something new").count()) throw new Error("Today says to read something new in a library with nothing to read");
 }, "phone");
 
+journey("phone: every screen's text follows the iPhone's text size, and Start review still holds its label at the largest (F70)", async (page) => {
+  // Ore drew every size in fixed pixels, so a phone set to larger text read Ore at the default size.
+  const size = (sel: string) => page.locator(sel).first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  const type = (t: number) => page.evaluate((t) => document.documentElement.style.setProperty("--type", String(t)), t);
+  await type(1);
+  const start = page.getByRole("button", { name: "Start review" });
+  const before = await start.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  await type(28 / 17); // the largest Ore follows: the first accessibility size
+  const after = await start.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  if (Math.abs(after / before - 28 / 17) > 0.02) throw new Error(`Start review's text went from ${before}px to ${after}px at 28/17`);
+  const clipped = await start.evaluate((e) => e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1);
+  if (clipped) throw new Error("Start review clips its label at the largest text size");
+  await type(1);
+  await phoneSource(page, "The Story Spine");
+  const body = await size(".phone-reader .doc p");
+  await type(1.353);
+  const larger = await size(".phone-reader .doc p");
+  if (Math.abs(larger / body - 1.353) > 0.02) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
+}, "phone");
+
 journey("phone: an episode on a phone that can't hear speech says the Mac fills its transcript, not that it is on its way (F77)", async (page) => {
   // With no speech model (the Simulator, an older phone) the episode said “on its way” for good: the Mac fills it.
   const cors = { "access-control-allow-origin": "*" };
