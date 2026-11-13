@@ -669,11 +669,14 @@ export function App() {
   /** `focusList`: off for a folder tab chosen by click or arrow, which keeps focus so the next arrow moves on (F44). */
   const go = useCallback((s: Tab, focusList = true) => {
     setStatus(s);
+    setFinishing(false);
+    // A folder tab is on the page already: moving the place would remount a skill page opened from Home,
+    // and with it the tab that has focus (F54). ⌘1/⌘2 go to the list from anywhere, and it takes the keys
+    // at once (Linear), also when it was not on screen (Home, a source).
+    if (!focusList) return;
     setPlace("sources");
     setOpenId(null);
-    setFinishing(false);
-    // The list takes the keys at once (Linear's ⌘1), also when it was not on screen (Home, a source).
-    if (focusList) requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
   }, []);
 
 

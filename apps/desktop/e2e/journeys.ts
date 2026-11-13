@@ -4422,6 +4422,16 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.keyboard.press("ArrowLeft");
   await until("a second arrow goes back to To read", async () => (await on("To read")) === "true");
+  // Also on a skill page opened from Home, whose tab used to remount the page under the focused tab (F54).
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await tabs.getByRole("tab", { name: "To read" }).click();
+  await page.keyboard.press("ArrowRight");
+  await until("→ from Home's skill page opens Done", async () => (await on("Done")) === "true");
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  if (!(await page.evaluate(() => !!document.activeElement?.closest("[role=tablist]")))) throw new Error("the tab lost focus on a skill page opened from Home");
+  await page.keyboard.press("ArrowLeft");
+  await until("a second arrow on Home's skill page goes back to To read", async () => (await on("To read")) === "true");
   // ⌘2, even from a focused tab, hands the keys to the list (Linear).
   await page.keyboard.press("Meta+2");
   await until("⌘2 focuses the list", () => page.evaluate(() => document.activeElement?.matches(".list") ?? false));
