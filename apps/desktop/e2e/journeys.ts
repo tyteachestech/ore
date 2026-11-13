@@ -9883,7 +9883,11 @@ journey("phone: an episode is in at once, says how far its transcript is, and fi
   const cors = { "access-control-allow-origin": "*" };
   const audio = "https://media.example.com/master-your-sleep.mp3";
   await page.route("https://itunes.apple.com/lookup?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: cors, body: JSON.stringify({ results: [{ trackId: 1000560143046, episodeUrl: audio, trackName: "Master your sleep", collectionName: "Huberman Lab", releaseDate: "2021-01-11T08:00:00Z" }] }) }));
-  await page.route(audio, (r) => r.fulfill({ status: 200, contentType: "audio/mpeg", headers: cors, body: Buffer.alloc(2_000_000) }));
+  // A second of silence that a browser plays (a WAV), padded so the download has a size to report.
+  const wav = Buffer.alloc(2_000_000);
+  wav.write("RIFF", 0), wav.writeUInt32LE(36 + 16000, 4), wav.write("WAVEfmt ", 8), wav.writeUInt32LE(16, 16), wav.writeUInt16LE(1, 20), wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(8000, 24), wav.writeUInt32LE(16000, 28), wav.writeUInt16LE(2, 32), wav.writeUInt16LE(16, 34), wav.write("data", 36), wav.writeUInt32LE(16000, 40);
+  await page.route(audio, (r) => r.fulfill({ status: 200, contentType: "audio/wav", headers: cors, body: wav }));
   // The iPhone's speech, standing in: it hears nothing until the journey lets it.
   await page.evaluate(() => void ((window as unknown as { __ORE_HEAR: { vtt: string; hold: boolean } }).__ORE_HEAR = { vtt: "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nWelcome back to the show.\n\n00:01:00.000 --> 00:01:05.000\nThanks for listening.\n\n", hold: true }));
   await tap(page, page.getByRole("button", { name: "Add a link" }));
@@ -9899,9 +9903,18 @@ journey("phone: an episode is in at once, says how far its transcript is, and fi
   const wait = page.locator(".doc-empty .filling");
   await wait.filter({ hasText: "Transcribing" }).waitFor();
   await wait.getByText("Keep Ore open to finish.").waitFor();
+  // It plays meanwhile, from the episode's own address: he needn't wait for the words to listen.
+  await page.locator(".player-pin:has(.player.audio)").waitFor();
+  await fits44(page, ".player.audio .ctl.play", "Play");
+  await until("the episode's audio is ready to play", async () => !(await page.locator(".player.audio .ctl.play").isDisabled()));
+  if (await page.locator(".video-error").count()) throw new Error("the episode won't play from its address");
+  if (process.env.ORE_SHOT) await page.screenshot({ path: process.env.ORE_SHOT });
   await page.evaluate(() => void ((window as unknown as { __ORE_HEAR: { hold: boolean } }).__ORE_HEAR.hold = false));
   await page.getByText("Thanks for listening.").waitFor();
   if (await page.locator(".doc-empty").count()) throw new Error("the transcript is in, and the reader still says it is waiting");
+  // It plays on from where it was: the transcript landing doesn't swap the audio under him.
+  if (await page.locator(".video-error").count() || (await page.locator(".player.audio .ctl.play").isDisabled())) throw new Error("the transcript landing stopped the episode's audio");
+  if (process.env.ORE_SHOT) await page.screenshot({ path: process.env.ORE_SHOT.replace(".png", "-after.png") });
 }, "phone");
 
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {

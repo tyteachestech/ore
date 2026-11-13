@@ -242,7 +242,7 @@ export const itemCommands: Record<string, Command> = {
         ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(enrichLogs(lib), item), ...tablesState(lib, item),
         body: item.body, annotations,
         ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
-        ...(item.meta.type !== "youtube" && !item.meta.video && { audio: audioOf(item) ?? undefined }),
+        ...(item.meta.type !== "youtube" && !item.meta.video && { audio: audioOf(item, lib) ?? undefined }),
         ...(hasPageText(item) && { page_text: true }),
       };
       const text = f.annotations
