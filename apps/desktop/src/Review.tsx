@@ -592,7 +592,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     const after = momentFor(card.history, rating as 1 | 2 | 3 | 4, { sure: conf === 3, remix: !!card.variant });
     const color = entry ? skillOf(entry.skills[0] ?? "").color : undefined;
     setBusy(true);
-    let goalClosed = false;
+    let goalClosed = false, saved = false;
     try {
       const elapsed = Date.now() - shownAt.current;
       await sessionReady.current;
@@ -608,6 +608,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         ...(session.current ? [opt("session", session.current.id)] : []),
       ];
       await submit(args, rating, elapsed);
+      saved = true;
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
@@ -621,6 +622,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     }
     // The mole's goal note stays until the next rating; one still waiting behind a moment (a gem cut by the
     // rating that closed the goal) gets its turn first.
+    if (!saved) return;
     if (goalTold.current && !moment) setGoalSaid(false);
     if (!goalClosed || goalTold.current) return;
     // D177: a goal that closes on a miss gets one more card first, a likely recall, so its moment doesn't

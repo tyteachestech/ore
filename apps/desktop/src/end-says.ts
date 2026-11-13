@@ -22,7 +22,7 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   ];
   const extra = s.depth_extra_days ?? 0;
   const depth: Said[] = (s.depth_days ?? 0) > 0
-    ? [{ text: `+${depthText(s.depth_days!)} of memory${extraText(s.depth_days!, extra)}. You dug that.`, hint: `How much longer the exercises you passed today will now last, added up (at most 30 days each)${extra > 0 ? "; extra is what came after today’s goal" : ""}` }]
+    ? [{ text: `+${depthText(s.depth_days!)} of memory${extraText(s.depth_days!, extra)}. You dug that.`, hint: `How much longer the exercises you passed today will now last, added up (at most 30 days each)${extraText(s.depth_days!, extra) ? "; extra is what came after today’s goal" : ""}` }]
     : [];
   const common: Said[] = [...(o.minutesLeft ? [{ text: `${o.minutesLeft} min to today’s goal. Your call.` }] : []), ...(o.waiting ? [{ text: o.waiting }] : [])];
   // The verdict opens unless something rare does; then it is one more everyday line.
