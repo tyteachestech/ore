@@ -98,13 +98,20 @@ export const MAC_WAY = "add it from the browser";
  *  pasting the text into the add box), which the phone doesn't have: the Mac tries the link itself (D227.3).
  *  The clause naming the Mac's way in goes, with all after it; whatever came before it stays. */
 export function phoneReason(error: string): string {
-  const at = error.indexOf(MAC_WAY);
-  if (at < 0) return error;
-  const head = error.slice(0, at);
-  const cut = Math.max(head.lastIndexOf(". ") + 1, head.lastIndexOf("; "), head.lastIndexOf(", or "));
-  const kept = cut > 0 ? error.slice(0, cut).trim() : "";
-  if (!kept) return "Ore couldn’t read this page here.";
-  return /[.!?]$/.test(kept) ? kept : `${kept}.`;
+  const kept = error
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => {
+      // The Mac's ways in: its Browser tab, or pasting the text into its add box (said several ways).
+      const at = Math.min(...[sentence.indexOf(MAC_WAY), sentence.search(/\bcopy (it|its|the)\b|\bpaste\b/i)].filter((i) => i >= 0));
+      if (!Number.isFinite(at)) return sentence;
+      const head = sentence.slice(0, at);
+      const cut = Math.max(head.lastIndexOf("; "), head.lastIndexOf(", or "), head.lastIndexOf(", then "));
+      const left = cut > 0 ? sentence.slice(0, cut).trim() : "";
+      return left && (/[.!?]$/.test(left) ? left : `${left}.`);
+    })
+    .filter(Boolean)
+    .join(" ");
+  return kept || "Ore couldn’t read this page here.";
 }
 
 /** Links on their way in: one this phone is reading says so, and one it couldn't read says why and that

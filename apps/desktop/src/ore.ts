@@ -112,6 +112,8 @@ export type Item = {
   /** What the device that added it couldn't bring in (a video's transcript on the iPhone, D235). */
   owed?: "transcript"[];
   owed_error?: string;
+  /** `ore show`, for one with a part owed: whether this device fills it, or the Mac must. */
+  fills_here?: boolean;
   /** `ore show`: being read now, or read; why the last reading failed; whether the reader is installed. */
   tables?: "reading" | "read";
   tables_error?: string;

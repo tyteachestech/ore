@@ -9821,6 +9821,116 @@ async function press(page: Page, target: Locator, ms = 650) {
   await send("touchend", 0);
 }
 
+journey("phone: Move to To read from a done source's ⋯ moves it, and it stays moved after a relaunch (F-new-phone-move-to-read)", async (page) => {
+  // The reader showed it unfinished, but the phone's reader handed the move to a refresh that wrote nothing.
+  await phoneSource(page, "The Story Spine");
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Move to To read" }));
+  await tap(page, page.getByRole("button", { name: "Back" }));
+  const toRead = page.locator(".phone-sources section").filter({ has: page.locator("h2", { hasText: "To read" }) });
+  await toRead.getByText("The Story Spine").waitFor();
+  await page.reload();
+  await page.locator(".phone-app").waitFor();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await toRead.getByText("The Story Spine").waitFor();
+}, "phone");
+
+journey("phone: a highlight's note being typed is still there after the app is quit with it open (F-new-phone-highlight-note-quit)", async (page) => {
+  // The note saved only when the popup closed: iOS quitting the app with it open lost what he typed.
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  await tap(page, page.locator("aside.mynotes button").filter({ hasText: "after one week" }));
+  const field = page.locator(".popup .field");
+  await field.waitFor();
+  await field.fill("A note typed on the bus, then the app was quit.");
+  await page.reload();
+  await page.locator(".phone-reader .doc").first().waitFor();
+  const kept = page.locator("aside.mynotes button").filter({ hasText: /A note typed on the bus|after one week/ });
+  // The reader comes back where he was, its bars maybe hidden: back to the top brings them, then Collected.
+  await Bun.sleep(500);
+  if (!(await kept.first().isVisible())) {
+    await page.evaluate(() => document.querySelector(".phone-reader .reader-scroll")?.scrollTo({ top: 0 }));
+    await tap(page, page.locator(".phone-tools > :first-child"));
+  }
+  await tap(page, kept);
+  if ((await field.inputValue()) !== "A note typed on the bus, then the app was quit.") throw new Error(`the note came back as “${await field.inputValue()}”`);
+}, "phone");
+
+journey("phone: renaming a low Continue reading row on Today keeps the field above the keyboard (F-new-phone-today-rename-keyboard)", async (page) => {
+  // Today's lower rows sat where the keyboard comes up, and only the reader and the drawer lifted their fields.
+  const rows = page.locator(".home-read");
+  await rows.nth(2).waitFor();
+  await press(page, rows.last());
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const field = page.locator(".home-read input");
+  await field.waitFor();
+  await keyboardUp(page, 500);
+  await until("the rename field is above the keyboard", async () => {
+    const b = await field.boundingBox();
+    return !!b && b.y + b.height <= 844 - 500 + 0.5;
+  });
+}, "phone");
+
+journey("phone: Remove on a link still being read takes it off at once (F-new-phone-remove-waiting)", async (page) => {
+  // The remove waited its turn behind the read of a link that hung, so the tap showed nothing for 15 s.
+  await page.route("https://example.com/articles/slow", () => {}); // never answers
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://example.com/articles/slow");
+  await tap(page, page.getByRole("button", { name: "Add", exact: true }));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/slow" });
+  await tap(page, row.getByRole("button", { name: "Remove" }));
+  await row.waitFor({ state: "detached", timeout: 1000 });
+}, "phone");
+
+journey("phone: a jump from Sections puts the heading below the Back bar, not under it (F-new-phone-jump-under-bar)", async (page) => {
+  // The jump put the heading 24pt under the scroller's top, which on the phone is under the floating Back bar.
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".read-pill"));
+  await tap(page, page.locator(".sections-sheet .pick-row").last());
+  await page.locator(".sections-sheet").waitFor({ state: "detached" });
+  await until("the heading is in sight below the bar", () =>
+    page.evaluate(() => {
+      const bar = document.querySelector(".phone-source > .phone-bar")!.getBoundingClientRect();
+      const hs = [...document.querySelectorAll(".phone-reader .doc :is(h1, h2, h3)")];
+      const h = hs[hs.length - 1]!.getBoundingClientRect();
+      (window as unknown as { __jump: unknown }).__jump = { top: h.top, bar: bar.bottom, hs: hs.map((x) => x.textContent) };
+      return h.top >= bar.bottom && h.top < innerHeight / 2;
+    }),
+  ).catch(async (e) => { throw new Error(`${e.message}: ${JSON.stringify(await page.evaluate(() => (window as unknown as { __jump: unknown }).__jump))}`); });
+}, "phone");
+
+journey("phone: Today in a library with nothing to read says to add a first source with + (F-new-phone-empty-today)", async (page) => {
+  // A first launch showed a zero ring and "All caught up. Read something new." with nothing to say how.
+  await page.evaluate(async () => {
+    const core = (await import("/src/phone/core.ts" as string)) as { run: <T>(args: string[], input: string | null) => Promise<T> };
+    const all = await core.run<{ id: string }[]>(["ls", "--json"], null);
+    for (const i of all) await core.run(["archive", i.id, "--json"], null);
+  });
+  await Bun.sleep(1000); // the page's writes reach IndexedDB in the background
+  await page.reload();
+  await page.locator(".phone-app").waitFor();
+  await page.locator(".empty-state").filter({ hasText: "Nothing to read yet. Add a link, a file or a photo with +." }).waitFor();
+  if (await page.getByText("Read something new").count()) throw new Error("Today says to read something new in a library with nothing to read");
+}, "phone");
+
+journey("phone: an episode on a phone that can't hear speech says the Mac fills its transcript, not that it is on its way (F-new-phone-cant-hear)", async (page) => {
+  // With no speech model (the Simulator, an older phone) the episode said “on its way” for good: the Mac fills it.
+  const cors = { "access-control-allow-origin": "*" };
+  const audio = "https://media.example.com/quiet-rooms.mp3";
+  await page.route("https://itunes.apple.com/lookup?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: cors, body: JSON.stringify({ results: [{ trackId: 1000670069360, episodeUrl: audio, trackName: "Quiet rooms", collectionName: "Ride Home", releaseDate: "2024-09-19T08:00:00Z" }] }) }));
+  await page.route(audio, (r) => r.fulfill({ status: 200, contentType: "audio/mpeg", headers: cors, body: Buffer.alloc(200_000) }));
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://podcasts.apple.com/us/podcast/quiet-rooms/id1355212895?i=1000670069360");
+  await tap(page, page.getByRole("button", { name: "Add", exact: true }));
+  await page.getByText("Added “Quiet rooms”").waitFor();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await tap(page, page.locator(".phone-sources button").filter({ hasText: "Quiet rooms" }));
+  await page.locator(".doc-empty").filter({ hasText: "The transcript comes in when Ore is open on your Mac." }).waitFor();
+}, "phone");
+
 journey("phone: a long press on a Today source opens its menu", async (page) => {
   // Tyler 2026-11-12: holding a source on Today did nothing. Only the Sources list had the hold; Today's rows
   // left it to Radix, whose touch timer gives up at a finger's first few points of drift.

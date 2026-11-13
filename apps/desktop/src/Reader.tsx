@@ -1477,6 +1477,14 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   useEffect(() => () => keepNote(), [p.id]);
+  // Leaving the app saves it too, as Notes does: iOS may end the app before he comes back.
+  const keepNoteNow = useRef(keepNote);
+  keepNoteNow.current = keepNote;
+  useEffect(() => {
+    const hidden = () => document.hidden && keepNoteNow.current();
+    document.addEventListener("visibilitychange", hidden);
+    return () => document.removeEventListener("visibilitychange", hidden);
+  }, []);
 
   function closePopup(keep = true) {
     if (keep) {
@@ -3411,7 +3419,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
-              {doc.owed?.length ? (doc.owed_error ? `Couldn’t get the transcript: ${doc.owed_error} Reimport tries again.` : filling ? <FillingLine filling={filling} /> : doc.type === "youtube" ? "The transcript comes in when Ore is open on your Mac. Watch it above meanwhile." : "This episode’s transcript is on its way: its audio is downloaded, then heard.") : video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
+              {doc.owed?.length ? (doc.owed_error ? `Couldn’t get the transcript: ${doc.owed_error} Reimport tries again.` : filling ? <FillingLine filling={filling} /> : doc.type === "youtube" ? "The transcript comes in when Ore is open on your Mac. Watch it above meanwhile." : PHONE && doc.fills_here === false ? "The transcript comes in when Ore is open on your Mac. This iPhone can’t hear speech." : "This episode’s transcript is on its way: its audio is downloaded, then heard.") : video ? "This video has no transcript, so there’s no text to highlight. Watch it above and write what you took from it in the source note." : `No text was saved for this source.${doc.url ? " Open the original from ⋯ to read it." : " Archive it from ⋯ and add the text again."}`}
             </p>
           )}
           {PHONE && ready && canFinish && !closedBook && (
@@ -3488,6 +3496,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                 onChange={(e) => {
                   const note = fromBullets(e.target.value);
                   setPopup((cur) => cur && { ...cur, note });
+                  // Kept as he types, so a quit with the popup open (iOS ends a backgrounded app) loses nothing.
+                  const ann = annOf(popup.id);
+                  if (ann) unsavedNotes.set(popup.id, { note, was: ann.note ?? "" });
                 }}
                 // "- " or "* " shows as a bullet (saved as "- "); ⇧↵ on a bullet or "1. " line starts the next item, as in Claude's and ChatGPT's chat boxes; ↵ still closes.
                 onKeyDown={(e) => {

@@ -297,6 +297,9 @@ function Rows({ lines, row, onOpen }: { lines: Line[]; row: RowActions; onOpen: 
   );
 }
 
+/** A list row's in-place Rename field: Today's (Home's rows) and the lists'. styles.css pads the page under it. */
+const RENAMING = ".home-read, .phone-row-rename";
+
 /** Sources by To read and Done, as one list; `flat`: as given, no sections or courses (Archive, a course's lessons). */
 function SourceList({ title, items, onOpen, row, head, flat, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; flat?: boolean; empty?: string }) {
   // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.
@@ -448,6 +451,8 @@ export function PhoneApp() {
   const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState(false);
   const [waiting, setWaiting] = useState<Waiting[]>([]);
+  /** Links he removed whose remove hasn't run yet: a refresh meanwhile doesn't show them again. */
+  const removing = useRef(new Set<string>());
   const main = useRef<HTMLElement>(null);
   const cue = useRef<HTMLDivElement>(null);
   // Rendered inside the touch's own handler, so iOS lets the field take focus and bring up the keyboard.
@@ -475,7 +480,7 @@ export function PhoneApp() {
       setItems(all);
       setSkills(sk);
       void shareSkills(sk.filter((k) => !k.archived));
-      setWaiting(w);
+      setWaiting(w.filter((l) => !removing.current.has(l.id)));
       setError(null);
       // The Archive list, only while it shows: listed twice on every change otherwise.
       if (tabNow.current === "archive") setArchived(await ore<Item[]>("ls", "--archived"));
@@ -594,6 +599,8 @@ export function PhoneApp() {
       // A field in the reader (a prequestion, a highlight's note) or the drawer (New skill, with its refusal
       // under it) stays in sight above the keyboard. Sheets and Review lift themselves by --keyboard.
       if (field.closest(".phone-drawer")) return (field.closest("form") ?? field).scrollIntoView({ block: "nearest" });
+      // A row renamed in place (Today, Sources, a skill's list) may sit where the keyboard comes up.
+      if (field.closest(RENAMING)) return field.scrollIntoView({ block: "nearest" });
       if (!field.closest(".phone-reader")) return;
       if (!field.isContentEditable) return field.scrollIntoView({ block: "nearest" });
       // The source note is one tall editor: bring the caret, not the editor, into view, once the screen has shrunk.
@@ -854,7 +861,7 @@ export function PhoneApp() {
             onOpenLesson={(id) => open(id)}
             onPin={(item) => void pin(item)}
             onReview={(item) => setReviewing({ pick: null, source: item.id, run: 0 })}
-            onMove={() => void refresh()}
+            onMove={(item, to) => void moveTo(item, to)}
             jumpTo={jumpTo}
             blocked={false}
             targets={targets}
@@ -883,11 +890,17 @@ export function PhoneApp() {
   const courseGone = loaded && !!course && !courseOf.length;
   useEffect(() => void (courseGone && setCourse(null)), [courseGone]);
   const removeWaiting = async (l: Waiting) => {
+    // Off the list at once: the remove waits its turn behind a link being read, which can take a while.
+    removing.current.add(l.id);
+    setWaiting((all) => all.filter((w) => w.id !== l.id));
     try {
       await ore("inbox", "--remove", l.id);
+      removing.current.delete(l.id);
       void refresh();
       notify("Removed the link", "info", () => ore("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s])).then(refresh));
     } catch (e) {
+      removing.current.delete(l.id);
+      void refresh();
       notify(errorText(e), "error");
     }
   };
@@ -927,6 +940,7 @@ export function PhoneApp() {
             {tab === "today" ? (
               <Home
                 items={items ?? []}
+                empty={items?.length === 0 && !waiting.length}
                 skills={skills}
                 recent={[]}
                 reload={tick}
