@@ -1483,7 +1483,10 @@ const LINE_MS = 2600;
 function EndLines({ run, children }: { run: boolean; children: React.ReactNode }) {
   const lines = Children.toArray(children);
   const [at, setAt] = useState(0);
-  const [held, setHeld] = useState(false);
+  // The pointer and the keyboard each hold it on their own: leaving with one never lets go for the other.
+  const [over, setOver] = useState(false);
+  const [within, setWithin] = useState(false);
+  const held = over || within;
   const flat = still();
   useEffect(() => {
     if (flat || !run || held || lines.length < 2) return;
@@ -1493,7 +1496,7 @@ function EndLines({ run, children }: { run: boolean; children: React.ReactNode }
   if (flat || lines.length < 2) return <>{lines}</>;
   const on = at % lines.length, was = at ? (at - 1) % lines.length : -1;
   return (
-    <div className="end-lines" onMouseEnter={() => setHeld(true)} onMouseLeave={() => setHeld(false)} onFocus={() => setHeld(true)} onBlur={() => setHeld(false)}>
+    <div className="end-lines" onMouseEnter={() => setOver(true)} onMouseLeave={() => setOver(false)} onFocus={() => setWithin(true)} onBlur={() => setWithin(false)}>
       {lines.map((line, i) => (
         <div key={i} data-at={i === on ? "on" : i === was ? "was" : undefined} inert={i !== on}>{line}</div>
       ))}

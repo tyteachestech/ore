@@ -154,6 +154,12 @@ test("the end screen's lines share one place: one shows, the next rolls up after
   await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new (s.body.ownerDocument.defaultView as unknown as { MouseEvent: typeof MouseEvent }).MouseEvent("mouseover", { bubbles: true })));
   await act(async () => void jest.advanceTimersByTime(6000));
   expect(on()).toBe("+41 days of memory");
+  // Focus on the line holds it too, and the pointer leaving doesn't let go of that hold.
+  const win = s.body.ownerDocument.defaultView as unknown as { MouseEvent: typeof MouseEvent; FocusEvent: typeof FocusEvent };
+  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new win.FocusEvent("focusin", { bubbles: true })));
+  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new win.MouseEvent("mouseout", { bubbles: true })));
+  await act(async () => void jest.advanceTimersByTime(6000));
+  expect(on()).toBe("+41 days of memory");
   jest.useRealTimers();
   await s.done();
   // One line has nothing to take turns with.
