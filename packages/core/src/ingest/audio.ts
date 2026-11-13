@@ -128,9 +128,9 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
     const res = await fetcher(`https://itunes.apple.com/lookup?id=${apple[1]}&entity=podcastEpisode&limit=200`).catch(() => null);
     const results = res?.ok ? (((await res.json()) as { results?: Record<string, string>[] }).results ?? []) : [];
     const hit = results.find((r) => String(r.trackId) === apple[2] && r.episodeUrl);
-    if (!hit) throw new Error("Couldn’t find that episode’s audio on Apple Podcasts (it may be older than the show’s last 200). Add the episode from the show’s own site instead.");
     // The show's own feed names the language it speaks.
     const feed = results.find((r) => r.feedUrl)?.feedUrl;
+    if (!hit) return older(url, results.find((r) => r.feedUrl), fetcher);
     return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, artwork: hit.artworkUrl600 ?? hit.artworkUrl160, language: feed ? await showLanguage(feed, fetcher) : undefined };
   }
   const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
@@ -139,6 +139,44 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   const audio = pageAudio(html, url, true);
   if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
   return { audio, title: meta("og:title"), show: meta("og:site_name"), artwork: meta("og:image") };
+}
+
+/** An Apple Podcasts episode the lookup no longer lists (it gives a show's newest 200; a daily show
+ *  passes that in a year): Apple's page names the episode and its day, and the show's public feed, which
+ *  keeps every episode, has its audio (F62). */
+async function older(url: string, show: Record<string, string> | undefined, fetcher: typeof fetch): Promise<Episode> {
+  const gone = "Couldn’t find that episode’s audio on Apple Podcasts. Add the episode from the show’s own site instead.";
+  if (!show?.feedUrl) throw new Error(gone);
+  const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
+  const html = res?.ok ? await res.text() : "";
+  // Only the episode's own page: a link Apple no longer knows answers with the show's.
+  let ld: { "@type"?: string; name?: string; datePublished?: string } = {};
+  try {
+    ld = JSON.parse(html.match(/<script[^>]*type=["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/i)?.[1] ?? "{}");
+  } catch {}
+  const title = ld["@type"] === "PodcastEpisode" ? ld.name : undefined;
+  if (!title) throw new Error(gone);
+  const found = await inFeed(show.feedUrl, title, ld.datePublished, fetcher);
+  if (!found.audio) throw new Error(`Couldn’t find “${title}” in ${show.collectionName ?? "the show"}’s feed. Add the episode from the show’s own site instead.`);
+  return { audio: found.audio, title, show: show.collectionName, published: ld.datePublished, artwork: show.artworkUrl600 ?? show.artworkUrl160, language: found.language };
+}
+
+/** An episode's audio in its show's public feed: the item with that title, or the only one of that day
+ *  when the title was edited since. */
+async function inFeed(feed: string, title: string, published: string | undefined, fetcher: typeof fetch): Promise<{ audio?: string; language?: string }> {
+  const xml = await (await fetcher(feed).catch(() => null))?.text().catch(() => "") ?? "";
+  const items = [...xml.matchAll(/<item\b[\s\S]*?<\/item>/g)].map((m) => ({
+    title: decodeXml(m[0].match(/<title\b[^>]*>([\s\S]*?)<\/title>/)?.[1] ?? ""),
+    audio: m[0].match(/<enclosure\b[^>]*\burl="([^"]+)"/)?.[1],
+    day: (() => {
+      const t = Date.parse(m[0].match(/<pubDate>([^<]+)<\/pubDate>/)?.[1] ?? "");
+      return Number.isNaN(t) ? undefined : new Date(t).toISOString().slice(0, 10);
+    })(),
+  }));
+  const want = words(title);
+  const sameDay = published ? items.filter((i) => i.audio && i.day === published.slice(0, 10)) : [];
+  const hit = items.find((i) => i.audio && words(i.title) === want) ?? (sameDay.length === 1 ? sameDay[0] : undefined);
+  return { audio: hit?.audio && decodeXml(hit.audio), language: feedLanguage(xml) };
 }
 
 /** A page's `<meta>` values by property or name, in either attribute order: pages write `content`
@@ -260,18 +298,7 @@ async function spotify(url: string, fetcher: typeof fetch): Promise<Episode> {
   const shows = search?.ok ? (((await search.json()) as { results?: { collectionName?: string; feedUrl?: string }[] }).results ?? []) : [];
   const feed = shows.find((r) => r.feedUrl && words(r.collectionName ?? "") === words(show))?.feedUrl;
   if (!feed) throw new Error(onlySpotify);
-  const xml = await (await fetcher(feed).catch(() => null))?.text().catch(() => "") ?? "";
-  const items = [...xml.matchAll(/<item\b[\s\S]*?<\/item>/g)].map((m) => ({
-    title: decodeXml(m[0].match(/<title\b[^>]*>([\s\S]*?)<\/title>/)?.[1] ?? ""),
-    audio: m[0].match(/<enclosure\b[^>]*\burl="([^"]+)"/)?.[1],
-    day: (() => {
-      const t = Date.parse(m[0].match(/<pubDate>([^<]+)<\/pubDate>/)?.[1] ?? "");
-      return Number.isNaN(t) ? undefined : new Date(t).toISOString().slice(0, 10);
-    })(),
-  }));
-  const want = words(title);
-  const sameDay = published ? items.filter((i) => i.audio && i.day === published.slice(0, 10)) : [];
-  const hit = items.find((i) => i.audio && words(i.title) === want) ?? (sameDay.length === 1 ? sameDay[0] : undefined);
-  if (!hit?.audio) throw new Error(`Couldn’t find “${title}” in ${show}’s public feed: it may be only on Spotify. Find the episode on Apple Podcasts or the show’s site and add that link instead.`);
-  return { audio: decodeXml(hit.audio), title, show, published, language: feedLanguage(xml) };
+  const found = await inFeed(feed, title, published, fetcher);
+  if (!found.audio) throw new Error(`Couldn’t find “${title}” in ${show}’s public feed: it may be only on Spotify. Find the episode on Apple Podcasts or the show’s site and add that link instead.`);
+  return { audio: found.audio, title, show, published, language: found.language };
 }
