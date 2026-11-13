@@ -13,10 +13,14 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 - The hooks install only from `master`: commits in a branch worktree never replace the installed app.
 - Pause pulls while Tyler or an AI tester is using the app.
 
+## The Mac session
+- A Remote Control session goes offline when the Mac sleeps, and its messages wait until it wakes (2026-11-13: offline 30 min until Tyler wrote). Tyler keeps "Prevent automatic sleeping on power adapter when the display is off" on (System Settings › Battery › Options). When a session comes back after a gap, check `pmset -g log | grep -E "Sleep|Wake"` before blaming anything else.
+- Never ask for computer use on the Mac: its approval prompt never reaches Tyler (it was denied twice with no prompt shown). For a hands-on pass of the app, write the prompt to `/mnt/project-files/ai-user-testing/` and Tyler runs it himself in Codex or ChatGPT.
+
 ## Parallel threads
 - `~/Developer/ore` stays on `master`: the installed app carries a CLI compiled from it at install (D30), run against his real library. Build branches in a worktree (`git worktree add ../ore-<topic>`), never by checking one out there.
 - Rebase onto `origin/master` before pushing and again before merging; another thread may have landed.
-- Take a decision number (D-number) at merge time, from `docs/DECISIONS.md` on `origin/master` after that last rebase, never when the PR opens: open PRs claim the same next number and collide. Renumber the entry and every mention of it in the diff.
+- New decisions and findings carry placeholders, `D-new-<slug>` in `docs/DECISIONS.md` and `F-new-<slug>` in `docs/reviews/findings.md`, mentioned by those names everywhere in the branch. After the last rebase, run `bun run ids` and commit: each placeholder becomes the next free number. Open PRs never claim the same number, and `.gitattributes` (`merge=union`) keeps both sides' new rows in a rebase; the decisions and findings tests catch a duplicate.
 - Git housekeeping is the thread's job, never Tyler's: do resets, rebases, branch cleanup and reinstalls yourself on the Mac, and never ask him to run a git command. Never rewrite master's history; if it ever must be, the thread that does it also resets `~/Developer/ore`, rebases open PRs and deletes the old branches.
 - Name files in NFC Unicode (macOS shows NFD names as untracked).
 
