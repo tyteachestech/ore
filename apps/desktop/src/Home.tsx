@@ -117,6 +117,9 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   // Back on Home, the numbers it last read until fresh ones land: Today and the rows under it draw as one, at once.
   const [today, setToday] = useState<Today | null>(lastToday);
   const [error, setError] = useState<string | null>(null);
+  // Home stays mounted under Review: when it hands back, take the Today it read at its end screen before the first
+  // paint, so the goal line is already there instead of pushing the list down a moment later (F-new-r2-home-goal-return-jump).
+  useLayoutEffect(() => { const t = lastToday(); if (t) setToday(t); }, [reload]);
 
   const refresh = useCallback(() => {
     ore<Today>("today").then(

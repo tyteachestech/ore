@@ -1,3 +1,4 @@
+import { rememberToday } from "./ReviewPick";
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, Clock, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
@@ -418,7 +419,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
       const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
-      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current, next: await next });
+      // Home draws the Today it last read until a fresh one lands (F-new-r2-home-goal-return-jump): hand it this one,
+      // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
+      const today = await ore<Today>("today");
+      rememberToday(today);
+      setEnd({ session: receipt, today, before: before.current, next: await next });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();

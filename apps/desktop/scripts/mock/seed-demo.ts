@@ -69,9 +69,9 @@ Stability is the number of days it takes for the chance of recall to fall to 90%
 
 Between reviews, retrievability falls along a curve that is steep at first and then flattens:
 
-$$R(t) = \\left(1 + \\frac{19}{81} \\cdot \\frac{t}{S}\\right)^{-0.5}$$
+$$R(t) = \\left(1 + \\frac{t}{9S}\\right)^{-1}$$
 
-Here $t$ is the days since the last review and $S$ is the stability. When $t = S$ the formula gives exactly 0.9.
+Here $$t$$ is the days since the last review and $$S$$ is the stability. When $$t = S$$ the formula gives exactly 0.9.
 
 ![Two forgetting curves: a new memory falls fast, a stable one slowly](assets/curves.svg)
 
@@ -83,7 +83,13 @@ A successful recall raises stability, and it raises it most when the memory was 
 
 You choose a desired retention, usually 90%. Raising desired retention shortens every interval, so you forget less but review far more. Going from 90% to 95% roughly doubles the daily work. For most learning, 85% to 90% is the best trade.
 `;
-const CURVES = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420"><rect width="960" height="420" fill="#f6f5f1"/><g font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#333"><line x1="80" y1="40" x2="80" y2="350" stroke="#333" stroke-width="2"/><line x1="80" y1="350" x2="900" y2="350" stroke="#333" stroke-width="2"/><text x="20" y="64">100%</text><text x="30" y="116">90%</text><line x1="80" y1="110" x2="900" y2="110" stroke="#999" stroke-dasharray="6 6"/><text x="440" y="396">Days since last review</text><path d="M80 50 C 120 130, 200 250, 420 320 S 800 345, 900 348" fill="none" stroke="#d6457a" stroke-width="4"/><path d="M80 50 C 300 80, 600 130, 900 190" fill="none" stroke="#2f8f6f" stroke-width="4"/><text x="250" y="300" fill="#d6457a">Stability 3 days</text><text x="620" y="120" fill="#2f8f6f">Stability 60 days</text></g></svg>`;
+// Plot 0–180 days, 100% at y=50 and 0% at the y=350 axis. Straight one-day
+// samples cannot overshoot or hook upward the way the hand-drawn Béziers did.
+const curve = (stability: number) => Array.from({ length: 181 }, (_, days) => {
+  const retention = 1 / (1 + days / (9 * stability));
+  return `${days ? "L" : "M"}${(80 + days / 180 * 820).toFixed(3)} ${(350 - retention * 300).toFixed(3)}`;
+}).join(" ");
+const CURVES = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420"><rect width="960" height="420" fill="#f6f5f1"/><g font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#333"><line x1="80" y1="40" x2="80" y2="350" stroke="#333" stroke-width="2"/><line x1="80" y1="350" x2="900" y2="350" stroke="#333" stroke-width="2"/><text x="20" y="64">100%</text><text x="30" y="86">90%</text><line x1="80" y1="80" x2="900" y2="80" stroke="#999" stroke-dasharray="6 6"/><text x="440" y="396">Days since last review</text><path d="${curve(3)}" fill="none" stroke="#d6457a" stroke-width="4"/><path d="${curve(60)}" fill="none" stroke="#2f8f6f" stroke-width="4"/><text x="250" y="300" fill="#d6457a">Stability 3 days</text><text x="620" y="150" fill="#2f8f6f">Stability 60 days</text></g></svg>`;
 
 const SOURCES: Src[] = [
   // Learning
