@@ -108,6 +108,9 @@ async function openPhone(): Promise<Page> {
   await page.addInitScript(HYGIENE);
   await page.goto(url);
   await page.locator(".phone-app").waitFor();
+  // Opened means the library is read: a journey that relaunches at once (page.reload) cut the read of
+  // /library.json in half, and WebKit reported it as a page error after every journey passed (F86).
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
   return page;
 }
 
