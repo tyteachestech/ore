@@ -13,3 +13,9 @@ test("what to review puts Focus skills first, then Normal, then Light, and never
   const today = { skills: [{ skill: "light", due: 9 }, { skill: "focus", due: 1 }, { skill: "old", due: 3 }, { skill: "gone", due: 5 }] } as Today;
   expect(dueSkills(today, skills).map((r) => r.skill.id)).toEqual(["focus", "old", "light"]);
 });
+
+test("a row carries what a session there could win: gems one Good from cut today, and loose ones (D249)", () => {
+  const skills = [{ id: "a", name: "A" }, { id: "b", name: "B" }] as Skill[];
+  const today = { skills: [{ skill: "a", due: 3, ready_today: 2, win_back: 1 }, { skill: "b", due: 5, ready_today: 0, win_back: 0 }], no_skill_due: 1 } as Today;
+  expect(dueSkills(today, skills).map((r) => [r.skill.name, r.near, r.loose])).toEqual([["B", 0, 0], ["A", 2, 1], ["No skill", 0, 0]]);
+});
