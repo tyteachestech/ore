@@ -1,3 +1,4 @@
+import { followTextSize } from "./dynamic-type";
 // The phone build reads process.env at run time (vite.config.ts), so it has to exist before any
 // module that reads it loads: main.tsx imports this first. core.ts adds the library's variables.
 if (import.meta.env.VITE_PHONE === "1") {
@@ -12,4 +13,6 @@ if (import.meta.env.VITE_PHONE === "1") {
   // iOS scrolls the whole page to show a focused field, sliding the screen under the status bar;
   // the screens scroll inside themselves, so the page stays put.
   window.addEventListener("scroll", () => window.scrollY && window.scrollTo(0, 0));
+  // His text size in iOS Settings (F70): every screen's text follows it.
+  followTextSize();
 }
