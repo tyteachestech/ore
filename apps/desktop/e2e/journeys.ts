@@ -6533,6 +6533,18 @@ journey("review: when the day's goal closes the mole says so and the session goe
     if (!/Goal met/.test(await note.innerText())) throw new Error(`the note says ${JSON.stringify(await note.innerText())}`);
     await until("the next exercise", async () => (await q.innerText()) !== first);
     if (await page.locator(".review-end").count()) throw new Error("the session ended at the goal");
+    // ⌘Z takes back the rating that closed the goal: the note goes with it, and closing it again tells it again.
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings the first exercise back", async () => (await q.innerText()) === first);
+    if (await note.count()) throw new Error("the goal's note outlived the undo of the rating that closed it");
+    await page.evaluate(() => {
+      const now = Date.now;
+      Date.now = () => now() + 61_000;
+    });
+    await reveal(page);
+    await good.click();
+    await note.waitFor();
+    await until("the next exercise again", async () => (await q.innerText()) !== first);
     // The note leaves with the next rating, and the session is still going.
     const second = await q.innerText();
     await reveal(page);

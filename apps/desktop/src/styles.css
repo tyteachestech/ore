@@ -2170,7 +2170,6 @@ button.home-plan:hover { color: var(--text); }
 .end-says .end-lines > div { place-items: center start; }
 @keyframes end-says { from { opacity: 0; transform: translateX(-6px) scale(0.96); } }
 @media (prefers-reduced-motion: reduce) { .end-says, .end-says .end-lines > div { animation: none !important; } }
-/* The session is over: its bar steps back for what it won. */
 /* The end screen's lines (D241): one place; the line showing rolls up and out as the next rolls up into it. */
 .end-lines { display: grid; place-items: center; width: 100%; margin: 10px 0 0; min-height: 36px; overflow: hidden; }
 .end-lines > div { grid-area: 1 / 1; display: grid; place-items: center; opacity: 0; }

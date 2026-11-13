@@ -208,7 +208,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const [start, setStart] = useState<Today | null>(null);
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
-  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; forget: Forget }[]>([]);
+  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget }[]>([]);
   const last = undos.at(-1);
   /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
   const retired = useRef(new Set<string>());
@@ -617,8 +617,9 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     } finally {
       setBusy(false);
     }
-    // The mole's goal note stays until the next rating.
-    if (goalTold.current) setGoalSaid(false);
+    // The mole's goal note stays until the next rating; one still waiting behind a moment (a gem cut by the
+    // rating that closed the goal) gets its turn first.
+    if (goalTold.current && !moment) setGoalSaid(false);
     if (!goalClosed || goalTold.current) return;
     // D177: a goal that closes on a miss gets one more card first, a likely recall, so its moment doesn't
     // follow a failure. Once only: whatever he answers next, the goal is told.
@@ -636,7 +637,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
    *  ⌘Z takes it back and ⇧⌘Z gives it again: the same rating, answer and time. Throws if the write fails. */
   const submit = async (args: string[], rating: number, elapsed: number, again?: { forget: Forget; setTs: (ts: string) => void }) => {
-    const was = { queue: queue ?? [], done, activeMs: activeMs.current, off: new Set(putOffIds.current), won: wonLast.current };
+    const was = { queue: queue ?? [], done, activeMs: activeMs.current, off: new Set(putOffIds.current), won: wonLast.current, told: goalTold.current };
     const r = await ore<{ ts: string }>("review", ...args);
     reviewed.current++;
     const id = args[0]!;
@@ -691,6 +692,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       putOffIds.current = new Set(last.off);
       // D177's one more goes with the rating that earned it.
       wonLast.current = last.won;
+      // So does the goal's note: undo the rating that closed the goal and it is open again, to be told again.
+      if (!last.told) {
+        goalTold.current = false;
+        setGoalSaid(false);
+      }
       setDone(last.done);
       setQueue(last.queue.filter((e) => !retired.current.has(e.id)));
       setUndos((u) => u.slice(0, -1));
@@ -1100,7 +1106,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick, source)}</p>}
 
-        {goalSaid && !end && (
+        {goalSaid && !moment && !end && (
           <div className="review-moment" data-tone="goal" role="status">
             <span className="moment-mole"><Mole bare size={40} mood="happy" /></span>
             <span className="moment-text">
@@ -1112,7 +1118,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
             </Hint>
           </div>
         )}
-        {moment && !goalSaid && !end && (
+        {moment && !end && (
           <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} role="status">
             {!quick && <span className="moment-mole"><Mole bare size={40} mood={moment.tone === "miss" ? "peek" : "happy"} /></span>}
             <span className="moment-gem" aria-hidden="true">
