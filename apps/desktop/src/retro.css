@@ -279,3 +279,17 @@
 .home-day.met i { background: var(--c-green); box-shadow: none; }
 .home-day.today i { outline: none; box-shadow: inset 0 0 0 2px var(--muted); }
 .home-day.off i { background: var(--bg); box-shadow: inset 0 0 0 2px var(--border); }
+
+/* The vein (D240): a new highlight's colour arrives as dots that sweep along each line, swell and join into the
+   tint. `--vein-r` is a dot's radius; past 4.4px the dots of a 6px grid have joined and the line is its tint. */
+@property --vein-r { syntax: "<length>"; inherits: false; initial-value: 4.4px; }
+.vein { position: absolute; inset: 0; pointer-events: none; --tint: var(--keep); }
+.vein.card { --tint: var(--card); } .vein.question { --tint: var(--question); } .vein.apply { --tint: var(--apply); }
+.vein i { position: absolute; background: radial-gradient(circle, var(--tint) var(--vein-r), transparent calc(var(--vein-r) + 0.6px)) 0 50% / 6px 6px; animation: vein-sweep var(--t-4) var(--ease-out) both, vein-swell var(--t-4) var(--ease-in-out) both; animation-delay: calc(var(--i, 0) * 3 * var(--stagger)); }
+@keyframes vein-sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+@keyframes vein-swell { from { --vein-r: 1.2px; } 40% { --vein-r: 2.1px; } to { --vein-r: 4.4px; } }
+/* A Key point's ore (D240): loose dots that lift off the words and gather where its margin mark lands. */
+.vein-ore { position: absolute; inset: 0; pointer-events: none; }
+.vein-ore i { position: absolute; left: -2.5px; top: -2.5px; width: 5px; height: 5px; border-radius: 50%; background: color-mix(in oklab, var(--card-solid), white 30%); will-change: transform; }
+.mark-icon.gather { animation: vein-land var(--t-4) var(--ease-spring) var(--land, 0ms) both; }
+@keyframes vein-land { from { opacity: 0; scale: 0.3; } to { opacity: 0.75; scale: 1; } }

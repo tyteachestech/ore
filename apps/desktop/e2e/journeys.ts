@@ -7915,6 +7915,41 @@ journey("quiz check that fails says why, as Review does, with try again", async 
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
+// Before settle: it removes the highlight it makes.
+journey("highlight: its colour arrives as dots that join (the vein), its ore flies to Collected, a Key point's gathers in the margin; none under reduced motion (D240)", async (page) => {
+  await openSource(page, TESTING);
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  const moving = () => page.evaluate(() => document.querySelectorAll(".vein, .vein-ore, .collect-fly").length);
+  const tinted = (name: string) => page.evaluate((name) => (CSS.highlights.get(name)?.size ?? 0), name);
+  const before = await tinted("hl-keep");
+  await select(page, "Free recall, short-answer questions");
+  // The dots are the tint while they sweep: the real one waits for them.
+  const at = await page.evaluate(() => ({ lines: document.querySelectorAll(".vein.keep i").length, ore: document.querySelectorAll(".collect-fly.keep").length }));
+  if (!at.lines) throw new Error("no vein over the new highlight");
+  if ((await tinted("hl-keep")) !== before) throw new Error("the tint was painted under the vein");
+  await popup.waitFor();
+  await until("the ore lifts off toward Collected", async () => at.ore > 0 || (await page.locator(".collect-fly.keep").count()) > 0 || (await page.locator(".collected-chip.keep").count()) > 0, 400);
+  await until("the vein has joined into the tint", async () => (await page.locator(".vein").count()) === 0 && (await tinted("hl-keep")) === before + 1, 1000);
+  // A Key point: its ore gathers where the margin mark lands.
+  await popup.locator(".intent.card").click();
+  await until("the ore gathers in the margin", async () => (await page.locator(".vein-ore i").count()) > 0, 400);
+  await page.locator(".mark-icon.card").first().waitFor();
+  await until("nothing is left on the page", async () => (await moving()) === 0 && (await page.locator(".mark-icon.gather").count()) === 0, 2500);
+  // Reduced motion: the highlight is simply there.
+  const card = page.locator(".mark-icon.card").first();
+  if (!(await popup.isVisible())) await card.click();
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await page.waitForTimeout(500);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await select(page, "Free recall, short-answer questions");
+  if (await moving()) throw new Error("the vein ran under reduced motion");
+  await popup.waitFor();
+  if ((await tinted("hl-keep")) !== before + 1) throw new Error("no tint under reduced motion");
+  await page.emulateMedia({ reducedMotion: null });
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await page.waitForTimeout(500); // the write lands before the next journey reads the library
+});
+
 // Last: its question highlight would change the lists the question journeys read.
 journey("settle: closing a typed highlight lifts the popup away, pops its mark and glows once, then leaves nothing behind", async (page) => {
   await openSource(page, TESTING);
