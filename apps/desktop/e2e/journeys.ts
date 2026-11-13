@@ -950,6 +950,22 @@ journey("ambience radio over Review: Esc closes the radio only, and its number k
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("ambience radio over Review: its button stays at the bottom left and one click opens it (F95)", async (page) => {
+  await startReview(page, null);
+  const orb = page.getByRole("button", { name: /^Ambience/ });
+  const b = (await orb.boundingBox())!;
+  const top = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest(".radio-orb") != null, [b.x + b.width / 2, b.y + b.height / 2]);
+  if (!top) throw new Error("Review covers the radio's button");
+  await orb.click();
+  const pop = page.locator(".popover.radio");
+  await pop.waitFor();
+  await page.keyboard.press("Escape");
+  await pop.waitFor({ state: "detached" });
+  if (!(await page.locator(".review").isVisible())) throw new Error("opening the radio from its button ended the review");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
   await openSource(page, TESTING);
   await page.keyboard.press("Meta+j");
