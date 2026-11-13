@@ -1,5 +1,6 @@
 import { Check } from "./icons";
 import { Gem } from "./Gem";
+import { Hint } from "./Hint";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { SkillIcon } from "./IconPicker";
 import { is } from "./keys";
@@ -133,11 +134,11 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
               </span>
               <span className="name">{s.name}</span>
               {/* D249: what a session here could win, never the size of the pile: gems one Good from cut
-                  today, and cut ones that came loose. The count of what is due is for a screen reader only. */}
+                  today, and cut ones that came loose, as a gem and a number with the words on hover (Tyler's pick). The count of what is due is for a screen reader only. */}
               {(near > 0 || loose > 0) && (
                 <span className="pick-gems" data-color={s.color}>
-                  {near > 0 && <span><Gem kind="ready" size={16} />{near} nearly cut</span>}
-                  {loose > 0 && <span><Gem kind="dull" size={16} />{loose} loose</span>}
+                  {near > 0 && <Hint text={`${near} nearly cut: one Good today cuts ${near === 1 ? "it" : "each"}`}><span><Gem kind="ready" size={16} />{near}<span className="sr-only"> nearly cut</span></span></Hint>}
+                  {loose > 0 && <Hint text={`${loose} came loose: a pass sets ${loose === 1 ? "it" : "each"} back`}><span><Gem kind="dull" size={16} />{loose}<span className="sr-only"> loose</span></span></Hint>}
                 </span>
               )}
               <span className="sr-only">{due} {due === 1 ? "exercise" : "exercises"} ready</span>
