@@ -8,6 +8,7 @@ import { CaretDown, LinkSimple } from "../icons";
 import type { LinkTarget } from "./NoteEditor";
 import { MoreButton } from "../Menu";
 import { blockAt, kindOf, KINDS, turnInto } from "./blockops";
+import { kindIcon } from "./kind-icons";
 import { COLORS, paint, type Color } from "./colors";
 import { clampX } from "../popup-place";
 
@@ -81,6 +82,7 @@ export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0, 
           KINDS.map((k) => ({
             id: k.kind,
             label: k.label,
+            icon: kindIcon(k.kind),
             run: () => {
               const now = blockAt(v.state.doc, sel.from);
               const tr = now && turnInto(v.state, now, k.kind);

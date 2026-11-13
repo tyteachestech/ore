@@ -13,11 +13,11 @@ import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
 import { menuIcon } from "./menu-icons";
 
-/** The item's icon at its left (menu-icons.ts), or an empty slot so the labels line up. */
+/** The item's icon at its left: its own (`icon`, a block type's) or menu-icons.ts's, else an empty slot so the labels line up. */
 const Glyph = ({ a, plain }: { a: MenuAction; plain?: boolean }) => {
   if (plain) return null;
   const I = menuIcon(a);
-  return <span className="menu-icon" aria-hidden="true">{I && <I />}</span>;
+  return <span className="menu-icon" aria-hidden="true">{a.icon ?? (I && <I />)}</span>;
 };
 
 /** A picked action runs once the menu has closed and handed focus back (its onCloseAutoFocus), so a
@@ -381,8 +381,8 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
                     <Fragment key={a.id}>
                       {a.divider && !step && <div className="sheet-sep" role="separator" />}
                       <button className={`pick-row${a.danger ? " danger" : ""}`} role={a.checked === undefined ? undefined : "checkbox"} aria-checked={a.checked} onClick={() => pick(a)}>
-                        {step ? <span className="menu-tick">{a.checked && <Tick />}</span> : !a.icon && <Glyph a={a} />}
-                        {a.icon}
+                        {step ? <span className="menu-tick">{a.checked && <Tick />}</span> : <Glyph a={a} />}
+                        {step && a.icon}
                         <span className="name">{a.label}</span>
                         {a.sub && <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />}
                       </button>

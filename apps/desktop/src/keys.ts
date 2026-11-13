@@ -28,6 +28,7 @@ const DEFAULTS = [
   { id: "go-feed", label: "Go to Feed", group: "General", combo: "Meta+Digit3", global: true },
   { id: "mark-read", label: "Mark post read or unread", group: "Feed", combo: "Shift+Meta+KeyU" },
   { id: "tutor", label: "Tutor chat", group: "General", combo: "Meta+KeyJ", global: true },
+  { id: "ambience", label: "Ambience", group: "General", combo: "Alt+Meta+KeyA", global: true },
   { id: "tutor-stop", label: "Stop the tutor's reply", group: "General", combo: "Meta+Period", global: true },
   { id: "review", label: "Start review", group: "General", combo: "Meta+KeyR", global: true },
   { id: "quick-quiz", label: "Quick quiz, from any app", group: "General", combo: "Ctrl+Alt+KeyQ", global: true, system: true },
@@ -258,9 +259,11 @@ export const keepKeysIn = (e: { stopPropagation(): void; nativeEvent: KeyboardEv
 };
 
 /** Whether a keydown lands in a text field, where a plain letter is typing. */
+/** Whether a keystroke belongs to what has focus: a text field, or a panel marked `data-own-keys` (the ambience
+ *  radio's pads take 1 to 5 and Enter, which must not also rate an exercise under it, D254). */
 export const inTextField = (e: KeyboardEvent) => {
   const t = e.target as HTMLElement | null;
-  return !!t && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+  return !!t && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || !!t.closest?.("[data-own-keys]"));
 };
 
 /** The source note's toggle: N like Q for questions, outside text fields; ⇧⌘N, its old binding,
