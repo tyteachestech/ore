@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { doctor } from "../src/doctor.ts";
@@ -295,6 +296,31 @@ describe("review loop", () => {
     const idx2 = openIndex(lib);
     expect(idx2.search("rereading").some((h) => h.ref === a.meta.id)).toBe(true);
     idx2.close();
+  });
+
+  test("a first build of the index drops no rows; a changed file is still indexed once (F84)", async () => {
+    // Each drop scans the whole search table, so on a fresh index (every launch on the phone) 2,800 files
+    // spent 1.35 s of a 1.75 s first Today deleting rows that were not there.
+    const { lib, a } = await setup();
+    const run = Database.prototype.run;
+    let drops = 0;
+    Database.prototype.run = function (this: Database, sql: string, ...rest: never[]) {
+      if (/^delete from fts where/.test(sql)) drops++;
+      return (run as (...all: unknown[]) => unknown).call(this, sql, ...rest);
+    } as typeof run;
+    try {
+      rebuildIndex(lib);
+      openIndex(lib).close();
+      expect(drops).toBe(0);
+      writeFileSync(a.path, readFileSync(a.path, "utf8").replace("What beats restudy?", "Which practice beats rereading?"));
+      const idx = openIndex(lib);
+      expect(drops).toBeGreaterThan(0);
+      expect(idx.search("rereading").filter((h) => h.ref === a.meta.id)).toHaveLength(1);
+      expect(idx.search("restudy").filter((h) => h.ref === a.meta.id)).toHaveLength(0);
+      idx.close();
+    } finally {
+      Database.prototype.run = run;
+    }
   });
 
   test("the index replays only changed cards and always matches a full rebuild", async () => {

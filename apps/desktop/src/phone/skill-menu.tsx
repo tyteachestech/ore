@@ -1,3 +1,4 @@
+import { Folder, X } from "../icons";
 import { importanceActions, LEVELS } from "../importance";
 import type { MenuAction } from "../Menu";
 import { layoutOf, skillGroups } from "../Skills";
@@ -68,8 +69,8 @@ export function skillMenu({ skills, refresh, notify, open, review, edit }: {
           label: "Move to",
           run: () => {},
           sub: [
-            ...collections.filter((c) => c !== s.collection).map((c) => ({ id: `to:${c}`, label: c, run: () => moveSkill(s, c) })),
-            ...(s.collection ? [{ id: "to:", label: "No collection", run: () => moveSkill(s, "") }] : []),
+            ...collections.filter((c) => c !== s.collection).map((c) => ({ id: `to:${c}`, label: c, icon: <Folder />, run: () => moveSkill(s, c) })),
+            ...(s.collection ? [{ id: "to:", label: "No collection", icon: <X />, run: () => moveSkill(s, "") }] : []),
           ],
         }]
       : []),

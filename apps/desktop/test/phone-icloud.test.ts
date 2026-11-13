@@ -14,6 +14,9 @@ let other: string[] = [];
 /** Files the folder holds that the phone lists but doesn't load, as base64. */
 const shared = new Map<string, string>();
 
+/** How many `library_read` calls are open at once, and the most there have been. */
+const reading = { now: 0, most: 0 };
+
 const invoke = async <T,>(cmd: string, args: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }): Promise<T> => {
   // A binary file goes as its raw bytes (lib.rs `library_write`); kept here as base64 to compare.
   if (cmd === "library_write") {
@@ -25,7 +28,12 @@ const invoke = async <T,>(cmd: string, args: Record<string, unknown> | Uint8Arra
   }
   args = args as Record<string, unknown>;
   if (cmd === "library_scan") return { files: [...folder.keys()].map((r) => [r, folder.get(r)!.mtime, stamp(r)]), waiting, other } as T;
-  if (cmd === "library_read") return (args.paths as string[]).map((r) => folder.get(r)?.text ?? null) as T;
+  if (cmd === "library_read") {
+    reading.most = Math.max(reading.most, ++reading.now);
+    await new Promise((r) => setTimeout(r, 1));
+    reading.now--;
+    return (args.paths as string[]).map((r) => folder.get(r)?.text ?? null) as T;
+  }
   if (cmd === "library_bytes") return (shared.get(args.path as string) ?? null) as T;
   if (cmd === "library_apply") {
     const out: [string, number, string][] = [];
@@ -204,4 +212,14 @@ test("a binary file is read back as one block copy, not byte by byte", async () 
   } finally {
     Uint8Array.from = from;
   }
+});
+
+test("a big folder is read in parts asked for together, not one after another", async () => {
+  // Seven parts read in turn held the launch about 260 ms on a 950-source library.
+  for (let i = 0; i < 900; i++) mac(`items/big-${i}/doc.md`, `# Big ${i}`);
+  reading.most = 0;
+  expect(await rescan()).toBe(true);
+  expect(reading.most).toBe(3);
+  expect(fs.readFileSync(`${P}/items/big-0/doc.md`)).toBe("# Big 0");
+  expect(fs.readFileSync(`${P}/items/big-899/doc.md`)).toBe("# Big 899");
 });

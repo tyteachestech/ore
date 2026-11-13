@@ -1608,7 +1608,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .skill-col.side .question-quote .from { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question.done .question-quote .note { text-decoration: line-through; }
 .q-lead { position: absolute; right: 8px; top: 9px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; }
-.q-lead::before { content: ""; width: 8px; height: 8px; background: var(--question-solid); }
+.q-lead::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--question-solid); }
 .q-lead:hover { background: var(--bg-hover); }
 .q-lead:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .hint-lines { display: flex; flex-direction: column; gap: 2px; }
@@ -2073,7 +2073,7 @@ button.home-plan:hover { color: var(--text); }
 .review-calibration-row:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
 .review-calibration-name { text-align: right; }
 .review-calibration-bar { display: flex; gap: 2px; }
-.review-calibration-bar i { width: 6px; height: 6px; background: var(--bg-active); }
+.review-calibration-bar i { width: 6px; height: 6px; border-radius: 50%; background: var(--bg-active); }
 .review-calibration-bar i[data-on] { background: var(--muted); }
 .review-calibration-pct { font-variant-numeric: tabular-nums; text-align: left; }
 .review-original { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
@@ -2387,6 +2387,10 @@ button.home-plan:hover { color: var(--text); }
 .menu-item:has(> .menu-icon) { padding-left: 6px; }
 .menu-icon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; margin-right: -8px; color: var(--muted); }
 .menu-item.danger .menu-icon { color: inherit; }
+/* A highlight type in its Type submenu (Reader.tsx Mark), in its colour as on the highlight popup. */
+.menu-mark { flex: none; }
+.menu-mark.keep { color: var(--keep-solid); } .menu-mark.card { color: var(--card-solid); }
+.menu-mark.question { color: var(--question-solid); } .menu-mark.apply { color: var(--apply-solid); }
 .menu-item.check { gap: 8px; padding-left: 6px; }
 .menu-item.check > .skill-icon { flex: none; }
 /* The tick's column: 16px holds the Tick's ink (12.5px) whole; the indicator is a flex box so the sprite centres on the row, not on the text baseline. */
@@ -3268,6 +3272,9 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .action-sheet .pick-row { width: 100%; font-size: 16px; }
 .action-sheet .pick-row .name { flex: 1; min-width: 0; color: inherit; font-weight: 500; }
 .action-sheet .pick-row.danger { color: var(--error); }
+/* Its icon (menu-icons.ts), as in the Mac's menus: the row's own 12px gap to the label. */
+.action-sheet .pick-row > .menu-icon { margin-right: 0; }
+.action-sheet .pick-row.danger .menu-icon { color: inherit; }
 .action-sheet .sheet-back { color: var(--muted); font-size: 14px; min-height: 36px; }
 .action-sheet .sheet-sep { height: 1px; margin: 6px 12px; background: var(--border); }
 .action-sheet .menu-caret { color: var(--faint); }
