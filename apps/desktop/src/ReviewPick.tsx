@@ -137,8 +137,8 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
                   today, and cut ones that came loose, as a gem and a number with the words on hover (Tyler's pick). The count of what is due is for a screen reader only. */}
               {(near > 0 || loose > 0) && (
                 <span className="pick-gems" data-color={s.color}>
-                  {near > 0 && <Hint text={`${near} nearly cut: one Good today cuts ${near === 1 ? "it" : "each"}`}><span><Gem kind="ready" size={16} />{near}<span className="sr-only"> nearly cut</span></span></Hint>}
-                  {loose > 0 && <Hint text={`${loose} came loose: a pass sets ${loose === 1 ? "it" : "each"} back`}><span><Gem kind="dull" size={16} />{loose}<span className="sr-only"> loose</span></span></Hint>}
+                  {near > 0 && <Hint text={`${near} nearly cut`}><span><Gem kind="ready" size={16} />{near}<span className="sr-only"> nearly cut</span></span></Hint>}
+                  {loose > 0 && <Hint text={`${loose} came loose`}><span><Gem kind="dull" size={16} />{loose}<span className="sr-only"> loose</span></span></Hint>}
                 </span>
               )}
               <span className="sr-only">{due} {due === 1 ? "exercise" : "exercises"} ready</span>
