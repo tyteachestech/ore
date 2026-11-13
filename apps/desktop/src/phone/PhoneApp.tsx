@@ -525,7 +525,8 @@ export function PhoneApp() {
   }, []);
   // An episode is in at once (D227); its audio is downloaded and heard after, while the app stays his. Each
   // one that lands wakes the lists and the reader that shows it.
-  const fill = useCallback(() => void fillOwed(() => (stepLanded({}), void refresh())), [refresh]);
+  // A relaunch can cut the module's load short (WebKit rejects the import): the next pass fills it.
+  const fill = useCallback(() => void fillOwed(() => (stepLanded({}), void refresh())).catch(() => {}), [refresh]);
   // Asked for while one is running (a share that arrived after it listed the inbox): it runs once more after.
   const readAgain = useRef(false);
   const bringInRef = useRef<() => Promise<void>>(async () => {});
