@@ -1,7 +1,7 @@
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, Clock, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { Children, useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Cutting, Gem } from "./Gem";
@@ -1474,6 +1474,33 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
   );
 }
 
+/** How long one line of the end screen holds before the next rolls up. */
+const LINE_MS = 2600;
+
+/** The end screen's lines (D241): one place, one line at a time. Each rolls up into it, holds, and rolls on up
+ *  as the next arrives, round and round; the pointer or the keyboard on a line holds it. Every line is in the
+ *  page throughout, so a single line just sits there, and under Reduce Motion they are a plain list. */
+function EndLines({ run, children }: { run: boolean; children: React.ReactNode }) {
+  const lines = Children.toArray(children);
+  const [at, setAt] = useState(0);
+  const [held, setHeld] = useState(false);
+  const flat = still();
+  useEffect(() => {
+    if (flat || !run || held || lines.length < 2) return;
+    const id = setInterval(() => setAt((i) => i + 1), LINE_MS);
+    return () => clearInterval(id);
+  }, [flat, run, held, lines.length]);
+  if (flat || lines.length < 2) return <>{lines}</>;
+  const on = at % lines.length, was = at ? (at - 1) % lines.length : -1;
+  return (
+    <div className="end-lines" onMouseEnter={() => setHeld(true)} onMouseLeave={() => setHeld(false)} onFocus={() => setHeld(true)} onBlur={() => setHeld(false)}>
+      {lines.map((line, i) => (
+        <div key={i} data-at={i === on ? "on" : i === was ? "was" : undefined} inert={i !== on}>{line}</div>
+      ))}
+    </div>
+  );
+}
+
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
 export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void }) {
@@ -1542,36 +1569,40 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           {more > 0 && landed >= shown.length && <b>+{more}</b>}
         </p>
       )}
-      {s.kept > 0 ? (
-        <p className="review-kept">
-          <b>{s.kept}</b> {s.kept === 1 ? "memory" : "memories"} kept
-        </p>
-      ) : (
-        // A session of misses is still the work that makes them stick (D62: no guilt copy).
-        <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>
-      )}
-      {/* D197: what the session's passes added to his memory, as one number. */}
-      {(s.depth_days ?? 0) > 0 && (
-        <Hint text="How much longer the exercises you passed today will now last, added up">
-          <p className="review-rescued review-depth" tabIndex={0}>+{depthText(s.depth_days!)} of memory</p>
-        </Hint>
-      )}
-      {longGapText(s) && <p className="review-rescued">{longGapText(s)}</p>}
-      {rescuedWorthSaying(s) && (
-        <p className="review-rescued">
-          {/* The rich ore the cart carried (D197), when a cart ran. */}
-          {pour && <i className="rich-ore" aria-hidden="true" />}
-          {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}
-        </p>
-      )}
-      {ups.map((k) => {
-        const sk = skills.find((x) => x.id === k.skill) ?? { id: k.skill, name: k.skill };
-        return (
-          <p key={k.skill} className="review-levelup" data-color={sk.color}>
-            <SkillChip skill={sk} /> reached level {k.level}
+      {/* D241: what the session won, one line at a time in one place, each rolling up to make way for the next. */}
+      <EndLines run={stage === "done"}>
+        {s.kept > 0 ? (
+          <p className="review-kept">
+            <b>{s.kept}</b> {s.kept === 1 ? "memory" : "memories"} kept
           </p>
-        );
-      })}
+        ) : (
+          // A session of misses is still the work that makes them stick (D62: no guilt copy).
+          <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>
+        )}
+        {/* D197: what the session's passes added to his memory, as one number. */}
+        {(s.depth_days ?? 0) > 0 && (
+          <Hint text="How much longer the exercises you passed today will now last, added up">
+            <p className="review-rescued review-depth" tabIndex={0}>+{depthText(s.depth_days!)} of memory</p>
+          </Hint>
+        )}
+        {longGapText(s) && <p className="review-rescued">{longGapText(s)}</p>}
+        {rescuedWorthSaying(s) && (
+          <p className="review-rescued">
+            {/* The rich ore the cart carried (D197), when a cart ran. */}
+            {pour && <i className="rich-ore" aria-hidden="true" />}
+            {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}
+          </p>
+        )}
+        {ups.map((k) => {
+          const sk = skills.find((x) => x.id === k.skill) ?? { id: k.skill, name: k.skill };
+          return (
+            <p key={k.skill} className="review-levelup" data-color={sk.color}>
+              <SkillChip skill={sk} /> reached level {k.level}
+            </p>
+          );
+        })}
+        {!t.met && t.counts && <p className="quiz-faint">{minutesText(Math.max(0, t.goal_ms - t.active_ms))} min to today’s goal</p>}
+      </EndLines>
       {/* D165: how often he is right at each of his three taps, so he sees whether they mean anything, not only whether Sure is too sure. */}
       {s.calibration && (
         <div className="review-calibration" role="group" aria-label="When you say">
@@ -1589,7 +1620,6 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           ))}
         </div>
       )}
-      {!t.met && t.counts && <p className="quiz-faint">{minutesText(Math.max(0, t.goal_ms - t.active_ms))} min to today’s goal</p>}
       {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
       {end.next && (
         <Hint text="To try on your own work · opens the passage">
