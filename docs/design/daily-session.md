@@ -28,7 +28,7 @@ With a backlog that never empties, the question is never "how do I finish?" but 
 | 2. Open | Home shows minutes done of the goal beside the ring; the due count waits in Start review's hint. ↵ starts | D58, D65.4, D80 |
 | 3. Review | One card at a time, full window. The most valuable due cards first, with new cards mixed in at a fixed share (below) | D59, D22, D24 |
 | 4. A new card | Shows the **New** label on first sight, so they read it with care. Answering it approves it; E edits it; ⇧⌘⌫ deletes it. Its FSRS schedule starts from that first answer, like any card | D65.3, D9 |
-| 5. Close | When the goal closes the mole says so and the session flows on (D246); when he leaves, the end screen: memories kept, rescued just before forgetting, a gem for each card that became solid. Keep going goes on | D62, D90, D65.4 |
+| 5. Close | When the goal closes the mole says so and the session flows on (D246); when he leaves, the end screen: a gem for each card that became solid, and one row of three results (memories kept, days of memory, the rarest thing; D-new-end-tally). Keep going goes on | D62, D90, D65.4 |
 | 6. Read | Continue reading picks up where they left off. Highlights and notes as they go; Finish opens the quiz; Done drafts the source's cards, which start tomorrow | D58, D106, D65.3 |
 | Any time | Esc leaves. Nothing is lost and nothing is owed | D59 |
 

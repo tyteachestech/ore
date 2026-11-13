@@ -1,20 +1,25 @@
 import { depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
 
+/** One of the end screen's results (D-new-end-tally): a number, what it counts, and for a rare one what kind. */
+export type Tile = { key: "kept" | "depth" | "level" | "rescued" | "long" | "cut"; value: string; label: string; hint?: string; rare?: Said["rare"] };
+
 /** A line of the mole's. `rare`: a thing most sessions don't have, which leads and wears its own mark (D247). */
 export type Said = { text: string; hint?: string; verdict?: true; rare?: { kind: "level"; skill: string } | { kind: "then" } | { kind: "long" } | { kind: "rescued" } };
 
 /** How many lines a session's end may say (Tyler: "keep it to 2, maybe 3 max"). */
 export const SAID_MAX = 3;
 
-/** What the mole says at a session's end (D243), one line at a time, three at most (D247). The rare things
+/** What the mole says at a session's end (D243), three lines at most (D247). The full end screen has him say
+ *  only the first, since its numbers stand in the row under the ring (`endTiles`); the quick quiz lists them all. The rare things
  *  lead, rarest first: a skill's new level, a long gap he recalled across, memories pulled back in time. Days
  *  of memory always has its place. What room is left goes to the everyday lines, in an order `roll` (0 to 1,
  *  one per end screen) shuffles: which true line shows varies, never whether something was won (D62). With
  *  nothing rare the verdict opens, and a session of misses always opens with why it was worth it (D62).
- *  His voice is an old miner's: short, dry, and only ever what the numbers say, never about the person. */
+ *  His voice is an old miner's: short, dry, fond of a pun, and only ever what the numbers say, never about the person. */
 export function endSays(o: { session: SessionEnd; today: Today; closed: boolean; short: boolean; ups: { skill?: string; name: string; level: number }[]; waiting: string | null; minutesLeft: string | null; roll?: number }): Said[] {
   const s = o.session;
-  const verdict: Said = { verdict: true, text: s.kept === 0 ? "Every miss comes back sooner. That’s how they stick." : o.closed ? "Goal met. Tools down." : o.short ? "Seam’s empty. Today counts." : "Honest work." };
+  // His verdict is a corny mining pun (Tyler, 2026-11-13), one of a few per case so it isn't the same every day.
+  const verdict: Said = { verdict: true, text: pick(s.kept === 0 ? PUNS.missed : o.closed ? PUNS.closed : o.short ? PUNS.short : PUNS.plain, o.roll ?? 0) };
   const rare: Said[] = [
     ...o.ups.map((k): Said => ({ text: `${k.name} hit level ${k.level}.`, rare: { kind: "level", skill: k.skill ?? "" } })),
     // Then and now (D248): the two answers stand under the ring; he only points at them.
@@ -33,6 +38,39 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   const lead = [...opens, ...rare].slice(0, SAID_MAX - depth.length);
   return [...lead, ...depth, ...rest].slice(0, SAID_MAX);
 }
+
+/** The end screen's row of results (D-new-end-tally), three at most, always in this order: memories kept, the
+ *  days of memory they added, then the rarest true thing of the session (a skill's new level, memories pulled
+ *  back in time, a long gap recalled across, else the gems cut). A session of misses has none (D62). */
+export function endTiles(o: { session: SessionEnd; ups: { skill?: string; name: string; level: number }[] }): Tile[] {
+  const s = o.session;
+  if (s.kept === 0) return [];
+  const days = s.depth_days ?? 0, extra = s.depth_extra_days ?? 0, cut = s.cut?.length ?? 0, up = o.ups[0];
+  const [n, unit] = depthText(days).split(" ") as [string, string];
+  const third: Tile | null = up
+    ? { key: "level", value: String(up.level), label: `${up.name} level`, rare: { kind: "level", skill: up.skill ?? "" } }
+    : rescuedWorthSaying(s)
+      ? { key: "rescued", value: String(s.rescued), label: "pulled back in time", hint: "Due so long you were about to lose them, and you still recalled them", rare: { kind: "rescued" } }
+      : longGapText(s)
+        ? { key: "long", value: String(s.longest_days), label: "days since you saw one", hint: longGapText(s)!, rare: { kind: "long" } }
+        : cut
+          ? { key: "cut", value: String(cut), label: cut === 1 ? "gem cut" : "gems cut", hint: "Cut: you’d still recall it three weeks from now" }
+          : null;
+  return [
+    { key: "kept", value: String(s.kept), label: s.kept === 1 ? "memory kept" : "memories kept" },
+    ...(days > 0 ? [{ key: "depth", value: `+${n}`, label: `${unit} of memory`, hint: `How much longer the exercises you passed today will now last, added up (at most 30 days each)${extra > 0 && extra < days ? `; ${depthText(extra)} of it came after today’s goal` : ""}` } satisfies Tile] : []),
+    ...(third ? [third] : []),
+  ];
+}
+
+/** The mole's verdicts. A session of misses still says why it was worth it (D62); none is about the person. */
+export const PUNS = {
+  plain: ["Gneiss work.", "You rock.", "Ore-some.", "Can you dig it? You can.", "Don’t take that for granite."],
+  closed: ["Goal met. You rock.", "Goal met. Quarry on tomorrow.", "Goal met. Mine blown."],
+  short: ["Seam’s empty. Today counts.", "Vein’s run dry. Today counts."],
+  missed: ["Schist happens. Every miss comes back sooner.", "Rocky one. Every miss comes back sooner."],
+} as const;
+const pick = (xs: readonly string[], roll: number) => xs[Math.min(xs.length - 1, Math.floor(roll * xs.length))]!;
 
 /** `xs` in an order picked by `roll` (0 to 1): the same roll, the same order. */
 function shuffled<T>(xs: T[], roll: number): T[] {
