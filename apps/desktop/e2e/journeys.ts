@@ -507,6 +507,24 @@ journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel,
   await page.keyboard.press("Escape");
 });
 
+journey("a sheet opened in the same moment as All sources keeps the keys: the list behind never takes them (F64)", async (page) => {
+  // F64: the list takes the keys a frame after All sources is chosen. ⌘R inside that frame opened What to review, then
+  // the list behind it took focus back, so ↵ never started the review (CI's release check met it now and then).
+  // Settings stands for any sheet here: it opens whatever is due.
+  await page.getByRole("button", { name: /^Home/ }).first().click();
+  const all = page.getByRole("button", { name: /^All sources/ });
+  await all.waitFor();
+  await all.evaluate((b: HTMLElement) => {
+    b.click();
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: ",", code: "Comma", metaKey: true, bubbles: true, cancelable: true }));
+  });
+  await page.locator(".settings-sheet").waitFor();
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  if (!(await page.evaluate(() => !!document.activeElement?.closest(".settings-sheet")))) throw new Error("the list behind Settings took the keys");
+  await page.keyboard.press("Escape");
+  await page.locator(".settings-sheet").waitFor({ state: "detached" });
+});
+
 journey("review: Tab and ⇧Tab stay on the card, never in the sidebar or sources hidden behind it", async (page) => {
   const inside = () => page.evaluate(() => !!document.activeElement?.closest(".review"));
   await page.getByRole("button", { name: "Start review" }).click();

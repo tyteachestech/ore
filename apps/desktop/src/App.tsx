@@ -666,6 +666,9 @@ export function App() {
     return () => window.removeEventListener("paste", onPaste);
   }, [notify]);
 
+  /** The list takes the keys on the next frame, once it is on screen; never from a sheet opened in that
+   *  frame (⌘R right after All sources: What to review was left without the keys, F64). */
+  const listTakesKeys = () => requestAnimationFrame(() => document.querySelector('[aria-modal="true"]') || listRef.current?.focus({ preventScroll: true }));
   /** `focusList`: off for a folder tab chosen by click or arrow, which keeps focus so the next arrow moves on (F44). */
   const go = useCallback((s: Tab, focusList = true) => {
     setStatus(s);
@@ -673,7 +676,7 @@ export function App() {
     setOpenId(null);
     setFinishing(false);
     // The list takes the keys at once (Linear's ⌘1), also when it was not on screen (Home, a source).
-    if (focusList) requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
+    if (focusList) listTakesKeys();
   }, []);
 
 
@@ -716,7 +719,7 @@ export function App() {
     if (!id) {
       setPlace("sources");
       // From Home the list was not on screen: it takes the keys at once, as `go` does (⌘K → All sources, then ↓ ↵).
-      requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
+      listTakesKeys();
     }
   }, []);
 
