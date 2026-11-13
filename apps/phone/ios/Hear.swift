@@ -21,7 +21,7 @@ public func oreCanTranscribe() -> Bool {
 }
 
 @available(iOS 26.0, *)
-private func hear(_ url: URL, _ language: String?) async -> (Bool, String) {
+private func hear(_ url: URL, _ language: String?, _ progress: (@convention(c) (Double, Double) -> Void)?) async -> (Bool, String) {
   let wanted = language.map { Locale(identifier: $0) } ?? Locale.current
   guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: wanted) else {
     let name = Locale.current.localizedString(forLanguageCode: wanted.language.languageCode?.identifier ?? "") ?? wanted.identifier
@@ -34,12 +34,15 @@ private func hear(_ url: URL, _ language: String?) async -> (Bool, String) {
     }
     let file: AVAudioFile
     do { file = try AVAudioFile(forReading: url) } catch { return (false, "Can’t read the sound in that file.") }
+    // How far it is, in seconds of audio, as each phrase is heard.
+    let total = file.processingFormat.sampleRate > 0 ? Double(file.length) / file.processingFormat.sampleRate : 0
     let analyzer = SpeechAnalyzer(modules: [transcriber])
     let collect = Task { () throws -> [(Double, Double, String)] in
       var cues: [(Double, Double, String)] = []
       for try await r in transcriber.results {
         let text = String(r.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty { cues.append((r.range.start.seconds, r.range.end.seconds, text)) }
+        if total > 0 { progress?(min(r.range.end.seconds, total), total) }
       }
       return cues
     }
@@ -57,9 +60,9 @@ private func hear(_ url: URL, _ language: String?) async -> (Bool, String) {
 }
 
 /// The audio file at `path` as WebVTT (`ok` true), or why not (`ok` false). Blocks until done: the shell
-/// calls it off the main thread. The string is malloc'd; the caller frees it with `free`.
+/// calls it off the main thread. `progress` hears how far it is: seconds of audio heard, of how many. The string is malloc'd; the caller frees it with `free`.
 @_cdecl("ore_transcribe")
-public func oreTranscribe(_ path: UnsafePointer<CChar>, _ language: UnsafePointer<CChar>?, _ ok: UnsafeMutablePointer<Bool>) -> UnsafeMutablePointer<CChar>? {
+public func oreTranscribe(_ path: UnsafePointer<CChar>, _ language: UnsafePointer<CChar>?, _ ok: UnsafeMutablePointer<Bool>, _ progress: (@convention(c) (Double, Double) -> Void)?) -> UnsafeMutablePointer<CChar>? {
   let url = URL(fileURLWithPath: String(cString: path))
   let lang = language.map { String(cString: $0) }.flatMap { $0.isEmpty ? nil : $0 }
   var result = (false, "Hearing speech needs iOS 26 or later.")
@@ -69,7 +72,7 @@ public func oreTranscribe(_ path: UnsafePointer<CChar>, _ language: UnsafePointe
     DispatchQueue.main.sync { task = UIApplication.shared.beginBackgroundTask(withName: "Hearing audio") { UIApplication.shared.endBackgroundTask(task); task = .invalid } }
     let done = DispatchSemaphore(value: 0)
     Task.detached {
-      result = await hear(url, lang)
+      result = await hear(url, lang, progress)
       done.signal()
     }
     done.wait()
