@@ -164,7 +164,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 
 **Guidebooks** ([`docs/guidebooks/`](docs/guidebooks/)): four evidence-based books the research briefs draw on (Learning Science, Teaching, Gamification, UX and UI Design), each with its paper summaries and source lists.
 
-**Guides**: [`docs/guides/ai-user-testing.md`](docs/guides/ai-user-testing.md) (usability testing with an AI agent driving the app) and its [iPhone version](docs/guides/ai-user-testing-iphone.md), the AI evals ([grading](docs/guides/grading-eval.md), [Ask your library](docs/guides/ask-library.md), [tutor](docs/guides/tutor-eval.md), [question quality](docs/guides/question-eval.md), [transcripts](docs/guides/transcript-eval.md)), the [speed bench](docs/guides/bench.md), [`skills/ore/README.md`](skills/ore/README.md) (the `/ore` Claude Code skill), [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md) (the mocked app for screenshots).
+**Guides**: [`docs/guides/ai-user-testing.md`](docs/guides/ai-user-testing.md) (usability testing with ChatGPT driving the app, retired 2026-11-13) and its [iPhone version](docs/guides/ai-user-testing-iphone.md), the AI evals ([grading](docs/guides/grading-eval.md), [Ask your library](docs/guides/ask-library.md), [tutor](docs/guides/tutor-eval.md), [question quality](docs/guides/question-eval.md), [transcripts](docs/guides/transcript-eval.md)), the [speed bench](docs/guides/bench.md), [`skills/ore/README.md`](skills/ore/README.md) (the `/ore` Claude Code skill), [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md) (the mocked app for screenshots).
 
 ## Contributing
 

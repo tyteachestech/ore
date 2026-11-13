@@ -373,10 +373,15 @@ export const longGapText = (s: { longest_days?: number }) => ((s.longest_days ??
 
 /** A span of memory in the unit a person would say it in (D197): days to two months, months to two years, then years. */
 export function depthText(days: number): string {
+  const d = depthParts(days);
+  return `${d.n} ${d.unit}`;
+}
+/** `depthText` in its two parts: the number as written and its unit. */
+export function depthParts(days: number): { n: string; unit: string } {
   const n = Math.round(days);
-  if (n < 60) return `${n} ${n === 1 ? "day" : "days"}`;
-  if (n < 730) return `${Math.round(n / 30.44)} months`;
-  return `${(n / 365.25).toFixed(1).replace(/\.0$/, "")} years`;
+  if (n < 60) return { n: String(n), unit: n === 1 ? "day" : "days" };
+  if (n < 730) return { n: String(Math.round(n / 30.44)), unit: "months" };
+  return { n: (n / 365.25).toFixed(1).replace(/\.0$/, ""), unit: "years" };
 }
 
 export type SessionEnd = {

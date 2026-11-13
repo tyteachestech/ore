@@ -1,5 +1,5 @@
 import { ranked } from "./match";
-import { Archive, ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
+import { Archive, ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, Folder, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple, X } from "./icons";
 import { DotBar } from "./Ring";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { HeadTabs, type HeadTab } from "./HeadTabs";
@@ -1567,8 +1567,8 @@ export function App() {
           label: "Move to",
           run: () => {},
           sub: [
-            ...collections.filter((c) => c !== s.collection).map((c) => ({ id: `to:${c}`, label: c, run: () => moveSkill(s, c) })),
-            ...(s.collection ? [{ id: "to:", label: "No collection", run: () => moveSkill(s, "") }] : []),
+            ...collections.filter((c) => c !== s.collection).map((c) => ({ id: `to:${c}`, label: c, icon: <Folder />, run: () => moveSkill(s, c) })),
+            ...(s.collection ? [{ id: "to:", label: "No collection", icon: <X />, run: () => moveSkill(s, "") }] : []),
           ],
         }]
       : []),

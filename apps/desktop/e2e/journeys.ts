@@ -98,7 +98,9 @@ async function openPhone(): Promise<Page> {
   const url = await phoneApp();
   const page = await (await safariBrowser()).newPage({ ...devices["iPhone 14"], viewport: { width: 390, height: 844 }, colorScheme: "dark" });
   page.setDefaultTimeout(8000);
-  page.on("pageerror", (e) => errors.push(e.message));
+  // Named for the journey, as `open` does: a page error on a phone page once came with no name (F86).
+  const of = running;
+  page.on("pageerror", (e) => errors.push(`${of}: ${e.message}`));
   // What the app's Tauri shell gives the page and a browser lacks: an image saved with a source loads through it.
   // A source's own files come from the phone build's dev server (vite.config.ts `/library-file`), as the shell's
   // asset protocol serves them from the folder.
@@ -1966,6 +1968,18 @@ journey("menus: every item of a source's right-click and ⋯ menu has an icon, i
   await openSource(page, TESTING);
   await page.getByRole("button", { name: "Source actions" }).first().click();
   await check("the reader's ⋯");
+  // A submenu of things with their own mark draws them: a highlight's Type shows each type's mark.
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.locator(".cp-line[data-menu-row]").first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Type" }).hover();
+  await page.keyboard.press("ArrowRight");
+  const sub = page.locator(".menu-sub");
+  await sub.waitFor();
+  const types = await sub.locator("[role=menuitemcheckbox]").count();
+  const marked = await sub.locator("[role=menuitemcheckbox] > .menu-mark").count();
+  if (!types || marked !== types) throw new Error(`a highlight's Type submenu: ${marked} of ${types} types have their mark`);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
 });
 
 journey("Collected: a key point he is typing survives closing its group and switching to the note and back", async (page) => {
@@ -6147,7 +6161,7 @@ journey("review: Later puts the exercise off to the end of the session with noth
     await reveal(page);
     await page.getByRole("button", { name: "Later", exact: true }).click();
     await doneButton.waitFor();
-    const kept = await page.locator(".review-kept b").innerText();
+    const kept = await page.locator('.end-tally [data-key="kept"] .sr-only').textContent();
     if (kept !== String(total - 1)) throw new Error(`the end screen counts ${kept} kept for ${total - 1} rated`);
     if (logged() !== total - 1) throw new Error(`${logged()} reviews logged for ${total - 1} rated`);
     const lines = reviewLog().slice(log.length).trim().split("\n").length;
@@ -9838,6 +9852,17 @@ async function press(page: Page, target: Locator, ms = 650) {
   for (let i = 0; i < ms / 100; i++) (await Bun.sleep(100), await send("touchmove", i % 2 ? 2 : 0));
   await send("touchend", 0);
 }
+
+// The phone's ⋯ is a sheet, not a menu: it draws the same icons as the Mac's menus (Tyler 2026-11-13).
+journey("phone: every row of a source's ⋯ sheet has its icon", async (page) => {
+  await phoneSource(page, "The Story Spine");
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  const rows = page.locator(".action-sheet .pick-row:not(.sheet-back)");
+  await rows.first().waitFor();
+  const n = await rows.count();
+  const drawn = await page.locator(".action-sheet .pick-row:not(.sheet-back) > .menu-icon > svg").count();
+  if (!n || drawn !== n) throw new Error(`the phone's ⋯ sheet: ${drawn} of ${n} rows have an icon`);
+}, "phone");
 
 journey("phone: Move to To read from a done source's ⋯ moves it, and it stays moved after a relaunch (F69)", async (page) => {
   // The reader showed it unfinished, but the phone's reader handed the move to a refresh that wrote nothing.

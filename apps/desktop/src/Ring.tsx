@@ -66,12 +66,14 @@ const DIGITS: Record<string, string[]> = {
   "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
   "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
   "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+  "+": ["00000", "00100", "00100", "11111", "00100", "00100", "00000"],
+  ".": ["00000", "00000", "00000", "00000", "00000", "00000", "00100"],
 };
 
 /** A number drawn in the ring's own fat round dots (D242), `height` px tall: a screen's hero number where the dot
  *  face's one-dot stroke is too thin to carry it. Decorative: the caller says the number in text beside it. */
-export function DotNumber({ value, height }: { value: number; height: number }) {
-  const chars = [...String(Math.max(0, Math.round(value)))];
+export function DotNumber({ value, height }: { value: number | string; height: number }) {
+  const chars = [...(typeof value === "string" ? value : String(Math.max(0, Math.round(value))))];
   const w = chars.length * 6 - 1;
   return (
     <svg className="dot-number" width={(height * w) / 7} height={height} viewBox={`0 0 ${w} 7`} aria-hidden="true">
