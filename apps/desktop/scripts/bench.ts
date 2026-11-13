@@ -43,15 +43,15 @@ for (let i = 0; i < 100 && !(await fetch(url).then((r) => r.ok, () => false)); i
 
 // In the page: every ore call's args and time, and long tasks, so a step can wait until all is quiet.
 const PROBE = `
-  window.__bench = { calls: [], inflight: 0, last: performance.now(), long: [] };
+  window.__bench = { calls: [], open: [], inflight: 0, last: performance.now(), long: [] };
   new PerformanceObserver((l) => { for (const e of l.getEntries()) { window.__bench.long.push(e.duration); window.__bench.last = Math.max(window.__bench.last, e.startTime + e.duration); } }).observe({ type: "longtask", buffered: true });
   const wrap = () => {
     const t = window.__TAURI_INTERNALS__; if (!t || t.__wrapped) return; t.__wrapped = true;
     const inv = t.invoke;
     t.invoke = async (cmd, args) => {
       if (cmd !== "ore") return inv(cmd, args);
-      const b = window.__bench, t0 = performance.now(); b.inflight++;
-      try { return await inv(cmd, args); } finally { b.inflight--; const t1 = performance.now(); b.last = Math.max(b.last, t1); b.calls.push({ cmd: args.args.join(" ").slice(0, 50), ms: Math.round(t1 - t0), t0 }); }
+      const b = window.__bench, t0 = performance.now(), name = args.args.join(" ").slice(0, 50); b.inflight++; b.open.push(name);
+      try { return await inv(cmd, args); } finally { b.inflight--; b.open.splice(b.open.indexOf(name), 1); const t1 = performance.now(); b.last = Math.max(b.last, t1); b.calls.push({ cmd: args.args.join(" ").slice(0, 50), ms: Math.round(t1 - t0), t0 }); }
     };
   };
   wrap(); document.addEventListener("DOMContentLoaded", wrap);
@@ -207,6 +207,12 @@ try {
         if (!ONLY || name.includes(ONLY)) runs.set(name, [...(runs.get(name) ?? []), res]);
       } catch (e) {
         console.error(`${name}: ${(e as Error).message.split("\n")[0]}`);
+        // What was on screen, so a step that broke names its cause instead of a timeout.
+        const seen = await page.evaluate(() => ({
+          text: (document.querySelector("[role=dialog], .review, main") as HTMLElement | null)?.innerText.replace(/\s+/g, " ").slice(0, 400),
+          open: (window as unknown as { __bench: { open: string[] } }).__bench.open,
+        })).catch(() => undefined);
+        console.error(`  on screen: ${seen?.text ?? "(nothing)"}\n  calls still running: ${seen?.open.join("; ") || "none"}`);
         failed.push(name);
       }
     }
