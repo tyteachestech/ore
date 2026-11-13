@@ -214,7 +214,7 @@ test("traced: nothing shows through a part above it (fur under the helmet, a lid
   for (const [x, y, r, t] of d) if (t.startsWith("fine-")) for (const [ex, ey, er] of over) expect(Math.hypot(x - ex, y - ey)).toBeGreaterThan(Math.min(r, er));
 });
 
-// D-new-mole-emotions: fourteen more emotions on the same puppet, each a move that ends back at rest.
+// D253: fourteen more emotions on the same puppet, each a move that ends back at rest.
 const EMOTIONS = ["nod", "shake", "wink", "laugh", "proud", "curious", "sad", "sleepy", "set", "shy", "wave", "huff", "anxious", "ecstatic"] as const;
 
 test("traced: each emotion plays, differs from rest while it plays, and settles back to the rest drawing", () => {
@@ -319,7 +319,9 @@ test("traced: asleep in profile he lies along the foot of the box, head to the l
   // The lamp is at the head end, the feet at the other.
   const lamp = d.filter(([, , , t]) => t === "lamp").map(([x]) => x);
   expect(Math.max(...lamp)).toBeLessThan(COLS / 2 - 8);
-  expect(ink(fine({ ...MOVES.doze.still, breath: 1 }), "fine-7")).toBeGreaterThan(ink(d, "fine-7"));
+  // Breathing in, his belly rises.
+  const belly = (e: typeof d) => Math.min(...e.filter(([x]) => x > 13 && x < 17).map(([, y]) => y));
+  expect(belly(fine({ ...MOVES.doze.still, breath: 1 }))).toBeLessThan(belly(d) - 0.3);
 });
 
 test("traced: no dot of the helmet is alone a shade whiter than the dots round it", () => {
