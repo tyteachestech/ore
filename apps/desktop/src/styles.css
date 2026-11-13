@@ -2146,6 +2146,14 @@ button.home-plan:hover { color: var(--text); }
 .cart-ore-in.rich { fill: var(--ore-rich); }
 .rich-ore { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ore-rich); box-shadow: 0 0 5px var(--c-green); vertical-align: 1px; }
 .cart-rough { margin: -9px 0 0 -9px; line-height: 0; }
+/* The mole asleep on the load (D-new-cart-nap). Its wrapper's own point is the middle of his body: the foot of the head's box. */
+.cart-mole { position: absolute; left: 0; top: 0; width: 96px; height: calc(96px * 18 / 22); margin: calc(-96px * 18 / 22) 0 0 -48px; transform-origin: 50% 100%; line-height: 0; will-change: transform; }
+.cart-zzz { position: absolute; display: flex; align-items: flex-end; gap: 3px; font: 400 12px/1 var(--mono); color: var(--muted); animation: cart-zzz-in var(--t-3) var(--t-moment) both; }
+.cart-zzz i { font-style: normal; animation: cart-zzz 1400ms infinite both; }
+.cart-zzz i:nth-child(2) { font-size: 14px; margin-bottom: 8px; animation-delay: 250ms; }
+.cart-zzz i:nth-child(3) { font-size: 16px; margin-bottom: 18px; animation-delay: 500ms; }
+@keyframes cart-zzz-in { from { opacity: 0; } }
+@keyframes cart-zzz { 0% { opacity: 0; translate: -4px 6px; } 30% { opacity: 1; } 100% { opacity: 0; translate: 6px -10px; } }
 .review-end.carted .dot-ring circle { transition: none !important; }
 .review-end.carted .ring-burst { animation-delay: 0ms; }
 .review-cut > span[data-wait] { visibility: hidden; animation: none; }

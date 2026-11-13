@@ -16,11 +16,11 @@ export const SAID_MAX = 3;
  *  one per end screen) shuffles: which true line shows varies, never whether something was won (D62). With
  *  nothing rare the verdict opens, and a session of misses always opens with why it was worth it (D62).
  *  His voice is an old miner's: short, dry, fond of a pun, and only ever what the numbers say, never about the person. */
-export function endSays(o: { session: SessionEnd; today: Today; closed: boolean; short: boolean; ups: { skill?: string; name: string; level: number }[]; minutesLeft: string | null; roll?: number; plain?: boolean }): Said[] {
+export function endSays(o: { session: SessionEnd; today: Today; closed: boolean; short: boolean; ups: { skill?: string; name: string; level: number }[]; minutesLeft: string | null; roll?: number; plain?: boolean; napped?: boolean }): Said[] {
   const s = o.session;
   // His verdict is a corny mining pun (Tyler, 2026-11-13), one of a few per case so it isn't the same every day.
   // `plain`: the quick quiz has no mole, so its one verdict (a session of misses) stays in plain words.
-  const verdict: Said = { verdict: true, text: o.plain && s.kept === 0 ? "Every miss comes back sooner. That’s how they stick." : pick(s.kept === 0 ? PUNS.missed : o.closed ? PUNS.closed : o.short ? PUNS.short : PUNS.plain, o.roll ?? 0) };
+  const verdict: Said = { verdict: true, text: o.plain && s.kept === 0 ? "Every miss comes back sooner. That’s how they stick." : pick(s.kept === 0 ? PUNS.missed : o.short ? PUNS.short : o.napped ? (o.closed ? PUNS.nappedClosed : PUNS.napped) : o.closed ? PUNS.closed : PUNS.plain, o.roll ?? 0) };
   const rare: Said[] = [
     ...o.ups.map((k): Said => ({ text: `${k.name} hit level ${k.level}.`, rare: { kind: "level", skill: k.skill ?? "" } })),
     // Then and now (D248): the two answers stand under the ring; he only points at them.
@@ -69,6 +69,9 @@ export const PUNS = {
   plain: ["Gneiss work.", "You rock.", "Ore-some.", "Can you dig it? You can.", "Don’t take that for granite."],
   closed: ["Goal met. You rock.", "Goal met. Quarry on tomorrow.", "Goal met. Mine blown."],
   short: ["Seam’s empty. Today counts.", "Vein’s run dry. Today counts."],
+  // He fell out of the cart asleep (D-new-cart-nap) and covers for it.
+  napped: ["Wasn’t asleep. Supervising.", "Resting my eyes. Both of them.", "You dig, I nap. Good system.", "I’m awake. Schist."],
+  nappedClosed: ["Goal met. I supervised.", "Goal met. Slept right through it.", "Goal met. Wake me tomorrow."],
   missed: ["Schist happens. Every miss comes back sooner.", "Rocky one. Every miss comes back sooner."],
 } as const;
 const pick = (xs: readonly string[], roll: number) => xs[Math.min(xs.length - 1, Math.floor(roll * xs.length))]!;

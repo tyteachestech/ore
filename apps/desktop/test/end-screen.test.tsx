@@ -25,14 +25,14 @@ const today = (met: boolean, active_ms: number) => ({ goal_minutes: 10, goal_ms:
 const end = (cut: string[], before = today(false, 0), now = today(true, 600_000)) => ({ session: { id: "s", reviews: 5, kept: 5, rescued: 0, cut }, today: now, before, next: null }) as never;
 const skills = [{ id: "ai", name: "AI", color: "purple", icon: "ai" }] as never;
 const wait = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
-async function mount(e: never) {
+async function mount(e: never, roll = 0) {
   const body = document.createElement("div");
   body.className = "review-body";
   document.body.appendChild(body);
   const root = createRoot(body);
   // One roll for every end screen here, so the mole's pun is the first of its kind (only while it mounts: ids elsewhere need real ones).
   const random = Math.random;
-  Math.random = () => 0;
+  Math.random = () => roll;
   try {
     await act(async () => root.render(<TooltipProvider><EndScreen end={e} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} /></TooltipProvider>));
   } finally {
@@ -72,6 +72,33 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   expect(cheer - up).toBeLessThanOrEqual(580);
   await s.done();
 }, 10_000);
+
+test("the mole rides the cart in asleep, falls out onto the ring once it has gone, and covers for it (D-new-cart-nap)", async () => {
+  jest.useFakeTimers();
+  const s = await mount(end(["ai"]));
+  // Asleep on the load, his whole body; nobody on the ring yet.
+  expect(s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood")).toBe("nap");
+  expect(s.q(".cart-zzz")).toBe(1);
+  expect(s.q(".review-mole .mole")).toBe(0);
+  let awake = false;
+  for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
+    await act(async () => void jest.advanceTimersByTime(20));
+    // Awake in the air before he lands, and never two moles at once.
+    if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "fall") awake = true;
+    if (s.q(".cart-tip")) expect(s.q(".review-mole .mole")).toBe(0);
+  }
+  expect(awake).toBe(true);
+  expect(s.q(".review-mole .mole")).toBe(1);
+  for (let i = 0; i < 200; i++) await act(async () => void jest.advanceTimersByTime(50));
+  expect(s.body.querySelector(".end-says")!.textContent).toContain("Goal met. I supervised.");
+  jest.useRealTimers();
+  await s.done();
+  // One ending in three with a cart he comes up out of the ground as before, and says his usual line.
+  const plain = await mount(end(["ai"]), 0.9);
+  expect(plain.q(".cart-tip .cart")).toBe(1);
+  expect(plain.q(".cart-mole")).toBe(0);
+  await plain.done();
+});
 
 test("a gem cut with the ring already full: the cart still comes, carrying only the stone", async () => {
   const s = await mount(end(["ai"], today(true, 600_000)));
@@ -270,6 +297,10 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   expect(endSays({ ...base, roll: 0.5, session: session({}) })[0]!.text).toBe("Ore-some.");
   expect(endSays({ ...base, roll: 0.99, closed: true, session: session({}) })[0]!.text).toBe("Goal met. Mine blown.");
   expect(PUNS.missed.every((t) => t.includes("Every miss comes back sooner"))).toBe(true);
+  // Fallen out of the cart asleep, he covers for it; a day with nothing left due still says it counts.
+  expect(endSays({ ...base, napped: true, session: session({}) })[0]!.text).toBe("Wasn’t asleep. Supervising.");
+  expect(endSays({ ...base, napped: true, closed: true, session: session({}) })[0]!.text).toBe("Goal met. I supervised.");
+  expect(endSays({ ...base, napped: true, short: true, session: session({}) })[0]!.text).toBe("Seam’s empty. Today counts.");
   // A session of misses opens with why it was worth it, whatever else is true (D62).
   expect(endSays({ ...base, session: session({ kept: 0, longest_days: 9 }), ups: [{ name: "AI", level: 3 }] })[0]!.verdict).toBe(true);
   // A gap under a week, and rescues that were most of the session, go unsaid.
