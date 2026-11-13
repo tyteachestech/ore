@@ -116,19 +116,25 @@ function hash(s: string): string {
 /** The IndexedDB key that holds which snapshot the phone's writes sit on. */
 const SNAPSHOT = "#snapshot";
 
+/** A binary file's entry. Its text is made only when read (a shared .txt or .csv is), never kept: decoded
+ *  up front, an hour's audio was a second copy twice its size. */
+const binary = (bytes: Uint8Array, mtime: number, unread?: true): Entry => ({
+  mtime,
+  bytes,
+  ...(unread && { unread }),
+  get text() {
+    return new TextDecoder().decode(bytes);
+  },
+});
+/** `text` is the file's, or ignored when `bytes` are given. */
 function put(p: string, text: string, mtime = Date.now(), bytes?: Uint8Array) {
   if (disk && downloading.has(rel(p))) throw Object.assign(new Error("This file is still downloading from iCloud: try again in a moment"), { code: "EBUSY" });
-  const e: Entry = bytes ? { text, mtime, bytes } : { text, mtime };
+  const e: Entry = bytes ? binary(bytes, mtime) : { text, mtime };
   files.set(p, e);
   addDirs(p);
   if (SCRATCH.test(p)) return;
-  if (bytes && disk) return p.startsWith(disk.prefix + "/") ? queue(p, { text: base64(bytes), base64: true }) : undefined;
+  if (bytes && disk) return p.startsWith(disk.prefix + "/") ? queue(p, { bytes }) : undefined;
   persist(p, e);
-}
-function base64(b: Uint8Array): string {
-  let s = "";
-  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
-  return btoa(s);
 }
 /** The lock and the search index are rebuilt each launch, never kept. */
 const SCRATCH = /\/\.(ore|index)\//;
@@ -143,15 +149,16 @@ function drop(p: string) {
 
 // ---- on the phone: Ore's iCloud Drive folder (apps/phone/src-tauri/src/lib.rs).
 
-type Invoke = <T>(cmd: string, args: Record<string, unknown>) => Promise<T>;
+type Invoke = <T>(cmd: string, args: Record<string, unknown> | Uint8Array, options?: { headers: Record<string, string> }) => Promise<T>;
 type Stamped = [rel: string, mtime: number, stamp: string];
 type Scan = { files: Stamped[]; waiting: string[]; other?: string[] };
 let disk: { root: string; prefix: string; invoke: Invoke } | null = null;
 /** Each file's stamp (mtime and size) as last read or written, to tell what the Mac changed since. */
 const known = new Map<string, string>();
 /** Writes and deletes (null) not sent yet, by library path. The last one for a path wins, so an atomic
- *  write's temp file never reaches iCloud. A picture or other binary goes as base64. */
-type Op = { text: string; base64?: boolean } | null;
+ *  write's temp file never reaches iCloud. A picture, audio or other binary goes as its raw bytes, one
+ *  call each (lib.rs `library_write`): as base64 text an hour's audio cost several times its size. */
+type Op = { text: string } | { bytes: Uint8Array } | null;
 const unsent = new Map<string, Op>();
 /** Paths this phone has sent or asked to delete since launch: a delete of one still goes to the folder
  *  even before the folder's stamp for it comes back (or a folder, which has no stamp). */
@@ -176,6 +183,8 @@ function queue(p: string, op: Op) {
  *  watched for the Mac's changes. */
 const LISTED = /(\.(md|ya?ml|jsonl?|excalidraw|vtt)|\/(thumbnail|course-cover)\.(jpe?g|png|webp|gif))$/i;
 
+const HEAVY = /\.(mp3|m4a|wav|aac|aiff|flac|mp4|mov|m4v)$/i;
+
 /** Sends the writes made so far to the folder; resolves once they are on disk. */
 export function flush(): Promise<void> {
   clearTimeout(timer);
@@ -187,8 +196,26 @@ export function flush(): Promise<void> {
   const { root, invoke } = disk;
   sending = sending.then(async () => {
     try {
-      const wire = ops.map(([r, op]) => [r, op?.text ?? null, !!op?.base64]);
-      for (const [r, ms, stamp] of await invoke<Stamped[]>("library_apply", { root, ops: wire })) {
+      const stamps: Stamped[] = [];
+      const enc = encodeURIComponent;
+      // In the order they were made (a folder's delete before a file written into it), text and deletes in batches.
+      let batch: [string, string | null, boolean][] = [];
+      const send = async () => {
+        if (batch.length) stamps.push(...(await invoke<Stamped[]>("library_apply", { root, ops: batch })));
+        batch = [];
+      };
+      for (const [r, op] of ops) {
+        if (!op || "text" in op) batch.push([r, op?.text ?? null, false]);
+        else (await send(), stamps.push(await invoke<Stamped>("library_write", op.bytes, { headers: { "x-root": enc(root), "x-path": enc(r) } })));
+      }
+      await send();
+      // Audio and video on disk leave memory: nothing reads them back here (they play from the folder), and an
+      // hour's episode is 60 MB or more. Listed like any file the phone doesn't load.
+      for (const [r, op] of ops) {
+        const p = `${disk!.prefix}/${r}`;
+        if (op && "bytes" in op && HEAVY.test(r) && files.get(p)?.bytes === op.bytes) files.set(p, { text: "", mtime: Date.now(), unread: true });
+      }
+      for (const [r, ms, stamp] of stamps) {
         if (LISTED.test("/" + r)) known.set(r, stamp);
         const e = files.get(`${disk!.prefix}/${r}`);
         if (e) e.mtime = ms;
@@ -250,8 +277,7 @@ export async function load(p: string): Promise<boolean> {
   if (!disk) return false;
   const b64 = await disk.invoke<string | null>("library_bytes", { root: disk.root, path: rel(p) });
   if (b64 == null) return false;
-  e.bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  e.text = new TextDecoder().decode(e.bytes); // as a written file has both: a shared .txt or .csv is read as text
+  files.set(p, binary(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)), e.mtime, true));
   return true;
 }
 
@@ -320,10 +346,11 @@ export function readFileSync(p: string, enc?: unknown): string {
   const e = files.get(p);
   if (!e) throw err("ENOENT", p);
   if (e.unread && !e.bytes) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
-  if (enc === undefined && e.bytes) return Bytes.from(e.bytes) as unknown as string;
+  // One block copy: Bytes.from walked an hour's audio byte by byte and held over a gigabyte while it did.
+  if (enc === undefined && e.bytes) return new Bytes(e.bytes) as unknown as string;
   return e.text;
 }
-export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, new TextDecoder().decode(s), Date.now(), s));
+export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, "", Date.now(), s));
 export const appendFileSync = (p: string, s: string) => put(p, (files.get(p)?.text ?? "") + s);
 export function mkdirSync(p: string, _o?: unknown) {
   dirs.add(p);
@@ -349,7 +376,7 @@ export function renameSync(a: string, b: string) {
 export const copyFileSync = (a: string, b: string) => {
   readFileSync(a); // throws for a missing file, and for one the phone lists but hasn't loaded
   const e = files.get(a)!;
-  put(b, e.text, Date.now(), e.bytes);
+  put(b, e.bytes ? "" : e.text, Date.now(), e.bytes);
 };
 export const mkdtempSync = (prefix: string) => {
   const d = `${prefix}${Math.random().toString(36).slice(2, 8)}`;
