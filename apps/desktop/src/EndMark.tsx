@@ -1,4 +1,4 @@
-/* The end screen's result marks (D258): small shaded objects in dots, after the "one object you earned"
+/* The end screen's result marks (D259): small shaded objects in dots, after the "one object you earned"
    reward screens (Runna, Discord) and Duolingo's illustrated result icons. Each is a 16 by 16 sprite, a row per
    line: a digit is how lit that cell is (1 faint to 9 full), and a dot grows and brightens with it, so a face
    in shadow is small dim dots and a face in light is big bright ones. Edit a sprite here by hand. */

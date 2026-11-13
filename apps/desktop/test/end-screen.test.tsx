@@ -236,7 +236,7 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   // Each number is drawn in dots, and its text is the true number for a reader and for a test.
   expect(row.map((li) => li.querySelectorAll("b .dot-number circle").length > 5)).toEqual([true, true, true]);
   expect(row.map((li) => li.textContent)).toEqual(["5memories kept", "+41days of memory", "2gems cut"]);
-  // Each result's mark is a shaded dot object on the number's own line (D258): a gem for memories kept, a calendar for the days added.
+  // Each result's mark is a shaded dot object on the number's own line (D259): a gem for memories kept, a calendar for the days added.
   expect(row.map((li) => li.querySelector(".end-tally-pair > .end-tally-mark + b") !== null)).toEqual([true, true, true]);
   expect(row.slice(0, 2).map((li) => li.querySelector(".end-mark")?.getAttribute("data-kind"))).toEqual(["gem", "calendar"]);
   expect(s.q('.end-tally [data-key="kept"] .end-mark circle')).toBeGreaterThan(60);
