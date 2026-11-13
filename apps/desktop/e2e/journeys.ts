@@ -507,6 +507,24 @@ journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel,
   await page.keyboard.press("Escape");
 });
 
+journey("a sheet opened in the same moment as All sources keeps the keys: the list behind never takes them (F64)", async (page) => {
+  // F64: the list takes the keys a frame after All sources is chosen. ⌘R inside that frame opened What to review, then
+  // the list behind it took focus back, so ↵ never started the review (CI's release check met it now and then).
+  // Settings stands for any sheet here: it opens whatever is due.
+  await page.getByRole("button", { name: /^Home/ }).first().click();
+  const all = page.getByRole("button", { name: /^All sources/ });
+  await all.waitFor();
+  await all.evaluate((b: HTMLElement) => {
+    b.click();
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: ",", code: "Comma", metaKey: true, bubbles: true, cancelable: true }));
+  });
+  await page.locator(".settings-sheet").waitFor();
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  if (!(await page.evaluate(() => !!document.activeElement?.closest(".settings-sheet")))) throw new Error("the list behind Settings took the keys");
+  await page.keyboard.press("Escape");
+  await page.locator(".settings-sheet").waitFor({ state: "detached" });
+});
+
 journey("review: Tab and ⇧Tab stay on the card, never in the sidebar or sources hidden behind it", async (page) => {
   const inside = () => page.evaluate(() => !!document.activeElement?.closest(".review"));
   await page.getByRole("button", { name: "Start review" }).click();
@@ -10118,8 +10136,15 @@ journey("phone: a file picked with + is read on the phone; a picture waits for t
   await page.getByText(/^Added “/).waitFor();
   await pick("screenshot.png");
   await page.locator(".add-link").waitFor({ state: "detached" });
+  // F80: a PDF added here drew no first page (only the Mac's Quick Look did), so its row had a bare icon.
+  await pick("outline.pdf");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “Remembering on purpose”").waitFor();
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const drawn = page.locator("li", { hasText: "Remembering on purpose" }).locator("img.thumb");
+  await drawn.waitFor();
+  await until("the PDF's first page is its row's picture", () => drawn.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 100 && i.naturalHeight > i.naturalWidth));
   const row = page.locator(".phone-waiting").filter({ hasText: "screenshot.png" });
   await row.getByText("Your Mac reads the text in a picture or a scan.").waitFor();
   if (await page.locator(".phone-waiting").count() !== 1) throw new Error("the Word file it read is still listed as coming in");

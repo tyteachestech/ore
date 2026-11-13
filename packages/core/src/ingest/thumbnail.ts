@@ -82,8 +82,32 @@ export function epubCover(epub: Uint8Array): Picture | undefined {
   return pick && data ? { ext: EXT[pick.type]!, data } : undefined;
 }
 
-/** First page of a PDF through Quick Look (macOS only; elsewhere none). */
+/** A canvas to draw on, where there is one: the iPhone's webview. The Mac's `ore` and CI have none. */
+type Canvas = { width: number; height: number; toBlob(done: (b: Blob | null) => void, type: string, quality: number): void };
+const canvas = () => (globalThis as { document?: { createElement(tag: "canvas"): Canvas } }).document?.createElement("canvas");
+
+/** First page of a PDF, drawn by pdf.js at SIZE on a white sheet (F80). */
+async function drawnPage(data: Uint8Array, sheet: Canvas): Promise<Picture | undefined> {
+  // Loaded only here: pdf.js is heavy, and `ore` must not pay for it at every start.
+  const pdf = (await import("./pdf.ts")).openPdf(data);
+  try {
+    const page = await (await pdf.promise).getPage(1);
+    const full = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: SIZE / Math.max(full.width, full.height) });
+    sheet.width = Math.round(viewport.width);
+    sheet.height = Math.round(viewport.height);
+    await page.render({ canvas: sheet as never, viewport, background: "#fff" }).promise;
+    const blob = await new Promise<Blob | null>((done) => sheet.toBlob(done, "image/jpeg", 0.85));
+    return blob ? { ext: "jpg", data: new Uint8Array(await blob.arrayBuffer()) } : undefined;
+  } finally {
+    await pdf.destroy();
+  }
+}
+
+/** First page of a PDF: drawn here in a webview (the iPhone), through Quick Look on the Mac; elsewhere none. */
 async function pdfPage(path: string): Promise<Picture | undefined> {
+  const sheet = canvas();
+  if (sheet) return drawnPage(new Uint8Array(readFileSync(path)), sheet).catch(() => undefined);
   if (process.platform !== "darwin") return undefined;
   const out = mkdtempSync(join(tmpdir(), "ore-thumb-"));
   try {

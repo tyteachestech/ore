@@ -427,7 +427,7 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
 
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it
  *  can't open with the next step. */
-function openPdf(data: Uint8Array) {
+export function openPdf(data: Uint8Array) {
   const task = getDocument({ data: data.slice(), useSystemFonts: true, fontExtraProperties: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
   const promise = task.promise.catch((e: Error) => {
     if (e.name === "PasswordException") throw new Error("That PDF is locked with a password. Open it in Preview, enter the password, choose File › Export as PDF, and add the copy.");
