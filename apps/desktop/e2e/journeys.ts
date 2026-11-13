@@ -6563,6 +6563,35 @@ journey("review: when the day's goal closes the mole says so and the session goe
   }
 });
 
+journey("review: a session whose receipt carries then and now shows the question with his answer then over his answer today (D248)", async (page) => {
+  const log = oreCalls(page);
+  // The receipt's then and now needs a typed miss three weeks old, which no journey can make: the rule is
+  // core's (today.test.ts). Here the receipt is given one, to see it on the end screen.
+  const then_now = { card: "x", question: "Why does retrieval practice beat rereading?", then_ts: new Date(Date.now() - 29 * 864e5).toISOString(), then: "not sure", now: "Pulling it out of memory strengthens it" };
+  await page.route(/\/ore$/, async (route) => {
+    const args = ((JSON.parse(route.request().postData() ?? "{}") as { args?: string[] }).args ?? []);
+    if (!(args[0] === "session" && args[1] === "end")) return route.fallback();
+    const r = await route.fetch().catch(() => null);
+    if (r) await route.fulfill({ response: r, json: { ...(await r.json()), then_now } }).catch(() => {});
+  });
+  try {
+    await startReview(page, null);
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the rating is logged", async () => log.rated.length === 1);
+    await page.keyboard.press("Escape");
+    const box = page.locator(".review-end .then-now");
+    await box.waitFor();
+    const text = await box.innerText();
+    for (const want of [then_now.question, "4 weeks ago", then_now.then, "Today", then_now.now]) if (!text.includes(want)) throw new Error(`then and now lacks ${JSON.stringify(want)}: ${JSON.stringify(text)}`);
+    await page.keyboard.press("Enter");
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await page.unroute(/\/ore$/);
+    await log.undoAll();
+  }
+});
+
 journey("review: nothing counts the session up top (D246), and a miss still adds its retry to the session", async (page) => {
   const log = oreCalls(page);
   const { new_per_day } = (await ore("today")) as { new_per_day: number };

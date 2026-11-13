@@ -1,7 +1,7 @@
 import { depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
 
 /** A line of the mole's. `rare`: a thing most sessions don't have, which leads and wears its own mark (D247). */
-export type Said = { text: string; hint?: string; verdict?: true; rare?: { kind: "level"; skill: string } | { kind: "long" } | { kind: "rescued" } };
+export type Said = { text: string; hint?: string; verdict?: true; rare?: { kind: "level"; skill: string } | { kind: "then" } | { kind: "long" } | { kind: "rescued" } };
 
 /** How many lines a session's end may say (Tyler: "keep it to 2, maybe 3 max"). */
 export const SAID_MAX = 3;
@@ -17,6 +17,8 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   const verdict: Said = { verdict: true, text: s.kept === 0 ? "Every miss comes back sooner. That’s how they stick." : o.closed ? "Goal met. Tools down." : o.short ? "Seam’s empty. Today counts." : "Honest work." };
   const rare: Said[] = [
     ...o.ups.map((k): Said => ({ text: `${k.name} hit level ${k.level}.`, rare: { kind: "level", skill: k.skill ?? "" } })),
+    // Then and now (D248): the two answers stand under the ring; he only points at them.
+    ...(s.then_now ? [{ text: `${weeksAgo(s.then_now.then_ts)} back that one beat you. Read it now.`, rare: { kind: "then" } } satisfies Said] : []),
     ...(longGapText(s) ? [{ text: `${s.longest_days} days gone and you still had it.`, rare: { kind: "long" } } satisfies Said] : []),
     ...(rescuedWorthSaying(s) ? [{ text: `${s.rescued} pulled back just before you’d have lost ${s.rescued === 1 ? "it" : "them"}.`, rare: { kind: "rescued" } } satisfies Said] : []),
   ];
@@ -41,3 +43,9 @@ function shuffled<T>(xs: T[], roll: number): T[] {
 
 /** ", 12 of them extra": the part of the days that came after the goal, in the total's own unit when that is days. */
 const extraText = (total: number, extra: number) => (extra <= 0 || extra >= total ? "" : total < 60 ? `, ${extra} of them extra` : `, ${depthText(extra)} of it extra`);
+
+/** "4 weeks", "3 months": how long ago `ts` was, in the unit a person would say. */
+export const weeksAgo = (ts: string, now = Date.now()) => {
+  const days = Math.max(0, Math.round((now - Date.parse(ts)) / 864e5));
+  return days < 60 ? `${Math.max(1, Math.round(days / 7))} ${Math.round(days / 7) <= 1 ? "week" : "weeks"}` : `${Math.round(days / 30.44)} months`;
+};

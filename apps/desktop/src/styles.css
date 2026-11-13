@@ -2059,6 +2059,13 @@ button.home-plan:hover { color: var(--text); }
 .review-figure-box { position: absolute; border-radius: 2px; background: var(--bg-raised); box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 1.5px var(--bg); }
 .review-figure-box.shown { background: transparent; }
 /* D165: three pixel bars, one per tap; cells are square so the 8-bit grid stays sharp. */
+/* Then and now (D248): the question over a rule, then his two answers on a label column. No frame. */
+.then-now { width: min(520px, 100%); margin: 18px auto 0; text-align: left; }
+.then-now-q { margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 14px; font-weight: 600; line-height: 20px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.then-now dl { display: grid; grid-template-columns: 92px 1fr; gap: 6px 12px; margin: 0; font-size: 13px; line-height: 19px; }
+.then-now dt { color: var(--faint); font-family: var(--mono); font-size: 11px; line-height: 19px; }
+.then-now dd { margin: 0; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.then-now dd[data-then] { color: var(--muted); }
 .review-calibration { margin: 10px 0 0; display: grid; gap: 4px; justify-items: center; color: var(--muted); font-size: 13px; }
 .review-calibration-label { color: var(--faint); font-family: var(--mono); font-size: 11px; }
 .review-calibration-row { display: grid; grid-template-columns: 64px auto 36px; align-items: center; gap: 10px; padding: 2px 6px; border-radius: 6px; outline: none; }
@@ -2175,9 +2182,10 @@ button.home-plan:hover { color: var(--text); }
 .says-line { margin: 0; font: 400 12px/1.5 var(--mono); letter-spacing: 0.01em; color: var(--text); overflow-wrap: anywhere; }
 .says-line:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .says-rest { visibility: hidden; }
-/* A rare line's mark (D247): the thing's own drawing, 14px, on the words' midline. */
-.says-mark { display: inline-grid; place-items: center; width: 14px; height: 14px; margin-right: 7px; vertical-align: -2px; color: var(--muted); }
-.says-mark > .skill-icon { width: 14px; height: 14px; }
+/* A rare line's mark (D247): the thing's own drawing, 16px, on the words' midline. */
+.says-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 8px; vertical-align: middle; color: var(--muted); }
+.says-mark > * { grid-area: 1 / 1; }
+.says-mark > .skill-icon { width: 16px; height: 16px; }
 .says-block { position: relative; display: inline-block; width: 0; height: 1em; vertical-align: -0.12em; }
 .says-block::after { content: ""; position: absolute; left: 2px; top: 0; width: 0.55em; height: 100%; background: var(--text); }
 .says:not([data-typing]) .says-block::after { animation: block-blink 1s steps(1) infinite; }

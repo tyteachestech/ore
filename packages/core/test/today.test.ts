@@ -497,6 +497,35 @@ describe("strength breakdown and peak level (D63)", () => {
     expect(end.depth_extra_days).toBe(extra);
   });
 
+  test("then and now: an exercise he missed weeks ago and passed today comes with both answers, once in four weeks (D248)", async () => {
+    const { lib, cards } = await library(3);
+    const [a, b, c] = cards.map((x) => x.meta.id) as [string, string, string];
+    const day = (n: number) => new Date(Date.parse("2026-01-01T09:00:00Z") + n * 864e5);
+    // Day 0: a missed with a typed answer, b guessed, c missed in his head (nothing typed).
+    await recordReview(lib, a, { rating: 1, confidence: 2, answer: "no idea, something about sleep", now: day(0) });
+    await recordReview(lib, b, { rating: 3, confidence: 1, answer: "a guess", now: day(1) });
+    await recordReview(lib, c, { rating: 1, confidence: 2, now: day(0) });
+    // Ten days on is too soon to call it then.
+    await startSession(lib, day(10));
+    await recordReview(lib, a, { rating: 3, confidence: 2, answer: "soon", now: day(10) });
+    expect((await endSession(lib, day(10))).then_now).toBeUndefined();
+    // Four weeks on he passes all three, typing two: the oldest earlier answer is the one shown.
+    await startSession(lib, day(28));
+    await recordReview(lib, c, { rating: 3, confidence: 2, answer: "typed now", now: day(28) });
+    await recordReview(lib, b, { rating: 3, confidence: 2, answer: "b now", now: day(28) });
+    await recordReview(lib, a, { rating: 3, confidence: 3, answer: " Testing strengthens the memory itself ", now: day(28) });
+    const end = await endSession(lib, day(28));
+    expect(end.then_now).toEqual({ card: a, question: cards[0]!.question, then_ts: expect.any(String), then: "no idea, something about sleep", now: "Testing strengthens the memory itself" });
+    // The next day's session has b to show, but one was shown this month.
+    await startSession(lib, day(29));
+    await recordReview(lib, b, { rating: 3, confidence: 2, answer: "b again", now: day(29) });
+    expect((await endSession(lib, day(29))).then_now).toBeUndefined();
+    // Four weeks after that it may show again.
+    await startSession(lib, day(57));
+    await recordReview(lib, b, { rating: 3, confidence: 2, answer: "b for good", now: day(57) });
+    expect((await endSession(lib, day(57))).then_now?.then).toBe("a guess");
+  });
+
   test("the hook is his why, one line, set in skills.yaml", async () => {
     const { lib } = await library(0);
     expect((await setSkillLook(lib, "learning", { hook: "  So I can   build study tools  " })).hook).toBe("So I can build study tools");

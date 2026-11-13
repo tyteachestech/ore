@@ -391,6 +391,8 @@ export type SessionEnd = {
   depth_days?: number;
   /** The part of `depth_days` earned after the day's goal closed (D246). */
   depth_extra_days?: number;
+  /** Then and now (D248), at most once in four weeks: an exercise he missed or guessed weeks ago and passed now, with both answers. */
+  then_now?: { card: string; question: string; then_ts: string; then: string; now: string };
   /** On the week's first end screen (D69): of Explain answers marked Sure, the share the key-point check passed. */
   calibration?: { sure_n: number; sure_right: number; levels: { confidence: 1 | 2 | 3; n: number; right: number | null }[] } | null;
 };
