@@ -3,7 +3,7 @@ import { MOVES, REST, advance, puppet, start, type State } from "../src/Mole";
 import * as FINE from "../src/mole-fine";
 import { COLS, ROWS, fineDots } from "../src/mole-fine";
 
-// D214: the mole is a puppet on springs. D251, D-new-one-mole: one drawing, concept 4 traced dot by dot, at every size.
+// D214: the mole is a puppet on springs. D251, D261: one drawing, concept 4 traced dot by dot, at every size.
 const fine = (s: Partial<State> = {}) => fineDots({ ...REST, ...s });
 const key = (d: ReturnType<typeof fineDots>) => d.map(([c, r, rad, t]) => `${c.toFixed(2)},${r.toFixed(2)},${rad.toFixed(2)},${t}`).sort();
 

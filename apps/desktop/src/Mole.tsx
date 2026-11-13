@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { COLS, FINE_ORDER, ROWS, fineDots } from "./mole-fine";
 
 /* The tutor's mole (D168, a puppet since D214, an old miner since D238, traced from concept 4 since D251, one drawing
-   at every size since D-new-one-mole): its head and two paws over a strip of dirt, drawn as round dots
+   at every size since D261): its head and two paws over a strip of dirt, drawn as round dots
    (`mole-fine.ts`). It moves like a puppet: each value of its shape (how high it stands, its paws, where it looks)
    follows a spring, and every frame the drawing is laid out from those values. */
 /** The puppet's values. y: rows sunk into the hole. top: the dome's top row. rx: head half width. ex: how square the
