@@ -80,12 +80,12 @@ const seg = (x: number, y: number, x1: number, y1: number, x2: number, y2: numbe
 const oval = (x: number, y: number, cx: number, cy: number, rx: number, ry: number) => (Math.hypot((x - cx) / rx, (y - cy) / ry) - 1) * Math.min(rx, ry);
 
 /** Asleep on his back, seen from the side (`s.side`): head to the left, belly up, lying along the foot of the box and
- *  about 20 rows out past each side of it. He is drawn standing in profile, facing right, in his own dots (x forward,
+ *  about 12 rows out past each side of it. He is drawn standing in profile, facing right, in his own dots (x forward,
  *  y down from where the dirt would be), then laid back: the traced helmet tipped over his eyes, one lobe of the
- *  moustache draped on his chest, a paw behind his head, one knee up and the other leg crossed over it. */
+ *  moustache draped on his chest, a paw behind his head, a belly like a hill and two feet with no legs. */
 function sideDots(s: State): FineDot[] {
   const b = clamp(s.breath), layers: Layers = [], layer = () => { const l: Layers[number] = []; layers.push(l); return l; };
-  const BED = -11.5, MIDDLE = 5;
+  const BED = -11.5, MIDDLE = 1;
   const lay = (x: number, y: number): [number, number] => [MID + (y - MIDDLE) * U, GROUND - 0.5 * U - (x - BED) * U + s.y];
   const put = (l: Layers[number], x: number, y: number, r: number, tone: FineTone) => { const [X, Y] = lay(x, y); l.push([X, Y, r, tone, true]); };
   const turn = (x: number, y: number, a: number, px: number, py: number): [number, number] => { const c = Math.cos(a), n = Math.sin(a); return [px + (x - px) * c - (y - py) * n, py + (x - px) * n + (y - py) * c]; };
@@ -97,27 +97,26 @@ function sideDots(s: State): FineDot[] {
   const hat = layer(), TIP = 0.42;
   for (const p of HELMET) { const [x, y] = turn(p.x / U + 1.5, p.y / U, TIP, 0, -10); put(hat, x, y, p.r, p.tone); }
   for (const p of LAMP) { const [x, y] = turn(p.x / U + 7.5, p.y / U + 0.6, TIP, 0, -10); put(hat, x, y, p.r, p.tone); }
+  // Mega stout (Tyler, 2026-11-13: "no legs just feet", "mega stout so it's funny"): his belly is a hill higher
+  // than his nose, and two big flat feet stand on its far end like paddles, one behind the other, the near one bobbing (then "a bit
+  // less fat and feet bigger and flat").
   const under = layer(), foot = clamp(s.legs) * 1.6;
-  const TONES: FineTone[] = ["fine-9", "fine-5", "fine-5", "fine-7", "fine-9", "fine-5", "fine-5", "fine-5", "fine-5", "fine-9", "fine-4", "fine-4"], d = new Array<number>(12).fill(0);
-  for (let j = -27; j <= 37; j++) for (let i = -14; i <= 22; i++) {
+  const TONES: FineTone[] = ["fine-9", "fine-7", "fine-9", "fine-5", "fine-5", "fine-5", "fine-5", "fine-7"], d = new Array<number>(8).fill(0);
+  for (let j = -27; j <= 30; j++) for (let i = -14; i <= 28; i++) {
     const x = i + 0.07, y = j - 0.02;
-    d[0] = oval(x, y, 16 + foot, 31.5 - foot * 0.4, 2.7, 3.4);                              // the foot in the air
-    d[1] = seg(x, y, 10, 24, 14.5 + foot, 29 - foot * 0.4, 2.3);                            // its shin, over the other knee
-    d[2] = seg(x, y, 3, 18.5, 10, 24, 3);                                                   // its thigh
-    d[3] = oval(x, y, 7.6 + b * 0.7, 10.5, 4.6, 7);                                         // the pale of his belly
-    d[4] = oval(x, y, -8, -18.5, 2.6, 3);                                                   // a paw behind his head
-    d[5] = seg(x, y, -2.5, 1.5, -9, -14.5, 2.6);                                            // and its arm
-    d[6] = oval(x, y, 10.6, -7.6, 3.6, 3.2);                                                // snout
-    d[7] = oval(x, y, 0, -10, 11.2, 11);                                                    // head
-    d[8] = Math.min(oval(x, y, 0, 9, 10.6, 11.5), oval(x, y, 2.6 + b * 0.6, 11.5, 10.4, 8.6)); // torso, belly forward
-    d[9] = oval(x, y, -8.7, 33, 2.5, 3.6);                                                  // the far foot, flat on the bed
-    d[10] = seg(x, y, 8.5, 25, -7.5, 30.5, 2.3);                                            // far shin, knee up
-    d[11] = seg(x, y, 1, 19.5, 8.5, 25, 2.8);                                               // far thigh
-    for (let n = 0; n < 12; n++) {
+    d[0] = seg(x, y, 0.5 + foot, 23.2, 10.5 + foot, 23.2, 2.7);                               // the near foot: big, flat, sole to the sky
+    d[1] = oval(x, y, 10.6 + b * 1.1, 9, 6.6, 8.4);                                         // the pale of his belly
+    d[2] = oval(x, y, -8, -18.5, 2.6, 3);                                                   // a paw behind his head
+    d[3] = seg(x, y, -2.5, 1.5, -9, -14.5, 2.6);                                            // and its arm
+    d[4] = oval(x, y, 10.6, -7.6, 3.6, 3.2);                                                // snout
+    d[5] = oval(x, y, 0, -10, 11.2, 11);                                                    // head
+    d[6] = oval(x, y, 2.8 + b * 0.5, 8.5, 14 + b * 0.9, 12.6);                              // the belly: a hill
+    d[7] = seg(x, y, 4.5, 24.6, 14, 24.6, 2.5);                                             // the far foot, behind it and a little higher
+    for (let n = 0; n < 8; n++) {
       let tone: FineTone | undefined;
-      if (d[n]! < 0) tone = n === 8 && x < -6 ? "fine-4" : TONES[n];
+      if (d[n]! < 0) tone = n === 6 && x < -5 ? "fine-4" : TONES[n];
       // A dark dot where a part ends over the one below it.
-      else if (n !== 3 && n !== 6 && d[n]! < 0.8) for (let m = n + 1; m < 12; m++) if (d[m]! < -0.4) { tone = "fine-2"; break; }
+      else if (n !== 1 && n !== 4 && d[n]! < 0.8) for (let m = n + 1; m < 8; m++) if (d[m]! < -0.4) { tone = "fine-2"; break; }
       if (tone) { put(under, x, y, 0.4 * U, tone); break; }
     }
   }
