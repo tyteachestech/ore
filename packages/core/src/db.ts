@@ -317,7 +317,7 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
         db.run("delete from files where path = ?", [k.path]);
       }
       // An empty index has no rows to drop, and each drop scans the whole search table: on a first build they cost
-      // most of its time (F-new-first-index-drops). The write comes first so this process holds the lock before it
+      // most of its time (F84). The write comes first so this process holds the lock before it
       // looks: a read that another process then wrote past would fail the transaction instead of waiting its turn.
       db.run("delete from files where path = ''");
       const fresh = !db.query("select 1 where exists (select 1 from fts) or exists (select 1 from items) or exists (select 1 from cards)").get();

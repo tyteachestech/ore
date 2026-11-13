@@ -298,7 +298,7 @@ describe("review loop", () => {
     idx2.close();
   });
 
-  test("a first build of the index drops no rows; a changed file is still indexed once (F-new-first-index-drops)", async () => {
+  test("a first build of the index drops no rows; a changed file is still indexed once (F84)", async () => {
     // Each drop scans the whole search table, so on a fresh index (every launch on the phone) 2,800 files
     // spent 1.35 s of a 1.75 s first Today deleting rows that were not there.
     const { lib, a } = await setup();
