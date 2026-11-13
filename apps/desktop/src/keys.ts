@@ -259,9 +259,11 @@ export const keepKeysIn = (e: { stopPropagation(): void; nativeEvent: KeyboardEv
 };
 
 /** Whether a keydown lands in a text field, where a plain letter is typing. */
+/** Whether a keystroke belongs to what has focus: a text field, or a panel marked `data-own-keys` (the ambience
+ *  radio's pads take 1 to 5 and Enter, which must not also rate an exercise under it, D253). */
 export const inTextField = (e: KeyboardEvent) => {
   const t = e.target as HTMLElement | null;
-  return !!t && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+  return !!t && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || !!t.closest?.("[data-own-keys]"));
 };
 
 /** The source note's toggle: N like Q for questions, outside text fields; ⇧⌘N, its old binding,

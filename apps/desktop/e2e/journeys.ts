@@ -914,6 +914,16 @@ journey("ambience radio: the mole's twin at the bottom left; its pads play a cha
   if ((await lamp.getAttribute("aria-pressed")) !== "false") throw new Error("a channel with no file shows as playing");
   await page.unroute("**/sounds/lamp.mp3");
   await page.keyboard.press("Escape");
+  await pop.waitFor({ state: "detached" });
+  // ⌘K's "Ambience…" opens it and it stays open (the palette handing focus back must not close it).
+  await page.keyboard.press("Meta+KeyK");
+  await page.keyboard.type("Ambience");
+  await page.keyboard.press("Enter");
+  await pop.waitFor();
+  await page.waitForTimeout(300);
+  if (!(await pop.isVisible())) throw new Error("⌘K's Ambience opened the radio and it closed again");
+  await page.keyboard.press("5");
+  await page.keyboard.press("Escape");
 });
 
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {

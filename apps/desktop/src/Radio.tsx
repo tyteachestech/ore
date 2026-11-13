@@ -15,7 +15,7 @@ const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const now = () => performance.now() / 1000;
 
 /** Redraws `draw` every frame while `on`, at the canvas's device scale. */
-function useCanvas(on: boolean, w: number, h: number, draw: (ctx: CanvasRenderingContext2D, t: number) => void) {
+function useCanvas(on: boolean, w: number, h: number, draw: (ctx: CanvasRenderingContext2D, t: number) => void, redraw: unknown = null) {
   const ref = useRef<HTMLCanvasElement>(null);
   const fn = useRef(draw);
   fn.current = draw;
@@ -37,7 +37,7 @@ function useCanvas(on: boolean, w: number, h: number, draw: (ctx: CanvasRenderin
     };
     tick();
     return () => (cancelAnimationFrame(raf), clearTimeout(timer));
-  }, [on, w, h]);
+  }, [on, w, h, redraw]);
   return ref;
 }
 
@@ -46,18 +46,22 @@ const COLS = 59, ROWS = 22, S = 5;
 function Screen({ open }: { open: boolean }) {
   const { playing, since, missing, loading } = useAmbience();
   const g = useRef<Grid>(grid(COLS, ROWS));
+  // Moving to another channel is not switching off: it loads with the old picture held.
+  const on = playing ?? loading;
   const off = useRef<{ from: Float32Array; at: number } | null>(null);
-  const was = useRef(playing);
-  if (was.current !== playing) {
+  const held = useRef(new Float32Array(COLS * ROWS));
+  const was = useRef(on);
+  if (was.current !== on) {
     // Switching off (not to another channel) plays the power-down from what was on screen.
-    off.current = was.current && !playing ? { from: g.current.lit.slice(), at: now() } : null;
-    was.current = playing;
+    off.current = was.current && !on ? { from: g.current.lit.slice(), at: now() } : null;
+    was.current = on;
   }
   const lastMissing = !playing && !loading && missing.length ? missing[missing.length - 1] : null;
   const ref = useCanvas(open, COLS * S, ROWS * S, (ctx, t) => {
     const s = g.current;
     s.clear();
     if (playing) bigScreen(s, playing, t, now() - since, level());
+    else if (loading) s.lit.set(held.current);
     else if (off.current && powerDown(s, off.current.from, now() - off.current.at)) {}
     else {
       off.current = null;
@@ -65,6 +69,7 @@ function Screen({ open }: { open: boolean }) {
       // Standby: one dot breathing in the corner says the radio is on hand, and off.
       s.set(COLS - 2, ROWS - 2, 0.25 + 0.2 * Math.sin(t * 2.1));
     }
+    if (playing) held.current.set(s.lit);
     paint(ctx, s, S, AMBER);
   });
   const label = playing ? `${channelName(playing)} playing, ${clock(now() - since)}` : lastMissing ? `${channelName(lastMissing)} has no sound file` : "Nothing playing";
@@ -81,7 +86,7 @@ function Pads() {
   return (
     <div className="radio-pads" role="group" aria-label="Channels">
       {CHANNELS.map((ch, i) => (
-        <Hint key={ch.id} text={missing.includes(ch.id) ? `${ch.name}: no sound file` : ch.name} side="bottom">
+        <Hint key={ch.id} text={<>{missing.includes(ch.id) ? `${ch.name}: no sound file` : ch.name}<kbd>{i + 1}</kbd></>} side="bottom">
           <button
             ref={(el) => void (refs.current[i] = el)}
             className={`radio-pad${playing === ch.id ? " on" : ""}${loading === ch.id ? " loading" : ""}${missing.includes(ch.id) ? " missing" : ""}`}
@@ -102,7 +107,7 @@ function Pads() {
 }
 
 const ORB = 52;
-function Orb({ playing }: { playing: ChannelId | null }) {
+function Orb({ playing, hover }: { playing: ChannelId | null; hover: boolean }) {
   const g = useRef(grid(11, 11));
   const lv = useRef(0);
   const ref = useCanvas(!!playing, ORB, ORB, (ctx, t) => {
@@ -112,7 +117,7 @@ function Orb({ playing }: { playing: ChannelId | null }) {
     if (playing) icon(s, playing, 0, 0, 1, t || -1);
     else icon(s, "speaker", 0, 0, 1);
     ctx.clearRect(0, 0, ORB, ORB);
-    const grey = getComputedStyle(ctx.canvas).color;
+    const grey = playing ? "" : getComputedStyle(ctx.canvas).color;
     for (let y = 0; y < 11; y++) for (let x = 0; x < 11; x++) {
       const v = s.lit[y * 11 + x]!;
       if (v <= 0) continue;
@@ -125,7 +130,7 @@ function Orb({ playing }: { playing: ChannelId | null }) {
       ctx.fillStyle = `rgba(${AMBER},${0.25 + 0.6 * lv.current * w})`;
       ctx.beginPath(); ctx.arc(c + Math.cos(a) * 21, c + Math.sin(a) * 21, 1.1 + lv.current * 1.1 * w, 0, 7); ctx.fill();
     }
-  });
+  }, hover); // idle, it draws once: again on hover, so the speaker brightens with the button
   return <canvas ref={ref} className="radio-orb-dots" style={{ width: ORB, height: ORB }} aria-hidden="true" />;
 }
 
@@ -143,7 +148,7 @@ function Tag({ playing, since }: { playing: ChannelId; since: number }) {
 }
 
 export function Radio({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { playing, since } = useAmbience();
+  const { playing, since, loading } = useAmbience();
   const [hover, setHover] = useState(false);
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>
@@ -155,7 +160,7 @@ export function Radio({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
             onPointerEnter={() => setHover(true)}
             onPointerLeave={() => setHover(false)}
           >
-            <Orb playing={playing} />
+            <Orb playing={playing ?? loading} hover={hover} />
           </button>
         </Popover.Trigger>
       </Hint>
@@ -168,6 +173,7 @@ export function Radio({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
           sideOffset={10}
           collisionPadding={12}
           aria-label="Ambience"
+          data-own-keys
           onOpenAutoFocus={(e) => {
             // Focus the channel playing, else the first, so arrows and Space work at once.
             e.preventDefault();
@@ -176,7 +182,7 @@ export function Radio({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
           }}
           onKeyDown={(e) => {
             const n = Number(e.key);
-            if (n >= 1 && n <= CHANNELS.length && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); void toggle(CHANNELS[n - 1]!.id); }
+            if (n >= 1 && n <= CHANNELS.length && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); void toggle(CHANNELS[n - 1]!.id); }
           }}
         >
           <Screen open={open} />

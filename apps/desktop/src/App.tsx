@@ -1002,7 +1002,7 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Review and its picker handle their own keys; ⌘K and ⌘/ still open over Review (controls-08).
-      if (asking || (reviewing && !reviewing.paused && !is(e, "palette") && !is(e, "shortcuts"))) return;
+      if (asking || (reviewing && !reviewing.paused && !is(e, "palette") && !is(e, "shortcuts") && !is(e, "ambience"))) return;
       if (is(e, "settings")) {
         e.preventDefault();
         setPalette(false);
@@ -1888,8 +1888,8 @@ export function App() {
     } }] : []),
     { id: "tutor", label: tutorOpen ? "Close the tutor" : "Tutor chat…", hint: label(keys.tutor), keywords: ["ask", "library", "question", "chat", "answer", "ai", "quiz"], run: () => (tutorOpen ? closeTutor() : openTutor()) },
     ...(PHONE ? [] : [
-      { id: "ambience", label: "Ambience…", hint: label(keys.ambience), keywords: ["sound", "music", "focus", "noise", "radio"], run: () => setRadioOpen(true) },
-      ...CHANNELS.filter((c) => ambienceState().playing !== c.id).map((c) => ({ id: `ambience-${c.id}`, label: `Play ${c.name}`, keywords: ["ambience", "sound", "music", "focus"], run: () => void playAmbience(c.id) })),
+      { id: "ambience", label: "Ambience…", hint: label(keys.ambience), keywords: ["sound", "music", "focus", "noise", "radio"], run: () => requestAnimationFrame(() => requestAnimationFrame(() => setRadioOpen(true))) },
+      ...CHANNELS.filter((c) => ambienceState().playing !== c.id).map((c) => ({ id: `ambience-${c.id}`, label: `Play ${c.name}`, keywords: ["sound", "music", "radio"], run: () => void playAmbience(c.id) })),
       ...(ambienceState().playing ? [{ id: "ambience-stop", label: "Stop ambience", keywords: ["sound", "music", "silence", "mute"], run: stopAmbience }] : []),
     ]),
     ...(tutor.turns.length ? [{ id: "tutor-new", label: "New tutor chat", keywords: ["ask", "chat", "clear"], run: () => { tutor.fresh(); openTutor(); } }] : []),

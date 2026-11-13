@@ -132,7 +132,7 @@ const ambienceSounds: Plugin = {
   name: "ambience-sounds",
   configureServer(server) {
     server.middlewares.use("/sounds", (req, res, next) => {
-      const id = decodeURIComponent((req.url ?? "").split("?")[0]!).replace(/^\//, "").replace(/\.mp3$/, "");
+      const id = (req.url ?? "").split("?")[0]!.replace(/^\//, "").replace(/\.mp3$/, "");
       if (!SOUND_IDS.includes(id) || !existsSync(soundFile(id))) return next();
       res.setHeader("Content-Type", "audio/mpeg");
       res.end(readFileSync(soundFile(id)));

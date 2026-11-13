@@ -67,3 +67,18 @@ describe("ambience radio screen", () => {
     expect(vite).toContain("Library/Application Support/Ore/sounds");
   });
 });
+
+test("a key pressed on the radio's pads belongs to the radio: 2 there never also rates an exercise under it", async () => {
+  const { Window } = await import("happy-dom");
+  const { inTextField } = await import("../src/keys");
+  const doc = new Window().document;
+  const pop = doc.createElement("div");
+  pop.setAttribute("data-own-keys", "");
+  const pad = doc.createElement("button");
+  pop.append(pad);
+  doc.body.append(pop);
+  const outside = doc.createElement("button");
+  doc.body.append(outside);
+  expect(inTextField({ target: pad } as unknown as KeyboardEvent)).toBe(true);
+  expect(inTextField({ target: outside } as unknown as KeyboardEvent)).toBe(false);
+});
