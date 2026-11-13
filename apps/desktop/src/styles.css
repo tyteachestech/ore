@@ -3297,7 +3297,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .review-rate button[data-armed]:focus-visible { box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--rate), 0 0 0 4px var(--focus); }
 .review-guard { margin: 10px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
 /* The moment after a rating that changed the gem: it sits over the next card and never holds it back. */
-.review-moment { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: center; gap: 12px; max-width: min(520px, calc(100% - 32px)); padding: 10px 16px 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-rise var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
+.review-moment { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(520px, calc(100% - 32px)); padding: 10px 16px 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-rise var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
 .review-moment[data-tone="miss"] { animation-delay: 0s, 5.7s; }
 /* D246: the goal's note stays until the next rating and carries his way out, so it takes the pointer. */
 /* The goal's note (D246): the mole and his speech box (D245), told once and kept until the next rating. */
