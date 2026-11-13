@@ -2025,6 +2025,17 @@ button.home-plan:hover { color: var(--text); }
 .ring { position: relative; flex: none; }
 .ring-burst { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); animation: ring-burst 700ms ease-out 550ms 1 both; }
 @keyframes ring-burst { from { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); } to { transform: scale(1.25); opacity: 0; box-shadow: 0 0 0 14px transparent; } }
+/* The glint (D257, after Magic UI's shiny text): a light that crosses a dot drawing once, at a moment that was
+   earned. Each dot lights and swells in its turn, `--i` beats after the first; nothing is laid over them. Never a loop. */
+.glint circle { transform-box: fill-box; transform-origin: center; animation: glint var(--t-4) var(--ease-out) calc(var(--glint-at, 0ms) + var(--i, 0) * var(--glint-gap, 40ms)); }
+.ring.glint { --glint-at: 550ms; --glint-gap: 24ms; }
+.review-end.carted .ring.glint { --glint-at: 0ms; }
+@keyframes glint { 35% { fill: #fff; transform: scale(1.25); } }
+/* With the goal closing, the same light crosses the field of dots behind the emblem, once. */
+.end-emblem[data-glint]::after { content: ""; position: absolute; inset: -48px 0 -72px; z-index: -1; pointer-events: none; background-image: radial-gradient(circle, color-mix(in oklab, var(--c-green) 70%, var(--text)) 1.3px, transparent 1.8px); background-size: 9px 9px; background-position: center; -webkit-mask-image: linear-gradient(115deg, transparent 42%, #000 50%, transparent 58%), radial-gradient(closest-side, #000, transparent); mask-image: linear-gradient(115deg, transparent 42%, #000 50%, transparent 58%), radial-gradient(closest-side, #000, transparent); -webkit-mask-composite: source-in; mask-composite: intersect; -webkit-mask-size: 300% 100%, auto; mask-size: 300% 100%, auto; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: 100% 0, 0 0; mask-position: 100% 0, 0 0; opacity: 0; animation: glint-field 1100ms var(--ease-in-out) var(--glint-at, 550ms); }
+.review-end.carted .end-emblem[data-glint]::after { --glint-at: 0ms; }
+@keyframes glint-field { from { opacity: 1; -webkit-mask-position: 100% 0, 0 0; mask-position: 100% 0, 0 0; } to { opacity: 1; -webkit-mask-position: 0% 0, 0 0; mask-position: 0% 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) { .glint circle, .end-emblem[data-glint]::after { animation: none; } }
 
 /* Review (D59): one card centred, the keys at the foot; nothing counts the session on top (D246). */
 .review[hidden] { display: none; }
