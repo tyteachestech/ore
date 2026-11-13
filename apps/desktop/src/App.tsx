@@ -92,14 +92,14 @@ const added = (iso: string) => {
 
 /** Which sources the list shows, as folder tabs on the list's rule (D226): To read, Done, and Archived once
  *  there is any. The open tab's ▾ picks which details each row shows (Linear's Display properties). */
-function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; archived: boolean; go: (s: Tab) => void; details: Detail[]; toggle: (d: Detail) => void }) {
+function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; archived: boolean; go: (s: Tab, focusList?: boolean) => void; details: Detail[]; toggle: (d: Detail) => void }) {
   const views: HeadTab<Tab>[] = [
     { id: "toread", label: "To read", icon: PixelBook, tone: "read", keys: "go-toread" },
     { id: "done", label: "Done", icon: Check, tone: "done", keys: "go-done" },
     ...(archived || status === "archived" ? [{ id: "archived" as Tab, label: "Archived", icon: Archive, tone: "archived" }] : []),
   ];
   return (
-    <HeadTabs label="Sources shown" tabs={views} value={status} onChange={go} after={
+    <HeadTabs label="Sources shown" tabs={views} value={status} onChange={(s) => go(s, false)} after={
     <DropdownMenu.Root modal={false}>
       <Hint text="Which details each row shows">
         <DropdownMenu.Trigger asChild>
@@ -666,13 +666,14 @@ export function App() {
     return () => window.removeEventListener("paste", onPaste);
   }, [notify]);
 
-  const go = useCallback((s: Tab) => {
+  /** `focusList`: off for a folder tab chosen by click or arrow, which keeps focus so the next arrow moves on (F44). */
+  const go = useCallback((s: Tab, focusList = true) => {
     setStatus(s);
     setPlace("sources");
     setOpenId(null);
     setFinishing(false);
     // The list takes the keys at once (Linear's ⌘1), also when it was not on screen (Home, a source).
-    requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
+    if (focusList) requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
   }, []);
 
 

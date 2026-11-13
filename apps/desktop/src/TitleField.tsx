@@ -52,6 +52,8 @@ export function TitleField({ value, label = "Title", className = "row-rename", p
           return onClose(true);
         }
         if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+        // Its keypress would click the row the closed field hands focus back to, opening it (F47).
+        e.preventDefault();
         settled.current = true;
         commit(e.currentTarget);
       }}
