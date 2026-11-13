@@ -2,7 +2,7 @@
 
 <!-- impeccable:product-schema 1 -->
 
-<!-- Written by `impeccable init` without an interview: facts come from the owner's brief, AGENTS.md, CONTEXT.md and docs/DECISIONS.md. Settled decisions live in docs/DECISIONS.md; this file does not override them. -->
+<!-- Written by `impeccable init` without an interview: facts come from the owner's brief, AGENTS.md, GLOSSARY.md and docs/DECISIONS.md. Settled decisions live in docs/DECISIONS.md; this file does not override them. -->
 
 ## Platform
 
@@ -24,12 +24,12 @@ A personal reading-to-memory loop over plain files Tyler owns. The library files
 
 - Surfaces: Home with the daily goal and Start review (D58), the review mode (D59), the sources list, skill pages and ⌘K palette (Operate), and the reader with its prequestion strip, highlight popup and finish quiz (Read).
 - Used alongside the `/ore` Claude Code skill.
-- Keyboard first: ⌘K palette, ⌘N add, ⌘O open file, ⌘R review, ⌘1–2 lists, 1–3 highlight types, ⌘↵ finish, Esc back.
+- Keyboard first: ⌘K palette, ⌘N add, ⌘O open file, ⌘R review, ⌘0 Home, ⌘1–3 lists, 1–4 highlight types, ⇧⌘↵ finish, Esc back.
 
 ## Capabilities and Constraints
 
 - Built: add (links, files, courses), To read/Done, the reader with highlights and notes, video, Listen, skill pages, the finish quiz, Home, review with the daily goal, the quick quiz, skill strength as gems, and an iPhone app (D78).
-- Terms: source, highlight, highlight type (Keep, Card, Question), note, prequestion, finish, free recall, skill (CONTEXT.md).
+- Terms: source, highlight, highlight type (Keep, Card, Question), note, prequestion, finish, free recall, skill (GLOSSARY.md).
 - AI never sets a rating (D21). Notes are always Tyler's own words; no AI summary replaces them (D29).
 
 ## Brand Commitments

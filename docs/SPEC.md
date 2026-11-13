@@ -102,7 +102,7 @@ id: 01J...
 kind: card | prompt
 item: 01J...                 # source item
 annotation: 01J...           # source highlight (absent for items drafted from the source note or a prequestion)
-from: notes | prequestion    # optional: drafted from the source note, credited "from your notes", or from a prequestion after the finish (D19)
+from: notes | prequestion | tutor    # optional: drafted from the source note, credited "from your notes", or from a prequestion after the finish (D19)
 prequestion: 2               # with from: prequestion, its number (1-based)
 skills: [ai]
 topics: [slug]
@@ -113,10 +113,10 @@ created: ...
 Body for `card`: question, a line `---`, answer. A fill in the blank (D182) is a statement with its one hidden word written `____`, the answer being what it hides; Anki's `{{c1::text}}` is read and kept as `____`.
 Body for `prompt`: question, `---`, model answer, then `## Rubric` with 2–4 bullets (prefixes `Optionally…` and `Avoids…` allowed).
 
-### reviews/<yyyy>-<mm>.jsonl
+### reviews/<yyyy>-<mm>.<device>.jsonl
 ```json
 {"ts":"...","card":"01J...","session":"01J...","confidence":1|2|3,"answer":"what I typed","ai_rating":3,
- "ai":{"vendor":"claude","model":"…","prompt_version":"grade@3"},
+ "ai":{"vendor":"claude","model":"…","prompt_version":"grade@4"},
  "rating":1|2|3|4,"elapsed_ms":12000,"state_before":{...fsrs},"state_after":{...fsrs},"finishing":true}
 ```
 Each device appends to its own file (`<device>` is `ORE_DEVICE` or the computer's name, slugified; `iphone` on the phone); readers take every file of the month, including older files with no device part and a synced folder's conflicted copies, and count a review (card + ts) once. Taking a review back appends `{"ts":"...","card":"01J...","undo":"<ts of the review>"}` instead of rewriting the log. `finishing: true` marks the first encounter of a draft (D20); the card file keeps `state: draft`, and a draft with a review counts as live (the index and `ore cards` read it from the log), so finishing never rewrites the card. `variant: <id>` marks a review of a remixed version (D66); `in_head: true` an Explain card answered in his head and self-marked (D68). Card FSRS state is derived by replaying the log in order; `.index` caches it.
@@ -182,7 +182,7 @@ ore skills add <name> [--collection c]   new skill, Light (P3, D173) (the sideba
 ore skills archive <skill> [--undo]   archive a skill (D173): out of the sidebar's list, the due queue (cards filed only under archived skills), Home and enrich; --undo brings it back. Filing a source under it brings it back too
 ore skills arrange '<layout json>'   the sidebar in one write: [{"collection":"Work","skills":["ai",...]},{"collection":"","skills":[...]}], every skill exactly once; sorts skills.yaml into that order (a collection sits where its first skill is) and sets or clears each collection. Drag, Move to, renaming, reordering or deleting a collection, and their Undo all use it
 ore skills rm <skill> [--archive]      delete a skill: drops it from skills.yaml and untags its sources, cards and topics (cards keep reviewing, the skill note stays on disk); --archive also archives sources filed only under it
-ore suggested-skill <item> accept|dismiss|undo <json>   accept creates the suggested skill (P2) if new and files the item, its cards and topics under it; undo takes back an accept (its `undo` record) or a dismiss
+ore suggested-skill <item> accept|dismiss|undo <json>   accept creates the suggested skill (Light, P3, D173) if new and files the item, its cards and topics under it; undo takes back an accept (its `undo` record) or a dismiss
 ore enrich [item...|--all-pending]    runs AI (several items one after another): prequestions, skills, topics, card/prompt drafts from Card highlights, changed the source note and, once the item is done, its prequestions
 ore research <question>               AI finds 3–5 sources for one of his questions and prints them; writes nothing (D95); `ore add <url> --for <q>` any
 ore explain <item> --exact "<term>" [--start N]   AI explains a term in its paragraph and in general (Explain, D97); writes nothing
@@ -264,7 +264,7 @@ Coverage per content type, what each keeps and misses, and the plan (D96): `docs
 - Default AI vendor is set per library in `skills.yaml` (`ai: claude|codex`); `ORE_AI` overrides. Tyler's library is on `codex` until the `claude` CLI is logged in.
 
 ## 7. v0 deliverables
-1. Bun workspace: `packages/core`, `packages/cli`, `apps/raycast` (later `apps/desktop`). Tests for anchoring, scheduling order, review replay, frontmatter round-trips.
+1. Bun workspace: `packages/core`, `packages/cli`, `apps/desktop` (`apps/raycast` was removed by D104). Tests for anchoring, scheduling order, review replay, frontmatter round-trips.
 2. `ore` CLI as in §4, installed on PATH via `bun link`.
 3. Library `AGENTS.md` describing the layout and the rule "use `ore` for writes that have invariants".
 4. Claude Code skill `/ore` (in `skills/ore/SKILL.md`, installed to `~/.claude/skills/ore`): quiz me from `ore due`; probe only → confidence → my answer → `ore grade` → reveal + gaps → I confirm rating → `ore review`. Also `ore add` on request, and "fix this card" by editing the card file.
@@ -298,4 +298,4 @@ Maps (D35, deferred by D95; `docs/research/brief-diagramming.md`), all through t
 - Before building: a spike of Excalidraw inside the Tauri webview (untested); read the full texts flagged in `brief-diagramming-evidence.md`.
 
 ## 9. v2+ parking lot
-System-wide capture with screenshot + OCR (D16). EPUB layout view (foliate-js; EPUB text is v1, D13). X threads. Newsletters, audio (SpeechAnalyzer). Browser extension. MCP wrapper over the CLI. n-of-1 experiments: AI-drafted vs self-made cards, prompt vs card retention, importance weighting.
+System-wide capture with screenshot + OCR (D16). EPUB layout view (foliate-js; EPUB text is v1, D13). X threads. Newsletters by email. Browser extension. MCP wrapper over the CLI. n-of-1 experiments: AI-drafted vs self-made cards, prompt vs card retention, importance weighting.

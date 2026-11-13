@@ -65,7 +65,7 @@ A Fact card takes 2 keystrokes; an Explain card takes your typed answer plus 3. 
 **On every card**
 
 - A miss (Again) comes back once, about three cards later (D21). A miss you marked Sure adds one line: "You were sure about this one. Worth a careful look."
-- A new draft says New. After you answer it, E edits the question or answer in place, and ⌘⌫ retires it. That first review is how a draft is finished (D20); changes save through `ore card edit`.
+- A new draft says New. After you answer it, E edits the question or answer in place, and ⇧⌘⌫ retires it. That first review is how a draft is finished (D20); changes save through `ore card edit`.
 - After you answer, / opens "Ask about this": a chat that sees the card, its rubric, your answer and the source passage. It can explain, give an example, or suggest a better card, which you apply with one click. It's never available before you answer, and it never sets the rating.
 
 ## Daily goal and daily shape

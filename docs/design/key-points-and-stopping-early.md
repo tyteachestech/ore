@@ -63,7 +63,7 @@ Press the card button where the idea starts ("From 5:30"), again where it ends; 
 ![F-A2](../images/key-points/F-A2-question-not-for-me.png)
 ![P1](../images/key-points/P1-row-progress.png)
 
-Finish (⌘↵, ⋯, ⌘K; on a video also in the control row once he's past the start) works at any point. The app keeps how far he **reached** (the furthest point played or scrolled, not the current one). Before the end, the quiz says "up to 15:05", the recall asks about "the part you watched", and any prequestion whose verified quotes all lie past that point is dropped, so no quiz question or card comes from the code he skipped. Each question gets **Not for me** beside No idea: skipped, no card. The closing card (D71) is unchanged.
+Finish (⇧⌘↵, ⋯, ⌘K; on a video also in the control row once he's past the start) works at any point. The app keeps how far he **reached** (the furthest point played or scrolled, not the current one). Before the end, the quiz says "up to 15:05", the recall asks about "the part you watched", and any prequestion whose verified quotes all lie past that point is dropped, so no quiz question or card comes from the code he skipped. Each question gets **Not for me** beside No idea: skipped, no card. The closing card (D71) is unchanged.
 
 Every variant maps onto three things that exist plus this one change:
 

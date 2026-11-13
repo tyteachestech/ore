@@ -41,7 +41,7 @@ inbox/                         links added on the iPhone (`<id>.link.json`), wai
 .ore/                          lock, open-session marker, background logs (gitignored)
 ```
 
-Highlight intents: keep (a plain highlight), card (a ★ key point), question (older `research` highlights read as questions). Key points are drafted at once; enrich plans a few cards from an item's plain highlights (grouped into ideas, `also` on the card) once it is done, or while it is still being read once its highlights are six hours old (D180, the daily catch-up); once it is done it also drafts its source note and prequestions (D19, D118); cards drafted from the source note carry `from: notes`, from a prequestion `from: prequestion` and `prequestion: <n>`.
+Highlight intents: keep (a plain highlight), card (a ★ key point), question (older `research` highlights read as questions), apply (a Try it: a technique to try, D127). Key points are drafted at once; enrich plans a few cards from an item's plain highlights (grouped into ideas, `also` on the card) once it is done, or while it is still being read once its highlights are six hours old (D180, the daily catch-up); once it is done it also drafts its source note and prequestions (D19, D118); cards drafted from the source note carry `from: notes`, from a prequestion `from: prequestion` and `prequestion: <n>`.
 
 ## Learning rules
 - Tyler's rating is what gets logged. An AI grade is only a proposal.

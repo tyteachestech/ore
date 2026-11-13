@@ -45,6 +45,8 @@ Prompts live in `packages/core/src/ai/prompts/`; bump a prompt's `version` heade
 | `bun run eval:ask` | [`docs/guides/ask-library.md`](docs/guides/ask-library.md) |
 | `bun run eval:tutor` | [`docs/guides/tutor-eval.md`](docs/guides/tutor-eval.md) |
 | `bun run eval:questions` | [`docs/guides/question-eval.md`](docs/guides/question-eval.md) |
+| `bun run eval:transcripts` | [`docs/guides/transcript-eval.md`](docs/guides/transcript-eval.md) (Mac only) |
+| `bun run eval:mine` | [`docs/guides/grading-eval.md`](docs/guides/grading-eval.md) (read-only, no AI) |
 
 ## How the maintainer's work ships
 
