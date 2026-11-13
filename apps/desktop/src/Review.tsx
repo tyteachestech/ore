@@ -16,6 +16,7 @@ import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { endSays } from "./end-says";
+import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
@@ -1501,24 +1502,21 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
   );
 }
 
-/** How long one line of the end screen holds before the next rolls up. */
-const LINE_MS = 2600;
 
 /** The end screen's lines (D241): one place, one line at a time. Each rolls up into it, holds, and rolls on up
  *  as the next arrives, round and round; the pointer or the keyboard on a line holds it. Every line is in the
  *  page throughout, so a single line just sits there, and under Reduce Motion they are a plain list. */
-function EndLines({ run, turn = false, children }: { run: boolean; turn?: boolean; children: React.ReactNode }) {
+function EndLines({ run, children }: { run: boolean; children: React.ReactNode }) {
   const lines = Children.toArray(children);
   const [at, setAt] = useState(0);
   // The pointer and the keyboard each hold it on their own: leaving with one never lets go for the other.
   const [over, setOver] = useState(false);
   const [within, setWithin] = useState(false);
   const held = over || within;
-  // `turn`: there is room for one line only (the mole's bubble), so under Reduce Motion they still take turns, without the roll.
-  const flat = still() && !turn;
+  const flat = still();
   useEffect(() => {
     if (flat || !run || held || lines.length < 2) return;
-    const id = setInterval(() => setAt((i) => i + 1), LINE_MS);
+    const id = setInterval(() => setAt((i) => i + 1), HOLD_MS);
     return () => clearInterval(id);
   }, [flat, run, held, lines.length]);
   if (flat || lines.length < 2) return <>{lines}</>;
@@ -1636,14 +1634,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
             <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
             {/* D243: the mole says what the session won, one line at a time, once he has come up. */}
             {mood === "cheer" && (
-              <div className="end-says">
-                <svg className="end-says-tail" width="9" height="15" viewBox="0 0 9 15" aria-hidden="true">
-                  <path d="M9 0h-3v3h-3v3h-3v3h3v3h3v3h3z" />
-                </svg>
-                <EndLines run={stage === "done"} turn>
-                  {said.map((l) => (l.hint ? <Hint key={l.text} text={l.hint}><p tabIndex={0}>{l.text}</p></Hint> : <p key={l.text}>{l.text}</p>))}
-                </EndLines>
-              </div>
+              <MoleSays className="end-says" lines={said} run={stage === "done"} />
             )}
             <div className="end-ring">
               {ring}

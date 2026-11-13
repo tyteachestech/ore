@@ -1136,6 +1136,35 @@ describe("import coverage: audio and podcasts", () => {
     expect(item.body).toContain("[01:00] Thanks for listening.");
   });
 
+  test("an episode on Apple Podcasts older than the lookup's last 200 is found in the show's own feed (F62)", async () => {
+    // He shared a 2024 episode of a daily show: Apple's lookup lists only the newest 200, so it was refused.
+    // Apple's page names the episode and its day; the show's public feed has every episode's audio.
+    const audio = "https://traffic.megaphone.fm/OLD1.mp3";
+    const url = "https://podcasts.apple.com/us/podcast/thu-09-19-quiet-rooms/id1355212895?i=1000670069360";
+    const feed = "https://feeds.example.com/ridehome";
+    const item = (title: string, day: string, file: string) => `<item><title>${title}</title><pubDate>${day}</pubDate><enclosure url="${file}" length="1" type="audio/mpeg"/></item>`;
+    const page = (name: string) => `<html><head><meta property="og:title" content="${name}"><script id=schema:episode type="application/ld+json">{"@type":"PodcastEpisode","datePublished":"2024-09-19","name":"${name}","partOfSeries":{"@type":"CreativeWorkSeries","name":"Ride Home"},"thumbnailUrl":"https://is1-ssl.mzstatic.com/art/1200x1200bf.webp"}</script></head></html>`;
+    const pages = (name: string) => ({
+      "https://itunes.apple.com/lookup?id=1355212895&entity=podcastEpisode&limit=200": { body: JSON.stringify({ results: [{ wrapperType: "track", trackId: 1355212895, collectionName: "Ride Home", feedUrl: feed, artworkUrl600: "https://is1-ssl.mzstatic.com/art/600x600bb.png" }, { trackId: 1000700000001, episodeUrl: "https://traffic.megaphone.fm/NEW.mp3", trackName: "Fri. 11/06 – A newer one" }] }), type: "application/json" },
+      [url]: { body: page(name), type: HTML },
+      [feed]: { body: `<rss><channel><title>Ride Home</title><language>en-us</language>${item("Fri. 11/06 – A newer one", "Fri, 06 Nov 2026 21:00:00 GMT", "https://traffic.megaphone.fm/NEW.mp3")}${item("Thu. 09/19 – Quiet rooms", "Thu, 19 Sep 2024 16:10:52 GMT", audio)}</channel></rss>`, type: "application/rss+xml" },
+      [audio]: { body: new Uint8Array(4096), type: "audio/mpeg" },
+    });
+    serve(pages("Thu. 09/19 – Quiet rooms"));
+    const got = await addSource(await tempLibrary(), url);
+    expect(got.meta).toMatchObject({ title: "Thu. 09/19 – Quiet rooms", author: "Ride Home", published: "2024-09-19", url });
+    expect(got.body).toContain("[01:00] Thanks for listening.");
+    // Apple's title was edited since: the one episode the feed has for that day is it.
+    serve(pages("Thu. 09/19 - Quiet Rooms (re-air)"));
+    expect((await addSource(await tempLibrary(), url)).meta.title).toBe("Thu. 09/19 - Quiet Rooms (re-air)");
+    // Not in the feed either: refused, with the next step.
+    serve({ ...pages("An episode the feed dropped"), [url]: { body: page("An episode the feed dropped").replace("2024-09-19", "2019-01-02"), type: HTML } });
+    await expect(addSource(await tempLibrary(), url)).rejects.toThrow(/Couldn’t find “An episode the feed dropped” in Ride Home’s feed/);
+    // Apple answers a link it no longer knows with the show's page: never taken for an episode.
+    serve({ ...pages("x"), [url]: { body: page("Ride Home").replace("PodcastEpisode", "CreativeWorkSeries"), type: HTML } });
+    await expect(addSource(await tempLibrary(), url)).rejects.toThrow(/Couldn’t find that episode’s audio on Apple Podcasts/);
+  });
+
   test("an episode added with its transcript owed is in at once, then downloaded and heard with how far it is (F60)", async () => {
     // He shared an hour-long episode on the phone and saw nothing for ten minutes: the source is there at
     // once by its title, show and date, and the download and the hearing fill it, saying where they are.

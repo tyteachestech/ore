@@ -119,8 +119,8 @@ test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem 
   expect(seams[0]).toBeGreaterThan(0);
   expect(seams.slice(1)).toEqual([0, 0]);
   expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");
-  // The mole says it (D243).
-  expect(s.body.querySelector(".end-says")!.textContent).toContain("+41 days of memory");
+  // The mole speaks (D243); what he says of the depth is in the lines test below.
+  expect(s.q(".end-says .says-line")).toBe(1);
   await s.done();
   // More gems than fit: the count covers the polished ones left out too.
   const many = end(Array(8).fill("ai")) as unknown as { session: Record<string, unknown> };
@@ -138,49 +138,61 @@ test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem 
   await none.done();
 });
 
-test("the mole's lines share one bubble: one shows, the next rolls up after a hold, and under Reduce Motion they still take turns (D241, D243)", async () => {
+test("the mole's lines share one speech box: each is typed out a letter at a time with his block, holds, then the next is typed; under Reduce Motion a line stands at once (D241, D243, D245)", async () => {
   jest.useFakeTimers();
   // No cart (the goal was met before), so the lines start turning at once.
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
   Object.assign(e.session, { depth_days: 41, rescued: 2 });
   const s = await mount(e as never);
-  const on = () => s.body.querySelector('.end-says .end-lines > [data-at="on"]')?.textContent;
+  const line = () => s.body.querySelector(".end-says .says-line");
+  const typed = () => line()!.firstChild?.nodeType === 3 ? line()!.firstChild!.textContent : "";
   // He speaks once he has come up and cheered.
   expect(s.q(".end-says")).toBe(0);
   await act(async () => void jest.advanceTimersByTime(560));
-  expect(s.q(".end-lines > div")).toBeGreaterThanOrEqual(2);
-  expect(s.q('.end-lines > [data-at="on"]')).toBe(1);
-  // The verdict first. The count of memories kept is the hero under the ring (D242), not one of his lines.
-  expect(on()).toBe("Honest work.");
-  // Every line but the one showing is out of reach of the keyboard and the reader.
-  expect(s.q(".end-lines > div[inert]")).toBe(s.q(".end-lines > div") - 1);
-  await act(async () => void jest.advanceTimersByTime(2600));
-  const second = on();
-  expect(second).toBe("+41 days of memory. You dug that.");
-  expect(s.body.querySelector('.end-lines > [data-at="was"]')?.textContent).toBe("Honest work.");
-  // The pointer on a line holds it.
-  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new (s.body.ownerDocument.defaultView as unknown as { MouseEvent: typeof MouseEvent }).MouseEvent("mouseover", { bubbles: true })));
-  await act(async () => void jest.advanceTimersByTime(6000));
-  expect(on()).toBe(second);
-  // Focus on the line holds it too, and the pointer leaving doesn't let go of that hold.
+  // The verdict first, and the whole line is in the page from its first letter: only the typed part shows,
+  // the rest holds its place unseen, the block between them.
+  expect(line()!.textContent).toBe("Honest work.");
+  expect(typed()).toBe("");
+  expect(s.q(".says[data-typing] .says-line > .says-block + .says-rest")).toBe(1);
+  for (let i = 0; i < 4; i++) await act(async () => void jest.advanceTimersByTime(28));
+  expect(typed()).toBe("Hone");
+  expect(s.body.querySelector(".says-rest")!.textContent).toBe("st work.");
+  for (let i = 0; i < 40 && s.q(".says[data-typing]"); i++) await act(async () => void jest.advanceTimersByTime(28));
+  expect(typed()).toBe("Honest work.");
+  // A whole line holds, then the next is typed from nothing.
+  await act(async () => void jest.advanceTimersByTime(2599));
+  expect(line()!.textContent).toBe("Honest work.");
+  await act(async () => void jest.advanceTimersByTime(1));
+  expect(line()!.textContent).toBe("+41 days of memory. You dug that.");
+  expect(typed()).toBe("");
+  for (let i = 0; i < 80; i++) await act(async () => void jest.advanceTimersByTime(28));
+  const second = "+41 days of memory. You dug that.";
+  expect(typed()).toBe(second);
+  // The pointer on the box holds the line.
   const win = s.body.ownerDocument.defaultView as unknown as { MouseEvent: typeof MouseEvent; FocusEvent: typeof FocusEvent };
-  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new win.FocusEvent("focusin", { bubbles: true })));
-  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new win.MouseEvent("mouseout", { bubbles: true })));
+  const box = s.body.querySelector(".end-says")!;
+  await act(async () => void box.dispatchEvent(new win.MouseEvent("mouseover", { bubbles: true })));
   await act(async () => void jest.advanceTimersByTime(6000));
-  expect(on()).toBe(second);
-  jest.useRealTimers();
+  expect(line()!.textContent).toBe(second);
+  // Focus on the line holds it too, and the pointer leaving doesn't let go of that hold.
+  await act(async () => void box.dispatchEvent(new win.FocusEvent("focusin", { bubbles: true })));
+  await act(async () => void box.dispatchEvent(new win.MouseEvent("mouseout", { bubbles: true })));
+  await act(async () => void jest.advanceTimersByTime(6000));
+  expect(line()!.textContent).toBe(second);
   await s.done();
-  // One line has nothing to take turns with.
-  const one = await mount(end([], today(true, 600_000)));
-  await wait(700);
-  expect(one.q(".end-lines")).toBe(0);
-  expect(one.body.querySelector(".end-says > p")!.textContent).toBe("Honest work.");
-  await one.done();
   reduce = true;
   const flat = await mount(e as never);
+  // Reduce Motion: the line stands whole at once, nothing left to type.
+  expect(flat.body.querySelector(".end-says .says-line")!.firstChild!.textContent).toBe("Honest work.");
+  expect(flat.q(".says[data-typing]")).toBe(0);
+  // And the lines still take turns, each whole, round and round.
+  const said = () => flat.body.querySelector(".end-says .says-line")!.textContent;
+  await act(async () => void jest.advanceTimersByTime(2600));
+  expect(said()).toBe("+41 days of memory. You dug that.");
+  await act(async () => void jest.advanceTimersByTime(2600));
+  expect(said()).toBe("2 pulled back just before you’d have lost them.");
   reduce = false;
-  // The bubble has room for one line, so they still take turns; only the roll is gone (CSS).
-  expect(flat.q('.end-says .end-lines > [data-at="on"]')).toBe(1);
+  jest.useRealTimers();
   // Under the emblem nothing of Ore's is left but the count, and with no gem cut that stands in the ring (D242, D243).
   expect(flat.q(".review-end > p, .review-end > .end-lines")).toBe(0);
   expect(flat.q(".review-end h2")).toBe(0);
