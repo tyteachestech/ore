@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { DotsSix } from "../icons";
 import { label, useKeymap } from "../keys";
 import { MoreButton, WithMenu, type MenuAction } from "../Menu";
+import { kindIcon } from "./kind-icons";
 import { blockAt, BlockSelection, duplicate, gaps, kindOf, KINDS, moveBy, moveTo, remove, selectBlocks, selectedBlock, turnInto, type Block, type Gap } from "./blockops";
 
 type Line = { x: number; y: number; w: number };
@@ -114,7 +115,7 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
     };
     const kind = kindOf(v.state.doc, b);
     return [
-      { id: "turn", label: "Turn into", run: () => {}, sub: KINDS.map((k) => ({ id: k.kind, label: k.label, checked: k.kind === kind, run: run((x) => turnInto(v.state, x, k.kind)) })) },
+      { id: "turn", label: "Turn into", run: () => {}, sub: KINDS.map((k) => ({ id: k.kind, label: k.label, icon: kindIcon(k.kind), checked: k.kind === kind, run: run((x) => turnInto(v.state, x, k.kind)) })) },
       { id: "duplicate", label: "Duplicate", hint: label(keys["block-duplicate"]), run: run((x) => duplicate(v.state, x)) },
       { id: "up", label: "Move up", hint: label(keys["block-up"]), run: run((x) => moveBy(v.state, x, -1)) },
       { id: "down", label: "Move down", hint: label(keys["block-down"]), run: run((x) => moveBy(v.state, x, 1)) },

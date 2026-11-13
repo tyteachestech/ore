@@ -6,7 +6,7 @@ import type { MenuAction } from "./Menu";
    an action reads the same in every menu it is in, and the lists that build menus stay text. Keyed by the
    action's id; a label that turns the same id into another action (Restore on Archive's id) wins.
    A submenu's items draw one only where the item is a thing with its own mark (a skill's icon, a highlight
-   type, a level, a collection's folder); the diagram canvas's long command menu draws none (`plain`), as
+   type, a level, a collection's folder, a block type in Turn into: editor/kind-icons.tsx); the diagram canvas's long command menu draws none (`plain`), as
    Excalidraw's and Figma's don't. The iPhone's ⋯ sheet draws the same icons as the Mac's menus. */
 const BY_ID: Record<string, Icon> = {
   open: ArrowRight,

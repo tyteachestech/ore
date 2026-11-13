@@ -4720,6 +4720,12 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
   await grip("Effortful");
   await page.locator(".block-grip").click();
   await page.locator(".menu-item", { hasText: "Turn into" }).hover();
+  // Each block type draws its icon, as Notion's Turn into does (Tyler 2026-11-13).
+  const kinds = page.locator(".menu-sub [role=menuitemcheckbox]");
+  await kinds.first().waitFor();
+  const drawn = await page.locator(".menu-sub [role=menuitemcheckbox] > svg[data-sprite]").count();
+  if (drawn !== (await kinds.count())) throw new Error(`Turn into: ${drawn} of ${await kinds.count()} block types have an icon`);
+  if (process.env.ORE_E2E_SHOT) await page.screenshot({ path: process.env.ORE_E2E_SHOT });
   await page.getByRole("menuitemcheckbox", { name: "Heading 3", exact: true }).dispatchEvent("click");
   await until("it became a heading", () => page.locator(".note-editor h3", { hasText: "Effortful" }).isVisible());
   await page.keyboard.press("ControlOrMeta+z"); // the editor's own undo: ⌘ on the Mac, Ctrl where CI runs
