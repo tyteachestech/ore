@@ -37,7 +37,7 @@ Mood names are the ones in `Mole.tsx`. "Today" moods are on master; the rest com
 | Today's goal is met | 48px, `happy`, "Goal met. The rest is extra." | rises, one `wave`, then rests while the line is up. Built | same line |
 | Past the goal, still going | not on screen | not on screen: the bonus is in the end screen's numbers | none |
 
-The mid-session mole was 40px, under the size where the traced drawing is used (48px). He is 48px there since D258, so it is one mole all through a session.
+He is 48px mid-session since D258.
 
 ### The end screen
 

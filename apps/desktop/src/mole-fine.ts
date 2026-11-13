@@ -1,19 +1,18 @@
 import { PARTS } from "./mole-fine-data";
 import type { State } from "./Mole";
 
-/* The mole at 48 px and up (D251): concept 4 itself, every dot traced from the drawing, so his dots sit where the
-   drawing put them and not on a grid. He moves as a cut-out puppet on the same springs as the small one: the head
+/* The mole, at every size (D251, D261): concept 4 itself, every dot traced from the drawing, so his dots sit where the
+   drawing put them and not on a grid. He moves as a cut-out puppet on springs (`Mole.tsx`): the head
    (fur, face, helmet) rides up and down and leans, each lobe of the moustache swings from under his nose, the paws
    lift on their arms, and a dot under a part above it (fur under the helmet, a lid under an eye) shrinks away, so
-   nothing shows through and nothing pops. Positions come out in the small mole's 22 by 18 space, so he drops into
-   the same box. */
+   nothing shows through and nothing pops. Positions come out in a 22 by 18 space, the box the springs' values are written for. */
 
 /** Greys run from 0, the page, to 9, the text colour: `fine-0` … `fine-9`. */
 export type FineTone = `fine-${number}` | "eye" | "glint" | "nose" | "lamp" | "dirt";
 export const FINE_ORDER: FineTone[] = ["dirt", ...Array.from({ length: 10 }, (_, i) => `fine-${i}` as const), "nose", "lamp", "eye", "glint"];
 export type FineDot = [x: number, y: number, radius: number, tone: FineTone];
 
-/** The small mole's box and its dome's top row at rest (`COLS`, `ROWS`, `REST.top` in Mole.tsx, which imports this file). */
+/** His box and the dome's top row at rest (`REST.top` in Mole.tsx, which imports this file). */
 export const COLS = 22, ROWS = 18, REST_TOP = -0.3;
 /** One dot of his pitch in the 22-wide space: he is 33 dots across. */
 const U = COLS / 33;
@@ -123,14 +122,14 @@ function sideDots(s: State): FineDot[] {
   return settle(layers, Infinity);
 }
 
-/** Every dot of the fine mole in state `s`, in the small mole's space (x 0 to 22, the dirt along the foot of row 17).
+/** Every dot of the fine mole in state `s`, in that space (x 0 to 22, the dirt along the foot of row 17).
  *  `s.whole` draws his whole body and no dirt (falling out of the cart): his feet reach 17 rows below the box.
  *  `s.side` draws him asleep in profile instead (`sideDots`). */
 export function fineDots(s: State): FineDot[] {
   if (s.side > 0.5) return sideDots(s);
   const body = s.whole > 0.5;
   // The head rides his height and a hop (`top` above its rest is a hop, below it a squat), and leans from the ground up.
-  // The small mole flattens its dome when it is pleased or startled; this one keeps its head, so that part is taken back out.
+  // The pleased and startled poses lower `top` (written for a dome that flattened); he keeps his head, so that part is taken back out.
   const wide = clamp(s.tall), arc = clamp(s.arc), shutBoth = 1 - clamp(s.open);
   const rise = s.top - REST_TOP - 1.7 * wide - 0.9 * arc, sy = 1 - rise * 0.022, sx = 1 / sy;
   // A brow, cocked on the side he looks up to and both when he is startled, tips his helmet back to show.
