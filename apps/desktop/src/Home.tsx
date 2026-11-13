@@ -118,7 +118,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   const [today, setToday] = useState<Today | null>(lastToday);
   const [error, setError] = useState<string | null>(null);
   // Home stays mounted under Review: when it hands back, take the Today it read at its end screen before the first
-  // paint, so the goal line is already there instead of pushing the list down a moment later (F-new-r2-home-goal-return-jump).
+  // paint, so the goal line is already there instead of pushing the list down a moment later (F104).
   useLayoutEffect(() => { const t = lastToday(); if (t) setToday(t); }, [reload]);
 
   const refresh = useCallback(() => {

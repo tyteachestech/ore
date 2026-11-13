@@ -6644,7 +6644,7 @@ journey("review: a rating always moves the session one step on, and a miss adds 
   }
 });
 
-journey("Home: Done after meeting the goal keeps Continue reading still from its first paint (F-new-r2-home-goal-return-jump)", async (page) => {
+journey("Home: Done after meeting the goal keeps Continue reading still from its first paint (F104)", async (page) => {
   const log = oreCalls(page);
   const was = (await ore("today")) as { goal_minutes: number };
   try {

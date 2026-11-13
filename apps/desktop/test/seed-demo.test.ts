@@ -46,7 +46,7 @@ test("the demo library is set up to film: the day nearly done, gems to cut, a le
 }, 30_000);
 
 // Inspect the saved sources, the same Markdown the reader receives.
-test("demo source bodies contain no single-dollar math (F-new-r2-demo-inline-math)", async () => {
+test("demo source bodies contain no single-dollar math (F105)", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ore-demo-math-"));
   const root = join(dir, "lib");
   try {
@@ -90,7 +90,7 @@ function sampleCurve(path: string): [number, number][] {
   return points;
 }
 
-test("demo forgetting curves fall monotonically above the axis and match their stability (F-new-r2-demo-curve-hook)", async () => {
+test("demo forgetting curves fall monotonically above the axis and match their stability (F106)", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ore-demo-curves-"));
   const root = join(dir, "lib");
   try {

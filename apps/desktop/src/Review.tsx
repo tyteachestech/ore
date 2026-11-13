@@ -419,7 +419,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
       const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
-      // Home draws the Today it last read until a fresh one lands (F-new-r2-home-goal-return-jump): hand it this one,
+      // Home draws the Today it last read until a fresh one lands (F104): hand it this one,
       // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
       const today = await ore<Today>("today");
       rememberToday(today);
