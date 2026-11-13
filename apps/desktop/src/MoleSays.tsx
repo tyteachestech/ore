@@ -9,8 +9,8 @@ export const TYPE_MS = 28, HOLD_MS = 2600;
  *  letter in the mono with his block cursor (D186) at the words' end; a full line holds, then the next is typed.
  *  The pointer or the keyboard on the box holds the line. The whole line is in the page from its first letter
  *  (the letters to come are only unseen), so it never rewraps and a reader hears it whole. Under Reduce Motion
- *  a line stands at once and the block doesn't blink. `tail`: the side the mole is on. Children: a small action. */
-export function MoleSays({ lines, run = true, tail = "left", className = "", children }: { lines: { text: string; hint?: string }[]; run?: boolean; tail?: "left" | "right"; className?: string; children?: React.ReactNode }) {
+ *  a line stands at once and the block doesn't blink. A line's `mark` (a rare line's icon, D247) leads it. `tail`: the side the mole is on. Children: a small action. */
+export function MoleSays({ lines, run = true, tail = "left", className = "", children }: { lines: { text: string; hint?: string; mark?: React.ReactNode }[]; run?: boolean; tail?: "left" | "right"; className?: string; children?: React.ReactNode }) {
   const [at, setAt] = useState(0);
   const [typed, setTyped] = useState(0);
   // The pointer and the keyboard each hold it on their own: leaving with one never lets go for the other.
@@ -35,7 +35,7 @@ export function MoleSays({ lines, run = true, tail = "left", className = "", chi
   if (!line) return null;
   const words = (
     <p className="says-line" tabIndex={line.hint ? 0 : undefined}>
-      {text.slice(0, n)}<i className="says-block" aria-hidden="true" /><span className="says-rest">{text.slice(n)}</span>
+      {line.mark && <span className="says-mark" aria-hidden="true">{line.mark}</span>}{text.slice(0, n)}<i className="says-block" aria-hidden="true" /><span className="says-rest">{text.slice(n)}</span>
     </p>
   );
   return (

@@ -5,6 +5,7 @@ import { Children, useCallback, useEffect, useRef, useState, type MutableRefObje
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Cutting, Gem } from "./Gem";
+import { SkillIcon } from "./IconPicker";
 import { Mole } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
 import { still } from "./SideCursor";
@@ -15,7 +16,7 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { endSays } from "./end-says";
+import { endSays, type Said } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -1108,15 +1109,13 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick, source)}</p>}
 
         {goalSaid && !moment && !end && (
-          <div className="review-moment" data-tone="goal" role="status">
-            <span className="moment-mole"><Mole bare size={40} mood="happy" /></span>
-            <span className="moment-text">
-              <b>Goal met.</b>
-              <span>The rest is extra.</span>
-            </span>
-            <Hint text={<>End the session <kbd>Esc</kbd></>}>
-              <button className="moment-done" onClick={() => void finish()}>Done</button>
-            </Hint>
+          <div className="review-goal" role="status">
+            <Mole bare size={48} mood="happy" />
+            <MoleSays lines={GOAL_SAID}>
+              <Hint text={<>End the session <kbd>Esc</kbd></>}>
+                <button className="moment-done" onClick={() => void finish()}>Done</button>
+              </Hint>
+            </MoleSays>
           </div>
         )}
         {moment && !end && (
@@ -1503,6 +1502,9 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
 }
 
 
+/** What the mole says when the day's goal closes mid-session (D246). */
+const GOAL_SAID = [{ text: "Goal met. The rest is extra." }];
+
 /** The end screen's lines (D241): one place, one line at a time. Each rolls up into it, holds, and rolls on up
  *  as the next arrives, round and round; the pointer or the keyboard on a line holds it. Every line is in the
  *  page throughout, so a single line just sits there, and under Reduce Motion they are a plain list. */
@@ -1605,13 +1607,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       <b>{quick ? s.kept : <><DotNumber value={count} height={56} /><span className="sr-only">{s.kept}</span></>}</b> {s.kept === 1 ? "memory" : "memories"} kept
     </p>
   );
+  const [roll] = useState(Math.random);
+  const skill = (id: string) => skills.find((x) => x.id === id);
+  // D247: a rare line wears its own mark, in the drawing that thing already has: the skill's icon in its colour,
+  // the clock for a long gap, the gold-rimmed gem for one pulled back.
+  const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" ? <Clock size={14} /> : <Gem kind="cut" size={14} seam />);
   const said = endSays({
-    session: s, today: t, closed, short,
-    ups: ups.map((k) => ({ name: skills.find((x) => x.id === k.skill)?.name ?? k.skill, level: k.level })),
+    session: s, today: t, closed, short, roll,
+    ups: ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level })),
     // The quick quiz says it under its headline already.
     waiting: !quick && t.caught_up && t.new_waiting > 0 ? waiting(t) : null,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
-  });
+  }).map((l) => ({ ...l, mark: mark(l) }));
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
@@ -1648,7 +1655,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       {quick && (
         <EndLines run={stage === "done"}>
           {kept}
-          {said.slice(s.kept > 0 ? 1 : 0).map((l) => <p key={l.text} className={s.kept === 0 && l === said[0] ? "review-kept" : "review-rescued"}>{l.text}</p>)}
+          {said.filter((l) => !l.verdict || s.kept === 0).map((l) => <p key={l.text} className={l.verdict ? "review-kept" : "review-rescued"}>{l.text}</p>)}
         </EndLines>
       )}
       {/* D165: how often he is right at each of his three taps, so he sees whether they mean anything, not only whether Sure is too sure. */}

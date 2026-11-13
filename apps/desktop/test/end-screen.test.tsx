@@ -142,7 +142,7 @@ test("the mole's lines share one speech box: each is typed out a letter at a tim
   jest.useFakeTimers();
   // No cart (the goal was met before), so the lines start turning at once.
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
-  Object.assign(e.session, { depth_days: 41, rescued: 2 });
+  Object.assign(e.session, { depth_days: 41 });
   const s = await mount(e as never);
   const line = () => s.body.querySelector(".end-says .says-line");
   const typed = () => line()!.firstChild?.nodeType === 3 ? line()!.firstChild!.textContent : "";
@@ -190,7 +190,7 @@ test("the mole's lines share one speech box: each is typed out a letter at a tim
   await act(async () => void jest.advanceTimersByTime(2600));
   expect(said()).toBe("+41 days of memory. You dug that.");
   await act(async () => void jest.advanceTimersByTime(2600));
-  expect(said()).toBe("2 pulled back just before you’d have lost them.");
+  expect(said()).toBe("Honest work.");
   reduce = false;
   jest.useRealTimers();
   // Under the emblem nothing of Ore's is left but the count, and with no gem cut that stands in the ring (D242, D243).
@@ -244,10 +244,37 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   expect(endSays({ ...base, short: true, session: session({}) })[0]!.text).toBe("Seam’s empty. Today counts.");
   // No guilt for a session of misses, whatever else is true (D62).
   expect(endSays({ ...base, closed: true, session: session({ kept: 0 }) })[0]!.text).toBe("Every miss comes back sooner. That’s how they stick.");
-  const all = endSays({ ...base, session: session({ depth_days: 212, longest_days: 9, rescued: 2 }), ups: [{ name: "AI", level: 3 }], waiting: "2 new exercises start tomorrow.", minutesLeft: "4" });
-  expect(all.map((l) => l.text)).toEqual(["Honest work.", "+7 months of memory. You dug that.", "9 days gone and you still had it.", "2 pulled back just before you’d have lost them.", "AI hit level 3.", "4 min to today’s goal. Your call.", "2 new exercises start tomorrow."]);
-  // The one number that needs explaining keeps its hint.
-  expect(all[1]!.hint).toContain("added up");
+  // Three lines at most (D247). The rare things lead, rarest first, each with its mark; days of memory keeps its place.
+  const all = endSays({ ...base, session: session({ depth_days: 212, longest_days: 9, rescued: 2 }), ups: [{ skill: "ai", name: "AI", level: 3 }], waiting: "2 new exercises start tomorrow.", minutesLeft: "4" });
+  expect(all.map((l) => l.text)).toEqual(["AI hit level 3.", "9 days gone and you still had it.", "+7 months of memory. You dug that."]);
+  expect(all.map((l) => l.rare?.kind)).toEqual(["level", "long", undefined]);
+  expect(endSays({ ...base, session: session({ rescued: 2 }) }).map((l) => [l.text, l.rare?.kind])).toEqual([["2 pulled back just before you’d have lost them.", "rescued"], ["Honest work.", undefined]]);
+  // The one number that needs explaining keeps its hint, and says what came after the goal (D246).
+  expect(all[2]!.hint).toContain("added up");
+  expect(endSays({ ...base, session: session({ depth_days: 41, depth_extra_days: 12 }) })[1]!.text).toBe("+41 days of memory, 12 of them extra. You dug that.");
+  expect(endSays({ ...base, session: session({ depth_days: 212, depth_extra_days: 61 }) })[1]!.text).toBe("+7 months of memory, 2 months of it extra. You dug that.");
+  expect(endSays({ ...base, session: session({ depth_days: 41, depth_extra_days: 41 }) })[1]!.text).toBe("+41 days of memory. You dug that.");
+  // With nothing rare the verdict opens; the everyday lines after it come in an order the roll picks, and the same roll picks the same.
+  const plain = (roll: number) => endSays({ ...base, roll, session: session({}), waiting: "2 new exercises start tomorrow.", minutesLeft: "4" }).map((l) => l.text);
+  expect(plain(0)).toEqual(["Honest work.", "4 min to today’s goal. Your call.", "2 new exercises start tomorrow."]);
+  expect(plain(0.9)).toEqual(["Honest work.", "2 new exercises start tomorrow.", "4 min to today’s goal. Your call."]);
+  expect(plain(0.9)).toEqual(plain(0.9));
+  // A session of misses opens with why it was worth it, whatever else is true (D62).
+  expect(endSays({ ...base, session: session({ kept: 0, longest_days: 9 }), ups: [{ name: "AI", level: 3 }] })[0]!.verdict).toBe(true);
   // A gap under a week, and rescues that were most of the session, go unsaid.
   expect(endSays({ ...base, session: session({ longest_days: 3, rescued: 6 }) })).toHaveLength(1);
+});
+
+test("a rare line leads the mole's lines and wears its own mark (D247)", async () => {
+  jest.useFakeTimers();
+  const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { depth_days: 41, rescued: 2 });
+  const s = await mount(e as never);
+  await act(async () => void jest.advanceTimersByTime(560));
+  const line = s.body.querySelector(".end-says .says-line")!;
+  expect(line.textContent).toBe("2 pulled back just before you’d have lost them.");
+  // The gold-rimmed gem, the drawing a won-back memory already has.
+  expect(line.querySelectorAll(".says-mark .gem").length).toBe(1);
+  jest.useRealTimers();
+  await s.done();
 });

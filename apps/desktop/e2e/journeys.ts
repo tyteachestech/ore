@@ -6327,7 +6327,7 @@ journey("review: a Later on the one more exercise served after a miss closed the
   });
   const q = page.locator(".review-q");
   const again = page.getByRole("button", { name: "Again", exact: true });
-  const told = page.locator('.review-moment[data-tone="goal"]');
+  const told = page.locator('.review-goal');
   try {
     await startReview(page, /Learning/);
     const first = await q.innerText();
@@ -6515,7 +6515,7 @@ journey("review: when the day's goal closes the mole says so and the session goe
   const was = (await ore("today")) as { goal_minutes: number; met: boolean; due: number };
   if (was.met || was.due < 3) throw new Error(`needs an unmet goal and three exercises due: ${JSON.stringify({ met: was.met, due: was.due })}`);
   const q = page.locator(".review-q");
-  const note = page.locator('.review-moment[data-tone="goal"]');
+  const note = page.locator('.review-goal');
   const good = page.getByRole("button", { name: "Good", exact: true });
   try {
     await ore("goal", "--minutes", "1");
