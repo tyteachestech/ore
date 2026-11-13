@@ -1536,7 +1536,7 @@ function EndLines({ run, children }: { run: boolean; children: React.ReactNode }
 
 /** A result's number in the ring's dots, running up from nothing once `go` (D-new-end-tally); whole at once under Reduce Motion. */
 function CountUp({ value, go }: { value: string; go: boolean }) {
-  const m = /^(\D*)(\d+)(.*)$/.exec(value);
+  const m = /^(\D*)(\d+(?:\.(\d+))?)$/.exec(value);
   const [k, setK] = useState(still() ? 1 : 0);
   useEffect(() => {
     if (!go || still()) return;
@@ -1548,7 +1548,7 @@ function CountUp({ value, go }: { value: string; go: boolean }) {
     });
     return () => cancelAnimationFrame(frame);
   }, [go]);
-  return <DotNumber value={m ? `${m[1]}${Math.round(Number(m[2]) * k)}${m[3]}` : value} height={28} />;
+  return <DotNumber value={m ? `${m[1]}${(Number(m[2]) * k).toFixed(m[3]?.length ?? 0)}` : value} height={28} />;
 }
 
 /** How long after one result the next lands. */
@@ -1649,21 +1649,19 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       <b>{s.kept}</b> {s.kept === 1 ? "memory" : "memories"} kept
     </p>
   );
-  // The mole watches the results land, then says his line.
+  // The results land, then the mole says his line.
   const [tallied, setTallied] = useState(false);
   const [roll] = useState(Math.random);
   const skill = (id: string) => skills.find((x) => x.id === id);
   // D247: a rare line wears its own mark, in the drawing that thing already has: the skill's icon in its colour,
   // the clock for a long gap, the gold-rimmed gem for one pulled back.
   const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" || l.rare.kind === "then" ? <Clock size={16} /> : <Gem kind="cut" size={16} seam />);
+  const named = ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level }));
   const said = endSays({
-    session: s, today: t, closed, short, roll,
-    ups: ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level })),
-    // The quick quiz says it under its headline already.
-    waiting: !quick && t.caught_up && t.new_waiting > 0 ? waiting(t) : null,
+    session: s, today: t, closed, short, roll, ups: named, plain: quick,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   }).map((l) => ({ ...l, mark: mark(l) }));
-  const tiles = endTiles({ session: s, ups: ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level })) });
+  const tiles = endTiles({ session: s, ups: named });
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
@@ -1683,10 +1681,10 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         <>
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem">
-            <span className="review-mole">{up && <Mole bare size={96} mood={mood} look={full && !tallied && tiles.length > 0} />}</span>
+            <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
             {/* D243, D-new-end-tally: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {mood === "cheer" && (
-              <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done"} />
+              <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
             )}
             <div className="end-ring">
               {ring}

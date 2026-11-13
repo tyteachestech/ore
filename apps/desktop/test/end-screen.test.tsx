@@ -242,7 +242,7 @@ test("the end screen is one emblem over one row of results (D242, D-new-end-tall
 
 test("what the mole says at a session's end (D243): the verdict, then only what the numbers say", async () => {
   const { endSays } = await import("../src/end-says");
-  const base = { today: today(true, 600_000) as never, closed: false, short: false, ups: [], waiting: null, minutesLeft: null };
+  const base = { today: today(true, 600_000) as never, closed: false, short: false, ups: [], minutesLeft: null };
   const session = (o: Record<string, unknown>) => ({ id: "s", reviews: 8, kept: 5, rescued: 0, ...o }) as never;
   expect(endSays({ ...base, session: session({}) }).map((l) => l.text)).toEqual(["Gneiss work."]);
   expect(endSays({ ...base, closed: true, session: session({}) })[0]!.text).toBe("Goal met. You rock.");
@@ -250,7 +250,7 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   // No guilt for a session of misses, whatever else is true (D62).
   expect(endSays({ ...base, closed: true, session: session({ kept: 0 }) })[0]!.text).toBe("Schist happens. Every miss comes back sooner.");
   // Three lines at most (D247). The rare things lead, rarest first, each with its mark; days of memory keeps its place.
-  const all = endSays({ ...base, session: session({ depth_days: 212, longest_days: 9, rescued: 2 }), ups: [{ skill: "ai", name: "AI", level: 3 }], waiting: "2 new exercises start tomorrow.", minutesLeft: "4" });
+  const all = endSays({ ...base, session: session({ depth_days: 212, longest_days: 9, rescued: 2 }), ups: [{ skill: "ai", name: "AI", level: 3 }], minutesLeft: "4" });
   expect(all.map((l) => l.text)).toEqual(["AI hit level 3.", "9 days gone and you still had it.", "+7 months of memory. You dug that."]);
   expect(all.map((l) => l.rare?.kind)).toEqual(["level", "long", undefined]);
   expect(endSays({ ...base, session: session({ rescued: 2 }) }).map((l) => [l.text, l.rare?.kind])).toEqual([["2 pulled back just before you’d have lost them.", "rescued"], ["Gneiss work.", undefined]]);
@@ -259,11 +259,12 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   expect(endSays({ ...base, session: session({ depth_days: 41, depth_extra_days: 12 }) })[1]!.text).toBe("+41 days of memory, 12 of them extra. You dug that.");
   expect(endSays({ ...base, session: session({ depth_days: 212, depth_extra_days: 61 }) })[1]!.text).toBe("+7 months of memory, 2 months of it extra. You dug that.");
   expect(endSays({ ...base, session: session({ depth_days: 41, depth_extra_days: 41 }) })[1]!.text).toBe("+41 days of memory. You dug that.");
-  // With nothing rare the verdict opens; the everyday lines after it come in an order the roll picks, and the same roll picks the same.
-  const plain = (roll: number) => endSays({ ...base, roll, session: session({}), waiting: "2 new exercises start tomorrow.", minutesLeft: "4" }).map((l) => l.text);
-  expect(plain(0)).toEqual(["Gneiss work.", "4 min to today’s goal. Your call.", "2 new exercises start tomorrow."]);
-  expect(plain(0.9)).toEqual(["Don’t take that for granite.", "2 new exercises start tomorrow.", "4 min to today’s goal. Your call."]);
-  expect(plain(0.9)).toEqual(plain(0.9));
+  // With nothing rare the verdict opens, picked by the roll; the same roll picks the same.
+  const plain = (roll: number) => endSays({ ...base, roll, session: session({}), minutesLeft: "4" }).map((l) => l.text);
+  expect(plain(0)).toEqual(["Gneiss work.", "4 min to today’s goal. Your call."]);
+  expect(plain(0.9)).toEqual(["Don’t take that for granite.", "4 min to today’s goal. Your call."]);
+  // The quick quiz has no mole: its line for a session of misses stays in plain words.
+  expect(endSays({ ...base, plain: true, session: session({ kept: 0 }) })[0]!.text).toBe("Every miss comes back sooner. That’s how they stick.");
   // The verdict is a pun, one of a few of its kind by the roll; every one for a session of misses says why it was worth it.
   const { PUNS } = await import("../src/end-says");
   expect(endSays({ ...base, roll: 0.5, session: session({}) })[0]!.text).toBe("Ore-some.");
@@ -308,7 +309,7 @@ test("then and now: his answer from weeks ago over today's, under the ring, and 
   await none.done();
 });
 
-test("the results land one after another and count up, and the mole watches until the last is in (D-new-end-tally)", async () => {
+test("the results land one after another and count up, and the mole speaks once the last is in (D-new-end-tally)", async () => {
   jest.useFakeTimers();
   // No cart (the goal was met before), so the row starts at once.
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
@@ -351,4 +352,7 @@ test("the row of results (D-new-end-tally): kept, days of memory, then the rares
   expect(depth.hint).toContain("added up");
   expect(depth.hint).toContain("12 days of it came after today’s goal");
   expect(endTiles({ session: session({ kept: 0, depth_days: 9 }), ups: [{ name: "AI", level: 3 }] })).toEqual([]);
+  // Years keep their fraction, and one pulled back is "it".
+  expect(endTiles({ session: session({ depth_days: 900 }), ups: [] })[1]).toMatchObject({ value: "+2.5", label: "years of memory" });
+  expect(endTiles({ session: session({ rescued: 1 }), ups: [] })[1]!.hint).toContain("lose it");
 });

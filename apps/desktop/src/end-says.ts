@@ -1,4 +1,4 @@
-import { depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
+import { depthParts, depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
 
 /** One of the end screen's results (D-new-end-tally): a number, what it counts, and for a rare one what kind. */
 export type Tile = { key: "kept" | "depth" | "level" | "rescued" | "long" | "cut"; value: string; label: string; hint?: string; rare?: Said["rare"] };
@@ -16,10 +16,11 @@ export const SAID_MAX = 3;
  *  one per end screen) shuffles: which true line shows varies, never whether something was won (D62). With
  *  nothing rare the verdict opens, and a session of misses always opens with why it was worth it (D62).
  *  His voice is an old miner's: short, dry, fond of a pun, and only ever what the numbers say, never about the person. */
-export function endSays(o: { session: SessionEnd; today: Today; closed: boolean; short: boolean; ups: { skill?: string; name: string; level: number }[]; waiting: string | null; minutesLeft: string | null; roll?: number }): Said[] {
+export function endSays(o: { session: SessionEnd; today: Today; closed: boolean; short: boolean; ups: { skill?: string; name: string; level: number }[]; minutesLeft: string | null; roll?: number; plain?: boolean }): Said[] {
   const s = o.session;
   // His verdict is a corny mining pun (Tyler, 2026-11-13), one of a few per case so it isn't the same every day.
-  const verdict: Said = { verdict: true, text: pick(s.kept === 0 ? PUNS.missed : o.closed ? PUNS.closed : o.short ? PUNS.short : PUNS.plain, o.roll ?? 0) };
+  // `plain`: the quick quiz has no mole, so its one verdict (a session of misses) stays in plain words.
+  const verdict: Said = { verdict: true, text: o.plain && s.kept === 0 ? "Every miss comes back sooner. That’s how they stick." : pick(s.kept === 0 ? PUNS.missed : o.closed ? PUNS.closed : o.short ? PUNS.short : PUNS.plain, o.roll ?? 0) };
   const rare: Said[] = [
     ...o.ups.map((k): Said => ({ text: `${k.name} hit level ${k.level}.`, rare: { kind: "level", skill: k.skill ?? "" } })),
     // Then and now (D248): the two answers stand under the ring; he only points at them.
@@ -31,7 +32,7 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   const depth: Said[] = (s.depth_days ?? 0) > 0
     ? [{ text: `+${depthText(s.depth_days!)} of memory${extraText(s.depth_days!, extra)}. You dug that.`, hint: `How much longer the exercises you passed today will now last, added up (at most 30 days each)${extraText(s.depth_days!, extra) ? "; extra is what came after today’s goal" : ""}` }]
     : [];
-  const common: Said[] = [...(o.minutesLeft ? [{ text: `${o.minutesLeft} min to today’s goal. Your call.` }] : []), ...(o.waiting ? [{ text: o.waiting }] : [])];
+  const common: Said[] = o.minutesLeft ? [{ text: `${o.minutesLeft} min to today’s goal. Your call.` }] : [];
   // The verdict opens unless something rare does; then it is one more everyday line.
   const opens = rare.length && s.kept > 0 ? [] : [verdict];
   const rest = shuffled(opens.length ? common : [verdict, ...common], o.roll ?? 0);
@@ -46,11 +47,11 @@ export function endTiles(o: { session: SessionEnd; ups: { skill?: string; name: 
   const s = o.session;
   if (s.kept === 0) return [];
   const days = s.depth_days ?? 0, extra = s.depth_extra_days ?? 0, cut = s.cut?.length ?? 0, up = o.ups[0];
-  const [n, unit] = depthText(days).split(" ") as [string, string];
+  const { n, unit } = depthParts(days);
   const third: Tile | null = up
     ? { key: "level", value: String(up.level), label: `${up.name} level`, rare: { kind: "level", skill: up.skill ?? "" } }
     : rescuedWorthSaying(s)
-      ? { key: "rescued", value: String(s.rescued), label: "pulled back in time", hint: "Due so long you were about to lose them, and you still recalled them", rare: { kind: "rescued" } }
+      ? { key: "rescued", value: String(s.rescued), label: "pulled back in time", hint: s.rescued === 1 ? "Due so long you were about to lose it, and you still recalled it" : "Due so long you were about to lose them, and you still recalled them", rare: { kind: "rescued" } }
       : longGapText(s)
         ? { key: "long", value: String(s.longest_days), label: "days since you saw one", hint: longGapText(s)!, rare: { kind: "long" } }
         : cut
