@@ -13,8 +13,9 @@ import { MoreButton } from "./Menu";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
-import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
+import { endSays } from "./end-says";
 import { DotBar, DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
@@ -1480,14 +1481,15 @@ const LINE_MS = 2600;
 /** The end screen's lines (D241): one place, one line at a time. Each rolls up into it, holds, and rolls on up
  *  as the next arrives, round and round; the pointer or the keyboard on a line holds it. Every line is in the
  *  page throughout, so a single line just sits there, and under Reduce Motion they are a plain list. */
-function EndLines({ run, children }: { run: boolean; children: React.ReactNode }) {
+function EndLines({ run, turn = false, children }: { run: boolean; turn?: boolean; children: React.ReactNode }) {
   const lines = Children.toArray(children);
   const [at, setAt] = useState(0);
   // The pointer and the keyboard each hold it on their own: leaving with one never lets go for the other.
   const [over, setOver] = useState(false);
   const [within, setWithin] = useState(false);
   const held = over || within;
-  const flat = still();
+  // `turn`: there is room for one line only (the mole's bubble), so under Reduce Motion they still take turns, without the roll.
+  const flat = still() && !turn;
   useEffect(() => {
     if (flat || !run || held || lines.length < 2) return;
     const id = setInterval(() => setAt((i) => i + 1), LINE_MS);
@@ -1579,6 +1581,13 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       <b>{quick ? s.kept : <><DotNumber value={count} height={56} /><span className="sr-only">{s.kept}</span></>}</b> {s.kept === 1 ? "memory" : "memories"} kept
     </p>
   );
+  const said = endSays({
+    session: s, today: t, closed, short,
+    ups: ups.map((k) => ({ name: skills.find((x) => x.id === k.skill)?.name ?? k.skill, level: k.level })),
+    // The quick quiz says it under its headline already.
+    waiting: !quick && t.caught_up && t.new_waiting > 0 ? waiting(t) : null,
+    minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
+  });
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
@@ -1599,6 +1608,17 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem">
             <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
+            {/* D243: the mole says what the session won, one line at a time, once he has come up. */}
+            {mood === "cheer" && (
+              <div className="end-says">
+                <svg className="end-says-tail" width="9" height="15" viewBox="0 0 9 15" aria-hidden="true">
+                  <path d="M9 0h-3v3h-3v3h-3v3h3v3h3v3h3z" />
+                </svg>
+                <EndLines run={stage === "done"} turn>
+                  {said.map((l) => (l.hint ? <Hint key={l.text} text={l.hint}><p tabIndex={0}>{l.text}</p></Hint> : <p key={l.text}>{l.text}</p>))}
+                </EndLines>
+              </div>
+            )}
             <div className="end-ring">
               {ring}
               {cluster || kept}
@@ -1607,38 +1627,13 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           {cluster && kept}
         </>
       )}
-      {/* D241: what the session won, one line at a time in one place, each rolling up to make way for the next. */}
-      <EndLines run={stage === "done"}>
-        {quick && kept}
-        {/* A session of misses is still the work that makes them stick (D62: no guilt copy). */}
-        {s.kept === 0 && <p className="review-kept">Every miss comes back sooner. That’s how they stick.</p>}
-        {/* D197: what the session's passes added to his memory, as one number. */}
-        {(s.depth_days ?? 0) > 0 && (
-          <Hint text="How much longer the exercises you passed today will now last, added up">
-            <p className="review-rescued review-depth" tabIndex={0}>+{depthText(s.depth_days!)} of memory</p>
-          </Hint>
-        )}
-        {longGapText(s) && <p className="review-rescued">{longGapText(s)}</p>}
-        {rescuedWorthSaying(s) && (
-          <p className="review-rescued">
-            {/* The rich ore the cart carried (D197), when a cart ran. */}
-            {pour && <i className="rich-ore" aria-hidden="true" />}
-            {s.rescued} rescued just before you’d have forgotten {s.rescued === 1 ? "it" : "them"}
-          </p>
-        )}
-        {ups.map((k) => {
-          const sk = skills.find((x) => x.id === k.skill) ?? { id: k.skill, name: k.skill };
-          return (
-            <p key={k.skill} className="review-levelup" data-color={sk.color}>
-              <SkillChip skill={sk} /> reached level {k.level}
-            </p>
-          );
-        })}
-        {!t.met && t.counts && <p className="quiz-faint">{minutesText(Math.max(0, t.goal_ms - t.active_ms))} min to today’s goal</p>}
-        {!quick && held}
-      </EndLines>
-      {/* D242: the headline is a quiet label under what the session won, not a second hero. */}
-      {!quick && <h2>{title}</h2>}
+      {/* The quick quiz has no mole: it lists what the session won, one line at a time (D241). */}
+      {quick && (
+        <EndLines run={stage === "done"}>
+          {kept}
+          {said.slice(s.kept > 0 ? 1 : 0).map((l) => <p key={l.text} className={s.kept === 0 && l === said[0] ? "review-kept" : "review-rescued"}>{l.text}</p>)}
+        </EndLines>
+      )}
       {/* D165: how often he is right at each of his three taps, so he sees whether they mean anything, not only whether Sure is too sure. */}
       {s.calibration && (
         <div className="review-calibration" role="group" aria-label="When you say">
