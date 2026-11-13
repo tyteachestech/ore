@@ -1,5 +1,5 @@
 """Traces the mole of ChatGPT's concept 4 (docs/design/mole-concept-4.png) dot by dot into apps/desktop/src/mole-fine-data.ts
-(D250). Finds every dot (a disc brighter than the ring round it), splits them into his parts (helmet, lamp, fur, nose,
+(D-new-traced-mole). Finds every dot (a disc brighter than the ring round it), splits them into his parts (helmet, lamp, fur, nose,
 moustache lobes, paws), puts fur on his own dot pitch under every part that can move off it, and places the eyes, which
 are black on a dark page and can't be found. Run: python3 apps/desktop/scripts/mole-trace.py (needs Pillow and numpy)."""
 import os

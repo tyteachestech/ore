@@ -161,7 +161,7 @@ test("stretched tall the head is narrower than at rest, squashed it is wider", (
   expect(width({ top: 1.7, rx: 9 })).toBeGreaterThan(width({ rx: 9 }));
 });
 
-// D250: from 48px up he is concept 4 itself, traced dot by dot, moving as a cut-out puppet on the same springs.
+// D-new-traced-mole: from 48px up he is concept 4 itself, traced dot by dot, moving as a cut-out puppet on the same springs.
 const fine = (s: Partial<State> = {}) => fineDots({ ...REST, ...s });
 const ink = (d: ReturnType<typeof fineDots>, tone?: string) => d.reduce((a, [, , r, t]) => a + (!tone || t === tone ? r * r : 0), 0);
 

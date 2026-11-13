@@ -223,7 +223,7 @@ const BLINK_MS = 120, LOOK_MS = 900;
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
-/** From this width up he is drawn as the traced concept (`mole-fine.ts`, D250); under it his dots would be under 2px,
+/** From this width up he is drawn as the traced concept (`mole-fine.ts`, D-new-traced-mole); under it his dots would be under 2px,
  *  so the small grid mole above stands in. */
 export const FINE_FROM = 48;
 
