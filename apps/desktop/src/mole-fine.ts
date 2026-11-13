@@ -39,8 +39,10 @@ const CROWN = -27 * U, BRIM = -15.5 * U, PIVOT_Y = -10.4 * U, PIVOT_X = 0.9 * U,
 /** Pleased, his cheeks lift: each lobe swings out a little (radians), rises and parts (dots). An open mouth parts them too. */
 const SMILE = 0.2, LIFT = 0.4, APART = 0.6, PART = 0.1;
 
-/** Every dot of the fine mole in state `s`, in the small mole's space (x 0 to 22, the dirt along the foot of row 17). */
+/** Every dot of the fine mole in state `s`, in the small mole's space (x 0 to 22, the dirt along the foot of row 17).
+ *  `s.whole` draws his whole body and no dirt (asleep in the cart, falling): his feet reach 17 rows below the box. */
 export function fineDots(s: State): FineDot[] {
+  const body = s.whole > 0.5;
   // The head rides his height and a hop (`top` above its rest is a hop, below it a squat), and leans from the ground up.
   // The small mole flattens its dome when it is pleased or startled; this one keeps its head, so that part is taken back out.
   const wide = clamp(s.tall), arc = clamp(s.arc), shutBoth = 1 - clamp(s.open);
@@ -99,7 +101,7 @@ export function fineDots(s: State): FineDot[] {
   const star = clamp(s.star, 0, 1.08), blush = clamp(s.blush);
 
   const paws = layer();
-  for (const { side, paw } of SIDES) {
+  if (!body) for (const { side, paw } of SIDES) {
     const lift = side < 0 ? s.pawL : s.pawR;
     for (const p of paw) paws.push([MID + p.x, GROUND + p.y + s.y - lift, p.r, p.tone, true]);
   }
@@ -152,13 +154,44 @@ export function fineDots(s: State): FineDot[] {
     }
   }
   const fur = layer();
-  for (const p of FUR) { const [x, y] = head(p); fur.push([x, y, p.r, p.tone, true]); }
+  // Whole, the shadows his paws cast on his chest go with the paws.
+  for (const p of FUR) { const [x, y] = head(p); fur.push([x, y, p.r, body && p.y > -2.5 * U && p.tone < "fine-4" ? "fine-5" : p.tone, true]); }
   for (const p of GAP) { const [x, y] = head(p, fx, fy); fur.push([x, y, p.r, p.tone, true]); }
+
+  if (body) {
+    // Under his head, on the same pitch: belly, feet, legs, torso, then the arms behind it all. Units are his dots.
+    const b = clamp(s.breath), k = clamp(s.arms), under = layer();
+    const seg = (x: number, y: number, x1: number, y1: number, x2: number, y2: number, r: number) => {
+      const dx = x2 - x1, dy = y2 - y1, t = clamp(((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy));
+      return Math.hypot(x - x1 - dx * t, y - y1 - dy * t) - r;
+    };
+    const oval = (x: number, y: number, cx: number, cy: number, rx: number, ry: number) => (Math.hypot((x - cx) / rx, (y - cy) / ry) - 1) * Math.min(rx, ry);
+    const mixed = (a: number, c: number) => a + (c - a) * k;
+    const TONES: FineTone[] = ["fine-7", "fine-9", "fine-4", "fine-5", "fine-9", "fine-4"], d = [0, 0, 0, 0, 0, 0];
+    const ex = mixed(17.5, 16), ey2 = mixed(-7, -3), hx = mixed(11, 21), hy = mixed(-17, -11);
+    for (let j = -21; j <= 26; j++) for (let i = -24; i <= 24; i++) {
+      const x = i + 0.07, y = j - 0.02, ax = Math.abs(x);
+      const kick = clamp((x < 0 ? -1 : 1) * s.legs) * 2.2, fy = 23 - kick, lx = 6.4 + kick * 0.5;
+      d[0] = oval(ax, y, 0, 11, 7.6, 6.4 + b * 0.8);
+      d[1] = oval(ax, y, lx + 1.6, fy, 3.5, 2.3);
+      d[2] = seg(ax, y, 5, 16, lx, fy - 1.5, 2.9);
+      d[3] = Math.min(oval(ax, y, 0, 11.5, 13 + b * 0.6, 8.6 + b * 0.5), oval(ax, y, 0, 5, 11.6, 7));
+      d[4] = oval(ax, y, hx, hy, 3, 3);
+      d[5] = Math.min(seg(ax, y, 9.5, 2.5, ex, ey2, 2.5), seg(ax, y, ex, ey2, hx, hy, 2.3));
+      for (let n = 0; n < 6; n++) {
+        let tone: FineTone | undefined;
+        if (d[n]! < 0) tone = n === 3 && y > 16 ? "fine-4" : TONES[n];
+        // A dark dot where a part ends over the one below it.
+        else if (n && d[n]! < 0.8) for (let m = n + 1; m < 6; m++) if (d[m]! < -0.4) { tone = "fine-2"; break; }
+        if (tone) { under.push([MID + x * U, GROUND + y * U + s.y, 0.4 * U, tone, true]); break; }
+      }
+    }
+  }
 
   // Top layer first: each dot is sized by the nearest dot above it, then joins what hides the layers below.
   const out: FineDot[] = [], cell = 0.75, grid = new Map<number, number[]>();
   const key = (cx: number, cy: number) => cx * 4096 + cy;
-  const floor = GROUND - 0.28;
+  const floor = body ? Infinity : GROUND - 0.28;
   for (const l of layers) {
     const kept: [number, number, number][] = [];
     for (const [x, y, r0, tone, hides] of l) {
@@ -185,6 +218,6 @@ export function fineDots(s: State): FineDot[] {
     }
   }
   // The dirt swells where he comes up through it.
-  for (let i = 0; i < 33; i++) out.push([(i + 0.5) * U, ROWS - 0.3, 0.42 * U * (1 + 0.22 * clamp(s.kick, -1, 1) * Math.exp(-(((i - 16) / 9) ** 2))), "dirt"]);
+  if (!body) for (let i = 0; i < 33; i++) out.push([(i + 0.5) * U, ROWS - 0.3, 0.42 * U * (1 + 0.22 * clamp(s.kick, -1, 1) * Math.exp(-(((i - 16) / 9) ** 2))), "dirt"]);
   return out;
 }

@@ -26,13 +26,17 @@ export const REST = { y: 0, top: -0.3, rx: 10.2, ex: 2.6, hx: 0, lx: 0, ly: 0, o
   // popping beside his winking eye. ask, bang: a "?" and a "!" over his helmet. The rest run from 0 to 1 and show nothing at either end: tear, a drop down his
   // cheek; sweat, a bead down his temple; steam, a puff out of each side of his helmet; zzz, two Zs rising off him;
   // spark, three sparkles round his head, one after another. A frown below 0 is a worried brow, inner ends up.
-  star: 0, blush: 0, twinkle: 0, ask: 0, bang: 0, tear: 0, sweat: 0, steam: 0, zzz: 0, spark: 0 };
+  star: 0, blush: 0, twinkle: 0, ask: 0, bang: 0, tear: 0, sweat: 0, steam: 0, zzz: 0, spark: 0,
+  // Out of the ground (the traced mole only). whole: over a half he is drawn with his whole body and no dirt.
+  // breath: his belly swelling. arms: from folded behind his head, 0, to flung out, 1. legs: one foot kicks, then the other.
+  whole: 0, breath: 0, arms: 0, legs: 0 };
 export type State = typeof REST;
 type Key = keyof State;
 const KEYS = Object.keys(REST) as Key[];
 /** Spring per value: [stiffness, damping]. Eyes snap; the body carries a little bounce. */
 const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx: [210, 16], ex: [200, 22], hx: [70, 13], lx: [90, 15], ly: [90, 15], open: [900, 52], tall: [420, 26], arc: [320, 30], pawL: [260, 14], pawR: [260, 14], pw: [260, 24], kick: [160, 9], mouth: [380, 22], wink: [900, 52], frown: [320, 30], hat: [210, 16], tilt: [160, 14], lamp: [200, 18], droop: [120, 18], puff: [260, 12],
-  star: [300, 22], blush: [90, 16], twinkle: [420, 20], ask: [380, 17], bang: [520, 19], tear: [5, 4.5], sweat: [5, 4.5], steam: [90, 19], zzz: [7, 5.3], spark: [6, 4.9] };
+  star: [300, 22], blush: [90, 16], twinkle: [420, 20], ask: [380, 17], bang: [520, 19], tear: [5, 4.5], sweat: [5, 4.5], steam: [90, 19], zzz: [7, 5.3], spark: [6, 4.9],
+  whole: [900, 60], breath: [16, 7], arms: [220, 17], legs: [300, 14] };
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -158,7 +162,7 @@ export function step(v: State, vel: State, to: State, dt: number) {
   for (const [k, lo, hi] of LIMITS) if (v[k] < lo || v[k] > hi) { v[k] = clamp(v[k], lo, hi); vel[k] = 0; }
 }
 
-export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic";
+export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "fall";
 /** A mood: where each value should settle (`to`), where it starts (`from`), pushes that set it moving (`kick`), timed
  *  changes after (`at`), paws waving until `wave` ms, and when it rests (`end`) or starts over (`loop`).
  *  `still` is the one pose shown under reduced motion or in a hidden window. */
@@ -169,6 +173,8 @@ const HAPPY: Partial<State> = { arc: 1, pw: 6, ex: 3.6, rx: 10, top: 0.6 };
 /** Pushes, in dots a second: a paw's tap, both paws thrown up, a hop of the dome, a jolt; and the dome's top row in a squat. */
 const TAP = 45, THROW = 70, HOP = 95, JOLT = 62, SQUAT = 1.7;
 const WIDE: Partial<State> = { tall: 1, mouth: 1, rx: 10.4, top: 1.4 };
+/** Drawn whole. Asleep, and awake in mid-air. */
+const NAP: Partial<State> = { whole: 1, open: 0, hat: -0.9, droop: 0.4 }, FALL: Partial<State> = { ...WIDE, whole: 1, arms: 1, hat: 0.5 };
 const BLINK: (ms: number) => [number, Beat][] = (ms) => [[ms, { to: { open: 0 } }], [ms + 120, { to: { open: 1 } }]];
 /* Sizes here are in dots, and a dot is under 2px in the button and the chat: a move that shifts less than a row
    and a half is not seen. Each hop is a squat first (anticipation), then the spring up, then the dirt as he lands. */
@@ -231,6 +237,12 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   ecstatic: { to: { top: SQUAT }, end: 2600, still: { star: 1, arc: 1, mouth: 0.5, spark: 0.5, pawL: 3, pawR: 3 },
     at: [[110, { to: { star: 1, arc: 1, mouth: 0.5, top: REST.top, spark: 1 }, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [420, { kick: { kick: 7 } }],
       [800, { to: { top: SQUAT } }], [910, { to: { top: REST.top }, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [1220, { kick: { kick: 7 } }], [1300, { kick: { star: 5 } }], [1700, { kick: { star: 5 } }], [2300, { set: { spark: 0 } }]] },
+  /* Out of the ground, his whole body (the cart at the end of a review turns him on his back; a move does not). */
+  // Asleep on his back: paws behind his head, helmet down over his eyes, his belly and moustache rising on each snore.
+  nap: { from: NAP, to: NAP, loop: 3000, still: NAP,
+    at: [[0, { to: { breath: 1, puff: 0.5, droop: 0 } }], [1300, { to: { breath: 0, puff: 0, droop: 0.4 } }], [2100, { to: { legs: 1 } }], [2300, { to: { legs: 0 } }]] },
+  // Falling: eyes wide, mouth an O, arms flung out and his feet running on nothing.
+  fall: { from: { whole: 1 }, to: FALL, loop: 360, still: FALL, at: [[0, { to: { legs: 1, arms: 0.75 } }], [180, { to: { legs: -1, arms: 1 } }]] },
 };
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */

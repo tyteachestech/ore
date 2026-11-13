@@ -185,8 +185,8 @@ test("traced: every frame of every move is whole, stays over the dirt, and no fr
       const d = fineDots(s);
       for (const [x, y, r, t] of d) {
         expect(Number.isFinite(x) && Number.isFinite(y) && r > 0 && r < 0.4).toBe(true);
-        // Nothing of him shows under the dirt line.
-        if (t !== "dirt") expect(y).toBeLessThan(ROWS - 0.5);
+        // Nothing of him shows under the dirt line (drawn whole, there is no dirt).
+        if (t !== "dirt" && s.whole < 0.5) expect(y).toBeLessThan(ROWS - 0.5);
       }
       // A part never pops in or out: what is drawn changes by a small share from one frame to the next.
       const now = ink(d);
@@ -194,7 +194,8 @@ test("traced: every frame of every move is whole, stays over the dirt, and no fr
       before = now;
     }
   }
-});
+  // Every dot of every frame of 22 moves: the whole-body ones draw twice the dots.
+}, 20_000);
 
 test("traced: a blink shuts his eyes to a line, pleased swings the lobes wide, startled lifts the helmet off his brows", () => {
   expect(ink(fine({ open: 0 }), "eye")).toBeLessThan(ink(fine(), "eye") * 0.5);
@@ -288,4 +289,22 @@ test("a mark that travels is put back at its start only once it has passed out o
       advance(s, t, 1 / 60);
     }
   }
+});
+
+test("traced: out of the ground he has a whole body and no dirt; asleep his eyes are covered, falling they are wide", () => {
+  const low = (d: ReturnType<typeof fineDots>) => Math.max(...d.map(([, y]) => y));
+  const nap = fine(MOVES.nap.still), fall = fine(MOVES.fall.still);
+  for (const d of [nap, fall]) {
+    expect(d.some(([, , , t]) => t === "dirt")).toBe(false);
+    // His feet, well under where the dirt would be.
+    expect(low(d)).toBeGreaterThan(ROWS + 14);
+  }
+  expect(low(fine())).toBeLessThan(ROWS);
+  expect(ink(nap, "glint")).toBe(0);
+  expect(ink(fall, "glint")).toBeGreaterThan(0);
+  // Asleep his paws are behind his head; falling they are flung out past it.
+  const wide = (d: ReturnType<typeof fineDots>) => Math.max(...d.filter(([, , , t]) => t === "fine-9").map(([x]) => Math.abs(x - 11)));
+  expect(wide(fall)).toBeGreaterThan(wide(nap) + 3);
+  // His belly rises as he breathes in.
+  expect(ink(fine({ ...MOVES.nap.still, breath: 1 }), "fine-7")).toBeGreaterThan(ink(nap, "fine-7"));
 });
