@@ -412,12 +412,34 @@ fn player_port() -> Option<u16> {
     })
 }
 
+/// iOS puts its own Previous / Next / Done bar over the keyboard of a web view, which stacks above the note's own
+/// keyboard bar (KeyboardBar.tsx). WKContentView, the view that takes the keyboard, asks for that bar through
+/// `inputAccessoryView`; answering nil drops it for every field in the app, as Notion's and Bear's editors have none.
+#[cfg(target_os = "ios")]
+fn hide_keyboard_accessory() {
+    use objc2::runtime::{AnyClass, AnyObject, Imp, Sel};
+    unsafe extern "C-unwind" fn none(_this: *mut AnyObject, _cmd: Sel) -> *mut AnyObject {
+        std::ptr::null_mut()
+    }
+    let Some(cls) = AnyClass::get(c"WKContentView") else { return };
+    unsafe {
+        let imp: Imp = std::mem::transmute(none as unsafe extern "C-unwind" fn(*mut AnyObject, Sel) -> *mut AnyObject);
+        objc2::ffi::class_replaceMethod(cls as *const AnyClass as *mut AnyClass, objc2::sel!(inputAccessoryView), imp, c"@@:".as_ptr());
+    }
+}
+#[cfg(not(target_os = "ios"))]
+fn hide_keyboard_accessory() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .setup(|_| {
+            hide_keyboard_accessory();
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, library_write, http_fetch, can_transcribe, transcribe, share_inbox, share_skills, share_open, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");

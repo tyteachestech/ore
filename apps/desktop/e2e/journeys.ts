@@ -3621,7 +3621,7 @@ journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space
   if (!shown.includes("⌘R")) throw new Error(`Home's menu shows no Rename key: “${shown}”`);
 });
 
-// WebKit leaves a clicked button unfocused, so the first ⇧↓ after a ⌘-click found no row to grow from (F40).
+// WebKit leaves a clicked button unfocused, so the first ⇧↓ after a ⌘-click found no row to grow from (F45).
 journey("Home: after a ⌘-click picks a row, the first ⇧↓ grows the pick (Finder)", async (page) => {
   await openSource(page, AGENTS);
   await openSource(page, TESTING);
@@ -4414,7 +4414,7 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   await page.keyboard.press("Escape");
   await page.keyboard.press("Meta+1");
   await until("⌘1 goes back to To read", async () => (await on("To read")) === "true");
-  // Arrows walk the tabs as in any tab list: the open tab keeps focus, so a second arrow goes on (F39).
+  // Arrows walk the tabs as in any tab list: the open tab keeps focus, so a second arrow goes on (F44).
   await tabs.getByRole("tab", { name: "To read" }).click();
   await page.keyboard.press("ArrowRight");
   await until("→ opens Done", async () => (await on("Done")) === "true");
@@ -9743,8 +9743,8 @@ journey("phone: a long press on a Today source opens its menu", async (page) => 
   await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
 }, "phone");
 
-journey("phone: a held row in a skill's list opens its own menu only; Return in Rename opens nothing; Rename… is on Today's rows too (F41–F43)", async (page) => {
-  // On a skill's page a held row is under the section's own menu: a finger's pointer opens only the row's (F41).
+journey("phone: a held row in a skill's list opens its own menu only; Return in Rename opens nothing; Rename… is on Today's rows too (F46–F48)", async (page) => {
+  // On a skill's page a held row is under the section's own menu: a finger's pointer opens only the row's (F46).
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
   const row = page.locator(".phone-skill .phone-sources li button").first();
@@ -9755,7 +9755,7 @@ journey("phone: a held row in a skill's list opens its own menu only; Return in 
   await page.getByRole("menuitem", { name: "Review this source" }).waitFor();
   await Bun.sleep(200);
   if (await page.getByRole("menuitem", { name: "Search sources" }).count()) throw new Error("the section's menu opened over the row's");
-  // The Sources list's Return saves and stays on the list (F42).
+  // The Sources list's Return saves and stays on the list (F47).
   const place = (tab: string) => page.evaluate((tab) => localStorage.setItem("ore-phone-place", JSON.stringify({ tab, skill: null, openId: null, review: null })), tab);
   await place("sources");
   await page.reload();
@@ -9767,7 +9767,7 @@ journey("phone: a held row in a skill's list opens its own menu only; Return in 
   await page.locator(".phone-sources li button", { hasText: "Renamed in Sources" }).waitFor();
   await Bun.sleep(400);
   if (await page.locator(".phone-reader").count()) throw new Error("Return in the rename field opened the source");
-  // Today's rows rename in place, as the Sources list's do (F43, D225).
+  // Today's rows rename in place, as the Sources list's do (F48, D225).
   await place("today");
   await page.reload();
   await press(page, page.locator(".home-read").first());
@@ -10430,6 +10430,65 @@ journey("phone: the note's keyboard bar moves a block, edits a table and adds a 
   } finally {
     rmSync(dirname(diagram), { recursive: true, force: true });
   }
+}, "phone");
+
+/** iOS's keyboard, as the page sees it: the visual viewport shrinks by its height while the layout viewport stays. */
+const keyboardUp = (page: Page, h: number) =>
+  page.evaluate((h) => {
+    const vv = window.visualViewport!;
+    const full = innerHeight;
+    Object.defineProperty(vv, "height", { configurable: true, get: () => full - h });
+    vv.dispatchEvent(new Event("resize"));
+  }, h);
+
+journey("phone: the note's keyboard bar fits the screen, and the + menu stays under the header with the keyboard up", async (page) => {
+  // ten 44pt buttons on a 402pt screen put Hide the keyboard past the edge, with nothing to say the bar scrolls.
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  const bar = page.locator(".kb-bar");
+  await tap(page, note.locator("p").first());
+  const hide = bar.getByRole("button", { name: "Hide the keyboard" });
+  const onScreen = async () => ((await hide.boundingBox())?.x ?? Infinity) + 44 <= (page.viewportSize()?.width ?? 0) + 0.5;
+  await until("Hide the keyboard is on screen outside a list", onScreen);
+  if (await bar.getByRole("button", { name: "Indent" }).count()) throw new Error("Indent shows outside a list, where it does nothing");
+  await tap(page, bar.getByRole("button", { name: "Bulleted list" }));
+  await bar.getByRole("button", { name: "Indent" }).waitFor();
+  await until("Hide the keyboard is on screen in a list", onScreen);
+  await until("the bar fades where more buttons are", async () => (await bar.locator(".kb-scroll[data-more]").count()) === 1);
+  await tap(page, bar.getByRole("button", { name: "Bulleted list" }));
+  // the + menu grew past the header when the keyboard left less than 40vh.
+  await keyboardUp(page, 420); // with iOS's own bar and the notch, as on a 402pt iPhone
+  await tap(page, bar.getByRole("button", { name: "Add a block" }));
+  const menu = page.locator(".note-menu");
+  await menu.waitFor();
+  const head = await page.locator(".phone-source > .phone-bar").boundingBox();
+  await until("the + menu starts below the header", async () => ((await menu.boundingBox())?.y ?? 0) >= head!.y + head!.height);
+}, "phone");
+
+journey("phone: Review's ⋯ is as strong as ×, and Edit exercise's question stays under the head with the keyboard up", async (page) => {
+  // the ⋯ beside × was three specks; its ink now weighs what ×'s does.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  await page.locator(".review-q").waitFor();
+  const ink = (name: string) =>
+    page.getByRole("button", { name, exact: true }).evaluate((b) => {
+      const d = b.querySelector("svg path")?.getAttribute("d") ?? "";
+      return (d.match(/[aA]/g) ?? []).length; // one arc per dot
+    });
+  const [dots, x] = [await ink("Exercise actions"), await ink("Leave review")];
+  if (dots < x * 0.6) throw new Error(`⋯ has ${dots} dots of ink to ×'s ${x}`);
+  // Edit exercise's question went up under the head when the keyboard came up (the answer's buttons were pulled into sight).
+  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await tap(page, page.getByRole("button", { name: "Exercise actions" }));
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
+  const question = page.locator(".review-body textarea").first();
+  await tap(page, question);
+  await keyboardUp(page, 420); // with iOS's own bar and the notch, as on a 402pt iPhone
+  const reviewHead = await page.locator(".review-head").boundingBox();
+  await until("the question stays below the head", async () => ((await question.boundingBox())?.y ?? -1) >= reviewHead!.y + reviewHead!.height - 1);
 }, "phone");
 
 journey("phone: a kept draft goes when the Mac changes what it answered, and nothing is kept before he types", async (page) => {

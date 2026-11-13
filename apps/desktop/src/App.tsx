@@ -666,7 +666,7 @@ export function App() {
     return () => window.removeEventListener("paste", onPaste);
   }, [notify]);
 
-  /** `focusList`: off for a folder tab chosen by click or arrow, which keeps focus so the next arrow moves on (F39). */
+  /** `focusList`: off for a folder tab chosen by click or arrow, which keeps focus so the next arrow moves on (F44). */
   const go = useCallback((s: Tab, focusList = true) => {
     setStatus(s);
     setPlace("sources");

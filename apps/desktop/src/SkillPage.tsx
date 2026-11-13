@@ -326,7 +326,7 @@ function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, 
   };
   return (
     // A section's right-click menu is the Mac's. On the iPhone its actions are the buttons in its head, and the
-    // menu library's own touch timer opened it over a held row's menu (F41).
+    // menu library's own touch timer opened it over a held row's menu (F46).
     <WithMenu actions={PHONE ? [] : actions.map((a) => ({ ...a, run: () => (open || toggle(), a.run()) }))}>
     <section className="skill-card fold" data-tone={tone}>
       <div className="card-head">
