@@ -134,3 +134,43 @@ test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem 
   expect(none.q(".review-depth")).toBe(0);
   await none.done();
 });
+
+test("the end screen's lines share one place: one shows, the next rolls up after a hold, and under Reduce Motion they are a plain list (D241)", async () => {
+  jest.useFakeTimers();
+  // No cart (the goal was met before), so the lines start turning at once.
+  const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { depth_days: 41, rescued: 3 });
+  const s = await mount(e as never);
+  const on = () => s.body.querySelector('.end-lines > [data-at="on"]')?.textContent;
+  expect(s.q(".end-lines > div")).toBeGreaterThanOrEqual(2);
+  expect(s.q('.end-lines > [data-at="on"]')).toBe(1);
+  expect(on()).toBe("5 memories kept");
+  // Every line but the one showing is out of reach of the keyboard and the reader.
+  expect(s.q(".end-lines > div[inert]")).toBe(s.q(".end-lines > div") - 1);
+  await act(async () => void jest.advanceTimersByTime(2600));
+  expect(on()).toBe("+41 days of memory");
+  expect(s.body.querySelector('.end-lines > [data-at="was"]')?.textContent).toBe("5 memories kept");
+  // The pointer on a line holds it.
+  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new (s.body.ownerDocument.defaultView as unknown as { MouseEvent: typeof MouseEvent }).MouseEvent("mouseover", { bubbles: true })));
+  await act(async () => void jest.advanceTimersByTime(6000));
+  expect(on()).toBe("+41 days of memory");
+  // Focus on the line holds it too, and the pointer leaving doesn't let go of that hold.
+  const win = s.body.ownerDocument.defaultView as unknown as { MouseEvent: typeof MouseEvent; FocusEvent: typeof FocusEvent };
+  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new win.FocusEvent("focusin", { bubbles: true })));
+  await act(async () => void s.body.querySelector(".end-lines")!.dispatchEvent(new win.MouseEvent("mouseout", { bubbles: true })));
+  await act(async () => void jest.advanceTimersByTime(6000));
+  expect(on()).toBe("+41 days of memory");
+  jest.useRealTimers();
+  await s.done();
+  // One line has nothing to take turns with.
+  const one = await mount(end([], today(true, 600_000)));
+  expect(one.q(".end-lines")).toBe(0);
+  expect(one.q(".review-kept")).toBe(1);
+  await one.done();
+  reduce = true;
+  const flat = await mount(e as never);
+  reduce = false;
+  expect(flat.q(".end-lines")).toBe(0);
+  expect(flat.q(".review-kept, .review-rescued")).toBeGreaterThanOrEqual(2);
+  await flat.done();
+});

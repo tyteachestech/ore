@@ -2141,6 +2141,15 @@ button.home-plan:hover { color: var(--text); }
 .review-end.carted .ring-burst { animation-delay: 0ms; }
 .review-cut > span[data-wait] { visibility: hidden; animation: none; }
 .review-end h2 { font-family: var(--round); margin: 22px 0 0; font-size: 24px; }
+/* The end screen's lines (D241): one place; the line showing rolls up and out as the next rolls up into it. */
+.end-lines { display: grid; place-items: center; width: 100%; margin: 10px 0 0; min-height: 36px; overflow: hidden; }
+.end-lines > div { grid-area: 1 / 1; display: grid; place-items: center; opacity: 0; }
+/* Keyframes, not transitions: a line always comes from below, even the one that just left by the top (two lines). */
+.end-lines > div[data-at="on"] { opacity: 1; animation: end-line-in var(--t-4) var(--ease-out) both; }
+.end-lines > div[data-at="was"] { animation: end-line-out var(--t-4) var(--ease-out) both; }
+@keyframes end-line-in { from { opacity: 0; transform: translateY(100%); } }
+@keyframes end-line-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-100%); } }
+.end-lines > div > * { margin: 0; animation: none; }
 .review-kept { margin: 10px 0 0; font-size: 16px; color: var(--muted); }
 .review-kept b { font-family: var(--round); color: var(--text); font-size: 24px; font-variant-numeric: tabular-nums; }
 .review-rescued { margin: 6px 0 0; color: color-mix(in srgb, var(--c-green) 70%, var(--text)); }
