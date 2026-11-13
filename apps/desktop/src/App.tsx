@@ -669,14 +669,11 @@ export function App() {
   /** `focusList`: off for a folder tab chosen by click or arrow, which keeps focus so the next arrow moves on (F44). */
   const go = useCallback((s: Tab, focusList = true) => {
     setStatus(s);
-    setFinishing(false);
-    // A folder tab is on the page already: moving the place would remount a skill page opened from Home,
-    // and with it the tab that has focus (F54). ⌘1/⌘2 go to the list from anywhere, and it takes the keys
-    // at once (Linear), also when it was not on screen (Home, a source).
-    if (!focusList) return;
     setPlace("sources");
     setOpenId(null);
-    requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
+    setFinishing(false);
+    // The list takes the keys at once (Linear's ⌘1), also when it was not on screen (Home, a source).
+    if (focusList) requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }));
   }, []);
 
 
@@ -2326,7 +2323,9 @@ export function App() {
             so VoiceOver hears a reply that lands then (D159). */}
         {tutorButton}
         <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
-        <Boundary key={`${openId}-${skill}-${place}`} onBack={goHome}>
+        {/* A skill page is the same page wherever it was opened from: a place change under it (its folder tab,
+            ⌘1, from Home) must not remount it and drop the tab that has focus (F54). */}
+        <Boundary key={`${openId}-${skill}-${skill ? "" : place}`} onBack={goHome}>
         {openId ? (
           <Reader
             key={openId}

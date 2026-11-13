@@ -10382,15 +10382,25 @@ journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's
     await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
     await until("Later moves on", async () => (await page.locator(".review-q").innerText()) !== was);
   }
-  await field.waitFor();
+  if (!(await field.count())) throw new Error("no Explain exercise came up in 10 Laters");
   await field.focus();
   await field.fill("Fluency feels like knowing");
+  const focused = () => field.evaluate((el) => el === document.activeElement);
   await tap(page, more);
   await page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }).waitFor();
-  if (await field.evaluate((el) => el === document.activeElement)) throw new Error("the answer field kept focus, so the keyboard stays up over the sheet");
+  if (await focused()) throw new Error("the answer field kept focus, so the keyboard stays up over the sheet");
+  // Dismissed, the sheet gives the field its focus (and keyboard) back, with the draft.
   await page.keyboard.press("Escape");
   await page.locator(".action-sheet").waitFor({ state: "detached" });
   if ((await field.inputValue()) !== "Fluency feels like knowing") throw new Error("closing the sheet lost the draft");
+  await until("dismissing the sheet gives the answer field its focus back", focused);
+  // An action picked moves on: the keyboard doesn't come back up over the next exercise.
+  const was = await page.locator(".review-q").innerText();
+  await tap(page, more);
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+  await until("Later moves on", async () => (await page.locator(".review-q").innerText()) !== was);
+  await page.waitForTimeout(100);
+  if (await field.count() && (await focused())) throw new Error("picking Later gave the answer field its focus back, so the keyboard comes up again");
 }, "phone");
 
 // iOS takes a first tap as a hover when the hover shows or hides something, and clicks only on the second (F53).

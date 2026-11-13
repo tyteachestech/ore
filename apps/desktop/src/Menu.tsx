@@ -308,24 +308,27 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   const [height, setHeight] = useState<number>();
   const back = useRef<HTMLElement | null>(null);
   const show = (on: boolean) => {
-    if (on) {
-      back.current = document.activeElement as HTMLElement | null;
-      // A sheet opened over a field being typed puts the keyboard away, as Mail and Notes do, or it opens
-      // behind it (F52). The draft stays; closing the sheet gives the field its focus back.
-      if (!keepFocus && back.current?.matches("input, textarea, [contenteditable='true']")) back.current.blur();
-    }
     setOwn(on);
-    if (!on) {
-      setStepId(null);
-      if (!keepFocus) back.current?.focus?.();
-    }
+    if (!on) setStepId(null);
     onOpenChange?.(on);
   };
   const close = () => show(false);
+  /** An action was picked: focus doesn't go back to a field the sheet put the keyboard away from. */
+  const picked = useRef(false);
   useSwipeDown(box, close, open);
   useEffect(() => {
-    if (open) box.current?.focus();
-  }, [open]);
+    if (!open) return;
+    picked.current = false;
+    const was = (back.current = document.activeElement as HTMLElement | null);
+    // A sheet opened over a field being typed puts the keyboard away, as Mail and Notes do, or iOS leaves
+    // it up over the sheet (F52). The draft stays; dismissing the sheet gives the field its focus back.
+    const typing = !keepFocus && !!was && (was.isContentEditable || was.matches("input, textarea"));
+    if (typing) was.blur();
+    box.current?.focus();
+    return () => {
+      if (!keepFocus && !(typing && picked.current)) back.current?.focus?.();
+    };
+  }, [open, keepFocus]);
   // The sheet's height follows the step it shows: measured after each swap, so the change eases.
   useLayoutEffect(() => {
     if (open) setHeight(inner.current?.offsetHeight);
@@ -336,6 +339,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
   const pick = (a: MenuAction) => {
     if (a.sub) return setStepId(a.id);
     if (a.keep) return a.run();
+    picked.current = true;
     close();
     setTimeout(a.run, 0);
   };

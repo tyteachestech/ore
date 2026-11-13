@@ -1980,11 +1980,12 @@ button.home-plan:hover { color: var(--text); }
 .home-read .more { right: 12px; top: 50%; transform: translateY(-50%); }
 /* A tile keeps its ⋯'s room, so a long name never shifts when it shows. */
 .home-skill .more { flex: none; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); visibility: hidden; }
-.home-skill:hover .more, .home-skill .more:focus-visible, .home-skill .more[aria-expanded="true"] { visibility: visible; }
+/* Hover reveals are the Mac's: on the phone a hover that shows or hides something turns the first tap into a hover (F53). */
+:root:not(.phone) .home-skill:hover .more, .home-skill .more:focus-visible, .home-skill .more[aria-expanded="true"] { visibility: visible; }
 .home-skill .more:hover, .home-skill .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
-.home-read:hover .more, .home-read .more:focus-visible, .home-read .more[aria-expanded="true"] { display: grid; }
+:root:not(.phone) .home-read:hover .more, .home-read .more:focus-visible, .home-read .more[aria-expanded="true"] { display: grid; }
 .home-read .more:hover, .home-read .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
-.home-read:is(:hover, :has(.more[aria-expanded="true"])) .home-meter.small { visibility: hidden; }
+:root:not(.phone) .home-read:hover .home-meter.small, .home-read:has(.more[aria-expanded="true"]) .home-meter.small { visibility: hidden; }
 .home-read:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 1px var(--focus); }
 /* The title comes first: long skill pills give way to it, ending in … (DESIGN: long text). */
 .home-read .chips-button { max-width: 40%; overflow: hidden; }
@@ -2650,13 +2651,6 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* A tap leaves :hover on the element under the finger: on touch, hover looks like rest. */
 @media (hover: none) {
   .phone :is(.home-skill, .home-read, .pick-row, .phone-sources li button):hover:not(:active) { background: transparent; }
-}
-/* iOS takes a first tap as a hover when the hover shows or hides something, and opens on the second (F53).
-   On the phone a row's actions are its long press, so its hover shows no ⋯ and keeps its dots. */
-.phone .home-read:hover .more:not([aria-expanded="true"]) { display: none; }
-.phone .home-read:hover:not(:has(.more[aria-expanded="true"])) .home-meter.small { visibility: visible; }
-.phone .home-skill:hover .more:not([aria-expanded="true"]) { visibility: hidden; }
-@media (hover: none) {
   .phone .quiz-sure button:hover { background: none; color: var(--muted); }
   .phone .note-toggle:hover, .phone .home-gear:hover { background: none; }
 }
