@@ -9,7 +9,8 @@ import { join } from "node:path";
 
 export const FINDINGS = "docs/reviews/findings.md";
 export const DECISIONS = "docs/DECISIONS.md";
-const PLACEHOLDER = /\b([FD])-new-[a-z0-9][a-z0-9-]*[a-z0-9]\b/g;
+const NAME = "new-[a-z0-9]+(?:-[a-z0-9]+)*";
+const PLACEHOLDER = new RegExp(`\\b[FD]-${NAME}\\b`, "g");
 
 /** Maps every placeholder to its number, from the two files that define them. */
 export function numbers(findings: string, decisions: string): Map<string, string> {
@@ -18,8 +19,8 @@ export function numbers(findings: string, decisions: string): Map<string, string
     let next = Math.max(0, ...[...text.matchAll(used)].map((m) => Number(m[1]))) + 1;
     for (const [, name] of text.matchAll(defined)) if (!out.has(name!)) out.set(name!, `${prefix}${next++}`);
   };
-  take(findings, /^\| (F-new-[a-z0-9-]+) \|/gm, /^\| F(\d+) \|/gm, "F");
-  take(decisions, /^- (D-new-[a-z0-9-]+)\. /gm, /^- D(\d+)\. /gm, "D");
+  take(findings, new RegExp(`^\\| (F-${NAME}) \\|`, "gm"), /^\| F(\d+) \|/gm, "F");
+  take(decisions, new RegExp(`^- (D-${NAME})\\. `, "gm"), /^- D(\d+)\. /gm, "D");
   return out;
 }
 
@@ -41,7 +42,8 @@ if (import.meta.main) {
     files = execFileSync("git", ["grep", "-lE", "\\b[FD]-new-[a-z0-9]"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
   } catch {} // git grep exits 1 when nothing matches
   files = files.filter((f) => !f.endsWith("scripts/ids.ts") && !f.endsWith("test/ids.test.ts"));
-  for (const f of files) writeFileSync(join(root, f), renumber(read(f), map));
+  const out = files.map((f) => [f, renumber(read(f), map)] as const); // all or nothing: a bad name writes no file
+  for (const [f, text] of out) writeFileSync(join(root, f), text);
   for (const [name, n] of map) console.log(`${name} → ${n}`);
   if (!map.size) console.log("no new findings or decisions");
 }
