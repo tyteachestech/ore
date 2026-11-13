@@ -11471,7 +11471,7 @@ journey("phone: a half-typed answer to What do you already know? survives a rela
   await until("the answer comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval changes what I can remember");
 }, "phone");
 
-journey("a11y: reader equations expose mathematical content (F-new-a11y-math)", async (page) => {
+journey("a11y: reader equations expose mathematical content (F104)", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# Accessible equation\n\nThe relation is\n\n$$E = mc^2$$\n\nEnergy and mass.");
   await page.keyboard.press("Enter");
@@ -11481,7 +11481,7 @@ journey("a11y: reader equations expose mathematical content (F-new-a11y-math)", 
   if (!(await page.locator(".doc math").textContent())?.includes("E")) throw new Error("Equation lost its content");
 });
 
-journey("a11y: failed Add announces and describes the retained input (F-new-a11y-add-error)", async (page) => {
+journey("a11y: failed Add announces and describes the retained input (F106)", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   const input = page.getByLabel("Link, file path or text");
   const text = "# Unsaved learning note\n\nKeep these words after a failed save.";
@@ -11499,7 +11499,7 @@ journey("a11y: failed Add announces and describes the retained input (F-new-a11y
   await page.keyboard.press("Escape");
 });
 
-journey("a11y: revealing a Fact announces its answer and rating phase (F-new-a11y-answer)", async (page) => {
+journey("a11y: revealing a Fact announces its answer and rating phase (F107)", async (page) => {
   await startReview(page, /Learning/);
   await page.locator(".quiz-sure").waitFor();
   const live = page.locator(".review .sr-only[aria-live]");
@@ -11512,7 +11512,7 @@ journey("a11y: revealing a Fact announces its answer and rating phase (F-new-a11
   await page.keyboard.press("Escape");
 });
 
-journey("a11y: gem counts say their meaning and reveal hints by keyboard (F-new-a11y-gems)", async (page) => {
+journey("a11y: gem counts say their meaning and reveal hints by keyboard (F108)", async (page) => {
   const home = page.locator('.home-skill[data-id="learning"] .home-level');
   await home.waitFor();
   const homeTree = await home.ariaSnapshot();
@@ -11544,7 +11544,7 @@ journey("a11y: gem counts say their meaning and reveal hints by keyboard (F-new-
   await until("closing the breakdown puts focus back on its gem", async () => await trigger.evaluate((e) => e === document.activeElement));
 });
 
-journey("a11y: the suggested rating has a keyboard focus ring (F-new-a11y-rating-focus)", async (page) => {
+journey("a11y: the suggested rating has a keyboard focus ring (F109)", async (page) => {
   await startReview(page, /Learning/);
   await page.locator(".quiz-sure").waitFor();
   await page.keyboard.press("3");
@@ -11559,7 +11559,7 @@ journey("a11y: the suggested rating has a keyboard focus ring (F-new-a11y-rating
   await page.keyboard.press("Escape");
 });
 
-journey("a11y: tutor citations and hovered secondary text meet AA contrast (F-new-a11y-contrast)", async (page) => {
+journey("a11y: tutor citations and hovered secondary text meet AA contrast (F110)", async (page) => {
   const results: { text: string; ratio: number }[] = [];
   const measure = async (target: Locator) => {
     results.push(await target.evaluate((el) => {
@@ -11608,7 +11608,7 @@ journey("a11y: tutor citations and hovered secondary text meet AA contrast (F-ne
   await page.keyboard.press("Escape");
 });
 
-journey("a11y: reader toggle icons stay decorative in both states (F-new-a11y-icons)", async (page) => {
+journey("a11y: reader toggle icons stay decorative in both states (F111)", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# Accessible table\n\n| Term | Meaning |\n|---|---|\n| Recall | Retrieve from memory |\n\nTry remembering the meaning.");
   await page.keyboard.press("Enter");
