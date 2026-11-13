@@ -106,12 +106,19 @@ export const shareOpen = () => (isTauri() ? invoke<string | null>("share_open").
 
 /** Speech to a timed transcript in the shell (lib.rs `transcribe`): the audio goes over as raw bytes, its
  *  WebVTT comes back, or why not in the phone's own words. It works only while Ore is on screen. */
-const hear = (data: Uint8Array, ext: string, progress?: (done: number, label?: string) => void, language?: string) => (
-  progress?.(0),
-  invoke<string>("transcribe", data, { headers: { "x-ext": ext, ...(language ? { "x-language": language } : {}) } }).catch((e) => {
-    throw new Error(String(e));
-  })
-);
+const hear = (data: Uint8Array, ext: string, progress?: (done: number, label?: string) => void, language?: string) => {
+  progress?.(0);
+  const min = (s: number) => Math.max(1, Math.round(s / 60));
+  heard = (done, of) => progress?.(done / of, `Transcribing ${min(done)} of ${min(of)} min`);
+  return invoke<string>("transcribe", data, { headers: { "x-ext": ext, ...(language ? { "x-language": language } : {}) } })
+    .catch((e) => {
+      throw new Error(String(e));
+    })
+    .finally(() => (heard = null));
+};
+/** The shell says how far a long wait is (lib.rs `progress`): seconds of audio heard, bytes of a download. */
+let heard: ((done: number, of: number) => void) | null = null;
+let downloaded: ((got: number, of: number) => void) | null = null;
 
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
@@ -127,6 +134,9 @@ function boot() {
       setLibraryRoot(ROOT, root);
       // Podcasts and audio are heard here when this iPhone can (D227): the shell runs Apple's on-device speech.
       if (await invoke<boolean>("can_transcribe").catch(() => false)) await (await import("ore-commands")).setTranscriber(hear);
+      const { listen } = await import("@tauri-apps/api/event");
+      void listen<[number, number]>("hear-progress", (e) => heard?.(...e.payload));
+      void listen<[number, number]>("download-progress", (e) => downloaded?.(...e.payload));
     } else {
       const text = await (await fetch("/library.json")).text();
       const snap = JSON.parse(text) as Record<string, string | null>;
@@ -172,6 +182,9 @@ export async function fill(landed: () => void): Promise<void> {
         if (on && on !== id) landed();
         on = id;
         setFilling({ id, done, label });
+        // The shell's download arrives whole: while one is named, its own count says how far it is.
+        const mb = (n: number) => Math.max(1, Math.round(n / 1e6));
+        downloaded = label === "Downloading" ? (got, of) => setFilling({ id, done: got / of, label: `Downloading ${mb(got)} of ${mb(of)} MB` }) : null;
       },
       turn: exclusive,
     });
@@ -179,6 +192,7 @@ export async function fill(landed: () => void): Promise<void> {
     // One that failed keeps its reason on the source itself (core `fillOwed`).
   } finally {
     setFilling(null);
+    downloaded = null;
     filling = false;
     if (on) landed();
     if (fillAgain) (fillAgain = false), void fill(landed);

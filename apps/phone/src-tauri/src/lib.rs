@@ -229,14 +229,42 @@ async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, S
         let status = res.status();
         let final_url = res.get_url().to_string();
         let headers = res.headers_names().into_iter().filter_map(|n| res.header(&n).map(|v| (n.clone(), v.to_string()))).collect();
+        let of = res.header("content-length").and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
         let head = serde_json::to_vec(&Fetched { status, url: final_url, headers }).map_err(|e| e.to_string())?;
         let mut out = (head.len() as u32).to_be_bytes().to_vec();
         out.extend_from_slice(&head);
-        std::io::Read::read_to_end(&mut std::io::Read::take(res.into_reader(), 200 << 20), &mut out).map_err(|e| e.to_string())?;
+        // Read in pieces, so a long download (an episode's audio) says how far it is, every megabyte.
+        let mut reader = std::io::Read::take(res.into_reader(), 200 << 20);
+        let mut buf = vec![0u8; 256 << 10];
+        let (mut got, mut told) = (0usize, 0usize);
+        loop {
+            let n = std::io::Read::read(&mut reader, &mut buf).map_err(|e| e.to_string())?;
+            if n == 0 {
+                break;
+            }
+            out.extend_from_slice(&buf[..n]);
+            got += n;
+            if of > 0.0 && got - told >= 1 << 20 {
+                told = got;
+                progress("download-progress", got as f64, of);
+            }
+        }
         Ok(tauri::ipc::Response::new(out))
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// The app, for the progress of a long wait: set once at start.
+static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
+
+/// How far a long wait is, to the web view as an event: `download-progress` in bytes, `hear-progress` in
+/// seconds of audio, each as [done, of]. The app shows it where the source will be (Filling.tsx).
+fn progress(event: &str, done: f64, of: f64) {
+    use tauri::Emitter;
+    if let Some(app) = APP.get() {
+        let _ = app.emit(event, (done, of));
+    }
 }
 
 /// Whether this iPhone hears speech itself (apps/phone/ios/Hear.swift): iOS 26 with Apple's speech model.
@@ -270,8 +298,14 @@ async fn transcribe(request: tauri::ipc::Request<'_>) -> Result<String, String> 
 #[cfg(target_os = "ios")]
 extern "C" {
     fn ore_can_transcribe() -> bool;
-    fn ore_transcribe(path: *const std::ffi::c_char, language: *const std::ffi::c_char, ok: *mut bool) -> *mut std::ffi::c_char;
+    fn ore_transcribe(path: *const std::ffi::c_char, language: *const std::ffi::c_char, ok: *mut bool, progress: Option<extern "C" fn(f64, f64)>) -> *mut std::ffi::c_char;
     fn free(p: *mut std::ffi::c_void);
+}
+
+/// Called by Hear.swift as it goes: seconds of audio heard, of how many.
+#[cfg(target_os = "ios")]
+extern "C" fn heard(done: f64, of: f64) {
+    progress("hear-progress", done, of);
 }
 
 #[cfg(target_os = "ios")]
@@ -279,7 +313,7 @@ fn hear(path: &Path, language: &str) -> Result<String, String> {
     let path = std::ffi::CString::new(path.to_string_lossy().as_bytes()).map_err(|e| e.to_string())?;
     let language = std::ffi::CString::new(language).map_err(|e| e.to_string())?;
     let mut ok = false;
-    let out = unsafe { ore_transcribe(path.as_ptr(), language.as_ptr(), &mut ok) };
+    let out = unsafe { ore_transcribe(path.as_ptr(), language.as_ptr(), &mut ok, Some(heard)) };
     if out.is_null() {
         return Err("Couldn’t hear that audio.".into());
     }
@@ -436,7 +470,8 @@ pub fn run() {
         // Links and "Open original" open in Safari.
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .setup(|_| {
+        .setup(|app| {
+            let _ = APP.set(app.handle().clone());
             hide_keyboard_accessory();
             Ok(())
         })
