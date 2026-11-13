@@ -41,7 +41,8 @@ let lib: string | undefined;
 let bridge: ReturnType<typeof Bun.spawn> | undefined;
 let server: ReturnType<typeof Bun.serve> | undefined;
 let browser: Browser | undefined;
-let at = "the start"; // the screen the walk is on, so a timeout says where
+let at = "the start";
+let shown: (() => Promise<string>) | undefined; // the screen the walk is on, so a timeout says where
 try {
   lib = mkdtempSync(join(tmpdir(), "ore-release-"));
   await $`bun ${join(MOCK, "seed.ts")} ${lib}`.quiet();
@@ -73,6 +74,13 @@ try {
 
   const page = await browser.newPage({ viewport: { width: 1180, height: 800 } });
   page.setDefaultTimeout(10000);
+  // What was on screen when the walk broke (F64): a broken walk names its cause.
+  shown = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      const dialog = document.querySelector('[role="dialog"]')?.getAttribute("aria-label");
+      return `dialog: ${dialog ?? "none"}; focus: ${a ? `${a.tagName.toLowerCase()}.${a.className}` : "none"}; page: ${((document.querySelector('[role="dialog"]') ?? document.querySelector("main") ?? document.body) as HTMLElement).innerText.replace(/\s+/g, " ").slice(0, 160)}`;
+    });
   const ours = (url: string) => url.startsWith(origin) || url.startsWith(bridgeOrigin);
   page.on("console", (m) => {
     if (m.type() === "error" && /Content Security Policy|Refused to/i.test(m.text())) problems.push(m.text().slice(0, 240));
@@ -115,7 +123,7 @@ try {
   for (const f of fonts) if (f) problems.push(`font failed to load: ${f}`);
   await page.waitForTimeout(300);
 } catch (e) {
-  problems.push(`the walk broke at ${at}: ${(e as Error).message.split("\n")[0]}`);
+  problems.push(`the walk broke at ${at}: ${(e as Error).message.split("\n")[0]} (${await shown?.().catch(() => "the page is gone")})`);
 } finally {
   await browser?.close();
   server?.stop(true);

@@ -476,8 +476,13 @@ function untracked(url: string): string {
   const kept = query.split("&").filter((p) => p && !TRACKING.test(p.split("=")[0]!));
   return `${head}${kept.length ? `?${kept.join("&")}` : ""}${hash ?? ""}`;
 }
-/** The same page's link, however it was written: with or without tags, the host in any case, a default port. */
-const linkKey = (url: string) => (URL.canParse(url) ? new URL(untracked(url)).href : url);
+/** The same page's link, however it was written: with or without tags, the host in any case, a default port,
+ *  http or https, with or without `www.` (an old http link and the browser's https one are one page). */
+const linkKey = (url: string) => {
+  if (!URL.canParse(url)) return url;
+  const u = new URL(untracked(url));
+  return `${u.host.replace(/^www\./, "")}${u.pathname}${u.search}${u.hash}`;
+};
 /** The source already here from this link (a course's lessons aside); `preview` counts Feed posts being read. */
 const byLink = (lib: Library, url: string, preview = false) => allItems(lib, { preview }).find((i) => i.meta.url !== undefined && linkKey(i.meta.url) === linkKey(url) && !i.meta.course);
 
