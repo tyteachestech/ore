@@ -194,6 +194,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       timers.forEach(clearTimeout);
       anims.forEach((a) => a.cancel());
       cancelAnimationFrame(frame);
+      if (rider?.parentElement) rider.parentElement.style.clipPath = "";
     };
     // Plays once, for the session that just ended.
     // eslint-disable-next-line react-hooks/exhaustive-deps
