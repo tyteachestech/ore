@@ -69,7 +69,7 @@ export const PUNS = {
   plain: ["Gneiss work.", "You rock.", "Ore-some.", "Can you dig it? You can.", "Don’t take that for granite."],
   closed: ["Goal met. You rock.", "Goal met. Quarry on tomorrow.", "Goal met. Mine blown."],
   short: ["Seam’s empty. Today counts.", "Vein’s run dry. Today counts."],
-  // He fell out of the cart asleep (D-new-cart-nap) and covers for it.
+  // He fell out of the cart asleep (D254) and covers for it.
   napped: ["Wasn’t asleep. Supervising.", "Resting my eyes. Both of them.", "You dig, I nap. Good system.", "I’m awake. Schist."],
   nappedClosed: ["Goal met. I supervised.", "Goal met. Slept right through it.", "Goal met. Wake me tomorrow."],
   missed: ["Schist happens. Every miss comes back sooner.", "Rocky one. Every miss comes back sooner."],

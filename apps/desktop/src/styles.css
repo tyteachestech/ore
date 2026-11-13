@@ -2128,6 +2128,10 @@ button.home-plan:hover { color: var(--text); }
 .review-end { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4vh auto 0; max-width: 420px; animation: card-in var(--t-4) ease-out both; }
 /* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
 .review-mole { display: block; line-height: 0; margin-bottom: 2px; width: 96px; height: calc(96px * 18 / 22); }
+/* D254: he lands off the cart with a squash, then springs back to his height. */
+.review-mole.fell { transform-origin: 50% 100%; animation: mole-land var(--t-4) var(--ease-spring) both; }
+@keyframes mole-land { from { transform: scale(1.14, 0.8); } }
+@media (prefers-reduced-motion: reduce) { .review-mole.fell { animation: none; } }
 /* The cart's tip (D190): a layer as wide as the window over the end screen, so the cart crosses it on a rail just
    over the ring. Its ore is the ring's own dot, in size and colour; a rough stone is the gem it becomes. */
 .review-end.carted { position: relative; }
@@ -2146,7 +2150,7 @@ button.home-plan:hover { color: var(--text); }
 .cart-ore-in.rich { fill: var(--ore-rich); }
 .rich-ore { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ore-rich); box-shadow: 0 0 5px var(--c-green); vertical-align: 1px; }
 .cart-rough { margin: -9px 0 0 -9px; line-height: 0; }
-/* The mole asleep on the load (D-new-cart-nap). Its wrapper's own point is the middle of his body: the foot of the head's box. */
+/* The mole asleep on the load (D254). Its wrapper's own point is the middle of his body: the foot of the head's box. */
 .cart-mole { position: absolute; left: 0; top: 0; width: 96px; height: calc(96px * 18 / 22); margin: calc(-96px * 18 / 22) 0 0 -48px; transform-origin: 50% 100%; line-height: 0; will-change: transform; }
 .cart-zzz { position: absolute; display: flex; align-items: flex-end; gap: 3px; font: 400 12px/1 var(--mono); color: var(--muted); animation: cart-zzz-in var(--t-3) var(--t-moment) both; }
 .cart-zzz i { font-style: normal; animation: cart-zzz 1400ms infinite both; }

@@ -26,7 +26,7 @@ const ROUGH = 6;
 /** The mole riding the load: drawn at the size he stands at on the ring, shown smaller on the cart: `DOZE` asleep (side on, about 80px long), `RIDER` once awake. */
 const RIDER_PX = 96, DOZE = 0.45, RIDER = 0.55;
 /** How long he hangs asleep where the cart was, and again awake, and how long he takes to fall. */
-const HANG_MS = 300, FALL_MS = 520;
+const HANG_MS = 220, FALL_MS = 440;
 
 const dots = (rows: readonly string[], x0: number, y0: number) =>
   rows.flatMap((row, y) => [...row].map((t, x) => (t === "." ? null : <circle key={`${x},${y}`} className={`cart-${t}`} cx={x0 + x + 0.5} cy={y0 + y + 0.5} r={RADIUS[t]} />)));
@@ -45,7 +45,7 @@ type Flying = { el: HTMLElement; ours: boolean; x0: number; y0: number; dx: numb
 /** `host` is the end screen. `lit` are the ring dots to light, in order; `stones` the colours of the gems cut
  *  (already capped to those shown); `rich` how many of the ore are rich, poured first. `onStone(i)` when stone i lands, `onPoured` when the ring is full, `onLeave`
  *  as the cart starts off (the mole comes up), `onDone` when it has gone. `mole`: he rides in asleep on the load and
- *  falls out onto the ring once the cart has left (D-new-cart-nap); `onFell` as he lands, and `onDone` waits for it. */
+ *  falls out onto the ring once the cart has left (D254); `onFell` as he lands, and `onDone` waits for it. */
 export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onStone, onPoured, onLeave, onDone }: {
   mole?: boolean; onFell?: () => void;
   host: HTMLElement | null; lit: number[]; rich?: number; stones: (string | undefined)[];
@@ -54,7 +54,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
   const layer = useRef<HTMLDivElement>(null);
   const calls = useRef({ onStone, onPoured, onLeave, onDone, onFell });
   calls.current = { onStone, onPoured, onLeave, onDone, onFell };
-  // The mole asleep on the load (D-new-cart-nap) wakes once the cart has gone from under him.
+  // The mole asleep on the load (D254) wakes once the cart has gone from under him.
   const [awake, setAwake] = useState(false);
 
   useEffect(() => {

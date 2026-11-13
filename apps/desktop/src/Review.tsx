@@ -1606,7 +1606,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     const dots = oreFor(part(b), part(t), ringDots(END_RING));
     return !quick && !PHONE && !document.hidden && !still() && (dots.length > 0 || shown.length > 0) ? dots : null;
   });
-  // D-new-cart-nap: two endings in three with a cart, the mole rides it in asleep and falls out onto the ring; else he comes up out of the ground.
+  // D254: two endings in three with a cart, the mole rides it in asleep and falls out onto the ring; else he comes up out of the ground.
   const [nap] = useState(() => !!pour && Math.random() < NAP_SHARE);
   // cart: rolling and pouring · poured: the ring is full · leaving: the mole comes up · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
@@ -1614,11 +1614,11 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   // It always comes up out of the ground first, with or without a cart before it (under Reduce Motion it is just there, pleased).
   const [mood, setMood] = useState<"peek" | "cheer" | "surprised">(() => (still() ? "cheer" : nap ? "surprised" : "peek"));
   const [fell, setFell] = useState(false);
-  // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that.
+  // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
   const up = nap ? fell : stage === "leaving" || stage === "done";
   useEffect(() => {
     if (!up) return;
-    const id = setTimeout(() => setMood("cheer"), 560);
+    const id = setTimeout(() => setMood("cheer"), nap ? 420 : 560);
     return () => clearTimeout(id);
   }, [up]);
   const full = stage !== "cart";
@@ -1686,7 +1686,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         <>
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem">
-            <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
+            <span className={`review-mole${nap && fell ? " fell" : ""}`}>{up && <Mole bare size={96} mood={mood} />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {mood === "cheer" && (
               <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />

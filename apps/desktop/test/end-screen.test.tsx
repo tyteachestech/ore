@@ -46,7 +46,8 @@ const cheering = (body: HTMLElement) => body.querySelector(".review-mole .mole")
 
 test("a session that filled the ring and cut a gem: the cart is there, the mole and the gem wait, then all of it settles", async () => {
   jest.useFakeTimers();
-  const s = await mount(end(["ai"]));
+  // The roll picks the ending where he comes up out of the ground (the cart nap has its own test below).
+  const s = await mount(end(["ai"]), 0.9);
   expect(s.q(".review-end.carted .cart-tip .cart")).toBe(1);
   expect(s.q(".review-mole .mole")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(0);
@@ -73,7 +74,7 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   await s.done();
 }, 10_000);
 
-test("the mole rides the cart in asleep, falls out onto the ring once it has gone, and covers for it (D-new-cart-nap)", async () => {
+test("the mole rides the cart in asleep, falls out onto the ring once it has gone, and covers for it (D254)", async () => {
   jest.useFakeTimers();
   const s = await mount(end(["ai"]));
   // Asleep on the load, his whole body; nobody on the ring yet.
