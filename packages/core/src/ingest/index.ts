@@ -348,17 +348,22 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
 /** The response's body, refused once it passes MAX_BYTES (a server need not say how big it is). */
 const tooBig = () => `That file is over ${MAX_BYTES / 1024 / 1024} MB, too big to read as a source. Add the part you want instead.`;
 
-async function readCapped(res: Response): Promise<Uint8Array> {
+export async function readCapped(res: Response): Promise<Uint8Array> {
   if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) {
     await res.body?.cancel();
     throw new Error(tooBig());
   }
   const parts: Uint8Array[] = [];
   let size = 0;
-  for await (const part of res.body ?? []) {
-    size += part.length;
-    if (size > MAX_BYTES) throw new Error(tooBig());
-    parts.push(part);
+  // The stream's own reader, not `for await`: iOS 26's web view can't iterate a body, so every download failed there.
+  const reader = res.body?.getReader();
+  for (let r = await reader?.read(); r && !r.done; r = await reader!.read()) {
+    size += r.value.length;
+    if (size > MAX_BYTES) {
+      await reader!.cancel();
+      throw new Error(tooBig());
+    }
+    parts.push(r.value);
   }
   const out = new Uint8Array(size);
   let at = 0;

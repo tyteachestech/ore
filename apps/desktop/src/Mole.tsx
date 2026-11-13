@@ -1,27 +1,27 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-/* The tutor's mole (D168, drawn D169, a puppet since D214): its head and two paws over a strip of dirt, drawn as
-   round dots on a 22 by 18 grid, like Nothing's dot glyphs. The face is an Animal Crossing mole's: a lighter
-   muzzle, black eyes with one highlight, a pink nose.
+/* The tutor's mole (D168, drawn D169, a puppet since D214, an old miner since D238): its head and two paws over a
+   strip of dirt, drawn as round dots on a 22 by 18 grid, like Nothing's dot glyphs. He is the mine's old hand: a
+   helmet with a lit lamp, small black eyes under its brim, a pink nose over a white moustache in two long lobes.
    It moves like a puppet: each value of its shape (how high it stands, its dome, its paws, where it looks) follows a
    spring, and every frame the smooth shape is sampled onto the fixed grid. A dot's size says how much of it the
    shape covers, so the head and paws glide (halftone, D183). The face reads as features, so eyes, glints, the nose
-   and the mouth stay whole dots that move a whole column at a time and never shimmer. */
+   the moustache and the mouth stay whole dots that move a whole column at a time and never shimmer. */
 export const COLS = 22, ROWS = 18;
 const MID = (COLS - 1) / 2;
-/** Rows of room above the grid, so the dome never runs off its top. */
-export const HEAD = 3;
+/** Rows of room above the grid: his helmet stands 3 over it, and rides higher on a hop or a start. */
+export const HEAD = 8;
 
-export type Tone = "fur" | "muzzle" | "white" | "paw" | "eye" | "glint" | "nose" | "dirt";
+export type Tone = "fur" | "helmet" | "band" | "housing" | "lamp" | "brim" | "paw" | "stache" | "brow" | "eye" | "glint" | "nose" | "dirt";
 /** The puppet's values. y: rows sunk into the hole. top: the dome's top row. rx: head half width. ex: how square the
  *  dome is (2 round, 4 boxy). hx: head lean. lx, ly: where the eyes look. open: 1 open, 0 shut. tall: wide eyes.
- *  arc: ∩ eyes. nose: a bigger nose. pawL, pawR: rows each paw is raised. pw: paw width. kick: dirt swell. mouth: an o, then an O. */
-export const REST = { y: 0, top: -0.3, rx: 10.2, ex: 2.6, hx: 0, lx: 0, ly: 0, open: 1, tall: 0, arc: 0, nose: 0, pawL: 0, pawR: 0, pw: 5, kick: 0, mouth: 0 };
+ *  arc: ∩ eyes and the moustache spread wide. pawL, pawR: rows each paw is raised. pw: paw width. kick: dirt swell. mouth: an o, then an O. */
+export const REST = { y: 0, top: -0.3, rx: 10.2, ex: 2.6, hx: 0, lx: 0, ly: 0, open: 1, tall: 0, arc: 0, pawL: 0, pawR: 0, pw: 5, kick: 0, mouth: 0 };
 export type State = typeof REST;
 type Key = keyof State;
 const KEYS = Object.keys(REST) as Key[];
 /** Spring per value: [stiffness, damping]. Eyes snap; the body carries a little bounce. */
-const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx: [210, 16], ex: [200, 22], hx: [70, 13], lx: [90, 15], ly: [90, 15], open: [900, 52], tall: [420, 26], arc: [320, 30], nose: [300, 26], pawL: [260, 14], pawR: [260, 14], pw: [260, 24], kick: [160, 9], mouth: [380, 22] };
+const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx: [210, 16], ex: [200, 22], hx: [70, 13], lx: [90, 15], ly: [90, 15], open: [900, 52], tall: [420, 26], arc: [320, 30], pawL: [260, 14], pawR: [260, 14], pw: [260, 24], kick: [160, 9], mouth: [380, 22] };
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -30,24 +30,54 @@ const roundBox = (px: number, py: number, cx: number, cy: number, hw: number, hh
   return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rad;
 };
 
+const span = (r: number, a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => [r, a + i] as const);
+/** The moustache's left lobe (the right mirrors it): hanging at rest, spread wide when he is pleased. */
+const HANG = [[10, 8], [10, 9], ...span(11, 6, 10), ...span(12, 5, 9), ...span(13, 5, 9), ...span(14, 5, 8), ...span(15, 6, 8), [16, 6], [16, 7]] as const;
+const SPREAD = [[10, 9], ...span(11, 6, 10), ...span(12, 3, 9), ...span(13, 2, 6), [11, 2], [12, 2]] as const;
+const NOSE = [[9, 9], [9, 10], [10, 10]] as const;
+
 /** The face as whole dots, keyed r * 100 + c. Its position rounds to a dot; how open the eyes are picks a drawn shape. */
 function face(s: State, fx: number, fy: number) {
-  const m = new Map<number, Tone>(), set = (r: number, c: number, t: Tone) => m.set(r * 100 + c, t);
-  const ox = Math.round(fx + s.lx * 0.65), oy = Math.round(fy + s.ly * 0.75), er = 7 + oy;
-  for (const c0 of [5 + ox, 15 + ox]) {
-    if (s.arc > 0.5) { for (const [dc, dr] of [[0, 1], [1, 0], [2, 0], [3, 1]] as const) set(er + 1 + dr, c0 - 1 + dc, "eye"); continue; }
-    const rows = s.open < 0.35 ? [er + 2] : s.open < 0.75 ? [er + 1, er + 2] : s.tall > 0.5 ? [er - 1, er, er + 1, er + 2] : [er, er + 1, er + 2];
-    for (const r of rows) { set(r, c0, "eye"); set(r, c0 + 1, "eye"); }
+  const m = new Map<number, Tone>();
+  const ox = Math.round(fx + s.lx * 0.65), oy = Math.round(fy + s.ly * 0.75), nx = Math.round(fx * 1.1), er = 7;
+  const set = (r: number, c: number, t: Tone, dx = ox, dy = oy) => m.set((r + dy) * 100 + c + dx, t);
+  const both = (cells: readonly (readonly [number, number])[], t: Tone, dx = ox, dy = oy) => { for (const [r, c] of cells) { set(r, c, t, dx, dy); set(r, COLS - 1 - c, t, dx, dy); } };
+  // His eyes and brows never rise into the brim: a look up moves his nose and moustache, and cocks a brow.
+  const ey = Math.round(s.y + Math.max(0, s.ly));
+  if (s.arc > 0.5) both([[er + 1, 5], [er, 6], [er, 7], [er + 1, 8]], "eye", ox, ey);
+  else if (s.open < 0.35) both([[er + 1, 6], [er + 1, 7]], "eye", ox, ey);
+  else {
+    const top = s.tall > 0.5 ? er - 1 : er;
+    for (let r = top; r <= er + 1; r++) both([[r, 6], [r, 7]], "eye", ox, ey);
     // One highlight, top right of each eye (the light comes from the upper right).
-    if (rows.length > 2) set(rows[0]!, c0 + 1, "glint");
+    set(top, 7, "glint", ox, ey); set(top, 15, "glint", ox, ey);
   }
-  const nx = Math.round(fx * 1.1), nr = 11 + oy;
-  for (const c of [10 + nx, 11 + nx]) { set(nr, c, "nose"); if (s.nose > 0.5) set(nr + 1, c, "nose"); }
-  // The mouth, under the nose: a small o, then a round O when he's surprised.
-  const mr = 13 + oy + (s.nose > 0.5 ? 1 : 0);
-  if (s.mouth > 0.25) { set(mr, 10 + nx, "eye"); set(mr, 11 + nx, "eye"); }
-  if (s.mouth > 0.7) { set(mr + 1, 10 + nx, "eye"); set(mr + 1, 11 + nx, "eye"); }
+  // His brows sit under the brim, a row over his eyes: one shows, cocked, on the side he looks to, and both when
+  // his helmet jumps.
+  const brow = s.tall > 0.5 ? er - 2 : er - 1;
+  if (s.lx > 0.5 || s.tall > 0.5) for (const [r, c] of span(brow, 13, 16)) set(r, c, "brow", ox, ey);
+  if (s.lx < -0.5 || s.tall > 0.5) for (const [r, c] of span(brow, 5, 8)) set(r, c, "brow", ox, ey);
+  both(NOSE, "nose", nx);
+  both(s.arc > 0.5 ? SPREAD : HANG, "stache", nx);
+  // The mouth, between the lobes: a small o, then a round O when he's surprised.
+  if (s.mouth > 0.25) both([[13, 10]], "eye", nx);
+  if (s.mouth > 0.7) both([[14, 10]], "eye", nx);
   return m;
+}
+
+/** His head is a little narrower than the grid, so the helmet's brim overhangs it. */
+const NARROW = 0.93;
+/** The helmet, in its own rows (y 0 is the grid's top row at rest): a dome from -2.5 to a darker band, over a brim
+ *  the grid's whole width, with the lamp in its housing at the front. The size of the dot at (x from its middle, y). */
+function helmet(x: number, y: number): [cover: number, tone: Tone] | null {
+  const brim = roundBox(x, y, 0, 5, 10.9, 0.5, 0.5);
+  if (brim < 0.1) return [clamp(-brim * 4 + 0.6), "brim"];
+  const t = (4.5 - y) / 7;
+  if (t < 0 || t > 1) return null;
+  const cover = clamp((9 * (1 - t ** 2.2) ** (1 / 2.2) - Math.abs(x)) / 0.5 + 0.6);
+  if (cover <= 0.15) return null;
+  const lamp = Math.hypot(x, y - 1.5);
+  return lamp < 1 ? [1.25, "lamp"] : lamp < 2.3 ? [cover, "housing"] : [cover, Math.round(y) === 4 ? "band" : "helmet"];
 }
 
 export type Dot = [c: number, r: number, radius: number, tone: Tone];
@@ -56,7 +86,9 @@ export function moleDots(s: State): Dot[] {
   const out: Dot[] = [], bottom = ROWS - 1.5, ry = Math.max(4, bottom - s.top);
   const fx = s.hx * 0.8 + s.lx * 0.35, fy = s.y + s.ly * 0.25;
   // Squash and stretch: stretched tall the head narrows, squashed it spreads, so it keeps its mass through a hop.
-  const rx = s.rx * clamp((bottom - REST.top) / ry, 0.86, 1.06);
+  const rx = s.rx * NARROW * clamp((bottom - REST.top) / ry, 0.86, 1.06);
+  // The helmet rides the top of his head: up with a hop, never down over his eyes, and it jumps when he is startled.
+  const hatY = Math.min(s.top - REST.top, 0.3) + s.y - s.tall * 1.6, hatX = MID + s.hx * 0.9;
   // Each paw a rounded box, and a box one dot wider that keeps the head apart from it.
   const paws = [0, 1].map((side) => {
     const w = s.pw, top = ROWS - 4 - (side ? s.pawR : s.pawL) + s.y;
@@ -79,13 +111,12 @@ export function moleDots(s: State): Dot[] {
     const pawCov = clamp(-Math.min(pl, pr) * 4);
     head *= clamp(Math.min(gl, gr) * 4);
     if (pawCov > 0.15) { out.push([c, r, 0.44 * pawCov ** 0.6, "paw"]); continue; }
+    const hat = helmet(c - hatX, r - hatY);
+    if (hat) { out.push([c, r, 0.44 * hat[0] ** 0.6, hat[1]]); continue; }
     if (head <= 0.15) continue;
     const mark = head >= 0.5 ? marks.get(r * 100 + c) : undefined;
     if (mark) { out.push([c, r, mark === "eye" ? 0.56 : 0.44, mark]); continue; }
-    // Fur, then the muzzle: a light bell from between the eyes to the dirt, whitest in the middle.
-    const mx = c - MID - fx, my = r - 12.2 - fy;
-    const tone: Tone = (mx / 3.4) ** 2 + (my / 3) ** 2 <= 1 ? "white" : (mx / 4.6) ** 2 + (my / 3.8) ** 2 <= 1 ? "muzzle" : "fur";
-    out.push([c, r, 0.44 * head ** 0.6, tone]);
+    out.push([c, r, 0.44 * head ** 0.6, "fur"]);
   }
   // The dirt swells where he comes up through it.
   for (let c = 0; c < COLS; c++) out.push([c, ROWS - 1, 0.44 * (1 + 0.22 * clamp(s.kick, -1, 1) * Math.exp(-(((c - MID) / 6) ** 2))), "dirt"]);
@@ -93,7 +124,7 @@ export function moleDots(s: State): Dot[] {
 }
 
 /** One path per tone, painted back to front: eyes over the face, glints over the eyes. */
-const ORDER: Tone[] = ["dirt", "fur", "muzzle", "white", "paw", "nose", "eye", "glint"];
+const ORDER: Tone[] = ["dirt", "fur", "helmet", "band", "housing", "brim", "paw", "stache", "brow", "nose", "lamp", "eye", "glint"];
 function paths(dots: Dot[]): Record<Tone, string> {
   const by = Object.fromEntries(ORDER.map((t) => [t, ""])) as Record<Tone, string>;
   for (const [c, r, rad, t] of dots) {
@@ -122,26 +153,26 @@ export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer
  *  `still` is the one pose shown under reduced motion or in a hidden window. */
 type Beat = { to?: Partial<State>; kick?: Partial<State> };
 type Move = Beat & { from?: Partial<State>; at?: [ms: number, Beat][]; wave?: number; end?: number; loop?: number; still: Partial<State> };
-const HAPPY: Partial<State> = { arc: 1, nose: 1, pw: 6, ex: 3.6, rx: 10, top: 0.6 };
+const HAPPY: Partial<State> = { arc: 1, pw: 6, ex: 3.6, rx: 10, top: 0.6 };
 /** Pushes, in dots a second: a paw's tap, both paws thrown up, a hop of the dome, a jolt; and the dome's top row in a squat. */
 const TAP = 45, THROW = 70, HOP = 95, JOLT = 62, SQUAT = 1.7;
-const WIDE: Partial<State> = { tall: 1, nose: 1, mouth: 1, rx: 10.4, top: 1.4 };
+const WIDE: Partial<State> = { tall: 1, mouth: 1, rx: 10.4, top: 1.4 };
 const BLINK: (ms: number) => [number, Beat][] = (ms) => [[ms, { to: { open: 0 } }], [ms + 120, { to: { open: 1 } }]];
 /* Sizes here are in dots, and a dot is under 2px in the button and the chat: a move that shifts less than a row
    and a half is not seen. Each hop is a squat first (anticipation), then the spring up, then the dirt as he lands. */
 export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // Up out of the hole with a spray of dirt, then a blink.
-  peek: { from: { y: 18 }, at: [[260, { kick: { kick: 9 } }], ...BLINK(1200)], end: 1500, still: {} },
+  peek: { from: { y: 21 }, at: [[260, { kick: { kick: 9 } }], ...BLINK(1200)], end: 1500, still: {} },
   // Looks up to one side and taps a paw twice, blinks, then the other.
   thinking: { to: { lx: 1, ly: -1, hx: 0.6 }, loop: 4000, still: { lx: 1, ly: -1 },
     at: [[400, { kick: { pawR: TAP } }], [800, { kick: { pawR: TAP } }], ...BLINK(1500), [2000, { to: { lx: -1, hx: -0.6 } }], [2400, { kick: { pawL: TAP } }], [2800, { kick: { pawL: TAP } }], ...BLINK(3500)] },
-  // A squat, then arc eyes and a hop with both paws thrown up, and the dirt as he lands.
+  // A squat, then arc eyes, the moustache spread wide and a hop with both paws thrown up, and the dirt as he lands.
   happy: { to: { top: SQUAT }, end: 1700, still: HAPPY,
     at: [[110, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [420, { kick: { kick: 7 } }]] },
-  // A jolt up with both paws, wide eyes and an O.
+  // A jolt up with both paws, his helmet jumping off his brows, wide eyes and an O.
   surprised: { to: WIDE, kick: { top: -JOLT, pawL: THROW, pawR: THROW, kick: 6 }, end: 1400, still: WIDE },
   // Both paws waving, bobbing on each beat, then a squat, a last hop and it settles pleased.
-  cheer: { to: { arc: 1, nose: 1, ex: 3 }, wave: 900, end: 2400, still: HAPPY,
+  cheer: { to: { arc: 1, ex: 3 }, wave: 900, end: 2400, still: HAPPY,
     at: [[900, { to: { ...HAPPY, top: SQUAT, pawL: 0, pawR: 0 } }], [1010, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [1320, { kick: { kick: 7 } }]] },
 };
 

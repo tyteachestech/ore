@@ -4,7 +4,7 @@ import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
-import { Gem } from "./Gem";
+import { Cutting, Gem } from "./Gem";
 import { Mole } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
 import { still } from "./SideCursor";
@@ -14,13 +14,14 @@ import { MoreButton } from "./Menu";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
-import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
+import { momentFor, type Moment } from "./moment";
 import { Trap } from "./Trap";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
@@ -31,6 +32,16 @@ import { Occluded } from "./Occluded";
 const SURE = ["Guess", "Think so", "Sure"] as const;
 const KEY_POINTS_CHANGED = "The key points changed.";
 const RATINGS = ["Again", "Hard", "Good", "Easy"] as const;
+/** How long after the first press of a guarded rating the second one starts to count: past a double click. */
+const GUARD_MS = 500;
+/** The exercise's gem in words, for its hover. */
+const GEM_SAYS: Record<CardGem["kind"], string> = {
+  empty: "Not reviewed yet",
+  rough: "Growing: not near cut yet",
+  ready: "Nearly cut: cut if you recall it now",
+  cut: "Cut: you'd still recall this three weeks from now",
+  dull: "Missed since it was cut: recall it to win it back",
+};
 /** A missed card comes back this many cards later (D59). */
 const AGAIN_GAP = 3;
 /** The queue once its first card is answered. A miss comes back once (D59), a few cards later; a second
@@ -153,6 +164,16 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const [asking, setAsking] = useState(false);
   /** The rating under the pointer or focus, for where the timeline puts the next review (D149). */
   const [preview, setPreview] = useState<number | undefined>();
+  /** A rating two steps over what the marks say waits for a second press (D237); this is the one waiting. */
+  const [guard, setGuard] = useState<number | undefined>();
+  const guardAt = useRef(0);
+  /** The moment after a rating that changed the exercise's gem (D237). It sits over the next card and never holds it back. */
+  const [moment, setMoment] = useState<(Moment & { n: number; color?: string }) | null>(null);
+  useEffect(() => {
+    if (!moment) return;
+    const t = setTimeout(() => setMoment(null), moment.tone === "miss" ? 6000 : 4000);
+    return () => clearTimeout(t);
+  }, [moment]);
   /** Each card's Ask chat, kept while he closes and reopens it. */
   const [asks, setAsks] = useState<Record<string, AskChat>>({});
   const [end, setEnd] = useState<End | null>(null);
@@ -298,6 +319,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     setPassageGone(null);
     setAsking(false);
     setPreview(undefined);
+    setGuard(undefined);
   };
 
   /** The next card, loaded while he answers this one, so a rating moves on without waiting for it. Only
@@ -549,10 +571,23 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     return got === marks.length ? Math.max(3, grade.rating) : got ? 2 : 1;
   })();
 
+  // A rating waits only for what the marks say now: when they change, it stops waiting.
+  useEffect(() => setGuard(undefined), [suggested]);
+
   const advance = (again: boolean) => setQueue((q) => q && afterAnswer(q, again));
 
   const rate = async (rating: number) => {
     if (!card || phase !== "checked" || busyNow.current) return;
+    // D237: his rating is the one recorded (D21), but Good or Easy over a miss, by his own marks, takes a second
+    // press, so a slip of the finger can't turn a gem that should come loose into a cut one.
+    // The second press is a decision, so one that lands within the first's double click doesn't count. With nothing
+    // to go by yet (the check still running, or no mark of his own), there is no guard: that rating is his alone.
+    if (card.kind !== "card" && suggested !== undefined && rating >= suggested + 2 && (guard !== rating || Date.now() - guardAt.current < GUARD_MS)) {
+      if (guard !== rating) guardAt.current = Date.now();
+      return void setGuard(rating);
+    }
+    const after = momentFor(card.history, rating as 1 | 2 | 3 | 4, { sure: conf === 3, remix: !!card.variant });
+    const color = entry ? skillOf(entry.skills[0] ?? "").color : undefined;
     setBusy(true);
     let goalClosed = false;
     try {
@@ -570,6 +605,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         ...(session.current ? [opt("session", session.current.id)] : []),
       ];
       await submit(args, rating, elapsed);
+      // An everyday rating leaves a moment still showing to run its time.
+      if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
       // The session is today's slice (D65): it ends when the goal closes, and Keep going goes on.
       const b = before.current;
@@ -630,6 +667,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
    *  opens the session again, back on that card (Anki's Undo after Congratulations). */
   const undoRating = async () => {
     if (!last || busyNow.current) return;
+    setMoment(null);
     dropAhead();
     last.forget();
     setBusy(true);
@@ -1053,6 +1091,19 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick, source)}</p>}
 
+        {moment && !end && (
+          <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} role="status">
+            {!quick && <span className="moment-mole"><Mole bare size={40} mood={moment.tone === "miss" ? "peek" : "happy"} /></span>}
+            <span className="moment-gem" aria-hidden="true">
+              <Gem kind={moment.from.kind} size={36} seam={moment.from.seam} polished={moment.from.polished} />
+              <Gem kind={moment.to.kind} size={36} seam={moment.to.seam} polished={moment.to.polished} />
+            </span>
+            <span className="moment-text">
+              {moment.days > 0 && <b>+{moment.days} {moment.days === 1 ? "day" : "days"}</b>}
+              <span>{moment.line}</span>
+            </span>
+          </div>
+        )}
         {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
 
         {!end && card && entry && (
@@ -1237,16 +1288,31 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                 )}
 
                 {/* Its reviews so far and where the rating under the pointer puts the next (D149); a card never reviewed has nothing to show. */}
-                {card.history && card.history.reviews.length > 0 && <Timeline history={card.history} rating={(preview ?? suggested ?? 3) as Rating} />}
+                {card.history && card.history.reviews.length > 0 && (
+                  <div className="review-memory" data-color={skillOf(entry.skills[0] ?? "").color}>
+                    {/* D237: the exercise's own gem, as it is before this rating. */}
+                    {card.history.gem && (
+                      <Hint text={GEM_SAYS[card.history.gem.kind]} side="top">
+                        <span className="review-gem" tabIndex={0} aria-label={GEM_SAYS[card.history.gem.kind]}><Gem kind={card.history.gem.kind} size={18} seam={card.history.gem.seam} polished={card.history.gem.polished} /></span>
+                      </Hint>
+                    )}
+                    <Timeline history={card.history} rating={(preview ?? suggested ?? 3) as Rating} />
+                  </div>
+                )}
                 <div className="review-rate" role="group" aria-label="How well did you remember it?" onMouseLeave={() => setPreview(undefined)} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setPreview(undefined)}>
                   {RATINGS.map((r, i) => (
                     <Hint key={r} text={<>{i + 1 === suggested ? `${r}, suggested` : r} <kbd>{i + 1}</kbd>{i + 1 === suggested && <kbd>↵</kbd>}</>} side="top">
-                      <button className={`rate-${i + 1}${i + 1 === suggested ? " suggested" : ""}`} disabled={busy} onClick={() => void rate(i + 1)} onMouseEnter={() => setPreview(i + 1)} onFocus={() => setPreview(i + 1)}>
+                      <button className={`rate-${i + 1}${i + 1 === suggested ? " suggested" : ""}`} data-armed={guard === i + 1 || undefined} disabled={busy} onClick={() => void rate(i + 1)} onMouseEnter={() => setPreview(i + 1)} onFocus={() => setPreview(i + 1)}>
                         {r}
                       </button>
                     </Hint>
                   ))}
                 </div>
+                {guard !== undefined && (
+                  <p className="review-guard" role="status">
+                    {marks?.some((m) => !m) ? `${marks.filter((m) => !m).length} of ${marks.length} key points are marked missed.` : "This one is down as a miss."} Press {RATINGS[guard - 1]} again to keep it.
+                  </p>
+                )}
                 {!PHONE && <div className="review-tools">
                   <Hint text="Ask about this" keys="ask" side="top">
                     <button aria-label="Ask about this" aria-pressed={asking} onClick={() => setAsking((v) => !v)}>
@@ -1439,7 +1505,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     return () => clearTimeout(id);
   }, [up]);
   const full = stage !== "cart";
-  // D197: a cut gem that was won back carries its gold seam; a gem passed on a new case this session shows polished.
+  // D197: a cut gem that was won back has a gold rim; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
   const mendedN = (s.grades ?? []).filter((g) => g === "mended").length;
   const polishedN = (s.polished?.length ?? 0) + (s.grades ?? []).filter((g) => g === "polished").length;
@@ -1452,7 +1518,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         <CartTip host={host} lit={pour} rich={rescuedWorthSaying(s) ? s.rescued : 0} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
       )}
       {/* D169: the tutor's mole cheers from the top of the ring, once, at the end of a session (not in the quick quiz). After the cart (D190) it comes up first. */}
-      {!quick && <span className="review-mole">{up && <Mole bare size={64} mood={mood} />}</span>}
+      {!quick && <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>}
       <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
       <h2>{title}</h2>
       {/* "Caught up" never hides the new cards the daily limits hold back (D65). */}
@@ -1464,9 +1530,10 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
             const sk = skills.find((x) => x.id === g.skill);
             return (
               // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then. A gem cut before today and polished now shows once the cart has poured.
-              <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: you passed it as a remix" : g.seam ? "Mended: you missed it once and won it back" : "Cut: you'd still recall it three weeks from now"}`}>
-                <span data-color={sk?.color} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
-                  <Gem kind="cut" size={36} seam={g.seam} polished={g.polished} />
+              <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: you passed it as a remix" : g.seam ? "Won back: you missed it once and cut it again" : "Cut: you'd still recall it three weeks from now"}`}>
+                <span data-color={sk?.color} data-stone={(pour && !g.old) || undefined} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
+                  {/* With the cart, the stone that lands is cut where it stands: its dots fuse into pixels (D239). */}
+                  {pour && !g.old ? <Cutting go={i < landed} size={36} seam={g.seam} polished={g.polished} /> : <Gem kind="cut" size={36} seam={g.seam} polished={g.polished} />}
                   {sk && <span className="review-cut-skill"><SkillIcon icon={sk.icon} color={sk.color} dot /></span>}
                 </span>
               </Hint>

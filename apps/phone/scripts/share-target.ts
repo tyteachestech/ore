@@ -20,6 +20,8 @@ const ent = (indent: string) =>
 let p = readFileSync(yml, "utf8");
 if (!p.includes("OreShare:")) {
   p = p.replace(/(    dependencies:\n)(      - framework: libapp.a)/, "$1      - target: OreShare\n$2");
+  // The app's own Swift (apps/phone/ios: Apple's on-device speech, called from lib.rs `transcribe`).
+  p = p.replace(/(      - path: Sources\n)(      - path: Assets.xcassets)/, "$1      - path: ../../../ios\n$2");
   p = p.replace(/(    entitlements:\n      path: ore-phone_iOS\/ore-phone_iOS.entitlements\n)/, `$1${ent("      ")}\n`);
   p += `
   OreShare:

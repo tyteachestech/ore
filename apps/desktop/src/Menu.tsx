@@ -98,7 +98,7 @@ function useHold(on: boolean | undefined) {
     if (!on || !el) return;
     const stop = trackDrag(el, () => ({
       // Text in a field or the reader keeps iOS's own press (select, Look Up).
-      // So does a row inside with a menu of its own, which opens alone (F35).
+      // So does a row inside with a menu of its own, which opens alone (F41).
       accept: (t) => {
         const at = document.elementFromPoint(t.clientX, t.clientY);
         return !nativeMenu(at, getSelection()) && (!at || at.closest("[data-menu-row]") === el);

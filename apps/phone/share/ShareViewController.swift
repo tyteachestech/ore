@@ -2,8 +2,9 @@
 // `inbox/<ulid>.link.json` (packages/core/src/inbox.ts, D223, D227), in Ore's iCloud folder, or in the App
 // Group the app reads when it opens. A file (a PDF from Files, a photo) is copied to `inbox/<ulid>/<name>`
 // with `inbox/<ulid>.file.json` written after it. It is saved the moment the card appears; the card then offers his skills to file it under,
-// one tap each, under a preview of what was shared (its picture, title and site in one row, Raindrop's confirmation: the title Safari
-// hands over at once, the picture when Apple's LinkPresentation has fetched it), from the top of the sheet iOS gives it, and stays until Done, a tap above it or a swipe down (closing by itself after 3 s read as a glitch, Tyler 2026-11-12).
+// one tap each, under a preview of what was shared (its picture in its own wide shape, then its title and site: the title Safari
+// hands over at once, the picture when Apple's LinkPresentation has fetched it). Everything sits at the foot of the sheet iOS gives it,
+// under his thumb, ending in the buttons: Open, the main one, and a quieter Done (Tyler 2026-11-12). It stays until one of them, a tap above it or a swipe down (closing by itself after 3 s read as a glitch).
 // With no skills to offer it goes by itself.
 // No web view and no import here: Apple caps an extension's memory (~120 MB), so the app imports it.
 import LinkPresentation
@@ -103,41 +104,46 @@ class ShareViewController: UIViewController {
 
     let done = UIButton(type: .system)
     done.setTitle("Done", for: .normal)
-    done.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+    done.titleLabel?.font = .preferredFont(forTextStyle: .body)
     done.titleLabel?.adjustsFontForContentSizeCategory = true
-    done.tintColor = paper
-    done.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    done.tintColor = muted
+    done.contentEdgeInsets = UIEdgeInsets(top: 0, left: 4, bottom: 0, right: 16)
+    done.heightAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
     done.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     done.addTarget(self, action: #selector(finish), for: .touchUpInside)
     done.setContentHuggingPriority(.required, for: .horizontal)
 
-    // Open: on to the source in Ore now (ChatGPT's share goes straight to its app); Done stays in Safari.
-    opener.setTitle("Open", for: .normal)
-    opener.titleLabel?.font = .preferredFont(forTextStyle: .body)
-    opener.titleLabel?.adjustsFontForContentSizeCategory = true
-    opener.tintColor = muted
+    // Open: on to the source in Ore now (ChatGPT's share goes straight to its app), the card's one filled button; Done stays in Safari.
+    var open = UIButton.Configuration.filled()
+    open.title = "Open"
+    open.cornerStyle = .capsule
+    open.baseBackgroundColor = paper
+    open.baseForegroundColor = UIColor(white: 0.07, alpha: 1)
+    open.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { a in
+      var a = a
+      a.font = .preferredFont(forTextStyle: .headline)
+      return a
+    }
+    opener.configuration = open
     opener.isHidden = true
-    opener.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
-    opener.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    opener.heightAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
     opener.addTarget(self, action: #selector(openInOre), for: .touchUpInside)
-    opener.setContentHuggingPriority(.required, for: .horizontal)
 
-    let head = UIStackView(arrangedSubviews: [titleLabel, opener, done])
-    head.axis = .horizontal
-    head.alignment = .center
-    head.spacing = 12
+    // Done alone (nothing to open) keeps to the left, where it sits beside Open.
+    let actions = UIStackView(arrangedSubviews: [done, opener, UIView()])
+    actions.axis = .horizontal
+    actions.alignment = .center
 
     chips.axis = .vertical
     chips.spacing = 8
     chips.alignment = .leading
 
     // What was shared, so he sees it took the right thing. Hidden until there is something to show.
-    // One row of a fixed height, drawn here on the card's dark (Apple's own preview view tints itself from the
-    // site's icon and waits seconds for its title): the picture arrives later without moving the chips under his thumb.
+    // Drawn here on the card's dark (Apple's own preview view tints itself from the site's icon and waits seconds
+    // for its title). The picture is on top, so when it arrives nothing under his thumb moves.
     preview.isHidden = true
-    preview.axis = .horizontal
-    preview.spacing = 12
-    preview.alignment = .center
+    preview.axis = .vertical
+    preview.spacing = 10
     thumb.isHidden = true
     thumb.contentMode = .scaleAspectFill
     thumb.clipsToBounds = true
@@ -155,13 +161,10 @@ class ShareViewController: UIViewController {
     words.spacing = 2
     preview.addArrangedSubview(thumb)
     preview.addArrangedSubview(words)
-    NSLayoutConstraint.activate([
-      thumb.widthAnchor.constraint(equalToConstant: 64),
-      thumb.heightAnchor.constraint(equalToConstant: 64),
-      preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
-    ])
+    // The picture gives way first when the sheet is short of room.
+    thumb.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
-    let stack = UIStackView(arrangedSubviews: [head, preview, chips])
+    let stack = UIStackView(arrangedSubviews: [titleLabel, preview, chips, actions])
     stack.axis = .vertical
     stack.spacing = 14
     stack.translatesAutoresizingMaskIntoConstraints = false
@@ -170,14 +173,14 @@ class ShareViewController: UIViewController {
     NSLayoutConstraint.activate([
       card.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       card.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      // From the sheet's top, as any sheet's content: iOS sizes the sheet, so content at its foot left it mostly empty above.
-      card.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-      card.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor),
+      // At the sheet's foot, in reach of a thumb (iOS sizes the sheet; an extension can't shrink it).
+      card.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor),
+      card.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
       stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
       stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),
       stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
-      stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18),
-      head.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+      stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -10),
+      opener.widthAnchor.constraint(equalTo: actions.widthAnchor, constant: -80).withPriority(.defaultHigh),
     ])
   }
 
@@ -220,14 +223,12 @@ class ShareViewController: UIViewController {
     pageTitle.text = given ?? host
     site.text = given == nil ? nil : host
     site.isHidden = given == nil
-    // The picture's slot shows from the start, so the title doesn't slide over when the picture comes.
-    thumb.isHidden = false
     preview.isHidden = false
     let provider = LPMetadataProvider()
     provider.timeout = 10
     fetching = provider
     provider.startFetchingMetadata(for: url) { [weak self] got, _ in
-      guard let got else { self?.noPicture(); return }
+      guard let got else { return }
       let title = got.title
       DispatchQueue.main.async {
         guard let self, given == nil, let title, !title.isEmpty else { return }
@@ -235,32 +236,26 @@ class ShareViewController: UIViewController {
         self.site.text = host
         self.site.isHidden = false
       }
-      // A page with no picture of its own shows its site's icon in the slot instead.
-      self?.picture(from: got.imageProvider ?? got.iconProvider, icon: got.imageProvider == nil)
+      self?.picture(from: got.imageProvider)
     }
   }
 
-  private func picture(from provider: NSItemProvider?, icon: Bool = false) {
-    guard let provider, provider.canLoadObject(ofClass: UIImage.self) else { return noPicture() }
+  private func picture(from provider: NSItemProvider?) {
+    guard let provider, provider.canLoadObject(ofClass: UIImage.self) else { return }
     _ = provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
       // Drawn small before it is kept: a page's picture can be thousands of pixels wide, and an extension has little memory.
-      // In its own shape (its short side 192 px), so the slot crops it and never squashes it.
-      guard let full = image as? UIImage, full.size.width > 0, full.size.height > 0 else { self?.noPicture(); return }
-      let k = 192 / min(full.size.width, full.size.height)
-      guard let small = full.preparingThumbnail(of: CGSize(width: full.size.width * k, height: full.size.height * k)) else { self?.noPicture(); return }
+      guard let full = image as? UIImage, full.size.width > 0, full.size.height > 0 else { return }
+      let k = min(1, 1080 / max(full.size.width, full.size.height))
+      guard let small = full.preparingThumbnail(of: CGSize(width: full.size.width * k, height: full.size.height * k)) else { return }
       DispatchQueue.main.async {
-        self?.thumb.contentMode = icon ? .center : .scaleAspectFill
-        self?.thumb.image = icon ? small.preparingThumbnail(of: CGSize(width: 32, height: 32)) : small
-        self?.thumb.isHidden = false
+        guard let self else { return }
+        // In its own shape across the card (a square slot cut a wide picture's sides off, Tyler 2026-11-12);
+        // only a very tall or very wide one is cropped, between 3:4 and 5:2.
+        let shape = min(max(small.size.height / small.size.width, 0.4), 0.75)
+        self.thumb.image = small
+        self.thumb.heightAnchor.constraint(equalTo: self.thumb.widthAnchor, multiplier: shape).withPriority(.defaultHigh).isActive = true
+        self.thumb.isHidden = false
       }
-    }
-  }
-
-  /// Offline, or a page with neither picture nor icon: the empty slot goes, and the words take its place.
-  private func noPicture() {
-    DispatchQueue.main.async { [weak self] in
-      guard let self, self.thumb.image == nil else { return }
-      self.thumb.isHidden = true
     }
   }
 
@@ -464,5 +459,12 @@ class ShareViewController: UIViewController {
     closing?.cancel()
     fetching?.cancel()
     extensionContext?.completeRequest(returningItems: nil)
+  }
+}
+
+extension NSLayoutConstraint {
+  func withPriority(_ p: UILayoutPriority) -> NSLayoutConstraint {
+    priority = p
+    return self
   }
 }

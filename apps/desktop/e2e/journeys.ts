@@ -3621,7 +3621,7 @@ journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space
   if (!shown.includes("⌘R")) throw new Error(`Home's menu shows no Rename key: “${shown}”`);
 });
 
-// WebKit leaves a clicked button unfocused, so the first ⇧↓ after a ⌘-click found no row to grow from (F34).
+// WebKit leaves a clicked button unfocused, so the first ⇧↓ after a ⌘-click found no row to grow from (F40).
 journey("Home: after a ⌘-click picks a row, the first ⇧↓ grows the pick (Finder)", async (page) => {
   await openSource(page, AGENTS);
   await openSource(page, TESTING);
@@ -4400,6 +4400,11 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   const tabs = page.getByRole("tablist", { name: "Sources shown" });
   const on = (name: string) => tabs.getByRole("tab", { name }).getAttribute("aria-selected");
   await until("To read is the open tab", async () => (await on("To read")) === "true");
+  // F36: the header's gems load after the page; the tabs under it stay where they were when they land.
+  const tabY = async () => (await tabs.getByRole("tab", { name: "To read" }).boundingBox())!.y;
+  const y0 = await tabY();
+  await page.locator(".hero-strength").waitFor();
+  if ((await tabY()) !== y0) throw new Error(`the tabs moved from ${y0} to ${await tabY()} when the header's gems loaded`);
   await tabs.getByRole("tab", { name: "Done" }).hover();
   await page.getByRole("tooltip").filter({ hasText: "Done" }).waitFor();
   await tabs.getByRole("tab", { name: "Done" }).click();
@@ -4409,7 +4414,7 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   await page.keyboard.press("Escape");
   await page.keyboard.press("Meta+1");
   await until("⌘1 goes back to To read", async () => (await on("To read")) === "true");
-  // Arrows walk the tabs as in any tab list: the open tab keeps focus, so a second arrow goes on (F33).
+  // Arrows walk the tabs as in any tab list: the open tab keeps focus, so a second arrow goes on (F39).
   await tabs.getByRole("tab", { name: "To read" }).click();
   await page.keyboard.press("ArrowRight");
   await until("→ opens Done", async () => (await on("Done")) === "true");
@@ -5739,6 +5744,64 @@ journey("review: the screen reader's summary counts the key points as he has mar
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: Good over a miss takes a second press, and a cut gem he misses comes loose with the mole's line; ⌘Z takes both back (D237)", async (page) => {
+  // The exercise's gem is cut, whatever the seed's schedule says: its history comes back with that gem.
+  await page.route(/\/ore$/, async (route) => {
+    const args = (JSON.parse(route.request().postData() ?? "{}") as { args?: string[] }).args ?? [];
+    if (args[0] !== "card" || !args.includes("--review")) return route.continue();
+    const r = await route.fetch();
+    const j = JSON.parse(await r.text()) as { history?: Record<string, unknown>; data?: { history?: Record<string, unknown> } };
+    const h = (j.data ?? j).history;
+    if (h) {
+      h.reviews = [{ ts: new Date(Date.now() - 38 * 86_400_000).toISOString(), rating: 3 }];
+      h.gem = { kind: "cut", after: { 1: { kind: "dull", days: 0 }, 2: { kind: "cut", days: 2 }, 3: { kind: "cut", days: 9 }, 4: { kind: "cut", days: 14 } } };
+    }
+    await route.fulfill({ response: r, body: JSON.stringify(j) });
+  });
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 1, gaps: [], feedback: "", covered: [false, false] } }));
+  await startReview(page, /Teaching/);
+  const q = page.locator(".review-q");
+  await page.getByRole("textbox", { name: "Your answer" }).fill("because it is boring");
+  await page.getByRole("radio", { name: "Sure", exact: true }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await page.locator(".review-rate .rate-1.suggested").waitFor();
+  await page.locator('.review-gem .gem[data-kind="cut"]').waitFor();
+  const was = await q.innerText();
+  await page.waitForTimeout(400); // a rating key right after the answer shows is ignored
+  // Good, two steps over the marks: it waits, says why, and nothing is recorded.
+  await page.keyboard.press("3");
+  const guard = page.locator(".review-guard");
+  await guard.waitFor();
+  if (!(await guard.innerText()).includes("2 of 2 key points are marked missed. Press Good again to keep it.")) throw new Error(`the guard says: ${await guard.innerText()}`);
+  if ((await q.innerText()) !== was) throw new Error("one press of Good over a miss moved on");
+  if (await page.locator(".review-moment").count()) throw new Error("a rating that only waits showed a moment");
+  // A double click is one decision, not two: Good pressed again at once still waits.
+  await page.getByRole("button", { name: "Easy", exact: true }).dblclick();
+  await page.waitForTimeout(300);
+  if ((await q.innerText()) !== was || !(await guard.innerText()).includes("Press Easy again")) throw new Error("a double click on Easy over a miss recorded it");
+  // Marking both points as got means Good no longer goes over the marks: the wait and its reason go.
+  const got = page.getByRole("button", { name: /Mark as got$/ });
+  const missed = page.getByRole("button", { name: /Mark as missed$/ });
+  while (await got.count()) await got.first().click();
+  await guard.waitFor({ state: "detached" });
+  while (await missed.count()) await missed.first().click();
+  await page.locator(".review-rate .rate-1.suggested").waitFor();
+  // Again, what the marks say, goes in at one press: the gem comes loose and the line is true to his Sure.
+  await page.keyboard.press("1");
+  const moment = page.locator('.review-moment[data-tone="miss"]');
+  await moment.waitFor();
+  await moment.locator('.gem[data-kind="dull"]').waitFor();
+  if (!(await moment.innerText()).includes("You were sure")) throw new Error(`the moment says: ${await moment.innerText()}`);
+  if ((await moment.innerText()).includes("days")) throw new Error("a miss showed days added");
+  // ⌘Z: the rating and its moment are both taken back.
+  await page.keyboard.press("Meta+z");
+  await moment.waitFor({ state: "detached" });
+  // A miss comes back in the session, so the same exercise shows either way: the rating is gone once Undo is.
+  await page.getByRole("button", { name: "Undo last rating" }).waitFor({ state: "detached" });
+  if ((await q.innerText()) !== was) throw new Error("⌘Z did not leave the exercise showing");
+  await until("Esc leaves", async () => (await page.keyboard.press("Escape"), (await page.locator(".review").count()) === 0));
+});
+
 journey("review: with no AI marks (the check failed), the screen reader counts the ones he sets", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { grade: "AI is signed out." }));
   await startReview(page, /Teaching/);
@@ -5781,6 +5844,7 @@ journey("review: Open in source pauses on the card; Back to Review picks it up w
     await page.waitForTimeout(300); // the passage loads after the answer
     if (await open.isVisible()) break;
     const was = await q.innerText();
+    await armGood(page, await page.getByText("No idea", { exact: true }).isVisible());
     await page.getByRole("button", { name: "Good", exact: true }).click();
     await until("the next card", async () => (await q.innerText()) !== was);
   }
@@ -5833,6 +5897,7 @@ journey("review: Enter activates the focused button (Again, Edit exercise, Open 
     await page.waitForTimeout(300);
     if (await open.isVisible() && (await good.getAttribute("class"))?.includes("suggested")) break;
     const was = await q.innerText();
+    await armGood(page, await page.getByText("No idea", { exact: true }).isVisible());
     await good.click();
     await until("the next card", async () => (await q.innerText()) !== was);
   }
@@ -5925,7 +5990,7 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   const done = async () => Number(await session.getAttribute("aria-valuenow"));
   const before = await done();
   // A card asks how sure he is, then shows the answer; a question asks for his answer first.
-  await page.getByRole("radio", { name: "Think so" }).or(page.getByRole("button", { name: "No idea" })).first().click();
+  await reveal(page);
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await until("the session counts the rating", async () => (await done()) === before + 1);
   await page.getByRole("button", { name: "Undo last rating" }).click();
@@ -6291,8 +6356,7 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
     const text = await q.first().textContent({ timeout: 1000 }).catch(() => null);
     if (!text) continue;
     last = text;
-    const noIdea = page.getByRole("button", { name: "No idea" });
-    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await reveal(page);
     await page.getByRole("button", { name: "Good", exact: true }).click();
     await until("the card moves on", async () => (await doneButton.isVisible()) || ((await q.count()) > 0 && ((await q.first().textContent({ timeout: 500 }).catch(() => last)) !== last)));
   }
@@ -6326,6 +6390,11 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
       const noIdea = page.getByRole("button", { name: "No idea" });
       await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click().catch(() => {});
       await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
+      // Good over No idea waits for a second press (D237).
+      if (await page.locator(".review-guard").isVisible()) {
+        await page.waitForTimeout(550);
+        await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
+      }
       await page.waitForTimeout(300);
     }
     await doneButton.waitFor();
@@ -6499,10 +6568,22 @@ journey("review: What to review has a No skill row for exercises filed under no 
 /** Shows the answer of the card on screen: No idea on a question, Think so on a card. */
 async function reveal(page: Page) {
   const noIdea = page.getByRole("button", { name: "No idea" });
-  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  const none = await noIdea.isVisible();
+  await (none ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await page.waitForTimeout(300); // the passage loads after the answer, and a rating key right after it is ignored
+  await armGood(page, none);
 }
+
+/** Good over No idea takes two presses (D237: a rating two steps over a miss waits for a second one). After
+ *  No idea this gives the first, so a journey about something else rates Good with one. */
+async function armGood(page: Page, noIdea: boolean) {
+  if (!noIdea) return;
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await page.locator(".review-guard").waitFor();
+  await page.waitForTimeout(550); // a second press inside a double click doesn't count
+}
+
 
 /** Every `ore` call a page makes, in order, and the ratings it logged (to take back after the journey). */
 function oreCalls(page: Page) {
@@ -7858,6 +7939,41 @@ journey("quiz check that fails says why, as Review does, with try again", async 
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
+// Before settle: it removes the highlight it makes.
+journey("highlight: its colour arrives as dots that join (the vein), its ore flies to Collected, a Key point's gathers in the margin; none under reduced motion (D240)", async (page) => {
+  await openSource(page, TESTING);
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  const moving = () => page.evaluate(() => document.querySelectorAll(".vein, .vein-ore, .collect-fly").length);
+  const tinted = (name: string) => page.evaluate((name) => (CSS.highlights.get(name)?.size ?? 0), name);
+  const before = await tinted("hl-keep");
+  await select(page, "Free recall, short-answer questions");
+  // The dots are the tint while they sweep: the real one waits for them.
+  const at = await page.evaluate(() => ({ lines: document.querySelectorAll(".vein.keep i").length, ore: document.querySelectorAll(".collect-fly.keep").length }));
+  if (!at.lines) throw new Error("no vein over the new highlight");
+  if ((await tinted("hl-keep")) !== before) throw new Error("the tint was painted under the vein");
+  await popup.waitFor();
+  await until("the ore lifts off toward Collected", async () => at.ore > 0 || (await page.locator(".collect-fly.keep").count()) > 0 || (await page.locator(".collected-chip.keep").count()) > 0, 400);
+  await until("the vein has joined into the tint", async () => (await page.locator(".vein").count()) === 0 && (await tinted("hl-keep")) === before + 1, 1000);
+  // A Key point: its ore gathers where the margin mark lands.
+  await popup.locator(".intent.card").click();
+  await until("the ore gathers in the margin", async () => (await page.locator(".vein-ore i").count()) > 0, 400);
+  await page.locator(".mark-icon.card").first().waitFor();
+  await until("nothing is left on the page", async () => (await moving()) === 0 && (await page.locator(".mark-icon.gather").count()) === 0, 2500);
+  // Reduced motion: the highlight is simply there.
+  const card = page.locator(".mark-icon.card").first();
+  if (!(await popup.isVisible())) await card.click();
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await page.waitForTimeout(500);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await select(page, "Free recall, short-answer questions");
+  if (await moving()) throw new Error("the vein ran under reduced motion");
+  await popup.waitFor();
+  if ((await tinted("hl-keep")) !== before + 1) throw new Error("no tint under reduced motion");
+  await page.emulateMedia({ reducedMotion: null });
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await page.waitForTimeout(500); // the write lands before the next journey reads the library
+});
+
 // Last: its question highlight would change the lists the question journeys read.
 journey("settle: closing a typed highlight lifts the popup away, pops its mark and glows once, then leaves nothing behind", async (page) => {
   await openSource(page, TESTING);
@@ -8318,7 +8434,7 @@ journey("review: changing an Explain card's key points after it was checked keep
   const save = async (text: string, shows: string) => {
     if (!(await field.isVisible())) await page.getByRole("button", { name: "Edit exercise" }).click();
     await field.fill(text);
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await points.locator("li").first().filter({ hasText: shows }).waitFor();
   };
   // Only reordered: both marks stay, but they were the AI's, so nothing is suggested until he marks.
@@ -9627,8 +9743,8 @@ journey("phone: a long press on a Today source opens its menu", async (page) => 
   await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
 }, "phone");
 
-journey("phone: a held row in a skill's list opens its own menu only; Return in Rename opens nothing; Rename… is on Today's rows too (F35–F37)", async (page) => {
-  // On a skill's page a held row is under the section's own menu: a finger's pointer opens only the row's (F35).
+journey("phone: a held row in a skill's list opens its own menu only; Return in Rename opens nothing; Rename… is on Today's rows too (F41–F43)", async (page) => {
+  // On a skill's page a held row is under the section's own menu: a finger's pointer opens only the row's (F41).
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
   const row = page.locator(".phone-skill .phone-sources li button").first();
@@ -9639,7 +9755,7 @@ journey("phone: a held row in a skill's list opens its own menu only; Return in 
   await page.getByRole("menuitem", { name: "Review this source" }).waitFor();
   await Bun.sleep(200);
   if (await page.getByRole("menuitem", { name: "Search sources" }).count()) throw new Error("the section's menu opened over the row's");
-  // The Sources list's Return saves and stays on the list (F36).
+  // The Sources list's Return saves and stays on the list (F42).
   const place = (tab: string) => page.evaluate((tab) => localStorage.setItem("ore-phone-place", JSON.stringify({ tab, skill: null, openId: null, review: null })), tab);
   await place("sources");
   await page.reload();
@@ -9651,7 +9767,7 @@ journey("phone: a held row in a skill's list opens its own menu only; Return in 
   await page.locator(".phone-sources li button", { hasText: "Renamed in Sources" }).waitFor();
   await Bun.sleep(400);
   if (await page.locator(".phone-reader").count()) throw new Error("Return in the rename field opened the source");
-  // Today's rows rename in place, as the Sources list's do (F37, D225).
+  // Today's rows rename in place, as the Sources list's do (F43, D225).
   await place("today");
   await page.reload();
   await press(page, page.locator(".home-read").first());
@@ -9962,6 +10078,16 @@ journey("phone: a tap opens Source actions and works the note's keyboard bar", a
   await until("a tap on the bar's ⋯ opens Block actions", async () => (await block.getAttribute("aria-expanded")) === "true");
 }, "phone");
 
+journey("phone: a note's [[ link finds the library's sources", async (page) => {
+  // The phone gave its notes no link targets: [[ and the keyboard bar's link button always said "No source or skill by that name".
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  await tap(page, note);
+  await page.keyboard.type("[[Testing Eff");
+  await page.locator(".note-menu-row").filter({ hasText: TESTING }).first().waitFor();
+}, "phone");
+
 journey("phone: the last rating of a review shows the end screen, not Wrapping up", async (page) => {
   // The phone's `ore` runs in the page, so a rating saves inside the tap's own event: the queue emptied while
   // Review was still busy, and the end screen waited for a tap on Close.
@@ -10128,6 +10254,20 @@ journey("phone: the small controls of a source answer a 44pt touch", async (page
   const fits = (sel: string, what: string) => fits44(page, sel, what);
   await phoneSource(page, AGENTS);
   await fits(".doc-head .source", "the original-site link");
+  // Its 44pt reach takes no room: the link sits on the byline's line beside the date (it sat 4pt low), or, when the
+  // byline fills the line, starts the next one flush with it (it was indented 14pt).
+  const byline = async (width: number) => {
+    await page.locator(".doc-head .chips").evaluate((el, w) => ((el as HTMLElement).style.width = w), width ? `${width}px` : "");
+    return page.evaluate(() => {
+      const box = (sel: string) => document.querySelector(`.doc-head ${sel}`)!.getBoundingClientRect();
+      const [when, source, name] = [box(".when"), box(".source"), box(".by")];
+      return { off: source.y + source.height / 2 - (when.y + when.height / 2), indent: source.x + 4 - name.x };
+    });
+  };
+  const wide = await byline(1000);
+  if (Math.abs(wide.off) > 1) throw new Error(`the original-site link sits ${wide.off.toFixed(1)}pt off the byline's line`);
+  const narrow = await byline(0);
+  if (narrow.off < 10 || Math.abs(narrow.indent) > 1) throw new Error(`the wrapped original-site link sits ${narrow.indent.toFixed(1)}pt from the byline's start`);
   await fits(".read-pill", "the reading pill");
   await tap(page, page.getByRole("button", { name: "Back" }));
   await phoneSource(page, TESTING);

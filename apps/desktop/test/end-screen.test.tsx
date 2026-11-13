@@ -56,6 +56,10 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   expect(s.q(".cart-ore")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(30);
   expect(s.q(".review-cut > span[data-wait]")).toBe(0);
+  // The stone that landed is cut where it stands: it ends as a gem of solid pixels (D239).
+  for (const t0 = Date.now(); Date.now() - t0 < 3000 && s.q(".gem-cutting[data-cutting]"); ) await act(async () => void (await wait(40)));
+  expect(s.q(".gem-cutting[data-cutting]")).toBe(0);
+  expect(s.q('.review-cut .gem[data-kind="cut"] rect')).toBeGreaterThan(50);
   // The mole cheers once it is up (560ms), not when the cart has finished leaving.
   expect(cheer - up).toBeGreaterThanOrEqual(540);
   expect(cheer - up).toBeLessThanOrEqual(580);
@@ -103,7 +107,7 @@ test("an ore whose ring dot is missing still counts, so the ring is told it is f
   await act(async () => (root.unmount(), body.remove()));
 }, 10_000);
 
-test("gem grades on the end screen (D197): a won-back gem carries its gold seam, a gem polished this session shows after the cut ones, and the session's depth is one line", async () => {
+test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem polished this session shows after the cut ones, and the session's depth is one line", async () => {
   reduce = true;
   const e = end(["ai", "ai"]) as unknown as { session: Record<string, unknown> };
   Object.assign(e.session, { grades: ["mended", "cut"], polished: ["ai"], depth_days: 41 });
@@ -111,7 +115,7 @@ test("gem grades on the end screen (D197): a won-back gem carries its gold seam,
   reduce = false;
   const gems = [...s.body.querySelectorAll(".review-cut > span")];
   expect(gems).toHaveLength(3);
-  const seams = gems.map((g) => g.querySelectorAll('circle[fill="var(--seam)"]').length);
+  const seams = gems.map((g) => g.querySelectorAll('rect[data-gold]').length);
   expect(seams[0]).toBeGreaterThan(0);
   expect(seams.slice(1)).toEqual([0, 0]);
   expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");

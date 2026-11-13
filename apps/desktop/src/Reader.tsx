@@ -18,6 +18,7 @@ import { SearchButton, SearchField } from "./HeadSearch";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
 import { paragraphRange, sentenceRange, snapRange } from "./snap";
 import { Grab } from "./Grab";
+import { still } from "./SideCursor";
 import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
@@ -656,6 +657,8 @@ function ReaderView(p: Props & { reload: () => void }) {
   const [dragging, setDragging] = useState(false);
   /** Bumped when a highlight's range changes in place (an edge dragged), so the paint below reruns. */
   const [repaint, setRepaint] = useState(0);
+  /** Ranges whose highlight is drawing itself in (D240): painted by `vein`, not yet by the Highlight API. */
+  const veining = useRef(new Set<Range>());
   /** "Card here" open in the Collected tab: a line he is typing, anchored where he is. */
   const [adding, setAdding] = useState<string | null>(null);
   /** Where Card here was opened: the source offset his line is anchored at. */
@@ -1189,7 +1192,8 @@ function ReaderView(p: Props & { reload: () => void }) {
       const r = map.get(a.id);
       if (r) {
         // A card typed with nothing selected only marks where he was: a margin icon, no tint.
-        if (!a.point) by[a.intent].push(r);
+        // A highlight still drawing itself in (the vein) has no tint yet: its dots are the tint.
+        if (!a.point && !veining.current.has(r)) by[a.intent].push(r);
         painted.push({ a, r });
       }
     }
@@ -1513,6 +1517,79 @@ function ReaderView(p: Props & { reload: () => void }) {
     }
   }
 
+  const motionMs = (name: string, or: number) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || or;
+
+  /** The vein (D240, Tyler's pick A + C, 2026-11-13): a new highlight's colour arrives as rows of dots that sweep
+   *  along its lines, swell and join into the tint. An inert overlay over the lines; the real tint is held back
+   *  until the dots have joined, then takes their place. Not on the phone, nor under reduced motion. */
+  function vein(range: Range, intent: Intent) {
+    const page = pageRef.current;
+    if (!page || PHONE || still()) return;
+    const box = page.getBoundingClientRect();
+    const el = document.createElement("div");
+    el.className = `vein ${intent}`;
+    let lines = 0;
+    for (const r of range.getClientRects()) {
+      if (!r.width) continue;
+      const bit = document.createElement("i");
+      Object.assign(bit.style, { top: `${r.top - box.top}px`, left: `${r.left - box.left}px`, width: `${r.width}px`, height: `${r.height}px` });
+      // A long passage's lines follow one another closely; past the sixth they arrive together.
+      bit.style.setProperty("--i", String(Math.min(lines++, 6)));
+      el.appendChild(bit);
+    }
+    if (!lines) return;
+    veining.current.add(range);
+    page.appendChild(el);
+    setTimeout(() => {
+      el.remove();
+      veining.current.delete(range);
+      setRepaint((n) => n + 1);
+    }, motionMs("--t-4", 300) + Math.min(lines - 1, 6) * 3 * motionMs("--stagger", 16));
+  }
+
+  /** A highlight made a Key point (D240): loose dots lift off its words and gather in the margin, where its
+   *  mark lands as they arrive. The stone Review will cut starts here. Inert, so no key or click waits on it. */
+  function gather(id: string) {
+    const page = pageRef.current, range = rangeOf(id);
+    if (!page || !range || PHONE || still()) return;
+    const rects = [...range.getClientRects()].filter((r) => r.width);
+    if (!rects.length) return;
+    const fly = motionMs("--t-moment", 600) * 0.7, gap = motionMs("--stagger", 16), N = 18;
+    // After the change renders: the margin draws the mark as the type changes.
+    const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-in-out").trim() || "ease-in-out";
+    let tries = 0;
+    requestAnimationFrame(function land() {
+      const mark = page.querySelector<HTMLElement>(`.mark-icon[data-key="${CSS.escape(id)}"]`);
+      // The mark is drawn a frame or two after the type changes (the margin measures first).
+      if (!mark) return void (++tries < 6 && requestAnimationFrame(land));
+      const box = page.getBoundingClientRect(), to = mark.getBoundingClientRect();
+      const tx = to.left + to.width / 2 - box.left, ty = to.top + to.height / 2 - box.top;
+      mark.style.setProperty("--land", `${fly + (N - 1) * gap * 0.5}ms`);
+      mark.classList.add("gather");
+      const el = document.createElement("div");
+      el.className = "vein-ore";
+      for (let i = 0; i < N; i++) {
+        const r = rects[i % rects.length]!, dot = document.createElement("i");
+        const x = r.left - box.left + r.width * (((i * 37) % 100) / 100), y = r.top - box.top + r.height * (0.25 + ((i * 13) % 50) / 100);
+        el.appendChild(dot);
+        // Up a little, then over to the margin: an arc, as a thing thrown.
+        dot.animate(
+          [
+            { transform: `translate(${x}px, ${y}px) scale(0.4)`, opacity: 0 },
+            { transform: `translate(${x + (tx - x) * 0.35}px, ${y + (ty - y) * 0.35 - 14}px) scale(1)`, opacity: 1, offset: 0.35 },
+            { transform: `translate(${tx}px, ${ty}px) scale(0.7)`, opacity: 1 },
+          ],
+          { duration: fly, delay: i * gap * 0.5, easing, fill: "both" },
+        );
+      }
+      page.appendChild(el);
+      setTimeout(() => {
+        el.remove();
+        mark.classList.remove("gather");
+      }, fly + N * gap * 0.5 + motionMs("--t-4", 300) + 40);
+    });
+  }
+
   /** Where the popup sits for a highlight, in the page's coordinates, kept inside the page. */
   function placeFor(range: Range, room = 160) {
     const page = pageRef.current;
@@ -1708,7 +1785,9 @@ function ReaderView(p: Props & { reload: () => void }) {
     wakeOnLanding()(promise); // a skill page opened while it is made (4 on the focus is a try) reads it once it lands
     pending.current.set(tmp, promise);
     ranges.current.set(tmp, range);
+    vein(range, intent);
     setAnns((l) => [...l, { id: tmp, rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open" }]);
+    if (intent === "card") gather(tmp);
     if (popupToo) {
       openPopup(tmp, range, "", aim);
       fresh.current = tmp;
@@ -1868,6 +1947,7 @@ function ReaderView(p: Props & { reload: () => void }) {
     const wake = wakeOnLanding();
     const was = annOf(id)?.intent;
     setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, intent } : a)));
+    if (intent === "card" && was !== "card" && undoable) gather(id);
     const saved = realId(id);
     // On the history at once, so a ⌘Z right after the click takes this change back, not the step before it.
     const to = (i: Intent) => () => saved.then((rid) => setIntentOf(rid, i, false));
@@ -3210,50 +3290,53 @@ function ReaderView(p: Props & { reload: () => void }) {
             )}
             {(doc.author || authoring || published || doc.skills.length > 0 || suggested || source || !PHONE) && (
               <div className="chips">
-                {authoring ? (
-                  <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
-                ) : (
-                  doc.author ?
-                  (PHONE ? (
-                    <span className="by">{doc.author}</span>
+                {/* Who, when and its skills wrap as one group, so the original link after them starts flush when it drops to a line of its own. */}
+                <span className="byline">
+                  {authoring ? (
+                    <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
                   ) : (
-                    <Hint text="Edit author">
-                      <button className="by" ref={authorRef} onClick={() => setAuthoring(true)}>
-                        {doc.author}
-                      </button>
-                    </Hint>
-                  )) : (
-                    // None found on import (D210): a faint empty field where the name goes, one click fills it (Notion's empty property).
-                    !PHONE && (
-                      <Hint text="Add author">
-                        <button className="by-add" ref={authorRef} onClick={() => setAuthoring(true)}>
-                          Author
+                    doc.author ?
+                    (PHONE ? (
+                      <span className="by">{doc.author}</span>
+                    ) : (
+                      <Hint text="Edit author">
+                        <button className="by" ref={authorRef} onClick={() => setAuthoring(true)}>
+                          {doc.author}
                         </button>
                       </Hint>
+                    )) : (
+                      // None found on import (D210): a faint empty field where the name goes, one click fills it (Notion's empty property).
+                      !PHONE && (
+                        <Hint text="Add author">
+                          <button className="by-add" ref={authorRef} onClick={() => setAuthoring(true)}>
+                            Author
+                          </button>
+                        </Hint>
+                      )
                     )
-                  )
-                )}
-                {published && <span className="when">{published}</span>}
-                {PHONE ? (
-                  doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
-                ) : (
-                  <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked}>
-                    {doc.skills.length > 0 &&
-                      doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)}
-                  </SkillPicker>
-                )}
-                {suggested && (
-                  <span className="chip suggested">
-                    <Hint text={`Suggested skill${suggested.hook ? `: ${suggested.hook}` : ""}. Click to file this source under it.`}>
-                      <button onClick={() => void suggestion("accept")}>+ {suggested.name}</button>
-                    </Hint>
-                    <Hint text="Dismiss">
-                      <button className="x" aria-label={`Dismiss suggested skill ${suggested.name}`} onClick={() => void suggestion("dismiss")}>
-                        ×
-                      </button>
-                    </Hint>
-                  </span>
-                )}
+                  )}
+                  {published && <span className="when">{published}</span>}
+                  {PHONE ? (
+                    doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
+                  ) : (
+                    <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked}>
+                      {doc.skills.length > 0 &&
+                        doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)}
+                    </SkillPicker>
+                  )}
+                  {suggested && (
+                    <span className="chip suggested">
+                      <Hint text={`Suggested skill${suggested.hook ? `: ${suggested.hook}` : ""}. Click to file this source under it.`}>
+                        <button onClick={() => void suggestion("accept")}>+ {suggested.name}</button>
+                      </Hint>
+                      <Hint text="Dismiss">
+                        <button className="x" aria-label={`Dismiss suggested skill ${suggested.name}`} onClick={() => void suggestion("dismiss")}>
+                          ×
+                        </button>
+                      </Hint>
+                    </span>
+                  )}
+                </span>
                 {/* Where it's from, last on the byline (D210): one click opens the original. */}
                 {source && (
                   <Hint text={doc.url ? "Open the original page" : "Open the original file"} keys="original">
