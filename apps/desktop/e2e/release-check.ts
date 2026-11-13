@@ -74,7 +74,7 @@ try {
 
   const page = await browser.newPage({ viewport: { width: 1180, height: 800 } });
   page.setDefaultTimeout(10000);
-  // What was on screen when the walk broke (F-new-release-check-review): a broken walk names its cause.
+  // What was on screen when the walk broke (F64): a broken walk names its cause.
   shown = () =>
     page.evaluate(() => {
       const a = document.activeElement;
