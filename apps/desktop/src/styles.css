@@ -2141,6 +2141,20 @@ button.home-plan:hover { color: var(--text); }
 .review-end.carted .ring-burst { animation-delay: 0ms; }
 .review-cut > span[data-wait] { visibility: hidden; animation: none; }
 .review-end h2 { font-family: var(--round); margin: 22px 0 0; font-size: 24px; }
+/* The end screen's emblem (D242): the mole on the ring, the session's gems inside it, on a faint field of dots that
+   is brightest behind it. With no gem cut, the count of memories kept stands in the ring. */
+.review-end { position: relative; z-index: 0; }
+.end-emblem { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; }
+.end-emblem::before { content: ""; position: absolute; inset: -48px 0 -72px; z-index: -1; pointer-events: none; background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 16%, transparent) 1.1px, transparent 1.6px); background-size: 9px 9px; background-position: center; -webkit-mask-image: radial-gradient(closest-side, #000, transparent); mask-image: radial-gradient(closest-side, #000, transparent); }
+.end-ring { position: relative; display: grid; place-items: center; }
+.end-ring > * { grid-area: 1 / 1; }
+.end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
+.end-ring > .review-kept { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.end-emblem + .review-kept { display: flex; align-items: center; gap: 12px; margin: 20px 0 0; }
+.end-emblem ~ h2 { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--faint); margin: 10px 0 0; }
+.end-emblem ~ .end-lines { margin-top: 14px; }
+/* The session is over: its bar steps back for what it won. */
+.review:has(.review-end) .review-bar { opacity: 0.25; transition: opacity var(--t-4) var(--ease-out); }
 /* The end screen's lines (D241): one place; the line showing rolls up and out as the next rolls up into it. */
 .end-lines { display: grid; place-items: center; width: 100%; margin: 10px 0 0; min-height: 36px; overflow: hidden; }
 .end-lines > div { grid-area: 1 / 1; display: grid; place-items: center; opacity: 0; }
@@ -2158,12 +2172,13 @@ button.home-plan:hover { color: var(--text); }
 .review-try:hover { background: var(--bg-hover); }
 .review-try:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .review-try svg { flex: none; align-self: center; }
+/* One line, however long the plan is: its full text is the passage a click opens. */
+.review-try > span { min-width: 0; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .review-try-plan { color: var(--text); }
 .review-try-plan::after { content: " · "; color: var(--faint); }
 .review-try-from { color: var(--faint); font-size: 12px; }
 .review-cut { display: flex; align-items: flex-start; justify-content: center; gap: 10px; margin: 16px 0 2px; }
 .review-cut > span { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; animation: gem-in var(--t-4) var(--ease-spring) both; }
-.review-cut-skill { display: flex; justify-content: center; width: 100%; line-height: 1; font-size: 14px; }
 .review-cut b { font-family: var(--round); font-size: 24px; color: var(--text); font-variant-numeric: tabular-nums; animation: pop var(--t-4) var(--ease-out) 700ms both; }
 /* A stone the cart dropped is cut in place (Cutting, D239): it arrives by landing, so it has no entrance of its own. */
 .review-cut > span[data-stone] { animation: none; }
