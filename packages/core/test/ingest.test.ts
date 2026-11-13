@@ -163,7 +163,7 @@ describe("tracking links", () => {
     }
   });
 
-  test("the same page by http and by https, with or without www, is the source already here (F-new-http-https-twice)", async () => {
+  test("the same page by http and by https, with or without www, is the source already here (F63)", async () => {
     // An essay added from an old http link, then shared from the browser as https, came in twice.
     const lib = await tempLibrary();
     const real = globalThis.fetch;
