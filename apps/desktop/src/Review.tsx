@@ -16,14 +16,14 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { endSays, endTiles, weeksAgo, type Said, type Tile } from "./end-says";
+import { endMood, endSays, endTiles, weeksAgo, type Said, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
-import { momentFor, type Moment } from "./moment";
+import { MOMENT_MOOD, momentFor, type Moment } from "./moment";
 import { Trap } from "./Trap";
 import { waiting } from "./Home";
 import { stampBefore } from "./transcript";
@@ -1112,7 +1112,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
         {goalSaid && !moment && !end && (
           <div className="review-goal" role="status">
-            <Mole bare size={48} mood="happy" />
+            <Mole bare size={48} mood="wave" />
             <MoleSays lines={GOAL_SAID}>
               <Hint text={<>End the session <kbd>Esc</kbd></>}>
                 <button className="moment-done" onClick={() => void finish()}>Done</button>
@@ -1122,7 +1122,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         )}
         {moment && !end && (
           <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} role="status">
-            {!quick && <span className="moment-mole"><Mole bare size={40} mood={moment.tone === "miss" ? "peek" : "happy"} /></span>}
+            {!quick && <span className="moment-mole"><Mole bare size={48} mood={MOMENT_MOOD[moment.kind]} /></span>}
             <span className="moment-gem" aria-hidden="true">
               <Gem kind={moment.from.kind} size={36} seam={moment.from.seam} polished={moment.from.polished} />
               <Gem kind={moment.to.kind} size={36} seam={moment.to.seam} polished={moment.to.polished} />
@@ -1612,13 +1612,13 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
   // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D255): then he is there, startled (under Reduce Motion he is just there, pleased).
-  const [mood, setMood] = useState<"peek" | "cheer" | "surprised">(() => (still() ? "cheer" : nap ? "surprised" : "peek"));
+  const [settled, setSettled] = useState(still);
   const [fell, setFell] = useState(false);
-  // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
+  // The mole reacts to the day 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
   const up = nap ? fell : stage === "leaving" || stage === "done";
   useEffect(() => {
     if (!up) return;
-    const id = setTimeout(() => setMood("cheer"), nap ? 400 : 560);
+    const id = setTimeout(() => setSettled(true), nap ? 400 : 560);
     return () => clearTimeout(id);
   }, [up]);
   const full = stage !== "cart";
@@ -1667,6 +1667,9 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   }).map((l) => ({ ...l, mark: mark(l) }));
   const tiles = endTiles({ session: s, ups: named });
+  // His pose is for the line he says (D-new-mole-moments). Off the cart he is already startled, so a long gap gets his nod.
+  const react = endMood(said[0], { session: s, closed });
+  const mood = !settled ? (nap ? "surprised" : "peek") : nap && react === "surprised" ? "nod" : react;
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
@@ -1688,7 +1691,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           <div className="end-emblem">
             <span className={`review-mole${nap && fell ? " fell" : ""}`}>{up && <Mole bare size={96} mood={mood} />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
-            {mood === "cheer" && (
+            {settled && (
               <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
             )}
             <div className="end-ring">

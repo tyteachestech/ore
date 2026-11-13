@@ -41,8 +41,8 @@ async function mount(e: never, roll = 0) {
   const q = (s: string) => body.querySelectorAll(s).length;
   return { q, body, done: () => act(async () => (root.unmount(), body.remove())) };
 }
-/** The mole is playing its cheer. */
-const cheering = (body: HTMLElement) => body.querySelector(".review-mole .mole")?.getAttribute("data-mood") === "cheer";
+/** The mole is reacting to the day: a session that cut a gem pleases him (the hop is a new level's alone, D-new-mole-moments). */
+const cheering = (body: HTMLElement) => body.querySelector(".review-mole .mole")?.getAttribute("data-mood") === "happy";
 
 test("a session that filled the ring and cut a gem: the cart is there, the mole and the gem wait, then all of it settles", async () => {
   jest.useFakeTimers();
@@ -291,6 +291,15 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   const plain = (roll: number) => endSays({ ...base, roll, session: session({}), minutesLeft: "4" }).map((l) => l.text);
   expect(plain(0)).toEqual(["Gneiss work.", "4 min to today’s goal. Your call."]);
   expect(plain(0.9)).toEqual(["Don’t take that for granite.", "4 min to today’s goal. Your call."]);
+  // His pose is for the line he says, sized to how rare it is (D-new-mole-moments): the hop is a new level's alone.
+  const { endMood } = await import("../src/end-says");
+  const pose = (o: Parameters<typeof endSays>[0]) => endMood(endSays(o)[0], o);
+  expect(pose({ ...base, ups: [{ name: "AI", level: 3 }], session: session({}) })).toBe("cheer");
+  expect(pose({ ...base, session: session({ rescued: 2 }) })).toBe("proud");
+  expect(pose({ ...base, session: session({ kept: 0 }) })).toBe("set");
+  expect(pose({ ...base, session: session({ cut: ["ai"] }) })).toBe("happy");
+  expect(pose({ ...base, closed: true, session: session({}) })).toBe("happy");
+  expect(pose({ ...base, session: session({}) })).toBe("nod");
   // The quick quiz has no mole: its line for a session of misses stays in plain words.
   expect(endSays({ ...base, plain: true, session: session({ kept: 0 }) })[0]!.text).toBe("Every miss comes back sooner. That’s how they stick.");
   // The verdict is a pun, one of a few of its kind by the roll; every one for a session of misses says why it was worth it.
