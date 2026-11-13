@@ -1,4 +1,6 @@
 import { Check } from "./icons";
+import { Gem } from "./Gem";
+import { Hint } from "./Hint";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { SkillIcon } from "./IconPicker";
 import { is } from "./keys";
@@ -32,10 +34,10 @@ export const lastToday = () => seen;
 export const dueSkills = (today: Today, skills: Skill[]) => [
   ...today.skills
     .filter((x) => x.due > 0)
-    .flatMap((x) => skills.filter((s) => s.id === x.skill && !s.archived).map((s) => ({ skill: s, due: x.due })))
+    .flatMap((x) => skills.filter((s) => s.id === x.skill && !s.archived).map((s) => ({ skill: s, due: x.due, near: x.ready_today ?? 0, loose: x.win_back ?? 0 })))
     // Focus first, then Normal, then Light (D173), most due first within each.
     .sort((a, b) => (a.skill.priority ?? "P2").localeCompare(b.skill.priority ?? "P2") || b.due - a.due),
-  ...(today.no_skill_due > 0 ? [{ skill: { id: NO_SKILL, name: "No skill", color: "gray" } as Skill, due: today.no_skill_due }] : []),
+  ...(today.no_skill_due > 0 ? [{ skill: { id: NO_SKILL, name: "No skill", color: "gray" } as Skill, due: today.no_skill_due, near: 0, loose: 0 }] : []),
 ];
 
 /** Whether the skill list names every skill with cards due. Today's numbers can land before the
@@ -122,7 +124,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
           )}
         </div>
         <div className="pick-list">
-          {rows.map(({ skill: s, due }) => (
+          {rows.map(({ skill: s, due, near, loose }) => (
             <button key={s.id} className="pick-row" role="checkbox" aria-checked={on.has(s.id)} onClick={(e) => toggle(s.id, e.altKey)}>
               <span className="pick-box" aria-hidden="true">
                 {on.has(s.id) && <Check size={14} weight="bold" />}
@@ -131,7 +133,15 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
                 <SkillIcon icon={s.icon} color={s.color} dot />
               </span>
               <span className="name">{s.name}</span>
-              <span className="due">{due} {due === 1 ? "exercise" : "exercises"} ready</span>
+              {/* D249: what a session here could win, never the size of the pile: gems one Good from cut
+                  today, and cut ones that came loose, as a gem and a number with the words on hover (Tyler's pick). The count of what is due is for a screen reader only. */}
+              {(near > 0 || loose > 0) && (
+                <span className="pick-gems" data-color={s.color}>
+                  {near > 0 && <Hint text={`${near} ${near === 1 ? "gem" : "gems"} one good answer from cut`}><span><Gem kind="ready" size={16} />{near}<span className="sr-only"> one good answer from cut</span></span></Hint>}
+                  {loose > 0 && <Hint text={`${loose} ${loose === 1 ? "gem" : "gems"} to win back`}><span><Gem kind="dull" size={16} />{loose}<span className="sr-only"> to win back</span></span></Hint>}
+                </span>
+              )}
+              <span className="sr-only">{due} {due === 1 ? "exercise" : "exercises"} ready</span>
             </button>
           ))}
         </div>
