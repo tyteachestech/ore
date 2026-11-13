@@ -10,7 +10,7 @@ Worth it, small, and it serves the science pass's rec 1 (use Ore 10 min a day fo
 
 ## Minimal version
 
-1. **Follow.** Paste a blog, Substack or YouTube channel link in ⌘N. Today the add refuses feeds (D96); instead it finds the feed (`<link rel="alternate">`, `/feed`, YouTube's `feeds/videos.xml`) and offers **Follow** next to Add. Feeds live in the library's `feeds.yaml`, written through `packages/core` (`ore follow <url>`, `ore unfollow`). An optional skill per feed files what he opens.
+1. **Follow.** Paste a blog, Substack or YouTube channel link in ⌘N. Today the add refuses feeds (D96); instead it finds the feed (`<link rel="alternate">`, `/feed`, YouTube's `feeds/videos.xml`) and offers **Follow** next to Add. Feeds live in the library's `feeds.yaml`, written through `packages/core` (`ore feed follow <url>`, `ore feed unfollow`). An optional skill per feed files what he opens.
 2. **Feed** in the sidebar, under Home. Newest first: title, author, date, thumbnail, the same row as a source. One click opens it in the reader, which adds it as a source (filed to the feed's skill) and moves it out of Feed. E (or swipe on iPhone) dismisses. Nothing else.
 3. **No pile.** No unread count, no badge, nothing on Home. Unopened posts drop off after 14 days. Feeds are checked when the app opens and every few hours while it runs, on the Mac only; the phone sees the list through the library like everything else.
 4. **Failure states.** A feed that stops answering says so on its row in the follow list with Retry and Unfollow, never a silent empty Feed.
