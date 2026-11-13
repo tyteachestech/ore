@@ -6159,7 +6159,7 @@ journey("review: Later puts the exercise off to the end of the session with noth
     await reveal(page);
     await page.getByRole("button", { name: "Later", exact: true }).click();
     await doneButton.waitFor();
-    const kept = await page.locator(".review-kept b").innerText();
+    const kept = await page.locator('.end-tally [data-key="kept"] .sr-only').textContent();
     if (kept !== String(total - 1)) throw new Error(`the end screen counts ${kept} kept for ${total - 1} rated`);
     if (logged() !== total - 1) throw new Error(`${logged()} reviews logged for ${total - 1} rated`);
     const lines = reviewLog().slice(log.length).trim().split("\n").length;
