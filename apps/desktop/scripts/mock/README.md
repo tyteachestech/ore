@@ -5,6 +5,7 @@ Runs the desktop UI in a plain browser against a scratch library, through the re
 ```bash
 bun apps/desktop/scripts/mock/seed.ts /tmp/ore-mock          # realistic library: skills, sources, highlights, cards, due reviews
 bun apps/desktop/scripts/mock/seed-big.ts /tmp/ore-big       # a year of use: ~240 sources, 14 skills, ~1000 reviews (views at scale)
+bun apps/desktop/scripts/mock/seed-demo.ts ~/OreDemo         # the library the product video is filmed on (below)
 ORE_LIBRARY=/tmp/ore-mock bun apps/desktop/scripts/mock/bridge.ts &   # :1421 (PORT= for another)
 cd apps/desktop && bun run dev &                               # vite on :1420
 ```
@@ -14,6 +15,15 @@ In Playwright, before `goto("http://localhost:1420/")`: `await page.addInitScrip
 
 Every seed ends with `addMess` (`mess.ts`): `.DS_Store`, `._` files, `Icon\r`, a stray `.txt` and an empty
 folder, as Finder leaves them in a real library. Code that walks the library must skip them.
+
+### The demo library
+
+`seed-demo.ts <new folder>` writes a year of one person's learning that reads well on camera: 46 sources over seven
+skills, 90 exercises with real questions and answers (all written for Ore), a year of reviews replayed through
+FSRS, and today set up to film: nine of the day's ten minutes done, about a dozen exercises due, six gems one Good
+from being cut, and AI two gems short of level 2. It refuses a folder that isn't empty. On the Mac:
+`ORE_LIBRARY=~/OreDemo open -n /Applications/Ore.app`. Seed it on the day of filming (dates count back from now),
+and again for another take. `apps/desktop/test/seed-demo.test.ts` holds that state.
 
 ### Zoomed crops
 
