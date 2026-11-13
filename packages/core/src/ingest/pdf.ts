@@ -41,6 +41,8 @@ interface Item {
   italic?: boolean;
   /** Set in a math font (TeX's cmmi, Cambria Math): a formula's letters and symbols. */
   math?: boolean;
+  /** Set in a typewriter face (Courier, TeX's cmtt): code. */
+  mono?: boolean;
 }
 
 interface Line {
@@ -50,6 +52,9 @@ interface Line {
   x: number;
   /** The tallest glyph height on the line, in points: a heading is set larger than body text. */
   size: number;
+  /** Every word on the line is set in a typewriter face: a line of code, as written (`raw`, its
+   *  spaces kept), with the width of one of its letters for the indent. */
+  code?: { raw: string; cw: number };
 }
 
 function toItem(it: TextItem, font: (name: string) => string): Item {
@@ -64,26 +69,31 @@ function toItem(it: TextItem, font: (name: string) => string): Item {
 /** Math fonts set every variable in italic: that is notation, not emphasis. */
 const MATH_FONT = /^(?:cmmi|cmsy|cmex|cmbsy|msam|msbm|eufm|rsfs|stmary|wasy)|math|symbol/i;
 const BOLD_FONT = /bold|black|heavy|semibold|demi|[-_](?:bd|blk|medi)|^cm(?:ss)?bx|^sfbx/i;
+/** Typewriter faces: Courier, Consolas, Menlo, anything "Mono" (the Monotype foundry's aside), and TeX's (cmtt, sftt, lmtt, Nimbus Mono). */
+const MONO_FONT = /mono(?!type)|monaco|courier|consolas|menlo|inconsolata|typewriter|^(?:cm|sf|lm|ec|cmsl)tt|^nimbusmon/i;
 const ITALIC_FONT = /italic|oblique|ita(?:l)?$|[-_]it(?:[A-Z]|$)|^cmti|^cmsl|^cmssi|^sfti|^sfsl/i;
 
 /** Bold and italic from the font's name ("NimbusRomNo9L-Medi", "Helvetica-BoldOblique", TeX's
  *  "CMBX10" and "CMTI10"), its subset tag ("ABCDEF+") left off. */
-function faceOf(font: string): { bold?: boolean; italic?: boolean; math?: boolean } {
+function faceOf(font: string): { bold?: boolean; italic?: boolean; math?: boolean; mono?: boolean } {
   const name = font.replace(/^[A-Z]{6}\+/, "");
   if (!name) return {};
   if (MATH_FONT.test(name)) return { math: true };
+  if (MONO_FONT.test(name)) return { mono: true };
   return { bold: BOLD_FONT.test(name) || undefined, italic: ITALIC_FONT.test(name) || undefined };
 }
 
 // Marks kept in the text while lines are joined, written as Markdown once a paragraph is whole:
-// bold and italic runs, and a footnote's mark (its label between REF and END).
-const B = "\uE000", B_ = "\uE001", I = "\uE002", I_ = "\uE003", REF = "\uE010", END = "\uE011";
+// bold, italic and typewriter runs, and a footnote's mark (its label between REF and END).
+const B = "\uE000", B_ = "\uE001", I = "\uE002", I_ = "\uE003", C = "\uE004", C_ = "\uE005", REF = "\uE010", END = "\uE011";
 /** The text with its marks left out, for every check on what a line says. */
-const plain = (s: string) => s.replace(/\uE010[^\uE011]*\uE011/g, "").replace(/[\uE000-\uE003]/g, "");
+const plain = (s: string) => s.replace(/\uE010[^\uE011]*\uE011/g, "").replace(/[\uE000-\uE005]/g, "");
 
 /** A paragraph's runs as Markdown: one run across a line break or a hyphen stays one. */
 function emphasis(s: string): string {
   return s
+    .replace(new RegExp(`${C_}(\\s*)${C}`, "g"), "$1")
+    .replace(/[\uE004\uE005]/g, "`")
     .replace(new RegExp(`${I_}${B_}(\\s*)${B}${I}`, "g"), "$1")
     .replace(new RegExp(`${B_}(\\s*)${B}`, "g"), "$1")
     .replace(new RegExp(`${I_}(\\s*)${I}`, "g"), "$1")
@@ -121,6 +131,7 @@ function raised(cur: Line, it: Item, after: boolean): { text: string; power: boo
 
 /** An item's text with its bold or italic run marked, spaces kept outside the marks. */
 function styled(it: Item): string {
+  if (it.mono && it.str.trim()) return it.str.replace(/^(\s*)(.*?)(\s*)$/s, `$1${C}$2${C_}$3`);
   if (!(it.bold || it.italic) || !/[\p{L}\d]/u.test(it.str)) return it.str;
   const [, lead, core, tail] = it.str.match(/^(\s*)(.*?)(\s*)$/s)!;
   return lead + (it.bold ? B : "") + (it.italic ? I : "") + core + (it.italic ? I_ : "") + (it.bold ? B_ : "") + tail;
@@ -134,16 +145,19 @@ function pageLines(items: Item[]): Line[] {
   for (const it of items) {
     // A line starts where its first kept text is, so a dropped margin note never moves it.
     if (it.str.trim()) {
-      cur ??= { text: "", y: it.y, x: it.x, size: 0 };
+      cur ??= { text: "", y: it.y, x: it.x, size: 0, code: { raw: "", cw: it.mono ? (it.end - it.x) / it.str.length : 0 } };
+      if (!it.mono) cur.code = undefined;
       const sup = raised(cur, it, up);
       up = !!sup?.power;
       if (sup !== null) {
         cur.text += sup.text;
+        cur.code = undefined;
         continue;
       }
       cur.size = Math.max(cur.size, it.size);
     }
     if (cur) cur.text += styled(it);
+    if (cur?.code) cur.code.raw += it.str;
     if (it.eol && cur) {
       lines.push(cur);
       cur = null;
@@ -198,13 +212,14 @@ const FOOTNOTE = /^(?:\d{1,3}|[*†‡§])\s+\S/;
 
 // Join lines into paragraphs: a vertical gap clearly larger than the document's
 // typical line spacing (or a jump upwards, i.e. a new column) starts a paragraph.
-function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<string>()): { text: string; note: boolean }[] {
+function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<string>(), blocks: string[] = []): { text: string; note: boolean }[] {
   const out: { text: string; note: boolean }[] = [];
   let para = "";
   /** The open paragraph is a footnote: a sentence running onto the next page joins the one above them. */
   let inNote = false;
   const push = () => {
-    if (para) out.push({ text: para, note: inNote });
+    // A sentence that starts with "#" or ">" (a comment or a prompt quoted in the text) is still a sentence.
+    if (para) out.push({ text: para.replace(/^([\uE000-\uE003]*)(#{1,6}\s|>)/, "$1\\$2"), note: inNote });
     para = "";
     inNote = false;
   };
@@ -220,6 +235,23 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
       push();
       out.push({ text: line, note: false });
       item = null;
+      return;
+    }
+    // Lines of code, one under the other, are one block: each line kept, indented by how far in it
+    // starts, a wider gap a blank line. A typewriter word alone on a line in the middle of a
+    // sentence is that sentence's.
+    if (l.code && !(para && gap > 0 && gap <= typical * 1.4 && !/[.!?:;]$/.test(plain(para)))) {
+      let j = i + 1;
+      while (j < lines.length && lines[j]!.code && lines[j]!.y < lines[j - 1]!.y) j++;
+      const rows = lines.slice(i, j);
+      const left = Math.min(...rows.map((r) => r.x));
+      const pitch = Math.min(...rows.slice(1).map((r, n) => rows[n]!.y - r.y));
+      const code = rows.map((r, n) => (n > 0 && rows[n - 1]!.y - r.y > pitch * 1.6 ? "\n" : "") + " ".repeat(Math.round((r.x - left) / (r.code!.cw || l.code!.cw || 1))) + r.code!.raw.trimEnd()).join("\n");
+      const fence = code.includes("```") ? "````" : "```";
+      push();
+      out.push({ text: `${BLOCK}${blocks.push(`${fence}\n${code}\n${fence}`) - 1}${BLOCK_}`, note: false });
+      item = null;
+      skip = j;
       return;
     }
     // Lines set clearly larger than the body text, then body text, are a heading (the outline's);
@@ -252,7 +284,7 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
       push();
       if (!bullet) item = ended || gap > typical * 1.4 || gap < 0 ? null : item;
     }
-    const text = bullet ? "- " + l.text.replace(/^([\uE000-\uE003]*)[•◦▪‣·●○■□–]\s*/, "$1") : l.text;
+    const text = bullet ? "- " + l.text.replace(/^([\uE000-\uE005]*)[•◦▪‣·●○■□–]\s*/, "$1") : l.text;
     if (bullet) item = l.x + 4;
     if (!para) inNote = note;
     para = para ? join(para, text, words) : text;
@@ -281,7 +313,7 @@ function join(para: string, text: string, words: Set<string>): string {
   if (left !== undefined && right) {
     if (/[a-z]$/.test(left) && /^[a-z]/.test(right)) {
       const both = `${left}-${right}`.toLowerCase();
-      return words.has(both) && !words.has((left + right).toLowerCase()) ? para + text : para.replace(/-([\uE000-\uE003]*)$/, "$1") + text;
+      return words.has(both) && !words.has((left + right).toLowerCase()) ? para + text : para.replace(/-([\uE000-\uE005]*)$/, "$1") + text;
     }
     return para + text;
   }
@@ -331,9 +363,12 @@ function plainFaces(pages: Item[][]): void {
   const total = chars(() => true);
   const bold = chars((i) => i.bold) > total * 0.4;
   const italic = chars((i) => i.italic) > total * 0.4;
-  if (bold || italic) for (const i of all) {
+  // A paper typed in Courier is prose, not code.
+  const mono = chars((i) => i.mono) > total * 0.4;
+  if (bold || italic || mono) for (const i of all) {
     if (bold) i.bold = undefined;
     if (italic) i.italic = undefined;
+    if (mono) i.mono = undefined;
   }
 }
 
@@ -345,7 +380,7 @@ function footnotes(paras: { text: string; note: boolean }[][]): (text: string, p
   const defs = paras.map((page) => new Set(page.map(label).filter(Boolean)));
   const refs = paras.map((page) => new Set(page.filter((p) => !p.note).flatMap((p) => [...p.text.matchAll(/\uE010(\d+)\uE011/g)].map((m) => m[1]!))));
   return (text, page) => {
-    const n = text.match(/^[\uE000-\uE003]*(\d{1,3})[\uE000-\uE003]*\s+/);
+    const n = text.match(/^[\uE000-\uE005]*(\d{1,3})[\uE000-\uE005]*\s+/);
     if (n && defs[page]!.has(n[1]!) && (refs[page]!.has(n[1]!) || refs[page - 1]?.has(n[1]!)) && plain(text).startsWith(n[1]!)) {
       if (paras[page]!.some((p) => p.note && p.text === text)) text = `[^${n[1]}]: ` + text.slice(n[0].length);
     }
@@ -548,7 +583,7 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const typical = lineGap(raw);
   const lines = dropRunning(raw, body, typical);
   const words = wordsOf(lines);
-  const paras = lines.map((l) => paragraphs(l, body, typical, words));
+  const paras = lines.map((l) => paragraphs(l, body, typical, words, blocks));
   // A paragraph that runs onto the next page ends there: its last sentence is finished on the page
   // it starts on, above that page's footnotes.
   paras.forEach((page, i) => {

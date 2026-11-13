@@ -162,4 +162,22 @@ describe("tracking links", () => {
       globalThis.fetch = real;
     }
   });
+
+  test("the same page by http and by https, with or without www, is the source already here (F63)", async () => {
+    // An essay added from an old http link, then shared from the browser as https, came in twice.
+    const lib = await tempLibrary();
+    const real = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("# Great work\n\nThe essay's words.\n", { headers: { "content-type": "text/markdown" } })) as unknown as typeof fetch;
+    try {
+      const a = await addSource(lib, "http://example.com/greatwork.html");
+      expect(await addSource(lib, "https://example.com/greatwork.html")).toMatchObject({ kept: true, meta: { id: a.meta.id } });
+      expect(await addSource(lib, "https://www.example.com/greatwork.html")).toMatchObject({ kept: true, meta: { id: a.meta.id } });
+      expect(listItems(lib).length).toBe(1);
+      expect(findItem(lib, a.meta.id).meta.url).toBe("http://example.com/greatwork.html"); // kept as he first gave it
+      // Another page of the site is another source.
+      expect((await addSource(lib, "https://example.com/other.html")).kept).toBeUndefined();
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
 });

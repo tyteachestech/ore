@@ -444,6 +444,17 @@ describe("import coverage: files", () => {
     expect(text).not.toContain("## Spacing the practice");
   });
 
+  test("PDF: a programming book's code keeps its lines and indents, typewriter words in a sentence are code (F65)", async () => {
+    // code.pdf (make-code-pdf.py): set as LaTeX books are, prose in a serif face and code in a typewriter one.
+    // It came in as prose: lines run together, indents gone, "# inside class Card:" a heading over the whole book.
+    const b = (await addSource(await tempLibrary(), file("code.pdf"))).body;
+    expect(b).toContain("and one short method moves it on:\n\n```\n# inside class Card:\ndef review(self, grade):\n    if grade < 3:\n        self.interval = 1\n    else:\n        self.interval *= 2\n\n    return self.interval\n```\n\nCall it from the prompt");
+    expect(b).toContain("on its own line:\n\n```\n>>> card = Card()\n>>> card.review(4)\n2\n```\n\n");
+    expect(b).toContain("The name `__init__` has two underscores on each side, and `interval *= 2` doubles the gap after every answer");
+    expect(b).toContain("\n\n\\# starts a comment in Python, so"); // a sentence that starts with # is still a sentence
+    expect(b.replace(/```[\s\S]*?```/g, "").match(/^#+ .*$/gm)).toEqual(["## Spacing in Code"]); // the only heading
+  });
+
   test("PDF: footnotes, bold and italic, powers, hyphens at line and page ends, running heads written last", async () => {
     // Each line of hazards.pdf (make-hazards-pdf.py) is one hazard found reading 15 real PDFs (D121).
     const b = (await addSource(await tempLibrary(), file("hazards.pdf"))).body;
