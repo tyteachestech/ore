@@ -23,16 +23,16 @@ export const REST = { y: 0, top: -0.3, rx: 10.2, ex: 2.6, hx: 0, lx: 0, ly: 0, o
   // droop: the moustache hanging in. puff: the moustache blown out.
   wink: 0, frown: 0, hat: 0, tilt: 0, lamp: 0, droop: 0, puff: 0,
   // Drawn marks, as in a comic (the traced mole only). star: his eyes as stars. blush: his cheeks pink. twinkle: a star
-  // popping beside his winking eye. The rest run from 0 to 1 and show nothing at either end: tear, a drop down his
+  // popping beside his winking eye. ask, bang: a "?" and a "!" over his helmet. The rest run from 0 to 1 and show nothing at either end: tear, a drop down his
   // cheek; sweat, a bead down his temple; steam, a puff out of each side of his helmet; zzz, two Zs rising off him;
   // spark, three sparkles round his head, one after another. A frown below 0 is a worried brow, inner ends up.
-  star: 0, blush: 0, twinkle: 0, tear: 0, sweat: 0, steam: 0, zzz: 0, spark: 0 };
+  star: 0, blush: 0, twinkle: 0, ask: 0, bang: 0, tear: 0, sweat: 0, steam: 0, zzz: 0, spark: 0 };
 export type State = typeof REST;
 type Key = keyof State;
 const KEYS = Object.keys(REST) as Key[];
 /** Spring per value: [stiffness, damping]. Eyes snap; the body carries a little bounce. */
 const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx: [210, 16], ex: [200, 22], hx: [70, 13], lx: [90, 15], ly: [90, 15], open: [900, 52], tall: [420, 26], arc: [320, 30], pawL: [260, 14], pawR: [260, 14], pw: [260, 24], kick: [160, 9], mouth: [380, 22], wink: [900, 52], frown: [320, 30], hat: [210, 16], tilt: [160, 14], lamp: [200, 18], droop: [120, 18], puff: [260, 12],
-  star: [300, 22], blush: [90, 16], twinkle: [420, 20], tear: [5, 4.5], sweat: [5, 4.5], steam: [30, 11], zzz: [4, 4], spark: [10, 6.4] };
+  star: [300, 22], blush: [90, 16], twinkle: [420, 20], ask: [380, 17], bang: [520, 19], tear: [5, 4.5], sweat: [5, 4.5], steam: [30, 11], zzz: [4, 4], spark: [10, 6.4] };
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -181,8 +181,8 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // A squat, then arc eyes, the moustache spread wide and a hop with both paws thrown up, and the dirt as he lands.
   happy: { to: { top: SQUAT }, end: 1700, still: HAPPY,
     at: [[110, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [420, { kick: { kick: 7 } }]] },
-  // A jolt up with both paws, his helmet jumping off his brows, wide eyes and an O.
-  surprised: { to: WIDE, kick: { top: -JOLT, pawL: THROW, pawR: THROW, kick: 6 }, end: 1400, still: WIDE },
+  // A jolt up with both paws, his helmet jumping off his brows, wide eyes, an O, and a "!" over him (the traced mole).
+  surprised: { to: { ...WIDE, bang: 1 }, kick: { top: -JOLT, pawL: THROW, pawR: THROW, kick: 6 }, end: 1400, still: { ...WIDE, bang: 1 }, at: [[1000, { to: { bang: 0 } }]] },
   // Both paws waving, bobbing on each beat, then a squat, a last hop and it settles pleased.
   cheer: { to: { arc: 1, ex: 3 }, wave: 900, end: 2400, still: HAPPY,
     at: [[900, { to: { ...HAPPY, top: SQUAT, pawL: 0, pawR: 0 } }], [1010, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [1320, { kick: { kick: 7 } }]] },
@@ -197,10 +197,10 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // A laugh: arc eyes, mouth open, his head and moustache shaking with it.
   laugh: { to: { arc: 1, mouth: 0.5 }, end: 1500, still: { arc: 1, mouth: 0.5 },
     at: [0, 170, 340, 510, 680, 850].map((ms): [number, Beat] => [ms + 120, { kick: { top: -34, puff: 2.5 } }]) },
-  // Proud: he draws up and tips his helmet back, pleased.
-  proud: { to: { top: -1.3, hat: 1.1, tilt: -0.16, arc: 1 }, kick: { top: -30 }, end: 1700, still: { top: -1.3, hat: 1.1, tilt: -0.16, arc: 1 }, at: [[1150, { to: { hat: 0, tilt: 0 } }]] },
-  // Curious: his head cocked, one brow up, a look.
-  curious: { to: { hx: 1.2, lx: 1, ly: -0.8, tilt: 0.1 }, end: 1900, still: { hx: 1.2, lx: 1, ly: -0.8, tilt: 0.1 }, at: [...BLINK(900)] },
+  // Proud: he draws up and tips his helmet back, pleased, lamp bright, cheeks pink.
+  proud: { to: { top: -1.3, hat: 1.1, tilt: -0.16, arc: 1, lamp: 1, blush: 0.8 }, kick: { top: -30 }, end: 1900, still: { top: -1.3, hat: 1.1, tilt: -0.16, arc: 1, lamp: 1, blush: 0.8 }, at: [[1300, { to: { hat: 0, tilt: 0, lamp: 0, blush: 0 } }]] },
+  // Curious: his head cocked, one brow up, a look, a "?" over him.
+  curious: { to: { hx: 1.2, lx: 1, ly: -0.8, tilt: 0.1 }, end: 2100, still: { hx: 1.2, lx: 1, ly: -0.8, tilt: 0.1, ask: 1 }, at: [[250, { to: { ask: 1 } }], ...BLINK(1000), [1650, { to: { ask: 0 } }]] },
   // Sorry for a miss: helmet low, eyes down, a worried brow, the moustache hanging in, and one tear down his cheek.
   sad: { to: { hat: -0.7, ly: 1, droop: 1, top: 0.3, open: 0.7, frown: -1 }, end: 3000, still: { hat: -0.7, ly: 1, droop: 1, top: 0.3, open: 0.7, frown: -1, tear: 0.5 },
     at: [[450, { to: { tear: 1 } }], ...BLINK(1500), [2500, { set: { tear: 0 } }]] },

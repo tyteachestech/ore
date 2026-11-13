@@ -66,11 +66,17 @@ export function fineDots(s: State): FineDot[] {
   const show = (v: number) => clamp(v * 7) * clamp((0.9 - v) * 7);
   const drop = (v: number, x0: number, y0: number, x1: number, y1: number) => {
     const k = show(v), x = x0 + (x1 - x0) * v, y = y0 + (y1 - y0) * v;
-    mark(x, y, 0.58 * k, "glint"); mark(x - (x1 - x0) * 0.1, y - 0.8, 0.4 * k, "glint"); mark(x - (x1 - x0) * 0.2, y - 1.45, 0.22 * k, "glint");
+    mark(x, y, 0.6 * k, "glint"); mark(x - (x1 - x0) * 0.1, y - 0.85, 0.46 * k, "glint"); mark(x - (x1 - x0) * 0.2, y - 1.6, 0.28 * k, "glint");
   };
   const sparkle = (x: number, y: number, k: number, tone: FineTone = "glint") => {
     mark(x, y, 0.42 * k, tone);
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { mark(x + dx * 0.85, y + dy * 0.85, 0.3 * k, tone); mark(x + dx * 1.55, y + dy * 1.55, 0.17 * k, tone); }
+  };
+  /** His eye as a star: bigger, its arms three dots long, a small dot in each corner. */
+  const bigStar = (x: number, y: number, k: number) => {
+    mark(x, y, 0.52 * k, "lamp");
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { mark(x + dx * 0.98, y + dy * 0.98, 0.46 * k, "lamp"); mark(x + dx * 1.85, y + dy * 1.85, 0.33 * k, "lamp"); mark(x + dx * 2.55, y + dy * 2.55, 0.19 * k, "lamp"); }
+    for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]] as const) mark(x + dx * 0.8, y + dy * 0.8, 0.27 * k, "lamp");
   };
   drop(s.tear, -6.6, -10.4, -10.5, -4.6);
   drop(s.sweat, 9.8, -10.6, 10.6, -4.8);
@@ -86,7 +92,11 @@ export function fineDots(s: State): FineDot[] {
   }
   for (const [at, x, y] of [[0, -14.2, -8.5], [0.25, 14.6, -11], [0.5, -12.6, -23.6]] as const) sparkle(x, y, show(clamp((s.spark - at) / 0.5)), "lamp");
   sparkle(14, -9.2, clamp(s.twinkle));
-  const star = clamp(s.star, 0, 1.3), blush = clamp(s.blush);
+  // A "?" and a "!" over his helmet, as in a comic: each pops up whole and a little big, then settles.
+  const glyph = (cells: readonly (readonly [number, number])[], k: number, x0: number) => { for (const [i, j] of cells) mark(x0 + i * 0.82, -28.6 + j * 0.82 + (1 - clamp(k)) * 1.5, 0.37 * clamp(k, 0, 1.08), "glint", 0.5); };
+  glyph([[1, 0], [2, 0], [0, 0.9], [3, 0.9], [3, 1.9], [2.1, 2.8], [1.6, 3.8], [1.6, 5.5]], s.ask, 11.6);
+  glyph([[0, 0], [0, 1], [0, 2], [0, 3], [0, 4.7]], s.bang, 13.2);
+  const star = clamp(s.star, 0, 1.08), blush = clamp(s.blush);
 
   const paws = layer();
   for (const { side, paw } of SIDES) {
@@ -121,9 +131,11 @@ export function fineDots(s: State): FineDot[] {
       if (k > 0.02) face.push([x, y, p.r * k, "eye", true]);
       if (upper && wide * (1 - arc) > 0.02) { const [x2, y2] = head(p, ex, ey - U); face.push([x2, y2, p.r * wide * (1 - arc) * (1 - shut), "eye", true]); }
     }
-    const [gx, gy] = head(glint, ex, ey - wide * U);
-    face.push([gx, gy, glint.r * (1 - shut) * (1 - arc) * (1 - clamp(star)), "glint", false]);
-    if (star > 0.02) sparkle(cx / U + s.lx * 0.3, (top + U / 2) / U, star * 1.15, "lamp");
+    // The glint is what makes his eyes alive, so an open eye never loses it: it rides over the brim's shadow, slides
+    // down the eye when the helmet comes low, and goes only as the lid closes (Tyler, 2026-11-13: without it he looks spooky).
+    const [gx, gy] = head(glint, ex, ey - wide * U + clamp(tip, 0, 0.55));
+    marks.push([gx, gy, glint.r * clamp((1 - shut) * 2.5) * (1 - arc) * (1 - clamp(star)), "glint", false]);
+    if (star > 0.02) bigStar(cx / U + s.lx * 0.3, (top + U / 2) / U, star);
     if (blush > 0.02) for (const [dx, dy] of [[2.1, 1.9], [3.1, 1.9], [4.1, 1.9], [2.6, 2.75], [3.6, 2.75]] as const) mark(cx / U + side * dx, top / U + dy, 0.36 * blush, "nose");
     if (arc * (1 - clamp(star)) > 0.02) for (const [dx, dy] of [[-1.5, 1.25], [-0.8, 0.5], [0, 0.2], [0.8, 0.5], [1.5, 1.25]] as const) {
       const [x, y] = head({ x: cx + dx * U, y: top + dy * U, r: 0, tone: "eye" }, ex, ey);

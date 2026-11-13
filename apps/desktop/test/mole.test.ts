@@ -261,6 +261,19 @@ test("traced: comic marks. A tear and a bead of sweat show only on their way dow
   expect(ink(stars, "lamp")).toBeGreaterThan(ink(fine(), "lamp") * 1.5);
   expect(ink(fine({ blush: 1 }), "nose")).toBeGreaterThan(ink(fine(), "nose") * 1.5);
   expect(fine({ steam: 0.5 }).length).toBe(fine().length + 10);
-  // Tyler, 2026-11-13: the wave lost the white dot in his eyes.
-  for (const f of play("wave", 900)) expect(fineDots(f).filter(([, , , t]) => t === "glint").length).toBeGreaterThanOrEqual(2);
+});
+
+test("traced: an open eye never loses its glint, in any frame of any move (Tyler, 2026-11-13: without it he looks spooky)", () => {
+  const rest = fine(), eyes = ink(rest, "eye"), glint = Math.max(...rest.filter(([, , , t]) => t === "glint").map(([, , r]) => r));
+  for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[]) for (const s of play(name, MOVES[name].end ?? MOVES[name].loop!)) {
+    // Pleased arcs, star eyes and a wink have no open eye to light; a lid mostly down has its glint going with it.
+    if (s.arc > 0.03 || s.star > 0.03 || s.wink > 0.03 || s.open < 0.75) continue;
+    const d = fineDots(s);
+    if (ink(d, "eye") < eyes * 0.6) continue;
+    // Both glints at full size (the dirt may cover them while he is down in his hole).
+    const whole = d.filter(([, y, r, t]) => t === "glint" && r > glint * 0.85 && y < ROWS - 1).length;
+    if (s.y < 5) expect(whole).toBeGreaterThanOrEqual(2);
+  }
+  // A low helmet no longer covers it: sad, huff and the look down keep both.
+  for (const pose of [MOVES.huff.still, MOVES.lookdown.still, { hat: -0.7 }]) expect(fine(pose).filter(([, , r, t]) => t === "glint" && r > glint * 0.9).length).toBeGreaterThanOrEqual(2);
 });
