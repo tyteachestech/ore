@@ -109,6 +109,9 @@ async function openPhone(): Promise<Page> {
   await page.addInitScript(HYGIENE);
   await page.goto(url);
   await page.locator(".phone-app").waitFor();
+  // Opened means the library is read: a journey that relaunches at once (page.reload) cut the read of
+  // /library.json in half, and WebKit reported it as a page error after every journey passed (F86).
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
   return page;
 }
 
@@ -4767,6 +4770,12 @@ journey("note blocks: drag one by its ⋮⋮ handle, it stays moved after a relo
   await grip("Effortful");
   await page.locator(".block-grip").click();
   await page.locator(".menu-item", { hasText: "Turn into" }).hover();
+  // Each block type draws its icon, as Notion's Turn into does (Tyler 2026-11-13).
+  const kinds = page.locator(".menu-sub [role=menuitemcheckbox]");
+  await kinds.first().waitFor();
+  const drawn = await page.locator(".menu-sub [role=menuitemcheckbox] > svg[data-sprite]").count();
+  if (drawn !== (await kinds.count())) throw new Error(`Turn into: ${drawn} of ${await kinds.count()} block types have an icon`);
+  if (process.env.ORE_E2E_SHOT) await page.screenshot({ path: process.env.ORE_E2E_SHOT });
   await page.getByRole("menuitemcheckbox", { name: "Heading 3", exact: true }).dispatchEvent("click");
   await until("it became a heading", () => page.locator(".note-editor h3", { hasText: "Effortful" }).isVisible());
   await page.keyboard.press("ControlOrMeta+z"); // the editor's own undo: ⌘ on the Mac, Ctrl where CI runs
@@ -11254,6 +11263,8 @@ journey("phone: Finish's closing card keeps its unsaved line through a failed sa
 journey("phone: a link to a part of the page that wasn't saved says the next step is on the Mac", async (page) => {
   // The toast said to Reimport from ⋯, which the phone doesn't offer.
   await macChanges((lib) => itemFile(lib, "building-effective-agents", "doc.md"), "\n# Building Effective Agents\n", "\n# Building Effective Agents\n\nSee [the missing part](#a-part-not-saved).\n", async () => {
+    await page.reload(); // the phone reads the Mac's change on a relaunch, as every journey here does
+    await page.locator(".phone-opening").waitFor({ state: "detached" });
     await phoneSource(page, AGENTS);
     await tap(page, page.locator(".phone-reader .doc a").filter({ hasText: "the missing part" }));
     const toast = page.locator(".toasts").filter({ hasText: "wasn’t saved" });

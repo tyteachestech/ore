@@ -2390,6 +2390,8 @@ button.home-plan:hover { color: var(--text); }
 .menu-item:has(> .menu-icon) { padding-left: 6px; }
 .menu-icon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; margin-right: -8px; color: var(--muted); }
 .menu-item.danger .menu-icon { color: inherit; }
+/* A submenu's own icons (Turn into's block types, Importance's levels) are muted like the menu's; a highlight type keeps its colour. */
+.menu-item.check > svg[data-sprite]:not(.menu-mark) { color: var(--muted); }
 /* A highlight type in its Type submenu (Reader.tsx Mark), in its colour as on the highlight popup. */
 .menu-mark { flex: none; }
 .menu-mark.keep { color: var(--keep-solid); } .menu-mark.card { color: var(--card-solid); }
