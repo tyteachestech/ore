@@ -94,15 +94,17 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   let awake = false, grounded = false;
   for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
     await act(async () => void jest.advanceTimersByTime(20));
-    // Awake in the air before he lands, and never two moles at once.
+    // Awake in the air before he lands, and never two moles at once: while he is on the cart or in the air, his hole is empty.
     if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "fall") awake = true;
-    if (s.q(".cart-tip")) expect(s.q(".review-mole .mole")).toBe(0);
+    if (s.q(".cart-mole")) expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood") ?? "hole").toBe("hole");
     // He falls into his hole: under the dirt line nothing of him is drawn, so the ring never crosses his belly (F94).
     if (s.body.querySelector<HTMLElement>(".cart-ground")?.style.clipPath.startsWith("inset(")) grounded = true;
   }
   expect(awake).toBe(true);
   expect(grounded).toBe(true);
-  expect(s.q(".review-mole .mole")).toBe(1);
+  // Down the hole, and up he pops: the same mole, and only then does he speak.
+  expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood")).toBe("pop");
+  expect(s.q(".end-says")).toBe(0);
   for (let i = 0; i < 200; i++) await act(async () => void jest.advanceTimersByTime(50));
   expect(s.body.querySelector(".end-says")!.textContent).toContain("Goal met. I supervised.");
   jest.useRealTimers();

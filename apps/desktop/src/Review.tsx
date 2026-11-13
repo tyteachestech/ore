@@ -1615,16 +1615,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   // cart: rolling and pouring · poured: the ring is full · leaving: the cart starts off, and the mole comes up unless he is riding it (then when he has fallen) · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
-  // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D255): then he is there, startled (under Reduce Motion he is just there, at rest: pleased, or plain after a session of misses).
+  // He comes up out of the ground first, with or without a cart before it, and after falling off the cart into his hole too (D255: `hole` while he is on it, `pop` once he has gone down) (under Reduce Motion he is just there, at rest: pleased, or plain after a session of misses).
   const [settled, setSettled] = useState(still);
   const [fell, setFell] = useState(false);
   // The mole reacts to the day 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
-  const up = nap ? fell : stage === "leaving" || stage === "done";
+  const up = stage === "leaving" || stage === "done";
+  // After a fall the wait starts when he has gone down his hole: an empty beat, then up he pops, and only then does he speak.
+  const risen = nap ? fell : up;
   useEffect(() => {
-    if (!up) return;
-    const id = setTimeout(() => setSettled(true), nap ? 400 : 560);
+    if (!risen) return;
+    const id = setTimeout(() => setSettled(true), nap ? 1000 : 560);
     return () => clearTimeout(id);
-  }, [up]);
+  }, [risen]);
   const full = stage !== "cart";
   // D197: a cut gem that was won back has a gold rim; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
@@ -1672,7 +1674,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   }).map((l) => ({ ...l, mark: mark(l) }));
   const tiles = endTiles({ session: s, ups: named });
   // His pose is for the line he says (D258).
-  const mood = !settled ? (nap ? "surprised" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
+  const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
@@ -1692,7 +1694,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         <>
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem" data-glint={(closed && full) || undefined}>
-            <span className={`review-mole${nap && fell ? " fell" : ""}`}>{up && <Mole bare size={96} mood={mood} />}</span>
+            <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {settled && (
               <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />

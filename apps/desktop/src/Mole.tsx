@@ -55,7 +55,7 @@ export function step(v: State, vel: State, to: State, dt: number) {
   for (const [k, lo, hi] of LIMITS) if (v[k] < lo || v[k] > hi) { v[k] = clamp(v[k], lo, hi); vel[k] = 0; }
 }
 
-export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "doze" | "fall";
+export type Mood = "idle" | "peek" | "hole" | "pop" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "doze" | "fall";
 /** A mood: where each value should settle (`to`), where it starts (`from`), pushes that set it moving (`kick`), timed
  *  changes after (`at`), paws waving until `wave` ms, and when it rests (`end`) or starts over (`loop`).
  *  `still` is the one pose shown under reduced motion or in a hidden window. */
@@ -81,6 +81,11 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   happy: { to: { top: SQUAT }, end: 1700, still: HAPPY,
     at: [[110, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [420, { kick: { kick: 7 } }]] },
   // A jolt up with both paws, his helmet jumping off his brows, wide eyes, an O, and a "!" over him (the traced mole).
+// After his fall off the cart. `hole`: his hole with nobody up, only the dirt. `pop`: the dirt kicks as he goes in,
+  // a beat on the empty hole, then up with a start, helmet knocked askew, which he lets settle.
+  hole: { from: { y: 21 }, to: { y: 21 }, loop: 60_000, still: { y: 21 } },
+  pop: { from: { y: 21 }, to: { y: 21 }, kick: { kick: 12 }, end: 1900, still: { ...WIDE, bang: 1 },
+    at: [[150, { kick: { kick: 6 } }], [260, { to: { ...WIDE, y: 0, bang: 1, tilt: 0.35, hat: 0.8 }, kick: { pawL: THROW, pawR: THROW } }], [400, { kick: { kick: 8 } }], [780, { to: { tilt: 0, hat: 0 } }], [900, { to: { bang: 0 } }]] },
   surprised: { to: { ...WIDE, bang: 1 }, kick: { top: -JOLT, pawL: THROW, pawR: THROW, kick: 6 }, end: 1400, still: { ...WIDE, bang: 1 }, at: [[1000, { to: { bang: 0 } }]] },
   // Both paws waving, bobbing on each beat, then a squat, a last hop and it settles pleased.
   cheer: { to: { arc: 1, ex: 3 }, wave: 900, end: 2400, still: HAPPY,
@@ -139,7 +144,7 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   doze: { from: DOZE, to: DOZE, loop: 3000, still: DOZE,
     at: [[0, { to: { breath: 1 } }], [1300, { to: { breath: 0 }, kick: { puff: 2 } }], [2000, { to: { legs: 1 } }], [2250, { to: { legs: 0 } }]] },
   // Falling: eyes wide, mouth an O, arms flung out and his feet running on nothing.
-  fall: { from: { whole: 1, side: 0 }, to: FALL, loop: 360, still: FALL, at: [[0, { to: { legs: 1, arms: 0.75 } }], [180, { to: { legs: -1, arms: 1 } }]] },
+  fall: { from: { whole: 1, side: 0 }, to: FALL, loop: 280, still: FALL, at: [[0, { to: { legs: 1, arms: 0.55, tilt: -0.2 } }], [140, { to: { legs: -1, arms: 1, tilt: 0.2 } }]] },
 };
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */

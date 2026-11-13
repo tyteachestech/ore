@@ -24,12 +24,16 @@ const W = 20 * CELL, H = (15 + HEAD) * CELL;
 /** Where the heap's ore sits: five dots half behind the rim, four on top of them. */
 const HEAP: [number, number][] = [[5.6, -0.3], [8.4, -0.3], [11.2, -0.3], [14, -0.3], [4.2, 1.9], [7, 1.9], [9.8, 1.9], [12.6, 1.9], [15.4, 1.9]];
 const ROUGH = 6;
-/** The mole riding the load: drawn at the size he stands at on the ring, shown smaller on the cart: `DOZE` asleep (side on, about 80px long), `RIDER` once awake. */
-const RIDER_PX = 96, DOZE = 0.45, RIDER = 0.55;
+/** The mole riding the load: drawn at the size he stands at on the ring, shown smaller on the cart: `DOZE` asleep (side on, about 80px long), growing as he starts awake. */
+const RIDER_PX = 96, DOZE = 0.45;
+/** The middle of each drawing's body from the foot of its box, in px at full size: asleep he lies over it, awake he straddles it. */
+const SLEEPER = [0, -45] as const, FALLER = [-1, -6] as const;
+/** How far he is tipped when his slide leaves him hanging past the lip (degrees). */
+const SLID = 44;
 /** How far over the foot of his seat the dirt line is: the top of the seated mole's row of dirt. */
 const GROUND = 3;
-/** How far his slide carries him from the middle of the cart, in px: right, and down. */
-const SLIDE = [34, 16] as const;
+/** The gravity he dives under, px/s²: slower than the ore's, so a turn in the air can be seen. */
+const DIVE = 1500;
 /** A snoring Z, in dots on a 4 by 4 grid (the mole's own Z). */
 const Z = [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3], [3, 3]] as const;
 
@@ -153,39 +157,75 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     later(stoned + 340, () => {
       // It gathers speed across the screen: the roll runs twice as far as the window's edge, so the cart crosses
       // the edge at the curve's fastest and is clipped there. Nothing waits on it (the mole is already coming up).
-      roll(0, 2 * (bb.width - stop + 20), MOMENT, IN_OUT);
+      // With the mole hanging off its lip it backs out the way it came, so it never rolls through him.
+      roll(0, mole ? -2 * (stop + W + 20) : 2 * (bb.width - stop + 20), MOMENT, IN_OUT);
       play(rail, [{ opacity: 1 }, { opacity: 0 }], { duration: T4, delay: 260, easing: OUT });
     });
     later(stoned + 520, () => calls.current.onLeave());
     const rider = el.querySelector<HTMLElement>(".cart-mole"), seat = host.querySelector(".review-mole");
     if (!rider || !seat) later(stoned + 340 + MOMENT + 20, () => { calls.current.onFell?.(); calls.current.onDone(); });
     else {
-      // Asleep he is drawn side on, already on his back (`doze`): the wrapper's own point is the middle of his back.
-      // Awake he is the front view (`fall`), turned on his side about the middle of his body, a little above that.
-      const x = stop + W / 2 - 2, y = floor - 30, tipped = [x + 12, y + 4, 24] as const;
-      // Where his slow slide leaves him: over the lip, most of him past the bucket.
-      const SLID = 38, sx = x + SLIDE[0], sy = y + SLIDE[1], up = sy - DOZE * 40;
-      const tf = (x: number, y: number, turn: number, scale: number) => `translate3d(${x}px, ${y}px, 0) rotate(${turn}deg) scale(${scale})`;
-      play(rider, [{ transform: tf(x - (stop + W + 20), y, 0, DOZE) }, { transform: tf(x, y, 0, DOZE) }], { duration: MOMENT, easing: OUT });
-      // The bucket tips under him, and while his bed pours out he slides slowly down it and off the lip, asleep
-      // (Tyler, 2026-11-13: "he should be sliding slowly off the cart before fully falling").
-      const tip = MOMENT - 100;
-      later(tip, () => play(rider, [{ transform: tf(x, y, 0, DOZE) }, { transform: tf(...tipped, DOZE) }], { duration: T4, easing: SPRING }));
-      later(tip + T4, () => play(rider, [{ transform: tf(...tipped, DOZE) }, { transform: tf(sx, sy, SLID, DOZE) }], { duration: Math.max(T4, stoned + 340 - tip - T4), easing: "linear" }));
-      // The bucket drops back and the cart leaves. He does not: a beat asleep on nothing, a beat running on it
-      // (each `t-3`), then down under the gravity the ore fell under. `flushSync`: his drawing and his place change in the same frame.
-      const gone = stoned + 340, HANG = ms("--t-3", 200);
-      later(gone + HANG, () => { flushSync(() => setAwake(true)); play(rider, [{ transform: tf(sx, up, SLID - 90, RIDER) }, { transform: tf(sx, up, SLID - 90, RIDER) }], { duration: 1 }); });
-      later(gone + 2 * HANG, () => {
+      // Asleep he is drawn side on, already on his back (`doze`); awake he is the front view (`fall`). Each drawing's
+      // middle sits elsewhere in the wrapper (which turns and scales about the foot of its box), so a place is worked
+      // out for the middle of his body, and one drawing takes over from the other on the same spot.
+      const place = (mid: readonly [number, number], cx: number, cy: number, turn: number, scale: number) => {
+        const a = (turn * Math.PI) / 180, c = Math.cos(a), n = Math.sin(a);
+        return `translate3d(${cx - scale * (mid[0] * c - mid[1] * n)}px, ${cy - scale * (mid[0] * n + mid[1] * c)}px, 0) rotate(${turn}deg) scale(${scale})`;
+      };
+      const x = stop + W / 2 - 2, y = floor - 30 - DOZE * 45, ground = rider.parentElement!;
+      const asleep = (cx: number, cy: number, turn: number) => place(SLEEPER, cx, cy, turn, DOZE);
+      play(rider, [{ transform: asleep(x - (stop + W + 20), y, 0) }, { transform: asleep(x, y, 0) }], { duration: MOMENT, easing: OUT });
+      // The bucket tips under him, and while his bed pours out he slides down it, slowly, then faster, until he
+      // hangs past the lip (Tyler, 2026-11-13: "he should be sliding slowly off the cart before fully falling").
+      // From the tip on he is drawn over the cart, so its rim never crosses him.
+      const tip = MOMENT - 100, tipped = [x + 10, y + 4, 22] as const;
+      let end = [x + 46, y + 24, SLID] as [number, number, number];
+      later(tip, () => { ground.style.zIndex = "1"; play(rider, [{ transform: asleep(x, y, 0) }, { transform: asleep(...tipped) }], { duration: T4, easing: SPRING }); });
+      later(tip + T4, () => {
+        // The lip of the tipped bucket: he ends with his middle well past it, head and shoulders in the open.
+        const o = el.getBoundingClientRect(), at2 = at(lip.getBoundingClientRect(), o);
+        end = [at2.x + 18, at2.y - 12, SLID];
+        const N = 14;
+        // Most of the way in the last third: he creeps, then goes.
+        play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = (i / N) ** 3 * 0.8 + (i / N) * 0.2; return { transform: asleep(tipped[0] + (end[0] - tipped[0]) * t, tipped[1] + (end[1] - tipped[1]) * t, tipped[2] + (SLID - tipped[2]) * t) }; }), { duration: Math.max(T4, stoned + 160 - tip - T4), easing: "linear" });
+      });
+      // The bucket drops back, its lip flicking him up a little, and the cart backs out the way it came. He does
+      // not: asleep on nothing, sagging; then awake with a start, up off nothing and bigger, limbs going; then down.
+      const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = T4, HANG = 320, SAG = 4, JUMP = 62, NEAR = 0.72;
+      // Asleep on nothing he bobs with his breath, clear of the dirt line, so it reads as air and not a perch.
+      later(stoned + 160, () => play(rider, [
+        { transform: asleep(...end) }, { transform: asleep(end[0] + 3, end[1] - 6, end[2] - 5), easing: IN_OUT, offset: 0.2 },
+        { transform: asleep(end[0], end[1] + SAG, end[2]), easing: IN_OUT, offset: 0.45 }, { transform: asleep(end[0], end[1] + SAG - 5, end[2] - 3), easing: IN_OUT, offset: 0.72 }, { transform: asleep(end[0], end[1] + SAG, end[2]) },
+      ], { duration: gone + SLEEP - stoned - 160, easing: OUT }));
+      // He braces before he starts (anticipation): a dip and a curl, still asleep to look at.
+      later(gone + SLEEP, () => play(rider, [{ transform: asleep(end[0], end[1] + SAG, end[2]) }, { transform: asleep(end[0], end[1] + SAG + 7, end[2] + 14) }], { duration: BRACE, easing: OUT }));
+      // `flushSync`: his drawing and his place change in the same frame, on the same spot at the same size. He
+      // starts up and over his hole, so the dive after it is straight down.
+      let top = [0, 0] as [number, number];
+      later(gone + SLEEP + BRACE, () => {
+        flushSync(() => setAwake(true));
         const o = el.getBoundingClientRect(), to = seat.getBoundingClientRect();
-        // He lands in his hole, feet first: nothing of him is drawn under the dirt line he will sit behind, so his
-        // body goes into the ground and his head stops where the seated mole's is (F94).
-        if (rider.parentElement) rider.parentElement.style.clipPath = `inset(-9999px -9999px ${o.bottom - to.bottom + GROUND}px -9999px)`;
-        const dx = to.left - o.left + to.width / 2 - sx, dy = to.bottom - o.top - up, T = flight(dy), N = 14;
-        // Head over heels onto the ring, growing to the size he stands at, and up on his feet as he lands.
-        play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = i / N, [ax, ay] = along(dx, dy, T, t * T); return { transform: tf(sx + ax, up + ay, SLID - 90 + (450 - SLID) * t, RIDER + (1 - RIDER) * t) }; }), { duration: T * 1000, easing: "linear" });
-        // The standing mole takes his place in the same frame he lands in.
-        later(T * 1000, () => flushSync(() => { calls.current.onFell?.(); calls.current.onDone(); }));
+        const [cx, cy] = [end[0], end[1] + SAG + 7];
+        top = [to.left - o.left + to.width / 2, cy - 7 - JUMP];
+        play(rider, [{ transform: place(FALLER, cx, cy, SLID + 14 - 90, DOZE) }, { transform: place(FALLER, top[0], top[1], -14, NEAR) }], { duration: START, easing: SPRING });
+        // At the top he thrashes on nothing: his whole body rocks while his limbs go, and he starts to sink.
+        later(START, () => play(rider, [-14, 6, -16, 4, -14].map((turn, i) => ({ transform: place(FALLER, top[0], top[1] + [0, -5, -6, -4, 0][i]!, turn, NEAR) })), { duration: HANG, easing: "linear" }));
+      });
+      later(gone + SLEEP + BRACE + START + HANG, () => {
+        const o = el.getBoundingClientRect(), to = seat.getBoundingClientRect();
+        // He dives into his hole head first: nothing of him is drawn under the dirt line (F94), and he goes on
+        // down until his feet are out of sight. Then the hole is empty for a beat, and up he comes (`pop`).
+        ground.style.clipPath = `inset(-9999px -9999px ${o.bottom - to.bottom + GROUND}px -9999px)`;
+        const [cx, cy] = top, ty = to.bottom - o.top - GROUND;
+        // From rest at the top of his start, under his own slower gravity so the dive can be read: the middle of
+        // his body is at the dirt line at T, upside down by then, and UNDER later his feet are under it.
+        const dy = Math.max(1, ty - cy), T = Math.sqrt((2 * dy) / DIVE), UNDER = 0.16, N = 20;
+        play(rider, Array.from({ length: N + 1 }, (_, i) => {
+          // He is over on his head early in the drop, then goes straight down the hole.
+          const t = (i / N) * (T + UNDER), k = Math.min(1, t / T), over = Math.min(1, t / (0.5 * T)), turned = over * over * (3 - 2 * over);
+          return { transform: place(FALLER, cx, cy + 0.5 * DIVE * t * t, -14 + 194 * turned, NEAR + (1 - NEAR) * k) };
+        }), { duration: (T + UNDER) * 1000, easing: "linear" });
+        later((T + UNDER) * 1000, () => flushSync(() => { calls.current.onFell?.(); calls.current.onDone(); }));
       });
     }
 
@@ -194,7 +234,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       timers.forEach(clearTimeout);
       anims.forEach((a) => a.cancel());
       cancelAnimationFrame(frame);
-      if (rider?.parentElement) rider.parentElement.style.clipPath = "";
+      if (rider?.parentElement) Object.assign(rider.parentElement.style, { clipPath: "", zIndex: "" });
     };
     // Plays once, for the session that just ended.
     // eslint-disable-next-line react-hooks/exhaustive-deps

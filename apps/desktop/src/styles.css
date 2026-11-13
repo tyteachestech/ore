@@ -2143,9 +2143,6 @@ button.home-plan:hover { color: var(--text); }
 /* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
 .review-mole { display: block; line-height: 0; margin-bottom: 2px; width: 96px; height: calc(96px * 18 / 22); }
 /* D255: he lands off the cart with a squash, then springs back to his height. */
-.review-mole.fell { transform-origin: 50% 100%; animation: mole-land var(--t-4) var(--ease-spring) both; }
-@keyframes mole-land { from { transform: scale(1.14, 0.8); } }
-@media (prefers-reduced-motion: reduce) { .review-mole.fell { animation: none; } }
 /* The cart's tip (D190): a layer as wide as the window over the end screen, so the cart crosses it on a rail just
    over the ring. Its ore is the ring's own dot, in size and colour; a rough stone is the gem it becomes. */
 .review-end.carted { position: relative; }
