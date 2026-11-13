@@ -1,7 +1,7 @@
 import { PARTS } from "./mole-fine-data";
 import type { State } from "./Mole";
 
-/* The mole at 48 px and up (D-new-traced-mole): concept 4 itself, every dot traced from the drawing, so his dots sit where the
+/* The mole at 48 px and up (D251): concept 4 itself, every dot traced from the drawing, so his dots sit where the
    drawing put them and not on a grid. He moves as a cut-out puppet on the same springs as the small one: the head
    (fur, face, helmet) rides up and down and leans, each lobe of the moustache swings from under his nose, the paws
    lift on their arms, and a dot under a part above it (fur under the helmet, a lid under an eye) shrinks away, so
