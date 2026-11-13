@@ -2,7 +2,7 @@
 
 Where the old miner comes in during a review session, what he does there, and what he says. Written 2026-11-13 at Tyler's ask, while the mole's look and his wider set of expressions are being finished in another thread, so the two can be joined without a second round of design.
 
-Status: built where a moment already existed (D256, Tyler 2026-11-13: "the moments we do have that fit, yes utilize him"): the poses during a session, the goal note's wave, and the end screen's reaction by the day. Built simpler than the table in two places: a long gap is `surprised` without the `nod` after, and goal met is `happy` without it. Not built: him watching the results land (`lookdown`), the wave on Done, and anything on a screen he is not on today.
+Status: built where a moment already existed (D258, Tyler 2026-11-13: "the moments we do have that fit, yes utilize him"): the poses during a session, the goal note's wave, and the end screen's reaction by the day. Built simpler than the table in two places: a long gap is `surprised` without the `nod` after, and goal met is `happy` without it. Not built: him watching the results land (`lookdown`), the wave on Done, and anything on a screen he is not on today.
 
 ## What he is for
 
@@ -25,7 +25,7 @@ Mood names are the ones in `Mole.tsx`. "Today" moods are on master; the rest com
 
 ### During a session
 
-| Moment | Before D256 | Proposed | Line |
+| Moment | Before D258 | Proposed | Line |
 |---|---|---|---|
 | A question is open, or being rated | not on screen | not on screen | none |
 | An ordinary pass, nothing changed | not on screen | not on screen (rule 3) | none |
@@ -37,13 +37,13 @@ Mood names are the ones in `Mole.tsx`. "Today" moods are on master; the rest com
 | Today's goal is met | 48px, `happy`, "Goal met. The rest is extra." | rises, one `wave`, then rests while the line is up. Built | same line |
 | Past the goal, still going | not on screen | not on screen: the bonus is in the end screen's numbers | none |
 
-The mid-session mole was 40px, under the size where the traced drawing is used (48px). He is 48px there since D256, so it is one mole all through a session.
+The mid-session mole was 40px, under the size where the traced drawing is used (48px). He is 48px there since D258, so it is one mole all through a session.
 
 ### The end screen
 
 In order, as it plays:
 
-| Beat | Before D256 | Proposed |
+| Beat | Before D258 | Proposed |
 |---|---|---|
 | The cart tips into the ring | he is not up yet | same |
 | He comes up | `peek` (rises out of the ground) | built since (D255): two endings in three he rides the cart in asleep (`doze`), hangs in the air when it leaves, falls (`fall`) onto the ring and covers for it in his line; otherwise `peek` |
@@ -66,7 +66,7 @@ His reaction, by the line he says (built as `endMood`; where the table says two 
 | Every answer a miss | `set`, no cheer | "Schist happens. Every miss comes back sooner." |
 | Then and now is showing (once in four weeks) | `curious`, looking down at the two answers | "6 weeks back that one beat you. Read it now." |
 
-Before D256 every day with something kept ended on the same `cheer`. Scaling it was the last piece of "three sizes of ending": the row's colour already makes a big day look bigger, and his pose would make it feel bigger.
+Before D258 every day with something kept ended on the same `cheer`. Scaling it was the last piece of "three sizes of ending": the row's colour already makes a big day look bigger, and his pose would make it feel bigger.
 
 ### Where he stays out
 

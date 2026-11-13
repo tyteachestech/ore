@@ -6,7 +6,7 @@ import type { Mood } from "./Mole";
  *  phrase picked from a bank. Everything else gets no moment: a rating he gives a hundred times a day moves on. */
 export type Moment = { from: CardGem; to: CardGem; days: number; line: string; tone: "cut" | "miss" | "deep"; kind: "cut" | "won" | "polished" | "deep" | "miss" };
 
-/** The mole's pose for each kind of moment (D256), sized to how rare it is: winning a gem back is the hardest
+/** The mole's pose for each kind of moment (D258), sized to how rare it is: winning a gem back is the hardest
  *  thing in a session, so it alone gets the laugh; a miss gets a steady look, never a sad one (D62). */
 export const MOMENT_MOOD = { cut: "proud", won: "laugh", polished: "wink", deep: "surprised", miss: "set" } as const satisfies Record<Moment["kind"], Mood>;
 /** How the box behaves for each kind: a win springs in, a miss stays longer. */
