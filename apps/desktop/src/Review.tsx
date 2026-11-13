@@ -5,6 +5,7 @@ import { Children, useCallback, useEffect, useRef, useState, type MutableRefObje
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Cutting, Gem } from "./Gem";
+import { EndMark } from "./EndMark";
 import { SkillIcon } from "./IconPicker";
 import { Mole } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
@@ -1557,7 +1558,7 @@ const TALLY_GAP_MS = 320;
 const NAP_SHARE = 2 / 3;
 
 /** The end screen's row of results (D252, after Duolingo's lesson-complete row): three at most, each a
- *  mark, a number in dots and what it counts, landing one after another once `go`, then still. The number's text
+ *  mark beside a number in dots (D259) over what it counts, landing one after another once `go`, then still. The number's text
  *  is in the page throughout for a reader. A rare one wears its skill's colour or the won-back gold. */
 function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skills: Skill[]; onDone: () => void }) {
   const [n, setN] = useState(still() ? tiles.length : 0);
@@ -1574,11 +1575,13 @@ function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skil
     <ul className="end-tally">
       {tiles.map((t, i) => {
         const sk = t.rare?.kind === "level" ? skills.find((x) => x.id === (t.rare as { skill: string }).skill) : undefined;
-        const mark = t.key === "level" ? <SkillIcon icon={sk?.icon} color={sk?.color} dot /> : t.key === "rescued" ? <Gem kind="cut" size={16} seam /> : t.key === "cut" ? <Gem kind="cut" size={16} /> : t.key === "kept" ? <Check size={16} /> : <Clock size={16} />;
+        const mark = t.key === "level" ? <SkillIcon icon={sk?.icon} color={sk?.color} dot /> : t.key === "rescued" ? <Gem kind="cut" size={32} seam /> : t.key === "cut" ? <Gem kind="cut" size={32} /> : <EndMark kind={t.key === "kept" ? "gem" : t.key === "long" ? "comet" : "calendar"} />;
         const li = (
           <li key={t.key} data-key={t.key} data-rare={t.rare?.kind} data-color={sk?.color} data-wait={i >= n || undefined} tabIndex={t.hint ? 0 : undefined}>
-            <span className="end-tally-mark" aria-hidden="true">{mark}</span>
-            <b><CountUp value={t.value} go={go && i < n} /><span className="sr-only">{t.value}</span></b>
+            <span className="end-tally-pair">
+              <span className="end-tally-mark" aria-hidden="true">{mark}</span>
+              <b><CountUp value={t.value} go={go && i < n} /><span className="sr-only">{t.value}</span></b>
+            </span>
             <span className="end-tally-label">{t.label}</span>
           </li>
         );
