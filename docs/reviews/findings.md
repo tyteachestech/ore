@@ -74,3 +74,4 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F48 | 2026-11-12 | iPhone, Today | Today's hold menu for a source had no Rename…, though Sources and a skill's list do (D225) | fixed #326 | `Return in Today's rename field opened the source` |
 | F49 | 2026-11-12 | iPhone | Once, the search field sat under the keyboard's accessory bar; not seen again on the repeat | open | — |
 | F50 | 2026-11-12 | Home, iPhone Today | Return in a Continue reading row's Rename field dropped focus to the page instead of the row (found by F48's journey) | fixed #326 | `Return in Today's rename field opened the source` |
+| F51 | 2026-11-12 | iPhone share | Ore was missing from the share sheet for a PDF shared from Safari's viewer: the extension's SupportsWebURL/File/Image keys didn't match it | fixed #337 | `the share extension activates for any link, text or file, a PDF from Safari included` |
