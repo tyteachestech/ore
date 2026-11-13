@@ -240,6 +240,9 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   expect(row.map((li) => li.querySelector(".end-tally-pair > .end-tally-mark + b") !== null)).toEqual([true, true, true]);
   expect(row.slice(0, 2).map((li) => li.querySelector(".end-mark")?.getAttribute("data-kind"))).toEqual(["gem", "calendar"]);
   expect(s.q('.end-tally [data-key="kept"] .end-mark circle')).toBeGreaterThan(60);
+  // The marks loop, each its own way (D260): every dot of the gem takes a turn, and only the calendar's days.
+  expect(s.q('.end-tally [data-key="kept"] .end-mark circle:not([data-turn])')).toBe(0);
+  expect(s.q('.end-tally .end-mark[data-kind="calendar"] circle[data-turn]')).toBe(15);
   // The count is said once, and nothing rare is dressed as rare.
   expect(s.q(".review-kept")).toBe(0);
   expect(s.q(".end-tally [data-rare]")).toBe(0);
@@ -441,5 +444,7 @@ test("the glint (D257): a light crosses the ring and the field behind it only wh
   const css = await Bun.file(new URL("../src/styles.css", import.meta.url)).text();
   // Once, never a loop, and off under Reduce Motion.
   expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.glint circle, \.end-emblem\[data-glint\]::after \{ animation: none; \} \}/);
+  // The marks beside the numbers are the one loop, and they too stand still under Reduce Motion.
+  expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.end-tally li, \.end-tally \.end-mark circle \{ animation: none !important; \} \}/);
   for (const [rule] of css.matchAll(/[^{}]*glint[^{}]*\{[^{}]*animation:[^{}]*\}/g)) expect(rule).not.toContain("infinite");
 });

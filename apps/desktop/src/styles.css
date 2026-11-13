@@ -2197,7 +2197,19 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-tally-in { from { opacity: 0; transform: translateY(-10px); } }
 .end-tally-label { max-width: 100%; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 @media (max-width: 480px) { .end-tally { gap: 8px; } .end-tally-pair { gap: 6px; } .end-tally-mark .end-mark { width: 36px; height: 36px; } }
-@media (prefers-reduced-motion: reduce) { .end-tally li { animation: none; } }
+/* The marks' loops (D260), each the way the thing itself would move, for as long as the end screen is
+   open: the gem's faces catch a passing light, the calendar's added days light one by one, the comet's tail streams off
+   its head. A dot's turn is `--at`, its resting light `--o` (EndMark.tsx). Endless loops keep their own time (D185). */
+.end-mark circle { transform-box: fill-box; transform-origin: center; }
+.end-tally li:not([data-wait]) .end-mark[data-kind="gem"] circle { animation: end-facet 3600ms var(--ease-in-out) var(--at) infinite; }
+.end-tally li:not([data-wait]) .end-mark[data-kind="calendar"] circle[data-turn] { animation: end-day 4000ms var(--ease-out) var(--at) infinite; }
+.end-tally li:not([data-wait]) .end-mark[data-kind="comet"] circle[data-turn] { animation: end-stream 1500ms linear var(--at) infinite; }
+.end-tally li:not([data-wait]) .end-mark[data-kind="comet"] circle:not([data-turn]) { animation: end-head 3000ms var(--ease-in-out) infinite; }
+@keyframes end-facet { 0%, 16%, 100% { transform: scale(1); opacity: var(--o); } 7% { transform: scale(1.4); opacity: 1; } }
+@keyframes end-day { 0% { transform: scale(0.45); opacity: 0.5; } 6% { transform: scale(1.35); opacity: 1; } 12%, 100% { transform: scale(1); opacity: var(--o); } }
+@keyframes end-stream { 0%, 55%, 100% { transform: scale(0.8); opacity: calc(var(--o) * 0.75); } 22% { transform: scale(1.5); opacity: 1; } }
+@keyframes end-head { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .end-tally li, .end-tally .end-mark circle { animation: none !important; } }
 .end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
 /* The mole sits on the ring: its row of dirt rests on the ring's top dots. */
 .end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: -12px; }
