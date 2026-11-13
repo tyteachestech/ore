@@ -392,7 +392,7 @@ test("the row of results (D252): kept, days of memory, then the rarest true thin
   expect(endTiles({ session: session({ rescued: 1 }), ups: [] })[1]!.hint).toContain("lose it");
 });
 
-test("the glint (D256): a light crosses the ring and the field behind it only when this session closed the goal, and each number once it has landed; Reduce Motion plays none", async () => {
+test("the glint (D257): a light crosses the ring and the field behind it only when this session closed the goal, and each number once it has landed; Reduce Motion plays none", async () => {
   reduce = true;
   try {
     // The goal closed in this session: the ring, the field and the numbers all carry it.

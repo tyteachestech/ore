@@ -2025,7 +2025,7 @@ button.home-plan:hover { color: var(--text); }
 .ring { position: relative; flex: none; }
 .ring-burst { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); animation: ring-burst 700ms ease-out 550ms 1 both; }
 @keyframes ring-burst { from { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); } to { transform: scale(1.25); opacity: 0; box-shadow: 0 0 0 14px transparent; } }
-/* The glint (D256, after Magic UI's shiny text): a light that crosses a dot drawing once, at a moment that was
+/* The glint (D257, after Magic UI's shiny text): a light that crosses a dot drawing once, at a moment that was
    earned. Each dot lights and swells in its turn, `--i` beats after the first; nothing is laid over them. Never a loop. */
 .glint circle { transform-box: fill-box; transform-origin: center; animation: glint var(--t-4) var(--ease-out) calc(var(--glint-at, 0ms) + var(--i, 0) * var(--glint-gap, 40ms)); }
 .ring.glint { --glint-at: 550ms; --glint-gap: 24ms; }
