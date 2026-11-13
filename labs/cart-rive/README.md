@@ -4,6 +4,17 @@ A comparison test, not part of the app. Built blind from `/mnt/project-files/car
 screen's own cart animation, its clips and its pull requests were not opened. Nothing under `apps/` or
 `packages/` is changed. Tyler compares this with the app's version and decides.
 
+## Second pass (Tyler, 2026-11-13)
+
+After the first clip Tyler asked for cleaner arms and body, the nap on his back with a nose bubble, a slow slide
+off the bucket, and a wide-eyed wake right before a comic fall. Changes: a stouter body and real arms (the
+traced paws are now shown only in the hole); a nose bubble that swells and shrinks with his breath and pops to
+wake him; the cart stops so the lip leaves him right over his hole; he creeps while the ore pours and slides off
+as the stones drop; then a long stare, a scramble on nothing, a look down, a look at us, and a drop feet first
+with his arms and helmet a beat behind. This departs from the briefing's head-first dive.
+
+Still a front view turned on its side: a true on-his-back pose needs a side-view drawing of him.
+
 ## What is here
 
 - `gen.mjs` writes the whole Rive file as text (`rive/scene.rml`, Rive's markup): the mole from Ore's own

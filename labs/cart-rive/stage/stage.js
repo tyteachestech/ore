@@ -83,7 +83,7 @@ if (q.has("film") || reduced) {
     window.requestAnimationFrame = (cb) => queue.push(cb);
     window.cancelAnimationFrame = () => {};
     clock = () => vt;
-    window.cart = { end: 7.1, step(ms) { vt += ms; const run = queue; queue = []; for (const cb of run) cb(vt); } };
+    window.cart = { end: T.rollIn + T.pourSeconds[Object.keys(T.pourSeconds).find((b) => ORE <= +b) ?? 30] + T.hang + T.wake.total + 0.9, step(ms) { vt += ms; const run = queue; queue = []; for (const cb of run) cb(vt); } };
   }
   let t0 = 0, loaded = false;
   const now = () => (clock() - t0) / 1000;

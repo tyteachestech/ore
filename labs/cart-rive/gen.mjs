@@ -72,6 +72,7 @@ const part = (name, tone, px = 0, py = ORIGIN_Y) => {
   for (let i = 0; i < a.length; i += 4) out.push([(a[i] - px) * P, (a[i + 1] - py) * P, a[i + 2] * P, tone ?? grey(a[i + 3])]);
   return out;
 };
+const NOSE = [0, 1].map((k) => { const a = PARTS.nose; let t = 0; for (let i = k; i < a.length; i += 4) t += a[i]; return t / (a.length / 4); });
 /** My own dots on his grid: [x, y, r, tone] given in dots, around a pivot. */
 const mine = (list, px = 0, py = ORIGIN_Y) => list.map(([x, y, r, t]) => [(x - px) * P, (y - py) * P, r * P, t]);
 const at = (px, py) => ({ x: n2(px * P), y: n2((py - ORIGIN_Y) * P) }); // a pivot, in the root's space
@@ -79,13 +80,20 @@ const HEAD = [0, -1]; // where the head turns
 const inHead = (px, py) => ({ x: n2((px - HEAD[0]) * P), y: n2((py - HEAD[1]) * P) });
 
 // The body the rest drawing never shows: a stout barrel under the head, a pale belly, two small feet.
-const bodyDots = [], bellyDots = [], footDots = [];
-for (let y = 1; y <= 15; y++) for (let x = -12; x <= 12; x++) {
-  const d = Math.hypot(x / 11.6, (y - 7.6) / 8.2);
+const bodyDots = [], bellyDots = [], footDots = [], armDots = [];
+// Stout, not tall: a wide egg, shaded by dot size from the middle out, with a pale belly low on it.
+for (let y = 0; y <= 13; y++) for (let x = -13; x <= 13; x++) {
+  const d = Math.hypot(x / 12.6, (y - 6.3) / 7.2);
   if (d > 1) continue;
-  const b = Math.hypot(x / 6.4, (y - 9.2) / 4.9);
-  if (b <= 1) bellyDots.push([x, y, 0.42 - 0.05 * b * b, b > 0.8 ? 8 : 9]);
-  else bodyDots.push([x, y, d > 0.86 ? 0.3 : d > 0.7 ? 0.36 : 0.4, d > 0.86 ? 4 : d > 0.7 ? 5 : 6]);
+  const b = Math.hypot(x / 7.2, (y - 7.6) / 4.6);
+  if (b <= 1) bellyDots.push([x, y, 0.44 - 0.1 * b * b, 9]);
+  else bodyDots.push([x, y, 0.42 - 0.14 * d * d, d > 0.9 ? 4 : 5]);
+}
+// A short arm that hangs from the shoulder: grey sleeve, pale paw.
+for (let y = 0; y <= 8; y++) for (let x = -2; x <= 2; x++) {
+  const paw = y >= 6, w = paw ? 2.5 : 2.1;
+  if (Math.abs(x) > w || (y === 8 && Math.abs(x) > 1) || (y === 0 && Math.abs(x) > 1)) continue;
+  armDots.push([x, y, paw ? 0.42 : Math.abs(x) === 2 ? 0.3 : 0.38, paw ? 9 : Math.abs(x) === 2 ? 4 : 6]);
 }
 for (let y = 0; y <= 2; y++) for (let x = -2; x <= 2; x++) {
   if (Math.hypot(x / 2.6, (y - 1) / 1.5) > 1) continue;
@@ -107,10 +115,12 @@ function moleXml() {
   const lobe = (s, sign) => node(`Snore${s}`, { id: I(`snore${s}`), ...inHead(sign * 0.9, -10.4) }, node(`Lobe${s}`, { id: I(`lobe${s}`) }, [
     dotShapes(part(`lobe${s}`, undefined, sign * 0.9, -10.4), "lobe"), backing(part(`lobe${s}`, undefined, sign * 0.9, -10.4)),
   ]));
-  const arm = (s, sign) => node(`Arm${s}`, { id: I(`arm${s}`), ...at(sign * 11.8, -2.6) }, [
+  // In the hole his paws rest on the rim (the traced drawing); out of it he has arms. One of the two is shown.
+  const paw = (s, sign) => node(`Paw${s}`, { id: I(`paw${s}`), ...at(sign * 11.8, -2.6), opacity: 0 }, [
     dotShapes(part(`paw${s}`, undefined, sign * 11.8, -2.6), "paw"), backing(part(`paw${s}`, undefined, sign * 11.8, -2.6)),
   ]);
-  const foot = (s, sign) => node(`Foot${s}`, { id: I(`foot${s}`), ...at(sign * 5, 14.6) }, [dotShapes(mine(footDots, 0, 0), "foot"), backing(mine(footDots, 0, 0))]);
+  const arm = (s, sign) => node(`Arm${s}`, { id: I(`arm${s}`), ...at(sign * 10.6, 1.6) }, [dotShapes(mine(armDots, 0, 0), "arm"), backing(mine(armDots, 0, 0))]);
+  const foot = (s, sign) => node(`Foot${s}`, { id: I(`foot${s}`), ...at(sign * 5, 12.8) }, [dotShapes(mine(footDots, 0, 0), "foot"), backing(mine(footDots, 0, 0))]);
   const headPivot = HEAD, helmPivot = [0, -15.5];
   const hp = (name, tone) => part(name, tone, ...headPivot);
   const helmet = part("helmet", undefined, ...helmPivot), lamp = part("lamp", "lamp", ...helmPivot);
@@ -120,6 +130,7 @@ function moleXml() {
     node("Bob", { id: I("bob") }, node("Squash", { id: I("sq") }, node("Breath", { id: I("br") }, [
       node("Head", { id: I("head"), ...at(...headPivot) }, [
         node("ZAnchor", { id: I("zAnchor"), x: n2(7 * P), y: n2(-21 * P) }),
+        node("NoseAnchor", { id: I("noseAnchor"), ...inHead(NOSE[0] + 0.6, NOSE[1]) }),
         eye("L", -4.4, -12.6), eye("R", 5.6, -12.6),
         node("Helmet at", { x: n2((helmPivot[0] - headPivot[0]) * P), y: n2((helmPivot[1] - headPivot[1]) * P) }, node("Helmet", { id: I("helm") }, [dotShapes(lamp, "lamp"), dotShapes(helmet, "helmet"), backing(helmet)])),
         dotShapes(hp("nose", "nose"), "nose"),
@@ -127,25 +138,26 @@ function moleXml() {
         dotShapes(hp("gap"), "gap"),
         dotShapes(hp("fur"), "fur"), backing(hp("fur")),
       ]),
+      paw("L", -1), paw("R", 1),
       arm("L", -1), arm("R", 1),
-      node("Body", { id: I("body"), ...at(0, 9) }, [dotShapes(mine(bellyDots, 0, 9), "belly"), dotShapes(mine(bodyDots, 0, 9), "body"), backing(mine([...bodyDots, ...bellyDots], 0, 9))]),
+      node("Body", { id: I("body"), ...at(0, 8) }, [dotShapes(mine(bellyDots, 0, 8), "belly"), dotShapes(mine(bodyDots, 0, 8), "body"), backing(mine([...bodyDots, ...bellyDots], 0, 8))]),
       foot("L", -1), foot("R", 1),
     ]))),
   ]);
 }
 
 // ───────────────────────── the cart
-const CART = { stopX: 434, pivot: [34, -19], tip: (50 * Math.PI) / 180, wheelR: 8 };
-const PIVOT_W = [CART.stopX + CART.pivot[0], GROUND + CART.pivot[1]]; // the bucket's hinge, in the world, once stopped
+const CART = { stopX: 0, pivot: [34, -19], tip: (50 * Math.PI) / 180, wheelR: 8 };
 const rot = ([x, y], a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 const SEAT0 = [-32, -88]; // where he lies, in the bucket's space: across the heap, head to the back
 const SLIDE = 46; // how far down the tipped bucket he slides, px
+CART.stopX = HOLE_X - CART.pivot[0] - rot(SEAT0, CART.tip)[0] - SLIDE * Math.cos(CART.tip);
+const PIVOT_W = [CART.stopX + CART.pivot[0], GROUND + CART.pivot[1]]; // the bucket's hinge, in the world, once stopped
 const slope = [Math.cos(CART.tip), Math.sin(CART.tip)];
 const tipped0 = rot(SEAT0, CART.tip);
 const HANG = [PIVOT_W[0] + tipped0[0] + SLIDE * slope[0], PIVOT_W[1] + tipped0[1] + SLIDE * slope[1]]; // where he is left in the air
 const HANG_ROT = CART.tip - Math.PI / 2;
 const LIP_HANG = rot([HANG[0] - PIVOT_W[0], HANG[1] - PIVOT_W[1]], -CART.tip); // the same point, in the bucket's space
-const APEX = [HOLE_X, GROUND + ORIGIN_Y * P - 136];
 const REST = [HOLE_X, GROUND + ORIGIN_Y * P];
 
 // Ore sits heaped over the rim: rows from the bottom, each filled from the lip back, and it pours in that order.
@@ -209,8 +221,9 @@ function cartXml() {
 // ───────────────────────── small things: rail, dirt, Zs, the "!", crumbs
 function railXml() {
   const dots = [];
-  for (let x = 2; x <= 500; x += 6.4) dots.push([x, 0, 1.0, 3]);
-  dots.push([506, 0, 1.4, 5], [506, -3.4, 1.4, 5], [506, -6.8, 1.4, 6]);
+  const end = CART.stopX + 50;
+  for (let x = end - 4; x >= 0; x -= 6.4) dots.push([x, 0, 1.0, 3]);
+  dots.push([end, 0, 1.4, 5], [end, -3.4, 1.4, 5], [end, -6.8, 1.4, 6]);
   return node("Rail", { id: I("rail"), y: n2(GROUND + 1.2), opacity: 0 }, dotShapes(dots, "rail"));
 }
 const DIRT_MID = 6;
@@ -225,6 +238,14 @@ function zsXml() {
     el("TranslationConstraint", { targetId: I("zAnchor") }),
     ...[0, 1, 2].map((k) => node(`Z${k}`, { id: I(`z${k}`), opacity: 0 }, dotShapes(z, "z"))),
   ]);
+}
+const BUB = 12;
+function bubbleXml() {
+  // A ring of pale dots with a glint, over a disc of the page colour so it reads against his pale face.
+  const d = [];
+  for (let i = 0; i < 18; i++) { const a = (i / 18) * 2 * Math.PI; d.push([BUB * Math.cos(a), -BUB + BUB * Math.sin(a), 1.25, 9]); }
+  d.push([-3.6, -BUB - 3.6, 1.5, 9], [-5.6, -BUB - 0.6, 0.9, 9]);
+  return node("Bubble", { x: 0, y: 0 }, [el("TranslationConstraint", { targetId: I("noseAnchor") }), node("Bubble show", { id: I("bubbleAt"), opacity: 0 }, node("Bubble grow", { id: I("bubble") }, [dotShapes(d, "bubble"), dotShapes([[0, -BUB, BUB - 0.4, 1]], "bubble fill")]))]);
 }
 function bangXml() {
   const d = [[0, -13.6], [0, -10.2], [0, -6.8], [0, -3.4], [0, 3.4]].map(([x, y]) => [x, y, 1.5, 9]);
@@ -296,6 +317,7 @@ function asleep(a, frames, period = BREATH) {
     const f = (t) => Math.min(frames, c * period + t * period);
     a.k("br", "scaleX", [[f(0), 1], [f(0.45), 0.985], [f(1), 1]]).k("br", "scaleY", [[f(0), 1], [f(0.45), 1.045], [f(1), 1]]);
     a.k("bob", "y", [[f(0), 0], [f(0.45), -3], [f(1), 0]]);
+    a.s("bubble", [[f(0), 1], [f(0.45), 0.45], [f(1), 1]]); // in: it shrinks; out: it grows
     a.k("snoreL", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), 0.3], [f(0.68), 0.08], [f(0.76), 0.3], [f(0.84), 0.1], [f(0.92), 0.24], [f(1), 0]]);
     a.k("snoreR", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), -0.3], [f(0.68), -0.08], [f(0.76), -0.3], [f(0.84), -0.1], [f(0.92), -0.24], [f(1), 0]]);
   }
@@ -315,7 +337,7 @@ function asleep(a, frames, period = BREATH) {
 }
 const sleepingPose = (a) => a
   .k("openL", "opacity", [[0, 0, "h"]]).k("openR", "opacity", [[0, 0, "h"]]).k("shutL", "opacity", [[0, 1, "h"]]).k("shutR", "opacity", [[0, 1, "h"]])
-  .k("zs", "opacity", [[0, 1, "h"]]);
+  .k("zs", "opacity", [[0, 1, "h"]]).k("bubbleAt", "opacity", [[0, 1, "h"]]);
 
 const wheelRot = (x) => x / CART.wheelR;
 const cartAt = (a, keys) => {
@@ -342,7 +364,8 @@ const A1 = new Anim("Roll in", 54);
   a.k("body", "scaleX", [[0, 1, "h"], [28, 1, "o"], [33, 1.08, "io"], [38, 0.96, "io"], [43, 1.03, "io"], [48, 1]]);
   a.k("helm", "y", [[0, 0, "h"], [27, 0, "o"], [32, 4, "io"], [40, 1.5]]).k("helm", "rotation", [[0, 0, "h"], [27, 0, "o"], [33, 0.12, "io"], [42, 0.05]]);
   a.k("head", "rotation", [[0, -0.06, "h"], [27, -0.06, "o"], [33, 0.1, "io"], [42, -0.02, "io"], [54, 0.03]]);
-  a.k("armL", "rotation", [[0, -1.0, "h"], [28, -1.0, "o"], [34, -1.3, "io"], [42, -0.9]]).k("armR", "rotation", [[0, 1.0, "h"], [28, 1.0, "o"], [34, 1.45, "io"], [44, 0.5, "io"], [54, 0.3]]);
+  // Paws folded on his belly; the brake throws one loose.
+  a.k("armL", "rotation", [[0, -0.9, "h"], [28, -0.9, "o"], [34, -0.5, "io"], [42, -0.9]]).k("armR", "rotation", [[0, 0.9, "h"], [28, 0.9, "o"], [34, 1.5, "io"], [44, 0.2, "io"], [54, 0.1]]);
   a.k("footL", "rotation", [[0, 0.25, "h"], [28, 0.25, "o"], [34, -0.4, "io"], [42, 0.3, "io"], [50, 0.2]]).k("footR", "rotation", [[0, -0.25, "h"], [28, -0.25, "o"], [35, -0.7, "io"], [43, 0.1, "io"], [51, -0.2]]);
   // Sparks off the locked wheels.
   for (let s = 0; s < 6; s++) {
@@ -352,43 +375,50 @@ const A1 = new Anim("Roll in", 54);
 }
 
 // 2. The pour: he slides down the tipped bucket, slowly, then not. One second long; the state plays it faster for less ore.
+const CREEP = 0.28;
 const A2 = new Anim("Pour", 60);
 {
   const a = A2, t = CART.tip;
   a.k("bucket", "rotation", [[0, t], [9, t + deg(1.4)], [18, t - deg(1.1)], [27, t + deg(1)], [36, t - deg(0.8)], [45, t + deg(0.5)], [54, t]]);
   a.k("moleSeat", "strength", [[0, 1, "h"]]);
   a.k("seat", "x", [[0, SEAT0[0] + 6, "h"]]);
-  a.k("seatSlide", "strength", [[0, 0, [0.62, 0, 0.95, 0.45]], [57, 1, "h"]]);
+  a.k("seatSlide", "strength", [[0, 0, "in"], [60, CREEP, "h"]]); // he creeps while it pours
   a.k("cart", "x", [[0, CART.stopX, "h"]]).k("deck", "rotation", [[0, 0, "h"]]).k("rail", "opacity", [[0, 1, "h"]]);
   sleepingPose(a);
   asleep(a, 60, 60);
   a.k("helm", "y", [[0, 1.5, "h"]]).k("helm", "rotation", [[0, 0.05, "h"]]);
   a.k("head", "rotation", [[0, 0.03], [60, 0.14]]);
-  a.k("armL", "rotation", [[0, -0.9], [24, -1.0, "in"], [40, -0.15, "io"], [52, -0.4, "io"], [60, -0.25]]).k("armR", "rotation", [[0, 0.3], [40, 0.45, "io"], [60, 0.2]]);
-  a.k("footL", "rotation", [[0, 0.2], [44, 0.1, "in"], [57, -0.35, "io"], [60, -0.2]]).k("footR", "rotation", [[0, -0.2], [44, -0.1, "in"], [57, 0.3, "io"], [60, 0.2]]);
-  a.k("sq", "scaleY", [[0, 1, "h"], [48, 1, "in"], [57, 1.07, "h"]]).k("sq", "scaleX", [[0, 1, "h"], [48, 1, "in"], [57, 0.95, "h"]]);
+  a.k("armL", "rotation", [[0, -0.9, "h"]]).k("armR", "rotation", [[0, 0.1], [60, -0.2]]);
+  a.k("footL", "rotation", [[0, 0.2, "h"]]).k("footR", "rotation", [[0, -0.2, "h"]]);
 }
 
-// 3. The stones drop, the bucket falls back, the cart backs out. He stays where he was, on nothing (1.35 s).
-const A3 = new Anim("Left hanging", 81);
+// 3. The stones drop while he slides the rest of the way, faster and faster, off the lip. The bucket falls back,
+// the cart backs out, and he stays where he was, asleep on nothing (1.8 s).
+const A3 = new Anim("Left hanging", 108);
+const OFF = 30; // the frame he leaves the lip
 {
-  const a = A3, t = CART.tip, X = CART.stopX;
-  a.k("moleSeat", "strength", [[0, 0, "h"]]);
+  const a = A3, t = CART.tip, X = CART.stopX, B = OFF - 2;
+  a.k("seatSlide", "strength", [[0, CREEP, [0.7, 0, 1, 0.6]], [OFF, 1, "h"]]);
+  a.k("seat", "x", [[0, SEAT0[0] + 6, "h"]]);
+  a.k("moleSeat", "strength", [[0, 1, "h"], [OFF, 0, "h"]]);
   a.k("mole", "x", [[0, HANG[0], "h"]]).k("mole", "y", [[0, HANG[1], "h"]]).k("mole", "rotation", [[0, HANG_ROT, "h"]]);
-  a.k("bucket", "rotation", [[0, t, "h"], [3, t, [0.6, 0, 1, 0.7]], [12, deg(-7), "io"], [17, deg(3), "io"], [22, 0]]);
-  a.k("deck", "rotation", [[0, 0, "h"], [11, 0, "o"], [15, -0.06, "io"], [20, 0.02, "io"], [25, 0]]);
-  a.k("cart", "x", [[0, X, "h"], [16, X, "io"], [23, X + 6, [0.5, 0, 1, 0.6]], [50, -140, "h"]]);
-  for (const w of ["wheelF", "wheelB"]) a.k(w, "rotation", [[0, wheelRot(X - 38), "h"], [16, wheelRot(X - 38), "io"], [23, wheelRot(X - 32), [0.5, 0, 1, 0.6]], [50, wheelRot(-140 - 38), "h"]]);
-  a.k("rail", "opacity", [[0, 1, "h"], [48, 1, "l"], [60, 0, "h"]]);
+  a.k("bucket", "rotation", [[0, t, "h"], [B + 3, t, [0.6, 0, 1, 0.7]], [B + 12, deg(-7), "io"], [B + 17, deg(3), "io"], [B + 22, 0]]);
+  a.k("deck", "rotation", [[0, 0, "h"], [B + 11, 0, "o"], [B + 15, -0.06, "io"], [B + 20, 0.02, "io"], [B + 25, 0]]);
+  a.k("cart", "x", [[0, X, "h"], [B + 16, X, "io"], [B + 23, X + 6, [0.5, 0, 1, 0.6]], [B + 50, -140, "h"]]);
+  for (const w of ["wheelF", "wheelB"]) a.k(w, "rotation", [[0, wheelRot(X - 38), "h"], [B + 16, wheelRot(X - 38), "io"], [B + 23, wheelRot(X - 32), [0.5, 0, 1, 0.6]], [B + 50, wheelRot(-140 - 38), "h"]]);
+  a.k("rail", "opacity", [[0, 1, "h"], [B + 48, 1, "l"], [B + 60, 0, "h"]]);
   sleepingPose(a);
-  asleep(a, 81, 40.5);
-  // The arrival at the lip rings on through him: a settle, limbs swinging to rest.
-  a.k("sq", "scaleY", [[0, 1.07, "o"], [6, 0.95, "io"], [13, 1.02, "io"], [20, 1]]).k("sq", "scaleX", [[0, 0.95, "o"], [6, 1.04, "io"], [13, 0.99, "io"], [20, 1]]);
-  a.k("body", "scaleX", [[0, 1, "o"], [5, 1.06, "io"], [11, 0.97, "io"], [17, 1.02, "io"], [23, 1]]);
-  a.k("helm", "y", [[0, 1.5, "o"], [5, 4.5, "io"], [12, 1, "io"], [18, 2]]).k("helm", "rotation", [[0, 0.05, "h"]]);
-  a.k("head", "rotation", [[0, 0.14, "io"], [10, 0.2, "io"], [26, 0.15]]);
-  a.k("armL", "rotation", [[0, -0.25, "io"], [9, 0.22, "io"], [20, -0.1, "io"], [31, 0.05, "io"], [42, 0]]).k("armR", "rotation", [[0, 0.2, "io"], [10, 0.5, "io"], [21, 0.3, "io"], [32, 0.4]]);
-  a.k("footL", "rotation", [[0, -0.2, "io"], [8, 0.3, "io"], [18, -0.12, "io"], [28, 0.06, "io"], [38, 0]]).k("footR", "rotation", [[0, 0.2, "io"], [9, 0.45, "io"], [19, 0.1, "io"], [29, 0.26, "io"], [39, 0.2]]);
+  asleep(a, 108, 54);
+  // As he goes: stretched along the slide, an arm trailing. Then the stop at the lip rings on through him.
+  const o = OFF;
+  a.k("sq", "scaleY", [[0, 1, "h"], [o - 12, 1, "in"], [o, 1.08, "o"], [o + 6, 0.94, "io"], [o + 13, 1.02, "io"], [o + 20, 1]]).k("sq", "scaleX", [[0, 1, "h"], [o - 12, 1, "in"], [o, 0.94, "o"], [o + 6, 1.05, "io"], [o + 13, 0.99, "io"], [o + 20, 1]]);
+  a.k("body", "scaleX", [[0, 1, "h"], [o, 1, "o"], [o + 5, 1.06, "io"], [o + 11, 0.97, "io"], [o + 17, 1.02, "io"], [o + 23, 1]]);
+  a.k("helm", "y", [[0, 1.5, "h"], [o, 1.5, "o"], [o + 5, 4.5, "io"], [o + 12, 1, "io"], [o + 18, 2]]).k("helm", "rotation", [[0, 0.05, "h"]]);
+  a.k("head", "rotation", [[0, 0.14, "h"], [o, 0.14, "io"], [o + 10, 0.2, "io"], [o + 26, 0.15]]);
+  a.k("armL", "rotation", [[0, -0.9, "h"], [o - 14, -0.9, "in"], [o, -0.2, "io"], [o + 9, 0.3, "io"], [o + 20, -0.1, "io"], [o + 31, 0.08, "io"], [o + 42, 0]]);
+  a.k("armR", "rotation", [[0, -0.2, "io"], [o, -1.2, "io"], [o + 10, 0.25, "io"], [o + 21, -0.15, "io"], [o + 32, 0]]);
+  a.k("footL", "rotation", [[0, 0.2, "h"], [o - 10, 0.2, "in"], [o, -0.35, "io"], [o + 8, 0.3, "io"], [o + 18, -0.12, "io"], [o + 28, 0.06, "io"], [o + 38, 0]]);
+  a.k("footR", "rotation", [[0, -0.2, "h"], [o - 10, -0.2, "in"], [o, 0.3, "io"], [o + 9, 0.45, "io"], [o + 19, 0.1, "io"], [o + 29, 0.26, "io"], [o + 39, 0.2]]);
   for (let j = 0; j < MAX_STONES; j++) {
     const L = 2 + j * 5, T = 27, h = 58;
     a.k(`stoneFly${j}`, "strength", [[0, 0, "h"], [L, 0, "l"], [L + T, 1, "h"]]);
@@ -400,50 +430,58 @@ const A3 = new Anim("Left hanging", 81);
   }
 }
 
-// 4. He wakes, runs on nothing, dives into his hole, and pops up as if nothing happened.
-const A4 = new Anim("Wake and dive", 190);
-const T_KNOCK = 46, T_POP = 73, T_SETTLED = 100, T_SPEAK = 160;
+// 4. The bubble pops. Eyes wide. He scrambles on nothing, stops, looks down, looks at us, and drops into his
+// hole, helmet last. Then up he pops as if nothing happened.
+const RISE = 46, T_DROP = 58;
+const FEET = (12.8 + 2 - ORIGIN_Y) * P; // his soles, below his root
+const fallFrames = (d) => Math.sqrt((2 * d) / G) * 60;
+const T_KNOCK = Math.round(T_DROP + fallFrames(FLOOR - FEET - (HANG[1] - RISE)));
+const T_GONE = Math.ceil(T_DROP + fallFrames(REST[1] + 78 - (HANG[1] - RISE)));
+const T_POP = T_GONE + 18, T_SETTLED = T_POP + 27, T_SPEAK = T_POP + 87;
+const A4 = new Anim("Wake and dive", T_POP + 117);
 {
-  const a = A4, [hx, hy] = HANG, [ax, ay] = APEX, [rx, ry] = REST;
+  const a = A4, [hx, hy] = HANG, [rx, ry] = REST, top = hy - RISE;
   a.k("moleSeat", "strength", [[0, 0, "h"]]).k("rail", "opacity", [[0, 0, "h"]]).k("cart", "x", [[0, -140, "h"]]);
-  // The breath he was on stops; the brace.
   a.k("br", "scaleX", [[0, 1, "h"]]).k("br", "scaleY", [[0, 1, "h"]]).k("bob", "y", [[0, 0, "h"]]);
   a.k("snoreL", "rotation", [[0, 0, "h"]]).k("snoreR", "rotation", [[0, 0, "h"]]);
-  a.k("zs", "opacity", [[0, 1, "l"], [5, 0, "h"]]).s("zs", [[0, 1, "o"], [5, 1.5, "h"]]);
-  a.k("sq", "scaleY", [[0, 1, "o"], [6, 0.86, "o"], [11, 1.2, "io"], [18, 0.96, "io"], [23, 1.03, "io"], [28, 1]]);
-  a.k("sq", "scaleX", [[0, 1, "o"], [6, 1.1, "o"], [11, 0.88, "io"], [18, 1.03, "io"], [23, 0.98, "io"], [28, 1]]);
-  // Eyes: shut, then very open.
-  for (const s of ["L", "R"]) {
-    a.k(`shut${s}`, "opacity", [[0, 1, "h"], [6, 0, "h"], [118, 1, "h"], [123, 0, "h"]]).k(`open${s}`, "opacity", [[0, 0, "h"], [6, 1, "h"], [118, 0, "h"], [123, 1, "h"]]);
-    a.s(`eye${s}`, [[0, 1, "h"], [6, 1.7, "o"], [12, 1.45, "h"], [54, 1.45, "h"], [T_POP, 1.6, "h"], [T_POP + 22, 1.6, "io"], [T_POP + 30, 1, "h"]]);
+  // The bubble swells and pops; the Zs go with it.
+  a.s("bubble", [[0, 1, "o"], [4, 1.45, "h"]]).k("bubbleAt", "opacity", [[0, 1, "h"], [4, 0, "h"]]);
+  {
+    const n = rot([(NOSE[0] + 0.6) * P, (NOSE[1] - ORIGIN_Y) * P], HANG_ROT), bx = hx + n[0], by = hy + n[1] - BUB * 1.4;
+    for (let c = 0; c < 6; c++) { const ang = (c / 6) * 2 * Math.PI + 0.4; a.crumb(4, 9 + (c % 3) * 2, bx + 10 * Math.cos(ang), by + 10 * Math.sin(ang), 120 * Math.cos(ang), 120 * Math.sin(ang) - 60, 1500, 0.9, 8); }
   }
-  const eyeY = (s, base) => a.k(`eye${s}`, "y", [[0, base, "h"], [21, base, "io"], [25, base + 1.1 * P, "h"], [54, base, "h"]]);
+  a.k("zs", "opacity", [[0, 1, "h"], [4, 1, "l"], [8, 0, "h"]]).s("zs", [[0, 1, "h"], [4, 1, "o"], [8, 1.5, "h"]]);
+  // Eyes: shut, then very open. A long stare before anything else moves.
+  for (const s of ["L", "R"]) {
+    a.k(`shut${s}`, "opacity", [[0, 1, "h"], [5, 0, "h"], [T_POP + 45, 1, "h"], [T_POP + 50, 0, "h"]]).k(`open${s}`, "opacity", [[0, 0, "h"], [5, 1, "h"], [T_POP + 45, 0, "h"], [T_POP + 50, 1, "h"]]);
+    a.s(`eye${s}`, [[0, 1, "h"], [5, 2.0, "o"], [11, 1.65, "h"], [T_GONE, 1.6, "h"], [T_POP + 22, 1.6, "io"], [T_POP + 30, 1, "h"]]);
+  }
+  a.k("sq", "scaleY", [[0, 1, "o"], [4, 0.9, "o"], [8, 1.14, "io"], [14, 0.97, "io"], [19, 1, "h"]]).k("sq", "scaleX", [[0, 1, "o"], [4, 1.07, "o"], [8, 0.91, "io"], [14, 1.02, "io"], [19, 1, "h"]]);
+  a.k("helm", "y", [[0, 2, "h"], [5, 2, "o"], [9, -9, "in"], [15, 2.5, "io"], [19, 0, "h"]]);
+  a.k("helm", "rotation", [[0, 0.05, "h"], [5, 0.05, "o"], [9, -0.2, "io"], [16, 0.08, "io"], [21, 0, "h"]]);
+  a.k("head", "rotation", [[0, 0.15, "o"], [7, -0.1, "io"], [14, 0, "h"]]);
+  a.k("lobeL", "rotation", [[0, 0, "h"], [5, 0, "o"], [9, 0.5, "io"], [15, 0.1, "io"], [20, 0.2, "h"]]).k("lobeR", "rotation", [[0, 0, "h"], [5, 0, "o"], [9, -0.5, "io"], [15, -0.1, "io"], [20, -0.2, "h"]]);
+  // The scramble: upright in a blink, limbs windmilling, climbing on nothing.
+  const S0 = 20, S1 = 44;
+  a.k("mole", "rotation", [[0, HANG_ROT, "h"], [S0, HANG_ROT, "o"], [S0 + 7, 0.16, "io"], [S0 + 12, -0.05, "io"], [S0 + 17, 0, "h"]]);
+  a.k("mole", "y", [[0, hy, "h"], [S0, hy, "out"], [S1, top, "h"]]);
+  const xs = [[0, hx, "h"]]; for (let f = S0 + 8, i = 0; f < S1; f += 2, i++) xs.push([f, hx + (i % 2 ? 1.6 : -1.6), "h"]); xs.push([S1, hx, "h"]);
+  a.k("mole", "x", xs);
+  const run = (f0, f1, step, a0, a1) => { const ks = []; for (let f = f0, i = 0; f <= f1; f += step, i++) ks.push([f, i % 2 ? a1 : a0, "io"]); return ks; };
+  a.k("footL", "rotation", [[0, 0, "h"], [S0, 0, "o"], ...run(S0 + 3, S1 - 2, 3, 0.95, -0.95), [S1 + 3, 0.1, "h"]]);
+  a.k("footR", "rotation", [[0, 0.2, "h"], [S0, 0.2, "o"], ...run(S0 + 3, S1 - 2, 3, -0.95, 0.95), [S1 + 3, -0.1, "h"]]);
+  a.k("armL", "rotation", [[0, 0, "h"], [5, 0, "o"], [9, 0.9, "io"], [S0, 0.7, "io"], ...run(S0 + 4, S1 - 2, 4, 2.5, 1.1), [S1 + 5, 0.15, "h"]]);
+  a.k("armR", "rotation", [[0, 0, "h"], [5, 0, "o"], [9, -0.9, "io"], [S0, -0.7, "io"], ...run(S0 + 6, S1 - 2, 4, -2.5, -1.1), [S1 + 5, -0.15, "h"]]);
+  a.k("body", "scaleX", [[0, 1, "h"], [S1, 1, "o"], [S1 + 3, 1.05, "io"], [S1 + 6, 0.97, "io"], [S1 + 9, 1, "h"]]);
+  // He stops. A look down, a look at us, a gulp.
+  const eyeY = (s, base) => a.k(`eye${s}`, "y", [[0, base, "h"], [S1 + 2, base, "io"], [S1 + 5, base + 1.2 * P, "h"], [S1 + 10, base + 1.2 * P, "io"], [S1 + 12, base, "h"]]);
   eyeY("L", inHead(-4.4, -12.6).y); eyeY("R", inHead(5.6, -12.6).y);
-  // Up and over the hole: thrown up, no gravity until he looks down.
-  a.k("mole", "x", [[0, hx, "h"], [6, hx, [0.2, 0.6, 0.5, 1]], [18, ax, "h"], [19, ax - 1.6, "h"], [21, ax + 1.6, "h"], [23, ax - 1.6, "h"], [25, ax + 1.6, "h"], [27, ax - 1.2, "h"], [29, ax, "h"]]);
-  a.k("mole", "y", [[0, hy, "o"], [6, hy + 4, "h"]]);
-  const gl = (2 * (hy + 4 - ay)) / 0.04; // thrown so that he stops dead at the top, 0.2 s later
-  a.fall("mole", "y", 6, 18, hy + 4, -gl * 0.2, gl, "io");
-  a.k("mole", "y", [[30, ay, "o"], [34, ay - 9, "h"]]);
-  a.k("mole", "rotation", [[0, HANG_ROT, "h"], [6, HANG_ROT, "o"], [14, 0.14, "io"], [19, -0.04, "io"], [24, 0, "h"], [30, 0, [0.5, 0, 0.5, 1]], [41, Math.PI, "h"]]);
-  // Limbs running on nothing.
-  const run = (o, f0, f1, step, a0, a1) => { const ks = []; for (let f = f0, i = 0; f <= f1; f += step, i++) ks.push([f, i % 2 ? a1 : a0, "io"]); return ks; };
-  a.k("footL", "rotation", [[0, 0, "o"], [8, 0.5, "io"], ...run("footL", 13, 31, 3, 0.95, -0.95), [36, 0.15, "h"]]);
-  a.k("footR", "rotation", [[0, 0.2, "o"], [8, -0.5, "io"], ...run("footR", 13, 31, 3, -0.95, 0.95), [36, -0.15, "h"]]);
-  a.k("armL", "rotation", [[0, 0, "o"], [9, 2.5, "io"], ...run("armL", 13, 29, 4, 2.7, 1.5), [31, 2.2, "io"], [38, 3.43, "h"], [56, 0, "h"]]);
-  a.k("armR", "rotation", [[0, 0.4, "o"], [9, -2.5, "io"], ...run("armR", 15, 31, 4, -2.7, -1.5), [33, -2.2, "io"], [38, -3.43, "h"], [56, 0, "h"]]);
-  a.k("lobeL", "rotation", [[0, 0, "h"], [6, 0, "o"], [10, 0.55, "io"], [17, 0.1, "io"], [22, 0.25, "io"], [30, 0.1, "io"], [38, 0.5, "io"], [42, 0.3, "io"], [46, 0.55, "h"], [56, 0, "h"], [T_POP + 5, 0, "o"], [T_POP + 9, -0.35, "io"], [T_POP + 16, 0.2, "io"], [T_POP + 23, -0.06, "io"], [T_POP + 29, 0]]);
-  a.k("lobeR", "rotation", [[0, 0, "h"], [6, 0, "o"], [10, -0.55, "io"], [17, -0.1, "io"], [22, -0.25, "io"], [30, -0.1, "io"], [38, -0.5, "io"], [42, -0.3, "io"], [46, -0.55, "h"], [56, 0, "h"], [T_POP + 5, 0, "o"], [T_POP + 9, 0.35, "io"], [T_POP + 16, -0.2, "io"], [T_POP + 23, 0.06, "io"], [T_POP + 29, 0]]);
-  // The helmet is the last to hear about anything.
-  a.k("helm", "y", [[0, 2, "h"], [6, 2, "o"], [10, 7, "io"], [17, -9, "in"], [23, 2.5, "io"], [27, 0, "h"], [30, 0, "io"], [35, -4, "io"], [44, 3, "h"], [56, 4, "h"], [T_POP, 4, "o"], [T_POP + 6, 7, "io"], [T_POP + 12, -10, "in"], [T_POP + 20, 2, "io"], [T_POP + 24, 0]]);
-  a.k("helm", "rotation", [[0, 0.05, "h"], [6, 0.05, "o"], [17, -0.22, "io"], [24, 0.1, "io"], [30, 0.04, "h"], [56, 0.1, "h"], [T_POP + 6, 0.1, "io"], [T_POP + 12, 0.34, "io"], [T_POP + 20, 0.2, "io"], [T_POP + 24, 0.24, "h"], [134, 0.24, "io"], [141, -0.06, "io"], [147, 0]]);
-  a.k("helm", "x", [[0, 0, "h"], [T_POP + 12, 0, "io"], [T_POP + 20, 4, "h"], [134, 4, "io"], [141, -0.6, "io"], [147, 0]]);
-  a.k("head", "rotation", [[0, 0.15, "o"], [8, -0.12, "io"], [16, 0.06, "io"], [22, 0, "io"], [27, 0.1, "h"], [34, 0, "h"]]);
-  a.k("body", "scaleX", [[0, 1, "h"], [18, 1, "o"], [21, 1.05, "io"], [24, 0.97, "io"], [27, 1.03, "io"], [30, 1, "h"]]);
-  // The dive: a tuck, then gravity, head first. Arms out in front, stretched along the fall.
-  a.fall("mole", "y", 34, 56, ay - 9, 0, G, "h");
-  a.k("sq", "scaleY", [[30, 1, "o"], [34, 0.88, "in"], [46, 1.2, "h"], [56, 1, "h"]]).k("sq", "scaleX", [[30, 1, "o"], [34, 1.09, "in"], [46, 0.87, "h"], [56, 1, "h"]]);
-  a.k("footL", "rotation", [[36, 0.15, "io"], [47, 0.1, "io"], [50, 0.9, "io"], [53, -0.7, "io"], [56, 0, "h"]]).k("footR", "rotation", [[36, -0.15, "io"], [47, -0.1, "io"], [50, -0.9, "io"], [53, 0.7, "io"], [56, 0, "h"]]);
+  a.k("sq", "scaleY", [[S1 + 9, 1, "io"], [T_DROP - 2, 0.93, "in"], [T_DROP + 5, 1.22, "h"]]).k("sq", "scaleX", [[S1 + 9, 1, "io"], [T_DROP - 2, 1.05, "in"], [T_DROP + 5, 0.86, "h"]]);
+  // The drop: gravity, feet first, arms left behind overhead, and the helmet a beat late.
+  a.fall("mole", "y", T_DROP, T_GONE, top, 0, G, "h");
+  a.k("armL", "rotation", [[T_DROP, 0.15, "o"], [T_DROP + 5, 2.9, "h"]]).k("armR", "rotation", [[T_DROP, -0.15, "o"], [T_DROP + 5, -2.9, "h"]]);
+  a.k("helm", "y", [[T_DROP, 0, "out"], [T_DROP + 4, -17, "in"], [T_DROP + 9, 0, "h"]]).k("helm", "rotation", [[T_DROP, 0, "io"], [T_DROP + 4, 0.25, "io"], [T_DROP + 9, 0.1, "h"]]);
+  a.k("lobeL", "rotation", [[T_DROP, 0.2, "o"], [T_DROP + 4, 0.75, "h"]]).k("lobeR", "rotation", [[T_DROP, -0.2, "o"], [T_DROP + 4, -0.75, "h"]]);
   // The hit: the host is told (the ring is the page's), dirt flies, the dirt line gives.
   a.call("evKnock", T_KNOCK);
   for (let c = 0; c < 14; c++) {
@@ -451,12 +489,20 @@ const T_KNOCK = 46, T_POP = 73, T_SETTLED = 100, T_SPEAK = 160;
     a.crumb(T_KNOCK + (c % 3), 20 + ((c * 5) % 9), HOLE_X + side * (8 + u * 30), GROUND - 2, side * (60 + u * 190), -330 - ((c * 71) % 260), 2300, 1.1 + (c % 3) * 0.35, c % 4 === 0 ? 7 : "dirt");
   }
   a.k("dirtMid", "y", [[0, 0, "h"], [T_KNOCK, 0, "o"], [T_KNOCK + 3, 4.5, "io"], [T_KNOCK + 8, -2, "io"], [T_KNOCK + 13, 1, "io"], [T_KNOCK + 18, 0, "h"], [T_POP, 0, "o"], [T_POP + 3, -4, "io"], [T_POP + 9, 1.5, "io"], [T_POP + 14, 0]]);
-  a.crumb(62, 14, HOLE_X + 26, GROUND - 60, 4, 0, 2300, 1.2, "dirt"); // one that went higher than the rest
-  // The empty beat (0.3 s), then up he pops: upright, wide-eyed, helmet late and askew.
-  a.k("mole", "rotation", [[56, 0, "h"]]).k("mole", "x", [[56, rx, "h"]]);
-  a.k("mole", "y", [[57, ry + 78, "h"], [T_POP, ry + 78, [0.1, 0.75, 0.3, 1]], [T_POP + 6, ry - 13, "io"], [T_POP + 13, ry + 3.5, "io"], [T_POP + 19, ry - 1, "io"], [T_POP + 24, ry]]);
-  a.k("sq", "scaleY", [[T_POP, 1.16, "h"], [T_POP + 5, 1.16, "io"], [T_POP + 12, 0.92, "io"], [T_POP + 18, 1.03, "io"], [T_POP + 24, 1]]).k("sq", "scaleX", [[T_POP, 0.9, "h"], [T_POP + 5, 0.9, "io"], [T_POP + 12, 1.06, "io"], [T_POP + 18, 0.98, "io"], [T_POP + 24, 1]]);
-  a.k("armL", "rotation", [[T_POP, 0.5, "h"], [T_POP + 7, 0.5, "io"], [T_POP + 14, -0.14, "io"], [T_POP + 20, 0.04, "io"], [T_POP + 25, 0]]).k("armR", "rotation", [[T_POP, -0.5, "h"], [T_POP + 8, -0.5, "io"], [T_POP + 15, 0.14, "io"], [T_POP + 21, -0.04, "io"], [T_POP + 26, 0]]);
+  a.crumb(T_GONE + 6, 14, HOLE_X + 26, GROUND - 60, 4, 0, 2300, 1.2, "dirt"); // one that went higher than the rest
+  // Underground, out of sight: arms away, paws on, everything straight.
+  const U = T_GONE + 1;
+  for (const s of ["L", "R"]) a.k(`arm${s}`, "opacity", [[0, 1, "h"], [U, 0, "h"]]).k(`paw${s}`, "opacity", [[0, 0, "h"], [U, 1, "h"]]).k(`foot${s}`, "rotation", [[U, 0, "h"]]).k(`lobe${s}`, "rotation", [[U, 0, "h"]]);
+  a.k("mole", "x", [[U, rx, "h"]]).k("mole", "rotation", [[U, 0, "h"]]).k("mole", "y", [[U, ry + 78, "h"]]);
+  a.k("helm", "y", [[U, 4, "h"]]).k("helm", "rotation", [[U, 0.1, "h"]]);
+  // The empty beat (0.3 s), then up he pops: wide-eyed, helmet late and askew.
+  a.k("mole", "y", [[T_POP, ry + 78, [0.1, 0.75, 0.3, 1]], [T_POP + 6, ry - 13, "io"], [T_POP + 13, ry + 3.5, "io"], [T_POP + 19, ry - 1, "io"], [T_POP + 24, ry]]);
+  a.k("sq", "scaleY", [[U, 1.16, "h"], [T_POP + 5, 1.16, "io"], [T_POP + 12, 0.92, "io"], [T_POP + 18, 1.03, "io"], [T_POP + 24, 1]]).k("sq", "scaleX", [[U, 0.9, "h"], [T_POP + 5, 0.9, "io"], [T_POP + 12, 1.06, "io"], [T_POP + 18, 0.98, "io"], [T_POP + 24, 1]]);
+  a.k("pawL", "rotation", [[U, 0.5, "h"], [T_POP + 7, 0.5, "io"], [T_POP + 14, -0.14, "io"], [T_POP + 20, 0.04, "io"], [T_POP + 25, 0]]).k("pawR", "rotation", [[U, -0.5, "h"], [T_POP + 8, -0.5, "io"], [T_POP + 15, 0.14, "io"], [T_POP + 21, -0.04, "io"], [T_POP + 26, 0]]);
+  a.k("lobeL", "rotation", [[T_POP + 5, 0, "o"], [T_POP + 9, -0.35, "io"], [T_POP + 16, 0.2, "io"], [T_POP + 23, -0.06, "io"], [T_POP + 29, 0]]).k("lobeR", "rotation", [[T_POP + 5, 0, "o"], [T_POP + 9, 0.35, "io"], [T_POP + 16, -0.2, "io"], [T_POP + 23, 0.06, "io"], [T_POP + 29, 0]]);
+  a.k("helm", "y", [[T_POP, 4, "o"], [T_POP + 6, 7, "io"], [T_POP + 12, -10, "in"], [T_POP + 20, 2, "io"], [T_POP + 24, 0]]);
+  a.k("helm", "rotation", [[T_POP + 6, 0.1, "io"], [T_POP + 12, 0.34, "io"], [T_POP + 20, 0.2, "io"], [T_POP + 24, 0.24, "h"], [T_POP + 61, 0.24, "io"], [T_POP + 68, -0.06, "io"], [T_POP + 74, 0]]);
+  a.k("helm", "x", [[0, 0, "h"], [T_POP + 12, 0, "io"], [T_POP + 20, 4, "h"], [T_POP + 61, 4, "io"], [T_POP + 68, -0.6, "io"], [T_POP + 74, 0]]);
   a.call("evKnock", T_POP + 1);
   for (let c = 0; c < 7; c++) { const side = c % 2 ? 1 : -1; a.crumb(T_POP + 1 + (c % 2), 15 + c * 2, HOLE_X + side * (20 + c * 4), GROUND - 2, side * (50 + c * 30), -210 - c * 28, 2300, 1.0 + (c % 2) * 0.4, "dirt"); }
   a.k("bang", "opacity", [[0, 0, "h"], [T_POP + 4, 1, "h"], [T_POP + 36, 1, "l"], [T_POP + 42, 0, "h"]]).s("bang", [[T_POP + 4, 0.2, "o"], [T_POP + 8, 1.3, "io"], [T_POP + 13, 1, "h"]]).k("bang", "y", [[T_POP + 4, GROUND - 76, "o"], [T_POP + 8, GROUND - 86, "io"], [T_POP + 13, GROUND - 82]]);
@@ -468,6 +514,7 @@ const T_KNOCK = 46, T_POP = 73, T_SETTLED = 100, T_SPEAK = 160;
 
 // 5. Rest: he blinks now and then.
 const A5 = new Anim("At rest", 240, { loop: true });
+for (const s of ["L", "R"]) A5.k(`arm${s}`, "opacity", [[0, 0, "h"]]).k(`paw${s}`, "opacity", [[0, 1, "h"]]);
 for (const s of ["L", "R"]) A5.k(`shut${s}`, "opacity", [[0, 0, "h"], [150, 1, "h"], [155, 0, "h"]]).k(`open${s}`, "opacity", [[0, 1, "h"], [150, 0, "h"], [155, 1, "h"]]);
 
 // The ore's own layer, at 120 fps so each piece leaves 1/24 s after the last. A piece is blended from where it
@@ -554,7 +601,7 @@ ${el("Artboard", { name: "CartEnding", id: I("artboard"), width: W * X2, height:
   sm,
   ...["land:evLand", "stoneLand:evStone", "knock:evKnock", "settled:evSettled", "speak:evSpeak"].map((s) => el("Event", { name: s.split(":")[0], id: I(s.split(":")[1]) })),
   node("Scene", { scaleX: X2, scaleY: X2 }, [
-    bangXml(), zsXml(), crumbXml(), dirtXml(), mole, cart, railXml(),
+    bangXml(), bubbleXml(), zsXml(), crumbXml(), dirtXml(), mole, cart, railXml(),
     ...targets,
     el("Shape", { name: "Above the dirt", id: I("holeClip") }, `<Rectangle x="${W / 2}" y="${n2(FLOOR - 500)}" width="${W + 400}" height="1000"/>`),
     stage(),
@@ -569,5 +616,5 @@ fs.mkdirSync(path.join(HERE, "rive"), { recursive: true });
 fs.writeFileSync(path.join(HERE, "rive/scene.rml"), out);
 fs.writeFileSync(path.join(HERE, "rive/rive.yaml"), "name: cart-ending\n");
 // What the page needs to know to play its part.
-fs.writeFileSync(path.join(HERE, "rive/timing.json"), JSON.stringify({ W, H, RING, GROUND, P, pourSeconds: Object.fromEntries(BANDS.map((b) => [b, pourSeconds(b)])), rollIn: 54 / 60, hang: 81 / 60, wake: { knock: T_KNOCK / 60, pop: (T_POP + 1) / 60, settled: T_SETTLED / 60, speak: T_SPEAK / 60, total: 190 / 60 }, ore: { step: STEP / 120, flight: FLIGHT / 120 }, stone: { first: 2 / 60, step: 5 / 60, flight: 27 / 60 } }, null, 1));
+fs.writeFileSync(path.join(HERE, "rive/timing.json"), JSON.stringify({ W, H, RING, GROUND, P, pourSeconds: Object.fromEntries(BANDS.map((b) => [b, pourSeconds(b)])), rollIn: 54 / 60, hang: 108 / 60, wake: { knock: T_KNOCK / 60, pop: (T_POP + 1) / 60, settled: T_SETTLED / 60, speak: T_SPEAK / 60, total: A4.duration / 60 }, ore: { step: STEP / 120, flight: FLIGHT / 120 }, stone: { first: 2 / 60, step: 5 / 60, flight: 27 / 60 } }, null, 1));
 console.log(`scene.rml ${(out.length / 1024).toFixed(0)} KB, ${nid - 100} ids, ${crumbs.length} crumbs`);
