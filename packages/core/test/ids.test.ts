@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { numbers, renumber } from "../scripts/ids.ts";
+import { numbers, ordered, renumber } from "../scripts/ids.ts";
 
 const findings = "| F1 | x |\n| F2 | x |\n| F-new-tab-focus | a |\n| F-new-drop-undo | b |\n| F-new-x | c |\n";
 const decisions = "- D1. a\n- D7. b\n- D-new-home-list. c\n";
@@ -12,4 +12,8 @@ test("ids: placeholders take the next free numbers in the order their rows appea
 
 test("ids: a placeholder with no row is refused", () => {
   expect(() => renumber("see F-new-missing", numbers(findings, decisions))).toThrow(/no row/);
+});
+
+test("ids: rows a merge left above master's newer ones go back in number order, the rest of the file untouched", () => {
+  expect(ordered("intro F9\n\n| ID |\n| F1 | a |\n| F4 | mine |\n| F2 | b |\n| F3 | c |\n\nend\n")).toBe("intro F9\n\n| ID |\n| F1 | a |\n| F2 | b |\n| F3 | c |\n| F4 | mine |\n\nend\n");
 });

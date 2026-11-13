@@ -4,6 +4,7 @@ Proposals Tyler picked from, with the reasoning, by area. `../DECISIONS.md` is t
 
 **Who Ore is for**
 - [`daily-session.md`](daily-session.md) — the person and the daily session: 10 min to 1 hour over a due backlog that never empties (D144)
+- [`mole-in-reward-loop.md`](mole-in-reward-loop.md) — where the mole comes in during a review session, his pose and line at each moment (a proposal, 2026-11-13)
 - [`learning-system.md`](learning-system.md) — the learn-and-apply loop the science asks for, what Ore has of it, which rewards are safe to tune (proposed)
 
 **Reading**

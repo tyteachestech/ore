@@ -13,11 +13,11 @@ import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
 import { menuIcon } from "./menu-icons";
 
-/** The item's icon at its left (menu-icons.ts), or an empty slot so the labels line up. */
+/** The item's icon at its left: its own (`icon`, a block type's) or menu-icons.ts's, else an empty slot so the labels line up. */
 const Glyph = ({ a, plain }: { a: MenuAction; plain?: boolean }) => {
   if (plain) return null;
   const I = menuIcon(a);
-  return <span className="menu-icon" aria-hidden="true">{I && <I />}</span>;
+  return <span className="menu-icon" aria-hidden="true">{a.icon ?? (I && <I />)}</span>;
 };
 
 /** A picked action runs once the menu has closed and handed focus back (its onCloseAutoFocus), so a
@@ -150,6 +150,7 @@ export function WithMenu({ actions, children, keepFocus, hold, plain }: { action
                     {a.sub.map((b) =>
                       b.checked === undefined ? (
                         <ContextMenu.Item key={b.id} className="menu-item" onSelect={later(b.run)}>
+                          {b.icon && <span className="menu-icon" aria-hidden="true">{b.icon}</span>}
                           {b.label}
                         </ContextMenu.Item>
                       ) : (
@@ -248,6 +249,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
                     {a.sub.map((b) =>
                       b.checked === undefined ? (
                         <DropdownMenu.Item key={b.id} className="menu-item" onSelect={later(b.run)}>
+                          {b.icon && <span className="menu-icon" aria-hidden="true">{b.icon}</span>}
                           {b.label}
                         </DropdownMenu.Item>
                       ) : (
@@ -291,7 +293,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
 }
 
 /** On the phone the ⋯ menu is one bottom sheet that steps through (D155; Cult UI's family drawer, Apple's
- *  action sheets): the actions as 44pt rows, and a submenu ("Skills") swaps into the same sheet behind a
+ *  action sheets): the actions as 44pt rows, each with its icon as in the Mac's menus (menu-icons.ts), and a submenu ("Skills") swaps into the same sheet behind a
  *  back row, the sheet's height easing between the two, instead of a menu over a menu. Shortcuts stay off
  *  it. A pick closes the sheet and runs; a `keep` tick stays. Swipe down, a tap outside or Esc closes it. */
 function ActionSheet({ label, actions, className, icon, open: controlled, onOpenChange, onPointerDown, keepFocus }: { label: string; actions: Actions; className: string; icon?: ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void; onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void; keepFocus?: boolean }) {
@@ -379,8 +381,8 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
                     <Fragment key={a.id}>
                       {a.divider && !step && <div className="sheet-sep" role="separator" />}
                       <button className={`pick-row${a.danger ? " danger" : ""}`} role={a.checked === undefined ? undefined : "checkbox"} aria-checked={a.checked} onClick={() => pick(a)}>
-                        {step && <span className="menu-tick">{a.checked && <Tick />}</span>}
-                        {a.icon}
+                        {step ? <span className="menu-tick">{a.checked && <Tick />}</span> : <Glyph a={a} />}
+                        {step && a.icon}
                         <span className="name">{a.label}</span>
                         {a.sub && <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />}
                       </button>

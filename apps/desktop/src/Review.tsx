@@ -16,7 +16,7 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { endSays, weeksAgo, type Said } from "./end-says";
+import { endSays, endTiles, weeksAgo, type Said, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -1534,6 +1534,60 @@ function EndLines({ run, children }: { run: boolean; children: React.ReactNode }
   );
 }
 
+/** A result's number in the ring's dots, running up from nothing once `go` (D252); whole at once under Reduce Motion. */
+function CountUp({ value, go }: { value: string; go: boolean }) {
+  const m = /^(\D*)(\d+(?:\.(\d+))?)$/.exec(value);
+  const [k, setK] = useState(still() ? 1 : 0);
+  useEffect(() => {
+    if (!go || still()) return;
+    const ms = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--t-moment")) || 600, t0 = performance.now();
+    let frame = requestAnimationFrame(function step(now) {
+      const x = Math.min(1, (now - t0) / ms);
+      setK(1 - (1 - x) ** 3);
+      if (x < 1) frame = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [go]);
+  return <DotNumber value={m ? `${m[1]}${(Number(m[2]) * k).toFixed(m[3]?.length ?? 0)}` : value} height={28} />;
+}
+
+/** How long after one result the next lands. */
+const TALLY_GAP_MS = 320;
+/** How often, when the cart comes, the mole is asleep on it. */
+const NAP_SHARE = 2 / 3;
+
+/** The end screen's row of results (D252, after Duolingo's lesson-complete row): three at most, each a
+ *  mark, a number in dots and what it counts, landing one after another once `go`, then still. The number's text
+ *  is in the page throughout for a reader. A rare one wears its skill's colour or the won-back gold. */
+function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skills: Skill[]; onDone: () => void }) {
+  const [n, setN] = useState(still() ? tiles.length : 0);
+  const done = useRef(onDone);
+  done.current = onDone;
+  useEffect(() => {
+    if (!go) return;
+    if (n >= tiles.length) return done.current();
+    const id = setTimeout(() => setN((x) => x + 1), n ? TALLY_GAP_MS : 0);
+    return () => clearTimeout(id);
+  }, [go, n, tiles.length]);
+  if (!tiles.length) return null;
+  return (
+    <ul className="end-tally">
+      {tiles.map((t, i) => {
+        const sk = t.rare?.kind === "level" ? skills.find((x) => x.id === (t.rare as { skill: string }).skill) : undefined;
+        const mark = t.key === "level" ? <SkillIcon icon={sk?.icon} color={sk?.color} dot /> : t.key === "rescued" ? <Gem kind="cut" size={16} seam /> : t.key === "cut" ? <Gem kind="cut" size={16} /> : t.key === "kept" ? <Check size={16} /> : <Clock size={16} />;
+        const li = (
+          <li key={t.key} data-key={t.key} data-rare={t.rare?.kind} data-color={sk?.color} data-wait={i >= n || undefined} tabIndex={t.hint ? 0 : undefined}>
+            <span className="end-tally-mark" aria-hidden="true">{mark}</span>
+            <b><CountUp value={t.value} go={go && i < n} /><span className="sr-only">{t.value}</span></b>
+            <span className="end-tally-label">{t.label}</span>
+          </li>
+        );
+        return t.hint ? <Hint key={t.key} text={t.hint}>{li}</Hint> : li;
+      })}
+    </ul>
+  );
+}
+
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
 export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void }) {
@@ -1552,31 +1606,22 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     const dots = oreFor(part(b), part(t), ringDots(END_RING));
     return !quick && !PHONE && !document.hidden && !still() && (dots.length > 0 || shown.length > 0) ? dots : null;
   });
-  // cart: rolling and pouring · poured: the ring is full · leaving: the mole comes up · done: the cart has gone.
+  // D255: two endings in three with a cart, the mole rides it in asleep and falls out onto the ring; else he comes up out of the ground.
+  const [nap] = useState(() => !!pour && Math.random() < NAP_SHARE);
+  // cart: rolling and pouring · poured: the ring is full · leaving: the cart starts off, and the mole comes up unless he is riding it (then when he has fallen) · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
-  // It always comes up out of the ground first, with or without a cart before it (under Reduce Motion it is just there, pleased).
-  const [mood, setMood] = useState<"peek" | "cheer">(() => (still() ? "cheer" : "peek"));
-  // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that.
-  const up = stage === "leaving" || stage === "done";
+  // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D255): then he is there, startled (under Reduce Motion he is just there, pleased).
+  const [mood, setMood] = useState<"peek" | "cheer" | "surprised">(() => (still() ? "cheer" : nap ? "surprised" : "peek"));
+  const [fell, setFell] = useState(false);
+  // The mole cheers 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
+  const up = nap ? fell : stage === "leaving" || stage === "done";
   useEffect(() => {
     if (!up) return;
-    const id = setTimeout(() => setMood("cheer"), 560);
+    const id = setTimeout(() => setMood("cheer"), nap ? 400 : 560);
     return () => clearTimeout(id);
   }, [up]);
   const full = stage !== "cart";
-  // D242: the count of memories kept runs up from nothing once the cart has filled the ring; with no cart it is just there.
-  const [count, setCount] = useState(pour ? 0 : s.kept);
-  useEffect(() => {
-    if (!pour || !full) return;
-    const ms = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--t-moment")) || 600, t0 = performance.now();
-    let frame = requestAnimationFrame(function step(now) {
-      const k = Math.min(1, (now - t0) / ms);
-      setCount(Math.round(s.kept * (1 - (1 - k) ** 3)));
-      if (k < 1) frame = requestAnimationFrame(step);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [pour, full, s.kept]);
   // D197: a cut gem that was won back has a gold rim; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
   const mendedN = (s.grades ?? []).filter((g) => g === "mended").length;
@@ -1584,7 +1629,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   // `old`: a gem that was cut before this session and polished in it; it shows once the cart has poured.
   const gems = [...shown.map((skill, i) => ({ skill, seam: s.grades?.[i] === "mended", polished: s.grades?.[i] === "polished", old: false })), ...(s.polished ?? []).slice(0, CUT_SHOWN - shown.length).map((skill) => ({ skill, seam: false, polished: true, old: true }))];
   const more = cutN + (s.polished?.length ?? 0) - gems.length;
-  // D242: the gems land inside the ring, sized to fit it; with none cut, the count of memories kept stands there instead.
+  // D242: the gems land inside the ring, sized to fit it.
   const gemSize = quick ? 36 : gems.length <= 3 ? 56 : gems.length <= 6 ? 48 : 32;
   const cluster = gems.length > 0 && (
         <p className="review-cut" aria-label={[cutN && `${cutN} became solid`, mendedN && `${mendedN} won back`, polishedN && `${polishedN} polished`].filter(Boolean).join(", ")}>
@@ -1603,31 +1648,32 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           {more > 0 && landed >= shown.length && <b>+{more}</b>}
         </p>
   );
+  // The quick quiz says the count in a line of its own; the full end screen has it in the row of results.
   const kept = s.kept > 0 && (
     <p className="review-kept">
-      {/* The emblem's count is drawn in the ring's dots and counts up as the ring fills; its text is the true number throughout. */}
-      <b>{quick ? s.kept : <><DotNumber value={count} height={56} /><span className="sr-only">{s.kept}</span></>}</b> {s.kept === 1 ? "memory" : "memories"} kept
+      <b>{s.kept}</b> {s.kept === 1 ? "memory" : "memories"} kept
     </p>
   );
+  // The results land, then the mole says his line.
+  const [tallied, setTallied] = useState(false);
   const [roll] = useState(Math.random);
   const skill = (id: string) => skills.find((x) => x.id === id);
   // D247: a rare line wears its own mark, in the drawing that thing already has: the skill's icon in its colour,
   // the clock for a long gap, the gold-rimmed gem for one pulled back.
   const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" || l.rare.kind === "then" ? <Clock size={16} /> : <Gem kind="cut" size={16} seam />);
+  const named = ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level }));
   const said = endSays({
-    session: s, today: t, closed, short, roll,
-    ups: ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level })),
-    // The quick quiz says it under its headline already.
-    waiting: !quick && t.caught_up && t.new_waiting > 0 ? waiting(t) : null,
+    session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   }).map((l) => ({ ...l, mark: mark(l) }));
+  const tiles = endTiles({ session: s, ups: named });
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
   return (
     <div className={`review-end${pour ? " carted" : ""}`} role="status" ref={setHost}>
       {pour && stage !== "done" && host && (
-        <CartTip host={host} lit={pour} rich={rescuedWorthSaying(s) ? s.rescued : 0} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
+        <CartTip host={host} mole={nap} onFell={() => setFell(true)} lit={pour} rich={rescuedWorthSaying(s) ? s.rescued : 0} stones={shown.map((id) => skills.find((x) => x.id === id)?.color)} onStone={(i) => setLanded((n) => Math.max(n, i + 1))} onPoured={() => setStage((x) => (x === "cart" ? "poured" : x))} onLeave={() => setStage("leaving")} onDone={() => (setLanded(shown.length), setStage("done"))} />
       )}
       {quick ? (
         <>
@@ -1640,17 +1686,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         <>
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem">
-            <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
-            {/* D243: the mole says what the session won, one line at a time, once he has come up. */}
+            <span className={`review-mole${nap && fell ? " fell" : ""}`}>{up && <Mole bare size={96} mood={mood} />}</span>
+            {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {mood === "cheer" && (
-              <MoleSays className="end-says" lines={said} run={stage === "done"} />
+              <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
             )}
             <div className="end-ring">
               {ring}
-              {cluster || kept}
+              {cluster}
             </div>
           </div>
-          {cluster && kept}
+          <Tally tiles={tiles} go={full} skills={skills} onDone={() => setTallied(true)} />
+          {held}
         </>
       )}
       {/* The quick quiz has no mole: it lists what the session won, one line at a time (D241). */}

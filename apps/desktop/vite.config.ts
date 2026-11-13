@@ -2,6 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
@@ -120,6 +121,28 @@ const textImports: Plugin = {
   },
 };
 
+// The ambience radio's sounds (D254): ElevenLabs output may ship inside the app but not as loose files in this public
+// repo, so they live on his Mac, in ~/Library/Application Support/Ore/sounds (ORE_SOUNDS overrides; the e2e journeys
+// point it at their own tones). Served as /sounds/<id>.mp3 in dev and written into the build when they are there;
+// a channel with no file says so in the app.
+const SOUNDS = process.env.ORE_SOUNDS ?? join(homedir(), "Library/Application Support/Ore/sounds");
+const SOUND_IDS = ["cave", "rain", "lamp", "deep", "focus"];
+const soundFile = (id: string) => join(SOUNDS, `${id}.mp3`);
+const ambienceSounds: Plugin = {
+  name: "ambience-sounds",
+  configureServer(server) {
+    server.middlewares.use("/sounds", (req, res, next) => {
+      const id = (req.url ?? "").split("?")[0]!.replace(/^\//, "").replace(/\.mp3$/, "");
+      if (!SOUND_IDS.includes(id) || !existsSync(soundFile(id))) return next();
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.end(readFileSync(soundFile(id)));
+    });
+  },
+  generateBundle() {
+    for (const id of SOUND_IDS) if (existsSync(soundFile(id))) this.emitFile({ type: "asset", fileName: `sounds/${id}.mp3`, source: readFileSync(soundFile(id)) });
+  },
+};
+
 // Tauri expects a fixed dev port and no screen clearing (it prints its own logs).
 // The icon picker's icons ship with the app, so it works offline: the pixel skill icons (pixelSkillIcons, D157).
 export default defineConfig({
@@ -127,6 +150,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     pixelSkillIcons,
+    ...(PHONE ? [] : [ambienceSounds]),
     ...(PHONE ? [dynamicType] : []),
     ...(PHONE ? [phoneLibrary, textImports] : []),
   ],

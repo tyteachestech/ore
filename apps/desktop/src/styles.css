@@ -34,6 +34,9 @@
   --mole-room: 84px; /* the tutor's mole and its margins (D160) */
   --float: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.45);
   --error: #ff7b7b;
+  --lamp: #ffb224; /* the mole's lamp (D238), lit on the ambience radio (D254) */
+  --lcd: #15110a; /* the radio's screen glass */
+  --lcd-edge: #2e2414;
 
   --keep: rgba(255, 190, 20, 0.3); /* gold, not olive: plain yellow at low alpha turns olive on near-black */
   --card: rgba(96, 165, 250, 0.32);
@@ -139,7 +142,7 @@ kbd {
 .sidebar {
   background: var(--bg-side);
   border-right: 1px solid var(--border);
-  padding: calc(var(--titlebar) + 6px) 8px 12px;
+  padding: calc(var(--titlebar) + 6px) 8px var(--mole-room); /* the ambience radio sits at its foot (D254) */
   overflow-y: auto;
   overscroll-behavior: none;
 }
@@ -1608,7 +1611,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .skill-col.side .question-quote .from { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question.done .question-quote .note { text-decoration: line-through; }
 .q-lead { position: absolute; right: 8px; top: 9px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; }
-.q-lead::before { content: ""; width: 8px; height: 8px; background: var(--question-solid); }
+.q-lead::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--question-solid); }
 .q-lead:hover { background: var(--bg-hover); }
 .q-lead:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .hint-lines { display: flex; flex-direction: column; gap: 2px; }
@@ -2073,7 +2076,7 @@ button.home-plan:hover { color: var(--text); }
 .review-calibration-row:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
 .review-calibration-name { text-align: right; }
 .review-calibration-bar { display: flex; gap: 2px; }
-.review-calibration-bar i { width: 6px; height: 6px; background: var(--bg-active); }
+.review-calibration-bar i { width: 6px; height: 6px; border-radius: 50%; background: var(--bg-active); }
 .review-calibration-bar i[data-on] { background: var(--muted); }
 .review-calibration-pct { font-variant-numeric: tabular-nums; text-align: left; }
 .review-original { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
@@ -2128,6 +2131,10 @@ button.home-plan:hover { color: var(--text); }
 .review-end { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4vh auto 0; max-width: 420px; animation: card-in var(--t-4) ease-out both; }
 /* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
 .review-mole { display: block; line-height: 0; margin-bottom: 2px; width: 96px; height: calc(96px * 18 / 22); }
+/* D255: he lands off the cart with a squash, then springs back to his height. */
+.review-mole.fell { transform-origin: 50% 100%; animation: mole-land var(--t-4) var(--ease-spring) both; }
+@keyframes mole-land { from { transform: scale(1.14, 0.8); } }
+@media (prefers-reduced-motion: reduce) { .review-mole.fell { animation: none; } }
 /* The cart's tip (D190): a layer as wide as the window over the end screen, so the cart crosses it on a rail just
    over the ring. Its ore is the ring's own dot, in size and colour; a rough stone is the gem it becomes. */
 .review-end.carted { position: relative; }
@@ -2146,24 +2153,41 @@ button.home-plan:hover { color: var(--text); }
 .cart-ore-in.rich { fill: var(--ore-rich); }
 .rich-ore { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ore-rich); box-shadow: 0 0 5px var(--c-green); vertical-align: 1px; }
 .cart-rough { margin: -9px 0 0 -9px; line-height: 0; }
+/* The mole asleep on the load (D255). Its wrapper's own point is the middle of his body: the foot of the head's box. */
+.cart-mole { position: absolute; left: 0; top: 0; width: 96px; height: calc(96px * 18 / 22); margin: calc(-96px * 18 / 22) 0 0 -48px; transform-origin: 50% 100%; line-height: 0; will-change: transform; }
+.cart-zzz { position: absolute; left: -30px; top: -110px; width: 110px; height: 86px; overflow: visible; fill: var(--muted); }
+.cart-zzz g { animation: cart-zzz 1400ms infinite both; }
+.cart-zzz g:nth-child(2) { animation-delay: 250ms; }
+.cart-zzz g:nth-child(3) { animation-delay: 500ms; }
+@keyframes cart-zzz { 0% { opacity: 0; transform: translate(-1px, 2px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(2px, -3px); } }
 .review-end.carted .dot-ring circle { transition: none !important; }
 .review-end.carted .ring-burst { animation-delay: 0ms; }
 .review-cut > span[data-wait] { visibility: hidden; animation: none; }
 .review-end h2 { font-family: var(--round); margin: 22px 0 0; font-size: 24px; }
 /* The end screen's emblem (D242): the mole on the ring, the session's gems inside it, on a faint field of dots that
-   is brightest behind it. With no gem cut, the count of memories kept stands in the ring. */
+   is brightest behind it. */
 .review-end { position: relative; z-index: 0; }
 .end-emblem { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; }
 .end-emblem::before { content: ""; position: absolute; inset: -48px 0 -72px; z-index: -1; pointer-events: none; background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 16%, transparent) 1.1px, transparent 1.6px); background-size: 9px 9px; background-position: center; -webkit-mask-image: radial-gradient(closest-side, #000, transparent); mask-image: radial-gradient(closest-side, #000, transparent); }
 .end-ring { position: relative; display: grid; place-items: center; }
 .end-ring > * { grid-area: 1 / 1; }
+/* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
+   Each lands in hard steps, one after another, then is still. */
+.end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
+.end-tally li { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: min(124px, calc((100vw - 48px) / 3)); text-align: center; overflow-wrap: break-word; font: 400 12px/1.3 var(--mono); color: var(--muted); border-radius: 6px; animation: end-tally-in var(--t-4) steps(4, end) both; }
+.end-tally li[data-wait] { visibility: hidden; animation: none; }
+.end-tally li:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.end-tally b { display: grid; place-items: center; height: 28px; }
+.end-tally-mark { display: grid; place-items: center; height: 20px; }
+.end-tally li[data-rare="level"] .dot-number circle { fill: var(--skill, var(--text)); }
+.end-tally li[data-rare="rescued"] .dot-number circle { fill: var(--seam); }
+@keyframes end-tally-in { from { opacity: 0; transform: translateY(-10px); } }
+.end-tally-label { max-width: 100%; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+@media (max-width: 480px) { .end-tally { gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .end-tally li { animation: none; } }
 .end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
-.end-ring > .review-kept { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.end-emblem + .review-kept { display: flex; align-items: center; gap: 12px; margin: 20px 0 0; }
 /* The mole sits on the ring: its row of dirt rests on the ring's top dots. */
 .end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: -12px; }
-/* Two voices under the emblem: the dot number, and the mono for every word of Ore's (his own plan keeps the sans). Green stays the ring's. */
-.end-emblem ~ .review-kept { font-family: var(--mono); font-size: 13px; color: var(--muted); }
 /* Two groups: what the session won, then what comes next. */
 .end-emblem ~ .review-try { margin-top: 40px; }
 .end-emblem ~ .review-try ~ .review-foot { margin-top: 12px; }
@@ -2377,6 +2401,12 @@ button.home-plan:hover { color: var(--text); }
 .menu-item:has(> .menu-icon) { padding-left: 6px; }
 .menu-icon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; margin-right: -8px; color: var(--muted); }
 .menu-item.danger .menu-icon { color: inherit; }
+/* A submenu's own icons (Turn into's block types, Importance's levels) are muted like the menu's; a highlight type keeps its colour. */
+.menu-item.check > svg[data-sprite]:not(.menu-mark) { color: var(--muted); }
+/* A highlight type in its Type submenu (Reader.tsx Mark), in its colour as on the highlight popup. */
+.menu-mark { flex: none; }
+.menu-mark.keep { color: var(--keep-solid); } .menu-mark.card { color: var(--card-solid); }
+.menu-mark.question { color: var(--question-solid); } .menu-mark.apply { color: var(--apply-solid); }
 .menu-item.check { gap: 8px; padding-left: 6px; }
 .menu-item.check > .skill-icon { flex: none; }
 /* The tick's column: 16px holds the Tick's ink (12.5px) whole; the indicator is a flex box so the sprite centres on the row, not on the text baseline. */
@@ -3008,6 +3038,41 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-bubble:hover { background: var(--bg-hover); }
 .tutor-bubble:active { transform: scale(0.96); }
 .tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* The ambience radio (D254): the mole's twin at the bottom left, its big screen an amber dot LCD (the mole's lamp
+   colour, D238) over five pads. The screen is a device, so it stays dark in every theme. */
+.radio-orb {
+  position: fixed; left: 16px; bottom: 16px; z-index: 6;
+  width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg-raised); box-shadow: var(--float); color: var(--faint); transition: transform var(--t-2) ease-out;
+}
+.radio-orb:hover { background: var(--bg-hover); color: var(--muted); }
+.radio-orb:active { transform: scale(0.96); }
+.radio-orb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.radio-orb-dots { display: block; fill: currentColor; }
+.radio-tag {
+  position: fixed; left: 78px; bottom: 29px; z-index: 6; padding: 5px 8px; border-radius: 7px; pointer-events: none;
+  background: var(--lcd); box-shadow: 0 0 0 1px var(--lcd-edge), var(--float); animation: radio-tag var(--t-2) var(--ease-out);
+}
+.radio-tag canvas { display: block; }
+@keyframes radio-tag { from { opacity: 0; transform: translateX(-6px); } }
+.popover.radio { width: 320px; padding: 12px; }
+.radio-screen { display: block; width: 100% !important; height: auto !important; aspect-ratio: 295 / 110; border-radius: 8px; background: var(--lcd); box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--lcd-edge); }
+.radio-pads { display: flex; gap: 8px; margin-top: 10px; }
+.radio-pad {
+  position: relative; flex: 1; aspect-ratio: 1; border-radius: 10px; display: grid; place-items: center; color: var(--faint);
+  background: var(--bg-hover); box-shadow: var(--lift), 0 2px 0 var(--bg-side); transition: transform var(--t-1) var(--ease-out), color var(--t-2);
+}
+.radio-pad svg { fill: currentColor; }
+.radio-pad:hover { color: var(--muted); }
+.radio-pad:active { transform: translateY(2px) scale(0.96); box-shadow: var(--lift); }
+.radio-pad:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.radio-pad.on, .radio-pad.loading { color: var(--lamp); background: color-mix(in srgb, var(--lamp) 10%, var(--bg-hover)); }
+.radio-pad.on svg { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lamp) 60%, transparent)); }
+.radio-pad.on::after { content: ""; position: absolute; left: 50%; bottom: 6px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--lamp); }
+.radio-pad.loading svg { animation: radio-wait 1s steps(2) infinite; }
+@keyframes radio-wait { 50% { opacity: 0.4; } }
+.radio-pad.missing { color: color-mix(in srgb, var(--faint) 45%, transparent); }
+@media (prefers-reduced-motion: reduce) { .radio-tag, .radio-pad.loading svg { animation: none; } }
 .app:has(.quiz) .tutor-bubble { display: none; }
 /* The mole's tones (D169, the old miner D238): grey fur, a lighter helmet with a darker band and a bright brim,
    white paws, moustache and brows, black eyes with a glint, a pink nose, and the lamp, lit amber in its dark housing. */
@@ -3271,6 +3336,9 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .action-sheet .pick-row { width: 100%; font-size: 16px; }
 .action-sheet .pick-row .name { flex: 1; min-width: 0; color: inherit; font-weight: 500; }
 .action-sheet .pick-row.danger { color: var(--error); }
+/* Its icon (menu-icons.ts), as in the Mac's menus: the row's own 12px gap to the label. */
+.action-sheet .pick-row > .menu-icon { margin-right: 0; }
+.action-sheet .pick-row.danger .menu-icon { color: inherit; }
 .action-sheet .sheet-back { color: var(--muted); font-size: 14px; min-height: 36px; }
 .action-sheet .sheet-sep { height: 1px; margin: 6px 12px; background: var(--border); }
 .action-sheet .menu-caret { color: var(--faint); }
