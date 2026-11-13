@@ -12,7 +12,7 @@ export type FineTone = `fine-${number}` | "eye" | "glint" | "nose" | "lamp" | "d
 export const FINE_ORDER: FineTone[] = ["dirt", ...Array.from({ length: 10 }, (_, i) => `fine-${i}` as const), "nose", "lamp", "eye", "glint"];
 export type FineDot = [x: number, y: number, radius: number, tone: FineTone];
 
-/** His box and the dome's top row at rest (`COLS`, `ROWS`, `REST.top` in Mole.tsx, which imports this file). */
+/** His box and the dome's top row at rest (`REST.top` in Mole.tsx, which imports this file). */
 export const COLS = 22, ROWS = 18, REST_TOP = -0.3;
 /** One dot of his pitch in the 22-wide space: he is 33 dots across. */
 const U = COLS / 33;

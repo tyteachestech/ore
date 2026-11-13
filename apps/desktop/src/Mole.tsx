@@ -85,7 +85,7 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // Both paws waving, bobbing on each beat, then a squat, a last hop and it settles pleased.
   cheer: { to: { arc: 1, ex: 3 }, wave: 900, end: 2400, still: HAPPY,
     at: [[900, { to: { ...HAPPY, top: SQUAT, pawL: 0, pawR: 0 } }], [1010, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [1320, { kick: { kick: 7 } }]] },
-  /* A broad range for the traced mole (D251); the small one plays what its shape can show of each. */
+  /* A broad range for the traced mole (D251). */
   // Yes: two nods, his whole head dipping.
   nod: { end: 1000, still: {}, at: [[0, { to: { top: 1.1, ly: 1 } }], [190, { to: { top: REST.top, ly: 0 } }], [400, { to: { top: 1.1, ly: 1 } }], [590, { to: { top: REST.top, ly: 0 } }]] },
   // No: eyes shut, his head from side to side.
@@ -196,7 +196,6 @@ const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
  *  reduced motion and while the window is hidden (a mood shows its still pose). */
 export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean }) {
   const svg = useRef<SVGSVGElement>(null);
-  const order: readonly string[] = FINE_ORDER;
   const tones = useRef<Record<string, SVGPathElement | null>>({});
   const p = useRef(puppet());
   const run = useRef({ frame: 0, last: 0 });
@@ -206,7 +205,7 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
   // `data-mood` is the move it is playing (or showing still), for tests.
   const draw = () => {
     const d: Record<string, string> = paths(fineDots(p.current.v), FINE_ORDER);
-    for (const t of order) tones.current[t]?.setAttribute("d", d[t]!);
+    for (const t of FINE_ORDER) tones.current[t]?.setAttribute("d", d[t]!);
     svg.current?.setAttribute("data-mood", p.current.mood);
   };
   // Frames run while anything moves or a beat is still to come, then stop.
@@ -293,7 +292,7 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
   // The dirt sits low in the button, so the mole reads as poking out of the ground at its foot.
   return (
     <svg ref={svg} className="mole" width={size} height={bare ? (size * ROWS) / COLS : size} viewBox={bare ? `0 0 ${COLS} ${ROWS}` : `0 ${-LIFT} ${COLS} ${COLS}`} overflow="visible" aria-hidden="true">
-      {order.map((t) => (
+      {FINE_ORDER.map((t) => (
         <path key={t} ref={(el) => { tones.current[t] = el; }} className={`mole-${t}`} />
       ))}
     </svg>
