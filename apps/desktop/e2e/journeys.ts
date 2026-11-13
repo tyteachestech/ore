@@ -6530,7 +6530,8 @@ journey("review: when the day's goal closes the mole says so and the session goe
     await reveal(page);
     await good.click();
     await note.waitFor();
-    if (!/Goal met/.test(await note.innerText())) throw new Error(`the note says ${JSON.stringify(await note.innerText())}`);
+    // The line is typed out; its letters to come are in the page, unseen (D245).
+    if (!/Goal met\. The rest is extra\./.test((await note.textContent()) ?? "")) throw new Error(`the note says ${JSON.stringify(await note.textContent())}`);
     await until("the next exercise", async () => (await q.innerText()) !== first);
     if (await page.locator(".review-end").count()) throw new Error("the session ended at the goal");
     // ⌘Z takes back the rating that closed the goal: the note goes with it, and closing it again tells it again.
