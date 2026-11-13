@@ -1477,10 +1477,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   useEffect(() => () => keepNote(), [p.id]);
-  // Leaving the app saves it too, as Notes does: iOS may end the app before he comes back.
+  // On the phone leaving the app saves it too, as Notes does: iOS may end the app before he comes back.
   const keepNoteNow = useRef(keepNote);
   keepNoteNow.current = keepNote;
   useEffect(() => {
+    if (!PHONE) return;
     const hidden = () => document.hidden && keepNoteNow.current();
     document.addEventListener("visibilitychange", hidden);
     return () => document.removeEventListener("visibilitychange", hidden);
@@ -2111,6 +2112,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   async function remove(undoable = true) {
     if (!popup) return;
     const id = popup.id;
+    unsavedNotes.delete(id); // what he typed goes with the highlight
     closePopup(false);
     let rid: string;
     try {
@@ -3496,8 +3498,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                 onChange={(e) => {
                   const note = fromBullets(e.target.value);
                   setPopup((cur) => cur && { ...cur, note });
-                  // Kept as he types, so a quit with the popup open (iOS ends a backgrounded app) loses nothing.
-                  const ann = annOf(popup.id);
+                  // On the phone, kept as he types: iOS may end the app with the popup open, before a save lands.
+                  const ann = PHONE && !popup.id.startsWith("pending-") && annOf(popup.id);
                   if (ann) unsavedNotes.set(popup.id, { note, was: ann.note ?? "" });
                 }}
                 // "- " or "* " shows as a bullet (saved as "- "); ⇧↵ on a bullet or "1. " line starts the next item, as in Claude's and ChatGPT's chat boxes; ↵ still closes.

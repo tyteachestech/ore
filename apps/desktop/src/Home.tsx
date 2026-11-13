@@ -367,8 +367,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                   <Roll id="goal" value={minutesText(today.active_ms)} /> <span className="goal-of">of {today.goal_minutes} min</span>
                 </h1>
                 {/* Mid-goal with cards due, "N of 10 min" and Start review say it all (D65.4 as amended): no line. */}
-                {/* With nothing to read, the line under Today says what to do instead of "Read something new". */}
-                {!empty && subline(today) && <p>{subline(today)}</p>}
+                {subline(today, empty) && <p>{subline(today, empty)}</p>}
                 {/* His plan (D67): the cue that starts review, set in Settings › Review. On the phone (no Settings)
                     the plan is read, not set: a button that does nothing is never shown. */}
                 {onSettings ? (
@@ -582,13 +581,14 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
   );
 }
 
-function subline(t: Today): string {
+/** `empty`: nothing to read, so the empty library's line below says what to do, not "Read something new". */
+function subline(t: Today, empty?: boolean): string {
   if (!t.counts) return t.due ? "Today is off. Exercises are ready if you feel like it." : "Today is off.";
   // Caught up short of the goal still counts (D60); say why, or a full ring beside "<1 of 10" reads as a bug.
   if (t.met && t.active_ms < t.goal_ms) return t.new_waiting ? `All caught up, so today counts. ${waiting(t)}` : "All caught up, so today counts.";
   if (t.met) return t.caught_up ? (t.new_waiting ? `Goal met. ${waiting(t)}` : "Goal met and all caught up.") : "Goal met. Anything more is a bonus.";
   if (t.due) return "";
-  return t.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Read something new.";
+  return t.new_waiting ? `All caught up. ${waiting(t)}` : empty ? "" : "All caught up. Read something new.";
 }
 
 /** New cards the daily limits held back (D65), so "caught up" never reads as "there's nothing left". */

@@ -96,13 +96,14 @@ export const MAC_WAY = "add it from the browser";
 
 /** Why the phone couldn't read a link, without the Mac's own next steps (its Browser tab, `ore add --tab`,
  *  pasting the text into the add box), which the phone doesn't have: the Mac tries the link itself (D227.3).
- *  The clause naming the Mac's way in goes, with all after it; whatever came before it stays. */
+ *  In each sentence the clause naming one of them goes, with the rest of that sentence; what came before it
+ *  stays, and a sentence that was only that goes whole. */
 export function phoneReason(error: string): string {
   const kept = error
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => {
       // The Mac's ways in: its Browser tab, or pasting the text into its add box (said several ways).
-      const at = Math.min(...[sentence.indexOf(MAC_WAY), sentence.search(/\bcopy (it|its|the)\b|\bpaste\b/i)].filter((i) => i >= 0));
+      const at = Math.min(...[sentence.indexOf(MAC_WAY), sentence.search(/\bcopy (it|its|the)\b[^.]*\bpaste\b|\bpaste (it|its|the)\b[^.]*\bhere\b/i)].filter((i) => i >= 0));
       if (!Number.isFinite(at)) return sentence;
       const head = sentence.slice(0, at);
       const cut = Math.max(head.lastIndexOf("; "), head.lastIndexOf(", or "), head.lastIndexOf(", then "));
