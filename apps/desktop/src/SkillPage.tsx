@@ -13,7 +13,7 @@ import { focusFilter, IconPicker, SkillIcon } from "./IconPicker";
 import { is, isNotes, label, useKeymap, keepKeysIn } from "./keys";
 import { clickBelow, LinkedFrom, NoteBody, useNotes } from "./Notes";
 import { FindBar, onceFound } from "./Find";
-import { Hint } from "./Hint";
+import { escTaken, Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
@@ -450,6 +450,7 @@ const EXPLAIN_SHOWN = 5;
 function Strength({ s, color }: { s: SkillStats; color?: string }) {
   const k = s.strength;
   const [all, setAll] = useState(false);
+  const [open, setOpen] = useState(false);
   const p = levelProgress(k);
   // One vocabulary with the header: the gem states, then cards not reviewed yet as empty slots.
   const legend: [GemKind, number, string, { seam?: boolean; polished?: boolean }?][] = [
@@ -465,7 +466,7 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
   return (
     // Strength is said once, in the header: the number, one line, the level meter. The split, growth and what
     // he can now explain open from it (D62: reward what he remembers, never volume).
-    <Popover.Root>
+    <Popover.Root open={open} onOpenChange={setOpen}>
       {/* D90: the gem being cut (a ring to the next level, the level on it), the count, and the near goal. Words only on hover. */}
       <Hint text={gemHint(k, p.line)}>
         <Popover.Trigger asChild>
@@ -479,13 +480,16 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
         </Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover strength-pop" data-color={color} side="bottom" align="end" sideOffset={6} collisionPadding={12}>
+        <Popover.Content
+          // The page's own keys take Esc before Radix sees it, so the breakdown closes itself (F-new-a11y-gems).
+          onKeyDown={(e) => { if (e.key === "Escape" && !escTaken(e.nativeEvent)) { e.preventDefault(); setOpen(false); } }}
+          aria-label="Gem breakdown" className="popover strength-pop" data-color={color} side="bottom" align="end" sideOffset={6} collisionPadding={12}>
           <div className="strength">
             <div className="strength-legend">
               {legend.map(([kind, n, why, look]) =>
                 n > 0 ? (
                   <Hint key={why} text={why}>
-                    <span>
+                    <span role="img" aria-label={`${n} · ${why}`} tabIndex={0}>
                       <Gem kind={kind} size={18} {...look} />
                       {n}
                     </span>

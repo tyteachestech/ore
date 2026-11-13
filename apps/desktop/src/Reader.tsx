@@ -84,7 +84,7 @@ const PLACEHOLDER: Record<Intent, string> = {
 // That also drops the `<!-- page N -->` / `<!-- chapter N -->` markers. Links open in the browser.
 // Math is `$$…$$` only (intake writes inline TeX that way), so a price's `$` never reads as math.
 const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["remarkPlugins"]>;
-const rehypePlugins = [[rehypeKatex, { output: "html", throwOnError: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
+const rehypePlugins = [[rehypeKatex, { output: "htmlAndMathml", throwOnError: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 // A click on a link is handled by the reader (`followLink`). Footnotes (`footnotes` in text.ts) keep
 // their "^" in the text for the index, drawn as a small raised number.
 const caret = (children: ReactNode) => (typeof children === "string" && children.startsWith("^") ? <><span className="fn-caret">^</span>{children.slice(1)}</> : children);
@@ -456,7 +456,7 @@ function ColumnHead({ children, style }: { children?: ReactNode; style?: CSSProp
       {cols && (
         <Hint text={on ? "Show this column" : "Cover this column to test yourself"}>
           <button className="col-cover" data-noindex="" aria-label={on ? "Show this column" : "Cover this column"} aria-pressed={on} onClick={() => cols.toggle(i)}>
-            {on ? <Eye size={14} /> : <EyeSlash size={14} />}
+            {on ? <Eye size={14} aria-hidden="true" /> : <EyeSlash size={14} aria-hidden="true" />}
           </button>
         </Hint>
       )}
@@ -3246,7 +3246,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           {!PHONE && (
             <Hint text={hideSource ? "Show the source" : "Hide the source while you write"} keys="hide-source">
               <button className={`width-toggle${hideSource ? " on" : ""}`} aria-label={hideSource ? "Show the source" : "Hide the source"} aria-pressed={hideSource} onClick={toggleHide}>
-                {hideSource ? <EyeSlash size={16} /> : <Eye size={16} />}
+                {hideSource ? <EyeSlash size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
               </button>
             </Hint>
           )}
