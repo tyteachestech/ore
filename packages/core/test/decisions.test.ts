@@ -16,6 +16,10 @@ test("every decision in DECISIONS.md has its own number", () => {
 test("no decision is written twice under two ids", () => {
   const text = readFileSync(join(import.meta.dir, "..", "..", "..", "docs", "DECISIONS.md"), "utf8");
   const ids = new Map<string, string[]>();
-  for (const [, id, body] of text.matchAll(/^- (D[\w-]+)\. (.+)$/gm)) ids.set(body!, [...(ids.get(body!) ?? []), id!]);
+  // Keyed on how it opens, so a word changed further on, on one side of the merge, still counts as the same decision.
+  for (const [, id, body] of text.matchAll(/^- (D[\w-]+)\. (.+)$/gm)) {
+    const key = body!.toLowerCase().replace(/\s+/g, " ").slice(0, 120);
+    ids.set(key, [...(ids.get(key) ?? []), id!]);
+  }
   expect([...ids.values()].filter((v) => v.length > 1)).toEqual([]);
 });

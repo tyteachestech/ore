@@ -9988,7 +9988,8 @@ journey("phone: Review's confidence labels stay in their buttons at the largest 
   for (let i = 0; ; i++) {
     if (i > 12) throw new Error("no exercise in the review showed its source");
     const sure = page.getByRole("radio", { name: "Think so" });
-    await sure.waitFor();
+    await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
+    if (!(await sure.count())) throw new Error("the review ended before any exercise showed its source");
     const spill = await page.locator(".quiz-sure button").evaluateAll((els) => els.flatMap((b) => {
       const box = b.getBoundingClientRect();
       const range = document.createRange();
@@ -10008,10 +10009,18 @@ journey("phone: Review's confidence labels stay in their buttons at the largest 
     if (await open.count()) {
       const [w, h] = await open.evaluate(reach);
       if (w < 44 || h < 44) throw new Error(`Open in source is ${Math.round(w)}×${Math.round(h)} pt to a finger: want 44`);
+      // And a finger 20 pt above or below its middle lands on it: nothing clips or covers the margin.
+      const off = await open.evaluate((b) => {
+        const r = b.getBoundingClientRect();
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        return [y - 20, y + 20].filter((at) => !b.contains(document.elementFromPoint(x, at))).map((at) => Math.round(at - y));
+      });
+      if (off.length) throw new Error(`a tap ${off.join(" and ")} pt off Open in source's middle misses it`);
       break;
     }
+    const q = await page.locator(".review-q").innerText();
     await tap(page, good);
-    await good.waitFor({ state: "detached" }).catch(() => {});
+    await until("the next exercise comes up", async () => (await page.locator(".phone-full .review-end").count()) > 0 || (await page.locator(".review-q").innerText().catch(() => "")) !== q);
   }
 }, "phone");
 
@@ -10166,7 +10175,8 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
   await page.locator(".home-read .title").first().waitFor();
   for (const t of [1, 28 / 17]) {
     await page.evaluate((t) => document.documentElement.style.setProperty("--type", String(t)), t);
-    await check(`Today at ${t.toFixed(2)}`, ".home-read", ".title");
+    // The text itself: the cut is on the button's span, since WebKit draws a clamped <button> whole.
+    await check(`Today at ${t.toFixed(2)}`, ".home-read", ".title > span");
   }
   const meter = await page.locator(".home-read").first().evaluate((row) => {
     const pic = row.querySelector(".thumb")!.getBoundingClientRect();

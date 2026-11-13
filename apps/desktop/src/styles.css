@@ -2763,10 +2763,10 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .popup-tools { grid-column: 1; grid-row: 3; display: flex; justify-content: flex-end; gap: 2px; padding: 6px 0 0; border-left: 0; align-self: auto; }
 .phone .quiz-sure button, .phone .review-foot button, .phone .quiz-foot button { min-height: 44px; }
 /* A confidence label that wraps at a large text size grows its button (and its row) instead of hanging below it. */
-.phone .quiz-sure button { height: auto; padding: 6px 4px; line-height: 1.2; }
+.phone .quiz-sure button { height: auto; padding: 6px 8px; line-height: 1.2; }
 /* Open in source keeps its small look and reaches 44 pt with an unseen margin, as a skill page's controls do. */
 .phone .review-passage figcaption button { position: relative; }
-.phone .review-passage figcaption button::after { content: ""; position: absolute; inset: -10px -4px; }
+.phone .review-passage figcaption button::after { content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: max(44px, 100%); transform: translateY(-50%); }
 /* The rest of a source's small controls at 44pt too. A highlight's note field is a field, so it is that tall. */
 .phone .popup .field { min-height: 44px; }
 /* The links under a question in Collected: 44pt tall, their text still just under the question, the room below it. */
@@ -3165,7 +3165,9 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
   background: var(--bg-raised); box-shadow: var(--float);
   transform-origin: 100% 80%; animation: mole-says var(--t-3) var(--ease-out);
 }
-.mole-says-text { flex: 1; min-width: 0; padding: 0; text-align: left; font-size: 13px; line-height: 1.45; color: var(--text-read); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.mole-says-text { flex: 1; min-width: 0; padding: 0; text-align: left; font-size: 13px; line-height: 1.45; color: var(--text-read); overflow-wrap: anywhere; }
+/* The clamp is on the button's text: WebKit draws a clamped <button> whole. */
+.mole-says-text > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .mole-says-text:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
 .mole-says-x { flex: none; width: 20px; height: 20px; opacity: 0; }
 .mole-says:hover .mole-says-x, .mole-says-x:focus-visible { opacity: 1; }

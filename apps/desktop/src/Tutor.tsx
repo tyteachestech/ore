@@ -1240,7 +1240,7 @@ export function TutorBubble({ onOpen, said = null, failed = false, thinking = fa
       {said && (
         <div className="mole-says">
           <Hint text="Open the tutor" keys="tutor" side="top">
-            <button className="mole-says-text" onClick={onOpen}>{said}</button>
+            <button className="mole-says-text" onClick={onOpen}><span>{said}</span></button>
           </Hint>
           <Hint text="Dismiss" side="top">
             <button className="icon-btn mole-says-x" aria-label="Dismiss the reply" onClick={(e) => (onHush?.(), e.detail === 0 && mole.current?.focus())}>
