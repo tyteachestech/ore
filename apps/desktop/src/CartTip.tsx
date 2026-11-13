@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Mole } from "./Mole";
 import { Gem } from "./Gem";
 import { lit } from "./Ring";
@@ -25,8 +26,8 @@ const HEAP: [number, number][] = [[5.6, -0.3], [8.4, -0.3], [11.2, -0.3], [14, -
 const ROUGH = 6;
 /** The mole riding the load: drawn at the size he stands at on the ring, shown smaller on the cart: `DOZE` asleep (side on, about 80px long), `RIDER` once awake. */
 const RIDER_PX = 96, DOZE = 0.45, RIDER = 0.55;
-/** How long he hangs asleep where the cart was, and again awake, and how long he takes to fall. */
-const HANG_MS = 220, FALL_MS = 440;
+/** A snoring Z, in dots on a 4 by 4 grid (the mole's own Z). */
+const Z = [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3], [3, 3]] as const;
 
 const dots = (rows: readonly string[], x0: number, y0: number) =>
   rows.flatMap((row, y) => [...row].map((t, x) => (t === "." ? null : <circle key={`${x},${y}`} className={`cart-${t}`} cx={x0 + x + 0.5} cy={y0 + y + 0.5} r={RADIUS[t]} />)));
@@ -44,7 +45,7 @@ type Flying = { el: HTMLElement; ours: boolean; x0: number; y0: number; dx: numb
 
 /** `host` is the end screen. `lit` are the ring dots to light, in order; `stones` the colours of the gems cut
  *  (already capped to those shown); `rich` how many of the ore are rich, poured first. `onStone(i)` when stone i lands, `onPoured` when the ring is full, `onLeave`
- *  as the cart starts off (the mole comes up), `onDone` when it has gone. `mole`: he rides in asleep on the load and
+ *  as the cart starts off (the mole comes up, unless he is riding), `onDone` when it has gone. `mole`: he rides in asleep on the load and
  *  falls out onto the ring once the cart has left (D254); `onFell` as he lands, and `onDone` waits for it. */
 export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onStone, onPoured, onLeave, onDone }: {
   mole?: boolean; onFell?: () => void;
@@ -152,26 +153,27 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       play(rail, [{ opacity: 1 }, { opacity: 0 }], { duration: T4, delay: 260, easing: OUT });
     });
     later(stoned + 520, () => calls.current.onLeave());
-    const rider = el.querySelector<HTMLElement>(".cart-mole"), zzz = el.querySelector<HTMLElement>(".cart-zzz"), seat = host.querySelector(".review-mole");
+    const rider = el.querySelector<HTMLElement>(".cart-mole"), seat = host.querySelector(".review-mole");
     if (!rider || !seat) later(stoned + 340 + MOMENT + 20, () => { calls.current.onFell?.(); calls.current.onDone(); });
     else {
       // Asleep he is drawn side on, already on his back (`doze`): the wrapper's own point is the middle of his back.
       // Awake he is the front view (`fall`), turned on his side about the middle of his body, a little above that.
       const x = stop + W / 2 - 2, y = floor - 30, up = y - DOZE * 40, tipped = [x + 12, y + 4, 24] as const;
       const tf = (x: number, y: number, turn: number, scale: number) => `translate3d(${x}px, ${y}px, 0) rotate(${turn}deg) scale(${scale})`;
-      if (zzz) { zzz.style.left = `${x - DOZE * 70}px`; zzz.style.top = `${y - DOZE * 80 - 34}px`; }
       play(rider, [{ transform: tf(x - (stop + W + 20), y, 0, DOZE) }, { transform: tf(x, y, 0, DOZE) }], { duration: MOMENT, easing: OUT });
       // The bucket tips under him: he slides to the lip and sleeps on while his bed pours out.
       later(MOMENT - 100, () => play(rider, [{ transform: tf(x, y, 0, DOZE) }, { transform: tf(...tipped, DOZE) }], { duration: T4, easing: SPRING }));
       later(stoned + 160, () => play(rider, [{ transform: tf(...tipped, DOZE) }, { transform: tf(x + 6, y, 0, DOZE) }], { duration: T4, easing: OUT }));
-      // The cart leaves. He does not: a beat asleep on nothing, a beat running on it, then down.
-      const gone = stoned + 340;
-      later(gone + HANG_MS, () => { setAwake(true); play(rider, [{ transform: tf(x + 6, up, -90, RIDER) }, { transform: tf(x + 6, up, -90, RIDER) }], { duration: 1 }); });
-      later(gone + 2 * HANG_MS, () => {
-        const o = el.getBoundingClientRect(), to = seat.getBoundingClientRect(), dx = to.left - o.left + to.width / 2 - (x + 6), dy = to.bottom - o.top - up, N = 14;
+      // The cart leaves. He does not: a beat asleep on nothing, a beat running on it (each `t-3`), then down under
+      // the gravity the ore fell under. `flushSync`: his drawing and his place change in the same frame.
+      const gone = stoned + 340, HANG = ms("--t-3", 200);
+      later(gone + HANG, () => { flushSync(() => setAwake(true)); play(rider, [{ transform: tf(x + 6, up, -90, RIDER) }, { transform: tf(x + 6, up, -90, RIDER) }], { duration: 1 }); });
+      later(gone + 2 * HANG, () => {
+        const o = el.getBoundingClientRect(), to = seat.getBoundingClientRect(), dx = to.left - o.left + to.width / 2 - (x + 6), dy = to.bottom - o.top - up, T = flight(dy), N = 14;
         // Head over heels onto the ring, growing to the size he stands at, and up on his feet as he lands.
-        play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = i / N; return { transform: tf(x + 6 + dx * t, up + dy * t * t - 4 * 34 * t * (1 - t), -90 + 450 * t, RIDER + (1 - RIDER) * t) }; }), { duration: FALL_MS, easing: "linear" });
-        later(FALL_MS, () => { rider.hidden = true; calls.current.onFell?.(); calls.current.onDone(); });
+        play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = i / N, [ax, ay] = along(dx, dy, T, t * T); return { transform: tf(x + 6 + ax, up + ay, -90 + 450 * t, RIDER + (1 - RIDER) * t) }; }), { duration: T * 1000, easing: "linear" });
+        // The standing mole takes his place in the same frame he lands in.
+        later(T * 1000, () => flushSync(() => { calls.current.onFell?.(); calls.current.onDone(); }));
       });
     }
 
@@ -190,7 +192,13 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     <div className="cart-tip" ref={layer} aria-hidden="true">
       <span className="cart-rail" />
       {/* Before the cart, so he lies in the bucket, behind its near side. */}
-      {mole && <span className="cart-mole"><Mole bare size={RIDER_PX} mood={awake ? "fall" : "doze"} /></span>}
+      {mole && (
+        <span className="cart-mole">
+          <Mole bare size={RIDER_PX} mood={awake ? "fall" : "doze"} />
+          {/* His snoring, in his wrapper so it stays over his head as the bucket tips him. */}
+          {!awake && <svg className="cart-zzz" viewBox="0 0 28 22">{([[0, 16, 1.4], [9, 8, 1.7], [19, 0, 2]] as const).map(([x0, y0, p], n) => <g key={n}>{Z.map(([i, j]) => <circle key={`${i},${j}`} cx={x0 + (i + 0.5) * p} cy={y0 + (j + 0.5) * p} r={p * 0.4} />)}</g>)}</svg>}
+        </span>
+      )}
       <svg className="cart" width={W} height={H} viewBox={`0 ${-HEAD} 20 ${15 + HEAD}`}>
         {/* The rect fixes the group's box, so its foot is the same point whatever it carries. */}
         <g className="cart-bucket" style={{ transformOrigin: `${HINGE[0] + 4}px ${HINGE[1] + 12}px` }}>
@@ -213,7 +221,6 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
           <g key={x} className="cart-wheel">{dots(WHEEL, x, WHEEL_ROW)}</g>
         ))}
       </svg>
-      {mole && !awake && <span className="cart-zzz"><i>z</i><i>z</i><i>z</i></span>}
       {stones.map((color, i) => (
         <span key={i} className="cart-rough" data-color={color} hidden><Gem kind="rough" size={ROUGH * CELL} /></span>
       ))}

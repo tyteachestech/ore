@@ -302,6 +302,9 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   expect(endSays({ ...base, napped: true, session: session({}) })[0]!.text).toBe("Wasn’t asleep. Supervising.");
   expect(endSays({ ...base, napped: true, closed: true, session: session({}) })[0]!.text).toBe("Goal met. I supervised.");
   expect(endSays({ ...base, napped: true, short: true, session: session({}) })[0]!.text).toBe("Seam’s empty. Today counts.");
+  // Caught up short of the goal counts as the goal met: that line still wins, napped or not, as before the nap.
+  expect(endSays({ ...base, closed: true, short: true, session: session({}) })[0]!.text).toBe(PUNS.closed[0]!);
+  expect(endSays({ ...base, napped: true, closed: true, short: true, session: session({}) })[0]!.text).toBe("Goal met. I supervised.");
   // A session of misses opens with why it was worth it, whatever else is true (D62).
   expect(endSays({ ...base, session: session({ kept: 0, longest_days: 9 }), ups: [{ name: "AI", level: 3 }] })[0]!.verdict).toBe(true);
   // A gap under a week, and rescues that were most of the session, go unsaid.

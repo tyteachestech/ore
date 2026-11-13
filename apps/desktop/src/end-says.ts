@@ -20,7 +20,7 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   const s = o.session;
   // His verdict is a corny mining pun (Tyler, 2026-11-13), one of a few per case so it isn't the same every day.
   // `plain`: the quick quiz has no mole, so its one verdict (a session of misses) stays in plain words.
-  const verdict: Said = { verdict: true, text: o.plain && s.kept === 0 ? "Every miss comes back sooner. That’s how they stick." : pick(s.kept === 0 ? PUNS.missed : o.short ? PUNS.short : o.napped ? (o.closed ? PUNS.nappedClosed : PUNS.napped) : o.closed ? PUNS.closed : PUNS.plain, o.roll ?? 0) };
+  const verdict: Said = { verdict: true, text: o.plain && s.kept === 0 ? "Every miss comes back sooner. That’s how they stick." : pick(s.kept === 0 ? PUNS.missed : o.closed ? (o.napped ? PUNS.nappedClosed : PUNS.closed) : o.short ? PUNS.short : o.napped ? PUNS.napped : PUNS.plain, o.roll ?? 0) };
   const rare: Said[] = [
     ...o.ups.map((k): Said => ({ text: `${k.name} hit level ${k.level}.`, rare: { kind: "level", skill: k.skill ?? "" } })),
     // Then and now (D248): the two answers stand under the ring; he only points at them.
