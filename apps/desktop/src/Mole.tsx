@@ -1,19 +1,16 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
+import * as FINE from "./mole-fine";
 import { FINE_ORDER, fineDots } from "./mole-fine";
+import * as SMALL from "./mole-small";
+import { smallDots } from "./mole-small";
 
-/* The tutor's mole (D168, drawn D169, a puppet since D214, an old miner since D238): its head and two paws over a
-   strip of dirt, drawn as round dots on a 22 by 18 grid, like Nothing's dot glyphs. He is the mine's old hand: a
-   helmet with a lit lamp, small black eyes under its brim, a pink nose over a white moustache in two long lobes.
-   It moves like a puppet: each value of its shape (how high it stands, its dome, its paws, where it looks) follows a
-   spring, and every frame the smooth shape is sampled onto the fixed grid. A dot's size says how much of it the
-   shape covers, so the head and paws glide (halftone, D183). The face reads as features, so eyes, glints, the nose
-   the moustache and the mouth stay whole dots that move a whole column at a time and never shimmer. */
-export const COLS = 22, ROWS = 18;
-const MID = (COLS - 1) / 2;
-/** Rows of room above the grid: his helmet stands 3 over it, and rides higher on a hop or a start. */
-export const HEAD = 8;
+/* The tutor's mole (D168, drawn D169, a puppet since D214, an old miner since D238): his head and two paws over a
+   strip of dirt, in round dots, like Nothing's dot glyphs. He is the mine's old hand: a helmet with a lit lamp,
+   black eyes under its brim, a pink nose over a white moustache in two lobes. There are two drawings of him, moved by
+   the same springs and moods: under 48 px one drawn by hand on a 16-dot grid (`mole-small.ts`), from 48 px up
+   ChatGPT's concept 4 traced dot by dot (`mole-fine.ts`). Each value of the puppet (how high he stands, his paws,
+   where he looks) follows a spring; a drawing turns the values into dots. */
 
-export type Tone = "fur" | "helmet" | "band" | "housing" | "lamp" | "brim" | "paw" | "stache" | "brow" | "eye" | "glint" | "nose" | "dirt";
 /** The puppet's values. y: rows sunk into the hole. top: the dome's top row. rx: head half width. ex: how square the
  *  dome is (2 round, 4 boxy). hx: head lean. lx, ly: where the eyes look. open: 1 open, 0 shut. tall: wide eyes.
  *  arc: ∩ eyes and the moustache spread wide. pawL, pawR: rows each paw is raised. pw: paw width. kick: dirt swell. mouth: an o, then an O. */
@@ -40,113 +37,14 @@ const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx
   whole: [900, 60], breath: [16, 7], arms: [220, 17], legs: [300, 14], side: [900, 60] };
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const roundBox = (px: number, py: number, cx: number, cy: number, hw: number, hh: number, rad: number) => {
-  const qx = Math.abs(px - cx) - hw + rad, qy = Math.abs(py - cy) - hh + rad;
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rad;
-};
-
-const span = (r: number, a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => [r, a + i] as const);
-/** The moustache's left lobe (the right mirrors it): hanging at rest, spread wide when he is pleased. */
-const HANG = [[10, 8], [10, 9], ...span(11, 6, 10), ...span(12, 5, 9), ...span(13, 5, 9), ...span(14, 5, 8), ...span(15, 6, 8), [16, 6], [16, 7]] as const;
-const SPREAD = [[10, 9], ...span(11, 6, 10), ...span(12, 3, 9), ...span(13, 2, 6), [11, 2], [12, 2]] as const;
-const NOSE = [[9, 9], [9, 10], [10, 10]] as const;
-
-/** The face as whole dots, keyed r * 100 + c. Its position rounds to a dot; how open the eyes are picks a drawn shape. */
-function face(s: State, fx: number, fy: number) {
-  const m = new Map<number, Tone>();
-  const ox = Math.round(fx + s.lx * 0.65), oy = Math.round(fy + s.ly * 0.75), nx = Math.round(fx * 1.1), er = 7;
-  const set = (r: number, c: number, t: Tone, dx = ox, dy = oy) => m.set((r + dy) * 100 + c + dx, t);
-  const both = (cells: readonly (readonly [number, number])[], t: Tone, dx = ox, dy = oy) => { for (const [r, c] of cells) { set(r, c, t, dx, dy); set(r, COLS - 1 - c, t, dx, dy); } };
-  // His eyes and brows never rise into the brim: a look up moves his nose and moustache, and cocks a brow.
-  const ey = Math.round(s.y + Math.max(0, s.ly));
-  if (s.arc > 0.5) both([[er + 1, 5], [er, 6], [er, 7], [er + 1, 8]], "eye", ox, ey);
-  else if (s.open < 0.35) both([[er + 1, 6], [er + 1, 7]], "eye", ox, ey);
-  else {
-    const top = s.tall > 0.5 ? er - 1 : er;
-    for (let r = top; r <= er + 1; r++) both([[r, 6], [r, 7]], "eye", ox, ey);
-    // One highlight, top right of each eye (the light comes from the upper right).
-    set(top, 7, "glint", ox, ey); set(top, 15, "glint", ox, ey);
-  }
-  // His brows sit under the brim, a row over his eyes: one shows, cocked, on the side he looks to, and both when
-  // his helmet jumps.
-  const brow = s.tall > 0.5 ? er - 2 : er - 1;
-  if (s.lx > 0.5 || s.tall > 0.5) for (const [r, c] of span(brow, 13, 16)) set(r, c, "brow", ox, ey);
-  if (s.lx < -0.5 || s.tall > 0.5) for (const [r, c] of span(brow, 5, 8)) set(r, c, "brow", ox, ey);
-  both(NOSE, "nose", nx);
-  both(s.arc > 0.5 ? SPREAD : HANG, "stache", nx);
-  // The mouth, between the lobes: a small o, then a round O when he's surprised.
-  if (s.mouth > 0.25) both([[13, 10]], "eye", nx);
-  if (s.mouth > 0.7) both([[14, 10]], "eye", nx);
-  return m;
-}
-
-/** His head is a little narrower than the grid, so the helmet's brim overhangs it. */
-const NARROW = 0.93;
-/** The helmet, in its own rows (y 0 is the grid's top row at rest): a dome from -2.5 to a darker band, over a brim
- *  the grid's whole width, with the lamp in its housing at the front. The size of the dot at (x from its middle, y). */
-function helmet(x: number, y: number): [cover: number, tone: Tone] | null {
-  const brim = roundBox(x, y, 0, 5, 10.9, 0.5, 0.5);
-  if (brim < 0.1) return [clamp(-brim * 4 + 0.6), "brim"];
-  const t = (4.5 - y) / 7;
-  if (t < 0 || t > 1) return null;
-  const cover = clamp((9 * (1 - t ** 2.2) ** (1 / 2.2) - Math.abs(x)) / 0.5 + 0.6);
-  if (cover <= 0.15) return null;
-  const lamp = Math.hypot(x, y - 1.5);
-  return lamp < 1 ? [1.25, "lamp"] : lamp < 2.3 ? [cover, "housing"] : [cover, Math.round(y) === 4 ? "band" : "helmet"];
-}
-
-export type Dot = [c: number, r: number, radius: number, tone: Tone];
-/** Every dot of the mole in state `s`, rows from -HEAD (room above the grid) to the dirt at ROWS - 1. */
-export function moleDots(s: State): Dot[] {
-  const out: Dot[] = [], bottom = ROWS - 1.5, ry = Math.max(4, bottom - s.top);
-  const fx = s.hx * 0.8 + s.lx * 0.35, fy = s.y + s.ly * 0.25;
-  // Squash and stretch: stretched tall the head narrows, squashed it spreads, so it keeps its mass through a hop.
-  const rx = s.rx * NARROW * clamp((bottom - REST.top) / ry, 0.86, 1.06);
-  // The helmet rides the top of his head: up with a hop, never down over his eyes, and it jumps when he is startled.
-  const hatY = Math.min(s.top - REST.top, 0.3) + s.y - s.tall * 1.6, hatX = MID + s.hx * 0.9;
-  // Each paw a rounded box, and a box one dot wider that keeps the head apart from it.
-  const paws = [0, 1].map((side) => {
-    const w = s.pw, top = ROWS - 4 - (side ? s.pawR : s.pawL) + s.y;
-    const x0 = side ? COLS - w - 0.25 : -0.25, x1 = x0 + w - 0.5, y0 = top - 0.25, y1 = ROWS + 1;
-    const hh = Math.max(0.3, (y1 - y0) / 2);
-    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, hw: (x1 - x0) / 2, hh, rad: Math.min(1, hh) };
-  });
-  const paw = (i: number, c: number, r: number) => {
-    const b = paws[i]!;
-    return [roundBox(c, r, b.cx, b.cy, b.hw, b.hh, b.rad), roundBox(c, r, b.cx, b.cy, b.hw + 1, b.hh, b.rad)] as const;
-  };
-  const marks = face(s, fx, fy);
-  for (let r = -HEAD; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) {
-    const up = clamp((bottom - (r - s.y + 0.5)) / ry);
-    const dx = (c - MID - s.hx * up) / rx, dy = (r - s.y + 0.5 - bottom) / ry;
-    // Squarer at the cheeks, round at the crown.
-    const e = lerp(s.ex, 2, clamp((-dy - 0.45) / 0.55)), f = (Math.abs(dx) ** e + Math.abs(dy) ** e) ** (1 / e);
-    let head = dy > 0.3 ? 0 : clamp(((1 - f) * Math.min(rx, ry)) / 0.5 + 0.6);
-    const [pl, gl] = paw(0, c, r), [pr, gr] = paw(1, c, r);
-    const pawCov = clamp(-Math.min(pl, pr) * 4);
-    head *= clamp(Math.min(gl, gr) * 4);
-    if (pawCov > 0.15) { out.push([c, r, 0.44 * pawCov ** 0.6, "paw"]); continue; }
-    const hat = helmet(c - hatX, r - hatY);
-    if (hat) { out.push([c, r, 0.44 * hat[0] ** 0.6, hat[1]]); continue; }
-    if (head <= 0.15) continue;
-    const mark = head >= 0.5 ? marks.get(r * 100 + c) : undefined;
-    if (mark) { out.push([c, r, mark === "eye" ? 0.56 : 0.44, mark]); continue; }
-    out.push([c, r, 0.44 * head ** 0.6, "fur"]);
-  }
-  // The dirt swells where he comes up through it.
-  for (let c = 0; c < COLS; c++) out.push([c, ROWS - 1, 0.44 * (1 + 0.22 * clamp(s.kick, -1, 1) * Math.exp(-(((c - MID) / 6) ** 2))), "dirt"]);
-  return out;
-}
 
 /** One path per tone, painted back to front: eyes over the face, glints over the eyes. */
-const ORDER: Tone[] = ["dirt", "fur", "helmet", "band", "housing", "brim", "paw", "stache", "brow", "nose", "lamp", "eye", "glint"];
-function paths<T extends string>(dots: readonly (readonly [number, number, number, T])[], order: readonly T[], half = 0.5): Record<T, string> {
+function paths<T extends string>(dots: readonly (readonly [number, number, number, T])[], order: readonly T[]): Record<T, string> {
   const by = Object.fromEntries(order.map((t) => [t, ""])) as Record<T, string>;
   for (const [c, r, rad, t] of dots) {
     if (rad < 0.05) continue;
-    const x = c + half - rad;
-    by[t] += `M${x.toFixed(2)} ${(r + half).toFixed(2)}a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(2 * rad).toFixed(2)} 0a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(-2 * rad).toFixed(2)} 0`;
+    const x = c - rad;
+    by[t] += `M${x.toFixed(2)} ${r.toFixed(2)}a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(2 * rad).toFixed(2)} 0a${rad.toFixed(2)} ${rad.toFixed(2)} 0 1 0 ${(-2 * rad).toFixed(2)} 0`;
   }
   return by;
 }
@@ -291,15 +189,15 @@ export function advance(s: Puppet, now: number, dt: number) {
   return !!s.move || !settled(s);
 }
 
-/** In its button the sprite sits 3.3 dots below a square's top, so its dirt lands low and it pokes out of the ground. */
-const LIFT = 3.3;
+/** In its button the small mole sits 1.6 dots (4 px) below a square's top, so its dirt lands low and it pokes out of the ground. */
+const LIFT = 1.6;
 const BLINK_MS = 120, LOOK_MS = 900;
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
 /** From this width up he is drawn as the traced concept (`mole-fine.ts`, D251); under it his dots would be under 2px,
- *  so the small grid mole above stands in. */
-export const FINE_FROM = 48;
+ *  so the hand-drawn small mole stands in (`mole-small.ts`), which is drawn for `SMALL_PX`. */
+export const FINE_FROM = 48, SMALL_PX = 40;
 
 /** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite; the dome may
  *  rise into the room above it). `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
@@ -308,7 +206,7 @@ export const FINE_FROM = 48;
  *  reduced motion and while the window is hidden (a mood shows its still pose). */
 export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean }) {
   const svg = useRef<SVGSVGElement>(null);
-  const fine = size >= FINE_FROM, order: readonly string[] = fine ? FINE_ORDER : ORDER;
+  const fine = size >= FINE_FROM, order = FINE_ORDER, { COLS, ROWS } = fine ? FINE : SMALL;
   const tones = useRef<Record<string, SVGPathElement | null>>({});
   const p = useRef(puppet());
   const run = useRef({ frame: 0, last: 0 });
@@ -317,7 +215,7 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
 
   // `data-mood` is the move it is playing (or showing still), for tests.
   const draw = () => {
-    const d: Record<string, string> = fine ? paths(fineDots(p.current.v), FINE_ORDER, 0) : paths(moleDots(p.current.v), ORDER);
+    const d = paths(fine ? fineDots(p.current.v) : smallDots(p.current.v), FINE_ORDER);
     for (const t of order) tones.current[t]?.setAttribute("d", d[t]!);
     svg.current?.setAttribute("data-mood", p.current.mood);
   };

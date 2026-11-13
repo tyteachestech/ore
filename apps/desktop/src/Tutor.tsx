@@ -846,7 +846,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
         {/* The one mole (D186): it peeks over the field's edge, wonders while a reply is written and hops when one lands;
             the newest bubble's tail points down at it. What he pointed the chat at sits beside it. */}
         <div className="tutor-perch">
-          <span className="tutor-mole"><Mole bare size={36} mood={busy ? "thinking" : landed ? (landed.failed ? "surprised" : "happy") : "idle"} cue={landed?.id} /></span>
+          <span className="tutor-mole"><Mole bare size={40} mood={busy ? "thinking" : landed ? (landed.failed ? "surprised" : "happy") : "idle"} cue={landed?.id} /></span>
           {chips}
         </div>
         <div className="ask-input">

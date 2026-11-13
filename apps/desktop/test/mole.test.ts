@@ -1,13 +1,19 @@
 import { expect, test } from "bun:test";
-import { COLS, FINE_FROM, HEAD, MOVES, REST, ROWS, advance, moleDots, puppet, start, type State } from "../src/Mole";
+import { FINE_FROM, MOVES, REST, SMALL_PX, advance, puppet, start, type State } from "../src/Mole";
 import * as FINE from "../src/mole-fine";
 import { fineDots } from "../src/mole-fine";
+import { COLS, ROWS, smallDots } from "../src/mole-small";
 
-// D214: the mole is a puppet, a smooth shape sampled onto the fixed dot grid. Its body glides (dot sizes change),
-// its face stays whole dots.
-const at = (s: Partial<State> = {}) => moleDots({ ...REST, ...s });
-const cells = (d: ReturnType<typeof moleDots>, tone: string) => d.flatMap(([c, r, , t]) => (t === tone ? [[c, r]] : []));
-const key = (d: ReturnType<typeof moleDots>) => d.map(([c, r, rad, t]) => `${c},${r},${rad.toFixed(2)},${t}`).sort();
+// D-new-small-mole: under 48px the mole is drawn by hand on a 16-dot grid, whole dots of one size, and moves as a
+// cut-out puppet on the springs of D214.
+type Dots = ReturnType<typeof smallDots>;
+const at = (s: Partial<State> = {}) => smallDots({ ...REST, ...s });
+const of = (d: Dots, tone: string) => d.filter(([, , , t]) => t === tone);
+const key = (d: Dots) => d.map(([x, y, r, t]) => `${x.toFixed(2)},${y.toFixed(2)},${r.toFixed(2)},${t}`).sort();
+const DIRT = ROWS - 0.5;
+/** A dot that is whole and on the grid: what keeps him sharp. */
+const whole = (v: number) => Math.abs(v - 0.5 - Math.round(v - 0.5)) < 0.01;
+const crisp = ([x, y, r, t]: Dots[number]) => whole(x) && whole(y) && (r === 0.44 || (t === "eye" && r === 0.56));
 
 /** Plays a mood for `ms` at 60 Hz, frame by frame as the component does. */
 function play(name: keyof typeof MOVES, ms: number) {
@@ -16,101 +22,99 @@ function play(name: keyof typeof MOVES, ms: number) {
   for (let t = 1000 / 60; t <= ms; t += 1000 / 60) { advance(s, t, 1 / 60); frames.push({ ...s.v }); }
   return frames;
 }
+/** The moods the small mole is asked for: the tutor button, his chat, the Review moment. */
+const USED = ["peek", "thinking", "happy", "surprised"] as const;
 
-test("every frame of every move stays on the grid, over one row of dirt", () => {
+test("his dots land on whole Retina pixels: 16 across 40px", () => {
+  expect((SMALL_PX / COLS) * 2).toBe(5);
+  expect(FINE_FROM).toBeGreaterThan(SMALL_PX);
+});
+
+test("at rest, and held in each mood, every dot is whole and on the grid (no mush)", () => {
+  expect(at().every(crisp)).toBe(true);
+  expect(at({ open: 0 }).every(crisp)).toBe(true);
+  expect(at({ lx: 1, hx: 0.45 }).every(crisp)).toBe(true);
+  for (const name of USED) expect(at(MOVES[name].still).every(crisp)).toBe(true);
+  // Thinking holds its look for two seconds a side: once the paw's tap is over he is sharp again.
+  const think = play("thinking", 1900);
+  expect(smallDots(think.at(-1)!).every(crisp)).toBe(true);
+});
+
+test("every frame of every move stays in his box, over one row of dirt", () => {
   for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[])
     for (const s of play(name, 2 * (MOVES[name].end ?? MOVES[name].loop!))) {
-      const d = moleDots(s);
-      for (const [c, r, rad] of d) {
-        expect(Number.isInteger(c) && Number.isInteger(r)).toBe(true);
-        expect(c >= 0 && c < COLS && r >= -HEAD && r < ROWS).toBe(true);
-        expect(rad).toBeLessThanOrEqual(0.56);
+      const d = smallDots(s);
+      for (const [x, y, r, t] of d) {
+        expect(Number.isFinite(x) && Number.isFinite(y) && r > 0 && r <= 0.56).toBe(true);
+        // A lean carries the brim's ends a dot past his box.
+        expect(x > -1.5 && x < COLS + 1.5).toBe(true);
+        // Nothing of him shows under the dirt line.
+        if (t !== "dirt") expect(y).toBeLessThan(DIRT);
       }
-      expect(cells(d, "dirt")).toHaveLength(COLS);
-      expect(cells(d, "dirt").every(([, r]) => r === ROWS - 1)).toBe(true);
+      expect(of(d, "dirt")).toHaveLength(COLS);
+      expect(of(d, "dirt").every(([, y]) => y === DIRT)).toBe(true);
     }
 });
 
-test("at rest it is mirror-symmetric, with two eyes, two glints and a nose on the midline", () => {
+test("at rest he is the old miner: mirror-symmetric, a lamp of four dots, two eyes with a glint each, a nose on the midline", () => {
   // The glints both sit top right (one light), so they count as eye here.
-  const d = at(), size = ([, , rad, t]: (typeof d)[number]) => (t === "glint" ? 0.56 : rad).toFixed(3);
-  const shape = new Set(d.map((dot) => `${dot[0]},${dot[1]},${size(dot)}`));
-  for (const dot of d) expect(shape.has(`${COLS - 1 - dot[0]},${dot[1]},${size(dot)}`)).toBe(true);
-  expect(cells(d, "glint")).toHaveLength(2);
-  expect(cells(d, "nose").map(([c]) => c)).toEqual([9, 10, 11, 12, 10, 11]);
-  expect(cells(d, "eye")).toHaveLength(6);
+  // The helmet's dome is dented on one side, as in the drawing; from the brim down he mirrors.
+  const d = at().filter(([, y]) => y > 4), shape = new Set(d.map(([x, y, , t]) => `${x},${y},${t === "glint" ? "eye" : t}`));
+  for (const [x, y, , t] of d) expect(shape.has(`${COLS - x},${y},${t === "glint" ? "eye" : t}`)).toBe(true);
+  expect(of(at(), "lamp").map(([x, y]) => [x, y])).toEqual([[7.5, 2.5], [8.5, 2.5], [7.5, 3.5], [8.5, 3.5]]);
+  expect(of(d, "nose").map(([x]) => x)).toEqual([7.5, 8.5]);
+  expect(of(d, "glint")).toHaveLength(2);
+  expect(of(d, "eye")).toHaveLength(6);
+  // His brim is the grid's whole width, and droops at both ends over eyes that sit under it.
+  const white = of(d, "fine-9"), rowOf = (x: number) => white.filter((w) => w[0] === x).map(([, y]) => y);
+  expect(rowOf(0.5)).toContain(6.5);
+  expect(rowOf(COLS - 0.5)).toContain(6.5);
+  expect(Math.min(...of(d, "eye").map(([, y]) => y))).toBeGreaterThan(5);
 });
 
-// D238: the old miner. A helmet with a lit lamp, a brim the grid's whole width, a moustache in two long lobes.
-test("he wears a helmet: a lamp of four dots on the midline, over a brim that spans the grid", () => {
-  const d = at();
-  expect(cells(d, "lamp")).toEqual([[10, 1], [11, 1], [10, 2], [11, 2]]);
-  expect(cells(d, "brim").map(([c]) => c)).toEqual(Array.from({ length: COLS }, (_, c) => c));
-  expect(new Set(cells(d, "brim").map(([, r]) => r))).toEqual(new Set([5]));
-  // The eyes sit under the brim, never behind it.
-  expect(Math.min(...cells(d, "eye").map(([, r]) => r!))).toBeGreaterThan(5);
+test("an open eye never loses its glint, in any frame of any move", () => {
+  for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[])
+    for (const s of play(name, MOVES[name].end ?? MOVES[name].loop!)) {
+      if (s.y > 1 || s.open < 0.35 || s.arc > 0.5) continue; // in his hole, shut, or pleased (arcs)
+      expect(of(smallDots(s), "glint")).toHaveLength(2);
+    }
 });
 
-test("his moustache hangs in two lobes to the dirt, and spreads wide when he is pleased", () => {
-  const rows = (d: ReturnType<typeof moleDots>) => cells(d, "stache").map(([, r]) => r!);
-  const hang = at(), wide = at(MOVES.happy.still);
-  expect(Math.max(...rows(hang))).toBe(ROWS - 2);
-  // Parted under the nose: nothing on the two middle columns below the lobes' join.
-  expect(cells(hang, "stache").filter(([c, r]) => (c === 10 || c === 11) && r! > 11)).toHaveLength(0);
-  expect(Math.max(...rows(wide))).toBeLessThan(14);
-  const reach = (d: ReturnType<typeof moleDots>) => Math.min(...cells(d, "stache").map(([c]) => c!));
-  expect(reach(wide)).toBeLessThan(reach(hang));
+test("a blink only touches the eyes, and a glance moves them a whole column", () => {
+  const rest = at(), shut = at({ open: 0 });
+  const body = (d: Dots) => d.filter(([, , , t]) => t !== "eye" && t !== "glint" && t !== "fine-5").map(([x, y]) => `${x},${y}`).sort();
+  expect(body(shut)).toEqual(body(rest));
+  expect(of(shut, "eye")).toHaveLength(4);
+  expect(of(shut, "glint")).toHaveLength(0);
+  expect(of(at({ lx: 1 }), "eye").map(([x, y]) => [x, y])).toEqual(of(rest, "eye").map(([x, y]) => [x + 1, y]));
 });
 
-test("startled, his helmet jumps and both brows show; thinking cocks the one on the side he looks to", () => {
-  const brimRow = (d: ReturnType<typeof moleDots>) => Math.min(...cells(d, "brim").map(([, r]) => r!));
-  const wide = at(MOVES.surprised.still);
-  expect(brimRow(wide)).toBeLessThan(brimRow(at()));
-  expect(cells(wide, "brow")).toHaveLength(8);
-  expect(cells(at(), "brow")).toHaveLength(0);
-  const think = cells(at(MOVES.thinking.still), "brow");
-  expect(think).toHaveLength(4);
-  expect(think.every(([c]) => c! > COLS / 2)).toBe(true);
-  // The brow sits over the eye, never on it: both eyes keep their four dots (three and a glint) as he looks up.
-  const up = at(MOVES.thinking.still);
-  expect(cells(up, "eye").length + cells(up, "glint").length).toBe(8);
+test("pleased, his eyes are arcs and the moustache spreads wide; startled, the helmet jumps over wide eyes and an O", () => {
+  const reach = (d: Dots) => Math.min(...of(d, "fine-9").filter(([, y]) => y > 8 && y < 11).map(([x]) => x));
+  const happy = at(MOVES.happy.still), wide = at(MOVES.surprised.still);
+  expect(of(happy, "glint")).toHaveLength(0);
+  expect(of(happy, "eye")).toHaveLength(8);
+  expect(reach(happy)).toBeLessThan(reach(at()));
+  const lampTop = (d: Dots) => Math.min(...of(d, "lamp").map(([, y]) => y));
+  expect(lampTop(wide)).toBe(lampTop(at()) - 2);
+  // Eyes a row taller (five dots and a glint each), and four dots of mouth under the nose.
+  expect(of(wide, "eye")).toHaveLength(10 + 4);
+  expect(of(wide, "glint")).toHaveLength(2);
 });
 
 test("the helmet never comes down over his eyes, whatever the move", () => {
   for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[])
     for (const s of play(name, MOVES[name].end ?? MOVES[name].loop!)) {
       if (s.y > 1) continue; // still coming up out of his hole
-      expect(cells(moleDots(s), "eye").length).toBeGreaterThanOrEqual(4);
+      // His eyes (the dots over his nose's row; the mouth is under it) are never shrunk by the helmet.
+      const nose = Math.min(...of(smallDots(s), "nose").map(([, y]) => y));
+      for (const [, y, r] of of(smallDots(s), "eye")) if (y <= nose) expect(r).toBe(0.56);
     }
 });
 
-test("the face is whole dots: eyes, glints and nose are full size wherever the body glides", () => {
-  for (const s of play("thinking", 4000)) for (const [, , rad, t] of moleDots(s)) {
-    if (t === "eye") expect(rad).toBe(0.56);
-    if (t === "glint" || t === "nose") expect(rad).toBe(0.44);
-  }
-});
-
-test("a blink only touches the eyes, and a glance moves them a whole column", () => {
-  const rest = at(), shut = at({ open: 0 });
-  const body = (d: ReturnType<typeof moleDots>) => d.map(([c, r]) => `${c},${r}`).sort();
-  expect(body(shut)).toEqual(body(rest));
-  expect(cells(shut, "nose")).toEqual(cells(rest, "nose"));
-  expect(cells(shut, "eye").length).toBeLessThan(cells(rest, "eye").length);
-  expect(cells(at({ lx: 1 }), "eye")).toEqual(cells(rest, "eye").map(([c, r]) => [c! + 1, r!]));
-});
-
 test("sunk into its hole only the dirt is left, and a peek brings it up", () => {
-  expect(at(MOVES.peek.from).every(([, r, , t]) => t === "dirt" || r === ROWS - 1)).toBe(true);
-  const frames = play("peek", 3000);
-  expect(key(moleDots(frames.at(-1)!))).toEqual(key(at()));
-});
-
-test("surprised opens an O under the nose; happy and cheer close their eyes to arcs", () => {
-  const wide = at(MOVES.surprised.still);
-  const nose = cells(wide, "nose"), mouth = cells(wide, "eye").filter(([, r]) => r! > Math.max(...nose.map(([, y]) => y!)));
-  expect(mouth).toHaveLength(4);
-  expect(cells(at(MOVES.happy.still), "glint")).toHaveLength(0);
+  expect(at(MOVES.peek.from).every(([, , , t]) => t === "dirt")).toBe(true);
+  expect(key(smallDots(play("peek", 3000).at(-1)!))).toEqual(key(at()));
 });
 
 test("a move plays, rests, and its springs settle so the frames can stop", () => {
@@ -121,32 +125,34 @@ test("a move plays, rests, and its springs settle so the frames can stop", () =>
     let t = 0, moving = true;
     for (; t < mid; t += 1000 / 60) advance(s, t, 1 / 60);
     // Before it rests it has reached its still pose.
-    expect(key(moleDots(s.v))).toEqual(key(at(MOVES[name].still)));
+    expect(key(smallDots(s.v))).toEqual(key(at(MOVES[name].still)));
     for (; moving && t < 20_000; t += 1000 / 60) moving = advance(s, t, 1 / 60);
     expect(moving).toBe(false);
     expect(s.mood).toBe("idle");
-    expect(key(moleDots(s.v))).toEqual(key(at()));
+    expect(key(smallDots(s.v))).toEqual(key(at()));
   }
 });
 
 test("each mood's still pose (reduced motion, hidden window) shows the whole mole out of its hole", () => {
   for (const move of Object.values(MOVES)) {
+    if (move.still.whole || move.still.side) continue; // drawn only by the traced mole
     const d = at(move.still);
-    expect(cells(d, "paw").some(([, r]) => r === ROWS - 2)).toBe(true);
-    expect(cells(d, "eye").length).toBeGreaterThan(0);
+    expect(of(d, "lamp")).toHaveLength(4);
+    expect(of(d, "eye").length).toBeGreaterThan(0);
   }
 });
 
-test("a move is big enough to see at button size: a squat, then a hop of a row and a half; a tap as high", () => {
-  // A dot is 1.6 to 1.8px in the chat and the button, so less than a row and a half of travel is lost.
+test("a move is big enough to see: a squat, then a hop with both paws up; a tap as high", () => {
+  // The springs count in rows of the 22-dot mole they were written on, 1.8px each.
   for (const name of ["happy", "cheer"] as const) {
     const frames = play(name, MOVES[name].end!), pose = { ...REST, ...MOVES[name].still }.top;
     const low = frames.findIndex((f) => f.top > REST.top + 1), high = frames.findIndex((f) => f.top < pose - 1.5);
     expect(low).toBeGreaterThanOrEqual(0);
     expect(high).toBeGreaterThan(low);
-    // Both paws go up with it, and never past the room above the grid.
     expect(Math.max(...frames.map((f) => Math.min(f.pawL, f.pawR)))).toBeGreaterThan(1.5);
-    expect(Math.min(...frames.map((f) => f.top))).toBeGreaterThan(-HEAD);
+    // On screen: his lamp travels more than a dot (2.5px) up from where it rests.
+    const lamp = (f: State) => Math.min(...of(smallDots(f), "lamp").map(([, y]) => y));
+    expect(Math.min(...frames.map(lamp))).toBeLessThan(lamp({ ...REST }) - 1);
   }
   expect(Math.min(...play("surprised", 400).map((f) => f.top))).toBeLessThan(REST.top - 1);
   const think = play("thinking", 4000);
@@ -154,19 +160,12 @@ test("a move is big enough to see at button size: a squat, then a hop of a row a
   expect(Math.max(...think.map((f) => f.pawL))).toBeGreaterThan(1.4);
 });
 
-test("stretched tall the head is narrower than at rest, squashed it is wider", () => {
-  // How much of row 9 the head covers: the sum of its dots' sizes.
-  const width = (s: Partial<State>) => at(s).reduce((n, [, r, rad, t]) => (r === 9 && t !== "paw" ? n + rad : n), 0);
-  expect(width({ top: -2 })).toBeLessThan(width({}));
-  expect(width({ top: 1.7, rx: 9 })).toBeGreaterThan(width({ rx: 9 }));
-});
-
 // D251: from 48px up he is concept 4 itself, traced dot by dot, moving as a cut-out puppet on the same springs.
 const fine = (s: Partial<State> = {}) => fineDots({ ...REST, ...s });
 const ink = (d: ReturnType<typeof fineDots>, tone?: string) => d.reduce((a, [, , r, t]) => a + (!tone || t === tone ? r * r : 0), 0);
 
-test("the traced mole shares the small one's box", () => {
-  expect([FINE.COLS, FINE.ROWS, FINE.REST_TOP]).toEqual([COLS, ROWS, REST.top]);
+test("the traced mole is drawn from 48px, in a 22 by 18 box, on the springs' own rest", () => {
+  expect([FINE.COLS, FINE.ROWS, FINE.REST_TOP]).toEqual([22, 18, REST.top]);
   expect(FINE_FROM).toBe(48);
 });
 
@@ -175,7 +174,7 @@ test("traced, at rest: every dot of the drawing, a lamp, a nose, two eyes with a
   expect(d.length).toBeGreaterThan(560);
   expect([count("lamp"), count("nose"), count("eye"), count("glint"), count("dirt")]).toEqual([8, 7, 8, 2, 33]);
   // He fits the small mole's box: across its width, and his helmet no more than a row over its top.
-  for (const [x, y, r] of d) { expect(x - r).toBeGreaterThanOrEqual(-0.2); expect(x + r).toBeLessThanOrEqual(COLS + 0.2); expect(y - r).toBeGreaterThan(-1); }
+  for (const [x, y, r] of d) { expect(x - r).toBeGreaterThanOrEqual(-0.2); expect(x + r).toBeLessThanOrEqual(FINE.COLS + 0.2); expect(y - r).toBeGreaterThan(-1); }
 });
 
 test("traced: every frame of every move is whole, stays over the dirt, and no frame jumps", () => {
@@ -186,7 +185,7 @@ test("traced: every frame of every move is whole, stays over the dirt, and no fr
       for (const [x, y, r, t] of d) {
         expect(Number.isFinite(x) && Number.isFinite(y) && r > 0 && r < 0.4).toBe(true);
         // Nothing of him shows under the dirt line (drawn whole, there is no dirt).
-        if (t !== "dirt" && s.whole < 0.5 && s.side < 0.5) expect(y).toBeLessThan(ROWS - 0.5);
+        if (t !== "dirt" && s.whole < 0.5 && s.side < 0.5) expect(y).toBeLessThan(FINE.ROWS - 0.5);
       }
       // A part never pops in or out: what is drawn changes by a small share from one frame to the next.
       const now = ink(d);
@@ -255,7 +254,7 @@ test("traced: comic marks. A tear and a bead of sweat show only on their way dow
     expect(white(fine({ [k]: 0.5 }))).toBeGreaterThan(white(fine()) + 0.1);
   }
   // The tear falls: lower at 0.7 than at 0.3.
-  const low = (d: ReturnType<typeof fineDots>) => Math.max(...d.filter(([, y, , t]) => t === "glint" && y < ROWS - 1).map(([, y]) => y));
+  const low = (d: ReturnType<typeof fineDots>) => Math.max(...d.filter(([, y, , t]) => t === "glint" && y < FINE.ROWS - 1).map(([, y]) => y));
   expect(low(fine({ tear: 0.7 }))).toBeGreaterThan(low(fine({ tear: 0.3 })) + 1);
   const stars = fine({ star: 1 });
   expect(ink(stars, "eye")).toBe(0);
@@ -272,7 +271,7 @@ test("traced: an open eye never loses its glint, in any frame of any move (Tyler
     const d = fineDots(s);
     if (ink(d, "eye") < eyes * 0.6) continue;
     // Both glints at full size (the dirt may cover them while he is down in his hole).
-    const whole = d.filter(([, y, r, t]) => t === "glint" && r > glint * 0.85 && y < ROWS - 1).length;
+    const whole = d.filter(([, y, r, t]) => t === "glint" && r > glint * 0.85 && y < FINE.ROWS - 1).length;
     if (s.y < 5) expect(whole).toBeGreaterThanOrEqual(2);
   }
   // A low helmet no longer covers it: sad, huff and the look down keep both.
@@ -297,9 +296,9 @@ test("traced: out of the ground he has a whole body and no dirt; asleep his eyes
   for (const d of [nap, fall]) {
     expect(d.some(([, , , t]) => t === "dirt")).toBe(false);
     // His feet, well under where the dirt would be.
-    expect(low(d)).toBeGreaterThan(ROWS + 14);
+    expect(low(d)).toBeGreaterThan(FINE.ROWS + 14);
   }
-  expect(low(fine())).toBeLessThan(ROWS);
+  expect(low(fine())).toBeLessThan(FINE.ROWS);
   expect(ink(nap, "glint")).toBe(0);
   expect(ink(fall, "glint")).toBeGreaterThan(0);
   // Asleep his paws are behind his head; falling they are flung out past it.
@@ -314,18 +313,18 @@ test("traced: asleep in profile he lies along the foot of the box, head to the l
   expect(d.some(([, , , t]) => t === "dirt" || t === "eye" || t === "glint")).toBe(false);
   // Longer than he is tall, and nothing under the bed.
   expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(30);
-  expect(Math.max(...ys)).toBeLessThan(ROWS);
+  expect(Math.max(...ys)).toBeLessThan(FINE.ROWS);
   expect(Math.min(...ys)).toBeGreaterThan(-7);
   // Stout (Tyler, 2026-11-13): his belly is a hill higher than his nose, and he has feet but no legs: the white of
   // his feet starts within five rows of his far end.
   const nose = Math.min(...d.filter(([, , , t]) => t === "nose").map(([, y]) => y));
   expect(Math.min(...ys)).toBeLessThan(nose - 1);
-  const feet = d.filter(([x, , , t]) => t === "fine-9" && x > COLS / 2 + 13);
+  const feet = d.filter(([x, , , t]) => t === "fine-9" && x > FINE.COLS / 2 + 13);
   expect(feet.length).toBeGreaterThan(40);
   expect(Math.max(...xs) - Math.min(...feet.map(([x]) => x))).toBeLessThan(5.5);
   // The lamp is at the head end, the feet at the other.
   const lamp = d.filter(([, , , t]) => t === "lamp").map(([x]) => x);
-  expect(Math.max(...lamp)).toBeLessThan(COLS / 2 - 8);
+  expect(Math.max(...lamp)).toBeLessThan(FINE.COLS / 2 - 8);
   // Breathing in, his belly rises.
   const belly = (e: typeof d) => Math.min(...e.filter(([x]) => x > 13 && x < 17).map(([, y]) => y));
   expect(belly(fine({ ...MOVES.doze.still, breath: 1 }))).toBeLessThan(belly(d) - 0.3);
