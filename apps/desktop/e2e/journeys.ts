@@ -9953,6 +9953,38 @@ journey("phone: every screen's text follows the iPhone's text size, and Start re
   if (Math.abs(larger / body - 1.353) > 0.02) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
 }, "phone");
 
+journey("phone: a long title on Today and in Sources shows on two lines, with the reading dots under the picture, at every text size (F-new-phone-titles-cut)", async (page) => {
+  // The picture and the reading dots left a Continue reading title about 25 letters, and the lists cut theirs at one line.
+  const check = async (where: string, rows: string, title: string) => {
+    const bad = await page.locator(rows).evaluateAll((els, title) => els.flatMap((row) => {
+      const t = row.querySelector<HTMLElement>(title);
+      if (!t || !t.textContent?.trim()) return [];
+      const lines = Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight));
+      const cut = t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1;
+      // Beside the picture, the title has the rest of the row: nothing else takes its width.
+      const room = row.getBoundingClientRect().right - t.getBoundingClientRect().right;
+      return (cut && lines < 2) || room > 4 ? [`"${t.textContent.slice(0, 40)}": ${lines} line(s), ${Math.round(room)}px left of the row's edge`] : [];
+    }), title);
+    if (bad.length) throw new Error(`${where}: a title is cut short: ${bad.join("; ")}`);
+  };
+  await page.locator(".home-read .title").first().waitFor();
+  for (const t of [1, 28 / 17]) {
+    await page.evaluate((t) => document.documentElement.style.setProperty("--type", String(t)), t);
+    await check(`Today at ${t.toFixed(2)}`, ".home-read", ".title");
+  }
+  const meter = await page.locator(".home-read").first().evaluate((row) => {
+    const pic = row.querySelector(".thumb")!.getBoundingClientRect();
+    const dots = row.querySelector(".home-meter, .home-new")!.getBoundingClientRect();
+    return dots.top >= pic.bottom - 1 && dots.left >= pic.left - 1 && dots.right <= pic.right + 1;
+  });
+  if (!meter) throw new Error("Today: the reading dots (or New) are not under the picture");
+  await page.evaluate(() => document.documentElement.style.setProperty("--type", "1"));
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await page.locator(".phone-sources li button").first().waitFor();
+  await check("Sources", ".phone-sources li button", ".phone-title:not(.phone-two)");
+}, "phone");
+
 journey("phone: an episode on a phone that can't hear speech says the Mac fills its transcript, not that it is on its way (F77)", async (page) => {
   // With no speech model (the Simulator, an older phone) the episode said “on its way” for good: the Mac fills it.
   const cors = { "access-control-allow-origin": "*" };
