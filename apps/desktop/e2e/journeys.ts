@@ -10100,7 +10100,7 @@ journey("phone: every screen's text follows the iPhone's text size, and Start re
   if (Math.abs(larger / body - 1.353) > 0.02) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
 }, "phone");
 
-journey("phone: a long title on Today and in Sources shows on two lines, with the reading dots under the picture, at every text size (F87)", async (page) => {
+journey("phone: a long title on Today and in Sources shows on two lines, with the reading dots along the picture's bottom edge, at every text size (F87)", async (page) => {
   // The picture and the reading dots left a Continue reading title about 25 letters, and the lists cut theirs at one line.
   const check = async (where: string, rows: string, title: string) => {
     const bad = await page.locator(rows).evaluateAll((els, title) => els.flatMap((row) => {
@@ -10122,9 +10122,10 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
   const meter = await page.locator(".home-read").first().evaluate((row) => {
     const pic = row.querySelector(".thumb")!.getBoundingClientRect();
     const dots = row.querySelector(".home-meter, .home-new")!.getBoundingClientRect();
-    return dots.top >= pic.bottom - 1 && dots.left >= pic.left - 1 && dots.right <= pic.right + 1;
+    // On the picture, at its foot: the dots take no room of their own, and the picture is as big as the row.
+    return pic.width >= 112 && dots.top >= pic.top && Math.abs(dots.bottom - pic.bottom) <= 6 && dots.left >= pic.left - 1 && dots.right <= pic.right + 1;
   });
-  if (!meter) throw new Error("Today: the reading dots (or New) are not under the picture");
+  if (!meter) throw new Error("Today: the reading dots (or New) are not on the foot of a 112 pt picture");
   await page.evaluate(() => document.documentElement.style.setProperty("--type", "1"));
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
