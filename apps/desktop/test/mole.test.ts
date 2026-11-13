@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
-import { COLS, HEAD, MOVES, REST, ROWS, advance, moleDots, puppet, start, type State } from "../src/Mole";
+import { COLS, FINE_FROM, HEAD, MOVES, REST, ROWS, advance, moleDots, puppet, start, type State } from "../src/Mole";
+import * as FINE from "../src/mole-fine";
+import { fineDots } from "../src/mole-fine";
 
 // D214: the mole is a puppet, a smooth shape sampled onto the fixed dot grid. Its body glides (dot sizes change),
 // its face stays whole dots.
@@ -157,4 +159,56 @@ test("stretched tall the head is narrower than at rest, squashed it is wider", (
   const width = (s: Partial<State>) => at(s).reduce((n, [, r, rad, t]) => (r === 9 && t !== "paw" ? n + rad : n), 0);
   expect(width({ top: -2 })).toBeLessThan(width({}));
   expect(width({ top: 1.7, rx: 9 })).toBeGreaterThan(width({ rx: 9 }));
+});
+
+// D251: from 48px up he is concept 4 itself, traced dot by dot, moving as a cut-out puppet on the same springs.
+const fine = (s: Partial<State> = {}) => fineDots({ ...REST, ...s });
+const ink = (d: ReturnType<typeof fineDots>, tone?: string) => d.reduce((a, [, , r, t]) => a + (!tone || t === tone ? r * r : 0), 0);
+
+test("the traced mole shares the small one's box", () => {
+  expect([FINE.COLS, FINE.ROWS, FINE.REST_TOP]).toEqual([COLS, ROWS, REST.top]);
+  expect(FINE_FROM).toBe(48);
+});
+
+test("traced, at rest: every dot of the drawing, a lamp, a nose, two eyes with a glint each, over 33 dots of dirt", () => {
+  const d = fine(), count = (t: string) => d.filter(([, , , x]) => x === t).length;
+  expect(d.length).toBeGreaterThan(560);
+  expect([count("lamp"), count("nose"), count("eye"), count("glint"), count("dirt")]).toEqual([8, 7, 8, 2, 33]);
+  // He fits the small mole's box: across its width, and his helmet no more than a row over its top.
+  for (const [x, y, r] of d) { expect(x - r).toBeGreaterThanOrEqual(-0.2); expect(x + r).toBeLessThanOrEqual(COLS + 0.2); expect(y - r).toBeGreaterThan(-1); }
+});
+
+test("traced: every frame of every move is whole, stays over the dirt, and no frame jumps", () => {
+  for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[]) {
+    let before = -1;
+    for (const s of play(name, 2 * (MOVES[name].end ?? MOVES[name].loop!))) {
+      const d = fineDots(s);
+      for (const [x, y, r, t] of d) {
+        expect(Number.isFinite(x) && Number.isFinite(y) && r > 0 && r < 0.4).toBe(true);
+        // Nothing of him shows under the dirt line.
+        if (t !== "dirt") expect(y).toBeLessThan(ROWS - 0.5);
+      }
+      // A part never pops in or out: what is drawn changes by a small share from one frame to the next.
+      const now = ink(d);
+      if (before >= 0) expect(Math.abs(now - before)).toBeLessThan(7);
+      before = now;
+    }
+  }
+});
+
+test("traced: a blink shuts his eyes to a line, pleased swings the lobes wide, startled lifts the helmet off his brows", () => {
+  expect(ink(fine({ open: 0 }), "eye")).toBeLessThan(ink(fine(), "eye") * 0.5);
+  expect(fine({ open: 0 }).some(([, , , t]) => t === "glint")).toBe(false);
+  const white = (d: ReturnType<typeof fineDots>) => d.filter(([, y, , t]) => t === "fine-9" && y > 8 && y < 14.5).map(([x]) => x);
+  expect(Math.min(...white(fine(MOVES.happy.still)))).toBeLessThan(Math.min(...white(fine())) - 1);
+  const top = (d: ReturnType<typeof fineDots>) => Math.min(...d.map(([, y]) => y));
+  expect(top(fine(MOVES.surprised.still))).toBeLessThan(top(fine()) - 0.8);
+  // A look to a side alone raises no brow; thinking (up and to a side) cocks one.
+  expect(fine({ lx: 1 }).length).toBeLessThan(fine({ lx: 1, ly: -1 }).length);
+});
+
+test("traced: nothing shows through a part above it (fur under the helmet, a lid under an open eye)", () => {
+  const d = fine();
+  const over = d.filter(([, , , t]) => t === "eye");
+  for (const [x, y, r, t] of d) if (t.startsWith("fine-")) for (const [ex, ey, er] of over) expect(Math.hypot(x - ex, y - ey)).toBeGreaterThan(Math.min(r, er));
 });

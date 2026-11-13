@@ -3008,6 +3008,17 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .mole-nose { fill: #f096ac; }
 .mole-lamp { fill: #ffb224; }
 .mole-dirt { fill: color-mix(in srgb, var(--faint) 55%, var(--bg-raised)); }
+/* The traced mole (48px and up, D251): its greys run from the page (0) to the text colour (9). */
+.mole-fine-0 { fill: color-mix(in srgb, var(--text) 0%, var(--bg)); }
+.mole-fine-1 { fill: color-mix(in srgb, var(--text) 11%, var(--bg)); }
+.mole-fine-2 { fill: color-mix(in srgb, var(--text) 22%, var(--bg)); }
+.mole-fine-3 { fill: color-mix(in srgb, var(--text) 33%, var(--bg)); }
+.mole-fine-4 { fill: color-mix(in srgb, var(--text) 44%, var(--bg)); }
+.mole-fine-5 { fill: color-mix(in srgb, var(--text) 56%, var(--bg)); }
+.mole-fine-6 { fill: color-mix(in srgb, var(--text) 67%, var(--bg)); }
+.mole-fine-7 { fill: color-mix(in srgb, var(--text) 78%, var(--bg)); }
+.mole-fine-8 { fill: color-mix(in srgb, var(--text) 89%, var(--bg)); }
+.mole-fine-9 { fill: color-mix(in srgb, var(--text) 100%, var(--bg)); }
 @media (prefers-reduced-motion: reduce) { .tutor-bubble { transition: none; } }
 /* The mole says a reply that landed while the tutor was closed (D159, after Cult UI's speech bubble): its first
    lines in a raised bubble left of the mole, the tail a stair of 3px steps pointing at it. It grows out of the mole once. */
