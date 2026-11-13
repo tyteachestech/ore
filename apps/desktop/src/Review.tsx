@@ -15,7 +15,7 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { depthText, lastWin, longGapText, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { DotBar, minutes, minutesText, Ring, ringDots } from "./Ring";
+import { DotBar, DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -1535,6 +1535,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     return () => clearTimeout(id);
   }, [up]);
   const full = stage !== "cart";
+  // D242: the count of memories kept runs up from nothing once the cart has filled the ring; with no cart it is just there.
+  const [count, setCount] = useState(pour ? 0 : s.kept);
+  useEffect(() => {
+    if (!pour || !full) return;
+    const ms = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--t-moment")) || 600, t0 = performance.now();
+    let frame = requestAnimationFrame(function step(now) {
+      const k = Math.min(1, (now - t0) / ms);
+      setCount(Math.round(s.kept * (1 - (1 - k) ** 3)));
+      if (k < 1) frame = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pour, full, s.kept]);
   // D197: a cut gem that was won back has a gold rim; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
   const mendedN = (s.grades ?? []).filter((g) => g === "mended").length;
@@ -1563,7 +1575,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   );
   const kept = s.kept > 0 && (
     <p className="review-kept">
-      <b>{s.kept}</b> {s.kept === 1 ? "memory" : "memories"} kept
+      {/* The emblem's count is drawn in the ring's dots and counts up as the ring fills; its text is the true number throughout. */}
+      <b>{quick ? s.kept : <><DotNumber value={count} height={56} /><span className="sr-only">{s.kept}</span></>}</b> {s.kept === 1 ? "memory" : "memories"} kept
     </p>
   );
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;

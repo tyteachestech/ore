@@ -185,6 +185,9 @@ test("the end screen is one emblem (D242): the gems sit inside the ring with the
   // The count is said once: under the emblem, never also among the lines.
   expect(s.q(".review-kept")).toBe(1);
   expect(s.q(".end-emblem + .review-kept")).toBe(1);
+  // The count is drawn in dots (a 7 is 11 of them), and its text is the true number for a reader and for a test.
+  expect(s.q(".review-kept b .dot-number circle")).toBeGreaterThan(5);
+  expect(s.body.querySelector(".review-kept")!.textContent).toBe("5 memories kept");
   // The gem's own hint names its skill, so no icon repeats it under the gem.
   expect(s.q(".review-cut-skill")).toBe(0);
   await s.done();

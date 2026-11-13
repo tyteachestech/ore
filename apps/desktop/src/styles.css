@@ -2153,6 +2153,15 @@ button.home-plan:hover { color: var(--text); }
 .end-emblem + .review-kept { display: flex; align-items: center; gap: 12px; margin: 20px 0 0; }
 .end-emblem ~ h2 { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--faint); margin: 10px 0 0; }
 .end-emblem ~ .end-lines { margin-top: 14px; }
+/* The mole sits on the ring: its row of dirt rests on the ring's top dots. */
+.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: -12px; }
+/* Two voices under the emblem: the dot number, and the mono for every word of Ore's (his own plan keeps the sans). Green stays the ring's. */
+.end-emblem ~ .end-lines, .end-emblem ~ .review-rescued, .end-emblem ~ .quiz-faint, .end-emblem ~ .review-kept { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.end-emblem ~ .end-lines p { font: inherit; color: inherit; }
+/* Two groups: what the session won, then what comes next. */
+.end-emblem ~ .review-try { margin-top: 40px; }
+.end-emblem ~ .review-try ~ .review-foot { margin-top: 12px; }
+.end-emblem ~ .review-foot { margin-top: 40px; }
 /* The session is over: its bar steps back for what it won. */
 .review:has(.review-end) .review-bar { opacity: 0.25; transition: opacity var(--t-4) var(--ease-out); }
 /* The end screen's lines (D241): one place; the line showing rolls up and out as the next rolls up into it. */
