@@ -3106,6 +3106,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
   width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
   background: var(--bg-raised); box-shadow: var(--float); color: var(--faint); transition: transform var(--t-2) ease-out;
 }
+/* Over Review too, where a session is the steadiest need for it (F95, Tyler 2026-11-13); Settings keeps it under its sidebar. */
+:root:has(.review:not([hidden])) .radio-orb { z-index: 16; }
 .radio-orb:hover { background: var(--bg-hover); color: var(--muted); }
 .radio-orb:active { transform: scale(0.96); }
 .radio-orb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
