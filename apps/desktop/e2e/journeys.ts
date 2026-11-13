@@ -4438,6 +4438,16 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.keyboard.press("ArrowLeft");
   await until("a second arrow goes back to To read", async () => (await on("To read")) === "true");
+  // Also on a skill page opened from Home, whose tab used to remount the page under the focused tab (F55).
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await tabs.getByRole("tab", { name: "To read" }).click();
+  await page.keyboard.press("ArrowRight");
+  await until("→ from Home's skill page opens Done", async () => (await on("Done")) === "true");
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  if (!(await page.evaluate(() => !!document.activeElement?.closest("[role=tablist]")))) throw new Error("the tab lost focus on a skill page opened from Home");
+  await page.keyboard.press("ArrowLeft");
+  await until("a second arrow on Home's skill page goes back to To read", async () => (await on("To read")) === "true");
   // ⌘2, even from a focused tab, hands the keys to the list (Linear).
   await page.keyboard.press("Meta+2");
   await until("⌘2 focuses the list", () => page.evaluate(() => document.activeElement?.matches(".list") ?? false));
@@ -8943,8 +8953,9 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   await page.keyboard.type("x");
   await page.keyboard.press("Meta+z"); // the field's: the app leaves it alone
   if (!(await item()).skills.includes(others[1]!.id)) throw new Error("⌘Z with fresh typing in the filter took a skill off");
-  // Chromium on Linux undoes typing on ⌃Z only; the Mac's ⌘Z runs this (menubar.ts).
-  await page.evaluate(() => document.execCommand("undo"));
+  // Chromium on Linux undoes typing on ⌃Z only, so the x is still there: the Mac's ⌘Z runs this (menubar.ts).
+  // On a Mac the ⌘Z above already took it back, and another undo would eat the typed skill name.
+  if ((await page.locator(".skill-picker .menu-input").inputValue()).endsWith("x")) await page.evaluate(() => document.execCommand("undo"));
   await page.keyboard.press("Meta+z");
   await until("the typing undone, then the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
   await page.keyboard.press("Meta+z");
@@ -10373,6 +10384,58 @@ const itemFile = (lib: string, slug: string, name: string) => {
   return join(lib, "items", year, readdirSync(join(lib, "items", year)).find((d) => d.startsWith(slug))!, name);
 };
 const cardFile = (lib: string, text: string) => join(lib, "cards", readdirSync(join(lib, "cards")).find((f) => f.endsWith(".md") && readFileSync(join(lib, "cards", f), "utf8").includes(text))!);
+
+journey("phone: Review's ⋯ on an Explain being typed opens over the keyboard's place, and the draft stays (F53)", async (page) => {
+  // Its sheet opened behind the keyboard: the field kept focus, so the keyboard stayed up over it (Mail and Notes put it away).
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  await page.locator(".review-q").waitFor();
+  const more = page.getByRole("button", { name: "Exercise actions" });
+  const field = page.getByLabel("Your answer");
+  for (let i = 0; i < 10 && !(await field.count()); i++) {
+    const was = await page.locator(".review-q").innerText();
+    await tap(page, more);
+    await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+    await until("Later moves on", async () => (await page.locator(".review-q").innerText()) !== was);
+  }
+  if (!(await field.count())) throw new Error("no Explain exercise came up in 10 Laters");
+  await field.focus();
+  await field.fill("Fluency feels like knowing");
+  const focused = () => field.evaluate((el) => el === document.activeElement);
+  await tap(page, more);
+  await page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }).waitFor();
+  if (await focused()) throw new Error("the answer field kept focus, so the keyboard stays up over the sheet");
+  // Dismissed, the sheet gives the field its focus (and keyboard) back, with the draft.
+  await page.keyboard.press("Escape");
+  await page.locator(".action-sheet").waitFor({ state: "detached" });
+  await page.waitForTimeout(100);
+  if (!(await field.count())) throw new Error("Esc on the sheet also left Review");
+  if ((await field.inputValue()) !== "Fluency feels like knowing") throw new Error("closing the sheet lost the draft");
+  await until("dismissing the sheet gives the answer field its focus back", focused);
+  // An action picked moves on: the keyboard doesn't come back up over the next exercise.
+  const was = await page.locator(".review-q").innerText();
+  await tap(page, more);
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+  await until("Later moves on", async () => (await page.locator(".review-q").innerText()) !== was);
+  await page.waitForTimeout(100);
+  if (await field.count() && (await focused())) throw new Error("picking Later gave the answer field its focus back, so the keyboard comes up again");
+}, "phone");
+
+// iOS takes a first tap as a hover when the hover shows or hides something, and clicks only on the second (F54).
+journey("phone: a hover on a Today row or skill shows or hides nothing, so one tap opens it", async (page) => {
+  const row = page.locator(".home-read").first();
+  await row.waitFor();
+  await row.hover();
+  const read = await row.evaluate((el) => ({ more: getComputedStyle(el.querySelector(".more")!).display, meter: el.querySelector(".home-meter") ? getComputedStyle(el.querySelector(".home-meter")!).visibility : "visible" }));
+  if (read.more !== "none" || read.meter !== "visible") throw new Error(`a hover on a Today row changes it: ⋯ ${read.more}, dots ${read.meter}`);
+  const skill = page.locator(".home-skill").first();
+  await skill.hover();
+  const more = await skill.evaluate((el) => (el.querySelector(".more") ? getComputedStyle(el.querySelector(".more")!).visibility : "hidden"));
+  if (more !== "hidden") throw new Error("a hover on a Today skill shows its ⋯");
+  await tap(page, row.locator(".home-open"));
+  await page.locator(".phone-reader").waitFor();
+}, "phone");
 
 journey("phone: Review's ⋯ puts an exercise off with Later before its answer, and edits it after (D235)", async (page) => {
   // The phone's Review had no Later (D192 kept it on the Mac) and Edit only in a toolbar beside Ask, which needs the Mac.
