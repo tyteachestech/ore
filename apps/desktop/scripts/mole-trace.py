@@ -19,7 +19,6 @@ def trace(S=4, R=3.0, mind=6.0, thr=0.10):
     disc=(rr<=r*0.8).astype(float); ring=((rr>r*1.25)&(rr<=r*1.7)).astype(float)
     k=disc/disc.sum()-ring/ring.sum()
     from numpy.fft import rfft2, irfft2
-    P=np.zeros_like(d); 
     K=np.zeros_like(d); kh,kw=k.shape; K[:kh,:kw]=k; K=np.roll(K,(-(kh//2),-(kw//2)),(0,1))
     sc=irfft2(rfft2(d)*np.conj(rfft2(K)),d.shape)
     # NMS
@@ -30,7 +29,6 @@ def trace(S=4, R=3.0, mind=6.0, thr=0.10):
         y0,y1,x0,x1=max(0,y-md),y+md+1,max(0,x-md),x+md+1
         Y,X=np.mgrid[y0:min(s.shape[0],y1),x0:min(s.shape[1],x1)]
         s[y0:y1,x0:x1][np.hypot(Y-y,X-x)<md]=-1
-        if v<thr*0.25: continue
         # colour: mean of centre patch
         c=a[max(0,y-S):y+S+1,max(0,x-S):x+S+1].reshape(-1,3).mean(0)
         peak=d[max(0,y-S):y+S+1,max(0,x-S):x+S+1].mean()
@@ -77,7 +75,6 @@ for ox in np.arange(0,PITCH,0.25):
         if best is None or e<best[0]: best=(e,ox,oy)
 _,OX,OY=best; print('lattice',OX,OY)
 # head silhouette: union of discs around every traced non-dirt dot below the helmet top, restricted; simpler: site is inside if within the hull of fur/lobe dots row-wise
-allpts=[(x,y) for k in ['fur','lobeL','lobeR','nose','glintL','glintR'] for x,y,r,c in parts[k]]
 def inside(x,y):
     # head: a superellipse dome from under the helmet to the dirt
     top=62; bottom=DY
@@ -92,19 +89,6 @@ def furcolor(x,y):
         if d2<(PITCH*3.2)**2:
             ww=1/(d2+4); w+=ww; s+=ww*br(c)
     return s/w if w else 120
-fill=[]
-for i in range(-2,40):
-    for j in range(-2,40):
-        x=OX+i*PITCH; y=OY+j*PITCH
-        if not inside(x,y): continue
-        if occupied(x,y,parts['fur'],PITCH*0.62): continue
-        # image brightness at the site
-        yi,xi=int(round(y)),int(round(x))
-        if not (0<=yi<img.shape[0] and 0<=xi<img.shape[1]): continue
-        pix=img[max(0,yi-1):yi+2,max(0,xi-1):xi+2].mean()
-        covered=any(occupied(x,y,parts[k],PITCH*0.7) for k in ['helmet','lamp','lobeL','lobeR','pawL','pawR','nose','glintL','glintR'])
-        near_eye=(118<y<158) and (70<abs(x-CX)<10*0+ 75+0) 
-        fill.append((x,y,pix,covered))
 # eyes: empty dark sites near the glints
 gl={s:parts['glint'+s][0] for s in 'LR' if parts['glint'+s]}
 print('glints',gl)

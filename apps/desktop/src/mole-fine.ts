@@ -105,7 +105,7 @@ export function fineDots(s: State): FineDot[] {
   for (const p of GAP) { const [x, y] = head(p, fx, fy); fur.push([x, y, p.r, p.tone, true]); }
 
   // Top layer first: each dot is sized by the nearest dot above it, then joins what hides the layers below.
-  const out: FineDot[] = [], cell = 0.6, grid = new Map<number, number[]>();
+  const out: FineDot[] = [], cell = 0.75, grid = new Map<number, number[]>();
   const key = (cx: number, cy: number) => cx * 4096 + cy;
   const floor = GROUND - 0.28;
   for (const l of layers) {
