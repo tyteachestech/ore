@@ -23,6 +23,8 @@ describe("the iPhone's text size", () => {
   });
 
   test("a title grows less than body text, as iOS's Large Title does", () => {
+    expect(scaleFontSizes(".m { font-size: max(30px, 2em) }")).toContain("* 0.47");
+    expect(scaleFontSizes(".i { --icon-size: 20px }")).toBe(".i { --icon-size: 20px }");
     expect(scaleFontSizes(".t { font-size: 34px }")).toBe(".t { font-size: calc(34px * (1 + (var(--type, 1) - 1) * 0.47)) }");
     const at = (type: number) => 34 * (1 + (type - 1) * 0.47);
     expect(Math.round(at(23 / 17))).toBe(40);

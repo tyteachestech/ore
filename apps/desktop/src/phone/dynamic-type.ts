@@ -8,13 +8,13 @@ const TYPED = /var\(--type/;
 const TITLE = 28;
 const scaled = (v: string) => {
   if (TYPED.test(v) || !/\d(px|pt)\b/.test(v)) return v;
-  return parseFloat(v) >= TITLE ? `calc(${v} * (1 + (var(--type, 1) - 1) * 0.47))` : `calc(${v} * var(--type, 1))`;
+  return Math.max(...(v.match(/\d*\.?\d+(?=px|pt)/g) ?? []).map(Number)) >= TITLE ? `calc(${v} * (1 + (var(--type, 1) - 1) * 0.47))` : `calc(${v} * var(--type, 1))`;
 };
 
 /** The CSS with each fixed font size and line height times --type; sizes in em, % or keywords already follow. */
 export function scaleFontSizes(css: string): string {
   return css
-    .replace(/(font-size|line-height|--[\w-]+-size)(\s*:\s*)([^;}]+?)(\s*!important)?(?=\s*[;}])/g, (_, prop, colon, v, imp = "") => prop + colon + scaled(v.trim()) + imp)
+    .replace(/(font-size|line-height|--note-size)(\s*:\s*)([^;}]+?)(\s*!important)?(?=\s*[;}])/g, (_, prop, colon, v, imp = "") => prop + colon + scaled(v.trim()) + imp)
     // The shorthand's size and line height (`font: 600 13px/1.4 var(--font)`).
     .replace(/\bfont\s*:[^;}]+/g, (decl) => (TYPED.test(decl) ? decl : decl.replace(/(\d*\.?\d+px)(\/(\d*\.?\d+px))?/, (_, size, _s, lh) => `${scaled(size)}${lh ? `/${scaled(lh)}` : ""}`)));
 }
