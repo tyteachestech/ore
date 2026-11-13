@@ -1,7 +1,10 @@
 import { localDay } from "./ids.ts";
 import type { Review } from "./reviews.ts";
+import { nextState, retrievability } from "./scheduler.ts";
 
 export const MIN_RETENTION_N = 10;
+/** A solid memory, as `SOLID_DAYS` in today.ts (which imports this file). */
+const SOLID = 21;
 
 
 export interface RetentionResult {
@@ -34,8 +37,18 @@ export function retentionMetric(reviews: Review[]): RetentionResult {
 /** Two numbers for us to watch, never shown in the app (science pass 2026-11-02, rec 5; `ore stats --json`).
  *  `ai_agreement`: of typed answers the AI checked, how often his rating is its suggestion. Near 1, the AI
  *  is in effect setting the rating D21 keeps for him. `explain`: pass rates (Good or Easy) of typed and
- *  in-head answers on cards old enough for either (D68; passed twice at least), the fluency risk D68 took on. */
-export function raterStats(reviews: Review[]) {
+ *  in-head answers on cards old enough for either (D68; passed twice at least), the fluency risk D68 took on.
+ *  `near_cut` (D246): how often he rates Good or Easy on an exercise one Good from solid, against the other
+ *  growing ones, each with its mean recall chance at the time. Good cuts the gem, and people just short of a
+ *  goal overstate (Schweitzer 2004): `near` well above `other` at a like recall chance says the gem bends his rating. */
+export function raterStats(reviews: Review[], w?: number[]) {
+  const growing = reviews.filter((r) => (r.state_before.reps ?? 0) > 0 && r.state_before.stability < SOLID);
+  const isNear = (r: Review) => nextState(r.state_before, new Date(r.ts), 3, 0.9, w).stability >= SOLID;
+  const watch = (rs: Review[]) => ({
+    reviews: rs.length,
+    pass_rate: rs.length ? rs.filter((r) => r.rating >= 3).length / rs.length : null,
+    recall: rs.length ? rs.reduce((t, r) => t + retrievability(r.state_before, new Date(r.ts), 0.9, w), 0) / rs.length : null,
+  });
   const checked = reviews.filter((r) => r.ai_rating !== undefined && !r.in_head);
   const same = checked.filter((r) => r.rating === r.ai_rating).length;
   const old = reviews.filter((r) => (r.state_before.reps ?? 0) >= 2);
@@ -49,6 +62,7 @@ export function raterStats(reviews: Review[]) {
       his_lower: checked.filter((r) => r.rating < r.ai_rating!).length,
     },
     explain: { typed: rate(old.filter((r) => !r.in_head && r.answer)), in_head: rate(old.filter((r) => r.in_head)) },
+    near_cut: { near: watch(growing.filter(isNear)), other: watch(growing.filter((r) => !isNear(r))) },
   };
 }
 

@@ -389,6 +389,8 @@ export type SessionEnd = {
   polished?: string[];
   /** How much longer the exercises he passed now last, in days added up (D197). */
   depth_days?: number;
+  /** The part of `depth_days` earned after the day's goal closed (D246). */
+  depth_extra_days?: number;
   /** On the week's first end screen (D69): of Explain answers marked Sure, the share the key-point check passed. */
   calibration?: { sure_n: number; sure_right: number; levels: { confidence: 1 | 2 | 3; n: number; right: number | null }[] } | null;
 };

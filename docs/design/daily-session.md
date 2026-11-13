@@ -28,7 +28,7 @@ With a backlog that never empties, the question is never "how do I finish?" but 
 | 2. Open | Home shows minutes done of the goal beside the ring; the due count waits in Start review's hint. ↵ starts | D58, D65.4, D80 |
 | 3. Review | One card at a time, full window. The most valuable due cards first, with new cards mixed in at a fixed share (below) | D59, D22, D24 |
 | 4. A new card | Shows the **New** label on first sight, so they read it with care. Answering it approves it; E edits it; ⇧⌘⌫ deletes it. Its FSRS schedule starts from that first answer, like any card | D65.3, D9 |
-| 5. Close | When the goal closes, the end screen: memories kept, rescued just before forgetting, a gem for each card that became solid. Keep going goes on | D62, D90, D65.4 |
+| 5. Close | When the goal closes the mole says so and the session flows on (D246); when he leaves, the end screen: memories kept, rescued just before forgetting, a gem for each card that became solid. Keep going goes on | D62, D90, D65.4 |
 | 6. Read | Continue reading picks up where they left off. Highlights and notes as they go; Finish opens the quiz; Done drafts the source's cards, which start tomorrow | D58, D106, D65.3 |
 | Any time | Esc leaves. Nothing is lost and nothing is owed | D59 |
 
@@ -42,7 +42,7 @@ The block is the daily goal in minutes (D60). Inside it:
 
 1. **New cards get a fixed share of every session, mixed in** (Tyler's pick, 2026-11-08, settling review-08 in `reviews/2026-11-08-stress-test.md`; built in #171, its D-line amends D65.2). About one card in five is new, whatever is due, so new material arrives every day. This replaces D65.2's "new only while the goal has room after due cards", which under a standing backlog let no new card in.
 2. **The rest of the block takes the most valuable due cards, not the oldest.** The queue already ranks them by skill priority and how close each is to being forgotten (D22), interleaved across topics (D24). Cards at the bottom of the ranking wait, and waiting is cheap.
-3. **The session ends when the time is up**, not when the queue is empty. Keep going is there for a good day.
+3. **The goal is told when the time is up, and he ends the session**, not an empty queue (D246, amending the first rule here that the session ended itself at the goal): the mole says "Goal met. The rest is extra." and the next exercise is already there; Esc or Done ends it on the end screen. The quick quiz still closes at the goal.
 4. **A card missed today comes back today** (review-07), so a miss is fixed while it is fresh.
 
 ## Motivation: a habit they want, not one they owe

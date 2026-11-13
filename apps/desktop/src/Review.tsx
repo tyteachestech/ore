@@ -5,6 +5,7 @@ import { Children, useCallback, useEffect, useRef, useState, type MutableRefObje
 import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Cutting, Gem } from "./Gem";
+import { SkillIcon } from "./IconPicker";
 import { Mole } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
 import { still } from "./SideCursor";
@@ -15,9 +16,9 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { endSays } from "./end-says";
+import { endSays, type Said } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
-import { DotBar, DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
+import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -118,9 +119,6 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   giveBack?: () => HTMLElement | null | undefined;
 }) {
   const [queue, setQueue] = useState<DueEntry[] | null>(null);
-  /** The header's form, chosen from the session's length at its first exercise: step dots up to 30, else a bar.
-   *  A miss adds a step, so deciding on every rating flipped a 30-step session to the bar. */
-  const asDots = useRef(true);
   const [done, setDone] = useState(0);
   const [card, setCard] = useState<CardFull | null>(null);
   const [phase, setPhase] = useState<Phase>("answer");
@@ -176,6 +174,10 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     const t = setTimeout(() => setMoment(null), moment.tone === "miss" ? 6000 : 4000);
     return () => clearTimeout(t);
   }, [moment]);
+  /** D246: the day's goal closed during this session. The mole says so once, over the next exercise, and the
+   *  session goes on: everything after is extra, and Esc (his Done) ends it on the end screen. */
+  const [goalSaid, setGoalSaid] = useState(false);
+  const goalTold = useRef(false);
   /** Each card's Ask chat, kept while he closes and reopens it. */
   const [asks, setAsks] = useState<Record<string, AskChat>>({});
   const [end, setEnd] = useState<End | null>(null);
@@ -208,7 +210,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const [start, setStart] = useState<Today | null>(null);
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
-  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; forget: Forget }[]>([]);
+  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget }[]>([]);
   const last = undos.at(-1);
   /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
   const retired = useRef(new Set<string>());
@@ -261,7 +263,6 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         // An empty queue ends the session at once, and why ("nothing due in the skills you picked",
         // new cards waiting) reads today: let it land first.
         if (!q.length) await t;
-        asDots.current = q.length <= 30;
         setQueue(q);
       } catch (e) {
         setError(errorText(e));
@@ -591,7 +592,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     const after = momentFor(card.history, rating as 1 | 2 | 3 | 4, { sure: conf === 3, remix: !!card.variant });
     const color = entry ? skillOf(entry.skills[0] ?? "").color : undefined;
     setBusy(true);
-    let goalClosed = false;
+    let goalClosed = false, saved = false;
     try {
       const elapsed = Date.now() - shownAt.current;
       await sessionReady.current;
@@ -607,10 +608,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         ...(session.current ? [opt("session", session.current.id)] : []),
       ];
       await submit(args, rating, elapsed);
+      saved = true;
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
-      // The session is today's slice (D65): it ends when the goal closes, and Keep going goes on.
+      // The day's goal closing (D65) is told by the mole; the session flows on (D246).
       const b = before.current;
       goalClosed = !!b && b.counts && !b.met && b.active_ms + activeMs.current >= b.goal_ms;
     } catch (e) {
@@ -618,19 +620,28 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     } finally {
       setBusy(false);
     }
-    if (!goalClosed) return;
-    // D177: a goal that closes on a miss gets one more card first, a likely recall, so the session doesn't
-    // end on a failure. Once only: whatever he answers next, it ends.
+    // The mole's goal note stays until the next rating; one still waiting behind a moment (a gem cut by the
+    // rating that closed the goal) gets its turn first.
+    if (!saved) return;
+    if (goalTold.current && !moment) setGoalSaid(false);
+    if (!goalClosed || goalTold.current) return;
+    // D177: a goal that closes on a miss gets one more card first, a likely recall, so its moment doesn't
+    // follow a failure. Once only: whatever he answers next, the goal is told.
     const win = rating === 1 && !wonLast.current ? lastWin(afterAnswer(queue ?? [], true)) : null;
-    if (!win) return void finish();
-    wonLast.current = true;
-    setQueue(win);
+    if (win) {
+      wonLast.current = true;
+      return void setQueue(win);
+    }
+    // The quick quiz is a glance: it still ends at the goal. A full session flows on (D246).
+    if (quick) return void finish();
+    goalTold.current = true;
+    setGoalSaid(true);
   };
 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
    *  ⌘Z takes it back and ⇧⌘Z gives it again: the same rating, answer and time. Throws if the write fails. */
   const submit = async (args: string[], rating: number, elapsed: number, again?: { forget: Forget; setTs: (ts: string) => void }) => {
-    const was = { queue: queue ?? [], done, activeMs: activeMs.current, off: new Set(putOffIds.current), won: wonLast.current };
+    const was = { queue: queue ?? [], done, activeMs: activeMs.current, off: new Set(putOffIds.current), won: wonLast.current, told: goalTold.current };
     const r = await ore<{ ts: string }>("review", ...args);
     reviewed.current++;
     const id = args[0]!;
@@ -685,6 +696,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       putOffIds.current = new Set(last.off);
       // D177's one more goes with the rating that earned it.
       wonLast.current = last.won;
+      // So does the goal's note: undo the rating that closed the goal and it is open again, to be told again.
+      if (!last.told) {
+        goalTold.current = false;
+        setGoalSaid(false);
+      }
       setDone(last.done);
       setQueue(last.queue.filter((e) => !retired.current.has(e.id)));
       setUndos((u) => u.slice(0, -1));
@@ -1011,15 +1027,19 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   }, []);
 
   const left = queue?.length ?? 0;
-  const progress = done + left ? done / (done + left) : 0;
   const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
+  // D246: the gem he sees before he rates never shows what a Good would win. A Fact exercise, rated by him
+  // alone, shows none; a nearly cut one reads as growing. People just short of a goal overstate (Schweitzer 2004),
+  // and a generous Good here costs the memory the gem stands for.
+  const gemNow = card?.kind === "card" ? undefined : card?.history?.gem?.kind;
+  const gemShown = gemNow === "ready" ? "rough" : gemNow;
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
 
   return (
     // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it. Let go while a
     // layer sits over it (⌘K, ⌘/) or it is paused on a source, so that layer owns focus and Esc.
     <Trap off={paused || under}>
-    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="">
+    <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="" data-done={done} data-steps={done + left}>
       <div className="review-head" data-tauri-drag-region>
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).
@@ -1030,17 +1050,10 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
               </div>
             </Hint>
           )
-        ) : asDots.current && !end ? (
-          <div className="quiz-steps review-steps" role="progressbar" aria-label="Session" aria-valuemin={0} aria-valuemax={done + left} aria-valuenow={done}>
-            {Array.from({ length: done + left }, (_, i) => (
-              <span key={i} className={i < done ? "done" : i === done ? "now" : ""} />
-            ))}
-          </div>
         ) : (
-          <div className="review-bar" role="progressbar" aria-label="Session" aria-valuemin={0} aria-valuemax={done + left} aria-valuenow={done}>
-            {/* 6px dots: 60 need 360px, which the phone's head does not have. */}
-            <DotBar className="review-dots" share={end ? 1 : progress} n={PHONE ? 30 : 60} />
-          </div>
+          // D246: nothing counts the session up here. Exercises done over everything due drew the backlog as a bar
+          // that a miss set back, and the session never ended on it. The spacer keeps the buttons to the right.
+          <span className="review-head-gap" />
         )}
         {last && (
           <Hint text="Undo last rating" keys="undo">
@@ -1075,7 +1088,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
       {/* VoiceOver hears each new card and the key points as marked (by the AI, or by him), not only the end screen. */}
       <div className="sr-only" aria-live="polite">
-        {card && !end && queue?.length ? `Exercise ${done + 1} of ${done + left}. ${card.question.replace(/_{4,}/g, "blank")}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
+        {card && !end && queue?.length ? `Exercise ${done + 1}. ${card.question.replace(/_{4,}/g, "blank")}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
         {error && (
@@ -1097,6 +1110,16 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         {!error && !end && queue && !queue.length && reviewed.current > 0 && <p className="loading"><Working label="Wrapping up…" /></p>}
         {quick && !error && queue && !queue.length && !reviewed.current && <p className="loading">{nothingDue(start, pick, source)}</p>}
 
+        {goalSaid && !moment && !end && (
+          <div className="review-goal" role="status">
+            <Mole bare size={48} mood="happy" />
+            <MoleSays lines={GOAL_SAID}>
+              <Hint text={<>End the session <kbd>Esc</kbd></>}>
+                <button className="moment-done" onClick={() => void finish()}>Done</button>
+              </Hint>
+            </MoleSays>
+          </div>
+        )}
         {moment && !end && (
           <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} role="status">
             {!quick && <span className="moment-mole"><Mole bare size={40} mood={moment.tone === "miss" ? "peek" : "happy"} /></span>}
@@ -1297,9 +1320,9 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                 {card.history && card.history.reviews.length > 0 && (
                   <div className="review-memory" data-color={skillOf(entry.skills[0] ?? "").color}>
                     {/* D237: the exercise's own gem, as it is before this rating. */}
-                    {card.history.gem && (
-                      <Hint text={GEM_SAYS[card.history.gem.kind]} side="top">
-                        <span className="review-gem" tabIndex={0} aria-label={GEM_SAYS[card.history.gem.kind]}><Gem kind={card.history.gem.kind} size={18} seam={card.history.gem.seam} polished={card.history.gem.polished} /></span>
+                    {gemShown && (
+                      <Hint text={GEM_SAYS[gemShown]} side="top">
+                        <span className="review-gem" tabIndex={0} aria-label={GEM_SAYS[gemShown]}><Gem kind={gemShown} size={18} seam={card.history.gem!.seam} polished={card.history.gem!.polished} /></span>
                       </Hint>
                     )}
                     <Timeline history={card.history} rating={(preview ?? suggested ?? 3) as Rating} />
@@ -1481,6 +1504,9 @@ function EditCard({ draft, setDraft, points, ok, busy, onSave, onCancel }: {
 }
 
 
+/** What the mole says when the day's goal closes mid-session (D246). */
+const GOAL_SAID = [{ text: "Goal met. The rest is extra." }];
+
 /** The end screen's lines (D241): one place, one line at a time. Each rolls up into it, holds, and rolls on up
  *  as the next arrives, round and round; the pointer or the keyboard on a line holds it. Every line is in the
  *  page throughout, so a single line just sits there, and under Reduce Motion they are a plain list. */
@@ -1583,13 +1609,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       <b>{quick ? s.kept : <><DotNumber value={count} height={56} /><span className="sr-only">{s.kept}</span></>}</b> {s.kept === 1 ? "memory" : "memories"} kept
     </p>
   );
+  const [roll] = useState(Math.random);
+  const skill = (id: string) => skills.find((x) => x.id === id);
+  // D247: a rare line wears its own mark, in the drawing that thing already has: the skill's icon in its colour,
+  // the clock for a long gap, the gold-rimmed gem for one pulled back.
+  const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" ? <Clock size={14} /> : <Gem kind="cut" size={14} seam />);
   const said = endSays({
-    session: s, today: t, closed, short,
-    ups: ups.map((k) => ({ name: skills.find((x) => x.id === k.skill)?.name ?? k.skill, level: k.level })),
+    session: s, today: t, closed, short, roll,
+    ups: ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level })),
     // The quick quiz says it under its headline already.
     waiting: !quick && t.caught_up && t.new_waiting > 0 ? waiting(t) : null,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
-  });
+  }).map((l) => ({ ...l, mark: mark(l) }));
   const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
@@ -1626,7 +1657,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
       {quick && (
         <EndLines run={stage === "done"}>
           {kept}
-          {said.slice(s.kept > 0 ? 1 : 0).map((l) => <p key={l.text} className={s.kept === 0 && l === said[0] ? "review-kept" : "review-rescued"}>{l.text}</p>)}
+          {said.filter((l) => !l.verdict || s.kept === 0).map((l) => <p key={l.text} className={l.verdict ? "review-kept" : "review-rescued"}>{l.text}</p>)}
         </EndLines>
       )}
       {/* D165: how often he is right at each of his three taps, so he sees whether they mean anything, not only whether Sure is too sure. */}

@@ -2022,15 +2022,12 @@ button.home-plan:hover { color: var(--text); }
 .ring-burst { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); animation: ring-burst 700ms ease-out 550ms 1 both; }
 @keyframes ring-burst { from { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-green) 55%, transparent); } to { transform: scale(1.25); opacity: 0; box-shadow: 0 0 0 14px transparent; } }
 
-/* Review (D59): one card centred, the session bar on top, the keys at the foot. */
+/* Review (D59): one card centred, the keys at the foot; nothing counts the session on top (D246). */
 .review[hidden] { display: none; }
 .review { position: fixed; inset: 0; z-index: 15; display: flex; flex-direction: column; background: var(--bg); --skill: var(--c-green); }
 .review:focus-visible { outline: none; }
 .review-head { display: flex; align-items: center; gap: 14px; height: 52px; flex: none; padding: 8px 16px 0 90px; }
-.review-steps { gap: 3px; }
-.review-bar { flex: 1; height: 6px; }
-.review-dots { width: 100%; }
-.review-steps span { transition: background-color var(--t-3); }
+.review-head-gap { flex: 1; }
 .review-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding: 6vh 24px 32px; }
 .review-body > .loading, .review-body > .err { max-width: 640px; margin: 0 auto; }
 .review-card { position: relative; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; animation: card-in var(--t-2) var(--ease-out) both; }
@@ -2178,12 +2175,13 @@ button.home-plan:hover { color: var(--text); }
 .says-line { margin: 0; font: 400 12px/1.5 var(--mono); letter-spacing: 0.01em; color: var(--text); overflow-wrap: anywhere; }
 .says-line:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .says-rest { visibility: hidden; }
+/* A rare line's mark (D247): the thing's own drawing, 14px, on the words' midline. */
+.says-mark { display: inline-grid; place-items: center; width: 14px; height: 14px; margin-right: 7px; vertical-align: -2px; color: var(--muted); }
+.says-mark > .skill-icon { width: 14px; height: 14px; }
 .says-block { position: relative; display: inline-block; width: 0; height: 1em; vertical-align: -0.12em; }
 .says-block::after { content: ""; position: absolute; left: 2px; top: 0; width: 0.55em; height: 100%; background: var(--text); }
 .says:not([data-typing]) .says-block::after { animation: block-blink 1s steps(1) infinite; }
 @media (prefers-reduced-motion: reduce) { .says:not([data-typing]) .says-block::after { animation: none; } }
-/* The session is over: its bar steps back for what it won. */
-.review:has(.review-end) .review-bar { opacity: 0.25; transition: opacity var(--t-4) var(--ease-out); }
 /* The end screen's lines (D241): one place; the line showing rolls up and out as the next rolls up into it. */
 .end-lines { display: grid; place-items: center; width: 100%; margin: 10px 0 0; min-height: 36px; overflow: hidden; }
 .end-lines > div { grid-area: 1 / 1; display: grid; place-items: center; opacity: 0; }
@@ -3163,6 +3161,13 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* The moment after a rating that changed the gem: it sits over the next card and never holds it back. */
 .review-moment { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: center; gap: 12px; max-width: min(520px, calc(100% - 32px)); padding: 10px 16px 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-rise var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
 .review-moment[data-tone="miss"] { animation-delay: 0s, 5.7s; }
+/* D246: the goal's note stays until the next rating and carries his way out, so it takes the pointer. */
+/* The goal's note (D246): the mole and his speech box (D245), told once and kept until the next rating. */
+.review-goal { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: flex-end; gap: 12px; translate: -50% 0; animation: moment-rise var(--t-4) var(--ease-out) both; }
+.review-goal .says { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; white-space: nowrap; }
+.moment-done { flex: none; height: 24px; padding: 0 10px; border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.moment-done:hover, .moment-done:focus-visible { background: var(--bg-hover); color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .review-goal { animation: none; } }
 .moment-mole { flex: none; align-self: flex-end; display: inline-grid; margin: 0 0 -10px 4px; }
 .moment-gem { flex: none; display: inline-grid; }
 .moment-gem > .gem { grid-area: 1 / 1; }

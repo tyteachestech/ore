@@ -1,13 +1,14 @@
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { appendJsonl, deviceLog, readJsonl, visible, writeAtomic } from "./fsutil.ts";
-import { nowIso, ulid } from "./ids.ts";
+import { localDay, nowIso, ulid } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 import { readReviews } from "./reviews.ts";
 import { findCard } from "./cards.ts";
 import { loadParams, retrievability } from "./scheduler.ts";
-import { desiredRetention, loadSkills } from "./skills.ts";
+import { desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
+import { ACTIVE_CAP_MS } from "./study.ts";
 import { gemGrade, type GemGrade } from "./today.ts";
 
 export interface SessionReceipt {
@@ -30,6 +31,9 @@ export interface SessionReceipt {
   /** How much longer the cards he passed this session now last than before it, in whole days added up
    *  (FSRS stability); a miss takes nothing off it (D197). */
   depth_days?: number;
+  /** The part of `depth_days` from exercises he answered after today's goal had closed (D246): the end
+   *  screen says how much of the session was extra. Absent when none was. */
+  depth_extra_days?: number;
   /** The longest gap, in whole days, between a card he passed this session and when he last saw it (D177):
    *  the end screen names it, so spacing's delayed gain is something he sees. */
   longest_days?: number;
@@ -98,6 +102,11 @@ export function firstEndThisWeek(lib: Library, now = new Date()): boolean {
   return readSessions(lib).filter((s) => s.type === "end" && (s.reviews ?? 0) > 0 && Date.parse(s.ts) >= monday.getTime() && Date.parse(s.ts) <= now.getTime()).length === 1;
 }
 
+/** The most one exercise adds to a session's depth (D246). Uncapped, one Good on an old exercise outweighed
+ *  twenty young ones and an Easy paid more than a Good, so the sum followed the library's age and how
+ *  generous his ratings were. Capped, it follows how many memories the session made stronger. */
+export const DEPTH_CAP_DAYS = 30;
+
 /** Ends session `id` (the open one by default); the open file goes only when it names this session. */
 export function endSession(lib: Library, now = new Date(), caughtUp = false, which?: string): Promise<SessionReceipt> {
   return withLock(paths.lock(lib), () => receipt(lib, now, caughtUp, which ?? openSessionId(lib)));
@@ -141,10 +150,23 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
   const cut = cutNow.map((c) => skillOf(c.card));
   const grades = cutNow.map((c) => c.after!);
   const polished = changed.filter((c) => c.before && c.before !== "polished" && c.after === "polished").map((c) => skillOf(c.card));
-  const depth = Math.round(kept.reduce((n, x) => n + Math.max(0, last.get(x.card)!.state_after.stability - x.state_before.stability), 0));
+  const gain = (x: (typeof kept)[number]) => Math.min(DEPTH_CAP_DAYS, Math.max(0, last.get(x.card)!.state_after.stability - x.state_before.stability));
+  const depth = Math.round(kept.reduce((n, x) => n + gain(x), 0));
+  // Past the goal (D246): answered once the day's active time had already reached it. An off day has no goal.
+  const settings = reviewSettings(lib);
+  const day = own[0] ? localDay(own[0].ts) : "";
+  const off = settings.weekdays_only && [0, 6].includes(new Date(`${day}T12:00:00`).getDay());
+  const pastGoal = new Set<string>();
+  let active = 0;
+  for (const x of all) {
+    if (localDay(x.ts) !== day) continue;
+    if (!off && active >= settings.goal_minutes * 60_000) pastGoal.add(x.ts + x.card);
+    active += Math.min(x.elapsed_ms ?? 0, ACTIVE_CAP_MS);
+  }
+  const extra = Math.round(kept.filter((x) => pastGoal.has(x.ts + x.card)).reduce((n, x) => n + gain(x), 0));
   const gaps = kept.flatMap((x) => (x.state_before.reps > 0 && x.state_before.last_review ? [Math.floor((Date.parse(x.ts) - Date.parse(x.state_before.last_review)) / 864e5)] : []));
   const longest = Math.max(0, ...gaps);
-  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
+  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
   if (openSessionId(lib) === id) unlinkSync(paths.openSession(lib));
   return r;

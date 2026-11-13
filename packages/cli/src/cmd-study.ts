@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
-  CardState, cardStates, calibration, raterStats, addCellCard, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
+  CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
   readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
@@ -184,9 +184,10 @@ export const studyCommands: Record<string, Command> = {
           ]),
         ]);
         // remix: variant vs original pass rates, for us to watch the prompts (D66); ai_agreement and explain:
-        // his rating against the AI's, typed against in-head answers. The app never shows them.
+        // his rating against the AI's, typed against in-head answers; near_cut: his ratings one Good from a cut gem
+        // against the other growing ones (D246). The app never shows them.
         const now = new Date();
-        return { data: f.skill ? rows.map((x) => ({ ...x, strength: skillStrength(lib, x.skill, now, index), growth: skillGrowth(lib, x.skill, now, 12, index) })) : { ...s, remix: remixStats(lib), calibration: calibration(readReviews(lib)), ...raterStats(readReviews(lib)) }, text };
+        return { data: f.skill ? rows.map((x) => ({ ...x, strength: skillStrength(lib, x.skill, now, index), growth: skillGrowth(lib, x.skill, now, 12, index) })) : { ...s, remix: remixStats(lib), calibration: calibration(readReviews(lib)), ...raterStats(readReviews(lib), loadParams(lib)) }, text };
       } finally {
         index.close();
       }

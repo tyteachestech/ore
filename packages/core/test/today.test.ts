@@ -6,7 +6,7 @@ import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
 import { appendJsonl } from "../src/fsutil.ts";
 import { paths } from "../src/library.ts";
-import { endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
+import { DEPTH_CAP_DAYS, endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
 import { readReviews, type Review } from "../src/reviews.ts";
 import { calibration, raterStats } from "../src/stats.ts";
 import { addSkill, archiveSkill, loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
@@ -446,7 +446,7 @@ describe("strength breakdown and peak level (D63)", () => {
     const end = await endSession(lib, at);
     expect(end.cut).toEqual(["learning"]);
     expect(end.grades).toEqual(["mended"]);
-    expect(end.depth_days).toBe(Math.round(skillStrengthOf(id) - before));
+    expect(end.depth_days).toBe(Math.round(Math.min(DEPTH_CAP_DAYS, skillStrengthOf(id) - before)));
     expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 2, win_back: 0, mended: 1, polished: 0 });
 
     // Passed on a new case (a remix, D66): polished, once; a polished gem is counted there, not as mended.
@@ -473,7 +473,28 @@ describe("strength breakdown and peak level (D63)", () => {
     const back = await endSession(lib, at);
     expect(back).toMatchObject({ cut: ["learning"], grades: ["polished"] });
     expect(back.polished).toBeUndefined();
-    expect(back.depth_days).toBe(Math.round(skillStrengthOf(other) - low));
+    expect(back.depth_days).toBe(Math.round(Math.min(DEPTH_CAP_DAYS, skillStrengthOf(other) - low)));
+  });
+
+  test("depth is capped per exercise and says what came after the goal (D246)", async () => {
+    const { lib, cards } = await library(3);
+    const [a, b, c] = cards.map((x) => x.meta.id) as [string, string, string];
+    const stab = (card: string) => readReviews(lib).findLast((r) => r.card === card)!.state_after.stability;
+    // An old, strong exercise: one Easy on it adds months.
+    let t = new Date("2026-01-01T09:00:00Z");
+    for (let i = 0; i < 6; i++) t = new Date((await recordReview(lib, a, { rating: 4, confidence: 2, now: t })).due_next);
+    const was = stab(a);
+    await startSession(lib, t);
+    await recordReview(lib, a, { rating: 4, confidence: 2, now: t, elapsed_ms: 5 * 60_000 });
+    expect(stab(a) - was).toBeGreaterThan(DEPTH_CAP_DAYS);
+    // Two more after 3 minutes of active time (one exercise's cap); the goal is 3 minutes here, so both are extra.
+    writeFileSync(paths.skills(lib), readFileSync(paths.skills(lib), "utf8") + "\nreview:\n  goal_minutes: 3\n");
+    await recordReview(lib, b, { rating: 3, confidence: 2, now: new Date(t.getTime() + 60e3), elapsed_ms: 20_000 });
+    await recordReview(lib, c, { rating: 1, confidence: 2, now: new Date(t.getTime() + 120e3), elapsed_ms: 20_000 });
+    const end = await endSession(lib, new Date(t.getTime() + 180e3));
+    const extra = Math.round(Math.min(DEPTH_CAP_DAYS, stab(b)));
+    expect(end.depth_days).toBe(Math.round(DEPTH_CAP_DAYS + Math.min(DEPTH_CAP_DAYS, stab(b))));
+    expect(end.depth_extra_days).toBe(extra);
   });
 
   test("the hook is his why, one line, set in skills.yaml", async () => {
@@ -509,6 +530,14 @@ describe("what the review log can say about the grader and in-head answers (scie
     const rs = [r({ ai_rating: 3 }), r({ ai_rating: 3 }), r({ ai_rating: 2 }), r({ ai_rating: 4, rating: 2 }), r({}), r({ ai_rating: 1, in_head: true })];
     expect(raterStats(rs).ai_agreement).toEqual({ n: 4, same: 2, share: 0.5, his_higher: 1, his_lower: 1 });
     expect(raterStats([]).ai_agreement.share).toBeNull();
+  });
+  test("ratings one Good from a cut gem against the other growing ones (D246)", () => {
+    const at = (stability: number, rating: number) => r({ rating, ts: "2026-03-01T09:00:00.000Z", state_before: { reps: 3, lapses: 0, stability, difficulty: 5, due: "2026-03-01T09:00:00.000Z", last_review: "2026-02-20T09:00:00.000Z", state: 2 } as unknown as Review["state_before"] });
+    const s = raterStats([at(15, 3), at(15, 4), at(15, 2), at(1, 3), at(1, 1), at(60, 3)]).near_cut;
+    expect(s.near).toMatchObject({ reviews: 3, pass_rate: 2 / 3 });
+    expect(s.other).toMatchObject({ reviews: 2, pass_rate: 0.5 });
+    expect(s.near.recall).toBeGreaterThan(0);
+    expect(raterStats([]).near_cut.near).toEqual({ reviews: 0, pass_rate: null, recall: null });
   });
   test("pass rates of typed and in-head answers, on cards old enough for either", () => {
     const rs = [
