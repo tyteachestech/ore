@@ -6,7 +6,7 @@ Every bug or UX miss anyone finds lands here as one row: a Codex or ChatGPT swee
 - **Add a row when a finding is verified** (triage-report step 3), before any fix. A new row goes at the end as `F-new-<slug>` (and is mentioned by that name in tests and journeys); `bun run ids` gives it the next free number at merge (`docs/WORKFLOW.md`). Never reuse or renumber a numbered ID.
 - **Status** is one of:
   - `open`
-  - `fixed #371`
+  - `fixed #PR`
   - `not a bug: <why>` (a D-number, or the reason it was ruled out)
   - `Tyler: <the question>` (his call, nothing built)
   - `known limit: <D-number or why>` (accepted as is)
