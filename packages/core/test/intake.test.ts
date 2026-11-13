@@ -1242,6 +1242,26 @@ describe("import coverage: audio and podcasts", () => {
     expect(item.meta.author).toBe("Learning Show");
   });
 
+  test("a podcast player's episode keeps its published date (F-new-player-date)", async () => {
+    const url = "https://overcast.fm/+Sundial";
+    const html = readFileSync(join(FIX, "audio/player-date.html"), "utf8");
+    const pages = (page: string) => ({
+      [url]: { body: page, type: HTML },
+      "https://audio.test/sundial.wav": { body: readFileSync(join(FIX, "audio/sundial.wav")), type: "audio/wav" },
+    });
+    serve(pages(html));
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "Episode 12: Restoring a sundial", author: "Workshop Radio", published: "2026-10-21T09:30:00-07:00", url });
+    expect(item.body).toBe("[00:00] Welcome back to the show. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n");
+    expect(readFileSync(join(item.dir, "source.wav")).length).toBe(4096);
+    expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(VTT);
+    // Invalid metadata is omitted, never saved as a date or replaced with today's date.
+    serve(pages(html.replace("2026-10-21T09:30:00-07:00", "whenever")));
+    expect((await addSource(await tempLibrary(), url)).meta.published).toBeUndefined();
+    serve(pages(html.replace(/<meta[^>]*article:published_time[^>]*>/, "")));
+    expect((await addSource(await tempLibrary(), url)).meta.published).toBeUndefined();
+  });
+
   test("a player's page whose audio has its type mid-path still plays it", async () => {
     const url = "https://pca.st/episode/abc";
     serve({
@@ -1702,6 +1722,72 @@ describe("import coverage: other languages", () => {
     });
     const language = () => readFileSync(join(dir, "args"), "utf8").trim().split(" ").slice(1).join(" ");
     const feed = (lang: string, items = "") => `<?xml version="1.0"?><rss><channel><title>Radio Ambulante</title><language>${lang}</language>${items}</channel></rss>`;
+
+    test("a publisher's episode is heard in its declared spoken language from a link or tab (F-new-episode-language)", async () => {
+      const url = "https://workshop.test/episodes/sundial";
+      const html = readFileSync(join(FIX, "audio/episode-language.html"), "utf8");
+      const transcript = readFileSync(join(FIX, "audio/sundial.vtt"), "utf8");
+      writeFileSync(join(dir, "out.vtt"), transcript);
+      try {
+        serve({
+          [url]: { body: html, type: HTML },
+          "https://audio.test/sundial.wav": { body: readFileSync(join(FIX, "audio/sundial.wav")), type: "audio/wav" },
+        });
+        for (const tab of [false, true]) {
+          const lib = await tempLibrary();
+          const item = tab ? await addTab(lib, { tab: { browser: "Safari", url, title: "x", html } }) : await addSource(lib, url);
+          expect(language()).toBe("es-MX");
+          expect(item.meta).toMatchObject({ title: "Restaurar un reloj de sol", author: "Ana Torres", published: "2026-10-21", url });
+          expect(item.body).toBe("[00:00] El taller abre sus puertas.\n\n[00:30] Medimos la sombra antes de mover la pieza.\n\n[01:00] El reloj vuelve al jardín.\n");
+          expect(readFileSync(join(item.dir, "page.html"), "utf8")).toBe(html);
+          expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(transcript);
+          expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.wav") });
+        }
+      } finally {
+        writeFileSync(join(dir, "out.vtt"), VTT);
+      }
+    });
+
+    test("a podcast player's episode uses its declared spoken language, not its UI language (F-new-player-language)", async () => {
+      const url = "https://pca.st/episode/sundial";
+      const transcript = readFileSync(join(FIX, "audio/sundial.vtt"), "utf8");
+      serve({
+        [url]: { body: readFileSync(join(FIX, "audio/episode-language.html"), "utf8"), type: HTML },
+        "https://audio.test/sundial.wav": { body: readFileSync(join(FIX, "audio/sundial.wav")), type: "audio/wav" },
+      });
+      writeFileSync(join(dir, "out.vtt"), transcript);
+      try {
+        const item = await addSource(await tempLibrary(), url);
+        expect(language()).toBe("es-MX");
+        expect(item.meta).toMatchObject({ title: "Restaurar un reloj de sol", author: "Workshop Radio", published: "2026-10-21", url });
+        expect(item.body).toBe("[00:00] El taller abre sus puertas.\n\n[00:30] Medimos la sombra antes de mover la pieza.\n\n[01:00] El reloj vuelve al jardín.\n");
+        expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(transcript);
+        expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.wav") });
+      } finally {
+        writeFileSync(join(dir, "out.vtt"), VTT);
+      }
+    });
+
+    test("an episode's missing or invalid spoken language leaves the chosen or Mac language alone", async () => {
+      const html = readFileSync(join(FIX, "audio/episode-language.html"), "utf8");
+      for (const [page, chosen, expected] of [
+        [html.replace('"es-mx"', '" es-mx "').replace('"PodcastEpisode"', '"RadioEpisode"'), undefined, "es-MX"],
+        [html.replace(', "inLanguage": "es-mx"', ""), undefined, ""],
+        [html.replace('"es-mx"', '"not a locale"'), "fr", "fr"],
+        [html.replace('"es-mx"', '{"name":"Spanish"}'), undefined, ""],
+        // An Article with audio at an episode URL is still heard, but its page language is not speech metadata.
+        [html.replace('"PodcastEpisode"', '"Article"'), undefined, ""],
+      ] as const) {
+        for (const url of ["https://workshop.test/episodes/sundial", "https://pca.st/episode/sundial"]) {
+          serve({
+            [url]: { body: page, type: HTML },
+            "https://audio.test/sundial.wav": { body: readFileSync(join(FIX, "audio/sundial.wav")), type: "audio/wav" },
+          });
+          await addSource(await tempLibrary(), url, { language: chosen });
+          expect(language()).toBe(expected);
+        }
+      }
+    });
 
     test("a Spanish show on Apple Podcasts is heard in Spanish, as its feed says", async () => {
       serve({
