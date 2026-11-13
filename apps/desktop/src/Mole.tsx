@@ -55,7 +55,7 @@ export function step(v: State, vel: State, to: State, dt: number) {
   for (const [k, lo, hi] of LIMITS) if (v[k] < lo || v[k] > hi) { v[k] = clamp(v[k], lo, hi); vel[k] = 0; }
 }
 
-export type Mood = "idle" | "peek" | "hole" | "pop" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "doze" | "fall";
+export type Mood = "idle" | "peek" | "hole" | "pop" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "doze" | "fall" | "dive";
 /** A mood: where each value should settle (`to`), where it starts (`from`), pushes that set it moving (`kick`), timed
  *  changes after (`at`), paws waving until `wave` ms, and when it rests (`end`) or starts over (`loop`).
  *  `still` is the one pose shown under reduced motion or in a hidden window. */
@@ -143,8 +143,11 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // head, his belly and moustache rising on each snore, the foot in the air bobbing.
   doze: { from: DOZE, to: DOZE, loop: 3000, still: DOZE,
     at: [[0, { to: { breath: 1 } }], [1300, { to: { breath: 0 }, kick: { puff: 2 } }], [2000, { to: { legs: 1 } }], [2250, { to: { legs: 0 } }]] },
-  // Falling: eyes wide, mouth an O, arms flung out and his feet running on nothing.
-  fall: { from: { whole: 1, side: 0 }, to: FALL, loop: 280, still: FALL, at: [[0, { to: { legs: 1, arms: 0.55, tilt: -0.2 } }], [140, { to: { legs: -1, arms: 1, tilt: 0.2 } }]] },
+  // Falling: eyes wide, mouth an O, arms flung out and his feet running on nothing. His helmet, pressed down by the
+  // start up, floats off his brows a beat late.
+  fall: { from: { whole: 1, side: 0, hat: -0.8 }, to: FALL, loop: 280, still: FALL, at: [[0, { to: { legs: 1, arms: 0.55, tilt: -0.2 } }], [140, { to: { legs: -1, arms: 1, tilt: 0.2 } }]] },
+  // Diving head first: what was thrashing is swept back by the air, his helmet pushed down to his brows, feet together.
+  dive: { from: { whole: 1, side: 0 }, to: { ...FALL, hat: -0.5, arms: 0.55, legs: 0, tilt: 0 }, loop: 3000, still: { ...FALL, hat: -0.5, arms: 0.55, legs: 0 } },
 };
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */

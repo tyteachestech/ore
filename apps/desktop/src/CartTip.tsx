@@ -34,6 +34,18 @@ const SLID = 44;
 const GROUND = 3;
 /** The gravity he dives under, px/s²: slower than the ore's, so a turn in the air can be seen. */
 const DIVE = 1500;
+/** How long he is pulled going up and diving, and how short he is pressed in the brace before it. */
+const STRETCH = 1.2, SQUASH = 0.86;
+/** The cart's hop as his weight leaves it, in px. */
+const HOPPED = [0, -4, 1, 0];
+/** How far the ring's nearest dot is knocked down as he hits, in px. */
+const KNOCK = 7;
+/** The dirt his dive throws up: each dot's speed across and up in px a second, and its size in px. */
+const DIRT: [number, number, number][] = [[-210, -260, 6], [-160, -380, 8], [-110, -470, 6], [-70, -340, 9], [-30, -520, 7], [20, -400, 6], [60, -500, 9], [105, -360, 7], [150, -440, 6], [200, -290, 8], [-130, -200, 5], [140, -190, 5], [-40, -250, 5], [45, -230, 5]];
+/** How far through his drop his head meets the dirt. */
+const HIT = 0.55;
+/** The longest any of that dirt is in the air, in ms. */
+const SETTLE = 840;
 /** A snoring Z, in dots on a 4 by 4 grid (the mole's own Z). */
 const Z = [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3], [3, 3]] as const;
 
@@ -64,7 +76,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
   const calls = useRef({ onStone, onPoured, onLeave, onDone, onFell });
   calls.current = { onStone, onPoured, onLeave, onDone, onFell };
   // The mole asleep on the load (D255) wakes once the cart has gone from under him.
-  const [awake, setAwake] = useState(false);
+  const [pose, setPose] = useState<"doze" | "fall" | "dive" | "gone">("doze");
 
   useEffect(() => {
     const el = layer.current, ring = host?.querySelector<SVGSVGElement>(".ring .dot-ring"), body = host?.closest<HTMLElement>(".review-body");
@@ -174,6 +186,12 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       };
       const x = stop + W / 2 - 2, y = floor - 30 - DOZE * 45, ground = rider.parentElement!;
       const asleep = (cx: number, cy: number, turn: number) => place(SLEEPER, cx, cy, turn, DOZE);
+      // Squash and stretch: his body is pulled long (over 1) or pressed short along its own length, about its
+      // middle and keeping its area, inside the wrapper that places him, so it never moves where he is.
+      const body = rider.firstElementChild as HTMLElement;
+      const about = (mid: readonly [number, number]) => { body.style.transformOrigin = `calc(50% + ${mid[0]}px) calc(100% + ${mid[1]}px)`; };
+      const pull = (ks: number[], duration: number, easing: string) => play(body, ks.map((k) => ({ transform: `scale(${1 / k}, ${k})` })), { duration, easing });
+      about(SLEEPER);
       play(rider, [{ transform: asleep(x - (stop + W + 20), y, 0) }, { transform: asleep(x, y, 0) }], { duration: MOMENT, easing: OUT });
       // The bucket tips under him, and while his bed pours out he slides down it, slowly, then faster, until he
       // hangs past the lip (Tyler, 2026-11-13: "he should be sliding slowly off the cart before fully falling").
@@ -193,20 +211,27 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       // not: asleep on nothing, sagging; then awake with a start, up off nothing and bigger, limbs going; then down.
       const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = T4, HANG = 320, SAG = 4, JUMP = 62, NEAR = 0.72;
       // Asleep on nothing he bobs with his breath, clear of the dirt line, so it reads as air and not a perch.
+      later(stoned + 160, () => { play(cart, HOPPED.map((y) => ({ transform: `translateY(${y}px)` })), { duration: T4, easing: OUT, composite: "add" }); });
       later(stoned + 160, () => play(rider, [
         { transform: asleep(...end) }, { transform: asleep(end[0] + 3, end[1] - 6, end[2] - 5), easing: IN_OUT, offset: 0.2 },
         { transform: asleep(end[0], end[1] + SAG, end[2]), easing: IN_OUT, offset: 0.45 }, { transform: asleep(end[0], end[1] + SAG - 5, end[2] - 3), easing: IN_OUT, offset: 0.72 }, { transform: asleep(end[0], end[1] + SAG, end[2]) },
       ], { duration: gone + SLEEP - stoned - 160, easing: OUT }));
       // He braces before he starts (anticipation): a dip and a curl, still asleep to look at.
       later(gone + SLEEP, () => play(rider, [{ transform: asleep(end[0], end[1] + SAG, end[2]) }, { transform: asleep(end[0], end[1] + SAG + 7, end[2] + 14) }], { duration: BRACE, easing: OUT }));
+      // Lying side on, his length runs across the drawing, so pressed short is the other way round.
+      later(gone + SLEEP, () => pull([1, 1 / SQUASH], BRACE, OUT));
       // `flushSync`: his drawing and his place change in the same frame, on the same spot at the same size. He
       // starts up and over his hole, so the dive after it is straight down.
       let top = [0, 0] as [number, number];
       later(gone + SLEEP + BRACE, () => {
-        flushSync(() => setAwake(true));
+        flushSync(() => setPose("fall"));
         const o = el.getBoundingClientRect(), to = seat.getBoundingClientRect();
         const [cx, cy] = [end[0], end[1] + SAG + 7];
         top = [to.left - o.left + to.width / 2, cy - 7 - JUMP];
+        // Pressed short in the brace, he goes up long and gathers at the top.
+        about(FALLER);
+        pull([SQUASH, STRETCH, 0.94], START, OUT);
+        later(START, () => pull([0.94, 1.04, 0.97, 1], HANG, IN_OUT));
         play(rider, [{ transform: place(FALLER, cx, cy, SLID + 14 - 90, DOZE) }, { transform: place(FALLER, top[0], top[1], -14, NEAR) }], { duration: START, easing: SPRING });
         // At the top he thrashes on nothing: his whole body rocks while his limbs go, and he starts to sink.
         later(START, () => play(rider, [-14, 6, -16, 4, -14].map((turn, i) => ({ transform: place(FALLER, top[0], top[1] + [0, -5, -6, -4, 0][i]!, turn, NEAR) })), { duration: HANG, easing: "linear" }));
@@ -225,7 +250,33 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
           const t = (i / N) * (T + UNDER), k = Math.min(1, t / T), over = Math.min(1, t / (0.5 * T)), turned = over * over * (3 - 2 * over);
           return { transform: place(FALLER, cx, cy + 0.5 * DIVE * t * t, -14 + 194 * turned, NEAR + (1 - NEAR) * k) };
         }), { duration: (T + UNDER) * 1000, easing: "linear" });
-        later((T + UNDER) * 1000, () => flushSync(() => { calls.current.onFell?.(); calls.current.onDone(); }));
+        // Head down, arms and helmet trailing, and longer the faster he goes.
+        setPose("dive");
+        pull([1, STRETCH], T * 1000, "ease-in");
+        // The hit, as his head meets the dirt: it flies, and the ring takes the knock, nearest dots first.
+        later(T * 1000 * HIT, () => {
+          const hx = to.left - o.left + to.width / 2;
+          DIRT.forEach(([vx, vy, r], i) => {
+            const d = document.createElement("span");
+            d.className = "cart-dirt";
+            d.style.width = d.style.height = `${r}px`;
+            el.appendChild(d);
+            // Up, over and back down to the dirt line it came from.
+            const fall = -vy / (0.25 * GRAVITY), N2 = 10;
+            play(d, Array.from({ length: N2 + 1 }, (_, j) => { const t = (j / N2) * fall; return { transform: `translate3d(${hx + vx * t}px, ${ty + vy * t + 0.5 * GRAVITY * 0.5 * t * t}px, 0)`, opacity: j === N2 ? 0 : 1 }; }), { duration: fall * 1000, easing: "linear" });
+            later(fall * 1000, () => d.remove());
+          });
+          const rr = ring.getBoundingClientRect(), mid = rr.left + rr.width / 2;
+          for (const c of circles) {
+            const b = c.getBoundingClientRect(), far = Math.hypot(b.left + b.width / 2 - mid, b.top - rr.top);
+            if (far > rr.width * 0.75) continue;
+            const push = 1 - far / (rr.width * 0.75);
+            anims.push(c.animate([{ transform: "translateY(0)" }, { transform: `translateY(${(KNOCK * push).toFixed(1)}px)`, offset: 0.3 }, { transform: "translateY(0)" }], { duration: T4, delay: far * 0.9, easing: OUT }));
+          }
+        });
+        // He is gone from here as he comes up there, never two of him; the layer stays until his dirt has come down.
+        later((T + UNDER) * 1000, () => flushSync(() => { setPose("gone"); calls.current.onFell?.(); }));
+        later(T * 1000 * HIT + SETTLE, () => calls.current.onDone());
       });
     }
 
@@ -245,12 +296,12 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     <div className="cart-tip" ref={layer} aria-hidden="true">
       <span className="cart-rail" />
       {/* Before the cart, so he lies in the bucket, behind its near side. */}
-      {mole && (
-        <span className="cart-ground"><span className="cart-mole">
-          <Mole bare size={RIDER_PX} mood={awake ? "fall" : "doze"} />
+      {mole && pose !== "gone" && (
+        <span className="cart-ground"><span className="cart-mole"><span className="cart-mole-body">
+          <Mole bare size={RIDER_PX} mood={pose} />
           {/* His snoring, in his wrapper so it stays over his head as the bucket tips him. */}
-          {!awake && <svg className="cart-zzz" viewBox="0 0 28 22">{([[0, 16, 1.4], [9, 8, 1.7], [19, 0, 2]] as const).map(([x0, y0, p], n) => <g key={n}>{Z.map(([i, j]) => <circle key={`${i},${j}`} cx={x0 + (i + 0.5) * p} cy={y0 + (j + 0.5) * p} r={p * 0.4} />)}</g>)}</svg>}
-        </span></span>
+          {pose === "doze" && <svg className="cart-zzz" viewBox="0 0 28 22">{([[0, 16, 1.4], [9, 8, 1.7], [19, 0, 2]] as const).map(([x0, y0, p], n) => <g key={n}>{Z.map(([i, j]) => <circle key={`${i},${j}`} cx={x0 + (i + 0.5) * p} cy={y0 + (j + 0.5) * p} r={p * 0.4} />)}</g>)}</svg>}
+        </span></span></span>
       )}
       <svg className="cart" width={W} height={H} viewBox={`0 ${-HEAD} 20 ${15 + HEAD}`}>
         {/* The rect fixes the group's box, so its foot is the same point whatever it carries. */}

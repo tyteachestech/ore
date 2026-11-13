@@ -116,6 +116,31 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   await plain.done();
 });
 
+test("the fall off the cart has weight: he is pressed short then pulled long, dives swept back, throws dirt, knocks the ring, and the cart hops as he leaves it", async () => {
+  jest.useFakeTimers();
+  const proto = w.Element.prototype as unknown as Record<string, unknown>, plain = proto.animate;
+  const seen: { cls: string; keys: Record<string, string>[]; o: { composite?: string } }[] = [];
+  proto.animate = function (this: Element, keys: Record<string, string>[], o: { composite?: string }) { seen.push({ cls: this.getAttribute("class") ?? this.tagName, keys, o }); return { cancel() {} }; };
+  try {
+    const s = await mount(end(["ai"]));
+    let dived = false, dirt = 0;
+    for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
+      await act(async () => void jest.advanceTimersByTime(20));
+      if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "dive") dived = true;
+      dirt = Math.max(dirt, s.q(".cart-dirt"));
+    }
+    expect(dived).toBe(true);
+    expect(dirt).toBeGreaterThanOrEqual(8);
+    // Squash and stretch are on his body, inside the wrapper that places him: shorter than 1 along his length, then longer.
+    const pulls = seen.filter((a) => a.cls === "cart-mole-body").flatMap((a) => a.keys.map((k) => Number(/scale\(([\d.]+), ([\d.]+)\)/.exec(k.transform!)![2])));
+    expect(Math.min(...pulls)).toBeLessThan(0.9);
+    expect(Math.max(...pulls)).toBeGreaterThan(1.15);
+    // The cart's hop is added to its roll, never in place of it.
+    expect(seen.some((a) => a.cls === "cart" && a.o.composite === "add" && a.keys.some((k) => k.transform === "translateY(-4px)"))).toBe(true);
+    await s.done();
+  } finally { proto.animate = plain; jest.useRealTimers(); }
+});
+
 test("a gem cut with the ring already full: the cart still comes, carrying only the stone", async () => {
   const s = await mount(end(["ai"], today(true, 600_000)));
   expect(s.q(".cart-tip .cart")).toBe(1);
