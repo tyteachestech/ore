@@ -32,7 +32,7 @@ type Key = keyof State;
 const KEYS = Object.keys(REST) as Key[];
 /** Spring per value: [stiffness, damping]. Eyes snap; the body carries a little bounce. */
 const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx: [210, 16], ex: [200, 22], hx: [70, 13], lx: [90, 15], ly: [90, 15], open: [900, 52], tall: [420, 26], arc: [320, 30], pawL: [260, 14], pawR: [260, 14], pw: [260, 24], kick: [160, 9], mouth: [380, 22], wink: [900, 52], frown: [320, 30], hat: [210, 16], tilt: [160, 14], lamp: [200, 18], droop: [120, 18], puff: [260, 12],
-  star: [300, 22], blush: [90, 16], twinkle: [420, 20], ask: [380, 17], bang: [520, 19], tear: [5, 4.5], sweat: [5, 4.5], steam: [30, 11], zzz: [4, 4], spark: [10, 6.4] };
+  star: [300, 22], blush: [90, 16], twinkle: [420, 20], ask: [380, 17], bang: [520, 19], tear: [5, 4.5], sweat: [5, 4.5], steam: [90, 19], zzz: [7, 5.3], spark: [6, 4.9] };
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

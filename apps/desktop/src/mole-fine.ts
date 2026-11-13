@@ -61,7 +61,7 @@ export function fineDots(s: State): FineDot[] {
 
   // Drawn marks sit over everything, each riding his head.
   const marks = layer();
-  const mark = (x: number, y: number, r: number, tone: FineTone, lean = 1) => { if (r > 0.02 * U) { const [X, Y] = head({ x: x * U, y: y * U, r: 0, tone }, 0, 0, lean); marks.push([X, Y, r * U, tone, true]); } };
+  const mark = (x: number, y: number, r: number, tone: FineTone, lean = 1) => { if (r * U > 0.02) { const [X, Y] = head({ x: x * U, y: y * U, r: 0, tone }, 0, 0, lean); marks.push([X, Y, r * U, tone, true]); } };
   /** Nothing at 0 and from 0.9 on, whole between: a mark that travels shows only on its way. */
   const show = (v: number) => clamp(v * 7) * clamp((0.9 - v) * 7);
   const drop = (v: number, x0: number, y0: number, x1: number, y1: number) => {
@@ -135,7 +135,7 @@ export function fineDots(s: State): FineDot[] {
     // down the eye when the helmet comes low, and goes only as the lid closes (Tyler, 2026-11-13: without it he looks spooky).
     const [gx, gy] = head(glint, ex, ey - wide * U + clamp(tip, 0, 0.55));
     marks.push([gx, gy, glint.r * clamp((1 - shut) * 2.5) * (1 - arc) * (1 - clamp(star)), "glint", false]);
-    if (star > 0.02) bigStar(cx / U + s.lx * 0.3, (top + U / 2) / U, star);
+    if (star > 0.02) bigStar((cx + ex) / U, (top + U / 2 + ey) / U, star);
     if (blush > 0.02) for (const [dx, dy] of [[2.1, 1.9], [3.1, 1.9], [4.1, 1.9], [2.6, 2.75], [3.6, 2.75]] as const) mark(cx / U + side * dx, top / U + dy, 0.36 * blush, "nose");
     if (arc * (1 - clamp(star)) > 0.02) for (const [dx, dy] of [[-1.5, 1.25], [-0.8, 0.5], [0, 0.2], [0.8, 0.5], [1.5, 1.25]] as const) {
       const [x, y] = head({ x: cx + dx * U, y: top + dy * U, r: 0, tone: "eye" }, ex, ey);

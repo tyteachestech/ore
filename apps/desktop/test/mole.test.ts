@@ -277,3 +277,15 @@ test("traced: an open eye never loses its glint, in any frame of any move (Tyler
   // A low helmet no longer covers it: sad, huff and the look down keep both.
   for (const pose of [MOVES.huff.still, MOVES.lookdown.still, { hat: -0.7 }]) expect(fine(pose).filter(([, , r, t]) => t === "glint" && r > glint * 0.9).length).toBeGreaterThanOrEqual(2);
 });
+
+test("a mark that travels is put back at its start only once it has passed out of sight", () => {
+  // tear, sweat, steam, zzz and spark show nothing from 0.9 on; a `set` before that would make the mark vanish mid-air.
+  for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[]) {
+    const m = MOVES[name], s = puppet(), sets = (m.at ?? []).filter(([, b]) => b.set);
+    start(s, name, 0);
+    for (let t = 0, i = 0; t < (m.end ?? m.loop!); t += 1000 / 60) {
+      for (; i < sets.length && t + 1000 / 60 >= sets[i]![0]; i++) for (const k of Object.keys(sets[i]![1].set!) as (keyof State)[]) expect(s.v[k]).toBeGreaterThanOrEqual(0.9);
+      advance(s, t, 1 / 60);
+    }
+  }
+});
