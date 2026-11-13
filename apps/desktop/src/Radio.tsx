@@ -15,7 +15,7 @@ const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const now = () => performance.now() / 1000;
 
 /** Redraws `draw` every frame while `on`, at the canvas's device scale. */
-function useCanvas(on: boolean, w: number, h: number, draw: (ctx: CanvasRenderingContext2D, t: number) => void, redraw: unknown = null) {
+function useCanvas(on: boolean, w: number, h: number, draw: (ctx: CanvasRenderingContext2D, t: number) => void) {
   const ref = useRef<HTMLCanvasElement>(null);
   const fn = useRef(draw);
   fn.current = draw;
@@ -37,7 +37,7 @@ function useCanvas(on: boolean, w: number, h: number, draw: (ctx: CanvasRenderin
     };
     tick();
     return () => (cancelAnimationFrame(raf), clearTimeout(timer));
-  }, [on, w, h, redraw]);
+  }, [on, w, h]);
   return ref;
 }
 
@@ -107,30 +107,32 @@ function Pads() {
 }
 
 const ORB = 52;
-function Orb({ playing, hover }: { playing: ChannelId | null; hover: boolean }) {
+/** Idle, the button is a plain grey speaker drawn like the pads' icons: no canvas, so it costs nothing at launch. */
+function Orb({ playing }: { playing: ChannelId | null }) {
+  if (!playing) return <svg className="radio-orb-dots" viewBox="0 0 16 16" width="26" height="26" aria-hidden="true"><path d={dots(ICONS.speaker)} /></svg>;
+  return <OrbPlaying playing={playing} />;
+}
+function OrbPlaying({ playing }: { playing: ChannelId }) {
   const g = useRef(grid(11, 11));
   const lv = useRef(0);
-  const ref = useCanvas(!!playing, ORB, ORB, (ctx, t) => {
+  const ref = useCanvas(true, ORB, ORB, (ctx, t) => {
     const s = g.current, c = ORB / 2, d = 2.3, o = c - 5.5 * d;
     s.clear();
-    lv.current += ((playing ? level() : 0) - lv.current) * 0.2;
-    if (playing) icon(s, playing, 0, 0, 1, t || -1);
-    else icon(s, "speaker", 0, 0, 1);
+    lv.current += (level() - lv.current) * 0.2;
+    icon(s, playing, 0, 0, 1, t || -1);
     ctx.clearRect(0, 0, ORB, ORB);
-    const grey = playing ? "" : getComputedStyle(ctx.canvas).color;
     for (let y = 0; y < 11; y++) for (let x = 0; x < 11; x++) {
       const v = s.lit[y * 11 + x]!;
       if (v <= 0) continue;
-      ctx.fillStyle = playing ? `rgba(${AMBER},${v})` : grey;
+      ctx.fillStyle = `rgba(${AMBER},${v})`;
       ctx.beginPath(); ctx.arc(o + x * d + d / 2, o + y * d + d / 2, d * 0.42, 0, 7); ctx.fill();
     }
-    if (!playing) return;
     for (let k = 0; k < 24; k++) {
       const a = (k / 24) * Math.PI * 2 - Math.PI / 2, w = 0.5 + 0.5 * Math.sin(k * 1.7 + t * 3);
       ctx.fillStyle = `rgba(${AMBER},${0.25 + 0.6 * lv.current * w})`;
       ctx.beginPath(); ctx.arc(c + Math.cos(a) * 21, c + Math.sin(a) * 21, 1.1 + lv.current * 1.1 * w, 0, 7); ctx.fill();
     }
-  }, hover); // idle, it draws once: again on hover, so the speaker brightens with the button
+  });
   return <canvas ref={ref} className="radio-orb-dots" style={{ width: ORB, height: ORB }} aria-hidden="true" />;
 }
 
@@ -160,7 +162,7 @@ export function Radio({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
             onPointerEnter={() => setHover(true)}
             onPointerLeave={() => setHover(false)}
           >
-            <Orb playing={playing ?? loading} hover={hover} />
+            <Orb playing={playing ?? loading} />
           </button>
         </Popover.Trigger>
       </Hint>

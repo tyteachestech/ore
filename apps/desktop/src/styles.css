@@ -3022,7 +3022,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .radio-orb:hover { background: var(--bg-hover); color: var(--muted); }
 .radio-orb:active { transform: scale(0.96); }
 .radio-orb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.radio-orb-dots { display: block; color: inherit; }
+.radio-orb-dots { display: block; fill: currentColor; }
 .radio-tag {
   position: fixed; left: 78px; bottom: 29px; z-index: 6; padding: 5px 8px; border-radius: 7px; pointer-events: none;
   background: var(--lcd); box-shadow: 0 0 0 1px var(--lcd-edge), var(--float); animation: radio-tag var(--t-2) var(--ease-out);
