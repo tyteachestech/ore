@@ -126,21 +126,19 @@ export function fineDots(s: State): FineDot[] {
     // Open: the traced block, a row taller when he is startled. A blink leaves its lower row as a line. Pleased: an arc.
     const shut = side > 0 ? Math.max(shutBoth, clamp(s.wink)) : shutBoth;
     for (const p of eye) {
-      const upper = p.y < top + U / 2, k = (upper ? 1 - shut : 1 - 0.25 * shut) * (1 - arc) * (1 - clamp(star));
+      // Pleased, his cheeks push the lower lids up: the eyes stay open and bright, a little narrowed.
+      const upper = p.y < top + U / 2, k = (upper ? 1 - shut : (1 - 0.25 * shut) * (1 - 0.3 * arc)) * (1 - clamp(star));
       const [x, y] = head(p, ex, ey);
       if (k > 0.02) face.push([x, y, p.r * k, "eye", true]);
-      if (upper && wide * (1 - arc) > 0.02) { const [x2, y2] = head(p, ex, ey - U); face.push([x2, y2, p.r * wide * (1 - arc) * (1 - shut), "eye", true]); }
+      if (upper && wide * (1 - arc) > 0.02) { const [x2, y2] = head(p, ex, ey - U); face.push([x2, y2, p.r * wide * (1 - shut), "eye", true]); }
     }
     // The glint is what makes his eyes alive, so an open eye never loses it: it rides over the brim's shadow, slides
-    // down the eye when the helmet comes low, and goes only as the lid closes (Tyler, 2026-11-13: without it he looks spooky).
+    // down the eye when the helmet comes low, grows when he is pleased, and goes only as the lid closes (Tyler,
+    // 2026-11-13: without it he looks spooky; "the white dot should maybe only be gone if ... his eyes are closed").
     const [gx, gy] = head(glint, ex, ey - wide * U + clamp(tip, 0, 0.55));
-    marks.push([gx, gy, glint.r * clamp((1 - shut) * 2.5) * (1 - arc) * (1 - clamp(star)), "glint", false]);
+    marks.push([gx, gy, glint.r * clamp((1 - shut) * 2.5) * (1 + 0.45 * arc) * (1 - clamp(star)), "glint", false]);
     if (star > 0.02) bigStar((cx + ex) / U, (top + U / 2 + ey) / U, star);
     if (blush > 0.02) for (const [dx, dy] of [[2.1, 1.9], [3.1, 1.9], [4.1, 1.9], [2.6, 2.75], [3.6, 2.75]] as const) mark(cx / U + side * dx, top / U + dy, 0.36 * blush, "nose");
-    if (arc * (1 - clamp(star)) > 0.02) for (const [dx, dy] of [[-1.5, 1.25], [-0.8, 0.5], [0, 0.2], [0.8, 0.5], [1.5, 1.25]] as const) {
-      const [x, y] = head({ x: cx + dx * U, y: top + dy * U, r: 0, tone: "eye" }, ex, ey);
-      face.push([x, y, 0.36 * U * arc * (1 - clamp(star)), "eye", true]);
-    }
     const brow = brows[n]!;
     if (brow > 0.02) for (let i = 0; i < 4; i++) {
       const [x, y] = head({ x: cx + (i - 1.5) * U, y: top - (1.45 + wide * 0.9 - Math.abs(i - 1.5 - side * 0.5) * 0.3 * (1 - wide)) * U, r: 0, tone: "glint" }, ex, ey);

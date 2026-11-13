@@ -266,8 +266,8 @@ test("traced: comic marks. A tear and a bead of sweat show only on their way dow
 test("traced: an open eye never loses its glint, in any frame of any move (Tyler, 2026-11-13: without it he looks spooky)", () => {
   const rest = fine(), eyes = ink(rest, "eye"), glint = Math.max(...rest.filter(([, , , t]) => t === "glint").map(([, , r]) => r));
   for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[]) for (const s of play(name, MOVES[name].end ?? MOVES[name].loop!)) {
-    // Pleased arcs, star eyes and a wink have no open eye to light; a lid mostly down has its glint going with it.
-    if (s.arc > 0.03 || s.star > 0.03 || s.wink > 0.03 || s.open < 0.75) continue;
+    // Only closed eyes lose it: star eyes and a wink have no open eye to light, and a lid mostly down takes its glint with it.
+    if (s.star > 0.03 || s.wink > 0.03 || s.open < 0.75) continue;
     const d = fineDots(s);
     if (ink(d, "eye") < eyes * 0.6) continue;
     // Both glints at full size (the dirt may cover them while he is down in his hole).
