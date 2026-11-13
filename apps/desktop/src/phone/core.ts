@@ -109,7 +109,7 @@ export const shareOpen = () => (isTauri() ? invoke<string | null>("share_open").
 const hear = (data: Uint8Array, ext: string, progress?: (done: number, label?: string) => void, language?: string) => {
   progress?.(0);
   const min = (s: number) => Math.max(1, Math.round(s / 60));
-  heard = (done, of) => progress?.(done / of, `Transcribing ${min(done)} of ${min(of)} min`);
+  heard = (done, of) => progress?.(Math.min(1, done / of), `Transcribing ${min(done)} of ${min(of)} min`);
   return invoke<string>("transcribe", data, { headers: { "x-ext": ext, ...(language ? { "x-language": language } : {}) } })
     .catch((e) => {
       throw new Error(String(e));
@@ -118,7 +118,7 @@ const hear = (data: Uint8Array, ext: string, progress?: (done: number, label?: s
 };
 /** The shell says how far a long wait is (lib.rs `progress`): seconds of audio heard, bytes of a download. */
 let heard: ((done: number, of: number) => void) | null = null;
-let downloaded: ((got: number, of: number) => void) | null = null;
+let downloaded: ((url: string, got: number, of: number) => void) | null = null;
 
 let booted: Promise<typeof import("ore-commands")> | null = null;
 /** Loads the library (Ore's iCloud Drive folder on the phone, the snapshot in a browser) and SQLite, then the command table. */
@@ -136,7 +136,7 @@ function boot() {
       if (await invoke<boolean>("can_transcribe").catch(() => false)) await (await import("ore-commands")).setTranscriber(hear);
       const { listen } = await import("@tauri-apps/api/event");
       void listen<[number, number]>("hear-progress", (e) => heard?.(...e.payload));
-      void listen<[number, number]>("download-progress", (e) => downloaded?.(...e.payload));
+      void listen<[string, number, number]>("download-progress", (e) => downloaded?.(...e.payload));
     } else {
       const text = await (await fetch("/library.json")).text();
       const snap = JSON.parse(text) as Record<string, string | null>;
@@ -184,7 +184,13 @@ export async function fill(landed: () => void): Promise<void> {
         setFilling({ id, done, label });
         // The shell's download arrives whole: while one is named, its own count says how far it is.
         const mb = (n: number) => Math.max(1, Math.round(n / 1e6));
-        downloaded = label === "Downloading" ? (got, of) => setFilling({ id, done: got / of, label: `Downloading ${mb(got)} of ${mb(of)} MB` }) : null;
+        // One download is followed, the first to report (the audio: a megabyte or more); a compressed body can
+        // pass its stated size, so the count stops at it.
+        let from: string | null = null;
+        downloaded =
+          label === "Downloading"
+            ? (url, got, of) => url === (from ??= url) && setFilling({ id, done: Math.min(1, got / of), label: `Downloading ${mb(Math.min(got, of))} of ${mb(of)} MB` })
+            : null;
       },
       turn: exclusive,
     });

@@ -246,7 +246,11 @@ async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, S
             got += n;
             if of > 0.0 && got - told >= 1 << 20 {
                 told = got;
-                progress("download-progress", got as f64, of);
+                // With its address: the app follows one download, not whichever is largest at the moment.
+                if let Some(app) = APP.get() {
+                    use tauri::Emitter;
+                    let _ = app.emit("download-progress", (url.clone(), got as f64, of));
+                }
             }
         }
         Ok(tauri::ipc::Response::new(out))
@@ -258,8 +262,9 @@ async fn http_fetch(url: String, method: Option<String>, headers: Vec<(String, S
 /// The app, for the progress of a long wait: set once at start.
 static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
-/// How far a long wait is, to the web view as an event: `download-progress` in bytes, `hear-progress` in
-/// seconds of audio, each as [done, of]. The app shows it where the source will be (Filling.tsx).
+/// How far a long wait is, to the web view as an event: `hear-progress` in seconds of audio, as [done, of]
+/// (`download-progress` is [url, bytes, of], from `http_fetch`). The app shows it where the source will be
+/// (Filling.tsx).
 fn progress(event: &str, done: f64, of: f64) {
     use tauri::Emitter;
     if let Some(app) = APP.get() {
