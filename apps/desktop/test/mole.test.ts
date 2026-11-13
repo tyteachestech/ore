@@ -185,8 +185,8 @@ test("traced: every frame of every move is whole, stays over the dirt, and no fr
       const d = fineDots(s);
       for (const [x, y, r, t] of d) {
         expect(Number.isFinite(x) && Number.isFinite(y) && r > 0 && r < 0.4).toBe(true);
-        // Nothing of him shows under the dirt line.
-        if (t !== "dirt") expect(y).toBeLessThan(ROWS - 0.5);
+        // Nothing of him shows under the dirt line (drawn whole, there is no dirt).
+        if (t !== "dirt" && s.whole < 0.5) expect(y).toBeLessThan(ROWS - 0.5);
       }
       // A part never pops in or out: what is drawn changes by a small share from one frame to the next.
       const now = ink(d);
@@ -194,7 +194,8 @@ test("traced: every frame of every move is whole, stays over the dirt, and no fr
       before = now;
     }
   }
-});
+  // Every dot of every frame of 22 moves: the whole-body ones draw twice the dots.
+}, 20_000);
 
 test("traced: a blink shuts his eyes to a line, pleased swings the lobes wide, startled lifts the helmet off his brows", () => {
   expect(ink(fine({ open: 0 }), "eye")).toBeLessThan(ink(fine(), "eye") * 0.5);
@@ -211,4 +212,99 @@ test("traced: nothing shows through a part above it (fur under the helmet, a lid
   const d = fine();
   const over = d.filter(([, , , t]) => t === "eye");
   for (const [x, y, r, t] of d) if (t.startsWith("fine-")) for (const [ex, ey, er] of over) expect(Math.hypot(x - ex, y - ey)).toBeGreaterThan(Math.min(r, er));
+});
+
+// D-new-mole-emotions: fourteen more emotions on the same puppet, each a move that ends back at rest.
+const EMOTIONS = ["nod", "shake", "wink", "laugh", "proud", "curious", "sad", "sleepy", "set", "shy", "wave", "huff", "anxious", "ecstatic"] as const;
+
+test("traced: each emotion plays, differs from rest while it plays, and settles back to the rest drawing", () => {
+  const sig = (d: ReturnType<typeof fineDots>) => d.map(([x, y, r, t]) => `${x.toFixed(1)},${y.toFixed(1)},${r.toFixed(2)},${t}`).sort().join(";");
+  const rest = sig(fine()), seen = new Set<string>();
+  for (const name of EMOTIONS) {
+    const s = puppet();
+    start(s, name, 0);
+    let t = 0, moving = true, moved = false;
+    for (; moving && t < 20_000; t += 1000 / 60) { moving = advance(s, t, 1 / 60); moved ||= sig(fineDots(s.v)) !== rest; }
+    expect(moved).toBe(true);
+    expect(moving).toBe(false);
+    expect(s.mood).toBe("idle");
+    for (const k of Object.keys(REST) as (keyof State)[]) expect(Math.abs(s.v[k] - REST[k])).toBeLessThan(0.02);
+    // No two emotions hold the same pose.
+    seen.add(sig(fine(MOVES[name].still)));
+  }
+  expect(seen.size).toBe(EMOTIONS.length);
+});
+
+test("traced: a wink shuts one eye, a frown draws two brows, the lamp flares, sad hangs the moustache in under a low helmet", () => {
+  const glints = (d: ReturnType<typeof fineDots>) => d.filter(([, , , t]) => t === "glint").length;
+  expect(glints(fine({ wink: 1 }))).toBe(1);
+  expect(ink(fine({ wink: 1 }), "eye")).toBeGreaterThan(ink(fine({ open: 0 }), "eye"));
+  expect(glints(fine({ frown: 1 }))).toBe(glints(fine()) + 8);
+  expect(ink(fine({ lamp: 1 }), "lamp")).toBeGreaterThan(ink(fine(), "lamp") * 1.5);
+  const top = (d: ReturnType<typeof fineDots>) => Math.min(...d.map(([, y]) => y));
+  expect(top(fine(MOVES.sad.still))).toBeGreaterThan(top(fine()) + 0.5);
+  expect(top(fine(MOVES.proud.still))).toBeLessThan(top(fine()) - 1);
+});
+
+test("traced: comic marks. A tear and a bead of sweat show only on their way down, stars take his eyes' place, a wave keeps his eyes' glints", () => {
+  const white = (d: ReturnType<typeof fineDots>) => ink(d, "glint");
+  for (const k of ["tear", "sweat", "zzz"] as const) {
+    // Nothing at either end, so a move can put it back at its start unseen.
+    expect(white(fine({ [k]: 0 }))).toBeCloseTo(white(fine()), 5);
+    expect(white(fine({ [k]: 1 }))).toBeCloseTo(white(fine()), 5);
+    expect(white(fine({ [k]: 0.5 }))).toBeGreaterThan(white(fine()) + 0.1);
+  }
+  // The tear falls: lower at 0.7 than at 0.3.
+  const low = (d: ReturnType<typeof fineDots>) => Math.max(...d.filter(([, y, , t]) => t === "glint" && y < ROWS - 1).map(([, y]) => y));
+  expect(low(fine({ tear: 0.7 }))).toBeGreaterThan(low(fine({ tear: 0.3 })) + 1);
+  const stars = fine({ star: 1 });
+  expect(ink(stars, "eye")).toBe(0);
+  expect(ink(stars, "lamp")).toBeGreaterThan(ink(fine(), "lamp") * 1.5);
+  expect(ink(fine({ blush: 1 }), "nose")).toBeGreaterThan(ink(fine(), "nose") * 1.5);
+  expect(fine({ steam: 0.5 }).length).toBe(fine().length + 10);
+});
+
+test("traced: an open eye never loses its glint, in any frame of any move (Tyler, 2026-11-13: without it he looks spooky)", () => {
+  const rest = fine(), eyes = ink(rest, "eye"), glint = Math.max(...rest.filter(([, , , t]) => t === "glint").map(([, , r]) => r));
+  for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[]) for (const s of play(name, MOVES[name].end ?? MOVES[name].loop!)) {
+    // Only closed eyes lose it: star eyes and a wink have no open eye to light, and a lid mostly down takes its glint with it.
+    if (s.star > 0.03 || s.wink > 0.03 || s.open < 0.75) continue;
+    const d = fineDots(s);
+    if (ink(d, "eye") < eyes * 0.6) continue;
+    // Both glints at full size (the dirt may cover them while he is down in his hole).
+    const whole = d.filter(([, y, r, t]) => t === "glint" && r > glint * 0.85 && y < ROWS - 1).length;
+    if (s.y < 5) expect(whole).toBeGreaterThanOrEqual(2);
+  }
+  // A low helmet no longer covers it: sad, huff and the look down keep both.
+  for (const pose of [MOVES.huff.still, MOVES.lookdown.still, { hat: -0.7 }]) expect(fine(pose).filter(([, , r, t]) => t === "glint" && r > glint * 0.9).length).toBeGreaterThanOrEqual(2);
+});
+
+test("a mark that travels is put back at its start only once it has passed out of sight", () => {
+  // tear, sweat, steam, zzz and spark show nothing from 0.9 on; a `set` before that would make the mark vanish mid-air.
+  for (const name of Object.keys(MOVES) as (keyof typeof MOVES)[]) {
+    const m = MOVES[name], s = puppet(), sets = (m.at ?? []).filter(([, b]) => b.set);
+    start(s, name, 0);
+    for (let t = 0, i = 0; t < (m.end ?? m.loop!); t += 1000 / 60) {
+      for (; i < sets.length && t + 1000 / 60 >= sets[i]![0]; i++) for (const k of Object.keys(sets[i]![1].set!) as (keyof State)[]) expect(s.v[k]).toBeGreaterThanOrEqual(0.9);
+      advance(s, t, 1 / 60);
+    }
+  }
+});
+
+test("traced: out of the ground he has a whole body and no dirt; asleep his eyes are covered, falling they are wide", () => {
+  const low = (d: ReturnType<typeof fineDots>) => Math.max(...d.map(([, y]) => y));
+  const nap = fine(MOVES.nap.still), fall = fine(MOVES.fall.still);
+  for (const d of [nap, fall]) {
+    expect(d.some(([, , , t]) => t === "dirt")).toBe(false);
+    // His feet, well under where the dirt would be.
+    expect(low(d)).toBeGreaterThan(ROWS + 14);
+  }
+  expect(low(fine())).toBeLessThan(ROWS);
+  expect(ink(nap, "glint")).toBe(0);
+  expect(ink(fall, "glint")).toBeGreaterThan(0);
+  // Asleep his paws are behind his head; falling they are flung out past it.
+  const wide = (d: ReturnType<typeof fineDots>) => Math.max(...d.filter(([, , , t]) => t === "fine-9").map(([x]) => Math.abs(x - 11)));
+  expect(wide(fall)).toBeGreaterThan(wide(nap) + 3);
+  // His belly rises as he breathes in.
+  expect(ink(fine({ ...MOVES.nap.still, breath: 1 }), "fine-7")).toBeGreaterThan(ink(nap, "fine-7"));
 });
