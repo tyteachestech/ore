@@ -6,7 +6,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
+import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
@@ -18,7 +18,7 @@ import { isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./cours
 import { dropTitle, hasText, pageDraft } from "./page.ts";
 import type { Tab } from "./tab.ts";
 import { makeThumbnail } from "./thumbnail.ts";
-import { fetchYoutube, isYoutubeUrl, srtToVtt, vttToBody, vttWords, youtubeId } from "./youtube.ts";
+import { fetchYoutube, isYoutubeUrl, owedVideo, ytDlp, srtToVtt, vttToBody, vttWords, youtubeId } from "./youtube.ts";
 export { courseCoverFile, epubCover, makeCourseCover, makeThumbnail, pageImage, thumbnailFile } from "./thumbnail.ts";
 export { transcriptOf, vttWords, youtubeId } from "./youtube.ts";
 export { embeddedVideo, pageDraft, TRANSCRIPT_HEADING, VIDEO_END } from "./page.ts";
@@ -289,6 +289,8 @@ function kindOf(name: string, ctype = ""): string | null {
 
 async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   if (opts.type === "youtube" || (!opts.type && isYoutubeUrl(url))) {
+    // No yt-dlp and no way to get it (the iPhone): the video now, its transcript owed (D227).
+    if (process.env.ORE_NO_TOOLS && isYoutubeUrl(url) && youtubeId(url) && !ytDlp()) return { type: "youtube", ...(await owedVideo(url)), body: "", source: { ext: "vtt", data: "WEBVTT\n" }, owed: ["transcript"] };
     const y = await fetchYoutube(url, { listen: true, onProgress: opts.onProgress });
     return { type: "youtube", title: y.title, url: y.url, author: y.author, published: y.published, body: y.body, source: { ext: "vtt", data: y.vtt } };
   }
@@ -346,17 +348,22 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
 /** The response's body, refused once it passes MAX_BYTES (a server need not say how big it is). */
 const tooBig = () => `That file is over ${MAX_BYTES / 1024 / 1024} MB, too big to read as a source. Add the part you want instead.`;
 
-async function readCapped(res: Response): Promise<Uint8Array> {
+export async function readCapped(res: Response): Promise<Uint8Array> {
   if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) {
     await res.body?.cancel();
     throw new Error(tooBig());
   }
   const parts: Uint8Array[] = [];
   let size = 0;
-  for await (const part of res.body ?? []) {
-    size += part.length;
-    if (size > MAX_BYTES) throw new Error(tooBig());
-    parts.push(part);
+  // The stream's own reader, not `for await`: iOS 26's web view can't iterate a body, so every download failed there.
+  const reader = res.body?.getReader();
+  for (let r = await reader?.read(); r && !r.done; r = await reader!.read()) {
+    size += r.value.length;
+    if (size > MAX_BYTES) {
+      await reader!.cancel();
+      throw new Error(tooBig());
+    }
+    parts.push(r.value);
   }
   const out = new Uint8Array(size);
   let at = 0;
@@ -440,6 +447,21 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
   return fromBytes(bytes, kind, path, undefined, undefined, opts);
 }
 
+// Tags a share or an ad adds to a link (utm_source=chatgpt.com, fbclid…): not part of the page, so a link is
+// kept without them, as Raindrop does, and the page added again with other tags is the source already here.
+const TRACKING = /^(utm_\w+|fbclid|gclid|dclid|gbraid|wbraid|msclkid|mc_cid|mc_eid|igshid|yclid|_hsenc|_hsmi|mkt_tok)$/i;
+function untracked(url: string): string {
+  const [, head, query, hash] = url.match(/^([^?#]*)(?:\?([^#]*))?(#.*)?$/)!;
+  if (query === undefined) return url;
+  // Only the tags go: the rest of the link is kept exactly as written.
+  const kept = query.split("&").filter((p) => p && !TRACKING.test(p.split("=")[0]!));
+  return `${head}${kept.length ? `?${kept.join("&")}` : ""}${hash ?? ""}`;
+}
+/** The same page's link, however it was written: with or without tags, the host in any case, a default port. */
+const linkKey = (url: string) => (URL.canParse(url) ? new URL(untracked(url)).href : url);
+/** The source already here from this link (a course's lessons aside); `preview` counts Feed posts being read. */
+const byLink = (lib: Library, url: string, preview = false) => allItems(lib, { preview }).find((i) => i.meta.url !== undefined && linkKey(i.meta.url) === linkKey(url) && !i.meta.course);
+
 // Ingest a URL or file into items/ with status inbox. Files dropped in
 // inbox/ are removed after a successful ingest (they now live as source.*).
 // A link already in the library isn't added twice: it comes back `kept`, filed under the new skills too.
@@ -447,17 +469,22 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   input = input.replace(/^~(?=\/)/, homedir());
   const isUrl = /^https?:\/\//i.test(input);
   if (isUrl && !URL.canParse(input)) throw new Error("That link looks cut off. Copy it again from the address bar.");
+  if (isUrl) input = untracked(input);
   if (!isUrl && /^[a-z][\w+.-]*:/i.test(input) && !existsSync(input)) throw new Error("Ore opens web links (http or https) and files. Open that one in your browser, then add the page from there.");
-  const had = isUrl ? allItems(lib, { preview: true }).find((i) => i.meta.url === input && !i.meta.course) : undefined;
+  const had = isUrl ? byLink(lib, input, true) : undefined;
   if (had && opts.preview) return had;
   if (had) return keep(lib, had, opts);
   const draft = isUrl ? await fromUrl(input, opts) : await fromFile(resolve(input), opts, input);
-  if (!draft.body.trim()) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
+  if (!draft.body.trim() && !draft.owed?.length) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
   const ready = await withImages(draft);
   // The same file added again (dropped twice, or a copy) is the source already here.
   const same = !isUrl && sameText(lib, ready.body);
   const item = same ? await keep(lib, same, opts) : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview });
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
+  if (!same && ready.owed?.length) {
+    mkdirSync(paths.inbox(lib), { recursive: true });
+    writeAtomic(owedNote(lib, item.meta.id), JSON.stringify({ id: item.meta.id, owed: ready.owed }) + "\n");
+  }
   if (!same) await makeThumbnail(item);
   if (!opts.preview) await unarchive(lib, opts.skills); // a Feed post read as a preview isn't filed
   return item;
@@ -498,9 +525,10 @@ const readsByLink = async (url: string) =>
 /** The page open in his browser as a source (D96): signed-in, paywalled and browser-built pages come
  *  in as he sees them. A link Ore reads better by fetching (a video, a PDF) is added by its link. */
 export async function addTab(lib: Library, opts: AddOptions & { tab?: Tab } = {}): Promise<Item & Partial<Kept>> {
-  const tab = opts.tab ?? (await (await import("./tab.ts")).frontTab());
+  const front = opts.tab ?? (await (await import("./tab.ts")).frontTab());
+  const tab = { ...front, url: untracked(front.url) };
   if (await readsByLink(tab.url)) return addSource(lib, tab.url, opts);
-  const had = listItems(lib).find((i) => i.meta.url === tab.url && !i.meta.course);
+  const had = byLink(lib, tab.url);
   if (had) return addSource(lib, tab.url, opts);
   const host = new URL(tab.url).host;
   const draft = await tabDraft(tab, host);
@@ -681,6 +709,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
   const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)) }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
+  if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
   if (!draft.body.trim()) throw new Error("Found no text to read at the original now. It may have moved; open it to check.");
   // An episode he added its page text to keeps it, after the transcript, so its highlights re-anchor (D215).
   const section = item.meta.page_added && draft.page ? await pageSection(draft.page, url, item.meta.title) : undefined;
@@ -712,7 +741,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     // Read again under the lock: a background enrich may have written its questions while this one read.
     const now = readItemDir(item.dir).meta;
     const added = tail ? recordEnd(lib, item.meta.id, draft.body.length - tail.length, tail) : undefined;
-    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure };
+    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure, owed: undefined, owed_error: undefined };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);
@@ -720,6 +749,37 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const gone = readAnnotations(next).filter((a) => report.orphaned.includes(a.id) && a.intent !== "question");
   for (const a of gone) reviseAnnotation(next, a, { status: "deleted" });
   return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone };
+}
+
+/** Where a source with a part owed is noted, beside the links waiting in inbox/: a pass that finds none
+ *  reads one folder, not every source. */
+const owedNote = (lib: Library, id: string) => join(paths.inbox(lib), `${id}.owed.json`);
+
+/** Fills what a device with no tools left owed (D227): each such source is read again here, as a reimport,
+ *  when this device has the tools. One that fails keeps its reason and waits for a Reimport by hand, so a
+ *  video that is gone isn't asked for on every pass. */
+export async function fillOwed(lib: Library): Promise<Item[]> {
+  if (!existsSync(paths.inbox(lib))) return [];
+  const ids = readdirSync(paths.inbox(lib)).filter((n) => n.endsWith(".owed.json") && !n.startsWith(".")).map((n) => n.replace(/\.owed\.json$/, ""));
+  if (!ids.length || !ytDlp()) return [];
+  const filled: Item[] = [];
+  for (const id of ids) {
+    let item: Item;
+    try {
+      item = findItem(lib, id);
+    } catch {
+      continue; // its source hasn't arrived yet (iCloud), or a synced copy of the note
+    }
+    if (item.meta.owed?.length && !item.meta.owed_error) {
+      try {
+        filled.push((await reimportSource(lib, id)).item);
+      } catch (e) {
+        await updateItemMeta(lib, id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) }));
+      }
+    }
+    rmSync(owedNote(lib, id), { force: true });
+  }
+  return filled;
 }
 
 /** The tables and formulas Docling read in a source's PDF (D125), kept beside it as `layout.json` so a

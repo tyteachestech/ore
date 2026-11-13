@@ -131,3 +131,18 @@ export const tableView = $view(tableSchema.node, () => (node) => {
     destroy: () => seen?.disconnect(),
   };
 });
+
+/** The table the caret is in and its cell, for the phone's keyboard bar (no grips to hover): null outside a table. */
+export function caretCell(state: EditorState): { table: number; row: number; col: number } | null {
+  const { $from } = state.selection;
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.spec.tableRole !== "table") continue;
+    if (d + 2 > $from.depth) return null;
+    const table = $from.before(d);
+    const map = TableMap.get($from.node(d));
+    const cell = $from.before(d + 2) - (table + 1);
+    const at = map.map.indexOf(cell);
+    return at < 0 ? null : { table, row: Math.floor(at / map.width), col: at % map.width };
+  }
+  return null;
+}

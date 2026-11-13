@@ -105,12 +105,14 @@ export const studyCommands: Record<string, Command> = {
   },
 
   due: {
-    usage: "[--limit N] [--skill s]... [--all] [--start]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills (- for the ones filed under no skill); --all: every unseen draft, past the day's new-card limits; --start: a session's first fetch, opening on the likeliest recall of the first ten (D176)",
-    options: { limit: { type: "string" }, skill: { type: "string", multiple: true }, all: { type: "boolean" }, start: { type: "boolean" } },
+    usage: "[--limit N] [--skill s]... [--source id] [--all] [--start]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills (- for the ones filed under no skill); --source keeps one source's cards, every unseen draft of it included (Review this source); --all: every unseen draft, past the day's new-card limits; --start: a session's first fetch, opening on the likeliest recall of the first ten (D176)",
+    options: { limit: { type: "string" }, skill: { type: "string", multiple: true }, source: { type: "string" }, all: { type: "boolean" }, start: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
       const picked = strs(f.skill);
-      const all = dueQueue(lib, new Date(), { skills: picked.length ? picked : undefined, newLimit: !f.all, start: !!f.start });
+      const item = typeof f.source === "string" ? findItem(lib, f.source).meta.id : undefined;
+      // One source picked by name: every draft of it, as Review this skill's pick of a skill is still the day's.
+      const all = dueQueue(lib, new Date(), { skills: picked.length ? picked : undefined, item, newLimit: !f.all && !item, start: !!f.start });
       const limit = int(f.limit, "limit");
       if (limit !== undefined && limit < 0) throw new Error("--limit must be 0 or more"); // slice(0, -1) would drop the last
       const q = limit === undefined ? all : all.slice(0, limit);

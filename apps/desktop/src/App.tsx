@@ -1,7 +1,9 @@
 import { ranked } from "./match";
-import { ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
+import { Archive, ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple } from "./icons";
 import { DotBar } from "./Ring";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { HeadTabs, type HeadTab } from "./HeadTabs";
+import { PixelBook } from "./PixelIcon";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
 import { blankStart, dragRows, type RowPick } from "./marquee";
@@ -21,7 +23,7 @@ import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Reader, type PracticeRef } from "./Reader";
 import { setSidebarShown, useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
-import { Settings, type SettingsSection } from "./Settings";
+import { Settings, useReminderAgent, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
@@ -35,6 +37,7 @@ import { dueSkills, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { Review } from "./Review";
 import { useToast } from "./Toast";
 import { lineAfter, lineKey, type Line } from "./lines";
+import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { readGuard } from "./reads";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
@@ -82,41 +85,32 @@ type Kept = { kept: true; filed: string[]; restored: boolean };
 const back = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
 const lessonFirst = (l: Extract<Line, { kind: "course" }>) => l.next ?? l.lessons[0]!;
 
-/** Which sources the list shows, as the list's title (Linear's view menu): To read, Done, and
- *  Archived once there is any. It replaces tabs with counts, which repeated what the list shows. */
 const added = (iso: string) => {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(d.getFullYear() !== new Date().getFullYear() && { year: "numeric" }) });
 };
 
+/** Which sources the list shows, as folder tabs on the list's rule (D226): To read, Done, and Archived once
+ *  there is any. The open tab's ▾ picks which details each row shows (Linear's Display properties). */
 function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; archived: boolean; go: (s: Tab) => void; details: Detail[]; toggle: (d: Detail) => void }) {
-  const views = [...TABS, ...(archived || status === "archived" ? [{ id: "archived" as Tab, label: "Archived", key: undefined }] : [])];
+  const views: HeadTab<Tab>[] = [
+    { id: "toread", label: "To read", icon: PixelBook, tone: "read", keys: "go-toread" },
+    { id: "done", label: "Done", icon: Check, tone: "done", keys: "go-done" },
+    ...(archived || status === "archived" ? [{ id: "archived" as Tab, label: "Archived", icon: Archive, tone: "archived" }] : []),
+  ];
   return (
+    <HeadTabs label="Sources shown" tabs={views} value={status} onChange={go} after={
     <DropdownMenu.Root modal={false}>
-      <Hint text="Show To read, Done or Archived, and which details each row shows">
+      <Hint text="Which details each row shows">
         <DropdownMenu.Trigger asChild>
-          <button className="view-menu">
-            <h2>{views.find((v) => v.id === status)?.label ?? "To read"}</h2>
+          <button className="view-menu" aria-label="Row details">
             <CaretDown size={11} weight="bold" aria-hidden="true" />
           </button>
         </DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="popover menu-list" align="start" sideOffset={4} collisionPadding={8}>
-          <DropdownMenu.RadioGroup value={status} onValueChange={(v) => setTimeout(() => go(v as Tab), 0)}>
-            {views.map((v) => (
-              <DropdownMenu.RadioItem key={v.id} value={v.id} className="menu-item check">
-                <span className="menu-tick">
-                  <DropdownMenu.ItemIndicator>
-                    <Tick />
-                  </DropdownMenu.ItemIndicator>
-                </span>
-                <span className="menu-label">{v.label}</span>
-              </DropdownMenu.RadioItem>
-            ))}
-          </DropdownMenu.RadioGroup>
           {/* Linear's Display properties: toggling keeps the menu open so he sees the rows change. */}
-          <DropdownMenu.Separator className="menu-sep" />
           {DETAILS.map((c) => (
             <DropdownMenu.CheckboxItem
               key={c.id}
@@ -136,6 +130,7 @@ function ViewMenu({ status, archived, go, details, toggle }: { status: Tab; arch
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+    } />
   );
 }
 
@@ -166,6 +161,7 @@ function lastView(): { status: Tab; skill: string | null } {
 
 
 export function App() {
+  useReminderAgent();
   const [items, setItems] = useState<Item[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -183,7 +179,7 @@ export function App() {
     bumpDetails();
   };
   /** The row menus' "Show" submenu: toggling keeps it open, so he sees the rows change (Linear's Display properties). */
-  const showMenu: MenuAction = { id: "show", label: "Show", run: () => {}, sub: DETAILS.map((d) => ({ id: d.id, label: d.label, checked: details.includes(d.id), keep: true, run: () => toggleDetail(d.id) })) };
+  const showMenu: MenuAction = { id: "show", label: "Show", divider: true, run: () => {}, sub: DETAILS.map((d) => ({ id: d.id, label: d.label, checked: details.includes(d.id), keep: true, run: () => toggleDetail(d.id) })) };
   const [cursor, setCursor] = useState<string | null>(null);
   /** Sources picked with ⇧ or ⌘ (Linear, Finder), by id; the row actions then act on all of them.
    *  `anchor` is where a ⇧ range starts. */
@@ -214,7 +210,7 @@ export function App() {
   /** Review mode (D59) over the window, for these skills (null: all). */
   /** `run` counts sessions, so "Keep going" mounts a fresh Review. */
   /** `paused`: the source he opened from a card (Open in source); Review waits, hidden, on the same card. */
-  const [reviewing, setReviewing] = useState<{ pick: string[] | null; run: number; paused?: string } | null>(null);
+  const [reviewing, setReviewing] = useState<{ pick: string[] | null; source?: string; run: number; paused?: string } | null>(null);
   /** What to review (D80), asked by ⌘R and the palette; Home asks from its own button. */
   const [asking, setAsking] = useState<Today | null>(null);
   const [homeTick, setHomeTick] = useState(0);
@@ -297,6 +293,8 @@ export function App() {
   const [rowDrag, setRowDrag] = useState<{ item: Item; course?: Extract<Line, { kind: "course" }>; many?: Item[]; skill: string | null; at: { x: number; y: number } } | null>(null);
   /** Where a dragged pinned row would land among the pinned (Raycast's pinned reorder). */
   const [pinDrop, setPinDrop] = useState<PinGap | null>(null);
+  /** The sidebar skill under a Continue reading row dragged from Home (F10), lit as the lists light theirs. */
+  const [homeDrop, setHomeDrop] = useState<string | null>(null);
   const rowSensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }));
   const { notify, progress, clear: clearToast, view: toast } = useToast();
   const tutor = useTutorChat(notify);
@@ -364,19 +362,20 @@ export function App() {
       if (busy) return;
       busy = true;
       try {
-        const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import");
+        const r = await ore<{ added: { title: string; kept: boolean }[]; failed: { url: string; error: string }[]; filled?: unknown[] }>("inbox", "--import");
         const fresh = r.added.filter((a) => !a.kept);
         if (fresh.length) notify(fresh.length === 1 ? `Added “${fresh[0]!.title}” from your iPhone` : `Added ${fresh.length} sources from your iPhone`, "info");
         for (const a of r.added.filter((a) => a.kept)) notify(`Already here: “${a.title}”, from your iPhone`, "info");
         for (const f of r.failed) notify(`Couldn’t add ${f.url} from your iPhone: ${f.error}`, "error");
-        if (r.added.length) reload();
+        if (r.added.length || r.filled?.length) reload();
       } catch (e) {
         notify(`Couldn’t bring in links from your iPhone: ${errorText(e)}`, "error");
       } finally {
         busy = false;
       }
     };
-    void fromPhone();
+    // A moment after launch: the calls that draw Home go first (each `ore` call is a process of its own).
+    const first = setTimeout(() => void fromPhone(), 1500);
     // Only after a real absence (10 s away): a click on a menu or a dialog closing doesn't reload the lists.
     let left = 0;
     // Focus moving into the video player (an iframe) blurs the window too: that isn't away.
@@ -389,7 +388,7 @@ export function App() {
     };
     addEventListener("blur", away);
     addEventListener("focus", back);
-    return () => (removeEventListener("blur", away), removeEventListener("focus", back));
+    return () => (clearTimeout(first), removeEventListener("blur", away), removeEventListener("focus", back));
   }, [notify, refresh, reload]);
 
   useEffect(() => save("ore.view", JSON.stringify({ status, skill })), [status, skill]);
@@ -797,13 +796,14 @@ export function App() {
   /** ⌘R from anywhere: the reader closes, so none of its keys fire under the review. */
   /** The source open when review started: leaving review puts him back in it, where he was. */
   const beforeReview = useRef<string | null>(null);
-  const startReview = useCallback((pick: string[] | null) => {
+  /** `source`: Review this source, only its exercises. */
+  const startReview = useCallback((pick: string[] | null, source?: string) => {
     setOpenId((id) => {
       beforeReview.current = id;
       return null;
     });
     setFinishing(false);
-    setReviewing((r) => ({ pick, run: (r?.run ?? 0) + 1 }));
+    setReviewing((r) => ({ pick, source, run: (r?.run ?? 0) + 1 }));
   }, []);
 
   /** ⌘R: ask what to review when more than one skill has cards due, else start. Home's last numbers
@@ -824,7 +824,8 @@ export function App() {
 
   const endReview = useCallback(
     (again?: boolean) => {
-      setReviewing((r) => (again ? { pick: null, run: (r?.run ?? 0) + 1 } : null));
+      // Keep going after Review this source stays on that source.
+      setReviewing((r) => (again ? { pick: null, source: r?.source, run: (r?.run ?? 0) + 1 } : null));
       if (!again && beforeReview.current) setOpenId(beforeReview.current);
       setHomeTick((n) => n + 1);
       void refresh();
@@ -835,7 +836,7 @@ export function App() {
   // Leaving the source he opened from a card (Esc, the Back pill, a link) goes back to Review, on that card.
   useEffect(() => {
     if (reviewing?.paused && openId !== reviewing.paused) {
-      setReviewing((r) => r && { pick: r.pick, run: r.run });
+      setReviewing((r) => r && { pick: r.pick, source: r.source, run: r.run });
       setOpenId(null);
     }
   }, [openId, reviewing?.paused]);
@@ -1263,7 +1264,7 @@ export function App() {
   useEffect(() => {
     if (openId || overlay || onHome || !current) return;
     const onKey = (e: KeyboardEvent) => {
-      // O is a plain letter: in a field (the skill note, a new question) it is typing.
+      // In a field (the filter, the skill note, a new question) these act on the text, not a row.
       if ((is(e, "original") || is(e, "archive")) && inTextField(e)) return;
       if (is(e, "copy") && !window.getSelection()?.toString() && (many.length > 1 || keyed)) {
         // ⌘C on the picked rows, or the selected one, copies them as linked titles; a course as its page.
@@ -1353,6 +1354,10 @@ export function App() {
 
   const onListKey = (e: ReactKeyboardEvent) => {
     if (!lines.length || !currentLine) return;
+    const now = Date.now();
+    const begun = now - typed.current.at < TYPE_GAP && typed.current.text !== "";
+    // Any key but a letter of a title ends the title being typed (an arrow, Esc, a shortcut).
+    if (!typesTitle(e, begun)) typed.current.text = "";
     const at = lines.indexOf(currentLine);
     if (e.key === "Escape" && picked.length) {
       e.preventDefault();
@@ -1393,8 +1398,25 @@ export function App() {
     } else if (is(e.nativeEvent, "rename") && keyed) {
       e.preventDefault();
       setRenamingRow(lineKey(currentLine));
+    } else if (is(e.nativeEvent, "pin") && keyed && many.length < 2 && currentLine.kind === "item" && !currentLine.item.archived_at) {
+      e.preventDefault();
+      void pinSource(currentLine.item);
+    } else if (!inTextField(e.nativeEvent) && typesTitle(e, begun)) {
+      // Finder's type-select (F8): the first letters of a title select its row. Stopped here, so a plain
+      // letter bound elsewhere (N opens a skill's note) never also acts while he types a title.
+      e.preventDefault();
+      e.stopPropagation();
+      const text = (begun ? typed.current.text : "") + e.key;
+      typed.current = { text, at: now };
+      const i = typeJump(lines.map((l) => (l.kind === "item" ? l.item.title : l.title)), text, keyed ? at : -1);
+      if (i < 0) return;
+      unpick();
+      setKeyed(true);
+      setCursor(lineKey(lines[i]!));
     }
   };
+  /** What he has typed of a title, and when the last letter came (Finder's type-select). */
+  const typed = useRef({ text: "", at: 0 });
 
   /** A source row's title edited in place (Finder's Rename): optimistic, put back if the write fails. */
   const [renamingRow, setRenamingRow] = useState<string | null>(null);
@@ -1534,7 +1556,7 @@ export function App() {
   const skillMenu = (s: Skill): MenuAction[] => [
     { id: "open", label: "Open", run: () => openSkill(s.id) },
     // One dialog holds the name, icon, color and collection, so one item opens it, name ready to type.
-    { id: "edit", label: "Edit skill…", run: () => editSkill(s.id, true) },
+    { id: "edit", label: "Edit skill…", divider: true, run: () => editSkill(s.id, true) },
     ...(collections.some((c) => c !== s.collection) || s.collection
       ? [{
           id: "move",
@@ -1547,7 +1569,7 @@ export function App() {
         }]
       : []),
     { id: "importance", label: "Importance", run: () => {}, sub: importanceActions(s, setImportance) },
-    s.archived ? { id: "unarchive", label: "Bring back", run: () => archiveSkill(s, false) } : { id: "archive", label: "Archive skill", run: () => archiveSkill(s, true) },
+    s.archived ? { id: "unarchive", label: "Bring back", divider: true, run: () => archiveSkill(s, false) } : { id: "archive", label: "Archive skill", divider: true, run: () => archiveSkill(s, true) },
     { id: "delete", label: "Delete skill…", danger: true, run: () => setDeleting(s.id) },
   ];
 
@@ -1586,7 +1608,7 @@ export function App() {
   const courseActions = (c: CourseLine): MenuAction[] => [
     { id: "open", label: c.next && c.next.status !== "inbox" ? "Continue" : "Open", hint: "↵", run: () => openSource(lessonFirst(c).id) },
     { id: "lessons", label: c.open ? "Hide lessons" : "Show lessons", hint: c.open ? "←" : "→", run: () => toggleCourse(c.id) },
-    { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(`course:${c.id}`) },
+    { id: "rename", label: "Rename…", hint: label(keys.rename), divider: true, run: () => setRenamingRow(`course:${c.id}`) },
     ...(c.url ? [{ id: "original", label: "Open course page", hint: label(keys.original), run: () => original({ ...lessonFirst(c), url: c.url }, "open") }] : []),
     ...(skills.length
       ? [{
@@ -1597,7 +1619,7 @@ export function App() {
         }]
       : []),
     showMenu,
-    { id: "archive", label: "Archive course", hint: label(keys.archive), danger: true, run: () => void archiveCourse(c) },
+    { id: "archive", label: "Archive course", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveCourse(c) },
   ];
 
   /** Writes each picked source in turn (the CLI owns the library), as one step with one Undo and
@@ -1633,11 +1655,11 @@ export function App() {
   const copyPaths = (list: Item[]) =>
     void navigator.clipboard.writeText(list.map(pathOf).join("\n")).then(() => notify(list.length > 1 ? `Copied ${list.length} paths` : "Path copied"), (e) => notify(errorText(e), "error"));
   const sourcesN = (n: number) => `${n} source${n === 1 ? "" : "s"}`;
-  const archiveMany = () => batch(`Archived ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null);
-  const restoreMany = () => batch(`Restored ${sourcesN(many.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])));
-  const moveMany = (to: Item["status"]) =>
-    batch(`Moved ${sourcesN(many.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }));
-  const fileMany = (k: Skill, on: boolean) => fileItems(many, sourcesN(many.length), k, on);
+  const archiveMany = (sel = many) => batch(`Archived ${sourcesN(sel.length)}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, sel);
+  const restoreMany = (sel = many) => batch(`Restored ${sourcesN(sel.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])), undefined, undefined, sel);
+  const moveMany = (to: Item["status"], sel = many) =>
+    batch(`Moved ${sourcesN(sel.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }), undefined, sel);
+  const fileMany = (k: Skill, on: boolean, sel = many) => fileItems(sel, sourcesN(sel.length), k, on);
   /** Puts `k` on each of these sources, or takes it off, each keeping its other skills. */
   const fileItems = (sel: Item[], what: string, k: Skill, on: boolean) => {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
@@ -1650,28 +1672,28 @@ export function App() {
     );
   };
   /** The picked sources' actions: the same as one row's that make sense for many, named for the count. */
-  const manyActions = (): MenuAction[] => {
-    const what = sourcesN(many.length);
-    if (many.every((i) => i.archived_at)) return [{ id: "restore", label: `Restore ${what}`, run: restoreMany }];
+  const manyActions = (sel = many): MenuAction[] => {
+    const what = sourcesN(sel.length);
+    if (sel.every((i) => i.archived_at)) return [{ id: "restore", label: `Restore ${what}`, run: () => restoreMany(sel) }];
     return [
-      many.every((i) => i.status === "done")
-        ? { id: "toread", label: `Move ${what} to To read`, run: () => moveMany("reading") }
-        : { id: "done", label: `Move ${what} to Done`, run: () => moveMany("done") },
+      sel.every((i) => i.status === "done")
+        ? { id: "toread", label: `Move ${what} to To read`, run: () => moveMany("reading", sel) }
+        : { id: "done", label: `Move ${what} to Done`, run: () => moveMany("done", sel) },
       ...(skills.length
         ? [{
             id: "skills",
             label: "Skills",
             run: () => {},
             sub: skills.map((k) => {
-              const all = many.every((i) => i.skills.includes(k.id));
-              return { id: k.id, label: k.name, icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: all, run: () => fileMany(k, !all) };
+              const all = sel.every((i) => i.skills.includes(k.id));
+              return { id: k.id, label: k.name, icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: all, run: () => fileMany(k, !all, sel) };
             }),
           }]
         : []),
-      { id: "copy", label: `Copy ${what} as Markdown`, hint: label(keys.copy), run: () => copySources(many) },
-      { id: "path", label: "Copy paths", hint: label(keys.path), run: () => copyPaths(many) },
+      { id: "copy", label: `Copy ${what} as Markdown`, hint: label(keys.copy), divider: true, run: () => copySources(sel) },
+      { id: "path", label: "Copy paths", hint: label(keys.path), run: () => copyPaths(sel) },
       showMenu,
-      { id: "archive", label: `Archive ${what}`, hint: label(keys.archive), danger: true, run: archiveMany },
+      { id: "archive", label: `Archive ${what}`, hint: label(keys.archive), danger: true, divider: true, run: () => archiveMany(sel) },
     ];
   };
 
@@ -1698,11 +1720,14 @@ export function App() {
   const pinSource = async (item: Item, undoable = true) => {
     const pinned_at = item.pinned_at ? undefined : new Date().toISOString();
     setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at } : i)) ?? all);
+    const write = ore("pin", item.id, ...(pinned_at ? [] : ["--undo"]));
+    // On the history at once, so ⌘Z before the write lands still takes it back (F20).
+    const flip = (on: boolean) => () => write.then(() => pinSource({ ...item, pinned_at: on ? undefined : "x" }, false));
+    const forget = undoable ? notify(pinned_at ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(!pinned_at), flip(!!pinned_at)) : undefined;
     try {
-      await ore("pin", item.id, ...(pinned_at ? [] : ["--undo"]));
-      const flip = (on: boolean) => () => pinSource({ ...item, pinned_at: on ? undefined : "x" }, false);
-      if (undoable) notify(pinned_at ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(!pinned_at), flip(!!pinned_at));
+      await write;
     } catch (e) {
+      forget?.();
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
@@ -1739,16 +1764,29 @@ export function App() {
     setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
     // Filing under an archived skill brings it back (D173); Undo archives it again.
     const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
+    const write = what.write(next);
+    const slot = `refile:${[...what.ids].join(",")}`;
+    // The step goes on the history at once, so ⌘Z pressed before the write lands still takes it back
+    // (F20); its undo waits for the write first.
+    const forget = changed
+      ? notify(
+          next.includes(changed.id) ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`,
+          "info",
+          () => write.then(() => refile(what, before, next, undefined, true)).then(() => rearchive(revived)),
+          () => refile(what, next, before, undefined, true),
+          undefined,
+          undefined,
+          slot,
+        )
+      : undefined;
     try {
-      await what.write(next);
-      if (changed) {
-        const on = next.includes(changed.id);
-        notify(on ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`, "info", () => refile(what, before, next, undefined, true).then(() => rearchive(revived)), () => refile(what, next, before, undefined, true));
-      }
+      await write;
     } catch (e) {
+      forget?.();
       // From the history (undo or redo): it puts the step back and says why.
       if (fromHistory) throw e;
-      notify(errorText(e), "error");
+      // In place of the toast that said it was filed.
+      notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
     } finally {
       void refresh();
       // Filing under an archived skill brings it back (D173): the sidebar shows it in its place again.
@@ -1791,13 +1829,10 @@ export function App() {
   };
   const rowActions = (r: Item): MenuAction[] => [
     { id: "open", label: "Open", hint: "↵", run: () => openSource(r.id) },
-    { id: "rename", label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(r.id) },
-    ...(r.archived_at ? [] : [{ id: "pin", label: r.pinned_at ? "Unpin" : "Pin to top", run: () => void pinSource(r) }]),
+    { id: "review-source", label: "Review this source", run: () => startReview(null, r.id) },
+    { id: "rename", divider: true, label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(r.id) },
+    ...(r.archived_at ? [] : [{ id: "pin", label: r.pinned_at ? "Unpin" : "Pin to top", hint: label(keys.pin), run: () => void pinSource(r) }]),
     ...pinMoves(r),
-    ...(r.url || r.source_file ? [{ id: "original", label: "Open original", hint: label(keys.original), run: () => original(r, "open") }] : []),
-    { id: "reveal", label: "Reveal in Finder", hint: label(keys.reveal), run: () => original(r, "reveal") },
-    { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copySources([r]) },
-    { id: "path", label: "Copy path", hint: label(keys.path), run: () => copyPaths([r]) },
     ...(r.archived_at
       ? [{ id: "restore", label: "Restore", run: () => void restoreSource(r) }]
       : [
@@ -1813,8 +1848,12 @@ export function App() {
           sub: skills.map((k) => ({ id: k.id, label: k.name, icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: r.skills.includes(k.id), run: () => fileSource(r, k) })),
         }]
       : []),
+    ...(r.url || r.source_file ? [{ id: "original", divider: true, label: "Open original", hint: label(keys.original), run: () => original(r, "open") }] : []),
+    { id: "reveal", label: "Reveal in Finder", hint: label(keys.reveal), divider: !(r.url || r.source_file), run: () => original(r, "reveal") },
+    { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copySources([r]) },
+    { id: "path", label: "Copy path", hint: label(keys.path), run: () => copyPaths([r]) },
     showMenu,
-    ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, run: () => void archiveSource(r) }]),
+    ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveSource(r) }]),
   ];
 
   /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178): a row's
@@ -2251,7 +2290,7 @@ export function App() {
         hidden={collapsed && !peek}
         peek={collapsed && peek}
         onPointer={(over) => (over ? clearTimeout(peekTimer.current) : peekOut())}
-        drop={dropping ? (dropping.skill ?? "") : (rowDrag?.skill ?? undefined)}
+        drop={dropping ? (dropping.skill ?? "") : (rowDrag?.skill ?? homeDrop ?? undefined)}
         onOpen={openSkill}
         menu={skillMenu}
         onCreated={(s) => {
@@ -2301,6 +2340,7 @@ export function App() {
             onOpenLesson={(id) => openSource(id)}
             onSound={setSound}
             onPin={(item) => void pinSource(item)}
+            onReview={(item) => startReview(null, item.id)}
             onMove={(item, to) => void moveSource(item, to)}
             notesOpen={sideShown}
             sideTab={sideTab}
@@ -2380,10 +2420,18 @@ export function App() {
             onRefile={(i, next, before, k) => void refile(sourceFiling(i), next, before, k)}
             onCreateSkill={createSkill}
             onSettings={() => setSettings({ section: "review" })}
-            // Home renames its own rows (onRename); the shortcuts act on the list's selected row, so
-            // Home shows none but ⌘C, which copies the focused row (onCopy).
-            sourceMenu={(i) => rowActions(i).filter((a) => a.id !== "rename").map((a) => (a.id === "copy" ? a : { ...a, hint: undefined }))}
+            // Home renames its own rows (onRename) and takes the lists' row keys on its focused row or pick
+            // (D232, D234), so its menus show them as the lists' do.
+            sourceMenu={rowActions}
             onCopy={(i) => copySources([i])}
+            manyMenu={(sel) => manyActions(sel).filter((a) => a.id !== "show")}
+            onDragSkill={setHomeDrop}
+            onDropOnSkill={(sel, id) => {
+              const k = skills.find((x) => x.id === id);
+              if (!k || sel.every((i) => i.skills.includes(k.id))) return;
+              if (sel.length > 1) fileMany(k, true, sel);
+              else void fileSource(sel[0]!, k);
+            }}
             onRename={(i, t) => retitle(i.id, i.title, t.trim())}
             skillMenu={skillMenu}
             onRetry={reload}
@@ -2418,6 +2466,7 @@ export function App() {
         <Boundary key={reviewing.run} onBack={() => endReview()}>
         <Review
           pick={reviewing.pick}
+          source={reviewing.source}
           skills={skills}
           paused={!!reviewing.paused}
           under={palette || help}

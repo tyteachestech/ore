@@ -19,6 +19,10 @@ bun run tauri ios build --debug
 xcrun devicectl list devices                       # the iPhone's identifier
 xcrun devicectl device install app --device <id> src-tauri/gen/apple/build/arm64/Ore.ipa
 ```
+The app icon: every build copies `src-tauri/icons/ios/` into the Xcode project's icon set, so a fresh worktree's
+build carries it too (`apps/desktop/scripts/app-icon.ts` draws those files). If the phone keeps showing an old
+icon after an install, restart it: iOS caches home screen icons.
+
 `tauri ios run` builds but didn't install on Xcode 27.1, hence `devicectl`. CocoaPods is needed (`brew install cocoapods`).
 
 Signing needs the paid Apple team (`bundle.iOS.developmentTeam` in tauri.conf.json), since iCloud is a paid

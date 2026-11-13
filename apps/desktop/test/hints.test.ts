@@ -7,8 +7,8 @@ import { BINDINGS } from "../src/keys";
 // that binding, through <Hint keys=…> or an inline label(keys.<id>). A binding with no on-screen
 // control is listed here with the reason; add a control's hint instead whenever one exists.
 const NO_CONTROL: Record<string, string> = {
-  "go-toread": "the list title's menu shows no shortcuts (Tyler, 2026-11-11); the Mac menu bar's Go menu and ⌘K show it",
-  "go-done": "as go-toread",
+  "go-toread": "Hint keys={keys} on the sources' To read folder tab (HeadTabs.tsx; the id comes from ViewMenu's list in App.tsx)",
+  "go-done": "as go-toread, on the Done tab",
   questions: "opens the Collected tab with the open passage as his answer's quote; the tab itself shows C (collected)",
   keep: "Hint keys={i} on the highlight popup's intent buttons",
   question: "Hint keys={i} on the highlight popup's intent buttons",
@@ -63,6 +63,10 @@ const ICON_ONLY_OK: Record<string, string> = {
   "phone/PhoneApp.tsx Close menu": "the phone app: a touch screen has no hover",
   "Menu.tsx label": "the phone's action sheet trigger (ActionSheet, PHONE): a touch screen has no hover",
   "editor/KeyboardBar.tsx Hide the keyboard": "the phone's keyboard bar (PHONE): a touch screen has no hover",
+  "editor/KeyboardBar.tsx Add a picture": "the phone's keyboard bar (PHONE): a touch screen has no hover",
+  "editor/KeyboardBar.tsx Move up": "the phone's keyboard bar while a block moves (PHONE): a touch screen has no hover",
+  "editor/KeyboardBar.tsx Move down": "the phone's keyboard bar while a block moves (PHONE): a touch screen has no hover",
+  "editor/KeyboardBar.tsx Done moving": "the phone's keyboard bar while a block moves (PHONE): a touch screen has no hover",
   "Video.tsx player.playing ? \"Pause\" : \"Play\"": "the video itself, clicked to play or pause as on YouTube; a hint would sit over the picture",
   "IconPicker.tsx label(icon)": "one of hundreds of cells in the icon grid; the filter field names them, and a tooltip each would cost the grid its speed",
 };
@@ -159,6 +163,7 @@ const DISMISS_OK: Record<string, [count: number, why: string]> = {
   "Review.tsx Done": [1, "the end screen's default button: its hint shows ↵, its key, as a Mac sheet's default button shows Return"],
   "Finish.tsx Done": [1, "its hint shows its key, finish (⌘↵); Esc leaves the panel, which runs Keep reading unless the source is already done"],
   "Tables.tsx Cancel": [2, "stops the 2 GB reader download (in a PDF and in Settings); Esc doesn't, so a stray Esc never throws the download away"],
+  "Diagram.tsx Done": [1, "the phone's diagram view (DiagramView, PHONE only): no keyboard to show Esc on; the Mac's editor's Done shows it"],
   "Toast.tsx Cancel": [1, "stops a long job from its progress toast; Esc doesn't reach a toast, so a stray Esc never stops one"],
 };
 

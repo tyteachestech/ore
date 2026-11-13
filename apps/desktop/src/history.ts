@@ -6,6 +6,35 @@ export type Step = { message: string; undo: () => Promise<unknown>; redo?: () =>
 
 const LIMIT = 50;
 
+/** One undo run for the window, as macOS's: a text field takes ⌘Z for typing he did there after the
+ *  app's newest step, and passes it to that step otherwise (a field he only clicked into, or a filter
+ *  he typed before ticking a skill). A field marked data-app-undo (Review's empty answer) never keeps it. */
+let tick = 0;
+let stepAt = 0;
+const typedAt = new WeakMap<EventTarget, number>();
+// What the field held before that typing: once its own ⌘Z has taken the typing back to it, ⌘Z is the app's again.
+const before = new WeakMap<EventTarget, string>();
+const watched = new WeakSet<Document>();
+const watchTyping = (doc: Document) => {
+  if (watched.has(doc)) return;
+  watched.add(doc);
+  doc.addEventListener("beforeinput", (e) => {
+    const t = e.target as HTMLInputElement | null;
+    if (t && "value" in t && (typedAt.get(t) ?? 0) <= stepAt) before.set(t, t.value);
+  }, true);
+  doc.addEventListener("input", (e) => e.target && typedAt.set(e.target, ++tick), true);
+};
+if (typeof document !== "undefined") watchTyping(document);
+
+/** Whether ⌘Z in `el` is its own typing undo rather than the app's. */
+export function ownsUndo(el: EventTarget | null): boolean {
+  const t = el as HTMLElement | null;
+  if (t?.ownerDocument) watchTyping(t.ownerDocument);
+  if (!t || (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA") || t.hasAttribute("data-app-undo")) return false;
+  return (typedAt.get(t) ?? 0) > stepAt && (t as HTMLInputElement).value !== before.get(t);
+}
+
+
 /** The app's undo and redo stacks (⌘Z, ⇧⌘Z). They live as long as the window, so moving between
  *  screens keeps them; a relaunch starts empty. */
 export class History {
@@ -30,6 +59,7 @@ export class History {
 
   /** A new step; anything undone before it can no longer be redone. */
   push(step: Step) {
+    stepAt = ++tick;
     this.past = [...this.past.slice(1 - LIMIT), step];
     this.future = [];
   }

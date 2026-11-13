@@ -148,14 +148,19 @@ interface Info {
   automatic_captions?: Record<string, Track[]>;
 }
 
-/** The captions to read: English first, then the video's own language (a Spanish lecture's Spanish),
- *  as written by people before YouTube's automatic ones. */
-function pickTrack(info: Info): Track | undefined {
+/** The captions to read: English written by people first, then the video's own language (a Spanish
+ *  lecture's Spanish), people's before YouTube's automatic ones, then English translated by YouTube. A human track may carry more than its language
+ *  ("en-GB", or "en-qlPKC2UN_YU" as MIT OpenCourseWare names its own). When yt-dlp names no language, the
+ *  video's own is the one its automatic captions were made in ("es-orig"), else its only human track's. */
+export function pickTrack(info: Pick<Info, "language" | "subtitles" | "automatic_captions">): Track | undefined {
   const manual = info.subtitles ?? {};
   const auto = info.automatic_captions ?? {};
-  const own = info.language?.split("-")[0];
-  const of = (lang: string) => Object.keys(manual).filter((k) => k === lang || new RegExp(`^${lang}-[A-Za-z]{2,4}$`).test(k)).map((k) => manual[k]);
-  const keys = [...of("en"), auto["en-orig"], auto["en"], ...(own && own !== "en" ? [...of(own), auto[`${own}-orig`], auto[own]] : [])];
+  const langs = Object.keys(manual).filter((k) => k !== "live_chat");
+  const own = (info.language ?? Object.keys(auto).find((k) => k.endsWith("-orig"))?.slice(0, -5) ?? (langs.length === 1 ? langs[0] : undefined))?.split("-")[0];
+  const of = (lang: string) => [...langs.filter((k) => k === lang), ...langs.filter((k) => k.startsWith(lang + "-"))].map((k) => manual[k]);
+  // For a video in another language, YouTube's automatic "en" is a machine translation: last, after its own captions.
+  const other = own && own !== "en" ? [...of(own), auto[`${own}-orig`], auto[own]] : [];
+  const keys = [...of("en"), auto["en-orig"], ...other, auto["en"]];
   for (const tracks of keys) {
     const vtt = tracks?.find((t) => t.ext === "vtt");
     if (vtt) return vtt;
@@ -173,7 +178,7 @@ export const DESCRIPTION_HEADING = "## From the description";
 
 /** A caption track's WebVTT. Some sites (TED) serve it as an HLS playlist of short VTT segments,
  *  fetched and joined in order; a cue a segment repeats is dropped as the rolling-caption repeat. */
-async function captions(text: string, url: string): Promise<string> {
+export async function captions(text: string, url: string): Promise<string> {
   if (!text.startsWith("#EXTM3U")) return text;
   const parts = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
   const segs = await Promise.all(parts.map(async (p) => {
@@ -182,6 +187,18 @@ async function captions(text: string, url: string): Promise<string> {
     return (await r.text()).replace(/^WEBVTT[^\n]*\n(?:[^\n]+\n)*/, "");
   }));
   return "WEBVTT\n\n" + segs.join("\n\n");
+}
+
+/** A YouTube video on a device that can't run yt-dlp (the iPhone, `ORE_NO_TOOLS`): its title and channel
+ *  from YouTube's public oEmbed, so it is in the library and plays at once; its transcript is owed, and a
+ *  device with yt-dlp fills it (D227, `fillOwed`). A video oEmbed won't describe waits for that device whole. */
+export async function owedVideo(url: string): Promise<Pick<YoutubeDoc, "title" | "author" | "url">> {
+  const link = `https://www.youtube.com/watch?v=${youtubeId(url)}`;
+  const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(link)}`);
+  if (!res.ok) throw new Error("Videos need yt-dlp, which only runs on the Mac.");
+  const o = (await res.json()) as { title?: string; author_name?: string };
+  if (!o.title) throw new Error("Videos need yt-dlp, which only runs on the Mac.");
+  return { title: o.title, author: o.author_name, url: link };
 }
 
 export interface VideoOptions {

@@ -32,9 +32,9 @@ function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noE
   if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
   return enrich;
 }
-import { int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
+import { fromBase64, int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
-import { importQueued, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
+import { fillOwed, importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
 
 const INTENTS = Intent.options;
 
@@ -104,13 +104,17 @@ export const itemCommands: Record<string, Command> = {
   },
 
   inbox: {
-    usage: "[--add <url> [--skill s]] [--remove <id>] [--import]   links added on the iPhone, waiting for the Mac to import them (D223): --add queues one (the phone), --import adds each with the whole import and enrichment (the Mac), --remove drops one; with none, lists them",
-    options: { add: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" } },
+    usage: "[--add <url> | --add-file <path> [--name n]] [--skill s] [--remove <id>] [--import]   links and files saved on a device, waiting to be imported (D223, D227): --add saves a link, --add-file a copy of a file (under the name it should be titled by), --import adds each that is this device's to import (its own; another device's after five minutes, or at once when that one couldn't) with the whole import, --remove drops one; with none, lists them",
+    options: { add: { type: "string" }, "add-file": { type: "string" }, name: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
+      if (f["add-file"] !== undefined) {
+        const l = queueFile(lib, need(str(f["add-file"]), "<path>"), strs(f.skill), str(f.name));
+        return { data: l, text: `Coming in: ${l.url}` };
+      }
       if (f.add !== undefined) {
         const l = queueLink(lib, str(f.add) ?? "", strs(f.skill));
-        return { data: l, text: `Waiting for your Mac: ${l.url}` };
+        return { data: l, text: `Coming in: ${l.url}` };
       }
       if (f.remove !== undefined) {
         removeQueuedLink(lib, need(str(f.remove), "<id>"));
@@ -122,7 +126,10 @@ export const itemCommands: Record<string, Command> = {
           afterAdd(lib, item, false);
           return { id: item.meta.id, title: item.meta.title, kept: !!item.kept };
         });
-        return { data: r, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`)].join("\n") };
+        // What a phone added with a part owed (a video's transcript) is filled here, then enriched.
+        const filled = (await fillOwed(lib)).map((i) => ({ id: i.meta.id, title: i.meta.title }));
+        for (const i of filled) startEnrich(lib, i.id);
+        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n") };
       }
       const all = queuedLinks(lib);
       return { data: all, text: all.length ? table(all.map((l) => [l.id, l.url, l.error ?? "waiting"])) : "Nothing waiting" };
@@ -379,7 +386,7 @@ export const itemCommands: Record<string, Command> = {
       if (f.base !== undefined && f.set === undefined) throw new Error("--base goes with --set");
       if (f.attach !== undefined) {
         const path = need(str(f.attach), "--attach");
-        const r = await attachToNote(lib, note, path === "-" ? { ext: need(str(f.ext), "--ext"), data: Buffer.from(await readStdin(), "base64") } : path);
+        const r = await attachToNote(lib, note, path === "-" ? { ext: need(str(f.ext), "--ext"), data: fromBase64(await readStdin()) } : path);
         return { data: r, text: `Copied to ${r.attached} (beside ${r.path})` };
       }
       const r0 =

@@ -16,6 +16,7 @@
     "eval:ask": "bun packages/core/eval/ask.ts",
     "eval:tutor": "bun packages/core/eval/tutor.ts",
     "eval:questions": "bun packages/core/eval/questions.ts",
+    "eval:transcripts": "bun packages/core/eval/transcripts.ts",
     "golden:update": "ORE_UPDATE_GOLDEN=1 bun test packages/core/test/golden.test.ts",
     "e2e": "bun apps/desktop/e2e/journeys.ts",
     "release:check": "bun apps/desktop/e2e/release-check.ts",

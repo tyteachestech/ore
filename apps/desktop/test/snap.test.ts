@@ -3,7 +3,7 @@ import { Window } from "happy-dom";
 
 const w = new Window();
 for (const k of ["document", "NodeFilter", "HTMLElement", "Node", "Range"] as const) (globalThis as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k];
-const { snapText, snapRange } = await import("../src/snap");
+const { snapText, snapRange, sentenceRange, paragraphRange } = await import("../src/snap");
 
 const T = "Start with the simplest solution, then grow it.";
 const end = (t: string, o: number) => t.slice(0, snapText(t, o, "end"));
@@ -81,5 +81,53 @@ describe("a selection on the page snaps across inline marks", () => {
     r.setStart(c, 2);
     r.setEnd(c, 5);
     expect(snapRange(r).toString()).toBe("rse");
+  });
+
+  // D224: a double click keeps the sentence, a double tap on the phone the paragraph.
+  const word = (el: HTMLElement, w: string) => {
+    const [n, o] = textAt(el, w);
+    const r = document.createRange();
+    r.setStart(n, o);
+    r.setEnd(n, o + w.length);
+    return r;
+  };
+  test("a double click's word grows to its sentence, across bold and links, with its full stop", () => {
+    const el = html("<p>First one here. Testing <strong>benefits</strong> memory <a href='#'>retention</a> a lot! Last one.</p>");
+    expect(sentenceRange(word(el, "memory")).toString()).toBe("Testing benefits memory retention a lot!");
+    expect(sentenceRange(word(el, "First")).toString()).toBe("First one here.");
+    expect(sentenceRange(word(el, "Last")).toString()).toBe("Last one.");
+  });
+  test("a sentence goes on past an abbreviation or an initial, and still ends at a real full stop", () => {
+    const el = html("<p>Intro here. As Dr. Smith showed, e.g. in Fig. 3, the U.S. Army held firm. Mr. J. R. Tolkien wrote it. It ended, etc. Then more.</p>");
+    expect(sentenceRange(word(el, "showed")).toString()).toBe("As Dr. Smith showed, e.g. in Fig. 3, the U.S. Army held firm.");
+    expect(sentenceRange(word(el, "Army")).toString()).toBe("As Dr. Smith showed, e.g. in Fig. 3, the U.S. Army held firm.");
+    expect(sentenceRange(word(el, "Tolkien")).toString()).toBe("Mr. J. R. Tolkien wrote it.");
+    expect(sentenceRange(word(el, "Then")).toString()).toBe("Then more.");
+    expect(sentenceRange(word(el, "Intro")).toString()).toBe("Intro here.");
+  });
+  test("a sentence never runs past its paragraph", () => {
+    const el = html("<p>No full stop here</p><p>Next paragraph.</p>");
+    expect(sentenceRange(word(el, "stop")).toString()).toBe("No full stop here");
+  });
+  test("a double click in code or math keeps just the word", () => {
+    const el = html("<p>Call <code>parseInt twice</code> now.</p>");
+    expect(sentenceRange(word(el, "parseInt")).toString()).toBe("parseInt");
+  });
+  test("a double tap's paragraph is the innermost block, trimmed, and never a heading", () => {
+    const el = html("<h2>A heading</h2><p>  One <em>paragraph</em> here.  </p><ul><li>An item.</li></ul><table><tr><td>A cell</td></tr></table>");
+    expect(paragraphRange(textAt(el, "paragraph")[0])?.toString()).toBe("One paragraph here.");
+    expect(paragraphRange(textAt(el, "An item")[0])?.toString()).toBe("An item.");
+    expect(paragraphRange(textAt(el, "A cell")[0])?.toString()).toBe("A cell");
+    expect(paragraphRange(textAt(el, "A heading")[0])).toBeNull();
+    const nested = html("<ul><li>Parent item<ul><li>Child one.</li></ul></li></ul>");
+    expect(paragraphRange(textAt(nested, "Parent")[0])?.toString()).toBe("Parent item");
+  });
+  test("a double click whose selection starts between elements still grows to its sentence", () => {
+    const el = html("<p>See <a href='#'>this</a>word here. Next one.</p>");
+    const p = el.firstChild!;
+    const r = document.createRange();
+    r.setStart(p, 2);
+    r.setEnd(textAt(el, "word")[0], 4);
+    expect(sentenceRange(r).toString()).toBe("See thisword here.");
   });
 });

@@ -13,3 +13,14 @@ test("every Tauri icon PNG is RGBA", () => {
     }
   }
 });
+
+// The Xcode project (gen/apple) is not in git and each worktree makes its own with Tauri's stock icons, so a
+// phone build from a fresh worktree shipped the old icon. The set is in git and every build copies it in.
+test("the iPhone's icon set is in git and every phone build copies it into the Xcode project", () => {
+  const phone = join(import.meta.dir, "../../phone/src-tauri");
+  const names = readdirSync(join(phone, "icons/ios")).filter((f) => f.endsWith(".png"));
+  expect(names).toHaveLength(18);
+  expect(names).toContain("AppIcon-512@2x.png");
+  const conf = JSON.parse(readFileSync(join(phone, "tauri.conf.json"), "utf8"));
+  expect(conf.build.beforeBuildCommand).toContain("cp src-tauri/icons/ios/*.png src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/");
+});

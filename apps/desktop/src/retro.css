@@ -106,6 +106,41 @@
 
 /* Labels: section and card titles, sidebar groups, metadata. */
 .card-title h2, .home-h, .home-cont .home-h, .side-label { font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+/* A page's section names are bigger and brighter than the sidebar's group labels (D226). */
+.head-tab .head-tab-name > *, .home-h, .home-cont .home-h { font-family: var(--mono); font-size: 16px; font-weight: 400; letter-spacing: 0.02em; color: var(--text); }
+.home-h, .home-cont .home-h { line-height: 30px; }
+
+/* Folder tabs (D226): a section's name is a tab drawn in the rule's own line, the rule broken under it. A
+   section's other views are their icons; the one he clicks grows out to its name. */
+.skill-card .card-head, .list-bar { align-items: flex-end; padding-bottom: 0; }
+.skill-card .card-head > .icon-btn, .skill-card .card-head .fold-action > *, .skill-card .card-head > .fold-head { margin-bottom: 3px; }
+.card-title { align-self: flex-end; }
+.head-tabs { display: flex; align-items: flex-end; gap: 2px; }
+.head-tabs-list { display: contents; }
+.head-tab, .head-tab-after { display: flex; align-items: center; height: 34px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; }
+/* The open tab's ▾ is its right end: the tab's outline carries on around it. */
+.head-tab-after { margin-left: -2px; padding-right: 4px; border-color: var(--border); border-left: 0; border-top-left-radius: 0; background: var(--bg); }
+.head-tabs.with-after .head-tab.on { border-right: 0; border-top-right-radius: 0; padding-right: 0; }
+.head-tab.on { border-color: var(--border); background: var(--bg); padding-right: 4px; }
+.head-tab-btn { display: flex; align-items: center; height: 100%; padding: 0 7px; border-radius: 7px 7px 0 0; color: var(--faint); }
+.head-tab.on .head-tab-btn { padding: 0 8px 0 10px; cursor: default; }
+.head-tab:not(.on) .head-tab-btn:hover { background: var(--bg-hover); }
+.head-tab:not(.on) .card-icon { opacity: 0.6; }
+.head-tab:not(.on) .head-tab-btn:hover .card-icon { opacity: 1; }
+.head-tab-name { display: grid; grid-template-columns: 0fr; }
+.head-tab.on .head-tab-name { grid-template-columns: 1fr; }
+.head-tab-name > * { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; line-height: 33px; opacity: 0; }
+.head-tab.on .head-tab-name > * { padding-left: 8px; opacity: 1; }
+[data-tone="done"] .card-icon { color: var(--c-green); }
+[data-tone="archived"] .card-icon { color: var(--muted); }
+.head-tab-after .view-menu { width: 22px; height: 22px; margin: 0; padding: 0; justify-content: center; }
+.list-bar { margin: 0 22px 6px; padding: 6px 0 0; border-bottom: 1px solid var(--border); }
+.list-bar > :not(.head-tabs) { margin-bottom: 4px; }
+/* The grow is for a click (the tab list carries data-grow from a pointer press); keys switch at once. */
+@media (prefers-reduced-motion: no-preference) {
+  .head-tabs-list[data-grow] .head-tab-name { transition: grid-template-columns var(--t-3) var(--ease-out); }
+  .head-tabs-list[data-grow] .head-tab-name > * { transition: opacity var(--t-2) var(--ease-out), padding-left var(--t-3) var(--ease-out); }
+}
 .card-title .card-icon { margin-right: 2px; }
 .skill-page .row .kind, .row .kind-line, .row .count, .side-item .count, .gem-ring-lv { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
 
@@ -208,7 +243,7 @@
 .intents .intent { flex: 1; gap: 5px; }
 .popup .field { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 4px 8px; }
 .popup .field:focus { box-shadow: none; }
-.popup-tools { align-self: end; border-left: 0; padding-left: 4px; gap: 2px; }
+.popup-tools { align-self: start; border-left: 0; padding-left: 4px; gap: 2px; }
 .popup-tools .intent { color: var(--faint); border-radius: 6px; }
 .popup-tools .intent:hover { color: var(--text); background: var(--bg-hover); }
 
@@ -244,3 +279,17 @@
 .home-day.met i { background: var(--c-green); box-shadow: none; }
 .home-day.today i { outline: none; box-shadow: inset 0 0 0 2px var(--muted); }
 .home-day.off i { background: var(--bg); box-shadow: inset 0 0 0 2px var(--border); }
+
+/* The vein (D240): a new highlight's colour arrives as dots that sweep along each line, swell and join into the
+   tint. `--vein-r` is a dot's radius; past 4.4px the dots of a 6px grid have joined and the line is its tint. */
+@property --vein-r { syntax: "<length>"; inherits: false; initial-value: 4.4px; }
+.vein { position: absolute; inset: 0; pointer-events: none; --tint: var(--keep); }
+.vein.card { --tint: var(--card); } .vein.question { --tint: var(--question); } .vein.apply { --tint: var(--apply); }
+.vein i { position: absolute; background: radial-gradient(circle, var(--tint) var(--vein-r), transparent calc(var(--vein-r) + 0.6px)) 0 50% / 6px 6px; animation: vein-sweep var(--t-4) var(--ease-out) both, vein-swell var(--t-4) var(--ease-in-out) both; animation-delay: calc(var(--i, 0) * 3 * var(--stagger)); }
+@keyframes vein-sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+@keyframes vein-swell { from { --vein-r: 1.2px; } 40% { --vein-r: 2.1px; } to { --vein-r: 4.4px; } }
+/* A Key point's ore (D240): loose dots that lift off the words and gather where its margin mark lands. */
+.vein-ore { position: absolute; inset: 0; pointer-events: none; }
+.vein-ore i { position: absolute; left: -2.5px; top: -2.5px; width: 5px; height: 5px; border-radius: 50%; background: color-mix(in oklab, var(--card-solid), white 30%); will-change: transform; }
+.mark-icon.gather { animation: vein-land var(--t-4) var(--ease-spring) var(--land, 0ms) both; }
+@keyframes vein-land { from { opacity: 0; scale: 0.3; } to { opacity: 0.75; scale: 1; } }

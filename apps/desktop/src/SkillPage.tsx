@@ -3,13 +3,14 @@ import { ranked } from "./match";
 import { HeadSearch } from "./HeadSearch";
 import { ImportanceIcon, levelOf } from "./importance";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
+import { HeadTab, HeadTabs } from "./HeadTabs";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { useSplit } from "./split";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import * as Popover from "@radix-ui/react-popover";
 import { focusFilter, IconPicker, SkillIcon } from "./IconPicker";
-import { is, isNotes, label, useKeymap } from "./keys";
+import { is, isNotes, label, useKeymap, keepKeysIn } from "./keys";
 import { clickBelow, LinkedFrom, NoteBody, useNotes } from "./Notes";
 import { FindBar, onceFound } from "./Find";
 import { Hint } from "./Hint";
@@ -52,12 +53,14 @@ type Props = {
   onFound: () => void;
   /** The skill's sources, in the view the title names. */
   children: ReactNode;
+  /** The iPhone: its note is a screen of its own (Tyler 2026-11-06, B), so the page is one column with this row in the note's place. */
+  noteRow?: ReactNode;
 };
 
 
 /** A skill's page (D46): the D23 stats as chips in the header, then two equal columns that each
  *  scroll on their own, so a long note (D41) never buries his questions (D47) and sources. */
-export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children }: Props) {
+export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children, noteRow }: Props) {
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
@@ -137,6 +140,30 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
   }, [loaded, findInNote]);
   // The note across the whole page for a wide table, until he clicks again; not kept (Tyler, option C).
   const [wide, setWide] = useState(false);
+  const side = (
+    <div className="skill-col side" aria-label={`${skill.name} questions and sources`}>
+      <Fold
+        id="sources"
+        title="Sources"
+        icon={PixelBook}
+        tone="read"
+        menu={view}
+        actions={[{ id: "search", label: "Search sources", run: () => setSearching(true) }, { id: "add", label: "Add source", hint: label(keys.add), run: onAddSource }]}
+        action={<>
+          <HeadSearch label="Search sources" value={search.value} onChange={search.set} open={searching} setOpen={setSearching} onKeys={search.keys} />
+          <Hint text={`Add a source to ${skill.name}`} keys="add">
+            <button className="icon-btn" aria-label={`Add a source to ${skill.name}`} onClick={onAddSource}>
+              <Plus size={14} weight="bold" aria-hidden="true" />
+            </button>
+          </Hint>
+        </>}
+      >
+        {children}
+      </Fold>
+      <Tries skill={skill.id} onPassage={onQuestion} notify={notify} />
+      <Questions skill={skill.id} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} notify={notify} />
+    </div>
+  );
   return (
     <div className="skill-page" data-color={skill.color} ref={pageRef}>
       {find.open && (
@@ -178,11 +205,17 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
         {stats && stats.strength.solid + stats.strength.growing + stats.strength.new > 0 && <Strength s={stats} color={skill.color} />}
       </header>
 
+      {noteRow ? (
+        <div className="skill-cols one">
+          {noteRow}
+          {side}
+        </div>
+      ) : (
       <div className={`skill-cols${split.dragging ? " dragging" : ""}${wide ? " wide" : ""}`} style={{ gridTemplateColumns: wide ? "minmax(0, 1fr)" : `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` }}>
         <div className="skill-col" ref={noteCol} onMouseDown={clickBelow(editor)} onScroll={(e) => !restoring.current && save(noteScroll, String(Math.round(e.currentTarget.scrollTop)))}>
           <section className="skill-card skill-note" data-tone="note" onMouseDown={clickBelow(editor)}>
             <div className="card-head">
-              <span className="card-title"><PixelNote className="card-icon" size={12} aria-hidden="true" /><h2>Your note</h2></span>
+              <span className="card-title"><HeadTab icon={PixelNote} tone="note">Your note</HeadTab></span>
               <Hint text={wide ? "Back beside sources and questions" : "Widen the note, for wide tables"}>
                 <button className="icon-btn note-widen" aria-label={wide ? "Narrow your note" : "Widen your note"} aria-pressed={wide} onClick={() => setWide((w) => !w)}>
                   {wide ? <Collapse size={14} aria-hidden="true" /> : <Expand size={14} aria-hidden="true" />}
@@ -211,29 +244,9 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
           <div className="col-divider" role="separator" aria-orientation="vertical" aria-label="Resize columns" {...split.divider} />
         </Hint>
 
-        <div className="skill-col side" aria-label={`${skill.name} questions and sources`}>
-          <Fold
-            id="sources"
-            title="Sources"
-            icon={PixelBook}
-            tone="read"
-            menu={view}
-            actions={[{ id: "search", label: "Search sources", run: () => setSearching(true) }, { id: "add", label: "Add source", hint: label(keys.add), run: onAddSource }]}
-            action={<>
-              <HeadSearch label="Search sources" value={search.value} onChange={search.set} open={searching} setOpen={setSearching} onKeys={search.keys} />
-              <Hint text={`Add a source to ${skill.name}`} keys="add">
-                <button className="icon-btn" aria-label={`Add a source to ${skill.name}`} onClick={onAddSource}>
-                  <Plus size={14} weight="bold" aria-hidden="true" />
-                </button>
-              </Hint>
-            </>}
-          >
-            {children}
-          </Fold>
-          <Tries skill={skill.id} onPassage={onQuestion} notify={notify} />
-          <Questions skill={skill.id} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} notify={notify} />
-        </div>
+        {side}
       </div>
+      )}
       {recalling && <SkillRecall skill={skill} goal={recalling === "goal" ? skill.goal : undefined} blocked={blocked} append={append} notify={notify} onClose={() => setRecalling(null)} />}
     </div>
   );
@@ -299,11 +312,10 @@ function foldedIds(): string[] {
   }
 }
 
-/** A card that folds to its header, Notion toggle-heading style; the summary stays
- *  in the header so a folded section still says what is in it. Folds are remembered for every skill. */
-/** A card that folds. With `menu`, the menu is its title (the caret alone folds it), as a button
- *  can't hold another. */
-/** `actions`: the card's right-click menu (its create action), which unfolds it first, as its + does. */
+/** A section that folds to its header (Notion's toggle heading); folds are remembered for every skill. Its
+ *  title is a folder tab, or with `menu` the tabs of its views; the caret at the far right folds it. `summary`
+ *  stays in the header so a folded section still says what is in it. `actions`: its right-click menu (its
+ *  create action), which unfolds it first, as its + does. */
 function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, action, actions = [], children }: { id: string; title: string; icon: typeof PixelBook; tone: string; summary?: ReactNode; summaryFolded?: boolean; menu?: ReactNode; action?: ReactNode; actions?: MenuAction[]; children: ReactNode }) {
   const [open, setOpen] = useState(() => !foldedIds().includes(id));
   const toggle = () => {
@@ -316,15 +328,17 @@ function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, 
     <WithMenu actions={actions.map((a) => ({ ...a, run: () => (open || toggle(), a.run()) }))}>
     <section className="skill-card fold" data-tone={tone}>
       <div className="card-head">
-        <button className={`fold-head${menu ? " caret-only" : ""}`} aria-expanded={open} aria-label={menu ? `${open ? "Fold" : "Unfold"} ${title}` : undefined} onClick={toggle}>
-          <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
-          {!menu && <span className="card-title"><I className="card-icon" size={12} aria-hidden="true" /><h2>{title}</h2></span>}
-          {summary && !(summaryFolded && open) && <span className="fold-sum">{summary}</span>}
-        </button>
-        {menu && <span className="card-title"><I className="card-icon" size={12} aria-hidden="true" />{menu}</span>}
-        {menu && <span className="fold-fill" />}
+        {/* Picking a view of a folded section opens it, or the pick would show nothing. */}
+        <span className="card-title" onClickCapture={() => menu && !open && toggle()}>{menu ?? <HeadTab icon={I} tone={tone}>{title}</HeadTab>}</span>
+        {summary && !(summaryFolded && open) ? <span className="fold-sum">{summary}</span> : <span className="fold-fill" />}
         {/* Its + adds into the body, so a folded card opens first, or the new row would be hidden. */}
         {action && <span className="fold-action" onClickCapture={() => !open && toggle()}>{action}</span>}
+        {/* At the far right, past the section's actions (D226, Tyler 2026-11-12): beside the tabs it read as one more view. */}
+        <Hint text={open ? "Fold" : "Unfold"}>
+          <button className="fold-head caret-only" aria-expanded={open} aria-label={`${open ? "Fold" : "Unfold"} ${title}`} onClick={toggle}>
+            <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
+          </button>
+        </Hint>
       </div>
       {open && <div className="fold-body">{children}</div>}
     </section>
@@ -389,7 +403,7 @@ function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; last
         // Clicking away saves (D211); an emptied field keeps the goal, only Enter clears it.
         onBlur={() => document.hasFocus() && ((draft ?? "").trim() ? void save() : setDraft(null))}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.key === "Enter") void save();
           if (e.key === "Escape") setDraft(null);
         }}
@@ -438,10 +452,10 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
   // One vocabulary with the header: the gem states, then cards not reviewed yet as empty slots.
   const legend: [GemKind, number, string, { seam?: boolean; polished?: boolean }?][] = [
     ["cut", k.polished ?? 0, "Polished: cut, and passed as a remix", { polished: true }],
-    ["cut", k.mended ?? 0, "Mended: cut, missed, and won back", { seam: true }],
+    ["cut", k.mended ?? 0, "Won back: cut, missed, and cut again", { seam: true }],
     ["cut", k.solid - (k.polished ?? 0) - (k.mended ?? 0), "Cut: you'd still recall these three weeks from now"],
-    ["ready", k.ready, "Glowing: cut if you recall them at their next review"],
-    ["dull", k.win_back, "Cracked: cut once, then missed. Review to mend them"],
+    ["ready", k.ready, "Nearly cut: cut if you recall them at their next review"],
+    ["dull", k.win_back, "Missed: cut once, then missed. Review to win them back"],
     ["rough", k.growing - k.ready - k.win_back, "Rough: reviewed, not near solid yet"],
     ["empty", k.new, "Not reviewed yet"],
   ];
@@ -470,7 +484,7 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
                 n > 0 ? (
                   <Hint key={why} text={why}>
                     <span>
-                      <Gem kind={kind} size={16} {...look} />
+                      <Gem kind={kind} size={18} {...look} />
                       {n}
                     </span>
                   </Hint>
@@ -566,6 +580,8 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
   const found = useMemo(() => (find ? ranked(qs ?? [], find, (q) => [questionText(q), q.item_title, ...q.answers.map((a) => a.text)]) : (qs ?? [])), [qs, find]);
   const open = found.filter((q) => q.status !== "done");
   const answered = found.filter((q) => q.status === "done");
+  /** The Answered tab is there once a question is answered; a search looks through both, so it shows one tab. */
+  const byStatus = answered.length > 0 && !find;
   return (
     <Fold
       id="questions"
@@ -574,6 +590,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
       tone="question"
       summary={open.length && !find ? `${open.length} open` : null}
       summaryFolded
+      menu={<HeadTabs label="Questions shown" tabs={byStatus ? QUESTION_TABS : QUESTION_TABS.slice(0, 1)} value={byStatus && showAnswered ? "answered" : "open"} onChange={(v) => setShowAnswered(v === "answered")} />}
       actions={[{ id: "search", label: "Search questions", run: () => setSearching(true) }, { id: "ask", label: "Add a question", run: () => setAsking(true) }]}
       action={<>
         <HeadSearch
@@ -610,23 +627,17 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
       )}
       {qs && !qs.length && !asking && <p className="quiet">No questions yet. Add one with +, or highlight a passage as a question while you read.</p>}
       {find && !found.length && <p className="quiet">No questions match “{find}”.</p>}
-      {(showAll || find ? open : open.slice(0, QUESTION_CAP)).map((q) => (
+      {/* Open and Answered are the header's tabs (D226); a search looks through both. */}
+      {!(byStatus && showAnswered) && (showAll || find ? open : open.slice(0, QUESTION_CAP)).map((q) => (
         <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />
       ))}
-      {!find && open.length > QUESTION_CAP && (
+      {!find && !(byStatus && showAnswered) && open.length > QUESTION_CAP && (
         <button className="answered-toggle" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
           {showAll ? "Show fewer" : `Show all ${open.length}`}
         </button>
       )}
-      {answered.length > 0 && (
-        <>
-          {!find && <button className="answered-toggle" aria-expanded={showAnswered} onClick={() => setShowAnswered(!showAnswered)}>
-            {showAnswered ? "Hide answered" : `Answered (${answered.length})`}
-          </button>}
-          {(showAnswered || !!find) &&
-            answered.map((q) => <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />)}
-        </>
-      )}
+      {(find ? true : byStatus && showAnswered) &&
+        answered.map((q) => <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />)}
     </Fold>
   );
 }
@@ -775,7 +786,7 @@ function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onP
     { id: "delete", label: "Remove", danger: true, divider: true, run: onRemove },
   ];
   return (
-    <WithMenu actions={actions}>
+    <WithMenu actions={actions} hold>
       <div className={`try${done ? " done" : ""}${history ? " history" : ""}`}>
         {!history && (
           <Hint text={done ? "Not tried yet" : "Mark tried"}>
@@ -824,7 +835,7 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
   useEffect(() => void (row.current = field.current?.closest<HTMLElement>(".try") ?? null), []);
   useFocusWhileMounted(field, () => (row.current?.isConnected ? row.current.querySelector<HTMLElement>(".try-check, .try-quote") : null));
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    e.stopPropagation();
+    keepKeysIn(e); // ⌘Z still reaches the app history
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSave(v.trim(), next.trim());
@@ -861,6 +872,11 @@ function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string
     </div>
   );
 }
+
+const QUESTION_TABS: HeadTab<"open" | "answered">[] = [
+  { id: "open", label: "Questions", icon: PixelQuestion, tone: "question" },
+  { id: "answered", label: "Answered", icon: Check, tone: "question" },
+];
 
 /** Open questions shown before "Show all", so Sources stays in view below them. */
 const QUESTION_CAP = 5;
@@ -945,7 +961,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   ];
 
   return (
-    <WithMenu actions={actions}>
+    <WithMenu actions={actions} hold>
     <div className={`question${done ? " done" : ""}`}>
       {/* D131: the question is the row; a circle at the left is Answered (Things), as a try's box is Tried. */}
       <Hint text={done ? "Reopen" : "Mark answered"}>

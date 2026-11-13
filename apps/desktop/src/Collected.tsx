@@ -1,9 +1,10 @@
 import { CaretRight, Plus } from "./icons";
+import { keepKeysIn } from "./keys";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { still } from "./SideCursor";
-import { PixelKeep, PixelQuestion, PixelStar, PixelTry } from "./PixelIcon";
+import { PixelKeep, PixelQuestion, PixelGem, PixelTry } from "./PixelIcon";
 import { INTENTS, PHONE, type Annotation, type Intent } from "./ore";
 import { passageText } from "./text";
 import { rankScore } from "./match";
@@ -12,7 +13,7 @@ import { load, save } from "./util";
 // D118: one highlight; a key point (`card` in the files) is a highlight he marked to come back, and the AI
 // plans the cards from all of them: the day after a sitting while he is still reading (D180), and at the finish.
 export const LABEL: Record<Intent, string> = { keep: "Highlight", card: "Key point", question: "Question", apply: "Try it" };
-export const ICON: Record<Intent, typeof PixelKeep> = { keep: PixelKeep, card: PixelStar, question: PixelQuestion, apply: PixelTry };
+export const ICON: Record<Intent, typeof PixelKeep> = { keep: PixelKeep, card: PixelGem, question: PixelQuestion, apply: PixelTry };
 /** What each mark means, said on hover where he picks it. */
 export const MEANS: Record<Intent, string> = {
   keep: "Exercises are planned from your highlights the next day",
@@ -22,6 +23,8 @@ export const MEANS: Record<Intent, string> = {
 };
 /** Highlights that are a generative step pop on their own (D65); any type pops when he writes a note on it. */
 const CELEBRATE: Intent[] = ["card", "question", "apply"];
+/** How many dots of ore a highlight sends to its chip. */
+const ORE = 6;
 const PLURAL: Record<Intent, string> = { keep: "Highlights", card: "Key points", question: "Questions", apply: "To try" };
 
 type Props = {
@@ -45,6 +48,8 @@ export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
   const chips = useRef(new Map<Intent, HTMLElement>());
   const prev = useRef<Map<string, { intent: Intent; noted: boolean }> | null>(null);
   const fly = useRef<{ intent: Intent; from: DOMRect } | null>(null);
+  /** Bumped for each flight, so a plain highlight's ore flies without the chip's pop. */
+  const [flown, setFlown] = useState(0);
 
   const counts = useMemo(() => {
     const c: Record<Intent, number> = { keep: 0, card: 0, question: 0, apply: 0 };
@@ -63,11 +68,16 @@ export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
     if (!before) return;
     const count = (m: typeof now, i: Intent, noted = false) => [...m.values()].filter((v) => v.intent === i && (!noted || v.noted)).length;
     const grew = INTENTS.find((i) => (CELEBRATE.includes(i) && count(now, i) > count(before, i)) || count(now, i, true) > count(before, i, true));
-    if (!grew) return;
-    const id = anns.find((a) => a.intent === grew && (before.get(a.id)?.intent !== grew || (!!a.note?.trim() && !before.get(a.id)?.noted)))?.id;
+    // A plain highlight is still collected (D240): its ore flies to the chip, which counts it without the pop.
+    const plain = !grew && count(now, "keep") > count(before, "keep") && now.size > before.size ? anns.find((a) => a.intent === "keep" && !before.has(a.id)) : undefined;
+    if (!grew && !plain) return;
+    const id = grew ? anns.find((a) => a.intent === grew && (before.get(a.id)?.intent !== grew || (!!a.note?.trim() && !before.get(a.id)?.noted)))?.id : plain!.id;
     const from = id ? rectOf(id) : undefined;
-    if (from && !still()) fly.current = { intent: grew, from };
-    setPop((p) => ({ intent: grew, n: (p?.n ?? 0) + 1 }));
+    if (from && !still()) {
+      fly.current = { intent: grew ?? "keep", from };
+      setFlown((n) => n + 1);
+    }
+    if (grew) setPop((p) => ({ intent: grew, n: (p?.n ?? 0) + 1 }));
   }, [anns, ready]);
   useEffect(() => {
     if (!pop) return;
@@ -75,28 +85,30 @@ export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
     return () => clearTimeout(t);
   }, [pop]);
 
-  // Fly a dot of the type's colour from the passage into its chip (after render: a first
-  // highlight of a type adds the chip).
+  // Ore of the type's colour lifts off the passage and lands in its chip (D240): a few loose dots, one after
+  // another, each on its own arc (after render: a first highlight of a type adds the chip).
   useLayoutEffect(() => {
     const f = fly.current;
     const chip = f && chips.current.get(f.intent);
     fly.current = null;
     if (!f || !chip) return;
     const to = chip.getBoundingClientRect();
-    const dot = document.createElement("div");
-    dot.className = `collect-fly ${f.intent}`;
-    document.body.append(dot);
-    const x0 = f.from.left + f.from.width / 2, y0 = f.from.top + f.from.height / 2;
     const x1 = to.left + 16, y1 = to.top + to.height / 2;
-    dot.animate(
-      [
-        { transform: `translate(${x0}px, ${y0}px) scale(1)`, opacity: 1 },
-        { transform: `translate(${(x0 + x1) / 2}px, ${Math.min(y0, y1) - 60}px) scale(1.2)`, opacity: 1, offset: 0.45 },
-        { transform: `translate(${x1}px, ${y1}px) scale(0.5)`, opacity: 0.9 },
-      ],
-      { duration: 520, easing: "cubic-bezier(.5,0,.3,1)" },
-    ).finished.finally(() => dot.remove());
-  }, [pop]);
+    for (let i = 0; i < ORE; i++) {
+      const dot = document.createElement("div");
+      dot.className = `collect-fly ${f.intent}`;
+      document.body.append(dot);
+      const x0 = f.from.left + f.from.width * (0.12 + i * 0.15), y0 = f.from.top + Math.min(f.from.height / 2, 14);
+      dot.animate(
+        [
+          { transform: `translate(${x0}px, ${y0}px) scale(0.4)`, opacity: 0 },
+          { transform: `translate(${x0 + (x1 - x0) * 0.4}px, ${Math.min(y0, y1) - 40 - i * 4}px) scale(1)`, opacity: 1, offset: 0.4 },
+          { transform: `translate(${x1}px, ${y1}px) scale(0.6)`, opacity: 0.9 },
+        ],
+        { duration: 520, delay: i * 40, easing: "cubic-bezier(.5,0,.3,1)", fill: "backwards" },
+      ).finished.finally(() => dot.remove());
+    }
+  }, [flown]);
 
   const total = anns.length;
   if (!total || fit === "none") return null;
@@ -251,7 +263,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
         {head(
           "card",
           "Key points",
-          PixelStar,
+          PixelGem,
           <Hint text="A key point of your own, from this spot" keys="card" side="left">
             <button className="icon-btn" aria-label="Add a key point" onClick={() => (shut.has("card") && toggle("card"), onAdding(true))}>
               <Plus size={12} weight="bold" aria-hidden="true" />
@@ -321,7 +333,7 @@ function AddLine({ value: v, ask, takeFocus, onChange, onDone }: { value: string
         aria-label="Key point"
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.key === "Enter" && !e.nativeEvent.isComposing) {
             e.preventDefault();
             finish(v);

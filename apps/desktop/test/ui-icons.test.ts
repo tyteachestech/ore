@@ -24,7 +24,7 @@ test("every sprite is 16 rows of 16", () => {
 // A single dot out of place on a symmetric subject reads as a flaw at 20px (the gear had one, the keyboard's keys
 // were uneven). These mirror left to right about their own box.
 test("symmetric sprites mirror left to right", () => {
-  for (const name of ["Archive", "Circle", "GearSix", "Globe", "Headphones", "House", "Keyboard", "LockSimple", "Plus", "Square", "Table", "Target", "Trash", "X", "PixelStar"]) {
+  for (const name of ["Archive", "Circle", "GearSix", "Globe", "Headphones", "House", "Keyboard", "LockSimple", "Pin", "Plus", "Scissors", "Square", "Table", "Target", "Trash", "User", "X", "PixelGem"]) {
     const rows = sprites.get(name)!;
     const { x0, x1 } = box(rows);
     for (const r of rows) for (let x = x0; x <= x1; x++) expect(r[x] === r[x0 + x1 - x] ? "mirrored" : `${name}: ${r}`).toBe("mirrored");

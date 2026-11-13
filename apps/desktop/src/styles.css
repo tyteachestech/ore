@@ -49,7 +49,7 @@
   --c-red: #ff7b72;
   --c-orange: #ffa657;
   --c-yellow: #e8c24a;
-  --seam: #ffb000; /* the gold of a mended gem (D197), the one colour a gem carries beside its skill's */
+  --seam: #ffb000; /* the gold rim of a won-back gem (D197, D236), the one colour a gem carries beside its skill's */
   --ore-rich: color-mix(in oklab, var(--c-green), white 45%);
   --c-green: #5fcf8a;
   --c-teal: #4fd1c5;
@@ -246,6 +246,8 @@ kbd {
 [data-color="blue"] { --skill: var(--c-blue); }
 [data-color="purple"] { --skill: var(--c-purple); }
 [data-color="pink"] { --skill: var(--c-pink); }
+/* A won-back gem's gold rim would vanish on a skill that is gold itself: there it is white gold. */
+[data-color="yellow"], [data-color="orange"] { --seam: #fff3cf; }
 .main { position: relative; min-width: 0; height: 100%; display: flex; flex-direction: column; padding-top: var(--titlebar); }
 
 /* Sources list: its title is the view menu (To read, Done, Archived), then the filter (⌘F). */
@@ -270,7 +272,7 @@ kbd {
 img.thumb[data-kind="pdf"], img.thumb[data-kind="epub"] { object-position: top; }
 /* No white glare on dark; full strength on hover and selection. */
 img.thumb { filter: brightness(0.86); }
-.row:hover .thumb, .row.on .thumb, .row.sel .thumb, .home-read:hover .thumb, [cmdk-item][data-selected="true"] .thumb { opacity: 1; filter: none; }
+.row:hover .thumb, .row.on .thumb, .row.sel .thumb, .home-read:hover .thumb, .home-read.sel .thumb, [cmdk-item][data-selected="true"] .thumb { opacity: 1; filter: none; }
 .thumb-at { position: relative; flex: none; display: flex; }
 .thumb-bar { position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; border-radius: 1px; background: var(--bg-active); overflow: hidden; }
 .row .col { flex: none; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -367,7 +369,7 @@ img.thumb { filter: brightness(0.86); }
 /* Hover and open light the ground behind them, so it shows with the names hidden too (Icon only). */
 .chips-button:hover, .chips-button[aria-expanded="true"] { background: var(--bg-active); box-shadow: 0 0 0 3px var(--bg-active); }
 .chips-button:hover .chip, .chips-button[aria-expanded="true"] .chip { color: var(--text); }
-.chips-add { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border-radius: 9px; color: var(--faint); opacity: 0; }
+.chips-add { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-block: -1px; padding: 0; border-radius: 10px; color: var(--faint); opacity: 0; }
 .chips-add:hover, .chips-add[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 .row:hover .chips-add, .doc-head:hover .chips-add, .chips-add:focus-visible, .chips-add[aria-expanded="true"] { opacity: 1; }
 .skill-picker { width: 240px; }
@@ -423,6 +425,10 @@ img.thumb { filter: brightness(0.86); }
 .skill-edit-foot { display: flex; align-items: center; gap: 12px; margin: 8px -18px 0; padding: 8px 18px; min-height: 36px; border-top: 1px solid var(--border); color: var(--faint); font-size: 12px; }
 .skill-edit-foot .right { margin-left: auto; }
 .swatches { display: flex; gap: 6px; }
+/* The iPhone's skill editor (a long press, Edit skill…): the screen's width less its gutters, the colours on two lines. */
+.phone .panel.skill-edit { width: calc(100vw - 32px); padding-bottom: 12px; }
+.phone .skill-edit .look-row { grid-template-columns: 76px minmax(0, 1fr); padding: 4px 0; }
+.phone .skill-edit .swatches { flex-wrap: wrap; gap: 8px; }
 .swatch { width: 20px; height: 20px; border-radius: 50%; background: var(--skill, transparent); border: 1px solid var(--border); }
 .swatch.small { width: 16px; height: 16px; }
 .swatch-hint { display: flex; } /* the swatch's hover hint (IconPicker.tsx Swatches) */
@@ -608,7 +614,9 @@ img.thumb { filter: brightness(0.86); }
 .doc-head .author-edit { font: inherit; font-size: 13px; color: var(--text); margin-right: 4px; max-width: 40ch; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -1px 0 var(--accent); outline: none; }
 .doc-thumb { display: block; height: 128px; max-width: 100%; width: auto; object-fit: cover; object-position: top; border-radius: 0; margin: 8px 0 14px; outline: 1px solid rgba(255, 255, 255, 0.08); outline-offset: -1px; }
 .doc-thumb.none { display: none; }
-.doc-head .chips { margin-bottom: 16px; align-items: center; }
+/* The byline is its own line group, then the original link 18px on (or flush left when it wraps); 28px clears it from the text. */
+.doc-head .chips { margin-bottom: 28px; align-items: center; column-gap: 18px; }
+.doc-head .byline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
 /* In the byline it takes the byline's size (Reeder's byline). */
 .doc-head .chips-button { flex-wrap: wrap; }
 .doc-head .chips-button .chip { font-size: 13px; }
@@ -629,7 +637,7 @@ img.thumb { filter: brightness(0.86); }
 .course-lessons .here { color: var(--text); font-weight: 600; }
 .course-lessons .menu-item svg { margin-left: auto; color: var(--faint); }
 /* Where it's from, last on the byline (D210): a page's site, or a file's own name. */
-.doc-head .source { flex: none; margin-left: 10px; padding: 0 4px; border-radius: 4px; font-size: 13px; color: color-mix(in srgb, var(--muted) 45%, var(--text-read)); max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-head .source { flex: none; margin-left: -4px; padding: 0 4px; border-radius: 4px; font-size: 13px; color: color-mix(in srgb, var(--muted) 45%, var(--text-read)); max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-head .source:hover { color: var(--accent); }
 .doc-head .when { color: var(--text-read); font-size: 13px; margin-right: 2px; white-space: nowrap; }
 .doc-head .by + .when::before, .doc-head .by + span .when::before, .doc-head .by-add + .when::before, .doc-head .by-add + span .when::before { content: "·"; margin-right: 6px; }
@@ -732,6 +740,10 @@ img.thumb { filter: brightness(0.86); }
 .figure-zoom.open { background: var(--bg); }
 .figure-zoom img { position: fixed; max-width: none; border-radius: 6px; transform-origin: 0 0; transition: transform var(--t-4) var(--ease-in-out); }
 @media (prefers-reduced-motion: reduce) { .figure-zoom, .figure-zoom img { transition: none; } }
+/* The phone's picture view (phone/FigureView.tsx): the same grow and shrink, the whole screen, pinch to zoom. */
+.figure-view { position: fixed; inset: 0; z-index: 100; touch-action: none; transition: background-color var(--t-4) var(--ease-out); }
+.figure-view img { position: absolute; max-width: none; transform-origin: 0 0; transition: transform var(--t-4) var(--ease-in-out); }
+@media (prefers-reduced-motion: reduce) { .figure-view, .figure-view img { transition: none; } }
 /* D166: boxes over a figure, each a card; the one being drawn, and the field for what's under it. */
 .figure-zoom img.drawable { cursor: crosshair; }
 .figure-box { position: fixed; pointer-events: none; border-radius: 2px; }
@@ -830,6 +842,7 @@ img.thumb { filter: brightness(0.86); }
   box-shadow: var(--float); padding: 8px;
   user-select: none; -webkit-user-select: none; cursor: default;
 }
+.popup.wide { width: 440px; }
 .intents { grid-column: 1; margin: 0 0 8px; }
 .intent { flex: 1; height: 26px; border-radius: 6px; color: var(--muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .intent:hover { background: var(--bg-hover); }
@@ -839,10 +852,11 @@ img.thumb { filter: brightness(0.86); }
 .intent.apply { --hue: var(--apply-solid); --tint: var(--apply); }
 .intent svg { color: var(--hue, currentColor); flex: none; }
 .intent.on { color: var(--text); background: var(--tint); }
-.popup .field { grid-column: 1; min-width: 0; align-self: start; min-height: 30px; max-height: 160px; padding: 5px 10px; line-height: 1.4; }
-/* Copy, Remove text and Remove stack in one column; Play and Explain, when they show, in a second beside it. */
+.popup .field { grid-column: 1; min-width: 0; align-self: start; font-variant-numeric: tabular-nums; min-height: 30px; max-height: 160px; padding: 5px 10px; line-height: 1.4; }
+/* Copy, Remove text and Remove stack in one column; Play and Explain, when they show, in a second beside it.
+   Pinned to the top (retro.css too), so a note growing under him never moves them from where his pointer met them. */
 .popup-tools {
-  grid-column: 2; grid-row: 1 / 3; align-self: center;
+  grid-column: 2; grid-row: 1 / 3; align-self: start;
   display: grid; grid-template-rows: repeat(3, 20px); grid-auto-flow: column; gap: 1px;
   padding-left: 6px; border-left: 1px solid var(--border);
 }
@@ -856,7 +870,7 @@ img.thumb { filter: brightness(0.86); }
 }
 /* A long highlight note previews its first six lines; its popup shows it all (TIP_HEIGHT in Reader.tsx).
    A footnote's preview (.tip.note) has nothing else that shows it, so it stays whole. */
-.tip:not(.note) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
+.tip:not(.note) { white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
 /* Hover hints with the action's shortcut (Hint.tsx; Linear's tooltips). */
 .hint {
   z-index: 30; display: flex; align-items: center; gap: 6px; max-width: 280px; padding: 4px 8px;
@@ -1093,7 +1107,7 @@ body.resizing iframe { pointer-events: none; }
 .width-toggle:hover, .width-toggle[aria-expanded="true"], .width-toggle.on { background: var(--bg-hover); color: var(--text); }
 /* Top right of Home and All sources, in the title bar (App.tsx). */
 .main-tools { position: absolute; top: 7px; right: 12px; z-index: 6; display: flex; align-items: center; gap: 6px; }
-.width-toggle:focus-visible, .note-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.width-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .note-toggle {
   display: flex; align-items: center; gap: 6px;
 }
@@ -1427,7 +1441,8 @@ body.resizing iframe { pointer-events: none; }
 [data-tone="question"] .card-icon { color: var(--question-solid); }
 [data-tone="apply"] .card-icon { color: var(--apply-solid); }
 .skill-note .card-head .card-title { margin-right: auto; }
-.hero-strength { margin-left: auto; flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; text-align: left; }
+/* It loads after the page: the negative margin keeps it inside the header's own height, so nothing below jumps when it lands (F36). */
+.hero-strength { margin: -9px 0 -9px auto; flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; text-align: left; }
 .hero-strength:hover, .hero-strength[aria-expanded="true"] { background: var(--bg-hover); }
 .hero-strength:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .strength-pop { width: 320px; padding: 14px; }
@@ -1472,7 +1487,8 @@ button.skill-badge:hover { filter: brightness(1.2); }
 .fold-head .caret { flex: none; color: var(--faint); transform: rotate(90deg); transition: transform var(--t-1) ease; }
 .fold-head[aria-expanded="false"] .caret { transform: none; }
 /* The caret sits on the rule's start and the icon after it, as in a fold whose whole head is the button. */
-.fold-head.caret-only { flex: none; width: auto; margin-right: -4px; }
+.fold-head.caret-only { flex: none; width: 30px; justify-content: center; margin: 0 -6px 0 0; padding: 0; }
+.fold-head.caret-only .caret { margin-top: 2px; }
 .fold-fill { flex: 1; }
 .fold-sum { margin-left: auto; display: flex; gap: 10px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fold-body { margin: 0 -6px; }
@@ -1494,14 +1510,12 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 /* Gems (D90, Gem.tsx): one slot per memory to the next level. */
 .gem-row { display: flex; align-items: center; width: 100%; min-width: 0; }
 .gem { flex: none; display: block; }
-/* Cracked: a dark slate gem with a crack, darker than any skill colour (grey skills included). */
-.gem[data-kind="dull"] { --skill: color-mix(in oklab, var(--c-gray), black 45%); }
 .gem[data-kind="empty"] { opacity: 0.35; }
-/* Glowing: the near goal. A slow breathe draws the eye; prefers-reduced-motion stops it globally. */
-.gem[data-kind="ready"] { filter: drop-shadow(0 0 1.5px var(--skill, var(--accent))) drop-shadow(0 0 4px var(--skill, var(--accent))); }
-/* Glowing and due today: a slow breathe draws the eye; prefers-reduced-motion stops it globally. */
-.gem[data-breathe] { animation: gem-glow 2.4s ease-in-out infinite; }
-@keyframes gem-glow { 50% { filter: drop-shadow(0 0 0.5px var(--skill, var(--accent))) drop-shadow(0 0 1px var(--skill, var(--accent))); } }
+/* Nearly cut and due today (D236): the swollen dots swell and settle slowly; prefers-reduced-motion stops it globally. No glow. */
+.gem[data-breathe] { animation: gem-swell 2.4s ease-in-out infinite; transform-origin: center; }
+@keyframes gem-swell { 50% { transform: scale(1.1); } }
+/* Polished (D197, D236): a faint halo of its own colour at the size the end screen draws it; the sparkle is in the art. */
+.gem[data-polished][width="36"] { background: radial-gradient(closest-side, color-mix(in oklab, var(--skill, var(--accent)) 22%, transparent) 35%, transparent 100%); }
 .gem[data-kind="rough"] { opacity: 0.8; }
 .gem-ring { position: relative; flex: none; display: inline-grid; place-items: center; }
 .gem-ring > .dot-ring { position: absolute; inset: 0; }
@@ -1959,6 +1973,7 @@ button.home-plan:hover { color: var(--text); }
 .home-reading { display: flex; flex-direction: column; }
 .home-read { display: flex; align-items: center; gap: 12px; height: var(--row); padding: 0 12px; border-radius: var(--radius); text-align: left; color: var(--text); min-width: 0; }
 .home-read:hover { background: var(--bg-hover); }
+.home-read.sel { background: var(--bg-active); }
 /* A row's or tile's ⋯ shows on hover (Linear); on a row it takes the meter's place. */
 .home-read { position: relative; }
 .home-read .more { position: absolute; width: 24px; height: 24px; border-radius: 6px; display: none; place-items: center; color: var(--faint); }
@@ -2103,7 +2118,7 @@ button.home-plan:hover { color: var(--text); }
 .review-keys kbd { margin-right: 4px; }
 .review-end { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4vh auto 0; max-width: 420px; animation: card-in var(--t-4) ease-out both; }
 /* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
-.review-mole { display: block; line-height: 0; margin-bottom: 2px; width: 64px; height: calc(64px * 18 / 22); }
+.review-mole { display: block; line-height: 0; margin-bottom: 2px; width: 96px; height: calc(96px * 18 / 22); }
 /* The cart's tip (D190): a layer as wide as the window over the end screen, so the cart crosses it on a rail just
    over the ring. Its ore is the ring's own dot, in size and colour; a rough stone is the gem it becomes. */
 .review-end.carted { position: relative; }
@@ -2141,6 +2156,13 @@ button.home-plan:hover { color: var(--text); }
 .review-cut > span { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; animation: gem-in var(--t-4) var(--ease-spring) both; }
 .review-cut-skill { display: flex; justify-content: center; width: 100%; line-height: 1; font-size: 14px; }
 .review-cut b { font-family: var(--round); font-size: 24px; color: var(--text); font-variant-numeric: tabular-nums; animation: pop var(--t-4) var(--ease-out) 700ms both; }
+/* A stone the cart dropped is cut in place (Cutting, D239): it arrives by landing, so it has no entrance of its own. */
+.review-cut > span[data-stone] { animation: none; }
+.gem-cutting { position: relative; display: inline-grid; place-items: center; }
+.gem-cutting > span { display: block; transform-origin: 50% 85%; will-change: transform; }
+.gem-cutting[data-cutting] .gem { opacity: 1; }
+.gem-cutting > i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: color-mix(in oklab, var(--skill, var(--accent)), white 40%); pointer-events: none; animation: gem-burst var(--t-moment) var(--ease-out) both; }
+@keyframes gem-burst { from { transform: none; opacity: 1; } to { transform: translate(var(--x), var(--y)) scale(0.5); opacity: 0; } }
 @keyframes gem-in { from { opacity: 0; transform: translateY(8px) scale(0.7) rotate(-10deg); } to { opacity: 1; transform: none; } }
 .review-levelup { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; padding: 6px 12px 6px 8px; border-radius: 999px; background: color-mix(in srgb, var(--skill, var(--c-green)) 12%, transparent); color: var(--text); font-weight: 600; animation: pop var(--t-4) var(--ease-spring) 700ms both; }
 @keyframes pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
@@ -2240,14 +2262,14 @@ button.home-plan:hover { color: var(--text); }
 .reading-for-card li { padding: 6px 0; font-size: 14px; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; }
 .reading-for-card li span { margin-top: 2px; font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .collected-chip svg, .collected-tab svg, .collected-list [cmdk-item] svg { color: var(--hue); flex: none; }
-.collected-chip.pop { animation: collected-pop var(--t-4) var(--ease-out) 380ms both; }
+.collected-chip.pop { animation: collected-pop var(--t-4) var(--ease-out) 520ms both; }
 .collected-chip .plus {
   position: absolute; left: 50%; top: -4px; transform: translateX(-50%); pointer-events: none;
-  font-size: 12px; font-weight: 700; color: var(--hue); animation: collected-plus 900ms ease-out 400ms both;
+  font-size: 12px; font-weight: 700; color: var(--hue); animation: collected-plus 900ms ease-out 540ms both;
 }
 .collect-fly {
-  position: fixed; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; z-index: 40; pointer-events: none;
-  background: var(--hue);
+  position: fixed; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; z-index: 40; pointer-events: none;
+  background: color-mix(in oklab, var(--hue), white 25%);
 }
 @keyframes collected-in { from { opacity: 0; transform: translate(-50%, 8px) scale(.9); } }
 @keyframes collected-pop {
@@ -2290,6 +2312,11 @@ button.home-plan:hover { color: var(--text); }
 .menu-item[data-state="open"] { background: var(--bg-active); }
 .menu-caret { margin-left: auto; color: var(--faint); }
 .menu-item kbd { margin-left: auto; color: var(--faint); }
+/* The item's icon (menu-icons.ts, ChatGPT's menus): 20px sprite in a 20px slot, 8px to its label; the slot stays when
+   an item has none, so the labels line up. The row starts 4px nearer the edge, where the tick of a check row sits. */
+.menu-item:has(> .menu-icon) { padding-left: 6px; }
+.menu-icon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; margin-right: -8px; color: var(--muted); }
+.menu-item.danger .menu-icon { color: inherit; }
 .menu-item.check { gap: 8px; padding-left: 6px; }
 .menu-item.check > .skill-icon { flex: none; }
 /* The tick's column: 16px holds the Tick's ink (12.5px) whole; the indicator is a flex box so the sprite centres on the row, not on the text baseline. */
@@ -2402,7 +2429,7 @@ button.home-plan:hover { color: var(--text); }
    edge, no fill, the sans at 12px/500. The mono is kept for a screen's main action and the answers in Review. */
 .note-toggle, .warm-start, .settings-btn { height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text); font: 500 12px var(--font); }
 .note-toggle:hover, .warm-start:hover, .settings-btn:hover { background: var(--bg-hover); }
-.settings-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.note-toggle:focus-visible, .warm-start:focus-visible, .settings-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .settings-select { display: inline-flex; align-items: center; gap: 8px; min-width: 104px; justify-content: space-between; font-variant-numeric: tabular-nums; }
 .settings-select svg { flex: none; color: var(--faint); }
 .settings-select-label { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2417,7 +2444,7 @@ button.home-plan:hover { color: var(--text); }
 .marks { position: absolute; inset: 0; pointer-events: none; --mark-gap: 20px; }
 .page.video .marks { --mark-gap: 54px; }
 .mark-icon {
-  position: absolute; pointer-events: auto; width: 16px; height: 16px; margin-left: calc(-1 * var(--mark-gap)); transform: translate(-50%, -50%);
+  position: absolute; pointer-events: auto; width: 20px; height: 20px; padding: 0; margin-left: calc(-1 * var(--mark-gap)); transform: translate(-50%, -50%);
   display: grid; place-items: center; border-radius: 4px; color: var(--hue); opacity: 0.75; transition: opacity var(--t-1) ease-out;
 }
 .mark-icon:hover { opacity: 1; background: var(--bg-hover); }
@@ -2455,7 +2482,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-shell:is(.open, .dragging) .phone-root { transform: translateX(calc(var(--open) * var(--drawer))); }
 .phone-scrim { position: absolute; inset: 0; z-index: 9; border: 0; padding: 0; background: #000; opacity: calc(var(--open) * .5); pointer-events: none; transition: opacity var(--t-4) var(--ease-out); }
 .phone-shell.open .phone-scrim { pointer-events: auto; }
-.phone-drawer { position: absolute; inset: 0 auto 0 0; z-index: 10; width: var(--drawer); box-sizing: border-box; padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px calc(env(safe-area-inset-bottom, 0px) + 16px); overflow-y: auto; background: var(--bg-side); border-right: 1px solid var(--border); transform: translateX(calc((var(--open) - 1) * 100%)); transition: transform var(--t-4) var(--ease-out); }
+.phone-drawer { position: absolute; inset: 0 auto 0 0; z-index: 10; width: var(--drawer); box-sizing: border-box; padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px calc(env(safe-area-inset-bottom, 0px) + 16px + var(--keyboard, 0px)); scroll-padding-bottom: var(--keyboard, 0px); overflow-y: auto; background: var(--bg-side); border-right: 1px solid var(--border); transform: translateX(calc((var(--open) - 1) * 100%)); transition: transform var(--t-4) var(--ease-out); }
 .phone-shell.dragging :is(.phone-root, .phone-scrim, .phone-drawer) { transition: none; }
 .phone-drawer button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 8px; background: none; border: 0; border-radius: 6px; color: var(--text); font: 400 16px var(--font); text-align: left; }
 .phone-drawer button.on, .phone-drawer button:active { background: var(--bg-hover); }
@@ -2488,6 +2515,12 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-sources h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 28px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .phone-sources ul { list-style: none; margin: 0; padding: 0; }
 .phone-sources li { position: relative; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* A source being renamed in place: the row's own shape, the title a field (Finder's Rename). */
+.phone-sources .phone-row-rename { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.phone-sources .phone-row-rename input { flex: 1; min-width: 0; height: 32px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: 16px var(--font); color: var(--text); }
+.phone-sources li button[hidden] { display: none; }
+/* A long press opens our menu on these (WithMenu hold), never iOS's own callout. */
+.phone :is(.home-read, .home-skill, .phone-drawer button) { -webkit-touch-callout: none; }
 .phone-sources li button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 0; background: var(--bg); border: 0; border-bottom: 1px solid var(--border); color: var(--text); text-align: left; font: 16px var(--font); }
 .phone-swipe { position: absolute; inset: 0; display: flex; align-items: center; color: var(--muted); font: 400 12px var(--mono); }
 .phone-swipe.left { justify-content: flex-end; }
@@ -2548,6 +2581,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .reader-tools { top: -44px; right: 4px; }
 .phone .reader-tools button { min-width: 44px; min-height: 44px; }
 .phone .page, .phone .reader-scroll > .page { padding-left: 20px; padding-right: 20px; margin-left: 0; }
+/* A double tap highlights the paragraph (D224): never the zoom iOS gives it; a pinch still zooms. */
+.phone .page { touch-action: manipulation; }
 /* The type shows in the highlight colour; the margin icons would sit off the edge at phone margins. */
 /* The open highlight's edges, to drag (Grab.tsx; Kindle, Apple Books on iPhone): a stem the height of
    the line with a knob above the start and below the end, in the highlight's colour. */
@@ -2571,17 +2606,20 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* The links under a question in Collected: 44pt tall, their text still just under the question, the room below it. */
 .phone .qp-sub { row-gap: 0; padding-bottom: 0; }
 .phone .qp-link { display: inline-flex; align-items: flex-start; min-height: 44px; }
-/* The original-site link over the title: 44pt tall and above the title's top, which takes no tap, in the same place. */
-.phone .doc-head .source { position: relative; z-index: 1; min-width: 44px; line-height: 44px; margin-top: -4.5px; margin-bottom: -12.5px; }
+/* The original-site link at the byline's end: 44pt to the finger, its own line height to the eye, so it sits on the byline's line. */
+.phone .doc-head .source { position: relative; z-index: 1; min-width: 44px; padding-block: 14px; margin-block: -14px; }
 /* The reading pill: 28pt to the eye, 44pt to the finger. */
 .phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
 /* Rename, Add author, a key point, a guess before reading and Leave anything out?: fields 44pt tall to the finger. */
 .phone .doc-head :is(.title-edit, .author-edit), .phone .cp-input, .phone .preq-input, .phone .quiz-leave { min-height: 44px; }
+/* Renaming from ⋯ keeps the title's own size (it is over 16px, so iOS doesn't zoom): the accent rule says it is being edited. */
+.phone .doc-head .title-edit { font-size: 26px !important; line-height: 1.25; outline: none; }
 /* The note's keyboard bar: nine 44pt buttons are wider than a 390pt iPhone; it scrolls the last few points sideways. */
 .phone .kb-bar { overflow-x: auto; scrollbar-width: none; }
 .phone .kb-btn { flex: 1 0 44px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
+.phone .review-moment { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
 .phone .menu-item { height: 44px; }
 /* A submenu (a source's Skills) has no room beside its menu at phone width: it rises as a sheet across the bottom.
@@ -2632,7 +2670,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-source::before { content: ""; position: absolute; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 6; }
 .phone-source .reader-tools { top: 0; right: 4px; transition: transform var(--t-3) ease-out, opacity var(--t-2); }
 .phone-source .reader-scroll { padding-top: 44px; }
-.phone-source .player-pin { top: 44px; }
+/* Sticky offsets count from inside the scroller's padding, which already clears the top bar. */
+.phone-source .player-pin { top: 0; }
 .phone .phone-source :is(.mynotes-text, .side-tabs-root, .reader > .empty-state, .reader-loading) { padding-top: 48px; }
 .phone-source:has(.reader.bars-hidden:not(.noting)) > .phone-bar { transform: translateY(-100%); }
 .phone .reader.bars-hidden:not(.noting) .reader-tools { transform: translateY(-44px); opacity: 0; pointer-events: none; }
@@ -2645,8 +2684,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
    rides that far up while the bar shows; a toast sits over the pill, and over the bar while it shows (Mail's Undo
    banner sits above its toolbar), so neither loses its taps; on the note page, with neither there, it is at the foot. */
 .phone { --tools-lift: 52px; }
-.phone .phone-app:has(.phone-source .reader:not(:is(.noting, .dragging)) .read-pill) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px); }
-.phone .phone-app:has(.phone-source .reader:not(:is(.bars-hidden, .dragging, .noting)) .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--tools-lift)); }
+.phone .phone-app:has(.phone-source .reader:not(:is(.noting, .dragging)) .read-pill) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--audio-bar)); }
+.phone .phone-app:has(.phone-source .reader:not(:is(.bars-hidden, .dragging, .noting)) .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--tools-lift) + var(--audio-bar)); }
 /* Toast buttons are finger-sized on the phone, without growing the toast. */
 .phone .toast-undo { min-height: 44px; margin: -12px -8px -12px 0; padding: 0 8px; display: inline-flex; align-items: center; }
 .phone .toast-x { width: 44px; height: 44px; margin: -12px -14px -12px -8px; }
@@ -2662,7 +2701,32 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* The video card on the phone (D92): no gutter, so each timestamp leads its paragraph. */
 .phone .doc .video-card { margin: 0 -8px 24px; }
 .phone .vc-head, .phone .vc-transcript { padding-left: 12px; padding-right: 12px; }
-.phone .vc-transcript .ts { position: static; margin-right: 6px; }
+.phone .doc .ts { position: static; margin-right: 6px; }
+/* A timestamp is a finger's size to tap (it seeks), without moving the line it leads. */
+.phone .doc .ts { padding: 14px 8px; margin: -14px 2px -14px -8px; }
+/* The player's buttons are finger-sized on the phone. */
+.phone .ctl { min-width: 44px; height: 44px; }
+.phone .ctl.rate { position: relative; height: 30px; }
+.phone .ctl.rate::before { content: ""; position: absolute; inset: -7px -2px; }
+/* A recording plays from a bar above the source's bottom bar, Podcasts' mini player: in reach of the thumb
+   and on screen wherever he reads. When the bottom bar leaves as he reads on, the player drops into its place. */
+.phone { --audio-bar: 0px; }
+.phone .phone-app:has(.phone-source .player.audio) { --audio-bar: 76px; }
+.phone-source .player-pin:has(> .player.audio) {
+  position: fixed; top: auto; left: 8px; right: 8px; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px + var(--tools-lift)); z-index: 6;
+  max-width: none; margin: 0; padding: 6px 12px 0; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--float);
+  transition: transform var(--t-3) var(--ease-out);
+}
+.phone-source .player-pin:has(> .player.audio)::after { content: none; }
+.phone-source .player-pin:has(> .player.audio) .controls { height: 48px; }
+.phone .reader:is(.bars-hidden, .dragging) .player-pin:has(> .player.audio) { transform: translateY(var(--tools-lift)); }
+.phone .reader.noting .player-pin:has(> .player.audio) { display: none; }
+.phone .reader-pane:has(.player.audio) .read-pill { transform: translate(-50%, calc(-1 * var(--audio-bar))); }
+.phone .reader:not(:is(.bars-hidden, .dragging, .noting)) .reader-pane:has(.phone-tools):has(.player.audio) .read-pill { transform: translate(-50%, calc(-1 * (var(--tools-lift) + var(--audio-bar)))); }
+.phone-reader .reader-pane:has(.player.audio) .doc { padding-bottom: calc(56px + var(--tools-lift) + var(--audio-bar)); }
+/* Back to current: above the bars at the foot, and above the recording's bar when the spoken text is up the page. */
+.phone .follow-down { bottom: calc(env(safe-area-inset-bottom, 0px) + 16px + var(--tools-lift) + var(--audio-bar)); }
+.phone-source .player-pin:has(> .player.audio) .back-current.up { top: auto; bottom: calc(100% + 8px); left: 50%; }
 
 /* The Feed: posts from what he follows. A read post dims: unread is what's new. The date stays at every width, since a feed is read by recency. */
 .row.post.read .title { color: var(--muted); }
@@ -2707,6 +2771,57 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-note-row:active { background: var(--bg-hover); }
 .phone .phone-note { padding: 8px 20px 40px; }
 .phone .phone-note .note-editor { --note-size: 17px; min-height: 60vh; }
+/* A skill's page on the phone (D228): the Mac's page in one column, its note a row that opens the note's screen. */
+.phone .phone-skill { padding: 8px 20px 40px; }
+.phone .phone-skill .skill-page { display: block; overflow: visible; }
+.phone .phone-skill .skill-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0 20px; }
+.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -4px 0 0 -12px; }
+.phone .phone-skill .skill-goal span { white-space: normal; }
+.phone .phone-skill .skill-col { padding-inline: 0; margin-inline: 0; }
+.phone .phone-skill .skill-cols.one { display: flex; flex-direction: column; gap: 24px; padding: 0; }
+.phone .phone-skill .skill-cols.one .phone-note-row { margin: 0; }
+.phone .phone-skill .phone-sources { padding: 0 6px; }
+.phone .phone-skill .phone-sources > .quiet { margin: 4px 2px; color: var(--faint); }
+.phone .phone-skill .answered-toggle { min-height: 44px; }
+/* No folding on the phone: one scrolling page, as Notes' folder is. */
+.phone .phone-skill .fold-head.caret-only { display: none; }
+.phone .phone-skill .card-head .icon-btn { width: 44px; height: 44px; margin: -9px -9px -9px 0; }
+.phone .phone-skill :is(.q-check, .try-check) { position: relative; }
+/* A question's and a try's actions are their long press on the phone (Mail's rows): the hover buttons never show. */
+.phone .phone-skill :is(.question, .try) .question-actions { display: none; }
+.phone .phone-skill :is(.question, .try) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.phone .phone-skill :is(.q-check, .try-check)::before { content: ""; position: absolute; inset: -14px; }
+/* A course as one row: its title, and under it the lesson a tap goes on with. */
+.phone-sources .phone-course .phone-two { display: flex; flex-direction: column; gap: 2px; }
+.phone-two > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-two small { font-size: 13px; color: var(--muted); }
+.phone-sources .phone-course > svg:last-child { flex: none; color: var(--faint); }
+/* The drawer's last rows: a new skill named in place, then Settings. */
+.phone-drawer .phone-drawer-quiet { color: var(--muted); }
+.phone-drawer .phone-drawer-foot { margin-top: 20px; }
+.phone-new-skill { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; }
+.phone-new-skill input { flex: 1; min-width: 0; height: 32px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: 16px var(--font); color: var(--text); }
+.phone-new-error { flex-basis: 100%; margin: 0 0 6px 26px; font-size: 13px; color: var(--c-red); }
+/* Settings on the phone (iOS Settings): grouped rows; a segmented choice goes under its name, full width. */
+.phone .phone-settings { padding: 8px 16px 40px; }
+.phone .phone-settings h1 { font-size: 30px; margin: 8px 0 20px; }
+.phone .phone-settings .settings-row { gap: 10px 16px; padding: 12px 14px; }
+.phone .phone-settings .settings-row-text > :is(span, label) { font-size: 16px; }
+.phone .phone-settings .settings-row-text p { font-size: 13px; }
+.phone .phone-settings .settings-row:has(.seg) { flex-direction: column; align-items: stretch; }
+.phone .phone-settings .settings-row:has(.seg) .settings-row-control { max-width: none; }
+.phone .phone-settings .seg { flex: 1; display: flex; }
+.phone .phone-settings .seg-item { flex: 1; height: 44px; font-size: 15px; }
+.phone .phone-settings .settings-plan { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.phone .phone-settings .settings-row:has(.settings-plan) { flex-direction: column; align-items: stretch; }
+.phone .phone-settings .settings-row:has(.settings-plan) .settings-row-control { max-width: none; }
+.phone .phone-settings .settings-plan .field { flex: 1; min-width: 140px; height: 44px; }
+.phone .phone-settings .settings-btn { height: 44px; padding: 0 14px; font-size: 15px; }
+.phone .phone-settings .phone-time { height: 44px; padding: 0 10px; color: var(--text); }
+/* iOS's switch size. */
+.phone .switch { width: 51px; height: 31px; }
+.phone .switch-thumb { width: 27px; height: 27px; }
+.phone .switch-thumb[data-state="checked"] { transform: translateX(22px); }
 /* A to-do's box answers a touch 44pt tall around its centre (0.775em + 1.5px down, 0.875em - 1.5px left of the
    text), from 22pt left of it to where the text starts, so a tap on the text still places the caret (Notes). One
    under another starts halfway between the two boxes (rows are 1.8em apart), so each row keeps its own taps. A
@@ -2805,14 +2920,17 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-bubble:active { transform: scale(0.96); }
 .tutor-bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .app:has(.quiz) .tutor-bubble { display: none; }
-/* The mole's tones (D169): grey fur, a lighter muzzle, white paws, black eyes with a
-   white glint, a pink nose (its one colour) and a dim row of dirt. */
+/* The mole's tones (D169, the old miner D238): grey fur, a lighter helmet with a darker band and a bright brim,
+   white paws, moustache and brows, black eyes with a glint, a pink nose, and the lamp, lit amber in its dark housing. */
 .mole-fur { fill: var(--faint); }
-.mole-muzzle { fill: color-mix(in srgb, var(--faint) 45%, var(--text-read)); }
-.mole-white { fill: var(--text-read); }
-.mole-paw, .mole-glint { fill: var(--text); }
+.mole-helmet { fill: color-mix(in srgb, var(--faint) 35%, var(--text-read)); }
+.mole-band { fill: color-mix(in srgb, var(--faint) 80%, var(--bg)); }
+.mole-housing { fill: color-mix(in srgb, var(--faint) 30%, var(--bg)); }
+.mole-brim { fill: var(--text-read); }
+.mole-paw, .mole-glint, .mole-stache, .mole-brow { fill: var(--text); }
 .mole-eye { fill: #060607; }
 .mole-nose { fill: #f096ac; }
+.mole-lamp { fill: #ffb224; }
 .mole-dirt { fill: color-mix(in srgb, var(--faint) 55%, var(--bg-raised)); }
 @media (prefers-reduced-motion: reduce) { .tutor-bubble { transition: none; } }
 /* The mole says a reply that landed while the tutor was closed (D159, after Cult UI's speech bubble): its first
@@ -2965,6 +3083,33 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .timeline .rate-3 { --rate: var(--c-green); }
 .timeline .rate-4 { --rate: var(--c-blue); }
 .timeline + .review-rate { margin-top: 14px; }
+/* The exercise's gem beside its reviews (D237): one line, the gem on the timeline's midline. */
+.review-memory { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+.review-memory .timeline { flex: 1; margin-top: 0; }
+.review-memory + .review-rate { margin-top: 14px; }
+.review-gem { flex: none; display: inline-grid; border-radius: 4px; }
+.review-gem:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* A rating waiting for its second press. */
+.review-rate button[data-armed] { box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--rate); }
+.review-rate button[data-armed]:focus-visible { box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--rate), 0 0 0 4px var(--focus); }
+.review-guard { margin: 10px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
+/* The moment after a rating that changed the gem: it sits over the next card and never holds it back. */
+.review-moment { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: center; gap: 12px; max-width: min(520px, calc(100% - 32px)); padding: 10px 16px 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-rise var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
+.review-moment[data-tone="miss"] { animation-delay: 0s, 5.7s; }
+.moment-mole { flex: none; align-self: flex-end; display: inline-grid; margin: 0 0 -10px 4px; }
+.moment-gem { flex: none; display: inline-grid; }
+.moment-gem > .gem { grid-area: 1 / 1; }
+.moment-gem > .gem:first-child { animation: moment-was var(--t-3) var(--ease-out) 350ms both; }
+.moment-gem > .gem:last-child { animation: moment-now var(--t-moment) var(--ease-spring) 350ms both; }
+.review-moment[data-tone="miss"] .moment-gem > .gem:last-child { animation-timing-function: var(--ease-out); animation-duration: var(--t-4); }
+.moment-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--muted); font-size: 13px; line-height: 18px; }
+.moment-text b { color: var(--text); font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+@keyframes moment-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes moment-leave { to { opacity: 0; transform: translateY(4px); } }
+@keyframes moment-was { to { opacity: 0; transform: scale(0.9); } }
+@keyframes moment-now { from { opacity: 0; transform: scale(0.8); } }
+/* Still (the global rule stops every animation): only the gem it became shows. */
+@media (prefers-reduced-motion: reduce) { .moment-gem > .gem:first-child { display: none; } }
 
 /* Settings › Reading previews (D151): a choice shown as small cards of itself. 64×44 cards 6px apart, the picked
    one ringed in `focus`; arrows move and pick. A page card draws three text lines on its own page colour; a
@@ -3048,6 +3193,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .original-pager { display: flex; align-items: center; justify-content: center; gap: 2px; height: 24px; margin-bottom: 8px; color: var(--faint); font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
 .original-pager span { min-width: 52px; text-align: center; }
 .original-pager .icon-btn:disabled { opacity: 0.35; }
+.phone .original-pager { height: 44px; }
+.phone .original-pager .icon-btn { width: 44px; height: 44px; }
 /* Three tabs in a panel at its narrowest: the names stay, the icons go. */
 .mynotes-head { container-type: inline-size; }
 @container (max-width: 330px) { .side-tabs:has(> :nth-child(3)) .card-icon { display: none; } }
@@ -3066,9 +3213,24 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .add-link .field { font-size: 17px; min-height: 44px; }
 .add-link .phone-error { padding: 0; }
 .add-link .pill-btn { justify-content: center; text-align: center; min-height: 44px; }
+.add-link-file { min-height: 44px; color: var(--muted); font: 500 15px var(--font); }
+.add-link-file:disabled { opacity: 0.45; }
 /* Above the keyboard, which the field brings up at once. */
 .phone .overlay:has(.add-link) { padding-bottom: var(--keyboard, 0px); }
 .phone-bar .phone-add { margin-left: auto; }
 .phone-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
 .phone-waiting .phone-error { flex-basis: 100%; order: 3; padding: 0 0 6px; }
+.phone-waiting-note { color: var(--faint); font-size: 13px; }
+.phone-waiting-why { flex-basis: 100%; order: 3; padding: 0 0 6px; }
 .phone-sources .phone-waiting button { width: auto; min-height: 44px; border: 0; padding: 0 0 0 8px; background: none; color: var(--accent); font: 500 15px var(--font); }
+
+/* The phone's diagram, view only (D235): its own screen, the drawing fit to it, pinch and pan by hand. */
+.diagram-view { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: var(--bg); padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+.diagram-view .diagram-head { height: 44px; }
+.diagram-view .diagram-name { width: auto; height: auto; margin: 0; padding: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; }
+.diagram-view .diagram-done { min-height: 44px; font-size: 16px; padding: 0 14px; border: 0; background: none; }
+.diagram-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; display: grid; place-items: center; }
+.diagram-art { width: 100%; height: 100%; display: grid; place-items: center; padding: 16px; transform-origin: center; will-change: transform; }
+.diagram-art svg { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+.diagram-empty { color: var(--muted); font-size: 15px; padding: 0 24px; text-align: center; }
+.kb-bar.moving .kb-btn:not(:disabled) { color: var(--text); }

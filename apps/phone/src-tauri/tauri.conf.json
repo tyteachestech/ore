@@ -4,13 +4,14 @@
   "version": "0.1.0",
   "identifier": "com.tylerpoelking.ore.phone",
   "build": {
-    "beforeBuildCommand": "cd ../desktop && ORE_PHONE=1 bunx vite build",
+    "beforeBuildCommand": "cp src-tauri/icons/ios/*.png src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/ && cd ../desktop && ORE_PHONE=1 bunx vite build",
     "frontendDist": "../../desktop/dist-phone"
   },
   "app": {
     "windows": [{ "label": "main", "title": "Ore", "theme": "Dark", "backgroundColor": "#121212" }],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; font-src 'self'; worker-src 'self' blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; font-src 'self'; worker-src 'self' blob:; img-src 'self' https: data: blob: asset: http://asset.localhost; media-src 'self' https: blob: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost; frame-src http://127.0.0.1:*",
+      "assetProtocol": { "enable": true, "scope": [] }
     }
   },
   "bundle": {

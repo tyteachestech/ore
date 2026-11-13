@@ -12,7 +12,7 @@
 import { chromium, devices, webkit, type Browser, type Locator, type Page } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { $ } from "bun";
 
 const MOCK = join(import.meta.dir, "../scripts/mock");
@@ -100,7 +100,9 @@ async function openPhone(): Promise<Page> {
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
   // What the app's Tauri shell gives the page and a browser lacks: an image saved with a source loads through it.
-  await page.addInitScript(`window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p, proto = "asset") => proto + "://localhost/" + encodeURIComponent(p), transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`);
+  // A source's own files come from the phone build's dev server (vite.config.ts `/library-file`), as the shell's
+  // asset protocol serves them from the folder.
+  await page.addInitScript(`window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p) => "/library-file" + p, transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`);
   await page.addInitScript(HYGIENE);
   await page.goto(url);
   await page.locator(".phone-app").waitFor();
@@ -617,6 +619,26 @@ journey("highlight: it shows, survives a reload, and ⌘Z takes it back", async 
   await until("it is still there after a relaunch", async () => Number(await keeps.innerText()) === before + 1);
 });
 
+journey("highlight popup: a click in the margin beside the text closes it and the highlight stays", async (page) => {
+  await openSource(page, TESTING);
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  await select(page, "The advantage only appears after a delay"); // a passage no other journey highlights
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  await until("the highlight is made", async () => Number(await keeps.innerText()) === before + 1);
+  // Beside the column, level with the text: in the reader's scroll area but off the page.
+  const box = (await page.locator(".reader-scroll").boundingBox())!;
+  const col = (await page.locator(".page").boundingBox())!;
+  if (col.x - box.x < 20) throw new Error("no margin beside the page to click in");
+  await page.mouse.click(box.x + (col.x - box.x) / 2, col.y + 80);
+  await popup.waitFor({ state: "detached" });
+  await page.waitForTimeout(300);
+  if (Number(await keeps.innerText()) !== before + 1) throw new Error("the click away dropped the highlight");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => Number(await keeps.innerText()) === before);
+});
+
 journey("skill page: To read's and Questions' heads line up, caret over caret and icon over icon", async (page) => {
   await page.getByRole("button", { name: /^Learning/ }).first().click();
   await page.locator(".skill-col.side .card-head .card-icon").nth(1).waitFor();
@@ -624,6 +646,9 @@ journey("skill page: To read's and Questions' heads line up, caret over caret an
     [...document.querySelectorAll(".skill-col.side .card-head")].map((h) => [".caret", ".card-icon"].map((s) => Math.round(h.querySelector(s)!.getBoundingClientRect().left))),
   );
   if (new Set(xs.map((x) => x.join())).size !== 1) throw new Error(`heads don't line up: ${JSON.stringify(xs)}`);
+  // The fold caret is the head's last control, at the far right: beside the tabs it read as one more view (D226).
+  const last = await page.evaluate(() => [...document.querySelectorAll(".skill-col.side .card-head")].every((h) => [...h.querySelectorAll("button")].at(-1)?.classList.contains("fold-head")));
+  if (!last) throw new Error("the fold caret is not the last control of its section's head");
 });
 
 journey("skill page Questions: each row is one Tab stop then its ⋯, and ↑ ↓ move between rows", async (page) => {
@@ -762,6 +787,55 @@ journey("highlight popup open: typing writes the note, and no letter runs a shor
   await page.keyboard.press("2");
   const after = await note.inputValue();
   if (after !== words + "2") throw new Error(`a 2 typed after the note became “${after}”`);
+});
+
+journey("highlight note: ⇧↵ carries a list on, an empty item ends it, a long note widens the popup, and its tools stay at the top", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "Each successful retrieval changes the memory itself");
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  const note = popup.getByLabel("Note");
+  const tools = popup.locator(".popup-tools");
+  const offset = async () => (await tools.boundingBox())!.y - (await popup.boundingBox())!.y;
+  const top = await offset();
+  const width = (await popup.boundingBox())!.width;
+  await page.keyboard.type("1. cue");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("quiz");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("- a");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("b");
+  const typed = await note.inputValue();
+  if (typed !== "1. cue\n2. quiz\n• a\n• b") throw new Error(`the note shows ${JSON.stringify(typed)}`);
+  if (!(await popup.isVisible())) throw new Error("⇧↵ closed the popup");
+  await page.keyboard.type(" and a longer thought that runs on for a while about how the cue works".repeat(2));
+  await until("a note past four lines widens the popup", async () => (await popup.boundingBox())!.width > width + 40);
+  const box = (await popup.boundingBox())!;
+  if (box.x < 0 || box.x + box.width > page.viewportSize()!.width) throw new Error("the wide popup runs off the window");
+  if (Math.abs((await offset()) - top) > 1) throw new Error("the tools moved down the popup as the note grew");
+  await page.keyboard.press("Enter");
+  await popup.waitFor({ state: "hidden" });
+  // Saved as Markdown: the bullets are "- " in the file, and come back as bullets.
+  await select(page, "Each successful retrieval changes the memory itself");
+  await popup.waitFor();
+  await until("the note comes back with its bullets", async () => (await note.inputValue()).startsWith("1. cue\n2. quiz\n• a\n• b"));
+});
+
+journey("highlight note: \"2.\" in an empty note starts a numbered list, and leaves the type as it was (D133's 2 is Key point)", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "Space the tests out");
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await popup.waitFor();
+  await page.keyboard.type("2. second");
+  const typed = await popup.getByLabel("Note").inputValue();
+  if (typed !== "2. second") throw new Error(`the note says ${JSON.stringify(typed)}`);
+  await page.waitForTimeout(300);
+  if ((await popup.locator(".intent.card").getAttribute("aria-pressed")) === "true") throw new Error("the 2 left it a Key point");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("x");
+  if ((await popup.getByLabel("Note").inputValue()) !== "2. second\n3. x") throw new Error("⇧↵ didn't count on to 3.");
 });
 
 journey("tutor mole: it sits at the bottom right on every screen, pages keep room to scroll clear of it, and a quiz panel hides it (D160, D168)", async (page) => {
@@ -1856,6 +1930,26 @@ journey("Collected row menu: change a highlight's type and remove it without ope
   await page.waitForTimeout(500); // the write lands before the next journey reads the library
 });
 
+// ChatGPT's menus (Tyler 2026-11-12): each item has its icon at the left, and its groups are split by thin lines.
+journey("menus: every item of a source's right-click and ⋯ menu has an icon, its groups split by lines", async (page) => {
+  const check = async (what: string) => {
+    const menu = page.getByRole("menu").first();
+    await menu.waitFor();
+    const items = menu.locator(":scope > [role=menuitem], :scope > [role=menuitemcheckbox]");
+    const n = await items.count();
+    const drawn = await menu.locator(":scope > [role=menuitem] > .menu-icon > svg, :scope > [role=menuitemcheckbox] > .menu-icon > svg").count();
+    if (!n || drawn !== n) throw new Error(`${what}: ${drawn} of ${n} items have an icon`);
+    if ((await menu.locator(":scope > [role=separator]").count()) < 2) throw new Error(`${what}: its items are not grouped`);
+    await page.keyboard.press("Escape");
+  };
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".row").filter({ hasText: TESTING }).first().click({ button: "right" });
+  await check("a row's right-click");
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: "Source actions" }).first().click();
+  await check("the reader's ⋯");
+});
+
 journey("Collected: a key point he is typing survives closing its group and switching to the note and back", async (page) => {
   await openSource(page, TESTING);
   await page.getByRole("tab", { name: "Collected" }).click();
@@ -1940,6 +2034,29 @@ journey("highlight: a selection snaps to whole words and the full stop, ⌥ keep
   await page.keyboard.up("Alt");
   await popup.waitFor();
   await until("⌥ keeps exactly what he selected", async () => (await active()) === "trengthens the route bac");
+  await page.keyboard.press("Escape");
+});
+
+journey("highlight: a double click keeps its sentence in one step, ⌥ double click just the word (D224)", async (page) => {
+  await openSource(page, TESTING);
+  const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await page.waitForTimeout(300);
+  const writes: string[] = [];
+  page.on("request", (r) => void (/"(?:highlight|annotate)"/.test(r.postData() ?? "") && writes.push(r.postData()!)));
+  const word = await pointAt(page, "strengthens");
+  await page.mouse.dblclick(word.x, word.y);
+  await popup.waitFor();
+  await until("the sentence is the highlight", async () => (await active()) === "It strengthens the route back to the information and adds new cues, so the next retrieval is easier.");
+  if (writes.length !== 1) throw new Error(`a double click wrote ${writes.length} times`);
+  await page.keyboard.press("Escape"); // drops the fresh one
+  await popup.waitFor({ state: "hidden" });
+  const other = await pointAt(page, "Effortful");
+  await page.keyboard.down("Alt");
+  await page.mouse.dblclick(other.x, other.y);
+  await page.keyboard.up("Alt");
+  await popup.waitFor();
+  await until("⌥ keeps just the word", async () => (await active()) === "Effortful");
   await page.keyboard.press("Escape");
 });
 
@@ -2272,6 +2389,37 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
+journey("a recording: a finger's scroll away from the spoken line stops following it, as the wheel does, and Back to current shows (D49)", async (page) => {
+  await page.setViewportSize({ width: 1000, height: 320 });
+  await openSource(page, "Lecture 4");
+  const size = await page.evaluate(() => localStorage.getItem("ore.size"));
+  for (let i = 0; i < 5; i++) await page.keyboard.press("Meta+Equal"); // the short transcript runs past the window
+  try {
+  const player = page.locator(".player.audio");
+  await player.waitFor();
+  await page.locator(".doc .ts").filter({ hasText: "00:30" }).click();
+  await until("it plays from the stamp", async () => (await player.getByRole("button", { name: "Pause" }).count()) === 1);
+  const box = page.locator(".reader-scroll");
+  await until("it follows the spoken line", async () => (await box.evaluate((el) => el.scrollTop)) > 40);
+  // A finger drags the text back to the top, as on the iPhone: touch events, then the scroll they make.
+  await box.evaluate((el) => {
+    const t = (y: number) => new Touch({ identifier: 1, target: el, clientX: 300, clientY: y });
+    el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [t(200)] }));
+    el.scrollTop = 0; // the page moves under the finger, then the move is reported
+    el.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [t(400)] }));
+    el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, touches: [] }));
+  });
+  await page.waitForTimeout(800);
+  const top = await box.evaluate((el) => el.scrollTop);
+  if (top > 5) throw new Error(`the playing recording pulled the text back to its line (scrollTop ${top})`);
+  await page.locator(".back-current").waitFor();
+  await page.keyboard.press("Space");
+  } finally {
+    // The text size is kept for every later journey: put it back as it was.
+    await page.evaluate((size) => (size === null ? localStorage.removeItem("ore.size") : localStorage.setItem("ore.size", size)), size);
+  }
+});
+
 journey("an episode with its page kept: one click adds the page's text below the transcript, the button goes, ⌘Z takes the text out and the button comes back (D219)", async (page) => {
   const lecture = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title.startsWith("Lecture 4"))!;
   const dir = ((await ore("show", lecture.id)) as { dir: string }).dir;
@@ -2418,9 +2566,9 @@ journey("highlight: one the core can't place says what to do, not “text not fo
 });
 
 /** The middle of a phrase in the reader, scrolled into view. */
-async function pointAt(page: Page, phrase: string) {
-  return (await page.evaluate((phrase) => {
-    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+async function pointAt(page: Page, phrase: string, root = ".doc") {
+  return (await page.evaluate(({ phrase, root }) => {
+    const walk = document.createTreeWalker(document.querySelector(root)!, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
       const i = n.data.indexOf(phrase);
       if (i < 0) continue;
@@ -2431,10 +2579,10 @@ async function pointAt(page: Page, phrase: string) {
       const b = r.getBoundingClientRect();
       return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
     }
-  }, phrase))!;
+  }, { phrase, root }))!;
 }
 
-journey("highlight: a drag that starts right after a double click keeps both, the word without a popup", async (page) => {
+journey("highlight: a drag that starts right after a double click keeps both, the double click's sentence without a popup", async (page) => {
   await openSource(page, TESTING);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
   const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
@@ -2444,17 +2592,17 @@ journey("highlight: a drag that starts right after a double click keeps both, th
   await select(page, "Free recall, short-answer questions"); // within the double-click time
   await page.getByRole("dialog", { name: "Highlight" }).waitFor();
   await until("the drag's passage is highlighted, its popup open", async () => (await active()).startsWith("Free recall, short-answer questions"));
-  await until("the word is kept too", async () => (await kept()).includes("laboratory"));
+  await until("the double click's sentence is kept too", async () => (await kept()).some((t) => t.startsWith("Decades of laboratory") && t.endsWith("no feedback is given.")));
 });
 
-journey("highlight: a triple click whose selection runs past the text keeps the double click's word", async (page) => {
+journey("highlight: a triple click whose selection runs past the text keeps the double click's sentence", async (page) => {
   await openSource(page, TESTING);
   const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
   await page.waitForTimeout(300);
   const word = await pointAt(page, "Decades");
   await page.mouse.dblclick(word.x, word.y);
   // WebKit's triple click on the last paragraph selects past the end of the text: the reader can't
-  // highlight that, so the word he double-clicked stays his.
+  // highlight that, so the sentence he double-clicked stays his.
   await page.evaluate(({ x, y }) => {
     const p = document.elementFromPoint(x, y)!.closest("p")!;
     const r = document.createRange();
@@ -2467,7 +2615,7 @@ journey("highlight: a triple click whose selection runs past the text keeps the 
       p.dispatchEvent(new MouseEvent(type, { bubbles: true, detail: 3, button: 0, clientX: x, clientY: y }));
     }
   }, word);
-  await until("the word is highlighted", async () => (await kept()).includes("Decades"));
+  await until("the sentence is highlighted", async () => (await kept()).some((t) => t.startsWith("Decades of laboratory") && t.endsWith("no feedback is given.")));
 });
 
 journey("highlight: an edge move that fails to save leaves it untouched, so Esc still drops it", async (page) => {
@@ -2604,6 +2752,57 @@ journey("highlight note: what he types is kept when he clicks away or presses Es
   await page.reload();
   await openSource(page, AGENTS);
   await reopen("decomposes a task", "Each step feeds the next");
+});
+
+journey("highlight note: a note whose save fails is kept, and saves when the highlight next closes", async (page) => {
+  await openSource(page, AGENTS);
+  const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
+  const away = () => page.locator(".doc-head h1").click(); // a click off the popup, as he does
+  const fail = (on: boolean) => page.evaluate((on) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = on ? { annotate: "The library is busy." } : {}), on);
+  const open = async () => {
+    const at = await page.evaluate(() => {
+      const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+        const i = n.data.indexOf("subtasks at once");
+        if (i < 0) continue;
+        n.parentElement!.scrollIntoView({ block: "center" });
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + 8);
+        const b = r.getClientRects()[0]!;
+        return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      }
+      return null;
+    });
+    if (!at) throw new Error("the passage is not in the reader");
+    await page.mouse.click(at.x, at.y);
+    await note.waitFor();
+  };
+  await select(page, "Parallelisation runs subtasks at once");
+  await note.click();
+  await page.keyboard.type("first thought");
+  await away();
+  await until("the popup closes", async () => !(await note.isVisible()));
+  await open();
+  await until("the first note is saved", async () => (await note.inputValue()) === "first thought");
+  await note.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and two");
+  await fail(true);
+  await away();
+  await until("the failed save says so", async () => (await page.locator(".toast").allInnerTexts()).some((t) => t.includes("The library is busy.")));
+  await fail(false);
+  // Leaving the source and coming back keeps them too.
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await openSource(page, AGENTS);
+  await open();
+  await until("the words he typed are still there", async () => (await note.inputValue()) === "first thought and two");
+  await away();
+  await until("the popup closes", async () => !(await note.isVisible()));
+  await page.reload();
+  await openSource(page, AGENTS);
+  await open();
+  await until("the retried save landed", async () => (await note.inputValue()) === "first thought and two");
 });
 
 journey("author: add one by hand from the title's menu or the empty byline field, it survives a reload, and ⌘Z takes it back", async (page) => {
@@ -3234,6 +3433,199 @@ journey("Add: Esc puts focus back on the + Add or Add a source that opened it, o
   await page.locator(".sidebar div.side-item .side-main").first().click();
   await page.locator(".skill-page").waitFor();
   await roundTrip("a skill page", page.getByRole("button", { name: /Add a source/ }).first());
+});
+
+journey("Home: ⌘-click and ⇧-click pick Continue reading rows, ⋯ acts on them all, Esc clears; a row dragged onto a sidebar skill is filed there, as in the source lists (F9, F10)", async (page) => {
+  await openSource(page, AGENTS);
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const rows = page.locator(".home-read");
+  await rows.nth(1).waitFor();
+  const picked = () => page.locator(".home-read.sel").count();
+  await rows.nth(0).click({ modifiers: ["Meta"] });
+  await rows.nth(1).click({ modifiers: ["Shift"] });
+  await until("⌘-click then ⇧-click pick two rows", async () => (await picked()) === 2);
+  if (await page.locator(".doc-head").count()) throw new Error("a ⌘-click opened the source");
+  await rows.nth(1).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Archive 2 sources" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await until("Esc clears the pick", async () => (await picked()) === 0);
+  // Dragged onto a skill it isn't under, a row is filed there.
+  const title = (await rows.nth(0).locator(".title").innerText()).trim();
+  const under = ((await ore("ls")) as { title: string; skills: string[] }[]).find((i) => i.title === title)!.skills;
+  const targets = page.locator(".sidebar .side-item[data-drop-skill]:not([data-drop-skill=''])");
+  const names = (await targets.allInnerTexts()).map((t) => t.trim());
+  const ids = await targets.evaluateAll((els) => els.map((el) => el.getAttribute("data-drop-skill")!));
+  const k = ids.findIndex((id) => !under.includes(id));
+  if (k < 0) throw new Error(`no skill “${title}” isn't under`);
+  const from = (await rows.nth(0).locator(".thumb, .title").first().boundingBox())!;
+  const to = (await targets.nth(k).boundingBox())!;
+  await page.mouse.move(from.x + 4, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 40, from.y + from.height / 2, { steps: 4 });
+  await page.locator(".row-ghost").waitFor();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  await until("the skill under the pointer is lit", async () => (await targets.nth(k).getAttribute("class"))?.includes("drop-on") ?? false);
+  await page.mouse.up();
+  await page.getByText(`Filed “${title}” under ${names[k]}`).first().waitFor();
+  if (await page.locator(".doc-head").count()) throw new Error("the drop opened the source");
+  // ⌘Z takes it back off the skill.
+  const id = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === title)!.id;
+  await page.keyboard.press("Meta+KeyZ");
+  await until("⌘Z takes the drop back", async () => !((await ore("show", id)) as { skills: string[] }).skills.includes(ids[k]!));
+});
+
+journey("All sources: a row dragged onto a sidebar skill is filed there, and ⌘Z takes it back off (F22)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row", { hasText: TESTING }).first();
+  await row.waitFor();
+  const under = ((await ore("ls")) as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!;
+  const targets = page.locator(".sidebar .side-item[data-drop-skill]:not([data-drop-skill=''])");
+  const ids = await targets.evaluateAll((els) => els.map((el) => el.getAttribute("data-drop-skill")!));
+  const k = ids.findIndex((id) => !under.skills.includes(id));
+  const name = (await targets.nth(k).innerText()).trim();
+  const from = (await row.boundingBox())!;
+  const to = (await targets.nth(k).boundingBox())!;
+  await page.mouse.move(from.x + 60, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 100, from.y + from.height / 2, { steps: 4 });
+  await page.locator(".row-ghost").waitFor();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  // A real write takes a moment: ⌘Z pressed at once, before it lands, still takes the drop back.
+  await page.evaluate(() => ((window as { __ORE_SLOW?: Record<string, number> }).__ORE_SLOW = { edit: 600 }));
+  await page.mouse.up();
+  await page.keyboard.press("Meta+KeyZ");
+  await page.evaluate(() => delete (window as { __ORE_SLOW?: unknown }).__ORE_SLOW);
+  const on = async () => ((await ore("show", under.id)) as { skills: string[] }).skills.includes(ids[k]!);
+  await page.getByText(`Undone: Filed “${TESTING}” under ${name}`).first().waitFor();
+  await until("⌘Z takes the drop back", async () => !(await on()));
+  await page.waitForTimeout(800);
+  if (await on()) throw new Error("the drop's write landed after its undo");
+});
+
+journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at once, ⇧⌘U marks the selected one, Esc clears (F9)", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const item = (n: number) => `<item><title>Pick post ${n}</title><link>http://localhost/pick-${n}.html</link><pubDate>${day}</pubDate></item>`;
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Pick Notes</title><link>http://localhost/</link>${[1, 2, 3].map(item).join("")}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", feed);
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const post = (n: number) => page.locator(".row.post", { hasText: `Pick post ${n}` });
+    await post(3).waitFor();
+    // In Unread a read post leaves the list; in All it stays, dimmed.
+    const isRead = (n: number) => post(n).evaluateAll((els) => !els.length || els[0]!.classList.contains("read"));
+    await post(1).click({ modifiers: ["Meta"] });
+    await post(3).click({ modifiers: ["Shift"] });
+    await until("⌘-click then ⇧-click pick three posts", async () => (await page.locator(".row.post.sel").count()) === 3);
+    if (await page.locator(".post-view, .doc-head").count()) throw new Error("a ⌘-click opened the post");
+    await page.keyboard.press("Escape");
+    await until("Esc clears the pick", async () => (await page.locator(".row.post.sel").count()) === 0);
+    await post(1).click({ modifiers: ["Meta"] });
+    await post(2).click({ modifiers: ["Meta"] });
+    await until("⌘-click picks two posts", async () => (await page.locator(".row.post.sel").count()) === 2);
+    await post(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Mark 2 read" }).click();
+    await until("both are read", async () => (await isRead(1)) && (await isRead(2)));
+    await page.getByText("Marked 2 posts read").first().waitFor();
+    await page.keyboard.press("Meta+KeyZ");
+    await until("⌘Z marks both unread again", async () => !(await isRead(1)) && !(await isRead(2)));
+    await post(2).click({ modifiers: ["Meta"] });
+    await post(1).click({ modifiers: ["Meta"] });
+    await post(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Mark 2 read" }).click();
+    await until("both are read again", async () => (await isRead(1)) && (await isRead(2)));
+    await until("the pick is cleared", async () => (await page.locator(".row.post.sel").count()) === 0);
+    await page.locator(".feed-list").focus();
+    for (let n = 0; n < 20 && !(await page.locator(".row.post.on", { hasText: "Pick post 3" }).count()); n++) await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Shift+Meta+KeyU");
+    await until("⇧⌘U marks the selected post read", async () => isRead(3));
+  } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
+journey("Feed: ⇧↓ grows the pick, ⇧⌘U marks the whole pick read, a click on empty space drops it, and a title's first letters select its post (D232, D234)", async (page) => {
+  const day = new Date(Date.now() - 864e5).toUTCString();
+  const titles = ["Keys alpha", "Keys beta", "Keys gamma", "Zebra keys"];
+  const item = (t: string, n: number) => `<item><title>${t}</title><link>http://localhost/keys-${n}.html</link><pubDate>${day}</pubDate></item>`;
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Keys Notes</title><link>http://localhost/</link>${titles.map(item).join("")}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const feed = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", feed);
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const post = (t: string) => page.locator(".row.post", { hasText: t });
+    await post("Zebra keys").waitFor();
+    const isRead = async (t: string) => !(await post(t).count()) || (await post(t).getAttribute("class"))!.includes("read");
+    const sel = () => page.locator(".row.post.sel").count();
+    await page.locator(".feed-list").focus();
+    await page.keyboard.type("zeb");
+    await until("typing a title's first letters selects its post", async () => (await page.locator(".row.post.on", { hasText: "Zebra keys" }).count()) === 1);
+    await page.waitForTimeout(1100); // the typed prefix ends
+    await page.keyboard.type("keys a");
+    await until("a prefix with a space selects its post", async () => (await page.locator(".row.post.on", { hasText: "Keys alpha" }).count()) === 1);
+    await page.keyboard.press("Shift+ArrowDown");
+    await page.keyboard.press("Shift+ArrowDown");
+    await until("⇧↓ twice picks three posts", async () => (await sel()) === 3);
+    const list = (await page.locator(".feed-list").boundingBox())!;
+    await page.mouse.click(list.x + list.width - 12, list.y + list.height - 12);
+    await until("a click on empty space drops the pick", async () => (await sel()) === 0);
+    await post("Keys alpha").click({ modifiers: ["Meta"] });
+    await post("Keys beta").click({ modifiers: ["Meta"] });
+    await until("⌘-click picks two posts", async () => (await sel()) === 2);
+    await page.locator(".feed-list").focus();
+    await page.keyboard.press("Shift+Meta+KeyU");
+    await until("⇧⌘U marks both picked posts read", async () => (await isRead("Keys alpha")) && (await isRead("Keys beta")));
+    if (await isRead("Keys gamma")) throw new Error("⇧⌘U marked a post outside the pick");
+    await post("Keys gamma").click({ modifiers: ["Meta"] });
+    await page.locator(".feed-list").focus();
+    await page.keyboard.press("Shift+ArrowDown");
+    await until("⇧↓ after a ⌘-click grows that pick", async () => (await sel()) === 2);
+  } finally {
+    await ore("feed", "unfollow", feed).catch(() => {});
+    server.stop(true);
+  }
+});
+
+journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space drops it, a title's first letters select its row, and ⌥⌘R renames the focused row (D232, D234)", async (page) => {
+  await openSource(page, AGENTS);
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: /^Home/ }).click();
+  const rows = page.locator(".home-read");
+  await rows.nth(1).waitFor();
+  const picked = () => page.locator(".home-read.sel").count();
+  const focused = () => page.evaluate(() => document.activeElement?.closest<HTMLElement>(".home-read")?.querySelector(".title")?.textContent ?? "");
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.type(AGENTS.slice(0, 5));
+  await until("typing a title's first letters selects its row", async () => (await focused()) === AGENTS);
+  await page.waitForTimeout(1100);
+  await page.keyboard.type(TESTING.slice(0, 6));
+  await until("another title's letters move to its row", async () => (await focused()) === TESTING);
+  const first = (await rows.nth(0).locator(".title").innerText()).trim();
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.press("Shift+ArrowDown");
+  await until("⇧↓ picks two rows", async () => (await picked()) === 2);
+  const home = (await page.locator(".home").boundingBox())!;
+  await page.mouse.click(home.x + home.width - 12, home.y + home.height - 12);
+  await until("a click on empty space drops the pick", async () => (await picked()) === 0);
+  if (await page.locator(".doc-head").count()) throw new Error("the click opened a source");
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.press("Alt+Meta+KeyR");
+  const field = rows.nth(0).locator("input");
+  await field.waitFor();
+  if ((await field.inputValue()) !== first) throw new Error(`⌥⌘R opened “${await field.inputValue()}”`);
+  await page.keyboard.press("Escape");
+  await rows.nth(0).locator(".home-open").focus();
+  await page.keyboard.press("Shift+Meta+KeyA");
+  await until("⇧⌘A archives the row and focus goes to the next", async () => (await page.locator(".home-read .title", { hasText: first }).count()) === 0 && (await page.evaluate(() => !!document.activeElement?.closest(".home-read, .home-skill"))));
+  await page.keyboard.press("Meta+z");
+  await page.locator(".home-read .title", { hasText: first }).waitFor();
+  await rows.nth(0).locator(".home-open").click({ button: "right" });
+  const shown = (await page.getByRole("menuitem", { name: /Rename/ }).innerText()).replace(/\s+/g, "");
+  await page.keyboard.press("Escape");
+  if (!shown.includes("⌘R")) throw new Error(`Home's menu shows no Rename key: “${shown}”`);
 });
 
 journey("Home and Feed: ⌘C on the focused row copies it as Markdown with its link, as a list's selected row does", async (page) => {
@@ -3989,9 +4381,37 @@ journey("skill page: Mark answered on a question, ⌘Z reopens it", async (page)
   await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Mark answered" }).click();
   await until("it leaves the open questions", async () => (await open()) === 0);
+  // The header's Answered tab (D226) shows it; the Questions tab goes back to the open ones.
+  const tabs = page.getByRole("tablist", { name: "Questions shown" });
+  await tabs.getByRole("tab", { name: "Answered" }).click();
+  await until("the Answered tab lists it", async () => (await open()) > 0);
+  if ((await tabs.getByRole("tab", { name: "Answered" }).getAttribute("aria-selected")) !== "true") throw new Error("the Answered tab is not the open one");
+  await page.keyboard.press("ArrowLeft");
+  await until("← moves back to the open questions", async () => (await tabs.getByRole("tab", { name: "Questions" }).getAttribute("aria-selected")) === "true" && (await open()) === 0);
   await page.waitForTimeout(300);
   await page.keyboard.press("Meta+z");
   await until("⌘Z reopens it", async () => (await open()) > 0);
+});
+
+journey("skill page: the sources' folder tabs show To read, Done and the row details menu", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const tabs = page.getByRole("tablist", { name: "Sources shown" });
+  const on = (name: string) => tabs.getByRole("tab", { name }).getAttribute("aria-selected");
+  await until("To read is the open tab", async () => (await on("To read")) === "true");
+  // F36: the header's gems load after the page; the tabs under it stay where they were when they land.
+  const tabY = async () => (await tabs.getByRole("tab", { name: "To read" }).boundingBox())!.y;
+  const y0 = await tabY();
+  await page.locator(".hero-strength").waitFor();
+  if ((await tabY()) !== y0) throw new Error(`the tabs moved from ${y0} to ${await tabY()} when the header's gems loaded`);
+  await tabs.getByRole("tab", { name: "Done" }).hover();
+  await page.getByRole("tooltip").filter({ hasText: "Done" }).waitFor();
+  await tabs.getByRole("tab", { name: "Done" }).click();
+  await until("a click opens Done", async () => (await on("Done")) === "true" && (await on("To read")) === "false");
+  await page.getByRole("button", { name: "Row details" }).click();
+  await page.getByRole("menuitemcheckbox").first().waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+1");
+  await until("⌘1 goes back to To read", async () => (await on("To read")) === "true");
 });
 
 journey("reader questions: ask one, ⌘Z takes it back; its ⋯ menu marks it answered and deletes it, ⌘Z each", async (page) => {
@@ -4704,8 +5124,7 @@ journey("diagram: opens in a sheet centred over the window, ⇧⌘↵ gives it t
 /** Opens a source he has finished, from All sources' Done view. */
 async function openDone(page: Page, title: string) {
   await page.getByRole("button", { name: /^All sources/ }).click();
-  await page.locator(".view-menu").click();
-  await page.getByRole("menuitemradio", { name: /^Done/ }).click();
+  await page.getByRole("tab", { name: "Done" }).click();
   await page.locator(".row").filter({ hasText: title }).first().click();
   await page.locator(".doc-head").filter({ hasText: title }).waitFor();
 }
@@ -5312,6 +5731,64 @@ journey("review: the screen reader's summary counts the key points as he has mar
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: Good over a miss takes a second press, and a cut gem he misses comes loose with the mole's line; ⌘Z takes both back (D237)", async (page) => {
+  // The exercise's gem is cut, whatever the seed's schedule says: its history comes back with that gem.
+  await page.route(/\/ore$/, async (route) => {
+    const args = (JSON.parse(route.request().postData() ?? "{}") as { args?: string[] }).args ?? [];
+    if (args[0] !== "card" || !args.includes("--review")) return route.continue();
+    const r = await route.fetch();
+    const j = JSON.parse(await r.text()) as { history?: Record<string, unknown>; data?: { history?: Record<string, unknown> } };
+    const h = (j.data ?? j).history;
+    if (h) {
+      h.reviews = [{ ts: new Date(Date.now() - 38 * 86_400_000).toISOString(), rating: 3 }];
+      h.gem = { kind: "cut", after: { 1: { kind: "dull", days: 0 }, 2: { kind: "cut", days: 2 }, 3: { kind: "cut", days: 9 }, 4: { kind: "cut", days: 14 } } };
+    }
+    await route.fulfill({ response: r, body: JSON.stringify(j) });
+  });
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 1, gaps: [], feedback: "", covered: [false, false] } }));
+  await startReview(page, /Teaching/);
+  const q = page.locator(".review-q");
+  await page.getByRole("textbox", { name: "Your answer" }).fill("because it is boring");
+  await page.getByRole("radio", { name: "Sure", exact: true }).click();
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await page.locator(".review-rate .rate-1.suggested").waitFor();
+  await page.locator('.review-gem .gem[data-kind="cut"]').waitFor();
+  const was = await q.innerText();
+  await page.waitForTimeout(400); // a rating key right after the answer shows is ignored
+  // Good, two steps over the marks: it waits, says why, and nothing is recorded.
+  await page.keyboard.press("3");
+  const guard = page.locator(".review-guard");
+  await guard.waitFor();
+  if (!(await guard.innerText()).includes("2 of 2 key points are marked missed. Press Good again to keep it.")) throw new Error(`the guard says: ${await guard.innerText()}`);
+  if ((await q.innerText()) !== was) throw new Error("one press of Good over a miss moved on");
+  if (await page.locator(".review-moment").count()) throw new Error("a rating that only waits showed a moment");
+  // A double click is one decision, not two: Good pressed again at once still waits.
+  await page.getByRole("button", { name: "Easy", exact: true }).dblclick();
+  await page.waitForTimeout(300);
+  if ((await q.innerText()) !== was || !(await guard.innerText()).includes("Press Easy again")) throw new Error("a double click on Easy over a miss recorded it");
+  // Marking both points as got means Good no longer goes over the marks: the wait and its reason go.
+  const got = page.getByRole("button", { name: /Mark as got$/ });
+  const missed = page.getByRole("button", { name: /Mark as missed$/ });
+  while (await got.count()) await got.first().click();
+  await guard.waitFor({ state: "detached" });
+  while (await missed.count()) await missed.first().click();
+  await page.locator(".review-rate .rate-1.suggested").waitFor();
+  // Again, what the marks say, goes in at one press: the gem comes loose and the line is true to his Sure.
+  await page.keyboard.press("1");
+  const moment = page.locator('.review-moment[data-tone="miss"]');
+  await moment.waitFor();
+  await moment.locator('.gem[data-kind="dull"]').waitFor();
+  if (!(await moment.innerText()).includes("You were sure")) throw new Error(`the moment says: ${await moment.innerText()}`);
+  if ((await moment.innerText()).includes("days")) throw new Error("a miss showed days added");
+  // ⌘Z: the rating and its moment are both taken back.
+  await page.keyboard.press("Meta+z");
+  await moment.waitFor({ state: "detached" });
+  // A miss comes back in the session, so the same exercise shows either way: the rating is gone once Undo is.
+  await page.getByRole("button", { name: "Undo last rating" }).waitFor({ state: "detached" });
+  if ((await q.innerText()) !== was) throw new Error("⌘Z did not leave the exercise showing");
+  await until("Esc leaves", async () => (await page.keyboard.press("Escape"), (await page.locator(".review").count()) === 0));
+});
+
 journey("review: with no AI marks (the check failed), the screen reader counts the ones he sets", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { grade: "AI is signed out." }));
   await startReview(page, /Teaching/);
@@ -5354,6 +5831,7 @@ journey("review: Open in source pauses on the card; Back to Review picks it up w
     await page.waitForTimeout(300); // the passage loads after the answer
     if (await open.isVisible()) break;
     const was = await q.innerText();
+    await armGood(page, await page.getByText("No idea", { exact: true }).isVisible());
     await page.getByRole("button", { name: "Good", exact: true }).click();
     await until("the next card", async () => (await q.innerText()) !== was);
   }
@@ -5406,6 +5884,7 @@ journey("review: Enter activates the focused button (Again, Edit exercise, Open 
     await page.waitForTimeout(300);
     if (await open.isVisible() && (await good.getAttribute("class"))?.includes("suggested")) break;
     const was = await q.innerText();
+    await armGood(page, await page.getByText("No idea", { exact: true }).isVisible());
     await good.click();
     await until("the next card", async () => (await q.innerText()) !== was);
   }
@@ -5498,7 +5977,7 @@ journey("review: rate a card, the session moves on, and Undo brings the card bac
   const done = async () => Number(await session.getAttribute("aria-valuenow"));
   const before = await done();
   // A card asks how sure he is, then shows the answer; a question asks for his answer first.
-  await page.getByRole("radio", { name: "Think so" }).or(page.getByRole("button", { name: "No idea" })).first().click();
+  await reveal(page);
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await until("the session counts the rating", async () => (await done()) === before + 1);
   await page.getByRole("button", { name: "Undo last rating" }).click();
@@ -5864,8 +6343,7 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
     const text = await q.first().textContent({ timeout: 1000 }).catch(() => null);
     if (!text) continue;
     last = text;
-    const noIdea = page.getByRole("button", { name: "No idea" });
-    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await reveal(page);
     await page.getByRole("button", { name: "Good", exact: true }).click();
     await until("the card moves on", async () => (await doneButton.isVisible()) || ((await q.count()) > 0 && ((await q.first().textContent({ timeout: 500 }).catch(() => last)) !== last)));
   }
@@ -5899,6 +6377,11 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
       const noIdea = page.getByRole("button", { name: "No idea" });
       await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click().catch(() => {});
       await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
+      // Good over No idea waits for a second press (D237).
+      if (await page.locator(".review-guard").isVisible()) {
+        await page.waitForTimeout(550);
+        await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
+      }
       await page.waitForTimeout(300);
     }
     await doneButton.waitFor();
@@ -6072,10 +6555,22 @@ journey("review: What to review has a No skill row for exercises filed under no 
 /** Shows the answer of the card on screen: No idea on a question, Think so on a card. */
 async function reveal(page: Page) {
   const noIdea = page.getByRole("button", { name: "No idea" });
-  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  const none = await noIdea.isVisible();
+  await (none ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await page.waitForTimeout(300); // the passage loads after the answer, and a rating key right after it is ignored
+  await armGood(page, none);
 }
+
+/** Good over No idea takes two presses (D237: a rating two steps over a miss waits for a second one). After
+ *  No idea this gives the first, so a journey about something else rates Good with one. */
+async function armGood(page: Page, noIdea: boolean) {
+  if (!noIdea) return;
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await page.locator(".review-guard").waitFor();
+  await page.waitForTimeout(550); // a second press inside a double click doesn't count
+}
+
 
 /** Every `ore` call a page makes, in order, and the ratings it logged (to take back after the journey). */
 function oreCalls(page: Page) {
@@ -7431,6 +7926,41 @@ journey("quiz check that fails says why, as Review does, with try again", async 
   await page.getByRole("button", { name: "Close quiz" }).click();
 });
 
+// Before settle: it removes the highlight it makes.
+journey("highlight: its colour arrives as dots that join (the vein), its ore flies to Collected, a Key point's gathers in the margin; none under reduced motion (D240)", async (page) => {
+  await openSource(page, TESTING);
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  const moving = () => page.evaluate(() => document.querySelectorAll(".vein, .vein-ore, .collect-fly").length);
+  const tinted = (name: string) => page.evaluate((name) => (CSS.highlights.get(name)?.size ?? 0), name);
+  const before = await tinted("hl-keep");
+  await select(page, "Free recall, short-answer questions");
+  // The dots are the tint while they sweep: the real one waits for them.
+  const at = await page.evaluate(() => ({ lines: document.querySelectorAll(".vein.keep i").length, ore: document.querySelectorAll(".collect-fly.keep").length }));
+  if (!at.lines) throw new Error("no vein over the new highlight");
+  if ((await tinted("hl-keep")) !== before) throw new Error("the tint was painted under the vein");
+  await popup.waitFor();
+  await until("the ore lifts off toward Collected", async () => at.ore > 0 || (await page.locator(".collect-fly.keep").count()) > 0 || (await page.locator(".collected-chip.keep").count()) > 0, 400);
+  await until("the vein has joined into the tint", async () => (await page.locator(".vein").count()) === 0 && (await tinted("hl-keep")) === before + 1, 1000);
+  // A Key point: its ore gathers where the margin mark lands.
+  await popup.locator(".intent.card").click();
+  await until("the ore gathers in the margin", async () => (await page.locator(".vein-ore i").count()) > 0, 400);
+  await page.locator(".mark-icon.card").first().waitFor();
+  await until("nothing is left on the page", async () => (await moving()) === 0 && (await page.locator(".mark-icon.gather").count()) === 0, 2500);
+  // Reduced motion: the highlight is simply there.
+  const card = page.locator(".mark-icon.card").first();
+  if (!(await popup.isVisible())) await card.click();
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await page.waitForTimeout(500);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await select(page, "Free recall, short-answer questions");
+  if (await moving()) throw new Error("the vein ran under reduced motion");
+  await popup.waitFor();
+  if ((await tinted("hl-keep")) !== before + 1) throw new Error("no tint under reduced motion");
+  await page.emulateMedia({ reducedMotion: null });
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await page.waitForTimeout(500); // the write lands before the next journey reads the library
+});
+
 // Last: its question highlight would change the lists the question journeys read.
 journey("settle: closing a typed highlight lifts the popup away, pops its mark and glows once, then leaves nothing behind", async (page) => {
   await openSource(page, TESTING);
@@ -7891,7 +8421,7 @@ journey("review: changing an Explain card's key points after it was checked keep
   const save = async (text: string, shows: string) => {
     if (!(await field.isVisible())) await page.getByRole("button", { name: "Edit exercise" }).click();
     await field.fill(text);
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await points.locator("li").first().filter({ hasText: shows }).waitFor();
   };
   // Only reordered: both marks stay, but they were the AI's, so nothing is suggested until he marks.
@@ -8166,7 +8696,38 @@ journey("typing with an input method: Enter that picks a word neither sends an a
   await label.waitFor({ state: "detached" });
 });
 
-journey("list archive: A selects the row after the archived one, so a second A archives that row; ⌘Z brings each back", async (page) => {
+journey("list type-select: typing a title's first letters selects its row, as Finder does; the same letter again steps to the next; after a pause it starts over; ↵ opens it", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const titles = () => page.locator(".list .row .title").allInnerTexts();
+  const selected = () => page.locator(".list .row[aria-selected=true] .title").innerText();
+  await until("All sources lists three sources", async () => (await titles()).length >= 3);
+  const all = await titles();
+  await page.locator(".list").focus();
+  // The last row, by the first letters of its title that no row above it shares.
+  const low = all.map((t) => t.toLowerCase());
+  const at = low.findLastIndex((t) => /^[a-z]/.test(t));
+  if (at < 1) throw new Error(`no row past the first to type to: ${all.join(" / ")}`);
+  let n = 1;
+  while (n < low[at]!.length && low.findIndex((t) => t.startsWith(low[at]!.slice(0, n))) !== at) n++;
+  if (low.findIndex((t) => t.startsWith(low[at]!.slice(0, n))) !== at) throw new Error(`“${all[at]}” has no prefix of its own (a row above starts with it)`);
+  await page.keyboard.type(low[at]!.slice(0, n), { delay: 60 });
+  await until(`typing “${low[at]!.slice(0, n)}” selects “${all[at]}”`, async () => (await selected()) === all[at]);
+  // A letter starting a row higher up, typed after a pause, starts over.
+  const first = low.findIndex((t) => /^[a-z]/.test(t));
+  await page.waitForTimeout(1200);
+  await page.keyboard.type(low[first]![0]!);
+  await until(`after a pause “${low[first]![0]}” selects “${all[first]}”`, async () => (await selected()) === all[first]);
+  const twin = low.findIndex((t, i) => i > first && t[0] === low[first]![0]);
+  if (twin > 0) {
+    await page.keyboard.type(low[first]![0]!);
+    await until(`the same letter again steps to “${all[twin]}”`, async () => (await selected()) === all[twin]);
+  }
+  const want = await selected();
+  await page.keyboard.press("Enter");
+  await until(`↵ opens “${want}”`, async () => (await page.locator(".doc-head").innerText()).includes(want));
+});
+
+journey("list archive: ⇧⌘A selects the row after the archived one, so a second ⇧⌘A archives that row; ⌘Z brings each back", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const titles = () => page.locator(".list .row .title").allInnerTexts();
   const selected = () => page.locator(".list .row[aria-selected=true] .title").innerText();
@@ -8177,9 +8738,9 @@ journey("list archive: A selects the row after the archived one, so a second A a
   await page.keyboard.press("ArrowDown");
   if ((await selected()) !== before[1]) throw new Error(`↓↓ selected “${await selected()}”, not the second row`);
   // Finder, Mail and Linear: the row after the one that went takes the selection.
-  await page.keyboard.press("a");
+  await page.keyboard.press("Shift+Meta+KeyA");
   await until(`“${before[2]}” is selected after the archive`, async () => (await selected()) === before[2]);
-  await page.keyboard.press("a");
+  await page.keyboard.press("Shift+Meta+KeyA");
   await until("the second A archives the row after", async () => !(await titles()).includes(before[2]!));
   const after = await titles();
   if (!after.includes(before[0]!)) throw new Error(`the second A archived “${before[0]}”, which he never picked`);
@@ -8311,6 +8872,54 @@ journey("a popover closes on any click outside it, even after a press inside it 
   await open();
   await page.locator(".side-head-tools").getByRole("button", { name: /^Actions for / }).first().click({ force: true });
   await closed("on a sidebar ⋯ (it stops its click)");
+  await page.keyboard.press("Escape");
+});
+
+journey("skill picker: two skills added in a source, then ⌘Z twice takes both off, picker open or closed", async (page) => {
+  const item = () => ore("ls").then((ls) => (ls as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!);
+  const start = (await item()).skills;
+  const others = ((await ore("skills")) as { id: string; name: string }[]).filter((k) => !start.includes(k.id)).slice(0, 2);
+  await openSource(page, TESTING);
+  for (const closeFirst of [true, false]) {
+    await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
+    const picker = page.locator(".skill-picker");
+    for (const k of others) {
+      await picker.getByRole("option").filter({ has: page.locator(".menu-label", { hasText: k.name }) }).click();
+      await until(`filed under ${k.name}`, async () => (await item()).skills.includes(k.id));
+      await page.getByText(`Filed under ${k.name}`, { exact: true }).last().waitFor(); // the tick is on the history
+    }
+    if (closeFirst) {
+      await page.keyboard.press("Escape");
+      await picker.waitFor({ state: "detached" });
+    }
+    await page.keyboard.press("Meta+z");
+    await until("the first ⌘Z takes the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
+    await page.keyboard.press("Meta+z");
+    await until("the second ⌘Z takes the first off", async () => (await item()).skills.join() === start.join());
+    if (!closeFirst) await page.keyboard.press("Escape");
+  }
+  // By keys: he types to filter and ticks with ↵, so focus stays in the filter field, which has
+  // nothing typed since the tick: ⌘Z is the app's (macOS keeps one undo run per window).
+  await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
+  for (const k of others) {
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(k.name);
+    await page.keyboard.press("Enter");
+    await until(`filed under ${k.name} by keys`, async () => (await item()).skills.includes(k.id));
+    await page.getByText(`Filed under ${k.name}`, { exact: true }).last().waitFor();
+  }
+  // Typing after the tick is the field's to undo first; once it is undone, ⌘Z goes back to the app.
+  await page.getByText(`Filed under ${others[1]!.name}`, { exact: true }).last().waitFor(); // the tick is on the history
+  await page.keyboard.type("x");
+  await page.keyboard.press("Meta+z"); // the field's: the app leaves it alone
+  if (!(await item()).skills.includes(others[1]!.id)) throw new Error("⌘Z with fresh typing in the filter took a skill off");
+  // Chromium on Linux undoes typing on ⌃Z only; the Mac's ⌘Z runs this (menubar.ts).
+  await page.evaluate(() => document.execCommand("undo"));
+  await page.keyboard.press("Meta+z");
+  await until("the typing undone, then the second skill off", async () => !(await item()).skills.includes(others[1]!.id));
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z in the filter takes both off", async () => (await item()).skills.join() === start.join());
   await page.keyboard.press("Escape");
 });
 
@@ -8456,7 +9065,7 @@ journey("stacked Undo: each ⌘Z's toast comes to the front and names the source
   await page.locator(".list").focus();
   await page.keyboard.press("ArrowDown");
   for (const t of before.slice(0, 3)) {
-    await page.keyboard.press("a");
+    await page.keyboard.press("Shift+Meta+KeyA");
     await until(`“${t}” is archived`, async () => !(await titles()).includes(t));
   }
   const front = () => page.locator(".toasts .toast").last().locator(".toast-msg").innerText();
@@ -9069,6 +9678,70 @@ async function phoneSource(page: Page, title: string) {
   await page.locator(".phone-reader .doc").first().waitFor();
 }
 
+/** A finger held still on the middle of the target for `ms`, then lifted, with the few points of drift a real
+ *  finger makes (Playwright's touchscreen only taps). Touch events built in the page, then the click a browser may
+ *  send on the lift, at that point: on whatever opened under the finger. */
+async function press(page: Page, target: Locator, ms = 650) {
+  let b = (await target.first().boundingBox())!;
+  for (let i = 0; i < 20; i++) {
+    await Bun.sleep(50); // Once a sliding drawer or sheet has stopped.
+    const now = (await target.first().boundingBox())!;
+    if (now.x === b.x && now.y === b.y) break;
+    b = now;
+  }
+  const [x, y] = [b.x + b.width / 2, b.y + b.height / 2];
+  const send = (type: string, dx: number) =>
+    page.evaluate(([type, x, y]) => {
+      const el = document.elementFromPoint(x as number, y as number)!;
+      const t = { clientX: x, clientY: y, target: el, identifier: 1 };
+      const e = new Event(type as string, { bubbles: true, cancelable: true });
+      Object.assign(e, { touches: type === "touchend" ? [] : [t], changedTouches: [t] });
+      el.dispatchEvent(e);
+      if (type === "touchend") document.elementFromPoint(x as number, y as number)!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: x as number, clientY: y as number }));
+    }, [type, x + dx, y] as const);
+  await send("touchstart", 0);
+  for (let i = 0; i < ms / 100; i++) (await Bun.sleep(100), await send("touchmove", i % 2 ? 2 : 0));
+  await send("touchend", 0);
+}
+
+journey("phone: a long press on a Today source opens its menu", async (page) => {
+  // Tyler 2026-11-12: holding a source on Today did nothing. Only the Sources list had the hold; Today's rows
+  // left it to Radix, whose touch timer gives up at a finger's first few points of drift.
+  await press(page, page.locator(".home-read").first());
+  await page.getByRole("menuitem", { name: /Move to (Done|To read)/ }).waitFor();
+  // The lift's click landed on the menu that opened under the finger and picked Open.
+  await Bun.sleep(300);
+  if (await page.locator(".phone-reader").count()) throw new Error("lifting the finger after the hold opened the source");
+  if (!(await page.getByRole("menuitem", { name: "Review this source" }).isVisible())) throw new Error("the menu closed as the finger lifted");
+  await page.keyboard.press("Escape");
+  // The Sources list's rows hold too, and their menu stays on screen (it ran off at the finger's x).
+  await page.evaluate(() => localStorage.setItem("ore-phone-place", JSON.stringify({ tab: "sources", skill: null, openId: null, review: null })));
+  await page.reload();
+  await press(page, page.locator(".phone-sources li button").first());
+  await page.getByRole("menuitem", { name: "Archive" }).waitFor();
+  // Renamed in place, the row still holds: its touch listeners stay on the row through the field.
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const field = page.locator(".phone-row-rename input");
+  await field.fill("A renamed source");
+  await field.press("Enter");
+  const renamed = page.locator(".phone-sources li button").filter({ hasText: "A renamed source" });
+  await renamed.waitFor();
+  await press(page, renamed);
+  await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
+}, "phone");
+
+journey("phone: a long press on a skill, on Today or in the drawer, opens the skill's menu, and Review this skill reviews it", async (page) => {
+  // Tyler 2026-11-12: skills had no menu on the phone at all. The Mac's right-click, less Delete.
+  await press(page, page.locator(".home-skill").first());
+  for (const name of ["Open", "Review this skill", "Edit skill…", "Importance", "Archive skill"]) await page.getByRole("menuitem", { name }).waitFor();
+  if (await page.getByRole("menuitem", { name: /Delete/ }).count()) throw new Error("Delete skill is on the phone's menu");
+  await page.keyboard.press("Escape");
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await press(page, page.locator(".phone-drawer section button").first());
+  await tap(page, page.getByRole("menuitem", { name: "Review this skill" }));
+  await page.locator(".phone-full .review, .phone-full .empty-state, .phone-full .loading").first().waitFor();
+}, "phone");
+
 journey("phone: reopening on a source that left the library lands on Today, not an error with its id", async (page) => {
   // Found in the Simulator: a place saved before the source was deleted (on the Mac, or by a new build) showed
   // `no item matches "01M4…"` and a lowercase "back to sources" instead of the app.
@@ -9078,21 +9751,211 @@ journey("phone: reopening on a source that left the library lands on Today, not 
   if (await page.getByText(/no item matches/).count()) throw new Error("the missing source's error is on screen");
 }, "phone");
 
-journey("phone: a link added waits for the Mac on Sources, and Remove takes it off", async (page) => {
-  // D223: the phone queues the link in the inbox; the Mac imports it.
+journey("phone: a link added is read on the phone itself; one it can't read waits for the Mac, and Remove takes it off", async (page) => {
+  // D235: the link is saved to the inbox, then the phone imports it with the Mac's own importer.
+  const para = "Mixing kinds of problems in one sitting makes each one harder to start and easier to keep. ";
+  const article = `<html><head><title>Interleaving in practice</title></head><body><article><h1>Interleaving in practice</h1>${`<p>${para.repeat(5)}</p>`.repeat(4)}</article></body></html>`;
+  await page.route("https://example.com/articles/interleaving", (r) => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", headers: { "access-control-allow-origin": "*" }, body: article }));
+  await page.route("https://example.com/articles/offline", (r) => r.abort());
   await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input").fill("not a link");
+  await page.locator(".add-link input.field").fill("not a link");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link .phone-error").filter({ hasText: "isn’t a link" }).waitFor();
-  await page.locator(".add-link input").fill("https://example.com/articles/interleaving");
+  await page.locator(".add-link input.field").fill("https://example.com/articles/interleaving");
   await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “Interleaving in practice”").waitFor();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await page.locator(".phone-sources").getByText("Interleaving in practice").first().waitFor();
+  if (await page.locator(".phone-waiting").count()) throw new Error("the link it read is still listed as coming in");
+  // One the phone can't reach keeps its reason, and the Mac tries it.
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://example.com/articles/offline");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/offline" });
+  await row.getByText("Your Mac will try it.").waitFor();
+  await tap(page, row.getByRole("button", { name: "Remove" }));
+  await row.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: a YouTube link is in the library at once and says its transcript comes from the Mac", async (page) => {
+  // D235: no yt-dlp on a phone, so the video comes in with its title and plays; the Mac fills the transcript.
+  await page.route("https://www.youtube.com/oembed?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ title: "How spacing works", author_name: "Learning Lab" }) }));
+  await page.route(/ytimg\.com|youtube(-nocookie)?\.com\/(embed|iframe_api)/, (r) => r.abort());
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://youtu.be/abcdefghijk");
+  await tap(page, page.locator(".add-link button"));
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “How spacing works”").waitFor();
+  // Not phoneSource: it waits for the text, and this source has none yet.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await tap(page, page.locator(".phone-sources button").filter({ hasText: "How spacing works" }));
+  await page.locator(".doc-empty").filter({ hasText: "The transcript comes in when Ore is open on your Mac." }).waitFor();
+}, "phone");
+
+journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
+  // D235: the file is saved to the inbox beside its item, then imported here like a link.
+  const files = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
+  const pick = async (name: string) => {
+    await tap(page, page.getByRole("button", { name: "Add a link" }));
+    const chooser = page.waitForEvent("filechooser");
+    await tap(page, page.getByRole("button", { name: "Choose a file or photo" }));
+    await (await chooser).setFiles(join(files, name));
+  };
+  await pick("notes.docx");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText(/^Added “/).waitFor();
+  await pick("screenshot.png");
   await page.locator(".add-link").waitFor({ state: "detached" });
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
-  const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/interleaving" });
-  await row.waitFor();
+  const row = page.locator(".phone-waiting").filter({ hasText: "screenshot.png" });
+  await row.getByText("Your Mac reads the text in a picture or a scan.").waitFor();
+  if (await page.locator(".phone-waiting").count() !== 1) throw new Error("the Word file it read is still listed as coming in");
   await tap(page, row.getByRole("button", { name: "Remove" }));
   await row.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: a skill's page is the Mac's in one column, and a course is one row that opens its lessons (D228)", async (page) => {
+  // Tyler 2026-11-12, iPhone parity phase 4: the phone's skill page listed only sources and a note row.
+  const lesson = (part: number) => `topics: []\ncourse:\n  id: memory-101\n  title: Memory 101\n  part: ${part}\n`;
+  await macChanges((lib) => itemFile(lib, "lecture-4-the-testing-effect", "doc.md"), "topics: []\n", lesson(1), () =>
+    macChanges((lib) => itemFile(lib, "the-testing-effect", "doc.md"), "topics: []\n", lesson(2), async () => {
+      await page.reload();
+      await tap(page, page.getByRole("button", { name: "Open menu" }));
+      await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
+      const sk = page.locator(".phone-skill");
+      await sk.locator(".skill-goal").waitFor();
+      await sk.locator(".hero-strength").waitFor();
+      await sk.getByText("Does this hold for kids?").waitFor();
+      const wide = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".phone-skill *")].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).map((e) => e.className).slice(0, 3));
+      if (wide.length) throw new Error(`wider than the screen: ${wide.join(", ")}`);
+      // A question's actions are its long press, as a row's are (its hover buttons never show on a phone).
+      await press(page, sk.locator(".question").first());
+      await page.getByRole("menuitem", { name: "Answer…" }).waitFor();
+      await page.keyboard.press("Escape");
+      const course = sk.locator(".phone-course").filter({ hasText: "Memory 101" });
+      await course.waitFor();
+      await press(page, course);
+      await page.getByRole("menuitem", { name: "Archive course" }).waitFor();
+      await page.keyboard.press("Escape");
+      if (await sk.locator("li button:not(.phone-course)").filter({ hasText: "Lecture 4 the testing effect" }).count()) throw new Error("a lesson is listed on its own beside its course");
+      await tap(page, course);
+      const lessons = page.locator(".phone-sources").filter({ has: page.locator("h1", { hasText: "Memory 101" }) });
+      await lessons.waitFor();
+      const titles = await lessons.locator("li .phone-title").allInnerTexts();
+      if (!titles[0]?.startsWith("Lecture 4") || !titles[1]?.startsWith("The Testing Effect")) throw new Error(`the lessons aren't in course order: ${titles.join(" | ")}`);
+      // A relaunch comes back to the course's lessons, as to any screen he was on.
+      await page.reload();
+      await lessons.waitFor();
+      await tap(page, lessons.locator("li button").first());
+      await page.locator(".phone-reader .doc").first().waitFor();
+    }),
+  );
+}, "phone");
+
+journey("phone: New skill in the drawer names one in place and opens its page; a name he has is refused there", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "New skill" }));
+  const field = page.getByRole("textbox", { name: "New skill name" });
+  await field.fill("learning");
+  await field.press("Enter");
+  await page.locator(".phone-new-error").filter({ hasText: "is taken" }).waitFor();
+  await field.fill("Juggling");
+  await field.press("Enter");
+  await page.locator(".phone-skill h1").filter({ hasText: "Juggling" }).waitFor();
+  await tap(page, page.locator(".phone-back").filter({ hasText: "Today" }));
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await page.locator(".phone-drawer section button").filter({ hasText: "Juggling" }).waitFor();
+}, "phone");
+
+journey("phone: New skill's field and its refusal stay above the keyboard", async (page) => {
+  await page.evaluate(() => document.documentElement.style.setProperty("--keyboard", "336px")); // iOS's keyboard, as the shell measures it
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "New skill" }));
+  const field = page.getByRole("textbox", { name: "New skill name" });
+  await field.fill("learning");
+  await field.press("Enter");
+  const error = page.locator(".phone-new-error");
+  await error.waitFor();
+  await until("the field and the refusal sit above the keyboard", async () => {
+    const f = (await field.boundingBox())!, e = (await error.boundingBox())!;
+    return f.y + f.height <= 844 - 336 && e.y + e.height <= 844 - 336;
+  });
+  await field.press("Escape");
+  await page.evaluate(() => document.documentElement.style.removeProperty("--keyboard"));
+}, "phone");
+
+journey("phone: a double tap on an open picture zooms it, and keeps it open (Photos)", async (page) => {
+  await phoneSource(page, AGENTS);
+  const img = page.locator(".phone-reader .doc img").first();
+  await until("the saved picture loads from the library", () => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0));
+  await tap(page, img);
+  const view = page.locator(".figure-view");
+  await view.locator("img").waitFor();
+  await page.waitForTimeout(400); // grown in
+  const scale = () => view.evaluate((v) => Math.max(...[...v.querySelectorAll<HTMLElement>("*")].map((el) => new DOMMatrix(getComputedStyle(el).transform === "none" ? undefined : getComputedStyle(el).transform).a)));
+  await page.touchscreen.tap(195, 422);
+  await page.waitForTimeout(80);
+  await page.touchscreen.tap(195, 422);
+  await page.waitForTimeout(700);
+  if (!(await view.count())) throw new Error("a double tap closed the picture");
+  await until("a double tap zooms in", async () => (await scale()) > 1.5);
+  await page.touchscreen.tap(195, 422);
+  await page.waitForTimeout(80);
+  await page.touchscreen.tap(195, 422);
+  await until("a second double tap zooms back out", async () => (await scale()) < 1.05);
+  await page.touchscreen.tap(195, 422);
+  await view.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: Settings in the drawer changes the daily goal and the reminder, and they stay (D228)", async (page) => {
+  const settings = async () => {
+    await tap(page, page.getByRole("button", { name: "Open menu" }));
+    await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+    await page.locator(".phone-settings h1").waitFor();
+  };
+  await settings();
+  await tap(page, page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }));
+  await tap(page, page.getByRole("switch", { name: "Reminder" }));
+  await page.locator(".phone-time").waitFor();
+  await page.locator(".phone-settings").getByText("isn’t in iCloud").waitFor();
+  await page.reload();
+  await page.locator(".phone-settings h1").waitFor();
+  await until("the goal stayed 20", async () => (await page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }).getAttribute("aria-checked")) === "true");
+  if ((await page.locator(".phone-time").inputValue()) !== "09:00") throw new Error("the reminder didn't stay on at 9:00");
+  await tap(page, page.locator(".phone-back"));
+  await page.locator(".phone-settings").waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: a double tap highlights the paragraph and opens it, a heading and a highlight keep their taps (D224)", async (page) => {
+  await phoneSource(page, TESTING);
+  await page.waitForTimeout(400);
+  const kept = () => page.evaluate(() => ["hl-keep", "hl-active"].flatMap((k) => [...(CSS.highlights.get(k) ?? [])].map((r) => r.toString())));
+  const at = (phrase: string) => pointAt(page, phrase, ".phone-reader .doc");
+  const twice = async (p: { x: number; y: number }) => {
+    await page.touchscreen.tap(p.x, p.y);
+    await page.touchscreen.tap(p.x, p.y);
+  };
+  const before = (await kept()).length;
+  const heading = await at("Why it works");
+  await page.waitForTimeout(300); // the scroll settles: a tap that stops one is no tap
+  await twice(heading);
+  await page.waitForTimeout(600);
+  if ((await kept()).length !== before) throw new Error(`a double tap on a heading highlighted ${JSON.stringify(await kept())}`);
+  const p = await at("familiarity is easily");
+  await page.waitForTimeout(300);
+  await twice(p);
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await until("the paragraph is highlighted", async () => (await kept()).some((t) => t.startsWith("Rereading, by contrast") && t.endsWith("weaker results.")));
+  const count = (await kept()).length;
+  await page.waitForTimeout(400);
+  await twice(p);
+  await page.waitForTimeout(600);
+  if ((await kept()).length !== count) throw new Error("a double tap on a highlight stacked a second one");
 }, "phone");
 
 journey("phone: a tap on a source's cut-off title shows all of it", async (page) => {
@@ -9118,17 +9981,17 @@ journey("phone: typing a long note keeps the line being typed above the keyboard
   for (let i = 0; i < 14; i++) await page.keyboard.type(` line ${i} of a note that keeps growing past the bottom of the screen while he types it.`);
   // Where the caret is: its own box, or on a new empty line (which gives none) its line's.
   const CARET = `(() => { const sel = getSelection(); const r = sel.getRangeAt(0).getBoundingClientRect(); if (r.height) return r; const n = sel.focusNode; return (n instanceof Element ? n : n.parentElement).getBoundingClientRect(); })()`;
-  // Leave the caret where iOS does, under the bar, and move it as a keystroke does (a browser's own reveal
-  // would lift it: iOS's doesn't know the bar).
+  // Leave the caret where iOS does, under the bar, and tell the page it moved, as a keystroke does (a
+  // browser's own reveal would lift it: iOS's doesn't know the bar).
   const underBar = () =>
     page.evaluate((CARET) => {
-      const sel = getSelection()!;
       const caret = eval(CARET) as DOMRect;
       const bar = document.querySelector(".kb-bar")!.getBoundingClientRect();
       let box = document.activeElement as HTMLElement | null;
       while (box && !(box.scrollHeight > box.clientHeight && getComputedStyle(box).overflowY !== "visible")) box = box.parentElement;
       box!.scrollTop -= bar.bottom - 4 - caret.bottom;
-      sel.collapse(sel.focusNode, sel.focusOffset);
+      // The caret moving on, as each keystroke moves it on iOS (a collapse to where it already is fires nothing).
+      document.dispatchEvent(new Event("selectionchange"));
     }, CARET);
   const above = () =>
     page.evaluate((CARET) => {
@@ -9163,6 +10026,16 @@ journey("phone: a tap opens Source actions and works the note's keyboard bar", a
   const block = page.locator(".kb-bar").getByRole("button", { name: "Block actions" });
   await tap(page, block);
   await until("a tap on the bar's ⋯ opens Block actions", async () => (await block.getAttribute("aria-expanded")) === "true");
+}, "phone");
+
+journey("phone: a note's [[ link finds the library's sources", async (page) => {
+  // The phone gave its notes no link targets: [[ and the keyboard bar's link button always said "No source or skill by that name".
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  const note = page.locator(".phone-reader [contenteditable=true]").first();
+  await tap(page, note);
+  await page.keyboard.type("[[Testing Eff");
+  await page.locator(".note-menu-row").filter({ hasText: TESTING }).first().waitFor();
 }, "phone");
 
 journey("phone: the last rating of a review shows the end screen, not Wrapping up", async (page) => {
@@ -9331,6 +10204,20 @@ journey("phone: the small controls of a source answer a 44pt touch", async (page
   const fits = (sel: string, what: string) => fits44(page, sel, what);
   await phoneSource(page, AGENTS);
   await fits(".doc-head .source", "the original-site link");
+  // Its 44pt reach takes no room: the link sits on the byline's line beside the date (it sat 4pt low), or, when the
+  // byline fills the line, starts the next one flush with it (it was indented 14pt).
+  const byline = async (width: number) => {
+    await page.locator(".doc-head .chips").evaluate((el, w) => ((el as HTMLElement).style.width = w), width ? `${width}px` : "");
+    return page.evaluate(() => {
+      const box = (sel: string) => document.querySelector(`.doc-head ${sel}`)!.getBoundingClientRect();
+      const [when, source, name] = [box(".when"), box(".source"), box(".by")];
+      return { off: source.y + source.height / 2 - (when.y + when.height / 2), indent: source.x + 4 - name.x };
+    });
+  };
+  const wide = await byline(1000);
+  if (Math.abs(wide.off) > 1) throw new Error(`the original-site link sits ${wide.off.toFixed(1)}pt off the byline's line`);
+  const narrow = await byline(0);
+  if (narrow.off < 10 || Math.abs(narrow.indent) > 1) throw new Error(`the wrapped original-site link sits ${narrow.indent.toFixed(1)}pt from the byline's start`);
   await fits(".read-pill", "the reading pill");
   await tap(page, page.getByRole("button", { name: "Back" }));
   await phoneSource(page, TESTING);
@@ -9420,6 +10307,80 @@ const itemFile = (lib: string, slug: string, name: string) => {
   return join(lib, "items", year, readdirSync(join(lib, "items", year)).find((d) => d.startsWith(slug))!, name);
 };
 const cardFile = (lib: string, text: string) => join(lib, "cards", readdirSync(join(lib, "cards")).find((f) => f.endsWith(".md") && readFileSync(join(lib, "cards", f), "utf8").includes(text))!);
+
+journey("phone: Review's ⋯ puts an exercise off with Later before its answer, and edits it after (D235)", async (page) => {
+  // The phone's Review had no Later (D192 kept it on the Mac) and Edit only in a toolbar beside Ask, which needs the Mac.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await page.locator(".review-pick").waitFor();
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const q = page.locator(".review-q");
+  await q.waitFor();
+  const first = await q.innerText();
+  const more = page.getByRole("button", { name: "Exercise actions" });
+  await tap(page, more);
+  if (await page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }).count()) throw new Error("Edit shows before the answer, which would give it away");
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
+  await until("Later moves on", async () => (await q.innerText()) !== first);
+  if (await page.getByRole("button", { name: "Ask about this" }).count()) throw new Error("Ask is on the phone, which can't run the AI");
+  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await tap(page, more);
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
+  await page.getByRole("button", { name: "Save" }).waitFor();
+}, "phone");
+
+journey("phone: the note's keyboard bar moves a block, edits a table and adds a picture; a diagram opens to view (D235)", async (page) => {
+  const notes = (lib: string) => itemFile(lib, "the-testing-effect", "notes.md");
+  const diagram = join(dirname(itemFile(PHONE_LIB, "the-testing-effect", "notes.md")), "diagrams", "loop.excalidraw");
+  mkdirSync(dirname(diagram), { recursive: true });
+  writeFileSync(diagram, JSON.stringify({ type: "excalidraw", version: 2, elements: [{ id: "a", type: "rectangle", x: 0, y: 0, width: 160, height: 70, angle: 0, strokeColor: "#1e1e1e", backgroundColor: "transparent", fillStyle: "solid", strokeWidth: 2, roughness: 0, opacity: 100, seed: 1, version: 1, isDeleted: false, boundElements: [], groupIds: [], roundness: null }], appState: {}, files: {} }));
+  const extra = "\n\n![Diagram](diagrams/loop.excalidraw)\n\n| Term | Meaning |\n| --- | --- |\n| Spacing | Gaps between reviews |\n\nfirst line\n\nsecond line\n\nthird line";
+  try {
+    await macChanges(notes, "= hypercorrection", `= hypercorrection${extra}`, async () => {
+      await page.reload();
+      await page.locator(".phone-app").waitFor();
+      await phoneSource(page, TESTING);
+      await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+      const note = page.locator(".phone-reader [contenteditable=true]").first();
+      const bar = page.locator(".kb-bar");
+      // Move: ⋮⋮ ▸ Move picks the block up, ↑ carries it, Done puts the caret back in it.
+      await tap(page, note.locator("p").filter({ hasText: "third line" }));
+      await tap(page, bar.getByRole("button", { name: "Block actions" }));
+      await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Move", exact: true }));
+      await tap(page, bar.getByRole("button", { name: "Move up" }));
+      await tap(page, bar.getByRole("button", { name: "Move up" }));
+      await tap(page, bar.getByRole("button", { name: "Done moving" }));
+      await until("third line moved above first line", async () => {
+        const t = await note.innerText();
+        return t.indexOf("third line") < t.indexOf("first line");
+      });
+      // A table cell swaps the block kinds for the table's edits.
+      await tap(page, note.locator("td").filter({ hasText: "Gaps" }));
+      await bar.getByRole("button", { name: "Table actions" }).waitFor();
+      if (await bar.getByRole("button", { name: "To-do" }).count()) throw new Error("the bar offers To-do inside a table cell");
+      const rows = await note.locator("tr").count();
+      await tap(page, bar.getByRole("button", { name: "Table actions" }));
+      await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Insert row below", exact: true }));
+      await until("a row was added", async () => (await note.locator("tr").count()) === rows + 1);
+      // A picture: iOS's own sheet answers the file field.
+      await tap(page, note.locator("p").filter({ hasText: "second line" }));
+      const chooser = page.waitForEvent("filechooser");
+      await tap(page, bar.getByRole("button", { name: "Add a picture" }));
+      await (await chooser).setFiles({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
+      await until("the picture is in the note", async () => (await note.locator("img.note-image").count()) === 1);
+      // A diagram opens to view, with no way to draw on it.
+      await tap(page, note.locator(".note-diagram").first());
+      const view = page.locator(".diagram-view");
+      await view.locator(".diagram-art svg").waitFor();
+      if (await page.locator(".kb-bar").count()) throw new Error("the keyboard bar stayed over the diagram");
+      if (await view.locator(".draw, [role=toolbar]").count()) throw new Error("the phone's diagram has drawing tools");
+      await tap(page, view.getByRole("button", { name: "Done" }));
+      await view.waitFor({ state: "detached" });
+    });
+  } finally {
+    rmSync(dirname(diagram), { recursive: true, force: true });
+  }
+}, "phone");
 
 journey("phone: a kept draft goes when the Mac changes what it answered, and nothing is kept before he types", async (page) => {
   // Kept drafts outlived their questions: Finish kept one (with a copy of the questions) the moment it opened, and
@@ -9547,6 +10508,102 @@ journey("phone: Source actions offers no Reimport, which needs the Mac", async (
   await tap(page, page.getByRole("button", { name: "Source actions" }));
   await page.locator(".action-sheet").waitFor();
   if (await page.locator(".action-sheet button").filter({ hasText: "Reimport" }).count()) throw new Error("Reimport is offered on the phone");
+}, "phone");
+
+/** A source only some phone journeys need (a video, a PDF), put in the phone's library for the journey and taken
+ *  out after; the page reloads to read it. */
+async function phoneWith(page: Page, add: () => Promise<string>, run: () => Promise<void>) {
+  const dir = await add();
+  try {
+    await page.reload();
+    await page.locator(".phone-app").waitFor();
+    await run();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+journey("phone: a picture in a source opens over the whole screen, and a tap puts it back (Books)", async (page) => {
+  await phoneSource(page, AGENTS);
+  const img = page.locator(".phone-reader .doc img").first();
+  await until("the saved picture loads from the library", () => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0));
+  await tap(page, img);
+  const big = page.locator(".figure-view img");
+  await big.waitFor();
+  await until("it opens edge to edge", async () => Math.round((await big.boundingBox())?.width ?? 0) === 390);
+  await page.touchscreen.tap(195, 120);
+  await page.locator(".figure-view").waitFor({ state: "detached" });
+  if ((await img.evaluate((i: HTMLElement) => i.style.visibility)) === "hidden") throw new Error("the picture in the text stayed hidden after closing");
+}, "phone");
+
+journey("phone: a recording plays from a bar above the bottom bar, its timestamps on screen", async (page) => {
+  await phoneSource(page, "Lecture 4");
+  const bar = page.locator(".player-pin:has(.player.audio)");
+  await bar.waitFor();
+  const b = (await bar.boundingBox())!;
+  const tools = (await page.locator(".phone-tools").boundingBox())!;
+  if (b.y + b.height > tools.y || b.y < 844 / 2) throw new Error(`the recording's bar is at ${Math.round(b.y)}–${Math.round(b.y + b.height)}, not just above the bottom bar at ${Math.round(tools.y)}`);
+  await fits44(page, ".player.audio .ctl.play", "Play");
+  const left = await page.locator(".doc .ts").first().evaluate((e) => e.getBoundingClientRect().left);
+  if (left < 0) throw new Error(`a timestamp starts at x ${Math.round(left)}, off the screen`);
+}, "phone");
+
+journey("phone: a video stays pinned under the top bar while its transcript scrolls", async (page) => {
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
+  const lines = Array.from({ length: 30 }, (_, i) => `Line ${i + 1} of the talk, long enough to wrap onto a second line on a phone.`);
+  const vtt = "WEBVTT\n\n" + lines.map((l, i) => `00:${String(i).padStart(2, "0")}:00.000 --> 00:${String(i).padStart(2, "0")}:30.000\n${l}\n`).join("\n");
+  const body = lines.map((l, i) => `[${String(i).padStart(2, "0")}:00] ${l}`).join("\n\n");
+  await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "youtube", title: "A pinned talk", url: "https://www.youtube.com/watch?v=pinnedTalk1", body, source: { ext: "vtt", data: vtt } })).dir, async () => {
+    await phoneSource(page, "A pinned talk");
+    const pin = page.locator(".player-pin");
+    await pin.waitFor();
+    await page.locator(".phone-reader .reader-scroll").evaluate((el) => (el.scrollTop = 900));
+    await until("the player sits just under the top bar", async () => {
+      const y = (await pin.boundingBox())?.y ?? -1;
+      return y >= 43 && y <= 48;
+    });
+  });
+}, "phone");
+
+journey("phone: Source actions renames a source and edits its author in place", async (page) => {
+  await phoneSource(page, TESTING);
+  const action = async (name: RegExp) => {
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: name }));
+  };
+  await action(/^Rename/);
+  const title = page.locator(".doc-head .title-edit");
+  await title.waitFor();
+  const size = await title.evaluate((e) => getComputedStyle(e).fontSize);
+  if (size !== "26px") throw new Error(`the title field is ${size}, not the title's 26px`);
+  await title.fill("Retrieval beats rereading");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head h1").filter({ hasText: "Retrieval beats rereading" }).waitFor();
+  await action(/author/);
+  const author = page.locator(".doc-head .author-edit");
+  await author.fill("A. Researcher");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head .by").filter({ hasText: "A. Researcher" }).waitFor();
+}, "phone");
+
+journey("phone: a PDF's own page opens from Source actions, turns, and Back returns to the text", async (page) => {
+  const pdf = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/textbook.pdf");
+  await phoneWith(page, async () => {
+    const r = JSON.parse(await $`bun ${join(import.meta.dir, "../../../packages/cli/src/ore.ts")} add ${pdf} --no-enrich --json`.env({ ...process.env, ORE_LIBRARY: PHONE_LIB, ORE_NO_ENRICH: "1" }).text()) as { path: string };
+    return join(PHONE_LIB, r.path, "..");
+  }, async () => {
+    await phoneSource(page, "Chapter 1");
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: "Original page" }));
+    await page.locator(".original canvas[data-page]").waitFor({ timeout: 15000 });
+    const pager = page.locator(".original-pager span");
+    const at = await pager.textContent();
+    await fits44(page, "[aria-label='Next page']", "Next page");
+    await tap(page, page.getByRole("button", { name: "Next page" }));
+    await until("Next page turns it", async () => (await pager.textContent()) !== at);
+    await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
+    await until("Back returns to the text", async () => !(await page.locator(".phone-reader .reader").evaluate((e) => e.classList.contains("noting"))));
+  });
 }, "phone");
 
 journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt touch", async (page) => {

@@ -14,6 +14,7 @@ import { NO_SKILL } from "./no-skill.ts";
 import { openSessionId, readSessions } from "./sessions.ts";
 import { archivedOnly, cardPriority, unfiled, desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
 import { retentionMetric } from "./stats.ts";
+import { gemPast, SOLID_DAYS } from "./today.ts";
 
 export interface ReviewInput {
   rating: 1 | 2 | 3 | 4;
@@ -122,6 +123,8 @@ export const medians = (rs: Review[], kinds: Map<string, string>): Record<"card"
 export interface QueueOptions {
   /** Only cards filed under one of these skills (D80's pick), or under none with NO_SKILL (D204); all when absent. */
   skills?: string[];
+  /** Only one source's cards ("Review this source"), its unseen drafts included; with `skills`, both must hold. */
+  item?: string;
   /** Apply the new-card limits (D60, D65, D144): at most `new_per_day`, and none drafted today. On by default. */
   newLimit?: boolean;
   /** A session's first fetch: its first card is a likely recall (D176). A fetch mid-session leaves the order alone. */
@@ -163,9 +166,10 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const cards = index.cards();
     for (const c of cards) {
       if (c.state === "retired") continue;
+      if (opts.item && c.item !== opts.item) continue;
       if (picked && !c.skills.some((s) => picked.has(s)) && !(picked.has(NO_SKILL) && unfiled(c.skills, skills))) continue;
       // An archived skill's cards wait out of review (D173), unless he picks the skill by name.
-      if (!picked && archivedOnly(c.skills, skills)) continue;
+      if (!picked && !opts.item && archivedOnly(c.skills, skills)) continue;
       // A miss today owes one relearn pass (D21) until he answers the card again, in this session or a
       // later one today: the session ending as the goal closes (D65), or Esc then ⌘R, doesn't drop it.
       const own = ownToday.get(c.id) ?? [];
@@ -275,8 +279,42 @@ export function libraryStats(lib: Library, open?: LibraryIndex): { skills: Skill
 /** A card's reviews in time and where each rating would put the next one (D149): the dates the review
  *  screen draws as a line of dots, so he sees the gaps widen while recall holds. Read from the log,
  *  nothing new stored. `now` for tests. */
-export function cardHistory(lib: Library, cardRef: string, now = new Date()): { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string> } {
+/** What a card's gem looks like (D236): `empty` never reviewed, `rough` growing, `ready` one Good review from
+ *  cut, `cut` solid, `dull` cut once and missed since. `seam`: it has been missed and won back (a gold rim it
+ *  keeps); `polished`: passed on a new case (D197). */
+export type CardGem = { kind: "empty" | "rough" | "ready" | "cut" | "dull"; seam?: boolean; polished?: boolean };
+type Rating = 1 | 2 | 3 | 4;
+
+/** A card's reviews, where each rating would put the next one (D149), and its gem: as it is now and as each
+ *  rating would leave it, with the days of memory (FSRS stability) that rating adds. */
+export function cardHistory(lib: Library, cardRef: string, now = new Date()): { reviews: { ts: string; rating: Rating }[]; next: Record<Rating, string>; gem: CardGem & { after: Record<Rating, CardGem & { days: number }> } } {
   const { retention, w, prior, before, at } = stateBefore(lib, findCard(lib, cardRef), now);
-  const due = (rating: 1 | 2 | 3 | 4) => nextState(before, at, rating, retention, w).due;
-  return { reviews: prior.map((r) => ({ ts: r.ts, rating: r.rating as 1 | 2 | 3 | 4 })), next: { 1: due(1), 2: due(2), 3: due(3), 4: due(4) } };
+  const after = (rating: Rating) => nextState(before, at, rating, retention, w);
+  const solid = (stability: number) => stability >= SOLID_DAYS;
+  const was = prior.length ? before.stability : 0;
+  // Its past by the one rule (`gemPast`), read from the log; where it stands now is the schedule's own state.
+  // The two can differ after the schedule is re-fitted, so "missed since" needs both to say it isn't solid.
+  const past = gemPast(prior);
+  const polished = past.applied || undefined;
+  const near = (state: FsrsState, when: Date) => solid(nextState(state, when, 3, retention, w).stability);
+  // The rim is gold once it has fallen and been cut again; a first miss has none yet.
+  const today = (): CardGem => {
+    if (!prior.length) return { kind: "empty" };
+    if (solid(was)) return { kind: "cut", ...(past.fell ? { seam: true } : {}), ...(polished ? { polished } : {}) };
+    if (past.cutOnce && !past.solid) return { kind: "dull", ...(past.wonBack ? { seam: true } : {}) };
+    // Nearly cut means what the Good on offer says: one given now, not on the day it falls due.
+    return { kind: near(before, at) ? "ready" : "rough" };
+  };
+  const then = (rating: Rating) => {
+    const a = after(rating);
+    const days = Math.max(0, Math.round(a.stability - was));
+    if (solid(a.stability)) return { kind: "cut" as const, ...(past.fell ? { seam: true } : {}), ...(polished ? { polished } : {}), days };
+    if (past.cutOnce || solid(was)) return { kind: "dull" as const, ...(past.wonBack ? { seam: true } : {}), days };
+    return { kind: near(a, new Date(a.due)) ? ("ready" as const) : ("rough" as const), days };
+  };
+  return {
+    reviews: prior.map((r) => ({ ts: r.ts, rating: r.rating as Rating })),
+    next: { 1: after(1).due, 2: after(2).due, 3: after(3).due, 4: after(4).due },
+    gem: { ...today(), after: { 1: then(1), 2: then(2), 3: then(3), 4: then(4) } },
+  };
 }

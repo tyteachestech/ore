@@ -4,6 +4,16 @@ import { invoke } from "@tauri-apps/api/core";
 export const PHONE = import.meta.env.VITE_PHONE === "1";
 
 /** On iPhone, reads in what the Mac changed (through iCloud) since; true if anything did. Never on the Mac. */
+/** The share card's skill chips (phone/core.ts `shareSkills`); nothing on the Mac. */
+export const shareSkills = async (skills: { id: string; name: string; icon?: string; color?: string }[]): Promise<void> => {
+  if (PHONE) (await import("./phone/core")).shareSkills(skills);
+};
+/** The inbox item the share card's Open asked the phone to show (phone/core.ts `shareOpen`); nothing on the Mac. */
+export const shareOpen = async (): Promise<string | null> => (PHONE ? (await import("./phone/core")).shareOpen() : null);
+/** A file picked on the phone goes to the inbox to be imported (phone/core.ts `queuePicked`). */
+export const queuePicked = async (name: string, bytes: Uint8Array, skill?: string): Promise<void> => {
+  if (PHONE) await (await import("./phone/core")).queuePicked(name, bytes, skill);
+};
 export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import("./phone/core")).pull() : false);
 
 // Every library read and write goes through the `ore` CLI (D30). Errors are the CLI's one-line message.
@@ -95,6 +105,9 @@ export type Item = {
   finished_at?: string;
   /** A PDF's tables or formulas that read as plain text until the optional reader reads them (D125). */
   structure?: ("tables" | "formulas")[];
+  /** What the device that added it couldn't bring in (a video's transcript on the iPhone, D235). */
+  owed?: "transcript"[];
+  owed_error?: string;
   /** `ore show`: being read now, or read; why the last reading failed; whether the reader is installed. */
   tables?: "reading" | "read";
   tables_error?: string;
@@ -310,7 +323,10 @@ export type CardFull = {
   /** Its reviews and where each rating puts the next one (D149); with --review only. */
   history?: CardHistory;
 };
-export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string> };
+/** A card's gem (D236); `seam`: missed and won back, `polished`: passed on a new case. */
+export type CardGem = { kind: "empty" | "rough" | "ready" | "cut" | "dull"; seam?: boolean; polished?: boolean };
+/** `gem`: as it is now and as each rating would leave it, with the days of memory that rating adds. */
+export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string>; gem?: CardGem & { after: Record<1 | 2 | 3 | 4, CardGem & { days: number }> } };
 
 /** `ore grade`: a proposed rating (never logged by itself, D21) and one mark per rubric point, with the words
  *  of his answer that earned each covered one ("" for none; absent from a grade made before D141). */

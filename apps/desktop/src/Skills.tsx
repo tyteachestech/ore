@@ -3,6 +3,7 @@ import { Command } from "cmdk";
 import { CaretDown, Check as CheckIcon, Plus } from "./icons";
 import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
+import { keepKeysIn } from "./keys";
 import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { Trap } from "./Trap";
@@ -143,7 +144,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
             if (!returnFocus?.current) return;
             e.preventDefault();
             returnFocus.current.focus();
-          }} onClick={stop} onKeyDown={stop} onContextMenu={stop}>
+          }} onClick={stop} onKeyDown={keepKeysIn} onContextMenu={stop}>
           <Command label="Skills" loop shouldFilter={false}>
             <Command.Input className="menu-input" placeholder="Find or create a skill…" value={query} onValueChange={setQuery} autoFocus />
             <Command.List>
@@ -286,7 +287,7 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
           }, 0);
         }}
         onKeyDown={(e) => {
-          e.stopPropagation();
+          keepKeysIn(e); // ⌘Z still reaches the app history
           if (e.key !== "Enter" && e.key !== "Escape") return;
           e.preventDefault(); // or the Enter would also click the name button that takes focus
           if (e.key === "Enter" && !saving) void save().then((ok) => ok && onEnter?.());
@@ -310,7 +311,8 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
   collections: string[];
   onSaved: () => void;
   onClose: () => void;
-  onDelete: () => void;
+  /** None on the iPhone: deleting a skill stays on the Mac, and with it this foot (Esc is a key it has none of). */
+  onDelete?: () => void;
   notify: Notify;
 }) {
   // An icon from before D157 (an emoji, "ph:") draws nothing and core refuses it, so it reads as none: Undo clears it.
@@ -393,14 +395,16 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
           <span>Collection</span>
           <CollectionPicker value={look.collection} collections={collections} onPick={(c) => void set("collection", c)} />
         </div>
-        <div className="skill-edit-foot">
-          <button className="foot-danger" onClick={onDelete}>
-            Delete skill…
-          </button>
-          <span className="right">
-            <kbd>Esc</kbd> close
-          </span>
-        </div>
+        {onDelete && (
+          <div className="skill-edit-foot">
+            <button className="foot-danger" onClick={onDelete}>
+              Delete skill…
+            </button>
+            <span className="right">
+              <kbd>Esc</kbd> close
+            </span>
+          </div>
+        )}
       </div>
       </Trap>
     </div>

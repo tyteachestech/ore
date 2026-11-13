@@ -9,7 +9,7 @@ import { paths } from "../src/library.ts";
 import { endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
 import { readReviews, type Review } from "../src/reviews.ts";
 import { calibration, raterStats } from "../src/stats.ts";
-import { loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
+import { addSkill, archiveSkill, loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
 import { NO_SKILL } from "../src/no-skill.ts";
 import { dueQueue, recordReview } from "../src/study.ts";
 import { level, nextLevelAt, reminderNote, skillGrowth, skillStrength, SOLID_DAYS, today } from "../src/today.ts";
@@ -186,6 +186,21 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(picked.flatMap((e, i) => (e.due === null ? [i] : []))).toEqual([4, 9]);
     expect(picked.filter((e) => e.due === null).map((e) => e.id)).toEqual([fromB.meta.id, fromC.meta.id]);
     expect(dueQueue(lib, later, { skills: ["habits"] }).map((e) => e.id)).toEqual([habit.meta.id]);
+  });
+
+  test("Review this source: only that source's cards, its drafts past the day's limit, even under an archived skill", async () => {
+    const { lib, item: a, cards } = await library(2);
+    const { item: b } = await addSnippet(lib, { text: "Interleaving beats blocking." });
+    const draftOn = (item: string, skills: string[], q: string) => writeNewCard(lib, { kind: "card", item, skills, topics: [], content_type: "fact", question: q, answer: "A", rubric: [] });
+    const fromB = draftOn(b.meta.id, ["learning"], "B?");
+    const old = await addSkill(lib, "Old");
+    const shelved = draftOn(b.meta.id, [old.id], "Old?");
+    await archiveSkill(lib, old.id, true);
+    // Written today: the day's limits hold them back from every other session (D65).
+    expect(dueQueue(lib).map((e) => e.id)).not.toContain(fromB.meta.id);
+    const only = dueQueue(lib, new Date(), { item: b.meta.id, newLimit: false }).map((e) => e.id);
+    expect(only.sort()).toEqual([fromB.meta.id, shelved.meta.id].sort());
+    expect(dueQueue(lib, new Date(), { item: a.meta.id, newLimit: false }).map((e) => e.id).sort()).toEqual(cards.map((c) => c.meta.id).sort());
   });
 
   test("exercises filed under no skill: Today counts them apart, and a pick takes them only with NO_SKILL (D204)", async () => {
