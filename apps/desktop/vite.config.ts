@@ -121,7 +121,7 @@ const textImports: Plugin = {
   },
 };
 
-// The ambience radio's sounds (D253): ElevenLabs output may ship inside the app but not as loose files in this public
+// The ambience radio's sounds (D254): ElevenLabs output may ship inside the app but not as loose files in this public
 // repo, so they live on his Mac, in ~/Library/Application Support/Ore/sounds (ORE_SOUNDS overrides; the e2e journeys
 // point it at their own tones). Served as /sounds/<id>.mp3 in dev and written into the build when they are there;
 // a channel with no file says so in the app.

@@ -35,7 +35,7 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   chmodSync(docling, 0o755);
   // Ports of their own, so a mock left running for screenshots (1420, 1421) never answers instead.
   const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50", ORE_MOCK_ENRICH: "1" }, stdout: "ignore", stderr: "inherit" });
-  // The ambience radio plays plain tones of its own (e2e/sounds), never the sounds on the Mac (D253).
+  // The ambience radio plays plain tones of its own (e2e/sounds), never the sounds on the Mac (D254).
   const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_SOUNDS: join(import.meta.dir, "sounds") }, stdout: "ignore", stderr: "ignore" });
   const url = `http://localhost:${PORT}/`;
   // A cold vite bundles its dependencies before it answers (pdf.js among them, D202), which took over 20 s on a
@@ -882,7 +882,7 @@ journey("tutor mole: it sits at the bottom right on every screen, pages keep roo
   await button.waitFor();
 });
 
-journey("ambience radio: the mole's twin at the bottom left; its pads play a channel and stop it, Esc closes, ⌥⌘A opens, a missing file says so (D253)", async (page) => {
+journey("ambience radio: the mole's twin at the bottom left; its pads play a channel and stop it, Esc closes, ⌥⌘A opens, a missing file says so (D254)", async (page) => {
   const orb = page.getByRole("button", { name: /^Ambience/ });
   const vp = page.viewportSize()!;
   const b = (await orb.boundingBox())!;

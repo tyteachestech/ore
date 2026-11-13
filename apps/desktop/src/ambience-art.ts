@@ -1,4 +1,4 @@
-/* The ambience radio's screen (D253): an amber dot-matrix LCD, drawn as round dots like the rest of Ore (D183).
+/* The ambience radio's screen (D254): an amber dot-matrix LCD, drawn as round dots like the rest of Ore (D183).
    Pure drawing on a grid of brightness values, so tests can read it without a canvas. */
 
 export type ChannelId = "cave" | "rain" | "lamp" | "deep" | "focus";

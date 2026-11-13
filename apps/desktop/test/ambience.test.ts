@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { bigScreen, CHANNELS, clock, grid, hasGlyph, ICONS, powerDown, scene, text } from "../src/ambience-art";
 
-// The ambience radio's screen (D253): what it draws, read off its dot grid.
+// The ambience radio's screen (D254): what it draws, read off its dot grid.
 const lit = (g: ReturnType<typeof grid>, x0 = 0, x1 = g.cols) => {
   let n = 0;
   for (let y = 0; y < g.rows; y++) for (let x = x0; x < x1; x++) if (g.lit[y * g.cols + x]! > 0) n++;

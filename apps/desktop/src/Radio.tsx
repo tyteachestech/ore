@@ -5,7 +5,7 @@ import { channelName, level, toggle, useAmbience } from "./ambience";
 import { dots } from "./dots";
 import { Hint } from "./Hint";
 
-/* The ambience radio (D253): a round button at the bottom left, the mole's twin at the bottom right (D160). Off until
+/* The ambience radio (D254): a round button at the bottom left, the mole's twin at the bottom right (D160). Off until
    he picks a channel. While one plays, its icon glows amber in the button and a ring of dots breathes with the sound;
    hovering shows the channel and how long it has played. A click opens the big screen over five pads, one per channel.
    Desktop only. Motion stops when Reduce Motion is on, and nothing draws while the window is hidden. */

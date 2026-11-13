@@ -2337,7 +2337,7 @@ export function App() {
         {/* The tutor's mole floats at the bottom right (D160). Its live line stays when the mole hides (an overlay),
             so VoiceOver hears a reply that lands then (D159). */}
         {tutorButton}
-        {/* The ambience radio, the mole's twin at the bottom left (D253). */}
+        {/* The ambience radio, the mole's twin at the bottom left (D254). */}
         {!PHONE && <Radio open={radioOpen} onOpenChange={setRadioOpen} />}
         <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
         {/* A skill page is the same page wherever it was opened from: a place change under it (its folder tab,

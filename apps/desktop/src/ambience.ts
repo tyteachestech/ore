@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { CHANNELS, type ChannelId } from "./ambience-art";
 
-/* The ambience radio's sound (D253): one channel at a time, looped without a gap through Web Audio, off until he
+/* The ambience radio's sound (D254): one channel at a time, looped without a gap through Web Audio, off until he
    picks one. The files are ElevenLabs output, which may ship inside the app but not as loose files in a public repo,
    so they never live in git: the build takes them from a folder on his Mac (vite.config.ts, `ambienceSounds`) and
    serves them at /sounds/<id>.mp3. A channel whose file is missing says so and stays off. */
