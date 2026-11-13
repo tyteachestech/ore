@@ -10008,8 +10008,15 @@ journey("phone: a file picked with + is read on the phone; a picture waits for t
   await page.getByText(/^Added “/).waitFor();
   await pick("screenshot.png");
   await page.locator(".add-link").waitFor({ state: "detached" });
+  // F-new-phone-pdf-thumb: a PDF added here drew no first page (only the Mac's Quick Look did), so its row had a bare icon.
+  await pick("outline.pdf");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “Remembering on purpose”").waitFor();
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const drawn = page.locator("li", { hasText: "Remembering on purpose" }).locator("img.thumb");
+  await drawn.waitFor();
+  await until("the PDF's first page is its row's picture", () => drawn.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 100 && i.naturalHeight > i.naturalWidth));
   const row = page.locator(".phone-waiting").filter({ hasText: "screenshot.png" });
   await row.getByText("Your Mac reads the text in a picture or a scan.").waitFor();
   if (await page.locator(".phone-waiting").count() !== 1) throw new Error("the Word file it read is still listed as coming in");
