@@ -1,0 +1,9 @@
+# Sweep 4a (iPhone): data at its extremes
+
+Rules, driver and report: `docs/reviews/2026-11-13-codex-phone-edges/common.md` (read it first). Write under `codex-out/s4a/`.
+
+## Tasks, each twice
+1. **An empty library, a first launch.** Make an empty library, `start --fresh` on it. Today, the drawer, Sources, Archive, search with no results, Start review with nothing due, a new skill, Settings. Every empty screen should say what to do next, never sit blank or show a zero for its own sake. Then add the first source with + (paste `https://en.wikipedia.org/wiki/Spaced_repetition`) and follow it until it can be read.
+2. **A big library.** Seed the big one and start on it. Scroll Sources to the bottom fast and back, search a common word, open the 1.5 MB book and jump to its end with the outline, start a review over the large backlog, open the skill with the most sources. Note anything that takes over a second, and any frame that freezes.
+3. **Long and odd text.** On the ordinary library: rename a source to 300 characters, to a single emoji, to Arabic (right to left), to Japanese, and to one 80-letter word with no spaces; make a skill with a 60-character name; type a 2,000-word note (paste the same paragraph many times) and a note of only emoji. Check every place each shows: Today, Sources rows, the drawer, search results, the source's header, the share card's skill chips, Review.
+4. **Big text, dark mode, a small phone.** `xcrun simctl ui $ORE_SIM_DEVICE content_size accessibility-extra-extra-extra-large`, then Today, a source, a review and Settings; back to `large`. `xcrun simctl ui $ORE_SIM_DEVICE appearance dark` (and light again) over the same screens. Then make the smallest iPhone this Mac offers its own simulator (`xcrun simctl list devicetypes`; ask for it by name with `--device`), and repeat Today, a source with its bottom bar, a review answer with the keyboard up, and the + sheet.

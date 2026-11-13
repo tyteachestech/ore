@@ -34,7 +34,7 @@ function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noE
 }
 import { fromBase64, int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
-import { fillOwed, importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
+import { canFill, fillOwed, importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
 
 const INTENTS = Intent.options;
 
@@ -244,6 +244,7 @@ export const itemCommands: Record<string, Command> = {
         ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
         ...(item.meta.type !== "youtube" && !item.meta.video && { audio: audioOf(item, lib) ?? undefined }),
         ...(hasPageText(item) && { page_text: true }),
+        ...(item.meta.owed?.length && { fills_here: await canFill(item) }),
       };
       const text = f.annotations
         ? annotations.map(annotationLine).join("\n") || "No annotations."
