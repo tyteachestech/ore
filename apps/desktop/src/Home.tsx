@@ -10,7 +10,7 @@ import * as HoverCard from "@radix-ui/react-hover-card";
 import { flushSync } from "react-dom";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { DotBar, minutes, minutesText, Ring } from "./Ring";
-import { dueSkills, knowsDue, rememberToday, ReviewPick } from "./ReviewPick";
+import { dueSkills, knowsDue, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { archivedOnly, SkillChips, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
@@ -98,7 +98,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   /** Rename… where the source list has it, typed on the row itself. */
   const withRename = (acts: MenuAction[], i: Item): MenuAction[] =>
     acts.flatMap((a) => (a.id !== "rename" ? [a] : onRename ? [{ ...a, run: () => setRenaming(i.id) }] : []));
-  const [today, setToday] = useState<Today | null>(null);
+  // Back on Home, the numbers it last read until fresh ones land: Today and the rows under it draw as one, at once.
+  const [today, setToday] = useState<Today | null>(lastToday);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -408,7 +409,9 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
 
       {/* Under Today: what to read on the left, skills on the right, split by a bar he can drag (as on the skill page). */}
       <div className={`home-cols${split.dragging ? " dragging" : ""}`} style={two ? { gridTemplateColumns: `minmax(0, ${1 - split.side}fr) 20px minmax(0, ${split.side}fr)` } : undefined}>
-      {reading.length > 0 && (
+      {/* Once Today is drawn (or has failed), as the skill tiles: drawn before, the rows jumped down under his
+          pointer as Today came in, and a click aimed at one landed beside it. */}
+      {reading.length > 0 && (today || error) && (
         <section className="home-cont" aria-label="Continue reading">
           <h2 className="home-h">Continue reading</h2>
           <DndContext

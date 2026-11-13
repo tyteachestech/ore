@@ -3632,9 +3632,14 @@ journey("Home: ⇧↓ grows the pick on Continue reading, a click on empty space
 journey("Home: after a ⌘-click picks a row, the first ⇧↓ grows the pick (Finder)", async (page) => {
   await openSource(page, AGENTS);
   await openSource(page, TESTING);
+  // Today's numbers slow to come, as on a busy Mac: the rows wait for them, or Today grows over the rows' place
+  // as they come and a click aimed at a row lands beside it (the ⌘-click picked nothing, CI 2026-11-13).
+  await page.evaluate(() => ((window as any).__ORE_SLOW = { today: 800 }));
   await page.getByRole("button", { name: /^Home/ }).click();
   const rows = page.locator(".home-read");
   await rows.nth(1).waitFor();
+  if (!(await page.locator(".home-goal").count())) throw new Error("Continue reading showed before Today, which then pushed it down");
+  await page.evaluate(() => delete (window as any).__ORE_SLOW);
   await rows.nth(0).locator(".home-open").click({ modifiers: ["Meta"] });
   await until("⌘-click picks the row", async () => (await page.locator(".home-read.sel").count()) === 1);
   await page.keyboard.press("Shift+ArrowDown");
