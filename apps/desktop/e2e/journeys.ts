@@ -11216,6 +11216,8 @@ journey("phone: Finish's closing card keeps its unsaved line through a failed sa
 journey("phone: a link to a part of the page that wasn't saved says the next step is on the Mac", async (page) => {
   // The toast said to Reimport from ⋯, which the phone doesn't offer.
   await macChanges((lib) => itemFile(lib, "building-effective-agents", "doc.md"), "\n# Building Effective Agents\n", "\n# Building Effective Agents\n\nSee [the missing part](#a-part-not-saved).\n", async () => {
+    await page.reload(); // the phone reads the Mac's change on a relaunch, as every journey here does
+    await page.locator(".phone-opening").waitFor({ state: "detached" });
     await phoneSource(page, AGENTS);
     await tap(page, page.locator(".phone-reader .doc a").filter({ hasText: "the missing part" }));
     const toast = page.locator(".toasts").filter({ hasText: "wasn’t saved" });
