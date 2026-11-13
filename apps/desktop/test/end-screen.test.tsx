@@ -77,7 +77,7 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   jest.useFakeTimers();
   const s = await mount(end(["ai"]));
   // Asleep on the load, his whole body; nobody on the ring yet.
-  expect(s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood")).toBe("nap");
+  expect(s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood")).toBe("doze");
   expect(s.q(".cart-zzz")).toBe(1);
   expect(s.q(".review-mole .mole")).toBe(0);
   let awake = false;
