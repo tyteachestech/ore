@@ -20,7 +20,7 @@ const lib = { root };
 
 // Deterministic, so two takes film the same library.
 let seed = 7;
-const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+const rnd = () => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31);
 const DAY = 86400_000;
 const now = Date.now();
 const at = (daysAgo: number) => new Date(now - daysAgo * DAY);
@@ -287,7 +287,7 @@ const plan = (when: Fact["when"], age: number): { first: number; ratings: (1 | 2
 let cards = 0, reviews = 0;
 const dueToday: string[] = [];
 /** Memories old enough to be looked at again early: the cards the recent days' sessions draw on. */
-const settled: string[] = [];
+const settled: { id: string; last: number }[] = [];
 for (const s of SOURCES) {
   const text = bodyOf(s);
   const item = await createItem(lib, {
@@ -324,7 +324,7 @@ for (const s of SOURCES) {
       rubric: x.rubric ?? [], maps: (x.rubric ?? []).map((_, k) => k), status: "ready", created: iso(40), ai: { vendor: "claude", model: "demo", prompt_version: "variant@demo" },
     });
     // Replay its reviews: each on the day it fell due (a day or two late now and then), until the next is in the future.
-    let t = p.first, n = 0, usedVariant = false;
+    let t = p.first, n = 0, usedVariant = false, last = p.first;
     const fixed = p.ratings === "life" ? null : p.ratings;
     while (fixed ? n < fixed.length : true) {
       if (t <= 0.6) break;
@@ -335,7 +335,7 @@ for (const s of SOURCES) {
       // This week's reviews took the time a real answer takes, so the week's days show as kept.
       const elapsed_ms = t < 7 ? 150_000 + Math.floor(rnd() * 30_000) : x.rubric ? 45_000 + Math.floor(rnd() * 40_000) : 12_000 + Math.floor(rnd() * 20_000);
       const r = await recordReview(lib, card.meta.id, { rating: variant ? 3 : rating, confidence: rating === 1 ? 1 : rating === 4 ? 3 : 2, now: at(t), elapsed_ms, variant });
-      reviews++; n++;
+      reviews++; n++; last = t;
       const gap = (new Date(r.due_next).getTime() - at(t).getTime()) / DAY;
       const next = t - gap - (fixed ? 0 : rnd() < 0.25 ? 1 + Math.floor(rnd() * 2) : 0);
       // "missed": the last review before today is the miss, so it stands dull, waiting to be won back.
@@ -347,7 +347,7 @@ for (const s of SOURCES) {
       t = next;
     }
     if (x.when === "ready") dueToday.push(card.meta.id);
-    if (!x.when && s.age > 120) settled.push(card.meta.id);
+    if (!x.when && s.age > 120) settled.push({ id: card.meta.id, last });
   }
   if (s.body) writeFileSync(join(item.dir, "notes.md"), "## In my words\n\nA review is worth the most on the day I'm about to forget. The schedule is just a guess at that day, kept per memory.\n\n- Stability = days until 90%\n- Higher retention = more reviews, not better memory\n");
 }
@@ -359,8 +359,13 @@ await setReviewSettings(lib, { goal_minutes: 10, plan: "my first coffee", new_pe
 let k = 0;
 for (const day of [10, 9, 8, 6, 5, 4, 2, 1, 0]) {
   const session = await startSession(lib, at(day ? day + 0.01 : 0.06));
-  for (let i = 0; i < (day ? 4 : 3); i++, k++, reviews++)
-    await recordReview(lib, settled[k % settled.length]!, { rating: 3, confidence: 2, now: at(day ? day - i * 0.002 : 0.05 - i * 0.004), elapsed_ms: 165_000 + Math.floor(rnd() * 15_000), session: session.id });
+  for (let i = 0; i < (day ? 4 : 3); i++, reviews++) {
+    // Only a memory last reviewed before that day: a card's reviews stay in time order.
+    while (settled[k % settled.length]!.last <= day + 0.5) k++;
+    const card = settled[k++ % settled.length]!;
+    card.last = day;
+    await recordReview(lib, card.id, { rating: 3, confidence: 2, now: at(day ? day - i * 0.002 : 0.05 - i * 0.004), elapsed_ms: 165_000 + Math.floor(rnd() * 15_000), session: session.id });
+  }
   await endSession(lib, at(day ? day - 0.01 : 0.03));
 }
 
