@@ -37,8 +37,11 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 ## Picked (2026-11-10, D190)
 - The first signature moment (Tyler's pick B of three, played on a copy of the real end screen): a finished session lands with the cart rolling in and tipping its ore into the ring, rough stones dropping to be cut, the mole coming up after. Not picked: Light up (today, tuned), Mole strike. The sketch moved in straight lines and he called it amateur; the build draws the cart in dots with turning wheels and throws the ore on real arcs. Lesson: sketch the idea, but say it is a sketch before he sees it.
 
+## Picked (2026-11-14, D263)
+- The radio's playing button is a named motion, the lamp: amber dots breathing in place with the real sound, grey and still when off. It means "running right now". More places for it are Tyler's call, one at a time.
+- Brand guidelines: `docs/design/brand.md` is the one page; the browsable version with live components (https://claude.ai/artifact/NotsGBRDucobyz6q4vfNn4) is rebuilt from the app's code by `apps/desktop/scripts/design-system/build.ts`, replacing the hand-drawn kit of 2026-11-07.
+
 ## Open
-- A page showing every component.
 - Redraw Hand, ThumbsDown, Paperclip, Compass.
 - A Rive trial; sound.
 - A mascot later; sound after the look.

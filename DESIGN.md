@@ -19,6 +19,7 @@ colors:
   intent-keep: "#dcc070"  # pastel intents (D129)
   intent-card: "#82bde6"
   intent-question: "#b59aec"
+  lamp: "#ffb224"  # running right now: the radio playing, the mole's helmet lamp (the lamp, D263)
   intent-research: "#79d6b2"  # research results on a question (D75); no longer a highlight type (D91)
 typography:
   ui:
@@ -86,7 +87,7 @@ spacing:
 
 The source of truth is `apps/desktop/src/styles.css`, with the Terminal look (D101) layered on top in `retro.css`. Every colour and size is a token on `:root`.
 
-**Direction in progress:** the look is being re-picked; read `docs/design/signature-style.md` before any style work. This file describes what is built today.
+**Direction in progress:** the look is being re-picked; read `docs/design/signature-style.md` before any style work. This file describes what is built today. The one-page version, for anything made in Ore's name, is `docs/design/brand.md`.
 
 ## Overview
 
@@ -242,7 +243,8 @@ One system, two moods (D185, Tyler's pick B "Glide" of three, 2026-11-10). The t
 - **Everyday** moves are quick and calm: `--t-1` to `--t-4` with `--ease-out`, never a bounce. A menu, a tab, a toast, a switch and a panel all belong here.
 - **Moments** are the few places the app celebrates real progress: a ring filling, a gem cut, a try or a question ticked, a finished session. They may take `--t-moment` and the spring, with dots lighting a `--stagger` apart. A moment that was drawn by hand and runs longer than 400ms (Settle, the ring's burst, the pixel burst) keeps its own time, as do the mole's springs (D214), stepped pixel frames (the working line) and endless loops.
 - **The glint** (D257) is the one shimmer: a light that crosses a dot drawing once, each dot going white and swelling a quarter in its turn (`.glint`, a dot's turn set by `--i`), never a gradient laid over the dots and never a loop (the one loop is the result marks', below). It is kept for a moment that was earned: the goal ring and the field behind it when a session closes the day's goal, and each result number as it lands. Home's ring has none: Home opens many times a day.
-- **The result marks' loops** (D260, Tyler's pick of three, 2026-11-13) are the one endless motion: on the session end screen each mark beside a result moves the way the thing itself would, from the moment its tile lands for as long as the screen is open. The gem's faces catch a light passing from the top left (3.6s), the calendar's days light one by one (4s), the comet's tail streams off its head (1.5s) while the head breathes. Dots only swell and brighten in place (`end-facet`, `end-day`, `end-stream`, `end-head`; a dot's turn is `--at` from `EndMark.tsx`); the numbers beside them keep the play-once glint.
+- **The lamp** (D263, Tyler 2026-11-14: "I love the animation of the radio when it's on") is how a thing that is running right now says so, and it is the radio's button while a channel plays (D254). Four things make it: it follows a real signal (the sound's level, smoothed), so it reads as alive and never as a timer; its dots swell and brighten where they stand, in two layers at two speeds (a slow light down the icon, a quicker ripple round the ring), and nothing travels; it is the one amber (`--lamp`) in a grey app, and off it is grey and perfectly still, so light means on; and it is small, at the screen's edge. Amber means running now, never progress (green) or a reward (the glint). A new place for it needs something that is really running, a signal to follow, a place out of the reading column, and Tyler's yes.
+- **The result marks' loops** (D260, Tyler's pick of three, 2026-11-13) are the other endless motion: on the session end screen each mark beside a result moves the way the thing itself would, from the moment its tile lands for as long as the screen is open. The gem's faces catch a light passing from the top left (3.6s), the calendar's days light one by one (4s), the comet's tail streams off its head (1.5s) while the head breathes. Dots only swell and brighten in place (`end-facet`, `end-day`, `end-stream`, `end-head`; a dot's turn is `--at` from `EndMark.tsx`); the numbers beside them keep the play-once glint.
 - **Nothing** moves for a keyboard-driven action or one done a hundred times a day: arrows through a list, rating an exercise, ⌘K. Two exceptions: a highlight landing (D240; Tyler: the rule is a default, not a law), and the sidebar cursor's one-frame bounce after a click (D113; Tyler kept it, 2026-11-13, F83).
 - Under Reduce Motion everything appears in place.
 
