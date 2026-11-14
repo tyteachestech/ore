@@ -5,6 +5,9 @@ test("a list's toast counts only what went in", () => {
   expect(manyAdded(3, 0)).toBe("Added 3 sources");
   expect(manyAdded(2, 1)).toBe("Added 1 source; 1 was already here");
   expect(manyAdded(2, 2)).toBe("All 2 are already here");
+  // One of a thing is singular (F-new-one-sources).
+  expect(manyAdded(1, 0)).toBe("Added 1 source");
+  expect(manyAdded(1, 1)).toBe("It is already here");
   expect(fileKind("/a/notes.text")).toBe("note");
 });
 

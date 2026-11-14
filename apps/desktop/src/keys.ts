@@ -43,7 +43,7 @@ const DEFAULTS = [
   { id: "collected", label: "Collected (side panel)", group: "Reader", combo: "KeyC" },
   { id: "questions", label: "Your questions (side panel)", group: "Reader", combo: "KeyQ" },
   { id: "rename", label: "Rename source", group: "Sources", combo: "Alt+Meta+KeyR" },
-  { id: "copy", label: "Copy with the source (a highlight, a source, picked sources)", group: "General", combo: "Meta+KeyC" },
+  { id: "copy", label: "Copy as Markdown, with the source (a highlight, sources)", group: "General", combo: "Meta+KeyC" },
   { id: "link", label: "Copy link to original", group: "Reader", combo: "Shift+Meta+KeyC", global: true },
   { id: "path", label: "Copy path (the original file, else doc.md)", group: "General", combo: "Alt+Meta+KeyC", global: true },
   { id: "listen", label: "Listen / stop listening", group: "Reader", combo: "KeyL", scope: "silent" },
