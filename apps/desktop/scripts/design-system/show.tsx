@@ -5,6 +5,7 @@ import { dots } from "../../src/dots";
 import { EndMark } from "../../src/EndMark";
 import { Gem } from "../../src/Gem";
 import * as Icons from "../../src/icons";
+import { LampRing } from "../../src/Lamp";
 import { Mole, type Mood } from "../../src/Mole";
 import { PixelGem, PixelKeep, PixelQuestion, PixelTry } from "../../src/PixelIcon";
 import { DotBar, DotNumber, DotRing } from "../../src/Ring";
@@ -109,8 +110,14 @@ const Lamp = () => (
         <span className="radio-orb playing ds-orb"><canvas className="radio-orb-dots" style={{ width: 52, height: 52 }} ref={(c) => void (c && orb(c, ch.id))} /></span>
       </Cell>
     ))}
+    <Cell label="Reading aloud">
+      <span className="listen-bar"><button className="ctl lamp"><LampRing size={26} level={beat} /><Icons.Pause size={15} /></button></span>
+    </Cell>
+    <Cell label="Tutor writing"><span className="tutor-bubble ds-orb"><Mole mood="thinking" signal={beat} /></span></Cell>
   </div>
 );
+/** A stand-in for words being spoken or written: a beat about three times a second, fading between. */
+const beat = () => 0.35 + 0.65 * Math.max(0, 1 - ((performance.now() % 340) / 340) * 1.4);
 
 const Marks = () => (
   <ul className="end-tally ds-row">

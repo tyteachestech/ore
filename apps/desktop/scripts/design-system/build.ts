@@ -180,7 +180,7 @@ const previews: [string, string, string, number, string, string][] = [
   ["Gem", "gems", "Dots", 130, "A memory, from rough stone to cut gem", "A gem is one memory, drawn as dots that fuse into pixels as it gets stronger.\n\n- Loose dots need work; solid pixels hold. A rock becomes a gem's outline at its first cut and keeps it.\n- Its colour is its skill's. The only other colour is the gold rim of one won back (`seam`).\n- No gem glows: no shadow, no blur. A polished gem gets a small plus-shaped sparkle.\n- 10 by 8 cells under 22px, 14 by 11 from there up."],
   ["Progress", "progress", "Dots", 150, "Rings, bars and numbers in dots", "Progress is drawn one dot per step.\n\n- Any progress lights one dot; only a finished ring lights them all.\n- Green (`c-green`) is the day's goal; a skill's ring takes the skill's colour; how far he has read is `paper`.\n- A screen has one hero number, in Geist Pixel Circle at 40px. Counts in rows stay in the mono.\n- Dots light `stagger` apart, never all at once."],
   ["Icons", "icons", "Dots", 230, "Every icon is a 16-grid sprite of round dots", "One icon set: MingCute's shapes redrawn on a 16 grid, every pixel a round dot 0.38 of a cell wide.\n\n- Drawn at 20px where 16 is asked, centred by their ink on the label's capitals.\n- `muted` by default; a selected icon shows by its row, never a second drawing.\n- Colour only for the four highlight types.\n- Never an emoji, a smooth glyph or another icon library beside them."],
-  ["Lamp", "lamp", "Motion", 140, "Something is running right now", "The lamp is how a thing that is running says so: its dots turn amber and breathe in place.\n\n- It follows a real signal (the sound's level), so it reads as alive, never as a timer.\n- Dots swell and brighten where they stand. Nothing travels.\n- Off, it is grey and perfectly still: light means on.\n- Small and at the edge of the screen. It goes still under Reduce Motion, and should if it ever pulls his eye from reading.\n- Amber (`lamp`) means running now. It never means progress (green) or a reward (the glint)."],
+  ["Lamp", "lamp", "Motion", 150, "Something is running right now", "The lamp is how a thing that is running says so: its dots turn amber and breathe in place.\n\n- It follows a real signal (the sound's level, each word the voice speaks, words arriving in a reply), so it reads as alive, never as a timer.\n- Three places: the radio playing, Listen reading aloud, the mole's helmet lamp while the tutor writes.\n- Dots swell and brighten where they stand. Nothing travels.\n- Off, it is grey and perfectly still: light means on.\n- Small and at the edge of the screen. It goes still under Reduce Motion, and should if it ever pulls his eye from reading.\n- Amber (`lamp`) means running now. It never means progress (green) or a reward (the glint)."],
   ["ResultMarks", "marks", "Motion", 130, "Each loops the way the thing itself would", "The marks beside a finished session's results: a gem, a calendar, a comet.\n\n- Shaded by dot size and brightness, in `text`. No colour.\n- Each loops its own way while the end screen is open: light crossing the gem's faces, days lighting one by one, a tail streaming.\n- These loops and the lamp are the only motion without an end."],
   ["Mole", "mole", "Mascot", 150, "The tutor. Press a mood", "The tutor is a miner mole: one traced drawing of about 580 dots, the same at every size.\n\n- He reacts once to what just happened, then rests. He blinks and glances at rest.\n- Greys only, plus his pink nose and amber lamp.\n- An open eye always keeps its white glint.\n- A miss gets a set jaw, never a sad face. He never nags."],
   ["Controls", "controls", "Controls", 220, "The four kinds of button", "Four buttons cover the app.\n\n- **Main action**: one per view, `paper` with ink text in the mono, 6px corners. Never a pill.\n- **Any other button**: 26px, a hairline edge, no fill, sans 12px.\n- **A choice of a few**: one segmented control everywhere. The picked option is a raised grey key; only its icon carries colour.\n- **An answer**: a button with a 3px lip it drops into when pressed."],
@@ -190,7 +190,9 @@ for (const [folder, name, group, height, subtitle, guide] of previews) {
   write(`components/${folder}/README.md`, `# ${folder}\n\n${guide}\n`);
 }
 
-// The cover: the name over the palette's blocks and a dot grid.
+// The cover: the app icon and the wordmark over the palette's blocks and a dot grid. The icon is the page's own
+// upload of src-tauri/icons/icon.png (Logos); upload it again and change this id if the icon is redrawn.
+const ICON = "/_blob/310cbe6f56d1f15a6a5958a31cdd1408";
 const dotGrid = Array.from({ length: 5 }, (_, y) => Array.from({ length: 15 }, (_, x) => `<circle cx="${232 + x * 16}" cy="${24 + y * 16}" r="1.5"/>`).join("")).join("");
 write("components/Cover/preview.html", `<!-- @dsCard height=300 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@1,800&display=swap">
@@ -201,7 +203,9 @@ write("components/Cover/preview.html", `<!-- @dsCard height=300 -->
   .q { fill: var(--question-solid); } .a { fill: var(--apply-solid); } .k { fill: var(--keep-solid); } .cd { fill: var(--card-solid); } .l { fill: var(--lamp); } .p { fill: var(--bg-raised); } .dot { fill: var(--faint); }
   .t { position: absolute; left: 48px; bottom: 44px; max-width: 400px; }
   .t h1 { margin: 0; font: italic 800 120px/.92 Poppins, Geist, sans-serif; color: var(--text); letter-spacing: -.02em; }
+  .t h1 i { color: var(--c-green); font-style: inherit; }
   .t p { margin: 12px 0 0; font: 13px/18px var(--mono); color: var(--muted); }
+  .icon { position: absolute; left: 40px; top: 28px; width: 72px; height: 72px; }
 </style>
 <div class="c">
   <svg width="480" height="300" viewBox="0 0 480 300" aria-hidden="true">
@@ -217,7 +221,8 @@ write("components/Cover/preview.html", `<!-- @dsCard height=300 -->
     <rect class="k" x="320" y="184" width="64" height="64" rx="12"/>
     <circle class="l" cx="420" cy="156" r="20"/>
   </svg>
-  <div class="t"><h1>Ore</h1><p>Calm learning, drawn in dots.</p></div>
+  <img class="icon" src="${ICON}" alt="Ore's app icon: a pickaxe in dots">
+  <div class="t"><h1>ore<i>_</i></h1><p>Calm learning, drawn in dots.</p></div>
 </div>
 `);
 console.log(`design system written to ${join(out, "project")}`);

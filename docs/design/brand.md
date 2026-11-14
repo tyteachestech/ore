@@ -63,7 +63,7 @@ Three motions have names:
 
 | Name | Says | How | Where |
 | --- | --- | --- | --- |
-| **The lamp** | this is running right now | dots turn amber and breathe in place with the real signal; grey and still when off | the ambience radio |
+| **The lamp** | this is running right now | dots turn amber and breathe in place with the real signal; grey and still when off | the radio playing, Listen reading aloud, the mole's helmet while the tutor writes |
 | **The glint** | you earned this | one light crosses a dot drawing, once | the goal ring, a result number |
 | **The spring** | a moment | 600ms with a little overshoot | a gem cut, the cart, the mole |
 
